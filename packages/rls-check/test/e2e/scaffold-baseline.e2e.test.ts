@@ -3,18 +3,18 @@
  *
  * `scaffold.sql` is not a fixture written to trip the checks — it is a recorded
  * `pg_dump` of a database the runtime provisioned from the scaffold template's
- * own collections. That makes this suite the one place where the two halves of
+ * own `backend/schema` tables. That makes this suite the one place where the two halves of
  * the product are compared against each other:
  *
  *   - **the finding set is a product decision.** The scaffold's
- *     `defaultSecurityRules` grant unfiltered reads on purpose (`AUTH_REQUIRE`
+ *     `defaultRls` grants unfiltered reads on purpose (`AUTH_REQUIRE`
  *     still stands in front of them), so a new project's first scan reports
  *     three criticals. That is documented and deliberate; what must never happen
  *     silently is the number changing — in either direction — because someone
- *     edited a template collection or a check's threshold.
+ *     edited a template table or a check's threshold.
  *
  *   - **the remediation must be actionable.** Every policy in this database is
- *     compiled from a collection's `securityRules` and re-applied on every boot.
+ *     compiled from a table's `rls` and re-applied on every boot.
  *     `ALTER POLICY` on one of them is undone by the next restart, so a fix that
  *     prescribed it would be worse than no fix at all: the operator would watch
  *     the finding disappear and file it as done.
@@ -48,8 +48,8 @@ if (!dockerAvailable) {
  * Every finding a freshly provisioned scaffold produces, as
  * `<severity> <check> <schema>.<table>`.
  *
- * Two unfiltered reads: `authors` and `tags` inherit `defaultSecurityRules`,
- * whose select rule is `access: "public"`. `posts` does not — it reads only
+ * Two unfiltered reads: `authors` and `tags` say `rls: "inherit"` and take
+ * `defaultRls`, whose select rule is `access: "public"`. `posts` does not — it reads only
  * published rows to everyone, every row to an editor — nor does `rebase.users`,
  * which declares admin-only rules of its own, and `posts_tags`, the junction the
  * many-to-many derives, is scoped to its edges. The five mediums are the
@@ -92,7 +92,9 @@ describe.skipIf(!dockerAvailable)("rls-check against a freshly provisioned scaff
 
     it("reads the whole provisioned schema", () => {
         expect(result.stats.schemas).toBe(2);
-        expect(result.stats.tables).toBe(16);
+        // 20 since the 2026-11-12 recording: boot also provisions the cron
+        // and UI-preference tables in `rebase`, which grant rebase_user nothing.
+        expect(result.stats.tables).toBe(20);
         expect(result.stats.policies).toBe(78);
     });
 
@@ -100,7 +102,7 @@ describe.skipIf(!dockerAvailable)("rls-check against a freshly provisioned scaff
         expect(result.findings.map(describeFinding).sort()).toEqual(EXPECTED_BASELINE);
     });
 
-    it("names the collection's rule — never SQL against the policy — for every managed finding", () => {
+    it("names the table's rule — never SQL against the policy — for every managed finding", () => {
         const managed = result.findings.filter((f) => f.target.policy);
         // The two unfiltered reads; if this ever becomes 0 the assertions
         // below would pass vacuously.
@@ -108,7 +110,8 @@ describe.skipIf(!dockerAvailable)("rls-check against a freshly provisioned scaff
 
         for (const f of managed) {
             expect(f.fix, describeFinding(f)).toBeDefined();
-            expect(f.fix, describeFinding(f)).toContain("securityRules");
+            expect(f.fix, describeFinding(f)).toContain("the table's `rls`");
+            expect(f.fix, describeFinding(f)).toContain("backend/schema/");
             expect(f.fix, describeFinding(f)).toContain(
                 "https://rebase.pro/docs/collections/security-rules"
             );
@@ -119,7 +122,7 @@ describe.skipIf(!dockerAvailable)("rls-check against a freshly provisioned scaff
 
     it("still prescribes SQL where SQL is the answer", () => {
         // `rls-enabled-not-forced` is about the table, not about a generated
-        // policy — the collection config has nothing to say about it, so the
+        // policy — the table definition has nothing to say about it, so the
         // fix stays an ALTER TABLE the reader can paste.
         const forced = result.findings.filter((f) => f.id === "rls-enabled-not-forced");
         expect(forced.length).toBeGreaterThan(0);

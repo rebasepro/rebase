@@ -1,29 +1,29 @@
 -- A Rebase scaffold's database, exactly as the runtime provisions it at boot.
 --
 -- NOT hand-written. This is `pg_dump -s` of a database that
--- `packages/cli/templates/template/config/collections/*` was booted against —
--- the four scaffold collections (posts, authors, tags, and the `rebase.users`
--- auth collection), the `posts_tags` junction the many-to-many derives, the
+-- `packages/cli/templates/template/backend/schema/*` was booted against —
+-- the four scaffold tables (posts, authors, tags, and the `rebase.users`
+-- auth table), the `posts_tags` junction the many-to-many derives, the
 -- auth and internal tables boot creates, the `rebase.uid()` / `rebase.roles()`
 -- helpers the policies call, and the request roles (`rebase_user`, and the
 -- `rebase_admin` family admin policies are written to) with their grants. It
 -- exists so `scaffold-baseline.e2e.test.ts` can assert what `rls-check` says
 -- about a stock Rebase project on day one: the baseline is a product decision
--- (the scaffold's `defaultSecurityRules` grant unfiltered reads on purpose;
+-- (the scaffold's `defaultRls` grants unfiltered reads on purpose;
 -- `posts` reads only published rows), and a scanner that quietly starts saying
 -- something else about it — in either direction — is a regression in one of
 -- the two.
 --
--- To re-record after a change to the scaffold's collections or to boot-time
+-- To re-record after a change to the scaffold's tables or to boot-time
 -- provisioning:
 --
 --   1. start an empty Postgres, as a role not named `rebase` (a role named
 --      like a schema shadows it on `search_path`);
---   2. load the template's collections with `loadCollectionsFromDirectory`
---      (which applies `defaultSecurityRules`) and boot them with
---      `initializeRebaseBackend({ collections, database: createPostgresAdapter(…),
---      auth: { collection: <the auth-enabled users collection>, … },
---      provisionSchema: true })`, then shut it down;
+--   2. import the template's `backend/schema/index.ts` and boot its tables
+--      with `initializeRebaseBackend({ tables: <every exported table>,
+--      defaultRls, database: createPostgresAdapter(…), auth: { jwtSecret },
+--      provisionSchema: true })` (the auth table is the `defineAuthTable`
+--      among them), then shut it down;
 --   3. `pg_dump -s`, then drop the pg_dump preamble (comments, `SET`,
 --      `set_config`, `\restrict`), the comments and blank lines between
 --      statements, the `OWNER TO` lines and the `FOR ROLE <owner>` of the
@@ -31,8 +31,11 @@
 --   4. write the `rebase_*` roles and memberships from
 --      `pg_dumpall --roles-only` above it, without `GRANTED BY`.
 --
--- Recorded 2026-11-11 against main@b29a2106ef (package version 0.29.3),
--- PostgreSQL 18.6.
+-- Recorded 2026-11-12 against feat/postgres-first-baas@b61e063d4d (package version
+-- 0.30.1), PostgreSQL 18.6. Against the 2026-11-11 recording the scaffold's
+-- own tables, policies, functions and grants are byte-identical; the
+-- additions are framework tables boot now provisions (`rebase.cron_claims`,
+-- `rebase.cron_job_state`, `rebase.cron_logs`, `rebase.ui_preferences`).
 
 -- Boot creates these; they are cluster objects, so `pg_dump` of one database
 -- does not carry them.
@@ -358,6 +361,38 @@ CREATE TABLE rebase.app_config (
     value jsonb NOT NULL,
     updated_at timestamp with time zone DEFAULT now()
 );
+CREATE TABLE rebase.cron_claims (
+    job_id text NOT NULL,
+    slot timestamp with time zone NOT NULL,
+    claimed_at timestamp with time zone DEFAULT now() NOT NULL
+);
+CREATE TABLE rebase.cron_job_state (
+    job_id text NOT NULL,
+    enabled boolean,
+    updated_at timestamp with time zone,
+    updated_by text,
+    running_until timestamp with time zone,
+    running_by text,
+    total_runs bigint DEFAULT 0 NOT NULL,
+    total_failures bigint DEFAULT 0 NOT NULL,
+    last_run_at timestamp with time zone,
+    last_duration_ms integer,
+    last_success boolean,
+    last_error text
+);
+CREATE TABLE rebase.cron_logs (
+    id text DEFAULT (gen_random_uuid())::text NOT NULL,
+    job_id text NOT NULL,
+    started_at timestamp with time zone NOT NULL,
+    finished_at timestamp with time zone NOT NULL,
+    duration_ms integer NOT NULL,
+    success boolean DEFAULT true NOT NULL,
+    error text,
+    result jsonb,
+    logs jsonb,
+    manual boolean DEFAULT false NOT NULL,
+    counted boolean
+);
 CREATE TABLE rebase.magic_link_tokens (
     id text DEFAULT (gen_random_uuid())::text NOT NULL,
     uid uuid NOT NULL,
@@ -427,6 +462,15 @@ CREATE TABLE rebase.schema_meta (
     value text NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
+CREATE TABLE rebase.ui_preferences (
+    scope text NOT NULL,
+    owner text DEFAULT ''::text NOT NULL,
+    table_slug text NOT NULL,
+    preferences jsonb NOT NULL,
+    updated_by text,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT ui_preferences_scope_check CHECK ((scope = ANY (ARRAY['workspace'::text, 'user'::text])))
+);
 CREATE TABLE rebase.user_identities (
     id text DEFAULT (gen_random_uuid())::text NOT NULL,
     uid uuid NOT NULL,
@@ -470,6 +514,12 @@ ALTER TABLE ONLY rebase.api_keys
     ADD CONSTRAINT api_keys_pkey PRIMARY KEY (id);
 ALTER TABLE ONLY rebase.app_config
     ADD CONSTRAINT app_config_pkey PRIMARY KEY (key);
+ALTER TABLE ONLY rebase.cron_claims
+    ADD CONSTRAINT cron_claims_pkey PRIMARY KEY (job_id, slot);
+ALTER TABLE ONLY rebase.cron_job_state
+    ADD CONSTRAINT cron_job_state_pkey PRIMARY KEY (job_id);
+ALTER TABLE ONLY rebase.cron_logs
+    ADD CONSTRAINT cron_logs_pkey PRIMARY KEY (id);
 ALTER TABLE ONLY rebase.magic_link_tokens
     ADD CONSTRAINT magic_link_tokens_pkey PRIMARY KEY (id);
 ALTER TABLE ONLY rebase.magic_link_tokens
@@ -492,6 +542,8 @@ ALTER TABLE ONLY rebase.refresh_tokens
     ADD CONSTRAINT refresh_tokens_token_hash_key UNIQUE (token_hash);
 ALTER TABLE ONLY rebase.schema_meta
     ADD CONSTRAINT schema_meta_pkey PRIMARY KEY (key);
+ALTER TABLE ONLY rebase.ui_preferences
+    ADD CONSTRAINT ui_preferences_pkey PRIMARY KEY (scope, owner, table_slug);
 ALTER TABLE ONLY rebase.user_identities
     ADD CONSTRAINT user_identities_pkey PRIMARY KEY (id);
 ALTER TABLE ONLY rebase.user_identities
@@ -504,6 +556,9 @@ CREATE INDEX posts_author_id_ix_00ad191 ON public.posts USING btree (author_id);
 CREATE INDEX posts_tags_tag_id_ix_d4456f1 ON public.posts_tags USING btree (tag_id);
 CREATE INDEX idx_api_keys_owner ON rebase.api_keys USING btree (owner_uid) WHERE (owner_uid IS NOT NULL);
 CREATE INDEX idx_api_keys_prefix ON rebase.api_keys USING btree (key_prefix);
+CREATE INDEX idx_cron_logs_job ON rebase.cron_logs USING btree (job_id, started_at DESC);
+CREATE INDEX idx_cron_logs_started ON rebase.cron_logs USING btree (started_at);
+CREATE INDEX idx_cron_logs_uncounted ON rebase.cron_logs USING btree (job_id, started_at DESC) WHERE (counted IS NULL);
 CREATE INDEX idx_magic_link_tokens_user ON rebase.magic_link_tokens USING btree (uid);
 CREATE INDEX idx_mfa_challenges_factor ON rebase.mfa_challenges USING btree (factor_id);
 CREATE INDEX idx_mfa_factors_user ON rebase.mfa_factors USING btree (uid);

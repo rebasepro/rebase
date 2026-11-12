@@ -15,15 +15,14 @@ exports[`remediation per check id > 'anonymous-write-allowed' 1`] = `
     "placeholders": [],
     "rebase": {
       "applicable": true,
-      "note": "Rebase enables row-level security on every collection's table and compiles each rule into a policy at boot and on \`rebase db push\`; \`ownerField\` compiles to \`<column>::text = rebase.uid()\`, so a row is visible and writable only to the user whose id it holds. https://rebase.pro/docs/collections/security-rules",
-      "securityRules": "[
+      "note": "Rebase enables row-level security on every table it declares and compiles each rule into a policy at boot and on \`rebase db push\`; \`ownerField\` compiles to \`<column>::text = rebase.uid()\`, so a row is visible and writable only to the user whose id it holds. https://rebase.pro/docs/collections/security-rules",
+      "rls": "[
     { name: "todos_insert", operation: "insert", ownerField: "user_id" }
 ]",
-      "snippet": "// The collection whose table is public.todos (config/collections/ in a Rebase project)
-defineCollection({
-    // …name, slug, properties and the rest stay as they are…
-    table: "todos",
-    securityRules: [
+      "snippet": "// The table definition for public.todos (backend/schema/ in a Rebase project)
+defineTable("todos", {
+    // …columns, relations and the rest stay as they are…
+    rls: [
         { name: "todos_insert", operation: "insert", ownerField: "user_id" }
     ]
 });",
@@ -46,14 +45,13 @@ exports[`remediation per check id > 'current-setting-throws' 1`] = `
     "rebase": {
       "applicable": true,
       "note": "A raw rule keeps the expression as SQL; Rebase writes it into the policy as is, with \`{column}\` standing for the row being checked. https://rebase.pro/docs/collections/security-rules",
-      "securityRules": "[
+      "rls": "[
     { name: "invoices_tenant", operation: "select", using: "(tenant_id = current_setting('app.tenant_id'::text, true))" }
 ]",
-      "snippet": "// The collection whose table is public.invoices (config/collections/ in a Rebase project)
-defineCollection({
-    // …name, slug, properties and the rest stay as they are…
-    table: "invoices",
-    securityRules: [
+      "snippet": "// The table definition for public.invoices (backend/schema/ in a Rebase project)
+defineTable("invoices", {
+    // …columns, relations and the rest stay as they are…
+    rls: [
         { name: "invoices_tenant", operation: "select", using: "(tenant_id = current_setting('app.tenant_id'::text, true))" }
     ]
 });",
@@ -77,8 +75,8 @@ exports[`remediation per check id > 'grant-to-public' 1`] = `
     "placeholders": [],
     "rebase": {
       "applicable": false,
-      "note": "Not a securityRules setting: Rebase grants table privileges to its own request role, and the rules decide which rows each request reaches.",
-      "securityRules": null,
+      "note": "Not an \`rls\` setting: Rebase grants table privileges to its own request role, and the rules decide which rows each request reaches.",
+      "rls": null,
       "snippet": null,
     },
     "sql": "REVOKE SELECT, INSERT ON "public"."todos" FROM PUBLIC;",
@@ -105,15 +103,14 @@ exports[`remediation per check id > 'junction-table-unprotected' 1`] = `
     "placeholders": [],
     "rebase": {
       "applicable": true,
-      "note": "If this is the junction of a many-to-many link, declare it as a \`relation\` property with \`kind: "manyToMany"\` instead: Rebase then creates the junction itself, with row-level security on and policies derived from both collections. The rule here is for a join table modelled as its own collection. A raw rule keeps the expression as SQL; Rebase writes it into the policy as is, with \`{column}\` standing for the row being checked. https://rebase.pro/docs/collections/security-rules",
-      "securityRules": "[
+      "note": "If this is the junction of a many-to-many link, declare it as a \`rel.manyToMany(...)\` relation instead: Rebase then creates the junction itself, with row-level security on and policies derived from both tables. The rule here is for a join table declared as its own table. A raw rule keeps the expression as SQL; Rebase writes it into the policy as is, with \`{column}\` standing for the row being checked. https://rebase.pro/docs/collections/security-rules",
+      "rls": "[
     { name: "post_tags_select_via_endpoints", operation: "select", using: "EXISTS (SELECT 1 FROM \\"public\\".\\"posts\\" AS e1 WHERE e1.\\"id\\" = {post_id}) AND EXISTS (SELECT 1 FROM \\"public\\".\\"tags\\" AS e2 WHERE e2.\\"id\\" = {tag_id})" }
 ]",
-      "snippet": "// The collection whose table is public.post_tags (config/collections/ in a Rebase project)
-defineCollection({
-    // …name, slug, properties and the rest stay as they are…
-    table: "post_tags",
-    securityRules: [
+      "snippet": "// The table definition for public.post_tags (backend/schema/ in a Rebase project)
+defineTable("post_tags", {
+    // …columns, relations and the rest stay as they are…
+    rls: [
         { name: "post_tags_select_via_endpoints", operation: "select", using: "EXISTS (SELECT 1 FROM \\"public\\".\\"posts\\" AS e1 WHERE e1.\\"id\\" = {post_id}) AND EXISTS (SELECT 1 FROM \\"public\\".\\"tags\\" AS e2 WHERE e2.\\"id\\" = {tag_id})" }
     ]
 });",
@@ -139,8 +136,8 @@ exports[`remediation per check id > 'matview-bypasses-rls' 1`] = `
     "placeholders": [],
     "rebase": {
       "applicable": false,
-      "note": "Not a securityRules setting: rules attach to a collection's table. Serve this data through a collection over the base table, whose rules then apply to every read, rather than through a view.",
-      "securityRules": null,
+      "note": "Not an \`rls\` setting: rules attach to a table. Serve this data through the base table's definition, whose rules then apply to every read, rather than through a view.",
+      "rls": null,
       "snippet": null,
     },
     "sql": "REVOKE SELECT ON "public"."todo_counts" FROM "anon";
@@ -157,20 +154,19 @@ exports[`remediation per check id > 'policy-always-true: Rebase-managed, s…' 1
     "alternatives": [],
     "apply": "rebase-config",
     "caveats": [
-      "Policy "posts_select_841c287" is compiled by Rebase from a collection's \`securityRules\` and dropped and re-created on every boot, so an ALTER POLICY would be undone at the next restart. Change the rule, then redeploy or run \`rebase db push\`. A collection that declares no \`securityRules\` of its own inherits \`defaultSecurityRules\` from config/collections/index.ts — a stock scaffold's unfiltered read rule lives there.",
+      "Policy "posts_select_841c287" is compiled by Rebase from a table's \`rls\` and dropped and re-created on every boot, so an ALTER POLICY would be undone at the next restart. Change the rule, then redeploy or run \`rebase db push\`. A table that says \`rls: "inherit"\` takes \`defaultRls\` from backend/schema/index.ts — a stock scaffold's unfiltered read rule lives there.",
     ],
     "placeholders": [],
     "rebase": {
       "applicable": true,
-      "note": "Rebase enables row-level security on every collection's table and compiles each rule into a policy at boot and on \`rebase db push\`; \`ownerField\` compiles to \`<column>::text = rebase.uid()\`, so a row is visible and writable only to the user whose id it holds. https://rebase.pro/docs/collections/security-rules",
-      "securityRules": "[
+      "note": "Rebase enables row-level security on every table it declares and compiles each rule into a policy at boot and on \`rebase db push\`; \`ownerField\` compiles to \`<column>::text = rebase.uid()\`, so a row is visible and writable only to the user whose id it holds. https://rebase.pro/docs/collections/security-rules",
+      "rls": "[
     { operation: "select", ownerField: "author_id" }
 ]",
-      "snippet": "// The collection whose table is public.posts (config/collections/ in a Rebase project)
-defineCollection({
-    // …name, slug, properties and the rest stay as they are…
-    table: "posts",
-    securityRules: [
+      "snippet": "// The table definition for public.posts (backend/schema/ in a Rebase project)
+defineTable("posts", {
+    // …columns, relations and the rest stay as they are…
+    rls: [
         { operation: "select", ownerField: "author_id" }
     ]
 });",
@@ -198,15 +194,14 @@ exports[`remediation per check id > 'policy-always-true: both clauses' 1`] = `
     "placeholders": [],
     "rebase": {
       "applicable": true,
-      "note": "Rebase enables row-level security on every collection's table and compiles each rule into a policy at boot and on \`rebase db push\`; \`ownerField\` compiles to \`<column>::text = rebase.uid()\`, so a row is visible and writable only to the user whose id it holds. https://rebase.pro/docs/collections/security-rules",
-      "securityRules": "[
+      "note": "Rebase enables row-level security on every table it declares and compiles each rule into a policy at boot and on \`rebase db push\`; \`ownerField\` compiles to \`<column>::text = rebase.uid()\`, so a row is visible and writable only to the user whose id it holds. https://rebase.pro/docs/collections/security-rules",
+      "rls": "[
     { name: "todos_all", operation: "all", ownerField: "user_id" }
 ]",
-      "snippet": "// The collection whose table is public.todos (config/collections/ in a Rebase project)
-defineCollection({
-    // …name, slug, properties and the rest stay as they are…
-    table: "todos",
-    securityRules: [
+      "snippet": "// The table definition for public.todos (backend/schema/ in a Rebase project)
+defineTable("todos", {
+    // …columns, relations and the rest stay as they are…
+    rls: [
         { name: "todos_all", operation: "all", ownerField: "user_id" }
     ]
 });",
@@ -235,15 +230,14 @@ exports[`remediation per check id > 'policy-anonymous-tautology' 1`] = `
     "placeholders": [],
     "rebase": {
       "applicable": true,
-      "note": "Rebase enables row-level security on every collection's table and compiles each rule into a policy at boot and on \`rebase db push\`; \`ownerField\` compiles to \`<column>::text = rebase.uid()\`, so a row is visible and writable only to the user whose id it holds. https://rebase.pro/docs/collections/security-rules",
-      "securityRules": "[
+      "note": "Rebase enables row-level security on every table it declares and compiles each rule into a policy at boot and on \`rebase db push\`; \`ownerField\` compiles to \`<column>::text = rebase.uid()\`, so a row is visible and writable only to the user whose id it holds. https://rebase.pro/docs/collections/security-rules",
+      "rls": "[
     { name: "todos_read", operation: "select", ownerField: "user_id" }
 ]",
-      "snippet": "// The collection whose table is public.todos (config/collections/ in a Rebase project)
-defineCollection({
-    // …name, slug, properties and the rest stay as they are…
-    table: "todos",
-    securityRules: [
+      "snippet": "// The table definition for public.todos (backend/schema/ in a Rebase project)
+defineTable("todos", {
+    // …columns, relations and the rest stay as they are…
+    rls: [
         { name: "todos_read", operation: "select", ownerField: "user_id" }
     ]
 });",
@@ -267,15 +261,14 @@ exports[`remediation per check id > 'policy-authenticated-tautology' 1`] = `
     "placeholders": [],
     "rebase": {
       "applicable": true,
-      "note": "Rebase enables row-level security on every collection's table and compiles each rule into a policy at boot and on \`rebase db push\`; \`ownerField\` compiles to \`<column>::text = rebase.uid()\`, so a row is visible and writable only to the user whose id it holds. https://rebase.pro/docs/collections/security-rules",
-      "securityRules": "[
+      "note": "Rebase enables row-level security on every table it declares and compiles each rule into a policy at boot and on \`rebase db push\`; \`ownerField\` compiles to \`<column>::text = rebase.uid()\`, so a row is visible and writable only to the user whose id it holds. https://rebase.pro/docs/collections/security-rules",
+      "rls": "[
     { name: "todos_read", operation: "select", ownerField: "user_id" }
 ]",
-      "snippet": "// The collection whose table is public.todos (config/collections/ in a Rebase project)
-defineCollection({
-    // …name, slug, properties and the rest stay as they are…
-    table: "todos",
-    securityRules: [
+      "snippet": "// The table definition for public.todos (backend/schema/ in a Rebase project)
+defineTable("todos", {
+    // …columns, relations and the rest stay as they are…
+    rls: [
         { name: "todos_read", operation: "select", ownerField: "user_id" }
     ]
 });",
@@ -310,14 +303,13 @@ exports[`remediation per check id > 'policy-role-unreachable' 1`] = `
     "rebase": {
       "applicable": true,
       "note": "A rule without \`pgRoles\` applies TO PUBLIC — every connection — and Rebase's API decides who is signed in; \`pgRoles\` is what pointed these policies at reporting_bot. A raw rule keeps the expression as SQL; Rebase writes it into the policy as is, with \`{column}\` standing for the row being checked. https://rebase.pro/docs/collections/security-rules",
-      "securityRules": "[
+      "rls": "[
     { name: "todos_reports", operation: "select", using: "true" }
 ]",
-      "snippet": "// The collection whose table is public.todos (config/collections/ in a Rebase project)
-defineCollection({
-    // …name, slug, properties and the rest stay as they are…
-    table: "todos",
-    securityRules: [
+      "snippet": "// The table definition for public.todos (backend/schema/ in a Rebase project)
+defineTable("todos", {
+    // …columns, relations and the rest stay as they are…
+    rls: [
         { name: "todos_reports", operation: "select", using: "true" }
     ]
 });",
@@ -340,8 +332,8 @@ exports[`remediation per check id > 'rls-disabled: a foreign table loses t…' 1
     "placeholders": [],
     "rebase": {
       "applicable": false,
-      "note": "Not expressible: a foreign table cannot have row-level security, and securityRules compile to policies. Keep it out of the collections a Rebase backend serves.",
-      "securityRules": null,
+      "note": "Not expressible: a foreign table cannot have row-level security, and \`rls\` rules compile to policies. Keep it out of the tables a Rebase backend declares.",
+      "rls": null,
       "snippet": null,
     },
     "sql": "REVOKE SELECT ON "public"."remote_orders" FROM "anon";",
@@ -368,15 +360,14 @@ exports[`remediation per check id > 'rls-disabled: a text owner column is …' 1
     "placeholders": [],
     "rebase": {
       "applicable": true,
-      "note": "Rebase enables row-level security on every collection's table and compiles each rule into a policy at boot and on \`rebase db push\`; \`ownerField\` compiles to \`<column>::text = rebase.uid()\`, so a row is visible and writable only to the user whose id it holds. Declare the table as a collection, or add the rule to the one that maps it. https://rebase.pro/docs/collections/security-rules",
-      "securityRules": "[
+      "note": "Rebase enables row-level security on every table it declares and compiles each rule into a policy at boot and on \`rebase db push\`; \`ownerField\` compiles to \`<column>::text = rebase.uid()\`, so a row is visible and writable only to the user whose id it holds. Declare the table with defineTable in backend/schema/, or add the rule to the definition that maps it. https://rebase.pro/docs/collections/security-rules",
+      "rls": "[
     { operation: "all", ownerField: "owner_id" }
 ]",
-      "snippet": "// The collection whose table is public.todos (config/collections/ in a Rebase project)
-defineCollection({
-    // …name, slug, properties and the rest stay as they are…
-    table: "todos",
-    securityRules: [
+      "snippet": "// The table definition for public.todos (backend/schema/ in a Rebase project)
+defineTable("todos", {
+    // …columns, relations and the rest stay as they are…
+    rls: [
         { operation: "all", ownerField: "owner_id" }
     ]
 });",
@@ -416,15 +407,14 @@ exports[`remediation per check id > 'rls-disabled: existing policies take …' 1
     "placeholders": [],
     "rebase": {
       "applicable": true,
-      "note": "Rebase enables row-level security on every collection's table and compiles each rule into a policy at boot and on \`rebase db push\`; \`ownerField\` compiles to \`<column>::text = rebase.uid()\`, so a row is visible and writable only to the user whose id it holds. Declare the table as a collection, or add the rule to the one that maps it. https://rebase.pro/docs/collections/security-rules",
-      "securityRules": "[
+      "note": "Rebase enables row-level security on every table it declares and compiles each rule into a policy at boot and on \`rebase db push\`; \`ownerField\` compiles to \`<column>::text = rebase.uid()\`, so a row is visible and writable only to the user whose id it holds. Declare the table with defineTable in backend/schema/, or add the rule to the definition that maps it. https://rebase.pro/docs/collections/security-rules",
+      "rls": "[
     { operation: "all", ownerField: "user_id" }
 ]",
-      "snippet": "// The collection whose table is public.todos (config/collections/ in a Rebase project)
-defineCollection({
-    // …name, slug, properties and the rest stay as they are…
-    table: "todos",
-    securityRules: [
+      "snippet": "// The table definition for public.todos (backend/schema/ in a Rebase project)
+defineTable("todos", {
+    // …columns, relations and the rest stay as they are…
+    rls: [
         { operation: "all", ownerField: "user_id" }
     ]
 });",
@@ -457,15 +447,14 @@ exports[`remediation per check id > 'rls-disabled: no owner column, so a p…' 1
     ],
     "rebase": {
       "applicable": true,
-      "note": "Rebase enables row-level security on every collection's table and compiles each rule into a policy at boot and on \`rebase db push\`; \`ownerField\` compiles to \`<column>::text = rebase.uid()\`, so a row is visible and writable only to the user whose id it holds. Declare the table as a collection, or add the rule to the one that maps it. https://rebase.pro/docs/collections/security-rules",
-      "securityRules": "[
+      "note": "Rebase enables row-level security on every table it declares and compiles each rule into a policy at boot and on \`rebase db push\`; \`ownerField\` compiles to \`<column>::text = rebase.uid()\`, so a row is visible and writable only to the user whose id it holds. Declare the table with defineTable in backend/schema/, or add the rule to the definition that maps it. https://rebase.pro/docs/collections/security-rules",
+      "rls": "[
     { operation: "all", ownerField: "<owner_column>" }
 ]",
-      "snippet": "// The collection whose table is public.notes (config/collections/ in a Rebase project)
-defineCollection({
-    // …name, slug, properties and the rest stay as they are…
-    table: "notes",
-    securityRules: [
+      "snippet": "// The table definition for public.notes (backend/schema/ in a Rebase project)
+defineTable("notes", {
+    // …columns, relations and the rest stay as they are…
+    rls: [
         { operation: "all", ownerField: "<owner_column>" }
     ]
 });",
@@ -498,15 +487,14 @@ REVOKE SELECT, INSERT, UPDATE, DELETE ON "public"."todos" FROM "authenticated";"
     "placeholders": [],
     "rebase": {
       "applicable": true,
-      "note": "Rebase enables row-level security on every collection's table and compiles each rule into a policy at boot and on \`rebase db push\`; \`ownerField\` compiles to \`<column>::text = rebase.uid()\`, so a row is visible and writable only to the user whose id it holds. Declare the table as a collection, or add the rule to the one that maps it. https://rebase.pro/docs/collections/security-rules",
-      "securityRules": "[
+      "note": "Rebase enables row-level security on every table it declares and compiles each rule into a policy at boot and on \`rebase db push\`; \`ownerField\` compiles to \`<column>::text = rebase.uid()\`, so a row is visible and writable only to the user whose id it holds. Declare the table with defineTable in backend/schema/, or add the rule to the definition that maps it. https://rebase.pro/docs/collections/security-rules",
+      "rls": "[
     { operation: "all", ownerField: "user_id" }
 ]",
-      "snippet": "// The collection whose table is public.todos (config/collections/ in a Rebase project)
-defineCollection({
-    // …name, slug, properties and the rest stay as they are…
-    table: "todos",
-    securityRules: [
+      "snippet": "// The table definition for public.todos (backend/schema/ in a Rebase project)
+defineTable("todos", {
+    // …columns, relations and the rest stay as they are…
+    rls: [
         { operation: "all", ownerField: "user_id" }
     ]
 });",
@@ -536,15 +524,14 @@ exports[`remediation per check id > 'rls-enabled-no-policies' 1`] = `
     "placeholders": [],
     "rebase": {
       "applicable": true,
-      "note": "Rebase enables row-level security on every collection's table and compiles each rule into a policy at boot and on \`rebase db push\`; \`ownerField\` compiles to \`<column>::text = rebase.uid()\`, so a row is visible and writable only to the user whose id it holds. https://rebase.pro/docs/collections/security-rules",
-      "securityRules": "[
+      "note": "Rebase enables row-level security on every table it declares and compiles each rule into a policy at boot and on \`rebase db push\`; \`ownerField\` compiles to \`<column>::text = rebase.uid()\`, so a row is visible and writable only to the user whose id it holds. https://rebase.pro/docs/collections/security-rules",
+      "rls": "[
     { operation: "all", ownerField: "user_id" }
 ]",
-      "snippet": "// The collection whose table is public.todos (config/collections/ in a Rebase project)
-defineCollection({
-    // …name, slug, properties and the rest stay as they are…
-    table: "todos",
-    securityRules: [
+      "snippet": "// The table definition for public.todos (backend/schema/ in a Rebase project)
+defineTable("todos", {
+    // …columns, relations and the rest stay as they are…
+    rls: [
         { operation: "all", ownerField: "user_id" }
     ]
 });",
@@ -570,8 +557,8 @@ exports[`remediation per check id > 'rls-enabled-not-forced: a login owner' 1`] 
     "placeholders": [],
     "rebase": {
       "applicable": false,
-      "note": "Not a securityRules setting. Rebase never sets FORCE: it runs every API request as rebase_user, which does not own collection tables, so the owner's exemption never reaches a caller.",
-      "securityRules": null,
+      "note": "Not an \`rls\` setting. Rebase never sets FORCE: it runs every API request as rebase_user, which does not own the tables it declares, so the owner's exemption never reaches a caller.",
+      "rls": null,
       "snippet": null,
     },
     "sql": "ALTER TABLE "public"."todos" FORCE ROW LEVEL SECURITY;",
@@ -593,8 +580,8 @@ exports[`remediation per check id > 'rls-enabled-not-forced: an exposed ro…' 1
     "placeholders": [],
     "rebase": {
       "applicable": false,
-      "note": "Not a securityRules setting. Rebase never sets FORCE: it runs every API request as rebase_user, which does not own collection tables, so the owner's exemption never reaches a caller.",
-      "securityRules": null,
+      "note": "Not an \`rls\` setting. Rebase never sets FORCE: it runs every API request as rebase_user, which does not own the tables it declares, so the owner's exemption never reaches a caller.",
+      "rls": null,
       "snippet": null,
     },
     "sql": "ALTER TABLE "public"."todos" FORCE ROW LEVEL SECURITY;
@@ -616,8 +603,8 @@ exports[`remediation per check id > 'rls-enabled-not-forced: on Rebase, ne…' 1
     "placeholders": [],
     "rebase": {
       "applicable": false,
-      "note": "Not a securityRules setting. Rebase never sets FORCE: it runs every API request as rebase_user, which does not own collection tables, so the owner's exemption never reaches a caller.",
-      "securityRules": null,
+      "note": "Not an \`rls\` setting. Rebase never sets FORCE: it runs every API request as rebase_user, which does not own the tables it declares, so the owner's exemption never reaches a caller.",
+      "rls": null,
       "snippet": null,
     },
     "sql": null,
@@ -638,8 +625,8 @@ exports[`remediation per check id > 'security-definer-mutable-search-path' 1`] =
     "placeholders": [],
     "rebase": {
       "applicable": false,
-      "note": "Not a securityRules setting: it concerns a function, not a collection's rows.",
-      "securityRules": null,
+      "note": "Not an \`rls\` setting: it concerns a function, not a table's rows.",
+      "rls": null,
       "snippet": null,
     },
     "sql": "DO $$
@@ -671,14 +658,13 @@ exports[`remediation per check id > 'unqualified-column-in-subquery: a col…' 1
     "rebase": {
       "applicable": true,
       "note": "A raw rule keeps the expression as SQL; Rebase writes it into the policy as is, with \`{column}\` standing for the row being checked. Rebase rewrites \`auth.uid()\` to \`rebase.uid()\`, which returns text: compare a uuid column with it as \`{column}::text = rebase.uid()\`. The structured form, \`policy.existsIn({ table, where })\` with \`policy.outerField("…")\` for the outer row, makes the binding explicit and is checked by the type system. https://rebase.pro/docs/collections/security-rules",
-      "securityRules": "[
+      "rls": "[
     { name: "documents_select", operation: "select", using: "(EXISTS ( SELECT 1 FROM memberships WHERE ((memberships.user_id = auth.uid()) AND (memberships.org_id = {org_id}))))" }
 ]",
-      "snippet": "// The collection whose table is public.documents (config/collections/ in a Rebase project)
-defineCollection({
-    // …name, slug, properties and the rest stay as they are…
-    table: "documents",
-    securityRules: [
+      "snippet": "// The table definition for public.documents (backend/schema/ in a Rebase project)
+defineTable("documents", {
+    // …columns, relations and the rest stay as they are…
+    rls: [
         { name: "documents_select", operation: "select", using: "(EXISTS ( SELECT 1 FROM memberships WHERE ((memberships.user_id = auth.uid()) AND (memberships.org_id = {org_id}))))" }
     ]
 });",
@@ -702,8 +688,8 @@ exports[`remediation per check id > 'view-bypasses-rls: before PostgreSQL …' 1
     "placeholders": [],
     "rebase": {
       "applicable": false,
-      "note": "Not a securityRules setting: rules attach to a collection's table. Serve this data through a collection over the base table, whose rules then apply to every read, rather than through a view.",
-      "securityRules": null,
+      "note": "Not an \`rls\` setting: rules attach to a table. Serve this data through the base table's definition, whose rules then apply to every read, rather than through a view.",
+      "rls": null,
       "snippet": null,
     },
     "sql": "REVOKE SELECT ON "public"."todo_titles" FROM "anon";",
@@ -729,8 +715,8 @@ exports[`remediation per check id > 'view-bypasses-rls: the caller lacks S…' 1
     "placeholders": [],
     "rebase": {
       "applicable": false,
-      "note": "Not a securityRules setting: rules attach to a collection's table. Serve this data through a collection over the base table, whose rules then apply to every read, rather than through a view.",
-      "securityRules": null,
+      "note": "Not an \`rls\` setting: rules attach to a table. Serve this data through the base table's definition, whose rules then apply to every read, rather than through a view.",
+      "rls": null,
       "snippet": null,
     },
     "sql": "ALTER VIEW "public"."todo_titles" SET (security_invoker = true);",

@@ -47,6 +47,11 @@ const TEMPLATE = path.join(__dirname, "../../cli/templates/template/backend/sche
 // vector, triggers, views, the Drizzle schema and the boot plans — so the
 // database boot provisions, and therefore `scaffold.sql` and
 // `EXPECTED_BASELINE`, are unchanged.
+// 2026-11-12, re-recorded with the hash unchanged: `scaffold.sql` was dumped
+// again from a boot of this template's `backend/schema` tables. Every scaffold
+// table, policy, function and grant is byte-identical to the 11-11 recording;
+// boot now also provisions `rebase.cron_*` and `rebase.ui_preferences`, which
+// moved the scaffold baseline's table count from 16 to 20 and no finding.
 const RECORDED = "3e3209c091ef45eb";
 
 describe("the recorded scaffold fixture", () => {

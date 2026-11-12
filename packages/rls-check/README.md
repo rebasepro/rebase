@@ -180,7 +180,7 @@ npx @rebasepro/rls-check [connection-string] [options]
   --format <name>        text (default), json (the same as --json) or agent: one JSON
                          document for a coding agent, where every finding carries the
                          failing table and policy, the SQL that fixes it and the
-                         equivalent Rebase securityRules. See "Agent output" below.
+                         equivalent rules for a Rebase table's rls. See "Agent output" below.
   --html <path>          Also write a self-contained HTML report to <path>. One file,
                          no network requests, safe to attach to a ticket.
   --schema <name>        Restrict the scan to a schema. Repeatable or comma-separated.
@@ -258,7 +258,7 @@ To keep the machine-readable result as an artifact:
 
 ### On a Rebase database, change the rule, not the policy
 
-Every policy on a Rebase deployment is compiled from a collection's `securityRules`, and the runtime re-applies them on every boot — it drops each generated policy and creates it again from the config. SQL run against one of them survives exactly until the next restart, so `rls-check` recognises those policies (a `<table>_<operation>_<hash>` name, or a call to `rebase.uid()` / `rebase.roles()` in the expression) and prescribes the rule instead: edit the collection under `config/collections/`, or `defaultSecurityRules` in `config/collections/index.ts` when the collection declares none of its own, then redeploy. A policy you wrote by hand in a migration is untouched by this, and its fix is still the SQL.
+Every policy on a Rebase deployment is compiled from a table's `rls` (a `defineTable` in `backend/schema/`), and the runtime re-applies them on every boot — it drops each generated policy and creates it again from the definition. SQL run against one of them survives exactly until the next restart, so `rls-check` recognises those policies (a `<table>_<operation>_<hash>` name, or a call to `rebase.uid()` / `rebase.roles()` in the expression) and prescribes the rule instead: edit the table's `rls` under `backend/schema/`, or `defaultRls` in `backend/schema/index.ts` when the table says `rls: "inherit"`, then redeploy. A policy you wrote by hand in a migration is untouched by this, and its fix is still the SQL.
 
 A stock Rebase scaffold reports three `policy-always-true` criticals on its first scan — `posts`, `authors` and `tags` inherit a `{ operation: "select", access: "public" }` rule — so decide whether to replace those rules or to `--skip policy-always-true` before you make this a gate.
 
@@ -368,9 +368,9 @@ Every finding names the check id (one of the fifteen `--list-checks` prints) and
     "caveats": ["With row-level security on, every role that neither owns the table nor holds BYPASSRLS sees only the rows a policy admits — …"],
     "rebase": {
       "applicable": true,
-      "securityRules": "[\n    { operation: \"all\", ownerField: \"user_id\" }\n]",
-      "snippet": "defineCollection({\n    // …name, slug, properties and the rest stay as they are…\n    table: \"todos\",\n    securityRules: [ … ]\n});",
-      "note": "Rebase enables row-level security on every collection's table and compiles each rule into a policy … `ownerField` compiles to `<column>::text = rebase.uid()` …"
+      "rls": "[\n    { operation: \"all\", ownerField: \"user_id\" }\n]",
+      "snippet": "defineTable(\"todos\", {\n    // …columns, relations and the rest stay as they are…\n    rls: [ … ]\n});",
+      "note": "Rebase enables row-level security on every table it declares and compiles each rule into a policy … `ownerField` compiles to `<column>::text = rebase.uid()` …"
     }
   }
 }
@@ -378,13 +378,13 @@ Every finding names the check id (one of the fifteen `--list-checks` prints) and
 
 What the fields promise:
 
-- **`apply`** says where the fix belongs. `sql`: run `remediation.sql` as a migration. `rebase-config`: the policy is compiled by Rebase from a collection's `securityRules` and re-made on every boot, so `sql` is `null` and the rule in `rebase.snippet` is what to change. `manual`: no statement can be written without a decision only a person can make, and `summary` names it.
+- **`apply`** says where the fix belongs. `sql`: run `remediation.sql` as a migration. `rebase-config`: the policy is compiled by Rebase from a table's `rls` and re-made on every boot, so `sql` is `null` and the rule in `rebase.snippet` is what to change. `manual`: no statement can be written without a decision only a person can make, and `summary` names it.
 - **`sql`** is statements only — no comments to interpret — and is written per check: the table's own owner column (compared as uuid or text, whichever its type allows), the grants that actually reach the exposed roles, the policy's own expression with only the flagged clause rewritten. Applying it clears the finding it is attached to; the test suite holds every check to that against a real PostgreSQL.
 - **`placeholders`** lists the tokens the catalog cannot fill — `<owner_column>` on a table with no column that looks like an owner, `<app_role>` for the role your application connects as. Replace them before running `sql`.
 - **`alternatives`** are fixes for a different intent ("nobody should reach this table at all"), not a second step.
-- **`rebase`** is the same fix as `defineCollection({ securityRules: [...] })`. The rules are type-checked against `SecurityRule` from `@rebasepro/types` in this package's tests. Where `securityRules` cannot express the fix — grants, views, functions, `FORCE` — `applicable` is `false`, the rules are `null`, and `note` says what Rebase does instead.
+- **`rebase`** is the same fix as `defineTable("todos", { rls: [...] })` in `backend/schema/`. The rules are type-checked against `SecurityRule` from `@rebasepro/types` in this package's tests. Where `rls` cannot express the fix — grants, views, functions, `FORCE` — `applicable` is `false`, the rules are `null`, and `note` says what Rebase does instead.
 
-Around the findings, the document carries the verdict (`exitCode`, `reason`, `failOn`), `complete` (false when a catalogue read or a check failed), `notes` (the same caveats the text report prints, such as a role to name with `--role`), `diagnostics` and `howToApply`, a paragraph an agent can read as instructions. Every key is always present, with `null` for an absent object, and `formatVersion` changes only when a key is renamed or removed. `--json` is unchanged.
+Around the findings, the document carries the verdict (`exitCode`, `reason`, `failOn`), `complete` (false when a catalogue read or a check failed), `notes` (the same caveats the text report prints, such as a role to name with `--role`), `diagnostics` and `howToApply`, a paragraph an agent can read as instructions. Every key is always present, with `null` for an absent object, and `formatVersion` changes only when a key is renamed or removed (2 since `rebase.securityRules` became `rebase.rls`). `--json` is unchanged.
 
 ## What this tool does not do
 

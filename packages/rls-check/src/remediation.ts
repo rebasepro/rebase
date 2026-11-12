@@ -1,6 +1,6 @@
 /**
  * Remediations for `--format agent`: for every finding, the SQL that fixes it
- * and the Rebase `securityRules` that say the same thing.
+ * and the Rebase `rls` rules that say the same thing.
  *
  * The `fix` a check writes is for a person reading a terminal — prose, options
  * and commented-out examples. A coding agent needs something else: one
@@ -23,11 +23,11 @@
  *
  * 3. The Rebase rules mean what the SQL means. `ownerField` compiles to
  *    `<column>::text = rebase.uid()`; a raw rule carries the corrected
- *    expression. Where `securityRules` cannot express the fix at all — grants,
+ *    expression. Where a table's `rls` cannot express the fix at all — grants,
  *    views, functions, FORCE — `rebase.applicable` is false and the note says
  *    what Rebase does instead, rather than inventing a rule.
  *
- * The TypeScript in `rebase.securityRules` is type-checked against
+ * The TypeScript in `rebase.rls` is type-checked against
  * `SecurityRule` from `@rebasepro/types` by `remediation.test.ts`. This package
  * cannot import that type — it ships with `pg` and nothing else — so the shapes
  * written here are held to it by the test instead.
@@ -55,7 +55,7 @@ import {
     roleNamed,
     rolesUsableBy,
     sameRole,
-    SECURITY_RULES_DOCS,
+    RLS_DOCS,
     WRITE_PRIVILEGES,
     type Privilege
 } from "./checks/util";
@@ -71,8 +71,9 @@ import type { DbPolicy, DbRelation, DbSnapshot, Finding, PolicyCommand } from ".
  *
  * - `sql`: run {@link Remediation.sql}, as a migration, after filling in its
  *   placeholders.
- * - `rebase-config`: the object is compiled by Rebase from a collection's
- *   `securityRules` and re-made on every boot, so SQL would be undone. Edit
+ * - `rebase-config`: the object is compiled by Rebase from a table's `rls`
+ *   (a `defineTable` in `backend/schema/`) and re-made on every boot, so SQL
+ *   would be undone. Edit
  *   the rule ({@link RebaseEquivalent.snippet}) and run `rebase db push`.
  * - `manual`: no statement can be written without a decision only a person
  *   can make. {@link Remediation.summary} says what to decide.
@@ -95,11 +96,11 @@ export interface AlternativeFix {
 
 /** The same fix, said the Rebase way. */
 export interface RebaseEquivalent {
-    /** False when `securityRules` cannot express this fix; `note` says why. */
+    /** False when a table's `rls` cannot express this fix; `note` says why. */
     applicable: boolean;
-    /** The `securityRules` array, as TypeScript source. Null when not applicable. */
-    securityRules: string | null;
-    /** A `defineCollection({ … })` excerpt showing where the rules go. */
+    /** The `rls` array, as TypeScript source. Null when not applicable. */
+    rls: string | null;
+    /** A `defineTable("…", { … })` excerpt showing where the rules go. */
     snippet: string | null;
     note: string;
 }
@@ -153,14 +154,13 @@ function rulesSource(rules: RuleSpec[], indent = ""): string {
     return `[\n${rules.map((r) => `${indent}    ${ruleSource(r)}`).join(",\n")}\n${indent}]`;
 }
 
-function collectionSnippet(schema: string, table: string, rules: RuleSpec[]): string {
+function tableSnippet(schema: string, table: string, rules: RuleSpec[]): string {
     return [
-        `// The collection whose table is ${schema}.${table} (config/collections/ in a Rebase project)`,
-        `defineCollection({`,
-        `    // …name, slug, properties and the rest stay as they are…`,
-        `    table: ${JSON.stringify(table)},`,
+        `// The table definition for ${schema}.${table} (backend/schema/ in a Rebase project)`,
+        `defineTable(${JSON.stringify(table)}, {`,
+        `    // …columns, relations and the rest stay as they are…`,
         ...(schema === "public" ? [] : [`    schema: ${JSON.stringify(schema)},`]),
-        `    securityRules: ${rulesSource(rules, "    ")}`,
+        `    rls: ${rulesSource(rules, "    ")}`,
         `});`
     ].join("\n");
 }
@@ -168,14 +168,14 @@ function collectionSnippet(schema: string, table: string, rules: RuleSpec[]): st
 function rebaseRules(schema: string, table: string, rules: RuleSpec[], note: string): RebaseEquivalent {
     return {
         applicable: true,
-        securityRules: rulesSource(rules),
-        snippet: collectionSnippet(schema, table, rules),
-        note: `${note} ${SECURITY_RULES_DOCS}`
+        rls: rulesSource(rules),
+        snippet: tableSnippet(schema, table, rules),
+        note: `${note} ${RLS_DOCS}`
     };
 }
 
 function noRebaseRule(note: string): RebaseEquivalent {
-    return { applicable: false, securityRules: null, snippet: null, note };
+    return { applicable: false, rls: null, snippet: null, note };
 }
 
 const OPERATION: Record<PolicyCommand, RuleOperation> = {
@@ -216,7 +216,7 @@ function ownerRule(snapshot: DbSnapshot, policy: DbPolicy | undefined, operation
 }
 
 const OWNER_FIELD_NOTE =
-    "Rebase enables row-level security on every collection's table and compiles each rule into a policy " +
+    "Rebase enables row-level security on every table it declares and compiles each rule into a policy " +
     "at boot and on `rebase db push`; `ownerField` compiles to `<column>::text = rebase.uid()`, so a row is " +
     "visible and writable only to the user whose id it holds.";
 
@@ -342,11 +342,10 @@ const RLS_FILTERS_EVERYONE =
 
 function managedCaveat(policy: DbPolicy): string {
     return (
-        `Policy "${policy.name}" is compiled by Rebase from a collection's \`securityRules\` and dropped and ` +
+        `Policy "${policy.name}" is compiled by Rebase from a table's \`rls\` and dropped and ` +
         "re-created on every boot, so an ALTER POLICY would be undone at the next restart. Change the rule, " +
-        "then redeploy or run `rebase db push`. A collection that declares no `securityRules` of its own " +
-        "inherits `defaultSecurityRules` from config/collections/index.ts — a stock scaffold's unfiltered " +
-        "read rule lives there."
+        "then redeploy or run `rebase db push`. A table that says `rls: \"inherit\"` takes `defaultRls` " +
+        "from backend/schema/index.ts — a stock scaffold's unfiltered read rule lives there."
     );
 }
 
@@ -554,8 +553,8 @@ function rlsDisabled(snapshot: DbSnapshot, finding: Finding): Remediation {
                 "caller, kept in a schema your API does not expose."
             ],
             rebase: noRebaseRule(
-                "Not expressible: a foreign table cannot have row-level security, and securityRules compile to " +
-                "policies. Keep it out of the collections a Rebase backend serves."
+                "Not expressible: a foreign table cannot have row-level security, and `rls` rules compile to " +
+                "policies. Keep it out of the tables a Rebase backend declares."
             )
         };
     }
@@ -570,7 +569,7 @@ function rlsDisabled(snapshot: DbSnapshot, finding: Finding): Remediation {
         `    USING (${scope.sql})\n` +
         `    WITH CHECK (${scope.sql});`;
     const rebase = rebaseRules(rel.schema, rel.name, [{ operation: "all", ownerField: scope.ownerField }],
-        `${OWNER_FIELD_NOTE} Declare the table as a collection, or add the rule to the one that maps it.`);
+        `${OWNER_FIELD_NOTE} Declare the table with defineTable in backend/schema/, or add the rule to the definition that maps it.`);
     const revokeAlternative: AlternativeFix[] = revokes.length > 0
         ? [{ summary: "If API callers should not reach this table at all, revoke their privileges instead.", sql: revokes.join("\n") }]
         : [];
@@ -660,8 +659,8 @@ function rlsEnabledNotForced(snapshot: DbSnapshot, finding: Finding): Remediatio
             "is a no-op: revoke the intermediate membership instead."]
         : [];
     const rebase = noRebaseRule(
-        "Not a securityRules setting. Rebase never sets FORCE: it runs every API request as rebase_user, which " +
-        "does not own collection tables, so the owner's exemption never reaches a caller."
+        "Not an `rls` setting. Rebase never sets FORCE: it runs every API request as rebase_user, which " +
+        "does not own the tables it declares, so the owner's exemption never reaches a caller."
     );
 
     // Rebase's own privileged writes run as the owner and rely on the owner
@@ -748,9 +747,9 @@ function junctionTableUnprotected(snapshot: DbSnapshot, finding: Finding): Remed
             rel.schema,
             rel.name,
             [{ name, operation: "select", using: linked((column) => `{${column}}`) }],
-            "If this is the junction of a many-to-many link, declare it as a `relation` property with " +
-            "`kind: \"manyToMany\"` instead: Rebase then creates the junction itself, with row-level security on " +
-            `and policies derived from both collections. The rule here is for a join table modelled as its own collection. ${RAW_RULE_NOTE}`
+            "If this is the junction of a many-to-many link, declare it as a `rel.manyToMany(...)` relation " +
+            "instead: Rebase then creates the junction itself, with row-level security on " +
+            `and policies derived from both tables. The rule here is for a join table declared as its own table. ${RAW_RULE_NOTE}`
         )
     };
 }
@@ -772,7 +771,7 @@ function grantToPublic(snapshot: DbSnapshot, finding: Finding): Remediation {
             `where it is needed: GRANT ${privileges.join(", ")} ON ${qrel(schema, table)} TO "<role>";`
         ],
         rebase: noRebaseRule(
-            "Not a securityRules setting: Rebase grants table privileges to its own request role, and the rules " +
+            "Not an `rls` setting: Rebase grants table privileges to its own request role, and the rules " +
             "decide which rows each request reaches."
         )
     };
@@ -783,8 +782,8 @@ function grantToPublic(snapshot: DbSnapshot, finding: Finding): Remediation {
 // ---------------------------------------------------------------------------
 
 const VIEW_NOTE =
-    "Not a securityRules setting: rules attach to a collection's table. Serve this data through a collection " +
-    "over the base table, whose rules then apply to every read, rather than through a view.";
+    "Not an `rls` setting: rules attach to a table. Serve this data through the base table's definition, " +
+    "whose rules then apply to every read, rather than through a view.";
 
 function viewBypassesRls(snapshot: DbSnapshot, finding: Finding): Remediation {
     const { schema } = finding.target;
@@ -872,7 +871,7 @@ function securityDefinerMutableSearchPath(snapshot: DbSnapshot, finding: Finding
             "Only pg_catalog is on the path afterwards: schema-qualify every table and function the body uses " +
             "(public.orders, not orders), or the routine fails at its next call."
         ],
-        rebase: noRebaseRule("Not a securityRules setting: it concerns a function, not a collection's rows.")
+        rebase: noRebaseRule("Not an `rls` setting: it concerns a function, not a table's rows.")
     };
 }
 

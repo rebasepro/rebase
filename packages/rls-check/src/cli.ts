@@ -196,7 +196,7 @@ export function buildScanResult(
 /**
  * What stdout carries. `text` is the report for a person; `json` is the
  * {@link ScanResult} contract; `agent` is one JSON document with a remediation —
- * SQL and the Rebase `securityRules` equivalent — on every finding, for a
+ * SQL and the Rebase `rls` equivalent — on every finding, for a
  * coding agent to apply.
  */
 export const OUTPUT_FORMATS = ["text", "json", "agent"] as const;
@@ -740,7 +740,7 @@ Options
   --format <name>        text (default), json (the same as --json) or agent: one JSON
                          document for a coding agent, where every finding carries the
                          failing table and policy, the SQL that fixes it and the
-                         equivalent Rebase securityRules.
+                         equivalent rules for a Rebase table's rls.
   --html <path>          Also write a self-contained HTML report to <path>. One file,
                          no network requests, safe to attach to a ticket.
   --schema <name>        Restrict the scan to a schema. Repeatable or comma-separated.

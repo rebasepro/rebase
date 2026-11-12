@@ -8,7 +8,7 @@
  *     told is a reviewed diff rather than an accident;
  *   - effect: applying the SQL to the snapshot clears the finding it came with —
  *     a fix that leaves its finding standing teaches the agent to ignore the tool;
- *   - types: every `securityRules` snippet compiles against the real
+ *   - types: every `rls` snippet compiles against the real
  *     `SecurityRule` in `@rebasepro/types`.
  *
  * The SQL is also run against a real Postgres, by `test/e2e/agent-remediation.e2e.test.ts`.
@@ -372,7 +372,7 @@ describe("remediation invariants", () => {
     });
 
     it.each(all)("$c.name: every placeholder appears where it has to be filled", ({ remediation }) => {
-        const text = [remediation.sql ?? "", remediation.rebase.securityRules ?? ""].join("\n");
+        const text = [remediation.sql ?? "", remediation.rebase.rls ?? ""].join("\n");
         for (const placeholder of remediation.placeholders) expect(text).toContain(placeholder.token);
         // And nothing that looks like a placeholder goes unlisted.
         const tokens = new Set(remediation.placeholders.map((p) => p.token));
@@ -383,11 +383,11 @@ describe("remediation invariants", () => {
         const { rebase } = remediation;
         expect(rebase.note.length).toBeGreaterThan(0);
         if (rebase.applicable) {
-            expect(rebase.securityRules).not.toBeNull();
-            expect(rebase.snippet).toContain("defineCollection({");
-            expect(rebase.snippet).toContain("securityRules: [");
+            expect(rebase.rls).not.toBeNull();
+            expect(rebase.snippet).toMatch(/^defineTable\("[^"]+", \{$/m);
+            expect(rebase.snippet).toContain("rls: [");
         } else {
-            expect(rebase.securityRules).toBeNull();
+            expect(rebase.rls).toBeNull();
             expect(rebase.snippet).toBeNull();
         }
     });
@@ -531,21 +531,21 @@ describe("applying the SQL clears the finding", () => {
 /** `@rebasepro/types`' SecurityRule, by path: this package may not depend on it. */
 const SECURITY_RULES_MODULE = fileURLToPath(new URL("../../types/src/types/security_rules", import.meta.url));
 
-describe("securityRules snippets", () => {
+describe("rls snippets", () => {
     const dir = mkdtempSync(join(tmpdir(), "rls-check-rules-"));
     afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
     it("type-check as readonly SecurityRule[] from @rebasepro/types", () => {
-        const securityRulesModule = SECURITY_RULES_MODULE;
+        const ruleTypeModule = SECURITY_RULES_MODULE;
         const snippets = CASES
-            .map((c) => remediationFor(c.snap, findingsOf(c)[0]).rebase.securityRules)
+            .map((c) => remediationFor(c.snap, findingsOf(c)[0]).rebase.rls)
             .filter((s): s is string => s !== null);
         expect(snippets.length).toBeGreaterThan(10);
 
         const file = join(dir, "rules.ts");
         writeFileSync(
             file,
-            `import type { SecurityRule } from ${JSON.stringify(securityRulesModule)};\n\n` +
+            `import type { SecurityRule } from ${JSON.stringify(ruleTypeModule)};\n\n` +
             snippets.map((s, i) => `export const rules${i}: readonly SecurityRule[] = ${s};\n`).join("\n")
         );
 
@@ -564,11 +564,11 @@ describe("securityRules snippets", () => {
     });
 
     it("are rejected when they are wrong — the check is not vacuous", () => {
-        const securityRulesModule = SECURITY_RULES_MODULE;
+        const ruleTypeModule = SECURITY_RULES_MODULE;
         const file = join(dir, "wrong.ts");
         writeFileSync(
             file,
-            `import type { SecurityRule } from ${JSON.stringify(securityRulesModule)};\n` +
+            `import type { SecurityRule } from ${JSON.stringify(ruleTypeModule)};\n` +
             `export const rules: readonly SecurityRule[] = [{ operation: "all", ownerField: "user_id", using: "true" }];\n`
         );
         const program = ts.createProgram([file], {

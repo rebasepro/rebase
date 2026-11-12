@@ -358,8 +358,8 @@ export function callerIdCall(snapshot: DbSnapshot): string {
 /**
  * The helper functions a Rebase deployment creates in its `rebase` schema, as
  * they appear inside a policy expression. A call to one of these is the
- * strongest single signal that the policy was compiled from a collection's
- * `securityRules` rather than written by hand.
+ * strongest single signal that the policy was compiled from a table's `rls`
+ * rather than written by hand.
  */
 const REBASE_HELPER_CALL = /\brebase\.(uid|roles|jwt|is_anonymous)\s*\(/i;
 
@@ -381,12 +381,12 @@ function hasGeneratedPolicyName(policy: DbPolicy): boolean {
 }
 
 /**
- * Is this policy one Rebase derives from a collection's `securityRules` and
- * re-applies at every boot?
+ * Is this policy one Rebase derives from a table's `rls` and re-applies at
+ * every boot?
  *
  * It matters because the ordinary remediation — edit the policy in the database
  * — is *silently undone* on such a policy: boot drops and recreates every
- * generated policy from the collection config, so a fix applied with SQL
+ * generated policy from the table definitions, so a fix applied with SQL
  * survives exactly until the next restart. Prescribing it is worse than
  * prescribing nothing, because the operator watches the finding disappear and
  * files it as done.
@@ -403,7 +403,7 @@ export function isRebaseManagedPolicy(snapshot: DbSnapshot, policy: DbPolicy): b
 }
 
 /** Where the rule that produces a managed policy is documented. */
-export const SECURITY_RULES_DOCS = "https://rebase.pro/docs/collections/security-rules";
+export const RLS_DOCS = "https://rebase.pro/docs/collections/security-rules";
 
 /**
  * The remediation for a Rebase-managed policy: change the rule it is compiled
@@ -416,17 +416,17 @@ export const SECURITY_RULES_DOCS = "https://rebase.pro/docs/collections/security
  */
 export function managedPolicyFix(policy: DbPolicy, intent: string): string {
     return (
-        `This policy is not hand-written: Rebase compiles it from the collection's\n` +
-        `\`securityRules\` and re-applies it (drop, then create) on every boot, so a\n` +
-        `change made to the policy in the database is undone the next time the runtime\n` +
-        `starts. Change the rule instead:\n` +
-        `  1. find the collection whose table is ${qrel(policy.schema, policy.table)} — in a scaffold,\n` +
-        `     under config/collections/;\n` +
+        `This policy is not hand-written: Rebase compiles it from the table's \`rls\`\n` +
+        `and re-applies it (drop, then create) on every boot, so a change made to the\n` +
+        `policy in the database is undone the next time the runtime starts. Change the\n` +
+        `rule instead:\n` +
+        `  1. find the defineTable for ${qrel(policy.schema, policy.table)} — in a scaffold,\n` +
+        `     under backend/schema/;\n` +
         `  2. ${intent};\n` +
-        `  3. a collection that declares no \`securityRules\` of its own inherits\n` +
-        `     \`defaultSecurityRules\` from config/collections/index.ts — a stock scaffold's\n` +
-        `     unfiltered read rule lives there, not on the collection;\n` +
+        `  3. a table that says \`rls: "inherit"\` takes \`defaultRls\` from\n` +
+        `     backend/schema/index.ts — a stock scaffold's unfiltered read rule lives\n` +
+        `     there, not on the table;\n` +
         `  4. redeploy (boot re-applies the policies), or run \`rebase db push\`.\n` +
-        `${SECURITY_RULES_DOCS}`
+        `${RLS_DOCS}`
     );
 }

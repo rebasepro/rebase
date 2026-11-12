@@ -79,8 +79,9 @@ describe("the fix for a Rebase-managed policy", () => {
     };
 
     it("names the rule the policy is compiled from", () => {
-        expect(managedFix()).toContain("securityRules");
-        expect(managedFix()).toContain("config/collections/");
+        expect(managedFix()).toContain("the table's `rls`");
+        expect(managedFix()).toContain("backend/schema/");
+        expect(managedFix()).toContain("defineTable");
     });
 
     it("says the database edit is undone at the next boot", () => {
@@ -98,7 +99,8 @@ describe("the fix for a Rebase-managed policy", () => {
     });
 
     it("mentions the inherited defaults, which is where a scaffold's open read lives", () => {
-        expect(managedFix()).toContain("defaultSecurityRules");
+        expect(managedFix()).toContain("defaultRls");
+        expect(managedFix()).toContain("backend/schema/index.ts");
     });
 
     it("leaves the SQL remediation in place for a hand-written policy", () => {
@@ -118,7 +120,7 @@ describe("the sibling checks that prescribe ALTER POLICY", () => {
                 })
             ])
         );
-        expect(f?.fix).toContain("securityRules");
+        expect(f?.fix).toContain("the table's `rls`");
         expect(f?.fix).not.toContain("ALTER POLICY");
     });
 
@@ -131,7 +133,7 @@ describe("the sibling checks that prescribe ALTER POLICY", () => {
         snap.grants.push({ schema: "public", table: "posts", grantee: "anon", privileges: ["INSERT"] });
 
         const [f] = anonymousWriteAllowed.run(snap);
-        expect(f?.fix).toContain("securityRules");
+        expect(f?.fix).toContain("the table's `rls`");
         expect(f?.fix).not.toContain("ALTER POLICY");
     });
 });
