@@ -408,6 +408,7 @@ function compileOne(
             relationName
         );
         const viaFix = "or express the link as `rel.via(...)`, whose steps compare every key column.";
+        const before = relations.length;
         switch (relation.kind) {
             case "belongsTo": {
                 const localKey = deriveBelongsToLocalKey(relationName, relation.localKey);
@@ -564,6 +565,18 @@ function compileOne(
                 const exhaustive: never = relation;
                 refuse(`unknown relation kind ${JSON.stringify(exhaustive)}.`);
             }
+        }
+        if (relations.length > before) {
+            const described = relations[relations.length - 1];
+            if (relation.private === true && relation.access !== undefined) {
+                refuse(
+                    "the relation is `private: true` and declares `access`. A private relation is never served to or " +
+                    "written by a client, so access rules say nothing; drop one of the two.",
+                    relationName
+                );
+            }
+            if (relation.private === true) described.private = true;
+            else if (relation.access !== undefined) described.access = relation.access;
         }
     }
     const allColumns = [...columns, ...derivedColumns];

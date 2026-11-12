@@ -650,13 +650,51 @@ class CollectionLift {
         this.foreignKeyColumns.set(entry.key, ownerKey);
     }
 
-    /** Fields of a relation property that would belong to a column, which a relation property has none of. */
+    /**
+     * Fields of a relation property the table model has no place for on a
+     * relation. Its `access` and `excludeFromApi` are carried, onto the
+     * relation's own `access` / `private` (see {@link relationFieldRules}).
+     */
     private rejectColumnFields(key: string, property: Property, kind: string): void {
-        for (const field of ["access", "excludeFromApi", "databaseDefault", "callbacks"] as const) {
-            if (property[field] !== undefined) {
-                this.refuse(key, `is a ${kind} relation property declaring \`${field}\`. Declare the foreign-key column as a property of its own and put \`${field}\` there.`);
-            }
+        if (property.databaseDefault !== undefined) {
+            this.refuse(key, `is a ${kind} relation property declaring \`databaseDefault\`. Declare the foreign-key column as a property of its own and put \`databaseDefault\` there.`);
         }
+        if (property.callbacks !== undefined) {
+            this.refuse(key, `is a ${kind} relation property declaring \`callbacks\`. A relation has no field-level hooks in the table model; move the logic into the table's \`hooks\` (\`beforeSave\` / \`afterRead\` see the whole row).`);
+        }
+    }
+
+    /**
+     * The field rules of the relation properties addressing a relation, as the
+     * relation's `access` / `private`: what `canReadRelation`, the include
+     * refusal and nested-write access enforce.
+     */
+    private relationFieldRules(entry: LegacyRelation): { access?: ColumnAccess; private?: true } {
+        let found: { key: string; rules: { access?: ColumnAccess; private?: true } } | undefined;
+        for (const [key, other] of this.addressed) {
+            if (other !== entry) continue;
+            const property = this.properties[key];
+            if (property?.type !== "relation") continue;
+            if (property.excludeFromApi === false) this.note(key, "excludeFromApi", "redundant", false, "States the default.");
+            let rules: { access?: ColumnAccess; private?: true } = {};
+            if (property.excludeFromApi === true) {
+                if (property.access !== undefined) {
+                    this.refuse(key, "declares both `excludeFromApi` and `access`, which the server refuses at boot. Keep one.");
+                }
+                rules = { private: true };
+            } else if (property.access !== undefined) {
+                const access: ColumnAccess = {};
+                if (property.access.read !== undefined) access.read = [...property.access.read];
+                if (property.access.write !== undefined) access.write = [...property.access.write];
+                if (access.read !== undefined || access.write !== undefined) rules = { access };
+            }
+            if (rules.access === undefined && rules.private === undefined) continue;
+            if (found && JSON.stringify(found.rules) !== JSON.stringify(rules)) {
+                this.refuse(key, `addresses the relation "${entry.key}" with field rules that differ from the property "${found.key}", which addresses it too. A relation has one set of rules; make them agree.`);
+            }
+            found = { key, rules };
+        }
+        return found?.rules ?? {};
     }
 
     /**
@@ -1148,6 +1186,7 @@ class CollectionLift {
                 this.refuse(key, `has a target that does not resolve: ${error instanceof Error ? error.message : String(error)}`);
             }
             const thunk = this.lifter.targetThunk(target, this.slug, key);
+            const rules = this.relationFieldRules(entry);
             if (relation.overrides !== undefined) this.note(key, "overrides", "ui", relation.overrides, "How the panel presents the relation's tab.");
             switch (relation.kind) {
                 case "belongsTo": {
@@ -1161,7 +1200,8 @@ class CollectionLift {
                         ...(relation.onDelete !== undefined ? { onDelete: relation.onDelete } : {}),
                         ...(relation.onUpdate !== undefined ? { onUpdate: relation.onUpdate } : {}),
                         ...(relation.index === false || !plan.constrained ? { index: false } : {}),
-                        ...(!plan.constrained ? { constraint: false } : {})
+                        ...(!plan.constrained ? { constraint: false } : {}),
+                        ...rules
                     });
                     if (relation.index === true) this.note(key, "index", "redundant", true, "States the default.");
                     break;
@@ -1171,7 +1211,8 @@ class CollectionLift {
                     this.noteInertActions(key, relation);
                     const options = {
                         ...(relation.foreignKeyOnTarget !== undefined ? { foreignKey: relation.foreignKeyOnTarget } : {}),
-                        ...(relation.sourceKey !== undefined ? { sourceKey: relation.sourceKey } : {})
+                        ...(relation.sourceKey !== undefined ? { sourceKey: relation.sourceKey } : {}),
+                        ...rules
                     };
                     this.relationDefs[key] = relation.kind === "hasOne" ? rel.hasOne(thunk, options) : rel.hasMany(thunk, options);
                     break;
@@ -1195,7 +1236,8 @@ class CollectionLift {
                         ...(through?.sourceColumn !== undefined ? { sourceKey: through.sourceColumn } : {}),
                         ...(through?.targetColumn !== undefined ? { targetKey: through.targetColumn } : {}),
                         ...(through?.properties !== undefined ? { pivot } : {}),
-                        ...(relation.onDelete !== undefined ? { onDelete: relation.onDelete } : {})
+                        ...(relation.onDelete !== undefined ? { onDelete: relation.onDelete } : {}),
+                        ...rules
                     });
                     break;
                 }
@@ -1206,7 +1248,8 @@ class CollectionLift {
                     }
                     this.relationDefs[key] = rel.via(thunk, {
                         steps: [...relation.joinPath],
-                        ...(relation.cardinality !== undefined ? { cardinality: relation.cardinality } : {})
+                        ...(relation.cardinality !== undefined ? { cardinality: relation.cardinality } : {}),
+                        ...rules
                     });
                     break;
                 }

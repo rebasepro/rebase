@@ -335,12 +335,13 @@ function columnsOfDescriptor(columns: readonly ColumnDescriptor[]): { key: strin
 
 // ── Relations ────────────────────────────────────────────────────────────────
 
+/** Each relation kind's options, in print order; the field rules every kind takes come last. */
 const RELATION_KEYS: Readonly<Record<RelationDef["kind"], readonly string[]>> = {
-    belongsTo: ["localKey", "notNull", "unique", "onDelete", "onUpdate", "index", "constraint"],
-    hasOne: ["foreignKey", "sourceKey"],
-    hasMany: ["foreignKey", "sourceKey", "orderBy"],
-    manyToMany: ["through", "sourceKey", "targetKey", "pivot", "onDelete"],
-    via: ["steps", "cardinality"]
+    belongsTo: ["localKey", "notNull", "unique", "onDelete", "onUpdate", "index", "constraint", "access", "private"],
+    hasOne: ["foreignKey", "sourceKey", "access", "private"],
+    hasMany: ["foreignKey", "sourceKey", "orderBy", "access", "private"],
+    manyToMany: ["through", "sourceKey", "targetKey", "pivot", "onDelete", "access", "private"],
+    via: ["steps", "cardinality", "access", "private"]
 };
 
 /**
@@ -435,6 +436,8 @@ function relationOfDescriptor(relation: RelationDescriptor, owner: TableDescript
             if (relation.cardinality === "one") entries.push(["cardinality", str("one")]);
             break;
     }
+    if (relation.access !== undefined) entries.push(["access", valueDoc(relation.access, `${path}.access`)]);
+    if (relation.private === true) entries.push(["private", text("true")]);
     return call(`rel.${relation.kind}`, entries.length > 0 ? [thunk, object(entries)] : [thunk]);
 }
 

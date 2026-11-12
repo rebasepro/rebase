@@ -35,8 +35,8 @@ const comments = defineTable("comments", {
         body: col.text().notNull(),
         postId: col.uuid().notNull()
     },
-    // One side of a two-way link annotates its thunk, or TypeScript cannot
-    // infer either table's type (TS7022): each would depend on the other.
+    // A two-way link (posts.comments ↔ comments.post) needs no annotation:
+    // a relation thunk is a `TableThunk`.
     relations: { post: rel.belongsTo(() => posts) },
     rls: [{ operation: "select", access: "public" }]
 });
@@ -408,6 +408,32 @@ describe("compileTables — relations", () => {
         const [, n] = compileTables([active, notes]);
         expect(n.relations[0]).toMatchObject({ kind: "belongsTo", target: "active_tags", constraint: false });
         expect(n.columns.at(-1)).toMatchObject({ column: "tag_id", type: { kind: "integer" } });
+    });
+
+    it("carries field-level access and `private` on every kind of relation", () => {
+        const owners = defineTable("owners", { columns: { id: col.uuid().primaryKey() }, rls: "admin-only" });
+        const things = defineTable("things", {
+            columns: { id: col.uuid().primaryKey() },
+            relations: {
+                owner: rel.belongsTo(() => owners, { access: { read: ["admin", "editor"], write: ["admin"] } }),
+                twin: rel.hasOne(() => owners, { foreignKey: "thing_id", private: true }),
+                many: rel.hasMany(() => owners, { foreignKey: "thing_ref", access: { write: [] } }),
+                linked: rel.manyToMany(() => owners, { access: { read: ["admin"] } }),
+                far: rel.via(() => owners, { steps: [{ table: "owners", on: { from: "id", to: "id" } }], private: true }),
+                plain: rel.belongsTo(() => owners)
+            },
+            rls: "admin-only"
+        });
+        const [, t] = compileTables([owners, things]);
+        const byName = Object.fromEntries(t.relations.map(r => [r.name, r]));
+        expect(byName.owner).toMatchObject({ access: { read: ["admin", "editor"], write: ["admin"] } });
+        expect(byName.owner.private).toBeUndefined();
+        expect(byName.twin).toMatchObject({ private: true });
+        expect(byName.twin.access).toBeUndefined();
+        expect(byName.many).toMatchObject({ access: { write: [] } });
+        expect(byName.linked).toMatchObject({ access: { read: ["admin"] } });
+        expect(byName.far).toMatchObject({ private: true });
+        expect("access" in byName.plain || "private" in byName.plain).toBe(false);
     });
 
     it("types a column pointing at an enum key with the key table's enum type", () => {

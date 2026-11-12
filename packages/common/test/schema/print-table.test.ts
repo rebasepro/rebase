@@ -274,7 +274,9 @@ describe("printRelation — every kind", () => {
         [
             rel.via(() => target, { steps: [{ table: "authors", on: { from: "author_id", to: "id" } }], cardinality: "one" }),
             "rel.via(() => authors, { steps: [{ table: \"authors\", on: { from: \"author_id\", to: \"id\" } }], cardinality: \"one\" })"
-        ]
+        ],
+        [rel.hasMany(() => target, { access: { read: ["admin"], write: [] } }), "rel.hasMany(() => authors, { access: { read: [\"admin\"], write: [] } })"],
+        [rel.belongsTo(() => target, { private: true }), "rel.belongsTo(() => authors, { private: true })"]
     ])("%#", (relation, expected) => {
         expect(printRelation("author", relation)).toBe(expected);
     });
@@ -486,7 +488,7 @@ describe("printTableSource / printTableModule", () => {
         // Self-references and accounts ↔ profiles close a cycle; tags does not. All print alike.
         expect(accountsModule).toContain("profile: rel.hasOne(() => profiles, { foreignKey: \"account_id\" })");
         expect(accountsModule).toContain("parent: rel.belongsTo(() => accounts)");
-        expect(accountsModule).toContain("tags: rel.manyToMany(() => tags)");
+        expect(accountsModule).toContain("tags: rel.manyToMany(() => tags, { private: true })");
         expect(accountsModule).not.toContain("RelationTarget");
         const postsCode = printTableSource(posts, optionsFor("posts")).code;
         expect(postsCode).toContain("comments: rel.hasMany(() => comments, {");
@@ -595,7 +597,9 @@ describe("round trip: compile(evaluate(print(compile(defs)))) is compile(defs)",
         expect(module).toContain("author: rel.belongsTo(() => users, { notNull: true, onDelete: \"restrict\" })");
         expect(module).toContain("tags: rel.manyToMany(() => tags, {\n            pivot: {");
         const accounts = printDescriptor(descriptors[5]);
-        expect(accounts).toContain("tags: rel.manyToMany(() => tags)");
+        // A relation's field rules come back from the descriptor.
+        expect(accounts).toContain("tags: rel.manyToMany(() => tags, { private: true })");
+        expect(accounts).toContain("access: { read: [\"admin\", \"member\"], write: [\"admin\"] }");
         expect(accounts).toContain("parent: rel.belongsTo(() => accounts)");
         expect(accounts).toContain("profile: rel.hasOne(() => profiles)");
     });

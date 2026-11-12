@@ -347,6 +347,18 @@ describe("compileTables — refusals", () => {
             ]);
         });
 
+        it("refuses a relation that is both private and access-ruled", () => {
+            const target = table("target");
+            const t = rawTable("t", {
+                columns: { id: id() },
+                relations: { both: rel.hasMany(() => target, { private: true, access: { read: ["admin"] } }) },
+                rls: "admin-only"
+            });
+            expect(problemsOf([target, t])).toEqual([
+                { table: "t", key: "both", message: expect.stringContaining("is `private: true` and declares `access`") }
+            ]);
+        });
+
         it("refuses a via with no steps", () => {
             const target = table("target");
             const t = rawTable("t", {

@@ -145,6 +145,10 @@ export interface RelationDescriptorBase {
     target: string;
     /** One row or many. */
     cardinality: "one" | "many";
+    /** Per-role read and write access to the relation (`rel.*(…, { access })`). */
+    access?: ColumnAccess;
+    /** Never on the wire, in the SDK or in OpenAPI (`rel.*(…, { private: true })`). Only server code sees it. */
+    private?: true;
 }
 
 /**

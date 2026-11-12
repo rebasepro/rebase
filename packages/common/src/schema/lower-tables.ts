@@ -372,7 +372,11 @@ function fillCollection(collection: PostgresCollectionConfig, def: AnyDef, ctx: 
         const at: Where = { table: def.name, key: column.key };
         const binding = boundBy.get(column.key);
         if (binding && !binding.keepsColumn) {
-            ordered.push({ key: binding.key, property: relationProperty(column.def, true), relation: planned.indexOf(binding) });
+            const property: RelationProperty = {
+                ...relationProperty(column.def, true),
+                ...relationFieldAccess(binding.def, { table: def.name, key: binding.key })
+            };
+            ordered.push({ key: binding.key, property, relation: planned.indexOf(binding) });
             absorbed.set(column.key, binding.key);
             return;
         }
@@ -405,7 +409,21 @@ function fillCollection(collection: PostgresCollectionConfig, def: AnyDef, ctx: 
             const bound = columns.find(column => column.key === entry.boundColumn);
             if (bound && entry.keepsColumn && relation.constraint !== false) property = relationProperty(bound.def, false);
         }
-        if (!property) return;
+        if (!property) {
+            // An absorbed column's relation property is placed above, with its
+            // field rules. `constraint: false` over a bound column plans no
+            // relation property at all, so nothing would carry them.
+            if (relation.constraint === false && (relation.access !== undefined || relation.private === true)) {
+                refuse(
+                    { table: def.name, key: entry.key },
+                    `is \`rel.belongsTo(…, { constraint: false })\` over the column "${entry.boundColumn}" and declares ` +
+                    `\`${relation.private === true ? "private" : "access"}\`. Without a constraint the link is that column ` +
+                    `alone: put the rule on the column (\`.${relation.private === true ? "private()" : "access({ … })"}\`).`
+                );
+            }
+            return;
+        }
+        Object.assign(property, relationFieldAccess(relation, { table: def.name, key: entry.key }));
         const item = { key: entry.key, property, relation: index };
         const after = ordered.findLastIndex(other => other.relation !== undefined && other.relation < index);
         const before = ordered.findIndex(other => other.relation !== undefined && other.relation > index);
@@ -415,7 +433,7 @@ function fillCollection(collection: PostgresCollectionConfig, def: AnyDef, ctx: 
     });
     for (const entry of planned) {
         if (entry.def.kind === "belongsTo") continue;
-        ordered.push({ key: entry.key, property: { type: "relation" } });
+        ordered.push({ key: entry.key, property: { type: "relation", ...relationFieldAccess(entry.def, { table: def.name, key: entry.key }) } });
     }
     const properties: PostgresProperties = {};
     for (const item of ordered) properties[item.key] = item.property;
@@ -554,6 +572,25 @@ function isImplicitIdColumn(columns: readonly { key: string; def: ColumnDef }[],
     return !def.unique && !def.readOnly && !def.private && def.access === undefined && def.stamp === undefined
         && def.validate === undefined && def.oneOf === undefined && def.description === undefined
         && def.storage === undefined && def.generatedAs === undefined && def.transform === undefined;
+}
+
+/**
+ * A relation's field rules as its property carries them: `private: true` is
+ * `excludeFromApi`, `access` is the property's `access` — what
+ * `canReadRelation`, the include refusal and nested-write access read.
+ */
+function relationFieldAccess(relation: RelationDef, at: Where): Pick<RelationProperty, "access" | "excludeFromApi"> {
+    if (relation.private === true) {
+        if (relation.access !== undefined) {
+            refuse(at, "is `private: true` and declares `access`. A private relation is never served to or written by a client, so access rules say nothing; drop one of the two.");
+        }
+        return { excludeFromApi: true };
+    }
+    if (relation.access === undefined) return {};
+    const access: FieldAccess = {};
+    if (relation.access.read !== undefined) access.read = [...relation.access.read];
+    if (relation.access.write !== undefined) access.write = [...relation.access.write];
+    return { access };
 }
 
 /** The property a relation is addressed by. */

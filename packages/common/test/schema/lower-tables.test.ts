@@ -306,6 +306,54 @@ describe("lowerTables — relations", () => {
         expect(alone.relations?.[1].target()).toBe(outside);
     });
 
+    it("lowers a relation's field rules onto its relation property, in every form", () => {
+        const tags = defineTable("tags", { columns: { id }, rls: "admin-only" });
+        const posts = defineTable("posts", {
+            columns: { id, authorId: col.uuid(), editorRef: col.uuid().column("editor_id").describe("who edits") },
+            relations: {
+                // Absorbs its plain column.
+                author: rel.belongsTo(() => users, { access: { read: ["admin", "editor"], write: ["admin"] } }),
+                // Carries only the constraint beside the column it binds.
+                editor: rel.belongsTo(() => users, { localKey: "editor_id", private: true }),
+                // Derives its column.
+                reviewer: rel.belongsTo(() => users, { access: { write: [] } }),
+                comments: rel.hasMany(() => tags, { access: { read: ["admin"] } }),
+                cover: rel.hasOne(() => tags, { private: true }),
+                labels: rel.manyToMany(() => tags, { access: { read: ["editor"], write: ["editor"] } }),
+                path: rel.via(() => tags, { steps: [{ table: "tags", on: { from: "id", to: "id" } }], private: true })
+            },
+            rls: "admin-only"
+        });
+        const { properties } = only([posts, users, tags]);
+        expect(properties.author).toEqual({ type: "relation", access: { read: ["admin", "editor"], write: ["admin"] } });
+        expect(properties.editor).toEqual({ type: "relation", excludeFromApi: true });
+        expect(properties.editorRef).toEqual({ type: "string", columnType: "uuid", columnName: "editor_id", description: "who edits" });
+        expect(properties.reviewer).toEqual({ type: "relation", access: { write: [] } });
+        expect(properties.comments).toEqual({ type: "relation", access: { read: ["admin"] } });
+        expect(properties.cover).toEqual({ type: "relation", excludeFromApi: true });
+        expect(properties.labels).toEqual({ type: "relation", access: { read: ["editor"], write: ["editor"] } });
+        expect(properties.path).toEqual({ type: "relation", excludeFromApi: true });
+    });
+
+    it("refuses field rules a relation has no property to carry, and private beside access", () => {
+        const unconstrained = defineTable("posts", {
+            columns: { id, authorId: col.uuid() },
+            relations: { author: rel.belongsTo(() => users, { constraint: false, index: false, access: { read: ["admin"] } }) },
+            rls: "admin-only"
+        });
+        expect(refusal(() => lowerTables([unconstrained, users]))).toEqual([
+            expect.stringContaining("posts.author: is `rel.belongsTo(…, { constraint: false })` over the column \"authorId\" and declares `access`")
+        ]);
+        const both = defineTable("both", {
+            columns: { id },
+            relations: { many: rel.hasMany(() => users, { private: true, access: { read: ["admin"] } }) },
+            rls: "admin-only"
+        });
+        expect(refusal(() => lowerTables([both, users]))).toEqual([
+            expect.stringContaining("both.many: is `private: true` and declares `access`")
+        ]);
+    });
+
     it("names an absorbed column by its relation in indexes, which the planner resolves to the same column", () => {
         const posts = defineTable("posts", {
             columns: { id, authorId: col.uuid(), at: col.timestamptz() },

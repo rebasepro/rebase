@@ -224,8 +224,8 @@ export const accounts = defineTable("accounts", {
     relations: {
         profile: rel.hasOne(() => profiles, { foreignKey: "account_id" }),
         parent: rel.belongsTo(() => accounts),
-        friends: rel.manyToMany(() => accounts, { through: "account_friends", sourceKey: "account_id", targetKey: "friend_id", onDelete: "cascade" }),
-        tags: rel.manyToMany(() => tags)
+        friends: rel.manyToMany(() => accounts, { through: "account_friends", sourceKey: "account_id", targetKey: "friend_id", onDelete: "cascade", access: { read: ["admin", "member"], write: ["admin"] } }),
+        tags: rel.manyToMany(() => tags, { private: true })
     },
     rls: [{ operation: "select", ownerField: "id" }],
     softDelete: true,

@@ -405,6 +405,16 @@ function relationOptions(): void {
     rel.belongsTo(users);
     // @ts-expect-error a via needs its steps
     rel.via(() => users);
+    // Every kind takes field-level access, or `private`.
+    rel.belongsTo(() => users, { access: { read: ["admin"], write: [] } });
+    rel.hasOne(() => users, { private: true });
+    rel.hasMany(() => users, { access: { write: ["admin"] } });
+    rel.manyToMany(() => users, { private: true });
+    rel.via(() => users, { steps: [{ table: "users", on: { from: "id", to: "id" } }], access: { read: ["admin"] } });
+    // @ts-expect-error roles are strings
+    rel.hasMany(() => users, { access: { read: [1] } });
+    // The literal is kept on a belongsTo, like its other options.
+    assertType<Equal<ReturnType<typeof rel.belongsTo<{ private: true }>>["private"], true>>();
     // What a thunk returns is not typed (a `TableThunk` is `() => void`, so
     // two-way links need no annotation); `compileTables` refuses a thunk that
     // does not return a table or view. Neither side of this link annotates.

@@ -182,6 +182,25 @@ describe("collectionToTableDef — relations", () => {
         expect(relations.author.target()).toBe(tables[1]);
     });
 
+    it("carries a relation property's `access` and `excludeFromApi` onto the relation", () => {
+        const posts = collection("posts", {
+            id: uuidKey,
+            author: { type: "relation", access: { read: ["admin"], write: [] }, relation: { kind: "belongsTo", target: () => authors } },
+            editors: { type: "relation", excludeFromApi: true, relation: { kind: "hasMany", target: () => authors, foreignKeyOnTarget: "post_id" } },
+            open: { type: "relation", excludeFromApi: false, relation: { kind: "manyToMany", target: () => authors } }
+        });
+        const { tables, notCarried } = collectionsToTableDefs([posts, authors]);
+        const relations = tables[0].config.relations ?? {};
+        expect(relations.author).toMatchObject({ kind: "belongsTo", access: { read: ["admin"], write: [] } });
+        expect(relations.author).not.toHaveProperty("private");
+        expect(relations.editors).toMatchObject({ kind: "hasMany", private: true });
+        expect(relations.editors).not.toHaveProperty("access");
+        expect(relations.open).not.toHaveProperty("private");
+        expect(notCarried.find(note => note.key === "open" && note.field === "excludeFromApi")).toMatchObject({ kind: "redundant" });
+        // The column the relation-property form plans carries no rule of its own.
+        expect(columnsOf(tables[0]).authorId).toEqual(def({ type: { kind: "uuid" } }));
+    });
+
     it("binds the property that owns the foreign key, and notes a requiredness only the relation stated", () => {
         const posts = collection("posts", {
             id: uuidKey,
@@ -394,6 +413,8 @@ describe("collectionToTableDef — refusals", () => {
         ["a relation property naming no relation", () => [collection("t", { id: uuidKey, a: { type: "relation" } })], /no relation named "a" is declared/],
         ["a lone relation key", () => [collection("t", { a: { type: "relation", isId: true, relation: { kind: "belongsTo", target: () => authors } } }), authors], /is the only `isId` property, and it is a relation/],
         ["a user stamp inside JSON", () => [collection("t", { id: uuidKey, m: { type: "map", properties: { by: { type: "string", autoValue: "user_on_create" } } } })], /stamps the acting user inside a JSON document/],
+        ["callbacks on a relation property", () => [collection("t", { id: uuidKey, a: { type: "relation", callbacks: { afterRead: ({ value }) => value }, relation: { kind: "hasMany", target: () => authors } } }), authors], /^t\.a: is a hasMany relation property declaring `callbacks`\. .*move the logic into the table's `hooks`/],
+        ["excludeFromApi with access on a relation property", () => [collection("t", { id: uuidKey, a: { type: "relation", excludeFromApi: true, access: { read: [] }, relation: { kind: "hasMany", target: () => authors } } }), authors], /^t\.a: declares both `excludeFromApi` and `access`/],
         ["a view with tenant", () => [collection("t", { id: { type: "string", isId: true } }, { view: { query: "SELECT 1" }, tenant: { field: "id", from: { claim: "x" } } })], /serves a view and declares `tenant`/]
     ])("refuses %s", (_name, collections, pattern) => {
         expect(refusal(() => collectionsToTableDefs(collections()))).toEqual(expect.arrayContaining([expect.stringMatching(pattern)]));

@@ -1,5 +1,6 @@
 import type { JoinStep, OnAction } from "../types/relations";
 import type { OrderByTuple } from "../types/filter-operators";
+import type { ColumnAccess } from "./column_options";
 import type { ColumnsShape } from "./columns";
 
 /**
@@ -35,11 +36,35 @@ interface RelationDefBase {
 }
 
 /**
+ * Field-level access on a relation, accepted by every `rel.*`: who may read
+ * the relation (`include` it, see its key) and who may write a link through it.
+ * The same rules a column states with `.access()` / `.private()`, enforced by
+ * the server on every door — an `include` the caller may not read is refused,
+ * a nested write the caller may not make is refused.
+ *
+ * @group Schema
+ */
+export interface RelationAccessOptions {
+    /**
+     * Per-role read and write access to the relation. `read` lists the roles
+     * that may include it; `write` the roles that may link or unlink through
+     * it. Omitted: whoever the table's `rls` lets read or write the row.
+     */
+    access?: ColumnAccess;
+    /**
+     * `true` keeps the relation off the wire entirely: not includable, not in
+     * the SDK or OpenAPI. Only server code traverses it. Not combined with
+     * `access`.
+     */
+    private?: boolean;
+}
+
+/**
  * Options of `rel.belongsTo`.
  *
  * @group Schema
  */
-export interface BelongsToOptions {
+export interface BelongsToOptions extends RelationAccessOptions {
     /**
      * The SQL column on this table holding the foreign key. `<relation>_id`
      * when omitted. A column in `columns` with this SQL name is bound to;
@@ -64,7 +89,7 @@ export interface BelongsToOptions {
  *
  * @group Schema
  */
-export interface HasOptions {
+export interface HasOptions extends RelationAccessOptions {
     /** The SQL column on the target that points back here. Derived from this table's slug when omitted. */
     foreignKey?: string;
     /** The SQL column on this table it points at, when that is not the primary key. */
@@ -86,7 +111,7 @@ export interface HasManyOptions extends HasOptions {
  *
  * @group Schema
  */
-export interface ManyToManyOptions<P extends ColumnsShape = ColumnsShape> {
+export interface ManyToManyOptions<P extends ColumnsShape = ColumnsShape> extends RelationAccessOptions {
     /** The junction table. The two table names, sorted and joined by `_`, when omitted. */
     through?: string;
     /** The junction column pointing at this table. */
@@ -104,7 +129,7 @@ export interface ManyToManyOptions<P extends ColumnsShape = ColumnsShape> {
  *
  * @group Schema
  */
-export interface ViaOptions {
+export interface ViaOptions extends RelationAccessOptions {
     /** The joins from this table to the target, in order. */
     steps: readonly JoinStep[];
     /** `many` when omitted. */

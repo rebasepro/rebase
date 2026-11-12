@@ -61,8 +61,9 @@ export const authors: PostgresCollectionConfig = {
     properties: {
         id: { type: "string", isId: "uuid" },
         name: { type: "string", validation: { required: true } },
-        posts: { type: "relation" },
-        profile: { type: "relation" }
+        // Field rules on relation properties: per-role access, and kept off the wire.
+        posts: { type: "relation", access: { read: ["admin", "editor"], write: ["admin"] } },
+        profile: { type: "relation", excludeFromApi: true }
     },
     relations: [
         { kind: "hasMany", relationName: "posts", target: () => posts, foreignKeyOnTarget: "author_id" },
@@ -92,12 +93,12 @@ export const posts: PostgresCollectionConfig = {
         id: { type: "number", isId: "increment" },
         title: { type: "string" },
         // The relation-property form: the foreign key is planned here.
-        author: { type: "relation", validation: { required: true } },
+        author: { type: "relation", validation: { required: true }, access: { write: ["admin"] } },
         // The explicit-FK form: `editorId` owns the column, `editor` its constraint.
-        editor: { type: "relation" },
+        editor: { type: "relation", excludeFromApi: true },
         editorId: { type: "string", columnType: "uuid", description: "Who edited it last" },
-        tags: { type: "relation" },
-        tagsVia: { type: "relation" }
+        tags: { type: "relation", access: { read: ["editor"], write: [] } },
+        tagsVia: { type: "relation", access: { read: ["admin"] } }
     },
     relations: [
         { kind: "belongsTo", relationName: "author", target: () => authors, localKey: "author_id", onDelete: "cascade", onUpdate: "cascade" },
