@@ -15,11 +15,12 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vitest";
 
 import { enumLabelsOf, noteKeySegments } from "./customization";
 import { Journal } from "./journal";
 import { migrateCollectionsToTables } from "./migrate";
+import { runCollectionsToTables } from "./command";
 import type { MigrationReport } from "./types";
 
 const FIXTURES = path.join(__dirname, "__fixtures__");
@@ -116,8 +117,15 @@ function expectMatchesFixture(fixture: string, dir: string, report: MigrationRep
     }
 }
 
-const run = (dir: string, options: { dryRun?: boolean; check?: boolean; force?: boolean } = {}): Promise<MigrationReport> =>
-    migrateCollectionsToTables({ projectRoot: dir, force: options.force ?? true, moduleAliases: ALIASES, ...(options.dryRun ? { dryRun: true } : {}), ...(options.check ? { check: true } : {}) });
+const run = (dir: string, options: { dryRun?: boolean; check?: boolean; force?: boolean; acceptRuleChanges?: boolean } = {}): Promise<MigrationReport> =>
+    migrateCollectionsToTables({
+        projectRoot: dir,
+        force: options.force ?? true,
+        moduleAliases: ALIASES,
+        ...(options.dryRun ? { dryRun: true } : {}),
+        ...(options.check ? { check: true } : {}),
+        ...(options.acceptRuleChanges ? { acceptRuleChanges: true } : {})
+    });
 
 describe("fixture projects", () => {
     it.each(["blog", "typed", "firestore"])("migrates %s, SQL byte-identical, as recorded", async fixture => {
@@ -223,6 +231,72 @@ describe("a relation field's form default", () => {
     }, 120_000);
 });
 
+/**
+ * The SQL check compiles both sides with this release's compiler, so it cannot
+ * see a rule whose policy grants something different than on the previous
+ * version. The firestore fixture's `customers` has one: a bare
+ * `access: "authenticated"`, which granted nothing before and admits every
+ * signed-in caller now.
+ */
+describe("rules that change meaning", () => {
+    it("are reported, carried as written, and printed last under their own heading", async () => {
+        const dir = materialize("firestore");
+        const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+        let report: MigrationReport;
+        let printed: string;
+        try {
+            report = await runCollectionsToTables({ force: true }, dir, ALIASES);
+            printed = log.mock.calls.map(call => call.map(String).join(" ")).join("\n");
+        } finally {
+            log.mockRestore();
+        }
+        expect(report.status).toBe("migrated");
+        expect(report.ruleChanges).toEqual([{
+            file: "config/collections/customers.ts",
+            collection: "customers",
+            rule: "securityRules[0]",
+            message: expect.stringContaining("granted nothing")
+        }]);
+        expect(report.ruleChanges[0].message).toContain('`access: "registered"`');
+        expect(report.ruleChanges[0].message).toContain("remove the rule");
+        expect(fs.readFileSync(path.join(dir, "backend", "schema", "customers.ts"), "utf8")).toContain('access: "authenticated"');
+
+        const heading = printed.indexOf("Review before deploying: these rules change meaning");
+        expect(heading).toBeGreaterThan(printed.indexOf("rebase db push --dry-run"));
+        expect(printed.slice(heading)).toContain("customers securityRules[0]");
+        expect(printed).toContain("rebase doctor --policies");
+    }, 180_000);
+
+    it("make --check fail unless --accept-rule-changes acknowledges them", async () => {
+        const dir = materialize("firestore");
+        expect((await run(dir)).status).toBe("migrated");
+        const refused = await run(dir, { check: true });
+        expect(refused.status).toBe("rule-changes");
+        expect(refused.removeCommand).toBeUndefined();
+        expect(JSON.parse(JSON.stringify(refused)).ruleChanges).toHaveLength(1);
+        const accepted = await run(dir, { check: true, acceptRuleChanges: true });
+        expect(accepted.status).toBe("checked");
+        expect(accepted.removeCommand).toBe("git rm -r config");
+    }, 180_000);
+
+    it("exit 1 from the command on --check without the flag", async () => {
+        const dir = materialize("firestore");
+        expect((await run(dir)).status).toBe("migrated");
+        const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+        const previous = process.exitCode;
+        try {
+            await runCollectionsToTables({ check: true, json: true }, dir, ALIASES);
+            expect(process.exitCode).toBe(1);
+            process.exitCode = previous;
+            await runCollectionsToTables({ check: true, json: true, acceptRuleChanges: true }, dir, ALIASES);
+            expect(process.exitCode).toBe(previous);
+        } finally {
+            process.exitCode = previous;
+            log.mockRestore();
+        }
+    }, 180_000);
+});
+
 describe("modes", () => {
     it("is idempotent: a second run finds every file already written and the SQL still identical", async () => {
         const dir = materialize("blog");
@@ -246,7 +320,7 @@ describe("modes", () => {
         expect(report.files.map(file => file.path)).toContain("backend/schema/index.ts");
         // The --json shape: plain data, every field present.
         const json = JSON.parse(JSON.stringify(report)) as Record<string, unknown>;
-        expect(Object.keys(json).sort()).toEqual(["collections", "files", "manualSteps", "notes", "projectRoot", "refusals", "sdk", "status"]);
+        expect(Object.keys(json).sort()).toEqual(["collections", "files", "manualSteps", "notes", "projectRoot", "refusals", "ruleChanges", "sdk", "status"]);
         for (const file of report.files) expect(Object.keys(file).sort()).toEqual(["action", "content", "path", "role"]);
     }, 120_000);
 

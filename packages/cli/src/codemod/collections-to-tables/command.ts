@@ -5,8 +5,9 @@
  * with this command in the message (`LEGACY_LAYOUT_REMEDY`).
  *
  * Prints the plan and the outcome for a person, or one JSON document
- * (`--json`) for a script or an agent. Exits 1 when the run was refused or the
- * SQL check failed.
+ * (`--json`) for a script or an agent. Exits 1 when the run was refused, the
+ * SQL check failed, or `--check` found rules that change meaning without
+ * `--accept-rule-changes`.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -46,6 +47,8 @@ ${chalk.bold("Options")}
   --force     Run on a dirty git tree, and replace output files that hold something else
               (an earlier run's output you edited). Without it, both are refused and nothing is written.
   --skip-sdk-calls  Leave the project's own code as it is; run rebase migrate sdk-calls later
+  --accept-rule-changes  With --check: the rules listed under "Review before deploying" were reviewed.
+              Without it, --check exits 1 while any rule changes meaning.
 
 ${chalk.bold("Manual steps")}
   What the codemod cannot carry exactly is not guessed at: it is printed at the end as a numbered
@@ -60,6 +63,15 @@ ${chalk.bold("Safety")}
   triggers, views, the Drizzle schema) must be byte-identical, or every file is put back.
   A construct the codemod cannot carry exactly is refused with its file and line, and nothing
   is written. config/ itself is never deleted: the run prints the git rm line to run.
+
+  That check compiles both sides with this release's compiler, so it proves the files were
+  converted faithfully, not that a rule still MEANS what it did. Two things cover that:
+  ${chalk.bold("Review before deploying")} — printed last — lists every security rule whose policy now grants
+  something different (e.g. a bare access: "authenticated", which granted nothing before and
+  admits every signed-in caller now). And against the project's database, after migrating:
+    rebase db push --dry-run     expect "No changes: the database already matches these tables."
+    rebase doctor --policies     expect no policy drift
+  Any policy difference either lists is a change in who can access what.
 `);
 }
 
@@ -139,8 +151,33 @@ function printReport(report: MigrationReport): void {
         default:
             break;
     }
+    if (report.status === "rule-changes") {
+        console.log(chalk.red("  The migrated schema matches config/collections, but rules change meaning (below). Review them, then run"));
+        console.log(chalk.red("  --check again with --accept-rule-changes."));
+    }
     if (report.removeCommand) console.log(chalk.cyan(`    ${report.removeCommand}`));
+    if (report.status === "migrated" || report.status === "already-migrated" || report.status === "checked" || report.status === "rule-changes") {
+        console.log("");
+        console.log("  The SQL check proves the files were converted faithfully, not what the rules mean. Before deploying,");
+        console.log("  against the project's database:");
+        console.log(chalk.cyan("    rebase db push --dry-run") + chalk.gray("   expect \"No changes: the database already matches these tables.\""));
+        console.log(chalk.cyan("    rebase doctor --policies") + chalk.gray("   expect no policy drift"));
+        console.log("  Any policy difference either lists is a change in who can access what.");
+    }
+    printRuleChanges(report);
     console.log("");
+}
+
+/** The rules that change meaning: last, so they cannot scroll away. */
+function printRuleChanges(report: MigrationReport): void {
+    if (report.ruleChanges.length === 0) return;
+    console.log("");
+    console.log(chalk.red.bold(`  ⚠ Review before deploying: these rules change meaning (${report.ruleChanges.length})`));
+    console.log(chalk.red("    Each is carried as written and keeps its policy name, but the policy now grants something different."));
+    for (const change of report.ruleChanges) {
+        console.log(`    ${chalk.red("!")} ${change.file} (${change.collection} ${change.rule})`);
+        console.log(`      ${change.message}`);
+    }
 }
 
 /**
@@ -151,7 +188,7 @@ function printReport(report: MigrationReport): void {
  * @param moduleAliases specifiers mapped to files for evaluating the project (the in-repo entry points `@rebasepro/*` at source)
  */
 export async function runCollectionsToTables(
-    flags: { check?: boolean; dryRun?: boolean; json?: boolean; force?: boolean; skipSdkCalls?: boolean },
+    flags: { check?: boolean; dryRun?: boolean; json?: boolean; force?: boolean; skipSdkCalls?: boolean; acceptRuleChanges?: boolean },
     dir: string | undefined,
     moduleAliases?: Record<string, string>
 ): Promise<MigrationReport> {
@@ -162,11 +199,12 @@ export async function runCollectionsToTables(
         ...(flags.dryRun ? { dryRun: true } : {}),
         ...(flags.force ? { force: true } : {}),
         ...(flags.skipSdkCalls ? { skipSdkCalls: true } : {}),
+        ...(flags.acceptRuleChanges ? { acceptRuleChanges: true } : {}),
         ...(moduleAliases ? { moduleAliases } : {})
     });
     if (flags.json) console.log(JSON.stringify(report, null, 2));
     else printReport(report);
-    if (report.status === "blocked" || report.status === "failed") process.exitCode = 1;
+    if (report.status === "blocked" || report.status === "failed" || report.status === "rule-changes") process.exitCode = 1;
     return report;
 }
 

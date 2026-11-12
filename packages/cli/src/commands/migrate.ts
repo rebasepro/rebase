@@ -26,7 +26,8 @@ export const COLLECTIONS_TO_TABLES_FLAGS = {
     "--dry-run": Boolean,
     "--json": Boolean,
     "--force": Boolean,
-    "--skip-sdk-calls": Boolean
+    "--skip-sdk-calls": Boolean,
+    "--accept-rule-changes": Boolean
 } as const;
 
 /** Every flag `rebase migrate sdk-calls` accepts. Its help page and the docs verifier read this. */
@@ -95,7 +96,8 @@ export async function migrateCommand(subcommand: string | undefined, rawArgs: st
                 dryRun: flags["--dry-run"] === true,
                 json: flags["--json"] === true,
                 force: flags["--force"] === true,
-                skipSdkCalls: flags["--skip-sdk-calls"] === true
+                skipSdkCalls: flags["--skip-sdk-calls"] === true,
+                acceptRuleChanges: flags["--accept-rule-changes"] === true
             }, positionals[1]);
             return;
         }

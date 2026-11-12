@@ -78,7 +78,7 @@ export function gitState(root: string): { clean: true } | { clean: false; reason
 }
 
 function emptyReport(root: string): MigrationReport {
-    return { projectRoot: root, status: "blocked", collections: [], files: [], refusals: [], notes: [], manualSteps: [] };
+    return { projectRoot: root, status: "blocked", collections: [], files: [], refusals: [], notes: [], manualSteps: [], ruleChanges: [] };
 }
 
 /** Run the codemod on one project. */
@@ -178,6 +178,16 @@ export async function migrateCollectionsToTables(options: MigrateOptions): Promi
     }
     let customizationModules: { identifier: string; file: string; slug: string }[] = [];
     if (lift) {
+        for (const item of lift.notCarried) {
+            if (item.kind !== "meaning") continue;
+            const entry = postgres.find(candidate => candidate.collection.slug === item.collection);
+            report.ruleChanges.push({
+                file: entry ? relativeToRoot(plan, entry.file) : relativeToRoot(plan, legacy.collectionsDir),
+                collection: item.collection,
+                rule: item.field,
+                message: item.reason
+            });
+        }
         const names = nameTables(postgres, lift.tables, schemaDir);
         const order = (legacy.navigationOrder ?? []).map(collection => collection.slug).filter(slug => names.has(slug));
         planBackend(plan, { entries: postgres, lift, schemaDir, order }, names);
@@ -424,6 +434,10 @@ export async function migrateCollectionsToTables(options: MigrateOptions): Promi
         }
         report.verification = await verifyMigration(legacyPostgres, schemaDir, importModule);
         report.status = report.verification.identical ? "checked" : "failed";
+        if (report.status === "checked" && report.ruleChanges.length > 0 && !options.acceptRuleChanges) {
+            report.status = "rule-changes";
+            return report;
+        }
         if (report.verification.identical) report.removeCommand = removeCommand(plan, configDir);
         return report;
     }

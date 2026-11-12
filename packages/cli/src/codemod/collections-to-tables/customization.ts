@@ -382,7 +382,7 @@ function applyFieldNote(plan: PlanContext, builder: Builder, item: LiftNote, fie
     const key = item.key ?? "";
     const { literal, field } = noteKeySegments(key);
     const label = `properties.${key}`;
-    if (item.kind === "inert" || item.kind === "redundant" || item.kind === "derived") return;
+    if (item.kind === "inert" || item.kind === "redundant" || item.kind === "derived" || item.kind === "meaning") return;
     if (item.kind === "unknown") {
         note(plan, builder.entry, `${label}.${item.field} is not a field of the property model (nothing read it); not carried.`);
         return;
@@ -521,7 +521,7 @@ function applyCollectionNote(plan: PlanContext, builder: Builder, item: LiftNote
         default:
             break;
     }
-    if (item.kind === "inert" || item.kind === "redundant" || item.kind === "derived") return;
+    if (item.kind === "inert" || item.kind === "redundant" || item.kind === "derived" || item.kind === "meaning") return;
     if (item.kind === "unknown") {
         note(plan, builder.entry, `${item.field} is not a field of the collection model (nothing read it); not carried.`);
         return;

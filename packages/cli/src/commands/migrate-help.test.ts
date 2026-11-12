@@ -67,6 +67,9 @@ describe("rebase migrate: discoverability", () => {
         expect(out).toMatch(/--dry-run\s+Print the plan/);
         expect(out).toMatch(/--force\s+Run on a dirty git tree/);
         expect(out).toContain("--skip-sdk-calls");
+        expect(out).toMatch(/--accept-rule-changes\s+With --check/);
+        expect(out).toContain("rebase db push --dry-run");
+        expect(out).toContain("rebase doctor --policies");
         expect(out).toContain("Manual steps");
         expect(exit).not.toHaveBeenCalled();
     });

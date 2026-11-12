@@ -52,6 +52,23 @@ export interface Note extends SourceLocation {
     message: string;
 }
 
+/**
+ * A security rule carried as written that compiles to a policy granting
+ * something different than it did on the previous version (a lift note of
+ * kind `meaning`). The codemod's SQL check compares the migrated schema with
+ * the legacy collections lifted by the same compiler, so it cannot see these:
+ * they are listed under "Review before deploying", and `--check` exits 1
+ * while one is present unless `--accept-rule-changes` acknowledges them.
+ */
+export interface RuleChange extends SourceLocation {
+    /** The collection's slug, or `defaultSecurityRules`. */
+    collection: string;
+    /** Which rule: `securityRules[2]`, `defaultSecurityRules[0]`. */
+    rule: string;
+    /** What it did, what it does now, and what to write instead. */
+    message: string;
+}
+
 /** One file the codemod writes, as planned. */
 export interface PlannedFile {
     /** Relative to the project root, `/`-separated. */
@@ -93,13 +110,15 @@ export interface VerificationResult {
 export interface MigrationReport {
     /** The project root, absolute. */
     projectRoot: string;
-    /** `migrated` (written and verified), `planned` (dry run), `checked` (`--check`), `already-migrated`, `blocked` (refusals), `failed` (verification). */
-    status: "migrated" | "planned" | "checked" | "already-migrated" | "blocked" | "failed";
+    /** `migrated` (written and verified), `planned` (dry run), `checked` (`--check`), `already-migrated`, `blocked` (refusals), `failed` (verification), `rule-changes` (`--check` matched, but rules change meaning and `--accept-rule-changes` was not given). */
+    status: "migrated" | "planned" | "checked" | "already-migrated" | "blocked" | "failed" | "rule-changes";
     collections: CollectionOutcome[];
     files: PlannedFile[];
     refusals: Refusal[];
     notes: Note[];
     manualSteps: ManualStep[];
+    /** Rules whose meaning changes with the migration: review them before deploying. */
+    ruleChanges: RuleChange[];
     verification?: VerificationResult;
     /** What the SDK-call rewrite did (absent with `skipSdkCalls`). */
     sdk?: SdkRewriteReport;
@@ -125,4 +144,9 @@ export interface MigrateOptions {
     moduleAliases?: Record<string, string>;
     /** Leave the project's SDK calls as they are (`--skip-sdk-calls`); by default they are rewritten too. */
     skipSdkCalls?: boolean;
+    /**
+     * `--accept-rule-changes`: the {@link RuleChange}s were reviewed. Without
+     * it, a `--check` run that finds one ends `rule-changes` (exit 1).
+     */
+    acceptRuleChanges?: boolean;
 }
