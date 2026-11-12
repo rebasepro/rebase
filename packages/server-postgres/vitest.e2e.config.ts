@@ -63,6 +63,12 @@ export default defineConfig({
         // `db-e2e` and `db-push-safety` run the CLI under tsx, `split-roles`
         // starts `rebase-server` — gets Node's own resolution in that process,
         // which is `dist`. Those files still need the packages built.
-        alias: workspaceDependencies().map(toSource)
+        alias: [
+            // The subpath a schema file imports, which an exact-match bare
+            // name does not reach — before the bare names, which it would not
+            // match anyway.
+            { find: /^@rebasepro\/server\/schema$/, replacement: fileURLToPath(new URL("../server/src/schema/index.ts", import.meta.url)) },
+            ...workspaceDependencies().map(toSource)
+        ]
     }
 });

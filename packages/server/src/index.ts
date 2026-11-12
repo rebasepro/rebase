@@ -66,6 +66,10 @@ export { rebase, _setRebaseMock, _resetRebaseMock } from "./singleton";
 // test or a script without booting a driver.
 export { composeCallbacks, createCallContext } from "@rebasepro/common";
 
+// What a schema file imports: the table builders, `policy` and the authoring
+// types — also served alone, loading no server code, as `@rebasepro/server/schema`.
+export * from "./schema/index";
+
 // The single definition of "the tables": boot, the stock runtime, `rebase db
 // generate`, the doctor and SDK generation all read backend/schema through
 // this, so what is served and what is protected can never drift apart.

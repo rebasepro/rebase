@@ -1,0 +1,19 @@
+{
+    "//": [
+        "Not a package. A resolution redirect, so that `@rebasepro/server/schema`",
+        "works under TypeScript's legacy `moduleResolution: \"node\"` as well as under",
+        "`bundler` / `node16` / `nodenext` — the same arrangement as ../functions.",
+        "",
+        "The `exports` map in ../package.json is the real declaration, and it is what",
+        "Node uses at runtime. A project scaffolded by `rebase init` compiles with",
+        "`moduleResolution: \"node\"`, which ignores `exports` and resolves subpaths as",
+        "directories; its backend/schema files import `@rebasepro/server/schema`.",
+        "`files` in ../package.json ships it; assert-build-output.mjs verifies the",
+        "targets exist."
+    ],
+    "type": "module",
+    "main": "../dist/schema/index.js",
+    "module": "../dist/schema/index.js",
+    "types": "../dist/schema/index.d.ts",
+    "sideEffects": false
+}

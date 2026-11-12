@@ -76,7 +76,14 @@ export function workspaceSourceAliases(): { find: RegExp; replacement: string }[
         // `@rebasepro/agent-skills` lives under tooling/ and ships markdown, not a
         // TypeScript entry; it has no source to point at.
         .filter(({ source }) => existsSync(source))
-        .map(({ name, source }) => ({ find: new RegExp(`^${name}$`), replacement: source }));
+        .flatMap(({ name, source }) => [
+            // `@rebasepro/server/schema` is what a project's schema files
+            // import; it is a subpath with a source entry of its own.
+            ...(name === "@rebasepro/server"
+                ? [{ find: /^@rebasepro\/server\/schema$/, replacement: fileURLToPath(new URL("../server/src/schema/index.ts", import.meta.url)) }]
+                : []),
+            { find: new RegExp(`^${name}$`), replacement: source }
+        ]);
 }
 
 export default defineConfig({

@@ -3,7 +3,12 @@ import path from "path";
 import { defineConfig } from "vite";
 
 /**
- * The second build of this package: `@rebasepro/server/functions`.
+ * The second build of this package: `@rebasepro/server/functions` and
+ * `@rebasepro/server/schema` — the two entry points that must load without
+ * the server. (`schema` is what a `backend/schema` file imports: the table
+ * builders and `policy`, re-exported from `@rebasepro/types` and inlined
+ * here, so `rebase db generate` and a frontend's type import evaluate no
+ * server module.)
  *
  * It is a separate config rather than a second entry in `vite.config.ts`
  * because of one line in that file — the output banner:
@@ -46,7 +51,8 @@ export default defineConfig(() => ({
                 // `dist/functions/index.js` — the path `exports["./functions"]`
                 // names, and the same shape `tsc --emitDeclarationOnly` uses
                 // for the matching `.d.ts`.
-                "functions/index": path.resolve(__dirname, "src/functions/index.ts")
+                "functions/index": path.resolve(__dirname, "src/functions/index.ts"),
+                "schema/index": path.resolve(__dirname, "src/schema/index.ts")
             },
             formats: ["es"],
             fileName: (_format, entryName) => `${entryName}.js`

@@ -14,6 +14,9 @@ module.exports = {
         "^@rebasepro/common$": "<rootDir>/../common/src/index.ts",
         "^@rebasepro/types$": "<rootDir>/../types/src/index.ts",
         "^@rebasepro/utils$": "<rootDir>/../utils/src/index.ts",
+        // Schema fixtures written as a project writes them import this
+        // subpath; mapped so they never run against a stale `dist`.
+        "^@rebasepro/server/schema$": "<rootDir>/src/schema/index.ts",
         // Only the shipped templates import this, and only for `defineCollection`
         // — see test/stubs/cms-types.ts. The server itself may not depend on it.
         "^@rebasepro/cms-types$": "<rootDir>/test/stubs/cms-types.ts",

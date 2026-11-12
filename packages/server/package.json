@@ -55,6 +55,12 @@
       "import": "./dist/functions/index.js",
       "default": "./dist/functions/index.js"
     },
+    "./schema": {
+      "types": "./dist/schema/index.d.ts",
+      "development": "./dist/schema/index.js",
+      "import": "./dist/schema/index.js",
+      "default": "./dist/schema/index.js"
+    },
     "./package.json": "./package.json"
   },
   "dependencies": {
@@ -125,7 +131,8 @@
   "files": [
     "bin",
     "dist",
-    "functions"
+    "functions",
+    "schema"
   ],
   "bin": {
     "rebase-server": "bin/rebase-server.js"

@@ -59,6 +59,9 @@ module.exports = {
         "^chalk$": "<rootDir>/test/mocks/chalk.cjs",
         "^\\.{1,2}/module-dir$": "<rootDir>/test/mocks/module-dir.cjs",
         // Resolve sibling workspace packages to source, not built dist.
+        // `@rebasepro/server/schema` (what a schema file imports) is a
+        // subpath the bare-name pattern below does not reach.
+        "^@rebasepro/server/schema$": "<rootDir>/../server/src/schema/index.ts",
         "^@rebasepro/([a-z0-9-]+)$": "<rootDir>/../$1/src/index.ts",
         // Strip the ESM ".js" suffix from relative TS imports.
         "^(\\.{1,2}/.*)\\.js$": "$1"
