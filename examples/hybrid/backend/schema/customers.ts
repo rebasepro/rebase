@@ -13,7 +13,7 @@ export const customers = defineTable("customers", {
         id: col.uuid().primaryKey().defaultRandom(),
         name: col.text().notNull(),
         email: col.text().notNull().unique().validate({ email: true }),
-        createdAt: col.timestamptz().onCreateNow()
+        createdAt: col.timestamp({ withTimezone: true }).onCreateNow()
     },
     relations: {
         orders: rel.hasMany(() => orders)

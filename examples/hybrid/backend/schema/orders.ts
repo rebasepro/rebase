@@ -13,10 +13,10 @@ export const orders = defineTable("orders", {
     columns: {
         id: col.uuid().primaryKey().defaultRandom(),
         customerId: col.uuid().notNull(),
-        total: col.numeric(10, 2).notNull(),
+        total: col.numeric({ precision: 10, scale: 2 }).notNull(),
         status: col.enum(["pending", "paid", "shipped", "cancelled"]).notNull().default("pending"),
         sourceEventId: col.text(),
-        createdAt: col.timestamptz().onCreateNow()
+        createdAt: col.timestamp({ withTimezone: true }).onCreateNow()
     },
     relations: {
         // Binds to `customerId` (SQL `customer_id`), the column declared above.
