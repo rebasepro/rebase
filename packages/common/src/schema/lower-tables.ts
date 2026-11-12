@@ -118,8 +118,10 @@ export interface PendingTableFeature {
  * Each one is a capability of `defineTable` that is not yet implemented end to
  * end: a definition using it is refused with a `SchemaDefinitionError` naming
  * the table, the column or relation, and the id below, rather than lowered to
- * something that means less. The slice that moves the planner onto
- * descriptors implements them natively and deletes their entries.
+ * something that means less. The planner already plans a lowered column from
+ * its own definition; what is left here waits on the request-time side —
+ * write validation and the relation service moving onto descriptors — which
+ * implements each natively and deletes its entry.
  *
  * @group Schema
  */
@@ -130,7 +132,7 @@ export const PENDING_TABLE_FEATURES = [
     },
     {
         id: "text-one-of",
-        description: "`.oneOf([...])` on a text column outside an array. A closed set of strings is planned as a Postgres enum type today; use `col.enum()` until a plain checked text column is supported."
+        description: "`.oneOf([...])` on a text column outside an array. The planner plans the column as TEXT from its definition, but the runtime reads a closed set of strings only as a legacy `enum`, which its other readers (search, the doctor, enum label upkeep) take for a Postgres enum type; use `col.enum()` until write validation reads the descriptor."
     },
     {
         id: "has-many-order-by",
@@ -436,7 +438,17 @@ function fillCollection(collection: LoweredCollection, def: AnyDef, ctx: LowerCo
         if (!property) return;
         Object.assign(property, relationFieldAccess(relation, { table: def.name, key: entry.key }));
         const item = { key: entry.key, property: fromRelation(property, relation), relation: index };
-        const after = ordered.findLastIndex(other => other.relation !== undefined && other.relation < index);
+        // The last relation property before this one in relation order. A
+        // loop rather than `findLastIndex`, which is ES2023: this source is
+        // compiled by consumers whose `lib` stops at ES2022.
+        let after = -1;
+        for (let position = ordered.length - 1; position >= 0; position--) {
+            const other = ordered[position].relation;
+            if (other !== undefined && other < index) {
+                after = position;
+                break;
+            }
+        }
         const before = ordered.findIndex(other => other.relation !== undefined && other.relation > index);
         if (after !== -1) ordered.splice(after + 1, 0, item);
         else if (before !== -1) ordered.splice(before, 0, item);

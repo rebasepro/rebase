@@ -8,7 +8,7 @@
     "lib": [
       "dom",
       "dom.iterable",
-      "esnext"
+      "es2022"
     ],
     "moduleResolution": "bundler",
     "jsx": "react-jsx",
