@@ -4,6 +4,3 @@
 declare module "@fontsource/*";
 declare module "*.css";
 
-declare module "virtual:rebase-collections" {
-    export const collections: import("@rebasepro/types").CollectionConfig[];
-}

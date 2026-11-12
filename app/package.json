@@ -6,18 +6,17 @@
     "type": "module",
     "workspaces": [
         "frontend",
-        "backend",
-        "config"
+        "backend"
     ],
     "scripts": {
         "dev": "node ../tooling/scripts/mirror-seed-assets.mjs && rebase dev",
-        "build": "pnpm --filter \"./frontend\" --filter \"./backend\" --filter \"./config\" -r run build",
+        "build": "pnpm --filter \"./frontend\" --filter \"./backend\" -r run build",
         "start": "pnpm --filter \"*-backend\" start",
-        "db:generate": "rebase db generate --collections ../config/collections",
+        "db:generate": "rebase db generate",
         "db:migrate": "rebase db migrate",
         "schema:introspect": "rebase schema introspect",
-        "db:push": "rebase db push --collections ../config/collections",
-        "schema:generate": "rebase schema generate --collections ../config/collections",
+        "db:push": "rebase db push",
+        "schema:generate": "rebase schema generate",
         "generate:sdk": "rebase generate-sdk",
         "deploy": "cd .. && ./tooling/scripts/deploy-demo.sh"
     },

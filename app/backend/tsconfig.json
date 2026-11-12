@@ -29,5 +29,5 @@
       ]
     }
   },
-  "include": ["src/**/*", "../config/**/*", "functions/**/*", "crons/**/*"]
+  "include": ["src/**/*", "functions/**/*", "crons/**/*", "schema/**/*", "lib/**/*"]
 }
