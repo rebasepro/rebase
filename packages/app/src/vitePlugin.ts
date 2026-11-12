@@ -2,6 +2,8 @@
 import path from "path";
 import fs from "fs";
 import type { Plugin, ResolvedConfig } from "vite";
+export { BACKEND_GUARD_PLUGIN_NAME, rebaseBackendGuard } from "./backend_guard.ts";
+export type { RebaseBackendGuardOptions } from "./backend_guard.ts";
 import { MCP_VIEW_UTILITIES, mcpViewBoot, mcpViewDocument, mcpViewInlineIntoHtml, mcpViewOneChunk, mcpViewWithoutLazyExtras } from "./mcp_view_build.ts";
 
 /**

@@ -347,7 +347,8 @@
         "packages/app/src/i18n/**",
         "packages/app/src/locales/**",
         "packages/app/src/index.ts",
-        "packages/app/src/vitePlugin.ts"
+        "packages/app/src/vitePlugin.ts",
+        "packages/app/src/backend_guard.ts"
       ],
       "focus": "A CMS user's first hour: a 100k-row collection (speed, count, scroll), a filter on every property type, sorting by a relation, empty search, a row deleted by someone else while open, a failed load that must not look like 'no data', URL state across reload, deep links into nested collections, selection and bulk actions, side panels and full-screen records, back/forward. Equivalent controls built the same way across table/list/kanban/card. Anything built from raw HTML instead of @rebasepro/ui. i18n and dark mode of these screens.",
       "audits": [
