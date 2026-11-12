@@ -1,7 +1,8 @@
 import { declaredRlsPolicyShape, DEFAULT_DATA_SOURCE_KEY, REBASE_ADMIN_REQUEST_ROLE, REBASE_ADMIN_ROLE, RLS_IS_REQUEST_ROLE_SQL, type CollectionConfig, type PolicyExpression, type SecurityOperation, type SecurityRule } from "@rebasepro/types";
 import { adminRequestPolicyName, getPolicyNamesForRule } from "@rebasepro/utils";
-import { getTableName } from "../relations";
+import { findRelation, getTableName, resolveCollectionRelations } from "../relations";
 import { securityRuleToConditions } from "./securityRuleToConditions";
+import { policyShorthandColumns } from "./policyCondition";
 import { policyToPostgres, type PolicyCompileOptions } from "./policyToPostgres";
 
 /**
@@ -77,8 +78,10 @@ export function compileRulePolicies(
     options?: RulePolicyCompileOptions
 ): CompiledRulePolicy[] {
     const ops = rule.operations && rule.operations.length > 0 ? rule.operations : [rule.operation ?? "all"];
-    const policyNames = getPolicyNamesForRule(rule, getTableName(collection));
-    const { usingExpr, withCheckExpr } = securityRuleToConditions(rule);
+    const tableName = getTableName(collection);
+    assertShorthandColumns(collection, rule, tableName);
+    const policyNames = getPolicyNamesForRule(rule, tableName);
+    const { usingExpr, withCheckExpr } = securityRuleToConditions(rule, { table: tableName });
     const mode = rule.mode ?? "permissive";
     // `rls.policyTarget: "requestRole"`: a grant is for the request roles only.
     // In the compiler, not on the rule, because a policy's name hashes the rule
@@ -137,6 +140,37 @@ export function compileRulePolicies(
             withCheck: needsWithCheck ? "true" : null
         }];
     });
+}
+
+/**
+ * Refuse a `PolicyShorthand` condition / check naming a key that is no column
+ * of the table — no property, and no `belongsTo` relation (which addresses its
+ * foreign-key column). The compiler snake-cases a name it does not know, so a
+ * typo would otherwise reach `CREATE POLICY` as a column that does not exist,
+ * fail there, and leave the table with RLS on and no policy.
+ */
+function assertShorthandColumns(collection: CollectionConfig, rule: SecurityRule, tableName: string): void {
+    const clauses = [["condition", rule.condition], ["check", rule.check]] as const;
+    for (const [clause, condition] of clauses) {
+        for (const column of policyShorthandColumns(condition)) {
+            if (addressesColumn(collection, column)) continue;
+            throw new Error(
+                `A rule on "${tableName}" names "${column}" in its \`${clause}\`, and "${tableName}" has no such ` +
+                "column. A shorthand's keys are column keys of the table: name one of " +
+                `${Object.keys(collection.properties ?? {}).map(k => `"${k}"`).join(", ") || "its columns"}.`
+            );
+        }
+    }
+}
+
+function addressesColumn(collection: CollectionConfig, key: string): boolean {
+    if (collection.properties && Object.prototype.hasOwnProperty.call(collection.properties, key)) return true;
+    try {
+        return findRelation(resolveCollectionRelations(collection), key)?.kind === "belongsTo";
+    } catch {
+        // A relation whose target is not in this bundle: it names no column here.
+        return false;
+    }
 }
 
 /**

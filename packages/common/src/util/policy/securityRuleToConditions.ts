@@ -1,5 +1,6 @@
-import { PolicyExpression, SecurityRule, policy } from "@rebasepro/types";
+import { PolicyExpression, SecurityRule, SecurityRuleAccess, policy } from "@rebasepro/types";
 import { sqlToPolicy } from "./sqlToPolicy";
+import { policyConditionToExpression, type PolicyConditionSite } from "./policyCondition";
 
 /**
  * The normalized `USING` / `WITH CHECK` conditions for a single security rule,
@@ -15,8 +16,11 @@ export interface RuleConditions {
 
 /**
  * Desugars a {@link SecurityRule} — its `access`/`ownerField`/`roles` shortcuts,
- * structured `condition`/`check`, and raw `using`/`withCheck` — into a single
- * normalized {@link PolicyExpression} pair.
+ * structured `condition`/`check` (an expression or the `PolicyShorthand`
+ * object form, see {@link policyConditionToExpression}), and raw
+ * `using`/`withCheck` — into a single normalized {@link PolicyExpression}
+ * pair. `access` combined with a condition gates it: `"public"` leaves the
+ * condition as it is, `"authenticated"` ANDs `policy.authenticated()` on.
  *
  * **This is the linchpin against drift:** both the Postgres DDL generators and
  * the client-side evaluator consume this one function, so there is exactly one
@@ -24,27 +28,44 @@ export interface RuleConditions {
  * into the expression here (AND'd with the base condition, matching how Postgres
  * generates the clause) rather than being handled separately by each consumer.
  */
-export function securityRuleToConditions(rule: SecurityRule): RuleConditions {
+export function securityRuleToConditions(rule: SecurityRule, site: Pick<PolicyConditionSite, "table"> = {}): RuleConditions {
     return {
-        usingExpr: withRoles(baseUsing(rule), rule),
-        withCheckExpr: withRoles(baseWithCheck(rule), rule)
+        usingExpr: withRoles(baseUsing(rule, site), rule),
+        withCheckExpr: withRoles(baseWithCheck(rule, site), rule)
     };
 }
 
-function baseUsing(rule: SecurityRule): PolicyExpression | null {
-    if (rule.condition) return rule.condition;
+/**
+ * A condition under an `access` gate. `"public"` adds nothing — `true AND c`
+ * is `c` — so a public rule's clause is its condition, as written.
+ */
+function gated(access: SecurityRuleAccess | undefined, condition: PolicyExpression): PolicyExpression {
+    return access === "authenticated" ? policy.and(policy.authenticated(), condition) : condition;
+}
+
+function baseUsing(rule: SecurityRule, site: Pick<PolicyConditionSite, "table">): PolicyExpression | null {
+    // A legacy rule never carries `access` beside a condition, so for it this
+    // is the condition itself — the same object, compiled as it always was.
+    if (rule.condition != null) return gated(rule.access, policyConditionToExpression(rule.condition, { ...site, clause: "condition" }));
     if (rule.using != null) return sqlToPolicy(rule.using);
+    // `access` alone: only `"public"` grants. A bare `access: "authenticated"`
+    // is a shape older releases accepted and compiled to no clause (deny); the
+    // types no longer admit it, and it keeps compiling — and being named — as
+    // it did. With a condition or check it is a `ConditionalAccessSecurityRule`.
     if (rule.access === "public") return policy.true();
+    // `access: "authenticated"` with only a `check`: the USING side is the
+    // caller test alone.
+    if (rule.access === "authenticated" && rule.check != null) return policy.authenticated();
     if (rule.ownerField) return policy.compare(policy.field(rule.ownerField), "eq", policy.authUid());
     return null;
 }
 
-function baseWithCheck(rule: SecurityRule): PolicyExpression | null {
-    if (rule.check) return rule.check;
+function baseWithCheck(rule: SecurityRule, site: Pick<PolicyConditionSite, "table">): PolicyExpression | null {
+    if (rule.check != null) return gated(rule.access, policyConditionToExpression(rule.check, { ...site, clause: "check" }));
     if (rule.withCheck != null) return sqlToPolicy(rule.withCheck);
     // No explicit WITH CHECK → fall back to the USING condition, matching
     // PostgreSQL's own default behavior.
-    return baseUsing(rule);
+    return baseUsing(rule, site);
 }
 
 /**

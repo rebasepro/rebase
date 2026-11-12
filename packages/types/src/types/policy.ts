@@ -353,6 +353,96 @@ export interface AuthClaimPolicyOperand {
     name: string;
 }
 
+// ── Shorthand conditions ─────────────────────────────────────────────
+
+/**
+ * A value a {@link PolicyShorthand} compares a column with.
+ * @group Models
+ */
+export type PolicyShorthandValue = string | number | boolean | null;
+
+/**
+ * The plain-object form of a row condition: `{ status: "published" }`.
+ *
+ * Every key is a column key of the table and every value a literal; the
+ * condition holds when **each** column equals its value (an AND of
+ * equalities), and a `null` value means the column `IS NULL`. It is what
+ * `policy.and(policy.compare(policy.field(k), "eq", policy.literal(v)), …)`
+ * spells longhand, and compiles to the same SQL — except `null`, which no
+ * comparison can express (`x = NULL` is never true) and which therefore
+ * compiles to `x IS NULL`.
+ *
+ * - **No key may be named `kind`.** `kind` is how a {@link PolicyExpression}
+ *   is recognised at runtime, so `{ kind: "true" }` would be read as the
+ *   expression that grants everything. The type refuses it and so does the
+ *   compiler; compare a column called `kind` with the longhand form.
+ * - **At least one key.** `{}` would be an AND of nothing, which is `true`;
+ *   the compiler refuses it — write `policy.true()` if every row is meant.
+ * - The keys are checked against the table when the rule is compiled: a key
+ *   that names no column is refused, with the table and the key in the error.
+ *
+ * Use {@link isPolicyShorthand} to tell it apart from a `PolicyExpression`.
+ *
+ * @example
+ * { operation: "select", access: "public", condition: { status: "published" } }
+ * { operation: "select", condition: { orgId: "acme", deletedAt: null } }
+ *
+ * @group Models
+ */
+export type PolicyShorthand = { readonly [column: string]: PolicyShorthandValue } & { readonly kind?: never };
+
+/**
+ * What a rule's `condition` / `check` accepts: a structured
+ * {@link PolicyExpression}, or the {@link PolicyShorthand} object form.
+ * @group Models
+ */
+export type PolicyCondition = PolicyExpression | PolicyShorthand;
+
+/**
+ * Every `kind` a {@link PolicyExpression} node can have — the discriminator
+ * {@link isPolicyShorthand} and {@link isPolicyExpressionKind} read.
+ * @group Models
+ */
+export const POLICY_EXPRESSION_KINDS: readonly PolicyExpression["kind"][] = [
+    "true", "false", "and", "or", "not", "compare", "rolesOverlap", "rolesContain",
+    "authenticated", "registered", "serverContext", "existsIn", "raw"
+];
+
+/**
+ * Whether `kind` names a {@link PolicyExpression} node.
+ * @group Models
+ */
+export function isPolicyExpressionKind(kind: unknown): kind is PolicyExpression["kind"] {
+    return typeof kind === "string" && (POLICY_EXPRESSION_KINDS as readonly string[]).includes(kind);
+}
+
+const isShorthandValue = (value: unknown): value is PolicyShorthandValue =>
+    value === null || typeof value === "string" || typeof value === "boolean"
+    || (typeof value === "number" && Number.isFinite(value));
+
+/**
+ * Whether a rule's `condition` / `check` is a {@link PolicyShorthand} rather
+ * than a {@link PolicyExpression}.
+ *
+ * True only for a plain object with at least one key, none of them `kind`,
+ * whose every value is a string, a finite number, a boolean or `null`. Every
+ * expression node carries `kind`, so no expression is ever taken for a
+ * shorthand — and an object that has a `kind` key is never taken for a
+ * shorthand either, whatever its value: such an object is ambiguous (a column
+ * called `kind`, or a misspelt node) and the compiler refuses it rather than
+ * guessing.
+ *
+ * @group Models
+ */
+export function isPolicyShorthand(value: unknown): value is PolicyShorthand {
+    if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+    const proto: unknown = Object.getPrototypeOf(value);
+    if (proto !== Object.prototype && proto !== null) return false;
+    if (Object.prototype.hasOwnProperty.call(value, "kind")) return false;
+    const entries = Object.entries(value);
+    return entries.length > 0 && entries.every(([, v]) => isShorthandValue(v));
+}
+
 // ── Constructor helpers ──────────────────────────────────────────────
 // Small, dependency-free builders so callers (and the desugaring in
 // `@rebasepro/common`) can assemble expressions without object-literal noise.

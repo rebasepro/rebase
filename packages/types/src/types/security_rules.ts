@@ -15,13 +15,26 @@
  * them with `getPolicyNamesForRule`/`getEffectiveSecurityRules` rather than
  * matching on `rule.name`.
  */
-import type { PolicyExpression } from "./policy";
+import type { PolicyCondition } from "./policy";
 
 /**
  * SQL operation that a policy applies to.
  * @group Models
  */
 export type SecurityOperation = "select" | "insert" | "update" | "delete" | "all";
+
+/**
+ * Who a rule's `access` shortcut admits.
+ *
+ * - `"public"` — every caller who reaches the database, signed in or not.
+ * - `"authenticated"` — a signed-in caller: the `rebase.uid()` is neither the
+ *   server context's `NULL` nor an anonymous visitor's sentinel (see
+ *   `policy.authenticated()`). Only together with a `condition` / `check`
+ *   ({@link ConditionalAccessSecurityRule}, {@link CheckedAccessSecurityRule}).
+ *
+ * @group Models
+ */
+export type SecurityRuleAccess = "public" | "authenticated";
 
 /**
  * Flexible Row Level Security rule for a collection.
@@ -41,10 +54,11 @@ export type SecurityOperation = "select" | "insert" | "update" | "delete" | "all
  * operation. Permissive rules are OR'd together (any one passing is enough).
  * Restrictive rules are AND'd (all must pass). This is standard PostgreSQL RLS behavior.
  *
- * **Mutual exclusivity:** `ownerField`, `access`, structured `condition`, and
- * raw SQL (`using`/`withCheck`) cannot be combined. The type system enforces
- * this — attempting to set conflicting fields will produce a compile-time
- * error.
+ * **Mutual exclusivity:** `ownerField`, `access` and raw SQL
+ * (`using`/`withCheck`) cannot be combined with each other, and a structured
+ * `condition`/`check` combines only with `access`
+ * ({@link ConditionalAccessSecurityRule}). The type system enforces this —
+ * attempting to set conflicting fields will produce a compile-time error.
  *
  * **Which form to reach for:** prefer the structured {@link StructuredSecurityRule}
  * (`condition`/`check`) or the shortcuts (`ownerField`, `access`, `roles`). These
@@ -58,6 +72,8 @@ export type SecurityOperation = "select" | "insert" | "update" | "delete" | "all
 export type SecurityRule =
     | OwnerSecurityRule
     | PublicSecurityRule
+    | ConditionalAccessSecurityRule
+    | CheckedAccessSecurityRule
     | StructuredSecurityRule
     | RawSQLSecurityRule
     | RawSQLCheckOnlySecurityRule
@@ -208,14 +224,22 @@ export interface OwnerSecurityRule extends SecurityRuleBase {
  * Security rule that grants unrestricted row access (no row filtering).
  * Generates `USING (true)`.
  *
- * This means "no row-level filter", NOT "anonymous/unauthenticated access".
- * Authentication is still enforced at the API layer — this only controls which
- * *rows* authenticated users can see.
+ * This means "no row-level filter", NOT "anonymous/unauthenticated access" on
+ * its own: when the API requires a token (`AUTH_REQUIRE`, the default) a
+ * caller without one is refused before RLS is consulted. This only controls
+ * which *rows* a caller who reached the database sees.
  *
- * Cannot be combined with `using`, `withCheck`, or `ownerField`.
+ * Cannot be combined with `using`, `withCheck`, or `ownerField`. To narrow the
+ * rows, add a `condition` — that is a {@link ConditionalAccessSecurityRule}.
+ *
+ * A bare `access: "authenticated"` is not accepted: older releases
+ * compiled it to a policy that denies every row, databases still hold it
+ * under that name, and so it keeps that meaning. Write
+ * `access: "authenticated"` together with a `condition` / `check`, or
+ * `condition: policy.authenticated()`.
  *
  * @example
- * // Public read (any authenticated user sees all rows)
+ * // Public read (every caller sees all rows)
  * { operation: "select", access: "public" }
  *
  * @group Models
@@ -231,13 +255,99 @@ export interface PublicSecurityRule extends SecurityRuleBase {
 }
 
 /**
+ * Security rule that grants `access` on the rows matching a condition:
+ * "anyone (or any signed-in caller) may do this, on rows where …".
+ *
+ * - `access: "public"` compiles to `USING (<condition>)` — no caller test.
+ * - `access: "authenticated"` compiles to
+ *   `USING (<signed in> AND <condition>)`.
+ *
+ * The write clause is derived as a structured rule derives it: `WITH CHECK`
+ * from `check`, falling back to `condition`, gated by `access` the same way.
+ * With only `check` ({@link CheckedAccessSecurityRule}), the `USING` clause is
+ * the `access` test alone.
+ *
+ * `condition` / `check` take a {@link PolicyExpression} or the
+ * {@link PolicyShorthand} object form. `roles` ANDs an application-role test
+ * on, as on every rule.
+ *
+ * A new shape: its policy names are hashed from their own input (see
+ * `getPolicyNameHash`), so they never coincide with a name an older rule
+ * shape compiles to.
+ *
+ * Cannot be combined with `ownerField` or raw `using`/`withCheck`.
+ *
+ * @example
+ * // Anyone reads the published posts
+ * { operation: "select", access: "public", condition: { status: "published" } }
+ *
+ * @example
+ * // Signed-in callers may file a report, but only as an open one
+ * { operation: "insert", access: "authenticated", check: { state: "open" } }
+ *
+ * @group Models
+ */
+export interface ConditionalAccessSecurityRule extends SecurityRuleBase {
+    /** The callers the rule admits — see {@link SecurityRuleAccess}. */
+    access: SecurityRuleAccess;
+
+    /**
+     * Which *existing* rows the callers may see / modify / delete (the `USING`
+     * clause, ANDed with the `access` test).
+     */
+    condition: PolicyCondition;
+
+    /**
+     * Which *new/updated* row values the callers may write (the `WITH CHECK`
+     * clause, ANDed with the `access` test). Defaults to `condition`.
+     */
+    check?: PolicyCondition;
+
+    ownerField?: never;
+    using?: never;
+    withCheck?: never;
+}
+
+/**
+ * {@link ConditionalAccessSecurityRule} with only a `check`: the callers named
+ * by `access` may write rows matching `check`; the `USING` clause (for
+ * `select` / `update` / `delete`) is the `access` test alone.
+ *
+ * @example
+ * // Signed-in callers may insert reports, only as open ones
+ * { operation: "insert", access: "authenticated", check: { state: "open" } }
+ *
+ * @group Models
+ */
+export interface CheckedAccessSecurityRule extends SecurityRuleBase {
+    /** The callers the rule admits — see {@link SecurityRuleAccess}. */
+    access: SecurityRuleAccess;
+
+    /**
+     * Which *new/updated* row values the callers may write (the `WITH CHECK`
+     * clause, ANDed with the `access` test).
+     */
+    check: PolicyCondition;
+
+    condition?: never;
+    ownerField?: never;
+    using?: never;
+    withCheck?: never;
+}
+
+/**
  * Security rule expressed as a structured, engine-agnostic
  * {@link PolicyExpression}. This is the **recommended** way to write a
  * non-trivial condition: it compiles to PostgreSQL `USING`/`WITH CHECK` SQL
  * *and* is evaluated identically by the admin UI, so the UI can never show an
  * action the database will reject.
  *
- * Cannot be combined with `ownerField`, `access`, or raw `using`/`withCheck`.
+ * Cannot be combined with `ownerField` or raw `using`/`withCheck`; combined
+ * with `access` it is a {@link ConditionalAccessSecurityRule}.
+ *
+ * @example
+ * // Rows of one organisation that are not deleted (shorthand form)
+ * { operation: "select", condition: { orgId: "acme", deletedAt: null } }
  *
  * @example
  * // Owner, or any user holding the `moderator` role
@@ -255,15 +365,19 @@ export interface StructuredSecurityRule extends SecurityRuleBase {
     /**
      * Structured condition for the `USING` clause — which *existing* rows are
      * visible / can be modified / deleted (SELECT, UPDATE, DELETE).
+     *
+     * A {@link PolicyExpression}, or the {@link PolicyShorthand} object form
+     * (`{ status: "published" }` — each column equals its value).
      */
-    condition: PolicyExpression;
+    condition: PolicyCondition;
 
     /**
      * Structured condition for the `WITH CHECK` clause — which *new/updated*
      * row values are allowed (INSERT, UPDATE). Defaults to `condition` when
-     * omitted, mirroring PostgreSQL's own behavior.
+     * omitted, mirroring PostgreSQL's own behavior. Takes the same two forms
+     * as `condition`.
      */
-    check?: PolicyExpression;
+    check?: PolicyCondition;
 
     ownerField?: never;
     access?: never;

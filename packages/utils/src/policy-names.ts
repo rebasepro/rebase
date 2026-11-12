@@ -1,4 +1,4 @@
-import type { SecurityOperation, SecurityRule } from "@rebasepro/types";
+import { isPolicyShorthand, type SecurityOperation, type SecurityRule } from "@rebasepro/types";
 import { sha1Hex } from "./sha1";
 import { toPostgresIdentifier, truncateToBytes } from "./names";
 
@@ -16,8 +16,25 @@ import { toPostgresIdentifier, truncateToBytes } from "./names";
  * in every deployed database while the UI keeps matching the old ones.
  */
 
-/** Stable digest of the parts of a rule that determine what the policy does. */
+/**
+ * Stable digest of the parts of a rule that determine what the policy does.
+ *
+ * Two hash inputs, never mixed:
+ *
+ * - **A rule of a shape every release has known** hashes
+ *   `JSON.stringify({ a, m, op, ops, own, rol, pg, u, w, c, ch })`, byte for
+ *   byte as it always has — a deployed database keeps its policies by these
+ *   names, so this input must never move. Its `condition` / `check` are
+ *   serialised in the key order they were written in, as they always were.
+ * - **A rule using a newer form** ({@link isNewShapeRule}: a
+ *   `PolicyShorthand` condition / check, or `access` combined with a
+ *   condition / check) hashes {@link newShapeHashInput}:
+ *   `"rls2:"` followed by canonical JSON in which every object's keys are
+ *   sorted, so `{ a: 1, b: 2 }` and `{ b: 2, a: 1 }` name the same policy.
+ *   A legacy input starts with `{`, so the two spaces cannot meet.
+ */
 export function getPolicyNameHash(rule: SecurityRule): string {
+    if (isNewShapeRule(rule)) return sha1Hex(newShapeHashInput(rule)).substring(0, 7);
     const data = JSON.stringify({
         a: rule.access,
         m: rule.mode,
@@ -32,6 +49,57 @@ export function getPolicyNameHash(rule: SecurityRule): string {
         ch: rule.check
     });
     return sha1Hex(data).substring(0, 7);
+}
+
+/**
+ * Whether a rule uses a form newer than the legacy hash input knows: a
+ * `PolicyShorthand` condition or check, or `access` together with a condition
+ * or check. (A bare `access: "authenticated"` is NOT new: older releases
+ * accepted it, compiled it to a deny, and deployed databases hold policies
+ * named from the legacy input.) Such a rule hashes
+ * {@link newShapeHashInput}; every other rule keeps the legacy input.
+ */
+export function isNewShapeRule(rule: SecurityRule): boolean {
+    if (rule.access !== undefined && (rule.condition != null || rule.check != null)) return true;
+    return isPolicyShorthand(rule.condition) || isPolicyShorthand(rule.check);
+}
+
+/**
+ * The hash input of a {@link isNewShapeRule new-shape} rule:
+ * `"rls2:" + canonicalJson({ a, c, ch, m, op, ops, own, pg, rol, u, w })`.
+ *
+ * `canonicalJson` is `JSON.stringify` with every object's keys sorted (arrays
+ * keep their order, `undefined` members are dropped). A shorthand is encoded
+ * as `{ "=": [[column, value], …] }`, its pairs sorted by column — the
+ * `=` tag keeps it apart from an expression node, which always carries
+ * `kind`. `ops`, `rol` and `pg` are sorted as in the legacy input.
+ */
+export function newShapeHashInput(rule: SecurityRule): string {
+    return `rls2:${canonicalJson({
+        a: rule.access,
+        m: rule.mode,
+        op: rule.operation,
+        ops: rule.operations?.slice().sort(),
+        own: rule.ownerField,
+        rol: rule.roles?.slice().sort(),
+        pg: rule.pgRoles?.slice().sort(),
+        u: rule.using,
+        w: rule.withCheck,
+        c: conditionHashValue(rule.condition),
+        ch: conditionHashValue(rule.check)
+    })}`;
+}
+
+function conditionHashValue(condition: unknown): unknown {
+    if (!isPolicyShorthand(condition)) return condition;
+    return { "=": Object.keys(condition).sort().map(column => [column, condition[column]]) };
+}
+
+function canonicalJson(value: unknown): string {
+    return JSON.stringify(value, (_key, member: unknown) => {
+        if (typeof member !== "object" || member === null || Array.isArray(member)) return member;
+        return Object.fromEntries(Object.entries(member).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
+    });
 }
 
 /** The operations a rule expands to — `operations` wins over `operation`. */
