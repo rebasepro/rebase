@@ -18,12 +18,18 @@
 import path from "node:path";
 import type { Node, Statement } from "ts-morph";
 import type { LiftNote } from "@rebasepro/common";
-import { ADMIN_COLLECTION_KEYS, ADMIN_PROPERTY_KEYS, type EnumValues } from "@rebasepro/types";
+import type { EnumValues } from "@rebasepro/types";
 import { enumValueLabel, labelFromIdentifier, singularLabel } from "@rebasepro/utils";
 
 import type { Member, PathSegment } from "./ast";
 import { collectReferences, nodeAtPath, nodeText, postDeclarationAssignments, resolveObject, toPosix, unwrap } from "./ast";
 import { memberFunctionText } from "./hooks";
+import {
+    COLLECTION_ADMIN_DESTINATIONS,
+    KANBAN_DESTINATIONS,
+    PROPERTY_ADMIN_DESTINATIONS,
+    PROPERTY_FIELD_DESTINATIONS
+} from "./vocabulary";
 import { importLines } from "./modules";
 import type { CollectionEntry, PlanContext } from "./plan-context";
 import { note, planFile, refuse, relativeToRoot } from "./plan-context";
@@ -31,27 +37,8 @@ import { printValue, RawSource } from "./print-js";
 import type { TableName } from "./backend";
 import { tableImportPath } from "./backend";
 
-/** Legacy collection `admin` keys that `customizeTable` names differently. Every other `admin` key keeps its name. */
-const COLLECTION_ADMIN_RENAMES: Readonly<Record<string, string>> = {
-    propertiesOrder: "fieldOrder",
-    listProperties: "listFields",
-    previewProperties: "previewFields"
-};
-
-/** Legacy property `admin` keys that a field customization names differently. */
-const PROPERTY_ADMIN_RENAMES: Readonly<Record<string, string>> = {
-    hideFromCollection: "hidden",
-    previewProperties: "previewFields"
-};
-
 /** The keys whose string value is a component path (the Vite plugin's `LAZY_COMPONENT_KEYS`). */
 const COMPONENT_KEYS = new Set(["Field", "Preview", "Builder", "Filter", "Component"]);
-
-/** Property-level presentation fields that keep their name on a field customization. */
-const SAME_NAME_FIELD_KEYS = new Set(["mode", "timezone", "propertyConfig", "conditions", "dynamicProps", "metadata", "description"]);
-
-const KNOWN_COLLECTION_ADMIN = new Set<string>(ADMIN_COLLECTION_KEYS);
-const KNOWN_PROPERTY_ADMIN = new Set<string>(ADMIN_PROPERTY_KEYS);
 
 /** A customization module being built. */
 interface Builder {
@@ -279,8 +266,13 @@ export function enumLabelsOf(values: EnumValues): Record<string, unknown> | unde
 function fieldAdmin(plan: PlanContext, builder: Builder, admin: Record<string, unknown>, segments: PathSegment[], target: Record<string, unknown>, label: string): void {
     for (const [key, value] of Object.entries(admin)) {
         if (value === undefined) continue;
-        if (!KNOWN_PROPERTY_ADMIN.has(key)) {
+        const destination = PROPERTY_ADMIN_DESTINATIONS[key];
+        if (destination === undefined) {
             note(plan, builder.entry, `${label}.admin.${key} is not an admin option (nothing read it); not carried.`);
+            continue;
+        }
+        if (typeof destination !== "string") {
+            note(plan, builder.entry, `${label}.admin.${key} is not carried: ${destination.dropped}`);
             continue;
         }
         const printed = printable(plan, builder, value, [...segments, "admin", key], `${label}.admin.${key}`);
@@ -291,7 +283,7 @@ function fieldAdmin(plan: PlanContext, builder: Builder, admin: Record<string, u
             if (Object.keys(rest).length > 0) target.disabled = rest;
             continue;
         }
-        target[PROPERTY_ADMIN_RENAMES[key] ?? key] = printed;
+        target[destination] = printed;
     }
 }
 
@@ -300,19 +292,25 @@ function collectionAdmin(plan: PlanContext, builder: Builder, admin: Record<stri
     const options = builder.options;
     for (const [key, value] of Object.entries(admin)) {
         if (value === undefined) continue;
-        if (!KNOWN_COLLECTION_ADMIN.has(key)) {
+        const destination = COLLECTION_ADMIN_DESTINATIONS[key];
+        if (destination === undefined) {
             note(plan, builder.entry, `admin.${key} is not an admin option (nothing read it); not carried.`);
             continue;
         }
+        if (typeof destination !== "string") {
+            note(plan, builder.entry, `admin.${key} is not carried: ${destination.dropped}`);
+            continue;
+        }
         const printed = printable(plan, builder, value, ["admin", key], `admin.${key}`);
-        if (key === "orderProperty") {
-            at(options, ["kanban"]).orderField = printed;
+        if (destination.includes(".")) {
+            const path_ = destination.split(".");
+            at(options, path_.slice(0, -1))[path_[path_.length - 1]] = printed;
             continue;
         }
         if (key === "kanban" && isPlainObject(printed)) {
             const kanban = at(options, ["kanban"]);
             for (const [kanbanKey, kanbanValue] of Object.entries(printed)) {
-                kanban[kanbanKey === "columnProperty" ? "columnField" : kanbanKey === "orderProperty" ? "orderField" : kanbanKey] = kanbanValue;
+                kanban[KANBAN_DESTINATIONS[kanbanKey] ?? kanbanKey] = kanbanValue;
             }
             continue;
         }
@@ -331,7 +329,7 @@ function collectionAdmin(plan: PlanContext, builder: Builder, admin: Record<stri
             };
             continue;
         }
-        options[COLLECTION_ADMIN_RENAMES[key] ?? key] = printed;
+        options[destination] = printed;
     }
     const kanban = options.kanban;
     if (isPlainObject(kanban) && kanban.columnField === undefined) {
@@ -348,7 +346,12 @@ function relationOverrides(plan: PlanContext, builder: Builder, value: unknown, 
         if (entry === undefined) continue;
         if (key === "admin" && isPlainObject(entry)) {
             for (const [adminKey, adminValue] of Object.entries(entry)) {
-                out[COLLECTION_ADMIN_RENAMES[adminKey] ?? adminKey] = printable(plan, builder, adminValue, [...segments, "admin", adminKey], `${label}.admin.${adminKey}`);
+                const destination = COLLECTION_ADMIN_DESTINATIONS[adminKey];
+                if (typeof destination !== "string" || destination.includes(".")) {
+                    note(plan, builder.entry, `${label}.admin.${adminKey} has no relation-tab option in \`customizeTable\`; not carried.`);
+                    continue;
+                }
+                out[destination] = printable(plan, builder, adminValue, [...segments, "admin", adminKey], `${label}.admin.${adminKey}`);
             }
             continue;
         }
@@ -407,7 +410,7 @@ function applyFieldNote(plan: PlanContext, builder: Builder, item: LiftNote, fie
             return;
         }
         case "propertiesOrder":
-            target.fieldOrder = item.value;
+            target[String(PROPERTY_FIELD_DESTINATIONS.propertiesOrder)] = item.value;
             return;
         case "storage.processFile":
         case "storage.postProcess":
@@ -420,8 +423,13 @@ function applyFieldNote(plan: PlanContext, builder: Builder, item: LiftNote, fie
         default:
             break;
     }
-    if (SAME_NAME_FIELD_KEYS.has(item.field)) {
-        target[item.field] = printable(plan, builder, item.value, [...literal, item.field], `${label}.${item.field}`);
+    const destination = PROPERTY_FIELD_DESTINATIONS[item.field];
+    if (destination !== undefined && typeof destination !== "string") {
+        note(plan, builder.entry, `${label}.${item.field} is not carried: ${destination.dropped}`);
+        return;
+    }
+    if (destination !== undefined) {
+        target[destination] = printable(plan, builder, item.value, [...literal, item.field], `${label}.${item.field}`);
         if (item.field === "dynamicProps") {
             plan.manualSteps.push({
                 title: `Check fields.${key}.dynamicProps of ${builder.name.table}`,

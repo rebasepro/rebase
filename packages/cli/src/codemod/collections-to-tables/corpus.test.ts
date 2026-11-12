@@ -70,14 +70,23 @@ function templateProject(preset: "blog" | "ecommerce" | "blank"): string {
         }
     }
     fs.rmSync(presets, { recursive: true, force: true });
+    // The template is being moved onto the new layout in place, its blog
+    // outputs beside config/ until that is deleted: drop them, so every preset
+    // is migrated from its legacy files alone.
+    for (const output of ["backend/schema", "backend/lib", "frontend/src/cms"]) fs.rmSync(path.join(dir, output), { recursive: true, force: true });
+    for (const moved of ["resources.ts", "storage.ts"]) {
+        if (fs.existsSync(path.join(dir, "config", moved))) fs.rmSync(path.join(dir, "backend", moved), { force: true });
+    }
     return dir;
 }
 
+const TEMPLATE_IS_LEGACY = fs.existsSync(path.join(REPO, "packages", "cli", "templates", "template", "config", "collections"));
+
 const PROJECTS: { name: string; dir: () => string; present: boolean }[] = [
     { name: "app", dir: () => tempCopy("app", path.join(REPO, "app")), present: fs.existsSync(path.join(REPO, "app", "config", "collections")) },
-    { name: "template blog", dir: () => templateProject("blog"), present: true },
-    { name: "template ecommerce", dir: () => templateProject("ecommerce"), present: true },
-    { name: "template blank", dir: () => templateProject("blank"), present: true },
+    { name: "template blog", dir: () => templateProject("blog"), present: TEMPLATE_IS_LEGACY },
+    { name: "template ecommerce", dir: () => templateProject("ecommerce"), present: TEMPLATE_IS_LEGACY },
+    { name: "template blank", dir: () => templateProject("blank"), present: TEMPLATE_IS_LEGACY },
     { name: "saas", dir: () => tempCopy("saas", path.join(REPO, "saas")), present: fs.existsSync(path.join(REPO, "saas", "config", "collections")) }
 ];
 
