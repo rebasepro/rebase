@@ -123,10 +123,6 @@ export interface PendingTableFeature {
  */
 export const PENDING_TABLE_FEATURES = [
     {
-        id: "column-generated-as",
-        description: "`.generatedAs(sql)` on a column. The planner generates only the search columns; a user column cannot be `GENERATED ALWAYS AS … STORED` yet."
-    },
-    {
         id: "identity-not-primary-key",
         description: "`.identity()` on a column that is not part of the primary key. Identity is planned only for a key (`isId: \"increment\"`)."
     },
@@ -785,7 +781,6 @@ const NO_FLAGS: Flags = { required: false, unique: false };
  */
 function lowerColumn(key: string, def: ColumnDef, ctx: ColumnContext): PostgresProperty {
     const { at } = ctx;
-    if (def.generatedAs !== undefined) pending(at, "column-generated-as");
     if (def.default?.kind === "identity") {
         if (!def.primaryKey) pending(at, "identity-not-primary-key");
         if (def.type.kind !== "integer") pending(at, "identity-width");
@@ -891,7 +886,10 @@ function baseFields(key: string, def: ColumnDef, ctx: ColumnContext): BaseFields
     }
     if (def.description !== undefined) out.description = def.description;
     if (def.transform !== undefined) out.callbacks = lowerTransform(def.transform, ctx.slug, ctx.describe);
-    if (def.default?.kind === "database") {
+    // The database fills a generated column on every write: a create may omit
+    // it however NOT NULL it is, which is what the runtime reads off
+    // `databaseDefault: true`. (The planner plans it from the definition.)
+    if (def.default?.kind === "database" || def.generatedAs !== undefined) {
         out.databaseDefault = true;
     } else if (!def.primaryKey) {
         if (def.default?.kind === "sql") out.databaseDefault = `sql\`${def.default.expression}\``;

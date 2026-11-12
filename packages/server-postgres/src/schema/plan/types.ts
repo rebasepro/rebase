@@ -172,7 +172,7 @@ export interface ColumnPlan {
     primaryKey: boolean;
     unique: boolean;
     default?: ColumnDefault;
-    /** A STORED generated column — today only the search ones. */
+    /** A STORED generated column: a search column, or one a definition declares `.generatedAs()`. */
     generated?: { expression: string; stored: true };
     foreignKey?: ForeignKeyPlan;
     /**

@@ -163,8 +163,14 @@ const referencesClause = (
 const renderColumn = (column: ColumnPlan, table: TablePlan, plan: SchemaPlan, uses: BuilderUses): string => {
     let out = builderFor(column.type, column.column, uses);
 
+    // Drizzle leaves a `.generatedAlwaysAs()` column out of every INSERT and
+    // types it out of `$inferInsert` and of an update's `set`.
     if (column.generated) {
-        return `${out}.generatedAlwaysAs(${wrapSql(column.generated.expression)})`;
+        out += `.generatedAlwaysAs(${wrapSql(column.generated.expression)})`;
+        if (column.primaryKey) out += ".primaryKey()";
+        if (column.unique) out += ".unique()";
+        if (!column.nullable && !column.primaryKey) out += ".notNull()";
+        return out;
     }
 
     // A junction endpoint spells `.notNull()` before its reference; every other

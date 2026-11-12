@@ -182,6 +182,26 @@ export function assertWritableColumns(
     const columns = getTableColumns(table) as Record<string, unknown> | undefined;
     if (!columns || Object.keys(columns).length === 0) return;
 
+    // A column the database computes (`GENERATED ALWAYS AS … STORED`) is never
+    // in a statement's column list: Postgres refuses any value but DEFAULT, and
+    // an INSERT would leave it out without a word while an UPDATE failed.
+    // Refused here for every caller, the trusted plane included, the way the
+    // search column is (it is never a field at all).
+    const generated = Object.keys(values).filter(key => {
+        const column = columns[key];
+        return typeof column === "object" && column !== null && "generated" in column
+            && typeof column.generated === "object" && column.generated !== null
+            && "type" in column.generated && column.generated.type === "always";
+    });
+    if (generated.length > 0) {
+        throw ApiError.badRequest(
+            `'${collectionPath}' computes ${generated.map(key => `'${key}'`).join(", ")} itself ` +
+            "(a generated column), so a write cannot set " + (generated.length > 1 ? "them" : "it") +
+            ". Leave " + (generated.length > 1 ? "them" : "it") + " out of the values.",
+            "FIELD_NOT_WRITABLE"
+        );
+    }
+
     const unknown = Object.keys(values).filter(key => !(key in columns));
     if (unknown.length === 0) return;
 

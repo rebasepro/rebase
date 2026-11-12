@@ -90,6 +90,8 @@ describe("lowerTables — columns", () => {
         ["onUpdateUser", col.text().onUpdateUser(), { type: "string", autoValue: "user_on_update" }],
         ["defaultSql", col.text().defaultSql("gen_short_id()"), { type: "string", databaseDefault: "sql`gen_short_id()`" }],
         ["dbDefault", col.text().dbDefault(), { type: "string", databaseDefault: true }],
+        ["generatedAs is closed to writes and filled by the database", col.text().notNull().generatedAs("upper(x)"),
+            { type: "string", access: { write: [] }, databaseDefault: true, validation: { required: true } }],
         ["private", col.text().private(), { type: "string", excludeFromApi: true }],
         ["private wins over readOnly", col.text().readOnly().private(), { type: "string", excludeFromApi: true }],
         ["readOnly", col.text().readOnly(), { type: "string", access: { write: [] } }],
@@ -601,7 +603,6 @@ describe("lowerTables — refusals", () => {
 
     /** One definition per pending feature, each refused with that feature's id. */
     const PENDING: Record<PendingTableFeatureId, () => (AnyTableDef | AnyViewDef)[]> = {
-        "column-generated-as": () => [defineTable("t", { columns: { id, g: col.text().generatedAs("upper(x)") }, rls: "admin-only" })],
         "identity-not-primary-key": () => [defineTable("t", { columns: { id, n: col.integer().identity() }, rls: "admin-only" })],
         "identity-width": () => [defineTable("t", { columns: { id: col.bigint().primaryKey().identity() }, rls: "admin-only" })],
         "array-element-type": () => [defineTable("t", { columns: { id, a: col.array(col.uuid()) }, rls: "admin-only" })],

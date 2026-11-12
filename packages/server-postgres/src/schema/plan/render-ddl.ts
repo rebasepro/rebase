@@ -114,8 +114,14 @@ export const renderColumnDefinition = (column: ColumnPlan): string => {
     // table's columns must be, and it hands over a rendered definition.
     if (column.sqlDefinition) return column.sqlDefinition;
 
+    // A generated column takes no DEFAULT (Postgres refuses one beside the
+    // expression); its key, UNIQUE and NOT NULL follow it as on any column.
     if (column.generated) {
-        return `${renderPgType(column.type)} GENERATED ALWAYS AS (${column.generated.expression}) STORED`;
+        let generated = `${renderPgType(column.type)} GENERATED ALWAYS AS (${column.generated.expression}) STORED`;
+        if (column.primaryKey) generated += " PRIMARY KEY";
+        if (column.unique) generated += " UNIQUE";
+        if (!column.nullable && !column.primaryKey) generated += " NOT NULL";
+        return generated;
     }
 
     let definition = renderPgType(column.type);
