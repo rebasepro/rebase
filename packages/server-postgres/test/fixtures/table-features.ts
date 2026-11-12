@@ -5,7 +5,7 @@
  * spelling to be equivalent to, so `table-features.test.ts` holds the planner,
  * both renderers, Postgres (PGlite) and the boot planner to them directly.
  */
-import { col, defineTable } from "@rebasepro/types";
+import { col, defineTable, rel } from "@rebasepro/types";
 
 /** `.generatedAs()`: a column Postgres computes from the row. */
 export const people = defineTable("people", {
@@ -19,5 +19,29 @@ export const people = defineTable("people", {
     rls: "admin-only"
 });
 
+/** `.identity()` at every width, key or not. */
+export const counters = defineTable("counters", {
+    columns: {
+        id: col.bigint().primaryKey().identity(),
+        sequenceNo: col.integer().notNull().identity(),
+        tick: col.smallint().identity(),
+        label: col.text()
+    },
+    rls: "admin-only"
+});
+
+/** A smallint identity key, and links into a bigint identity key — one bound, one derived. */
+export const tallies = defineTable("tallies", {
+    columns: {
+        code: col.smallint().primaryKey().identity(),
+        counterId: col.bigint().notNull()
+    },
+    relations: {
+        counter: rel.belongsTo(() => counters, { localKey: "counter_id" }),
+        backup: rel.belongsTo(() => counters)
+    },
+    rls: "admin-only"
+});
+
 /** Every table, in an order that declares a target before what points at it. */
-export const TABLE_FEATURES = [people];
+export const TABLE_FEATURES = [people, counters, tallies];

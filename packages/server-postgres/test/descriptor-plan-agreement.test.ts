@@ -25,6 +25,7 @@ import { collectionsToTableDefs, compileTables, isSchemaDefinitionError, lowerTa
 import { planSchema } from "../src/schema/plan/plan-schema";
 import type { ColumnPlan, SchemaPlan, TablePlan } from "../src/schema/plan/types";
 import { loadPlanCorpus, withPinnedPlannerWorld, type PlanCorpus } from "./helpers/plan-corpus";
+import { TABLE_FEATURES } from "./fixtures/table-features";
 
 type Def = AnyTableDef | AnyViewDef;
 
@@ -215,6 +216,10 @@ const published = defineView("published_posts", {
 describe("descriptor ↔ plan agreement", () => {
     it("agrees on a set written in the new model", () => {
         expect(agreementOf([users, categories, tags, posts, comments, memberships, published], "admin-only")).toEqual([]);
+    });
+
+    it("agrees on the features only the table model states (test/fixtures/table-features.ts)", () => {
+        expect(agreementOf(TABLE_FEATURES)).toEqual([]);
     });
 
     it("notices a descriptor that states a name the plan does not have", () => {

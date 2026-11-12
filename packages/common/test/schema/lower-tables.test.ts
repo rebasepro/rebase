@@ -169,7 +169,10 @@ describe("lowerTables — columns", () => {
             { type: "vector", dimensions: 3, index: { method: "hnsw", distance: ["cosine", "inner_product"], m: 8, efConstruction: 32 } }],
         ["vector single metric", col.vector(3, { index: { method: "ivfflat", metric: "l2", lists: 4 } }), { type: "vector", dimensions: 3, index: { method: "ivfflat", distance: "l2", lists: 4 } }],
         ["vector index false", col.vector(3, { index: false }), { type: "vector", dimensions: 3, index: false }],
-        ["bytea", col.bytea().unique(), { type: "binary", validation: { unique: true } }]
+        ["bytea", col.bytea().unique(), { type: "binary", validation: { unique: true } }],
+        ["identity outside the key is filled by the database", col.integer().notNull().identity(),
+            { type: "number", columnType: "integer", databaseDefault: true, validation: { required: true } }],
+        ["identity at another width", col.bigint().identity(), { type: "number", columnType: "bigint", databaseDefault: true }]
     ])("%s", (_name, column, expected) => {
         expect(lowerColumn(column)).toEqual(expected);
     });
@@ -181,7 +184,8 @@ describe("lowerTables — columns", () => {
             defineTable("c", { columns: { code: col.text().primaryKey() }, rls: "admin-only" }),
             defineTable("d", { columns: { id: col.text().primaryKey().defaultSql("gen_id()") }, rls: "admin-only" }),
             defineTable("e", { columns: { n: col.integer().primaryKey(), u: col.uuid().primaryKey() }, rls: "admin-only" }),
-            defineTable("f", { columns: { day: col.date().primaryKey(), n: col.numeric().primaryKey() }, rls: "admin-only" })
+            defineTable("f", { columns: { day: col.date().primaryKey(), n: col.numeric().primaryKey() }, rls: "admin-only" }),
+            defineTable("g", { columns: { id: col.bigint().primaryKey().identity() }, rls: "admin-only" })
         ]);
         expect(all.map(collection => collection.properties)).toEqual([
             { id: { type: "string", isId: "uuid" } },
@@ -189,7 +193,8 @@ describe("lowerTables — columns", () => {
             { code: { type: "string", isId: true } },
             { id: { type: "string", isId: "sql`gen_id()`" } },
             { n: { type: "number", isId: true }, u: { type: "string", columnType: "uuid", isId: true } },
-            { day: { type: "date", columnType: "date", isId: true }, n: { type: "number", columnType: "numeric", isId: true } }
+            { day: { type: "date", columnType: "date", isId: true }, n: { type: "number", columnType: "numeric", isId: true } },
+            { id: { type: "number", columnType: "bigint", isId: "increment" } }
         ]);
     });
 
@@ -603,8 +608,6 @@ describe("lowerTables — refusals", () => {
 
     /** One definition per pending feature, each refused with that feature's id. */
     const PENDING: Record<PendingTableFeatureId, () => (AnyTableDef | AnyViewDef)[]> = {
-        "identity-not-primary-key": () => [defineTable("t", { columns: { id, n: col.integer().identity() }, rls: "admin-only" })],
-        "identity-width": () => [defineTable("t", { columns: { id: col.bigint().primaryKey().identity() }, rls: "admin-only" })],
         "array-element-type": () => [defineTable("t", { columns: { id, a: col.array(col.uuid()) }, rls: "admin-only" })],
         "array-element-modifiers": () => [defineTable("t", { columns: { id, a: col.array(col.text().notNull()) }, rls: "admin-only" })],
         "enum-type-name": () => [defineTable("t", { columns: { id, s: col.enum(["a"], { name: "shared_status" }) }, rls: "admin-only" })],

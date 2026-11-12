@@ -123,14 +123,6 @@ export interface PendingTableFeature {
  */
 export const PENDING_TABLE_FEATURES = [
     {
-        id: "identity-not-primary-key",
-        description: "`.identity()` on a column that is not part of the primary key. Identity is planned only for a key (`isId: \"increment\"`)."
-    },
-    {
-        id: "identity-width",
-        description: "`.identity()` on a `smallint` or `bigint` column. An identity key is always planned as INTEGER, the type every column pointing at it takes."
-    },
-    {
         id: "array-element-type",
         description: "`col.array()` of an element other than `col.text()`, `col.integer()`, `col.boolean()` or an unparameterised `col.numeric()`. The planner emits `text[]`, `integer[]`, `boolean[]` and `numeric[]` only."
     },
@@ -781,10 +773,6 @@ const NO_FLAGS: Flags = { required: false, unique: false };
  */
 function lowerColumn(key: string, def: ColumnDef, ctx: ColumnContext): PostgresProperty {
     const { at } = ctx;
-    if (def.default?.kind === "identity") {
-        if (!def.primaryKey) pending(at, "identity-not-primary-key");
-        if (def.type.kind !== "integer") pending(at, "identity-width");
-    }
     if (def.primaryKey && !KEY_KINDS.has(def.type.kind)) pending(at, "primary-key-type");
     if (def.transform !== undefined && def.json?.transform !== undefined) {
         refuse(at, "declares a `.transform()` on the column and another on its JSON shape. Keep one: they are the same hook.");
@@ -886,10 +874,11 @@ function baseFields(key: string, def: ColumnDef, ctx: ColumnContext): BaseFields
     }
     if (def.description !== undefined) out.description = def.description;
     if (def.transform !== undefined) out.callbacks = lowerTransform(def.transform, ctx.slug, ctx.describe);
-    // The database fills a generated column on every write: a create may omit
-    // it however NOT NULL it is, which is what the runtime reads off
-    // `databaseDefault: true`. (The planner plans it from the definition.)
-    if (def.default?.kind === "database" || def.generatedAs !== undefined) {
+    // The database fills a generated column on every write, and an identity
+    // column that is not the key (a key's `isId` already says so): a create
+    // may omit either however NOT NULL it is, which is what the runtime reads
+    // off `databaseDefault: true`. The planner plans both from the definition.
+    if (def.default?.kind === "database" || def.generatedAs !== undefined || (def.default?.kind === "identity" && !def.primaryKey)) {
         out.databaseDefault = true;
     } else if (!def.primaryKey) {
         if (def.default?.kind === "sql") out.databaseDefault = `sql\`${def.default.expression}\``;
