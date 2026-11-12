@@ -31,6 +31,8 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import ts from "typescript";
+
 const repoRoot = path.resolve(import.meta.dirname, "..", "..", "..");
 
 const onlySrc = process.argv.includes("--src");
@@ -86,36 +88,39 @@ const FORBIDDEN_MODULES = [
 
 /**
  * Every syntax that can make a module's types depend on another module:
- * static imports and re-exports (`from "x"`), inline type imports
- * (`import("x").Foo`), and triple-slash references.
+ * static imports and re-exports (`from "x"`), bare imports, inline type
+ * imports (`import("x").Foo`), dynamic imports, `require`, ambient
+ * `declare module "x"` augmentations, and triple-slash references.
  *
- * Matching the specifier rather than the whole statement is deliberate — it
- * catches `import type React from "react"`, which is the exact form that caused
- * the original leak and which a naive /^import React/ scan misses.
+ * Read with TypeScript's own pre-processor (`ts.preProcessFile`), which walks
+ * the token stream: a specifier in a module position is found whatever the
+ * statement around it looks like — `import type React from "react"`, the exact
+ * form that caused the original leak and which a naive /^import React/ scan
+ * misses — while a string that merely *contains* import syntax is not. The
+ * codemod in `@rebasepro/cli` writes `import { customizeTable } from
+ * "@rebasepro/cms"` into the frontend files it generates; that is a string the
+ * CLI emits for a frontend, not a dependency of the CLI, and a regular
+ * expression over the text could not tell the two apart.
+ *
+ * Triple-slash references are also matched by text, because the
+ * pre-processor only reads them above the first statement and a `.d.ts`
+ * emitter is free to put one anywhere a comment may go.
  */
 function violationsIn(source) {
     const hits = [];
-    const patterns = [
-        // import … from "x" / export … from "x" / import "x"
-        /(?:\bfrom\s*|\bimport\s*)["']([^"']+)["']/g,
-        // import("x") — inline type imports and dynamic imports
-        /\bimport\s*\(\s*["']([^"']+)["']\s*\)/g,
-        // /// <reference types="x" />
-        /<reference\s+types\s*=\s*["']([^"']+)["']/g
-    ];
-    for (const pattern of patterns) {
-        for (const match of source.matchAll(pattern)) {
-            const specifier = match[1];
-            const forbidden = FORBIDDEN_MODULES.find(
-                (mod) => specifier === mod || specifier.startsWith(`${mod}/`)
-            );
-            if (forbidden) {
-                const line = source.slice(0, match.index).split("\n").length;
-                hits.push({ line, specifier, forbidden });
-            }
-        }
+    const lineOf = (index) => source.slice(0, index).split("\n").length;
+    const consider = (specifier, index) => {
+        const forbidden = FORBIDDEN_MODULES.find(
+            (mod) => specifier === mod || specifier.startsWith(`${mod}/`)
+        );
+        if (forbidden) hits.push({ line: lineOf(index), specifier, forbidden });
+    };
+    const { importedFiles, typeReferenceDirectives } = ts.preProcessFile(source, true, true);
+    for (const ref of [...importedFiles, ...typeReferenceDirectives]) consider(ref.fileName, ref.pos);
+    for (const match of source.matchAll(/<reference\s+types\s*=\s*["']([^"']+)["']/g)) {
+        consider(match[1], match.index);
     }
-    // One specifier can match several patterns; report each site once.
+    // A reference both readers found is one site.
     const seen = new Set();
     return hits.filter((hit) => {
         const key = `${hit.line}:${hit.specifier}`;

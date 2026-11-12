@@ -65,9 +65,21 @@ said 0 errors, and only a per-package tsc found it.`
     },
     {
         run: "check:headless",
-        why: `Proves BaaS mode stays honest: imports every collection file and server
-package under a loader hook that rejects React and @rebasepro UI packages.
-Reads source directly, so it needs no build and fails fast.`
+        why: `Proves BaaS mode stays honest: imports every backend/schema module (demo,
+template, presets), the backend modules beside them, and every kernel and
+server package under a loader hook that rejects React and @rebasepro UI
+packages. Reads source directly, so it needs no build and fails fast.`
+    },
+    {
+        run: "check:frontend-backend-imports",
+        why: `The other side of the same line. A frontend may import its backend's tables
+as TYPES only (\`import type { posts }\`), which the compiler erases; a value
+import ships the table, its hooks and every server module they reach to the
+browser, and builds and runs without complaint. Until 0.31 a Vite plugin
+stripped the server half of shared collection files; with tables in backend/
+and customizations in frontend/ this rule is what replaced it. Over the demo,
+the examples and the template/preset sources; check:templates runs the same
+function over each materialised scaffold.`
     },
     {
         run: "check:types-headless",
