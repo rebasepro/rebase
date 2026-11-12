@@ -256,7 +256,7 @@ describe("describeTables (runtime) — relations", () => {
     const { tables } = describeTables(meta);
     const posts = tableOf(tables, "posts");
 
-    it("turns each foreign key into a belongsTo, its column served under the relation's key", () => {
+    it("turns each foreign key into a belongsTo, its column the relation's", () => {
         expect(posts.relations).toEqual([
             { name: "author", kind: "belongsTo", target: "authors", cardinality: "one", localKey: "author_id", localField: "authorId", onDelete: "cascade", index: false, constraint: true },
             { name: "reviewer", kind: "belongsTo", target: "authors", cardinality: "one", localKey: "reviewer", localField: "reviewer_2", index: false, constraint: true }

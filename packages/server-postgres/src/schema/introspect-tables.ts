@@ -141,9 +141,10 @@ export interface IntrospectionNotes {
 export interface DescribeTablesOptions extends IntrospectTablesOptions {
     /**
      * - `"serve"` (default) — what the runtime serves, exactly as it always
-     *   has: owning links only (`belongsTo`, its foreign-key column served
-     *   under the relation's key), the catalogue's policies as the rules, no
-     *   heuristics.
+     *   has: owning links only (`belongsTo`, its foreign-key column marked
+     *   `derived` — the relation's, left out of the definition it is lowered
+     *   from, exactly the collection the runtime has always built), the
+     *   catalogue's policies as the rules, no heuristics.
      * - `"generate"` — what `schema introspect` writes: foreign-key columns
      *   declared in `columns`, the reverse `hasMany` and the `manyToMany` of
      *   each junction, the admin baseline folded into `"admin-only"` /

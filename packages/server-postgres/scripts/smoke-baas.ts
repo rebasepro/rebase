@@ -217,7 +217,8 @@ async function main(): Promise<void> {
 
         await check("serves both columns of a composite key, and no joined token", async () => {
             const body = await (await api("/memberships")).json() as { data: Record<string, unknown>[] };
-            expectTrue(typeof body.data[0].tenant_id === "number", "tenant_id missing or not a number");
+            // Keys are the columns in camelCase, as every table's are.
+            expectTrue(typeof body.data[0].tenantId === "number", "tenantId missing or not a number");
             expectTrue(!JSON.stringify(body.data).includes(":::"), "a ::: token reached the wire");
         });
 
@@ -260,15 +261,17 @@ async function main(): Promise<void> {
             // admin view-model row (relation refs, normalized ids) while GET
             // served raw columns. Client arithmetic and equality both broke on
             // the first refresh.
+            // The foreign key is a column like any other: its camelCase key,
+            // the scalar it holds.
             const created = await api("/orders", {
                 method: "POST",
-                body: JSON.stringify({ product_id: 1, quantity: 2 })
+                body: JSON.stringify({ productId: 1, quantity: 2 })
             });
             const createdText = await created.text();
             expectTrue(created.status === 201, `create: expected 201, got ${created.status} ${createdText}`);
             const createdBody = JSON.parse(createdText) as Record<string, unknown>;
 
-            expectTrue(createdBody.product_id === 1, `product_id was ${JSON.stringify(createdBody.product_id)}, not 1`);
+            expectTrue(createdBody.productId === 1, `productId was ${JSON.stringify(createdBody.productId)}, not 1: ${createdText}`);
             expectTrue(!("product" in createdBody) && !JSON.stringify(createdBody).includes("__type"),
                 `a relation object reached the create response: ${JSON.stringify(createdBody)}`);
 
