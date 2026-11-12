@@ -352,7 +352,10 @@ file: every setting declared in pnpm-workspace.yaml must come back from
         why: `The property and relation types are authored by hand, and for most of
 their fields the ONLY explanation anywhere is an editor's hover. A third
 of them had none, which is how \`readOnly\` and \`disabled\` came to be used
-interchangeably — they are not the same thing, and nothing said so.`
+interchangeably — they are not the same thing, and nothing said so.
+Since 0.31 the hand-authored surface is the table builder (\`col.*\`, \`rel.*\`,
+\`json.*\`, the column/table/hook options) and \`customizeTable\`, and a builder's
+explanation is on its methods, so methods count.`
     },
     {
         run: "check:rebase-props",

@@ -2,8 +2,8 @@
 /**
  * How much of the authoring surface is documented where an editor can show it?
  *
- * These are the types a person writes a collection against, and the *only*
- * place most of them are ever explained is the hover in an editor. A field with
+ * These are the types and builders a person writes a table against, and the
+ * *only* place most of them are ever explained is the hover in an editor. A field with
  * no JSDoc is a field whose meaning has to be guessed from its name — which is
  * how `readOnly` and `disabled` came to be used interchangeably (they are not:
  * one renders a value, the other renders a greyed-out control that can clear
@@ -18,9 +18,13 @@
  *
  * ## What counts
  *
- * A **field**: a property signature inside an exported `interface` or object
- * `type` in one of the files below. Not methods, not call signatures, not
- * anything in a `.test.ts`.
+ * A **member**: a property or method signature inside an exported
+ * `interface`, object `type` or `class`, or a member of an exported object
+ * literal (`export const col = { … }`), in one of the files below. Methods
+ * count since the authoring surface became a builder: `col.text()`,
+ * `.notNull()` and `rel.belongsTo()` are methods, and the hover on them is the
+ * whole explanation a reader gets. Not call signatures, not `constructor`,
+ * not `private`/`protected` members, not anything in a `.test.ts`.
  *
  * A field is **documented** when the lines immediately above it are a `/** … *\/`
  * block, or when it is the member of an interface whose *own* one-line purpose
@@ -39,17 +43,40 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".
 /**
  * The authoring surface, as files.
  *
- * Deliberately not "every exported interface in the monorepo". These are the
- * types somebody writes by hand in `config/collections/*.ts`, where an
- * undocumented field is a question with no answer short of reading the
- * implementation. Runtime and internal types are excluded — their readers have
- * the code.
+ * Deliberately not "every exported interface in the monorepo". These are what
+ * somebody writes by hand: a table in `backend/schema/*.ts` (`defineTable`,
+ * `col.*`, `rel.*`, `json.*`, the column, table and hook options) and its
+ * panel customization in `frontend/src/cms/*.tsx` (`customizeTable`), where an
+ * undocumented member is a question with no answer short of reading the
+ * implementation. The wire descriptors, the inference helpers and the
+ * collection view model the panel builds internally are excluded — their
+ * readers have the code.
  */
 const TARGETS = [
-    "packages/types/src/types/properties.ts",
-    "packages/types/src/types/relations.ts",
-    "packages/cms-types/src/types/property_options.ts"
+    "packages/types/src/schema/columns.ts",
+    "packages/types/src/schema/column_options.ts",
+    "packages/types/src/schema/json.ts",
+    "packages/types/src/schema/relations.ts",
+    "packages/types/src/schema/table.ts",
+    "packages/types/src/schema/table_options.ts",
+    "packages/types/src/schema/hooks.ts",
+    "packages/cms-types/src/table_customization.ts"
 ];
+
+/**
+ * Containers in those files that nobody writes: the builder's recorded state
+ * and the structural "any table" shapes the compiler accepts. Each is read
+ * through the builder that fills it, whose methods are counted and carry the
+ * explanation. Named one by one, with the reason, so the list cannot grow into
+ * a way to exclude a real authoring type.
+ */
+const NOT_AUTHORED = new Map([
+    ["ColumnDef", "what a column builder has recorded — filled by `col.*` and its modifiers, which are documented"],
+    ["ColumnStorage", "a storage column's options as stored and served (bucket by key, bytes) — `StorageOptions` is what is written"],
+    ["AnyTableDef", "the structural shape `compileTables` accepts any table as — a `defineTable` result, never written"],
+    ["AnyViewDef", "the same for views"],
+    ["CustomizableTable", "the structural constraint `customizeTable<typeof t>` checks a table against — never written"]
+]);
 
 /** The ceiling. Lower it when the number falls; never raise it. */
 const MAX_BARE_PERCENT = 5;
@@ -80,9 +107,11 @@ function fieldsOf(file) {
     // as a container was enough to swallow the rest of the file: every later
     // declaration was skipped as "already inside one", and the scan reported
     // zero fields for `properties.ts` while looking like it worked.
-    const OPENER = /^export\s+(?:declare\s+)?(?:interface|type)\s+([A-Za-z0-9_]+)\b.*\{\s*$/;
-    // `name?: type` or `name: type` at exactly one level of indentation.
-    const FIELD = /^ {4}(?:readonly\s+)?([A-Za-z_$][A-Za-z0-9_$]*)\??\s*:/;
+    const OPENER = /^export\s+(?:declare\s+)?(?:(?:abstract\s+)?(?:interface|type|class)|const)\s+([A-Za-z0-9_]+)\b.*\{\s*$/;
+    // `name?: type`, `name: type`, `name(…)` or `name<T>(…)` at exactly one
+    // level of indentation. `private`/`protected` members do not match: the
+    // keyword is followed by a space, not by `:` or `(`.
+    const FIELD = /^ {4}(?:readonly\s+|static\s+|async\s+)*([A-Za-z_$][A-Za-z0-9_$]*)\??\s*[:(<]/;
     /** A comment line. Its braces are prose — `@example` blocks are full of them. */
     const isComment = (line) => {
         const t = line.trim();
@@ -116,7 +145,10 @@ function fieldsOf(file) {
 
         if (depth === 1) {
             const field = LITERAL_PIN.test(line) ? null : FIELD.exec(line);
-            if (field) {
+            // An overload repeats a name already counted; `constructor` is
+            // not something a reader writes.
+            const repeated = field && fields.some(f => f.container === container && f.name === field[1]);
+            if (field && !repeated && field[1] !== "constructor") {
                 const previous = lines[i - 1]?.trim() ?? "";
                 fields.push({
                     container,
@@ -144,6 +176,7 @@ const bare = [];
 
 for (const file of TARGETS) {
     for (const field of fieldsOf(file)) {
+        if (NOT_AUTHORED.has(field.container)) continue;
         total += 1;
         if (!field.documented) bare.push({ ...field, file });
     }
