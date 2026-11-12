@@ -1,7 +1,7 @@
 /**
  * The columns a caller may not read, taken out of what their SQL returned.
  *
- * Per-field read rules (`access.read`, and `excludeFromApi`, which is
+ * Per-column read rules (`.access({ read })`, and `.private()`, which is
  * `read: []`) are not something Postgres can hold for one request role shared
  * by every user, so the SDK applies them to each row it serves
  * (`stripUnreadable`). SQL run as the caller (`DataDriver.sql`) returns rows
@@ -11,8 +11,9 @@
  * Postgres says where each result column came from: the row description
  * carries the table's oid and the column's number for every column that is a
  * plain reference to one, aliased or not, `RETURNING` included. A column whose
- * origin is a collection property this caller cannot read is dropped from
- * every row, the way the API drops it.
+ * origin is a table column this caller cannot read (or the foreign key of a
+ * to-one relation they cannot read) is dropped from every row, the way the API
+ * drops it.
  *
  * What it cannot see is a value computed from such a column — `md5(hash)`,
  * `hash || ''` — whose origin Postgres reports as none. That is the query
@@ -21,11 +22,11 @@
  *
  * A driver that reports no origins at all (PGlite) has its result columns
  * matched by name instead, against every restricted column of every
- * collection: it may drop a column of the same name from another table, never
+ * table: it may drop a column of the same name from another table, never
  * keep one it should drop.
  */
-import { getTableName, hasFieldAccessRules, restrictedFieldNames, type FieldViewer } from "@rebasepro/common";
-import { isPostgresCollectionConfig, type CollectionConfig } from "@rebasepro/types";
+import { hasColumnAccessRules, restrictedKeys, type FieldViewer } from "@rebasepro/common";
+import type { TableDescriptor } from "@rebasepro/types";
 
 /** A result column as the driver describes it. */
 export interface ResultField {
@@ -96,9 +97,6 @@ export class ColumnOrigins {
     }
 }
 
-const schemaOf = (collection: CollectionConfig): string =>
-    (isPostgresCollectionConfig(collection) && collection.schema) || "public";
-
 /**
  * `rows` without the columns `viewer` may not read, by the origins `fields`
  * describe. The rows are changed in place and returned.
@@ -107,17 +105,20 @@ export async function withoutUnreadableColumns(
     rows: Record<string, unknown>[],
     fields: ResultField[],
     viewer: FieldViewer,
-    collections: CollectionConfig[],
+    /** Every table the driver serves, as described: the rules are read off their columns and relations. */
+    tables: readonly TableDescriptor[],
     origins: ColumnOrigins,
     run: CatalogueRunner
 ): Promise<Record<string, unknown>[]> {
-    const restricted = collections.filter(hasFieldAccessRules);
+    const restricted = tables.filter(hasColumnAccessRules);
     if (restricted.length === 0 || rows.length === 0 || fields.length === 0) return rows;
 
     const refusedBy = new Map<string, Set<string>>();
-    for (const collection of restricted) {
-        const { refused } = restrictedFieldNames(collection, viewer, "read");
-        if (refused.size > 0) refusedBy.set(`${schemaOf(collection)}.${getTableName(collection)}`, refused);
+    for (const table of restricted) {
+        // `refused` holds the keys and the SQL names: the catalogue answers
+        // with the SQL name, which is the one that matters here.
+        const { refused } = restrictedKeys(table, viewer, "read");
+        if (refused.size > 0) refusedBy.set(`${table.schema || "public"}.${table.table}`, refused);
     }
     if (refusedBy.size === 0) return rows;
 

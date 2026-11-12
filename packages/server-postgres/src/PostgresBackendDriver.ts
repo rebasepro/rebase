@@ -3912,7 +3912,7 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
                 rowsOfResult(result),
                 fieldsOfResult(result),
                 { roles: this.user?.roles ?? [] },
-                this.delegate.registry?.getCollections() ?? [],
+                this.delegate.registry?.tables().map(table => table.descriptor) ?? [],
                 this.delegate.columnOrigins,
                 (text, params) => delegate.dataService.executeSql(text, params)
             );
