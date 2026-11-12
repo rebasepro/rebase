@@ -104,7 +104,8 @@ function bootstrapper(rec: Recorded, options: { id?: string; isDefault?: boolean
         },
         async initializeAuth() {
             // Roles are re-read per request, so the repository answers them.
-            const authRepository = { getUserRoleIds: async () => [] };
+            // The account roles the database holds: only "admin-1" is an administrator.
+            const authRepository = { getUserRoleIds: async (uid: string) => (uid === "admin-1" ? ["admin"] : []) };
             return { userService: authRepository, authRepository };
         },
         async ensureCollectionSchema() {
@@ -228,7 +229,9 @@ describe("one group, mounted alone, at a path of the application's choosing", ()
         app.route("/v2/schema", backend.routes.schema());
 
         expect((await app.request("/v2/schema/tables")).status).toBe(401);
-        const res = await app.request("/v2/schema/tables", await bearer("u-1", ["admin"]));
+        // An administrator: a person without `schema:read` is described only
+        // the tables their roles reach, and "widgets" is admin-only.
+        const res = await app.request("/v2/schema/tables", await bearer("admin-1", ["admin"]));
         expect(res.status).toBe(200);
         expect(res.headers.get("etag")).toBeTruthy();
         expect((await res.json() as { slug: string }[]).map(table => table.slug)).toContain("widgets");
