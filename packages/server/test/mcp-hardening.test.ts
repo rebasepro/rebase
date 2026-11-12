@@ -18,7 +18,7 @@ import { MCP_TOOLS } from "../src/mcp/mcp-tools";
 import { configureJwt, generateAccessToken, generateMcpAccessToken, signPurposeToken } from "../src/auth/jwt";
 import {
     buildApp, stubDriver, authorize, redeem, connectedClient, registerClient,
-    refreshWith, rpc, pkcePair, RESOURCE, REDIRECT, JWT_SECRET, COLLECTIONS
+    refreshWith, rpc, pkcePair, RESOURCE, REDIRECT, JWT_SECRET, COLLECTIONS, tablesOf
 } from "./helpers/mcp-harness";
 
 configureJwt({ secret: JWT_SECRET, accessExpiresIn: "1h" });
@@ -339,7 +339,8 @@ describe("tool inputs", () => {
     // the real one.
     function restRefusal(query: Record<string, string>): string | undefined {
         try {
-            parseQueryOptions(query, {}, { collection: COLLECTIONS[0] });
+            const tables = tablesOf(COLLECTIONS);
+            parseQueryOptions(query, {}, { table: tables[0], lookup: slug => tables.find(table => table.slug === slug) });
             return undefined;
         } catch (error) {
             return (error as Error).message;
@@ -747,7 +748,7 @@ describe("the mutating tools apply the field write rules", () => {
     ])("%s refuses a field the caller's roles cannot write, and says why", async (tool, args) => {
         const { body, saves } = await call(tool, args);
         expect(body.result?.isError).toBe(true);
-        expect(body.result?.content[0].text).toContain("'rating' on 'candidates' is not writable with your roles");
+        expect(body.result?.content[0].text).toContain("'rating' on table 'candidates' is not writable with your roles");
         expect(saves).toHaveLength(0);
     });
 
@@ -759,7 +760,7 @@ describe("the mutating tools apply the field write rules", () => {
         // `teamId` sets the column `team` sets, so the relation's rule is its rule.
         const { body, saves } = await call(tool, args);
         expect(body.result?.isError).toBe(true);
-        expect(body.result?.content[0].text).toContain(`'${key}' on 'candidates' is not writable with your roles`);
+        expect(body.result?.content[0].text).toContain(`'${key}' on table 'candidates' is not writable with your roles`);
         expect(saves).toHaveLength(0);
     });
 
@@ -775,15 +776,15 @@ describe("the mutating tools apply the field write rules", () => {
         for (const values of [{ inviteToken: "t" }, { invite_token: "t" }]) {
             const { body, saves } = await call("update_row", { table: "candidates", id: "c1", data: values }, ["admin"]);
             expect(body.result?.isError).toBe(true);
-            expect(body.result?.content[0].text).toContain("excluded from the API");
+            expect(body.result?.content[0].text).toContain("cannot be written through the API: the column is private");
             expect(saves).toHaveLength(0);
         }
     });
 
-    it("refuses a field the collection does not have", async () => {
+    it("refuses a field the table does not have", async () => {
         const { body, saves } = await call("update_row", { table: "candidates", id: "c1", data: { nmae: "Y" } });
         expect(body.result?.isError).toBe(true);
-        expect(body.result?.content[0].text).toContain("has no field 'nmae'");
+        expect(body.result?.content[0].text).toContain("has no column 'nmae'");
         expect(saves).toHaveLength(0);
     });
 
@@ -806,7 +807,7 @@ describe("the mutating tools apply the field write rules", () => {
             "update_row", { table: "candidates", id: "c1", data: { name: { $inc: 1 } } }
         );
         expect(body.result?.isError).toBe(true);
-        expect(body.result?.content[0].text).toContain("$inc is not defined on 'name', which is a string property");
+        expect(body.result?.content[0].text).toContain("$inc is not defined on 'name', which is a `text` column");
         expect(saves).toHaveLength(0);
     });
 
@@ -852,7 +853,7 @@ describe("query_table applies the field read rules to what it filters and sorts 
     it("refuses a filter on a field the caller's roles cannot read", async () => {
         const { body, fetches } = await query({ where: { salary: [">", 100000] } });
         expect(body.result?.isError).toBe(true);
-        expect(body.result?.content[0].text).toContain("'salary' is not readable on 'candidates' with your roles");
+        expect(body.result?.content[0].text).toContain("'salary' is not readable on table 'candidates' with your roles");
         expect(fetches).toHaveLength(0);
     });
 

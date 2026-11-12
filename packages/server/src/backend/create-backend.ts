@@ -1810,7 +1810,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             // schema change after boot reaches the next call.
             getTables: () => tableRegistry.list(),
             // The RESOLVED set the data path reads, not `config.collections`.
-            getCollections: () => activeCollections,
+            driverCollection,
             // The write tools' door into the users table answers to the
             // adapter, as the REST routes and the socket do.
             getAuthAdapter: () => authAdapter,
@@ -1893,7 +1893,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             oauthBasePath: `${basePath}/oauth`,
             getDriver: () => defaultDriver,
             getTables: () => tableRegistry.list(),
-            getCollections: () => activeCollections,
+            driverCollection,
             getAuthAdapter: () => authAdapter,
             serverInfo: {
                 name: "rebase",
@@ -1926,7 +1926,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             oauthBasePath: `${basePath}/oauth`,
             getDriver: () => defaultDriver,
             getTables: () => tableRegistry.list(),
-            getCollections: () => activeCollections,
+            driverCollection,
             getAuthAdapter: () => authAdapter,
             serverInfo: {
                 name: "rebase",

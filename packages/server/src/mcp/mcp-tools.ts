@@ -27,25 +27,27 @@
  * second lock, not the main one: a `data:write` token still cannot write a row
  * the user could not write themselves.
  */
-import type { AuthAdapter, CallerCredential, CollectionConfig, DataDriver, OrderBySpec, TableDescriptor } from "@rebasepro/types";
-import { ALL_WHERE_FILTER_OPS, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT, getCollectionDataPath, scopeGrants, scopeGrantsAny } from "@rebasepro/types";
-import { type FieldViewer, OrderBySpecError, canWriteField, restoresSoftDeletedRow, serializeOrderBy, softDeleteFieldOf } from "@rebasepro/common";
+import type { AuthAdapter, CallerCredential, DataDriver, OrderBySpec, TableDescriptor } from "@rebasepro/types";
+import { ALL_WHERE_FILTER_OPS, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT, scopeGrants, scopeGrantsAny } from "@rebasepro/types";
+import { type FieldViewer, OrderBySpecError, canWriteColumn, columnByKey, isSoftDeleteRestore, serializeOrderBy } from "@rebasepro/common";
 import { scopeDataDriver } from "../auth/rls-scope.js";
 import { ApiError } from "../api/errors.js";
 import { assertWriteRequestValid } from "../api/rest/write-validation.js";
 import { assertFieldOpsValid, assertNoFieldOpsOnCreate } from "../api/rest/field-ops.js";
 import { parseQueryOptions } from "../api/rest/query-parser.js";
 import { RestApiGenerator, type RowAddress } from "../api/rest/api-generator.js";
+import type { ServedTable } from "../api/rest/served-table.js";
+import type { DriverCollectionOf } from "../schema/driver-seam.js";
 import type { QueryOptions } from "../api/types.js";
-import { buildCollectionInputSchema, buildCollectionSchema } from "../api/openapi-generator.js";
+import { buildTableInputSchema, buildTableSchema } from "../api/openapi-generator.js";
 import { schemaViewFor, serializeTables, type SchemaView } from "../api/schema-tables.js";
 import {
     assertUserCreationBodyValid,
-    createUserThroughAuthCollection,
+    createUserThroughAuthTable,
     createsUsers,
-    deletingAuthCollectionUsers,
-    prepareAuthCollectionUpdates
-} from "../api/rest/auth-collection-writes.js";
+    deletingAuthTableUsers,
+    prepareAuthTableUpdates
+} from "../api/rest/auth-table-writes.js";
 import { logger } from "../utils/logger.js";
 import type { McpScope } from "./oauth-metadata.js";
 import type { McpConfirmationPlan } from "./confirmation.js";
@@ -86,10 +88,11 @@ export interface McpToolContext {
      */
     tables: readonly TableDescriptor[];
     /**
-     * The request-time configs the data path reads (REST's readers and
-     * writers, the drivers), by slug — the tables lowered for the runtime.
+     * What a data driver call names a table by (see `DriverCollectionOf`):
+     * every decision a tool makes reads the descriptors above; the driver
+     * contract still takes this until slice B-R7.
      */
-    collections: CollectionConfig[];
+    driverCollection: DriverCollectionOf;
     caller: McpCaller;
     /**
      * The deployment's auth adapter. The auth table's rows are the users, so
@@ -216,15 +219,26 @@ function servedSchema(ctx: McpToolContext): { view: SchemaView; tables: readonly
     return entry;
 }
 
-/** A table a call names, resolved: its descriptor as the caller is served it, and the config the data path reads. */
+/**
+ * A table a call names, resolved: its descriptor as the caller is served it
+ * (redacted), and the table as REST's readers and writers take it — the
+ * unredacted descriptor every check reads, with what the driver is handed.
+ */
 interface ResolvedTable {
     descriptor: TableDescriptor;
-    collection: CollectionConfig;
+    served: ServedTable;
 }
 
-/** The request-time config behind a served table. */
-function collectionOf(ctx: McpToolContext, slug: string): CollectionConfig | undefined {
-    return ctx.collections.find(c => c.slug === slug);
+/** The table behind a slug as REST's readers and writers take it, when a driver serves it. */
+function servedOf(ctx: McpToolContext, slug: string): ServedTable | undefined {
+    const table = ctx.tables.find(candidate => candidate.slug === slug);
+    const driverCollection = ctx.driverCollection(slug);
+    return table && driverCollection ? { table, driverCollection } : undefined;
+}
+
+/** A relation's target, by slug: what REST's aggregate and query checks resolve. */
+function lookupOf(ctx: McpToolContext): (slug: string) => TableDescriptor | undefined {
+    return slug => ctx.tables.find(table => table.slug === slug);
 }
 
 /**
@@ -237,7 +251,7 @@ function collectionOf(ctx: McpToolContext, slug: string): CollectionConfig | und
  */
 function resolveTable(ctx: McpToolContext, raw: unknown, scope: McpScope): ResolvedTable {
     const slug = String(raw ?? "");
-    const exists = ctx.tables.some(table => table.slug === slug) && collectionOf(ctx, slug) !== undefined;
+    const exists = servedOf(ctx, slug) !== undefined;
     if (!exists) {
         throw new McpToolError(`Unknown table "${slug}". Call list_tables to see the tables you can use.`);
     }
@@ -250,11 +264,11 @@ function resolveTable(ctx: McpToolContext, raw: unknown, scope: McpScope): Resol
             `Reconnect with "${scope}" or "${scope}:${slug}" to use it.`);
     }
     const descriptor = servedSchema(ctx).tables.find(table => table.slug === slug);
-    const collection = collectionOf(ctx, slug);
-    if (!descriptor || !collection) {
+    const served = servedOf(ctx, slug);
+    if (!descriptor || !served) {
         throw new McpToolError(`Unknown table "${slug}". Call list_tables to see the tables you can use.`);
     }
-    return { descriptor, collection };
+    return { descriptor, served };
 }
 
 /** Whether this connection's grant covers `scope` on the table `slug`. Every scope check on a table is this one. */
@@ -337,15 +351,15 @@ function asToolError(check: () => void): void {
  */
 function writableValues(
     raw: unknown,
-    collection: CollectionConfig,
+    table: TableDescriptor,
     ctx: McpToolContext,
     status: "new" | "existing"
 ): Record<string, unknown> {
     const values = valuesObject(raw);
     asToolError(() => {
-        assertWriteRequestValid(values, collection, { status, viewer: viewerOf(ctx) });
-        if (status === "new") assertNoFieldOpsOnCreate(values, "A create", collection);
-        else assertFieldOpsValid(values, collection);
+        assertWriteRequestValid(values, table, { status, viewer: viewerOf(ctx) });
+        if (status === "new") assertNoFieldOpsOnCreate(values, "A create", table);
+        else assertFieldOpsValid(values, table);
     });
     return values;
 }
@@ -371,21 +385,21 @@ function valuesObject(raw: unknown): Record<string, unknown> {
  */
 async function createUser(
     args: Record<string, unknown>,
-    collection: CollectionConfig,
+    served: ServedTable,
     ctx: McpToolContext
 ): Promise<Record<string, unknown> | undefined> {
     const adapter = ctx.authAdapter;
-    if (!createsUsers(adapter, collection)) return undefined;
+    if (!createsUsers(adapter, served.table)) return undefined;
 
     const body = valuesObject(args.data);
     asToolError(() => {
-        assertUserCreationBodyValid(adapter, collection, body, viewerOf(ctx));
-        assertNoFieldOpsOnCreate(body, "A create", collection);
+        assertUserCreationBodyValid(adapter, served, body, viewerOf(ctx));
+        assertNoFieldOpsOnCreate(body, "A create", served.table);
     });
     const driver = await scopedDriver(ctx);
-    const created = await createUserThroughAuthCollection(adapter, collection, body, viewerOf(ctx), values => driver.save({
-        path: dataPath(collection),
-        collection,
+    const created = await createUserThroughAuthTable(adapter, served, body, viewerOf(ctx), values => driver.save({
+        path: served.table.slug,
+        collection: served.driverCollection,
         values,
         id: args.id ? String(args.id) : undefined,
         status: "new"
@@ -396,19 +410,9 @@ async function createUser(
     return created && { ...created.row, ...created.delivery };
 }
 
-/** Where the driver reads and writes a table's rows. */
-function dataPath(collection: CollectionConfig): string {
-    return getCollectionDataPath(collection);
-}
-
 /** This table's rows at their own address, as REST's routes address them. */
-function ownRow(collection: CollectionConfig): RowAddress {
-    return {
-        collection,
-        path: dataPath(collection),
-        driverCollection: collection,
-        name: collection.slug
-    };
+function ownRow(served: ServedTable): RowAddress {
+    return { served, path: served.table.slug, name: served.table.slug };
 }
 
 /**
@@ -421,7 +425,7 @@ function ownRow(collection: CollectionConfig): RowAddress {
  * operator, a column the caller's roles cannot read, a `limit` past the
  * ceiling), the same foreign-key names (`authorId`) for a `belongsTo`.
  */
-function readOptions(args: Record<string, unknown>, collection: CollectionConfig, ctx: McpToolContext): QueryOptions {
+function readOptions(args: Record<string, unknown>, table: TableDescriptor, ctx: McpToolContext): QueryOptions {
     const query: Record<string, string> = {};
     if (args.where !== undefined && args.where !== null) {
         if (typeof args.where !== "object" || Array.isArray(args.where)) {
@@ -449,7 +453,7 @@ function readOptions(args: Record<string, unknown>, collection: CollectionConfig
         }
         query.deleted = args.deleted;
     }
-    return parseQueryOptions(query, {}, { collection, viewer: viewerOf(ctx) });
+    return parseQueryOptions(query, {}, { table, lookup: lookupOf(ctx), viewer: viewerOf(ctx) });
 }
 
 /** REST's `?searchString=`: text search across the table's text columns. */
@@ -486,8 +490,8 @@ async function assertRowExists(
     id: string,
     withDeleted?: true
 ): Promise<void> {
-    const { collection } = resolved;
-    const existing = await driver.fetchOne({ path: dataPath(collection), id, collection, withDeleted });
+    const { served } = resolved;
+    const existing = await driver.fetchOne({ path: served.table.slug, id, collection: served.driverCollection, withDeleted });
     if (!existing) throw notFound(resolved, id);
 }
 
@@ -597,15 +601,15 @@ const QUERY_INPUT_SCHEMA: Record<string, unknown> = {
 /** One page of rows, as the REST list route serves it. */
 async function readPage(
     args: Record<string, unknown>,
-    collection: CollectionConfig,
+    served: ServedTable,
     ctx: McpToolContext
 ): Promise<{ data: unknown[]; meta: unknown }> {
-    const options = readOptions(args, collection, ctx);
+    const options = readOptions(args, served.table, ctx);
     const driver = await scopedDriver(ctx);
     // REST's own listing, so a row here is the row `GET` serves — not
     // the admin panel's view model (`{ __type: "date" }`, a relation
     // as an embedded row), which no write door accepts back.
-    const page = await RestApiGenerator.readPage(driver, collection, options, searchStringOf(args));
+    const page = await RestApiGenerator.readPage(driver, served, options, searchStringOf(args));
     return { data: page.rows, meta: page.meta };
 }
 
@@ -647,25 +651,26 @@ function narrowedSchema(schema: Record<string, unknown>, keep: (key: string) => 
  * descriptor's: a rule's raw SQL only with `schema:read`.
  */
 function describeTable(resolved: ResolvedTable, ctx: McpToolContext): Record<string, unknown> {
-    const { descriptor, collection } = resolved;
+    const { descriptor, served } = resolved;
     const servedKeys = new Set([
         ...descriptor.columns.map(column => column.key),
         ...descriptor.relations.map(relation => relation.name)
     ]);
     const viewer = viewerOf(ctx);
-    const softDeleteField = softDeleteFieldOf(collection);
+    const softDeleteField = served.table.softDelete?.field;
     const { policies: _policies, junctions: _junctions, ...rls } = descriptor.rls;
     return {
         name: descriptor.slug,
         description: descriptor.description ?? null,
         ...(descriptor.kind === "view" && { kind: "view" }),
         primaryKey: descriptor.primaryKey,
-        row: narrowedSchema(buildCollectionSchema(collection, new Set()), key => servedKeys.has(key)),
+        // OpenAPI's schemas still build from the lowered table (REST's seam).
+        row: narrowedSchema(buildTableSchema(served.table, new Set(), lookupOf(ctx)), key => servedKeys.has(key)),
         create: descriptor.kind === "view"
             ? null
-            : narrowedSchema(buildCollectionInputSchema(collection), key => {
-                const property = collection.properties[key];
-                return property === undefined || canWriteField(property, viewer);
+            : narrowedSchema(buildTableInputSchema(served.table, lookupOf(ctx)), key => {
+                const column = columnByKey(served.table, key);
+                return column === undefined || canWriteColumn(column, viewer);
             }),
         relations: descriptor.relations.map(relation => ({ name: relation.name, kind: relation.kind, target: relation.target })),
         rls,
@@ -705,7 +710,7 @@ interface ResolvedBlock {
 /** show_record's block: a row's form, or a new row's starting from values checked as a create checks them. */
 async function recordBlock(args: Record<string, unknown>, ctx: McpToolContext): Promise<ResolvedBlock> {
     const resolved = resolveTable(ctx, args.table, "data:read");
-    const { collection } = resolved;
+    const { served } = resolved;
     const table = resolved.descriptor.slug;
     const id = optionalString(args.id, "`id`");
     if (id !== undefined && args.values !== undefined) {
@@ -713,7 +718,7 @@ async function recordBlock(args: Record<string, unknown>, ctx: McpToolContext): 
     }
     if (id !== undefined) {
         const driver = await scopedDriver(ctx);
-        const read = await RestApiGenerator.readRow(driver, ownRow(collection), id, {});
+        const read = await RestApiGenerator.readRow(driver, ownRow(served), id, {});
         if (!read) throw notFound(resolved, id);
         return {
             tables: [table],
@@ -724,7 +729,7 @@ async function recordBlock(args: Record<string, unknown>, ctx: McpToolContext): 
     if (!reaches(ctx, "data:write", table)) {
         throw new McpToolError(`A form for a new row needs "data:write" on "${table}", which this connection was not granted.`);
     }
-    const values = args.values === undefined ? undefined : writableValues(args.values, collection, ctx, "new");
+    const values = args.values === undefined ? undefined : writableValues(args.values, served.table, ctx, "new");
     return {
         tables: [table],
         block: { key: "record", type: "record", table, ...(values && { values }) },
@@ -770,9 +775,9 @@ async function appBlock(args: Record<string, unknown>, ctx: McpToolContext): Pro
  */
 async function appSeeds(tables: readonly ResolvedTable[], ctx: McpToolContext): Promise<McpViewSeed[]> {
     const args = { limit: DEFAULT_LIST_LIMIT };
-    const pages = await Promise.all(tables.map(async ({ descriptor, collection }): Promise<McpViewSeed[]> => {
+    const pages = await Promise.all(tables.map(async ({ descriptor, served }): Promise<McpViewSeed[]> => {
         try {
-            const page = await readPage(args, collection, ctx);
+            const page = await readPage(args, served, ctx);
             const total = isRecord(page.meta) && typeof page.meta.total === "number" ? page.meta.total : undefined;
             return [{ table: descriptor.slug, args, rows: page.data, ...(total !== undefined && { total }) }];
         } catch {
@@ -853,7 +858,7 @@ const TOOLS: McpToolDefinition[] = [
             // use is describe_table's, ~0.7k each.
             return {
                 tables: servedSchema(ctx).tables
-                    .filter(table => reaches(ctx, SCHEMA_SCOPE, table.slug) && collectionOf(ctx, table.slug) !== undefined)
+                    .filter(table => reaches(ctx, SCHEMA_SCOPE, table.slug) && servedOf(ctx, table.slug) !== undefined)
                     .map(table => ({
                         name: table.slug,
                         description: table.description ?? null,
@@ -905,8 +910,8 @@ const TOOLS: McpToolDefinition[] = [
         outputSchema: PAGE_OUTPUT,
         inputSchema: QUERY_INPUT_SCHEMA,
         async run(args, ctx) {
-            const { collection } = resolveTable(ctx, args.table, "data:read");
-            return readPage(args, collection, ctx);
+            const { served } = resolveTable(ctx, args.table, "data:read");
+            return readPage(args, served, ctx);
         }
     },
 
@@ -928,11 +933,11 @@ const TOOLS: McpToolDefinition[] = [
         ui: { resourceUri: MCP_APP_URI },
         modelResult: withoutView,
         async run(args, ctx) {
-            const { descriptor, collection } = resolveTable(ctx, args.table, "data:read");
+            const { descriptor, served } = resolveTable(ctx, args.table, "data:read");
             const { view, ...readArgs } = args;
             const mode = view === undefined ? undefined : viewModeOf(view, "`view`");
             const readAt = Date.now();
-            const page = await readPage(readArgs, collection, ctx);
+            const page = await readPage(readArgs, served, ctx);
             const block: ResolvedBlock = {
                 tables: [descriptor.slug],
                 summary: {},
@@ -1176,10 +1181,10 @@ const TOOLS: McpToolDefinition[] = [
             additionalProperties: false
         },
         async run(args, ctx) {
-            const { collection } = resolveTable(ctx, args.table, "data:read");
-            const options = readOptions(args, collection, ctx);
+            const { served } = resolveTable(ctx, args.table, "data:read");
+            const options = readOptions(args, served.table, ctx);
             const driver = await scopedDriver(ctx);
-            const count = await RestApiGenerator.countRawEntities(driver, collection, options, searchStringOf(args));
+            const count = await RestApiGenerator.countRawEntities(driver, served, options, searchStringOf(args));
             return { count };
         }
     },
@@ -1237,18 +1242,18 @@ const TOOLS: McpToolDefinition[] = [
             additionalProperties: false
         },
         async run(args, ctx) {
-            const { collection } = resolveTable(ctx, args.table, "data:read");
+            const { served } = resolveTable(ctx, args.table, "data:read");
             const select = restList(args.select, "`select`");
             if (!select) throw new McpToolError("`select` is required, e.g. [\"count()\"] or [\"sum(total)\"].");
             const groupBy = restList(args.groupBy, "`groupBy`");
-            const options = readOptions(args, collection, ctx);
+            const options = readOptions(args, served.table, ctx);
             const driver = await scopedDriver(ctx);
             if (!driver.restFetchService?.aggregate) {
                 throw new McpToolError("Aggregates are not available on this project's database. "
                     + "Use count_rows to count, or query_table to read the rows.");
             }
             const { rows, meta } = await RestApiGenerator.aggregate(
-                driver, collection, options, select, groupBy, viewerOf(ctx), searchStringOf(args)
+                driver, served, options, select, groupBy, viewerOf(ctx), lookupOf(ctx), searchStringOf(args)
             );
             return meta ? { data: rows, meta } : { data: rows };
         }
@@ -1276,7 +1281,7 @@ const TOOLS: McpToolDefinition[] = [
             const resolved = resolveTable(ctx, args.table, "data:read");
             const id = String(args.id);
             const driver = await scopedDriver(ctx);
-            const read = await RestApiGenerator.readRow(driver, ownRow(resolved.collection), id, {});
+            const read = await RestApiGenerator.readRow(driver, ownRow(resolved.served), id, {});
             if (!read) throw notFound(resolved, id);
             return read.row;
         }
@@ -1300,19 +1305,19 @@ const TOOLS: McpToolDefinition[] = [
             additionalProperties: false
         },
         async run(args, ctx) {
-            const { descriptor, collection } = resolveTable(ctx, args.table, "data:write");
-            const user = await createUser(args, collection, ctx);
+            const { descriptor, served } = resolveTable(ctx, args.table, "data:write");
+            const user = await createUser(args, served, ctx);
             if (user) {
                 logger.info("[mcp] User created", {
                     table: descriptor.slug, uid: ctx.caller.uid, clientId: ctx.caller.clientId
                 });
                 return user;
             }
-            const values = writableValues(args.data, collection, ctx, "new");
+            const values = writableValues(args.data, served.table, ctx, "new");
             const driver = await scopedDriver(ctx);
             const saved = await driver.save({
-                path: dataPath(collection),
-                collection,
+                path: served.table.slug,
+                collection: served.driverCollection,
                 values,
                 id: args.id ? String(args.id) : undefined,
                 status: "new"
@@ -1344,20 +1349,20 @@ const TOOLS: McpToolDefinition[] = [
         },
         async run(args, ctx) {
             const resolved = resolveTable(ctx, args.table, "data:write");
-            const { descriptor, collection } = resolved;
+            const { descriptor, served } = resolved;
             const id = String(args.id);
-            const body = writableValues(args.data, collection, ctx, "existing");
+            const body = writableValues(args.data, served.table, ctx, "existing");
             const driver = await scopedDriver(ctx);
-            await assertRowExists(driver, resolved, id, restoresSoftDeletedRow(collection, body) ? true : undefined);
+            await assertRowExists(driver, resolved, id, isSoftDeleteRestore(served.table, body) ? true : undefined);
             // On the auth table, the adapter's check and stored form: no
             // demoting the last administrator, the email as sign-in looks it up.
-            const [values] = await prepareAuthCollectionUpdates(ctx.authAdapter, collection, [{
+            const [values] = await prepareAuthTableUpdates(ctx.authAdapter, served.table, [{
                 uid: id,
                 values: body
             }]);
             const saved = await driver.save({
-                path: dataPath(collection),
-                collection,
+                path: served.table.slug,
+                collection: served.driverCollection,
                 values,
                 id,
                 status: "existing"
@@ -1389,16 +1394,16 @@ const TOOLS: McpToolDefinition[] = [
         },
         async run(args, ctx) {
             const resolved = resolveTable(ctx, args.table, "data:delete");
-            const { descriptor, collection } = resolved;
+            const { descriptor, served } = resolved;
             const id = String(args.id);
             const driver = await scopedDriver(ctx);
             await assertRowExists(driver, resolved, id);
             // On the auth table: the last administrator stays, and
             // `beforeUserDelete` may veto; after, the sessions end and
             // `afterUserDelete` runs.
-            await deletingAuthCollectionUsers(ctx.authAdapter, collection, [id], () => driver.delete({
-                row: { id, path: dataPath(collection) },
-                collection
+            await deletingAuthTableUsers(ctx.authAdapter, served.table, [id], () => driver.delete({
+                row: { id, path: served.table.slug },
+                collection: served.driverCollection
             }));
             logger.info("[mcp] Row deleted", {
                 table: descriptor.slug, id, uid: ctx.caller.uid, clientId: ctx.caller.clientId

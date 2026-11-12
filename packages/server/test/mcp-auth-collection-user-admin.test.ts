@@ -250,7 +250,7 @@ describe("create_row on the auth collection", () => {
         const result = await call("create_row", { table: "users", data: { email: "a@b.c", nmae: "x" } });
 
         expect(result.isError).toBe(true);
-        expect(result.content[0].text).toContain("has no field 'nmae'");
+        expect(result.content[0].text).toContain("has no column 'nmae'");
         expect(writes()).toHaveLength(0);
     });
 });

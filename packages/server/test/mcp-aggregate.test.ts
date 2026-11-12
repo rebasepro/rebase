@@ -146,7 +146,7 @@ describe("aggregate_rows", () => {
         for (const args of [{ select: ["max(margin)"] }, { select: ["count()"], groupBy: ["margin"] }]) {
             const body = await call(driver, args);
             expect(body.result?.isError).toBe(true);
-            expect(body.result?.content[0].text).toContain("'margin' is not readable on 'orders' with your roles");
+            expect(body.result?.content[0].text).toContain("'margin' is not readable on table 'orders' with your roles");
         }
         expect(asked).toHaveLength(0);
         const allowed = await call(driver, { select: ["max(margin)"] }, { roles: ["finance"] });

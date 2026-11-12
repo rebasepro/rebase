@@ -262,7 +262,7 @@ export function buildApp(options: HarnessOptions = {}) {
         oauthBasePath: "/api/oauth",
         getDriver: () => driver,
         getTables: () => tables,
-        getCollections: () => collections,
+        driverCollection: (slug: string) => collections.find(collection => collection.slug === slug),
         getAuthAdapter: () => options.authAdapter,
         serverInfo: { name: "rebase", version: "test" },
         maxBodySize: options.maxBodySize,

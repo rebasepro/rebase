@@ -35,7 +35,7 @@ function app(auth?: AuthAdapter) {
         mcpPath: "/api/admin/apps/mcp",
         oauthBasePath: "/api/oauth",
         getDriver: () => stubDriver().driver,
-        getCollections: () => [],
+        driverCollection: () => undefined,
         getAuthAdapter: () => auth,
         serverInfo: { name: "rebase", version: "test" }
     }));

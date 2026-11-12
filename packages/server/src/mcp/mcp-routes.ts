@@ -26,7 +26,8 @@ import { Hono } from "hono";
 import type { Context, HonoRequest } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { createMiddleware } from "hono/factory";
-import type { AuthAdapter, CollectionConfig, DataDriver, TableDescriptor } from "@rebasepro/types";
+import type { AuthAdapter, DataDriver, TableDescriptor } from "@rebasepro/types";
+import type { DriverCollectionOf } from "../schema/driver-seam.js";
 import { untrustedEnvelope } from "@rebasepro/common";
 import type { HonoEnv } from "../api/types.js";
 import { declaredErrorAnswer } from "../api/errors.js";
@@ -130,8 +131,8 @@ export interface McpRoutesConfig {
      * change after boot.
      */
     getTables(): readonly TableDescriptor[];
-    /** The request-time configs the data path reads: the tables, lowered for the runtime. */
-    getCollections(): CollectionConfig[];
+    /** What a data driver call names a table by (see `DriverCollectionOf`). Deleted with slice B-R7. */
+    driverCollection: DriverCollectionOf;
     /**
      * The deployment's auth adapter. A write to the auth table is user
      * administration, and the adapter holds it to the rules `/admin/users`
@@ -646,7 +647,7 @@ export function createMcpRoutes(config: McpRoutesConfig): Hono<HonoEnv> {
             const result = await tool.run(args, {
                 driver,
                 tables: config.getTables(),
-                collections: config.getCollections(),
+                driverCollection: config.driverCollection,
                 authAdapter: config.getAuthAdapter?.(),
                 caller,
                 ...(compileApp && { compileApp })
