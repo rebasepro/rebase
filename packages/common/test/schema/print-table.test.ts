@@ -196,7 +196,7 @@ describe("printColumn — golden chains", () => {
     });
 
     it("prints a transform from its source, and refuses one without", () => {
-        const builder = col.text().transform({ beforeSave: ({ value }) => value.trim() });
+        const builder = col.text().transform({ beforeSave: ({ value }) => value?.trim() ?? null });
         expect(printColumn(builder.def, { transform: TRANSFORM_SOURCE })).toBe(`col.text().transform(${TRANSFORM_SOURCE})`);
         expect(() => printColumn(builder.def, { key: "title" })).toThrow(TablePrintError);
         expect(() => printColumn(builder.def, { key: "title" })).toThrow(/title\.transform.*source text/);

@@ -199,7 +199,7 @@ describe("compileTables — columns", () => {
                     at: json.date().onCreateNow(),
                     by: json.string().onUpdateUser()
                 })),
-                trimmed: col.text().transform({ beforeSave: ({ value }) => value.trim() }),
+                trimmed: col.text().transform({ beforeSave: ({ value }) => value?.trim() ?? null }),
                 legacy: col.text().dbDefault(),
                 code: col.text().defaultSql("gen_short_id()"),
                 noIndex: col.vector(3, { index: false })

@@ -439,6 +439,35 @@ function relationOptions(): void {
 
 // ── Hooks are typed from the columns ─────────────────────────────────────────
 
+function transformTypes(): void {
+    // A nullable column hands its transform `null`.
+    col.text().transform({
+        beforeSave: ({ value }) => {
+            assertType<Equal<typeof value, string | null>>();
+            return value === null ? null : value.trim();
+        },
+        afterRead: ({ value }) => value
+    });
+    // `.notNull()` (or `.primaryKey()`) first: the value is never null…
+    col.text().notNull().transform({
+        beforeSave: ({ value }) => {
+            assertType<Equal<typeof value, string>>();
+            return value.trim();
+        }
+    });
+    col.uuid().primaryKey().transform({ afterRead: ({ value }) => { assertType<Equal<typeof value, string>>(); return value; } });
+    // …`.notNull()` after `.transform()` came too late for the hook's type: it keeps `null`.
+    col.integer().transform({ afterRead: ({ value }) => { assertType<Equal<typeof value, number | null>>(); return value; } }).notNull();
+    // @ts-expect-error a nullable column's hook cannot assume a value
+    col.text().transform({ beforeSave: ({ value }) => value.trim() });
+    // A JSON field that is not `.required()` can be absent.
+    json.string().transform({ beforeSave: ({ value }) => { assertType<Equal<typeof value, string | undefined>>(); return value; } });
+    json.string().required().transform({ beforeSave: ({ value }) => { assertType<Equal<typeof value, string>>(); return value.trim(); } });
+    json.number().transform({ afterRead: ({ value }) => { assertType<Equal<typeof value, number | undefined>>(); return value; } }).required();
+    // @ts-expect-error an optional JSON field's hook cannot assume a value
+    json.string().transform({ beforeSave: ({ value }) => value.trim() });
+}
+
 function hookTypes(): void {
     defineTable("hooked", {
         columns: { id: col.uuid().primaryKey(), title: col.text().notNull(), secret: col.text().private(), count: col.integer() },
@@ -469,7 +498,7 @@ function hookTypes(): void {
     });
 }
 
-void [slugTypes, rowTypes, insertTypes, updateTypes, keyTypes, viewTypes, refusedTables, keyTypedOptions, kindRestrictedModifiers, relationOptions, hookTypes];
+void [slugTypes, transformTypes, rowTypes, insertTypes, updateTypes, keyTypes, viewTypes, refusedTables, keyTypedOptions, kindRestrictedModifiers, relationOptions, hookTypes];
 
 test("the typed examples build", () => {
     expect(posts.name).toBe("posts");

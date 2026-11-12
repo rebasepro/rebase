@@ -88,6 +88,20 @@ export interface InitialColumnFlags extends ColumnFlags {
     primaryKey: false;
 }
 
+/**
+ * The value a column's `.transform()` hooks receive and return: the column's
+ * type, plus `null` while the column is nullable.
+ *
+ * Read from the flags at the point `.transform()` is called, so the order of
+ * the chain matters: `.notNull().transform(…)` (or `.primaryKey()` first)
+ * receives `TData`; `.transform(…).notNull()` was typed before the column
+ * became `NOT NULL` and keeps receiving `TData | null`. Write `.notNull()`
+ * first.
+ *
+ * @group Schema
+ */
+export type ColumnTransformValue<TData, F extends ColumnFlags> = F["notNull"] extends true ? TData : TData | null;
+
 type SetFlag<F extends ColumnFlags, K extends keyof ColumnFlags, V extends boolean> = {
     [P in keyof ColumnFlags]: P extends K ? V : F[P]
 };
@@ -275,8 +289,13 @@ export class ColumnBuilder<TData, TKind extends BuilderKind = BuilderKind, F ext
     /**
      * Field-level hooks: `beforeSave` returns the value to store, `afterRead`
      * the value to serve. They run on the server, for every caller.
+     *
+     * The value is `TData | null` on a column not (yet) marked `.notNull()` /
+     * `.primaryKey()` — a nullable column hands the hook `null` — and `TData`
+     * on one that is; see {@link ColumnTransformValue}. Chain `.notNull()`
+     * before `.transform()` to get the narrower type.
      */
-    transform(transform: ColumnTransform<TData>): ColumnBuilder<TData, TKind, F> {
+    transform(transform: ColumnTransform<ColumnTransformValue<TData, F>>): ColumnBuilder<TData, TKind, F> {
         const erased: ColumnTransform = transform;
         return this.with<TData, TKind, F>({ transform: erased });
     }

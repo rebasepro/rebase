@@ -179,8 +179,8 @@ describe("lowerTables — columns", () => {
             columns: {
                 id,
                 c: col.text().transform({
-                    beforeSave: props => { seen.push(["beforeSave", props.table, props.value, props.previousValue, props.values]); return props.value.trim(); },
-                    afterRead: props => { seen.push(["afterRead", props.table, props.value, props.values]); return props.value.toUpperCase(); }
+                    beforeSave: props => { seen.push(["beforeSave", props.table, props.value, props.previousValue, props.values]); return props.value?.trim() ?? null; },
+                    afterRead: props => { seen.push(["afterRead", props.table, props.value, props.values]); return props.value?.toUpperCase() ?? null; }
                 })
             },
             rls: "admin-only"

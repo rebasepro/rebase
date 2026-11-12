@@ -93,6 +93,17 @@ type JsonValidationFor<K extends JsonKind> =
     K extends "array" ? ArrayValidation :
     BaseValidation;
 
+/**
+ * The value a JSON field's `.transform()` hooks receive and return: the
+ * field's type, plus `undefined` while the field is not `.required()`.
+ *
+ * Read when `.transform()` is called: `.required().transform(…)` receives
+ * `TData`, `.transform(…).required()` keeps `TData | undefined`.
+ *
+ * @group Schema
+ */
+export type JsonTransformValue<TData, TRequired extends boolean> = TRequired extends true ? TData : TData | undefined;
+
 /** The brand every JSON field builder carries, so one built by another copy of this package is still recognised. */
 export const JSON_FIELD_BRAND = "rebase.json-field";
 
@@ -172,8 +183,15 @@ export class JsonField<TData, TKind extends JsonKind = JsonKind, TRequired exten
         return this.with<string, "string", TRequired>({ stamp: "updateUser" });
     }
 
-    /** Field-level hooks. They run on the server only. */
-    transform(transform: ColumnTransform<TData>): JsonField<TData, TKind, TRequired> {
+    /**
+     * Field-level hooks. They run on the server only.
+     *
+     * The value is `TData | undefined` on a field not (yet) marked
+     * `.required()` — the key can be absent from the document — and `TData` on
+     * one that is; see {@link JsonTransformValue}. Chain `.required()` before
+     * `.transform()` to get the narrower type.
+     */
+    transform(transform: ColumnTransform<JsonTransformValue<TData, TRequired>>): JsonField<TData, TKind, TRequired> {
         const erased: ColumnTransform = transform;
         return this.with<TData, TKind, TRequired>({ transform: erased });
     }
