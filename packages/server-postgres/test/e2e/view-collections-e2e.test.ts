@@ -25,6 +25,7 @@ import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.
 import { createPostgresBootstrapper, createPostgresDatabaseConnection, openRebase, type OpenedRebase } from "../../src/index.js";
 import { ensureCollectionTables, type Queryable } from "../../src/schema/ensure-collection-tables.js";
 import { compileSet } from "../helpers/plan-tables";
+import { tablesFromCollections } from "../helpers/tables.js";
 
 const songs: CollectionConfig = {
     name: "Songs",

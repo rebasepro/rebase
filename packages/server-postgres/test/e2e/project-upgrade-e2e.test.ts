@@ -51,8 +51,9 @@ import { ensureAuthTablesExist } from "../../src/auth/ensure-tables.js";
 import { ensureCollectionTables } from "../../src/schema/ensure-collection-tables.js";
 import { ensureCollectionPolicies } from "../../src/schema/ensure-collection-policies.js";
 import { ensureAppRole } from "../../src/security/rls-enforcement.js";
-import { PostgresCollectionRegistry } from "../../src/collections/PostgresCollectionRegistry.js";
-import { findRelationDefects, assertRelationsResolve } from "../../src/collections/validate-relations.js";
+import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry.js";
+import { FixtureTableRegistry } from "../helpers/tables";
+import { findRelationDefects, assertRelationsResolve } from "../../src/model/validate-relations.js";
 import { compileSet } from "../helpers/plan-tables";
 
 const SNAPSHOT_DIR = fileURLToPath(new URL("./project-snapshots", import.meta.url));
@@ -323,9 +324,9 @@ describe.each(snapshots)("upgrading a project left by $name", (snapshot) => {
         };
 
         it("either resolves, or says the generated file is what is stale", () => {
-            const defects = findRelationDefects(collections, staleRegistry());
+            const defects = findRelationDefects(staleRegistry());
             if (defects.length === 0) {
-                expect(() => assertRelationsResolve(collections, staleRegistry())).not.toThrow();
+                expect(() => assertRelationsResolve(staleRegistry())).not.toThrow();
                 return;
             }
 
@@ -333,7 +334,7 @@ describe.each(snapshots)("upgrading a project left by $name", (snapshot) => {
             // What is NOT legitimate is the diagnosis blaming the collection.
             let message = "";
             try {
-                assertRelationsResolve(collections, staleRegistry());
+                assertRelationsResolve(staleRegistry());
             } catch (error) {
                 message = error instanceof Error ? error.message : String(error);
             }
@@ -343,7 +344,7 @@ describe.each(snapshots)("upgrading a project left by $name", (snapshot) => {
         });
 
         it("never advises pinning a column the database no longer has", async () => {
-            const defects = findRelationDefects(collections, staleRegistry());
+            const defects = findRelationDefects(staleRegistry());
             if (defects.length === 0) return;
 
             const live = await client.query<{ schema: string; table: string; column: string }>(`

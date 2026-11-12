@@ -22,6 +22,7 @@ import type { CollectionConfig } from "@rebasepro/types";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { createPostgresBootstrapper, createPostgresDatabaseConnection, openRebase, type OpenedRebase } from "../../src/index.js";
 import { generatePostgresDdl } from "../../src/schema/generate-postgres-ddl-logic.js";
+import { tablesFromCollections } from "../helpers/tables.js";
 import { compileSet } from "../helpers/plan-tables";
 
 const scores: CollectionConfig = {
