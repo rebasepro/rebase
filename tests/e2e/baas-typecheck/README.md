@@ -38,10 +38,17 @@ cannot see through a type alias, and the fixture cannot see an unused import.
   the proof that the *schema* half of a collection is fully typed with no React.
 - `src/sdk.ts` — `@rebasepro/client` usage, including typed accessors.
 - `src/typed-sdk/` — a typed client against a generated `Database`.
-  `database.types.ts` is the codegen's output for `collections.ts` (kept in step
+  `database.types.ts` is the codegen's output for the `defineTable`s in
+  `schema.ts` (kept in step
   by `packages/codegen/test/baas-typecheck-fixture.test.ts`), and `probes.ts`
   asserts what that client refuses — each `@ts-expect-error` a call the server
   refuses — and what it must accept.
+- `registered/` — a project that registers its generated `Database` on
+  `Register` (and its schema module too: the generated one wins), so
+  `context.data`, `rebase.dataAsAdmin`, functions and crons are typed.
+- `registered-tables/` — a project that registers only its schema module
+  (`Register.tables`, no codegen run): the same surfaces and a client typed by
+  `DatabaseOf<typeof schema>`.
 - `src/admin_absent.ts` — the negative half: `admin` on a property or a
   collection, and the `Admin*Options` types, must not compile from core.
   `@ts-expect-error` is the assertion, so the file fails if any of them ever

@@ -1,4 +1,5 @@
 import type { RebaseCallContext } from "../call_context";
+import type { GeneratedDatabase } from "../types/register";
 import type { User } from "../users";
 import type { EntityStatus } from "../types/entities";
 import type { QueryNarrowing, ReadOperation, ReadQuery } from "../types/entity_callbacks";
@@ -17,8 +18,13 @@ export interface TableHookProps<USER extends User = User> {
     table: TableDescriptor;
     /** The path the request addressed: the slug, or a nested path. */
     path: string;
-    /** The caller, and `context.data` scoped to them. */
-    context: RebaseCallContext<USER>;
+    /**
+     * The caller, and `context.data` scoped to them — typed from a registered
+     * generated `Database` (`Register.database`). Not from `Register.tables`:
+     * a schema's own hooks typed from that same schema is a cycle TypeScript
+     * refuses.
+     */
+    context: RebaseCallContext<USER, GeneratedDatabase>;
 }
 
 /**

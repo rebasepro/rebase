@@ -3,6 +3,7 @@ import type { OrderByTuple } from "./filter-operators";
 import type { EntityStatus, EntityValues } from "./entities";
 import type { User } from "../users";
 import type { RebaseCallContext } from "../call_context";
+import type { GeneratedDatabase } from "./register";
 import type { LogicalCondition } from "../controllers/data";
 
 /**
@@ -174,7 +175,7 @@ export interface AfterReadProps<M extends Record<string, unknown> = Record<strin
     /**
      * Context of the app status
      */
-    context: RebaseCallContext<USER>;
+    context: RebaseCallContext<USER, GeneratedDatabase>;
 }
 
 /**
@@ -313,7 +314,7 @@ export interface BeforeQueryProps<M extends Record<string, unknown> = Record<str
      * same connection. Keep it to something cheap and cacheable, or read it
      * once per request outside the hook.
      */
-    context: RebaseCallContext<USER>;
+    context: RebaseCallContext<USER, GeneratedDatabase>;
 }
 
 /**
@@ -389,7 +390,7 @@ export interface AfterSaveProps<M extends Record<string, unknown> = Record<strin
     /**
      * Context of the app status
      */
-    context: RebaseCallContext<USER>;
+    context: RebaseCallContext<USER, GeneratedDatabase>;
 }
 
 /**
@@ -421,7 +422,7 @@ export interface BeforeDeleteProps<M extends Record<string, unknown> = Record<st
     /**
      * Context of the app status
      */
-    context: RebaseCallContext<USER>;
+    context: RebaseCallContext<USER, GeneratedDatabase>;
 }
 
 /**
@@ -453,5 +454,5 @@ export interface AfterDeleteProps<M extends Record<string, unknown> = Record<str
     /**
      * Context of the app status
      */
-    context: RebaseCallContext<USER>;
+    context: RebaseCallContext<USER, GeneratedDatabase>;
 }

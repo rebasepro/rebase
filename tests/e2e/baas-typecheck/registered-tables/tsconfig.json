@@ -1,0 +1,9 @@
+{
+    "//": "The no-codegen half of the typed-data proof: a project that registers its schema module on `Register.tables` and never runs `rebase generate-sdk`. A program of its own because a module augmentation reaches the whole program. Run via `pnpm check:baas-types`.",
+    "extends": "../tsconfig.json",
+    "include": [
+        "*.ts",
+        "../stubs",
+        "../../../../packages/mcp-apps/src/raw.d.ts"
+    ]
+}
