@@ -111,8 +111,8 @@ this list, in this order.
 | `check:floors` | Every manifest's declared `engines.node` and React peer floor against `.nvmrc` and what the packages actually require. Neither package manager enforces `engines` on its own; `bin/rebase.js`'s floor check and the scaffold's `engineStrict` do, and both read the declaration this keeps honest. | — |
 | `check:pnpm-settings` | Every setting `pnpm-workspace.yaml` declares comes back from `pnpm config`, with the value declared, and no `.npmrc` key duplicates one or is dead. pnpm 11 stopped reading `.npmrc` silently, leaving eight settings — the supply-chain release-age floor among them — doing nothing. | — |
 | `check:jsdoc-coverage` | Every public field on the hand-authored property and relation types has a doc comment — for most of them the editor hover is the only explanation anywhere. | — |
-| `check:rebase-props` | The `<Rebase>` props table against `RebaseProps` and what `Rebase.tsx` reads, so the table cannot document ten of twenty-four. | — |
-| `check:property-options` | The properties page against every `Admin*Options` interface, so a per-property `admin` option cannot exist in the type and nowhere else. | — |
+| `check:rebase-props` | The `<Rebase>` props table against `RebaseProps`, and the `<RebaseCMS>` one against `RebaseCMSConfig`, both directions, so a table cannot document ten of twenty-four. | — |
+| `check:property-options` | The `customizeTable` reference (`frontend/customize-table.md`) against every option interface the call takes — table-level, per-field and the shapes their keys hold, methods included — so a panel option cannot exist in the type and nowhere else. | — |
 | `check:subpath-imports` | Every deep import the docs recommend resolves against that package's `exports` map. | — |
 | `check:studio-tools` | The Studio tools table against the `useMemo` in `RebaseStudio.tsx` that declares each tool's slug and drawer group. | — |
 | `check:ui-string-paths` | A path named in a UI string points at something the reader's project has, not at a file in this repository. | — |

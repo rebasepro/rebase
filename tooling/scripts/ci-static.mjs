@@ -346,14 +346,17 @@ interchangeably — they are not the same thing, and nothing said so.`
         run: "check:rebase-props",
         why: `The \`<Rebase>\` props table documented ten of twenty-four props, and two
 of the ten were declared on RebaseProps and never read by Rebase.tsx. A
-hand-written table drifts the moment a prop is added.`
+hand-written table drifts the moment a prop is added. \`<RebaseCMS>\` has its own
+table since 0.31 (\`RebaseCMSConfig\`), held the same way.`
     },
     {
         run: "check:property-options",
         why: `The properties page listed 30 of the 36 keys the \`Admin*Options\`
 interfaces declare, and four of the six it missed — \`locale\`,
 \`minimumFractionDigits\`, \`maximumFractionDigits\`, \`notation\` — were in
-no English page at all. The sibling of check:rebase-props, same reason.`
+no English page at all. The sibling of check:rebase-props, same reason.
+Since 0.31 those options are what \`customizeTable\` takes, so it reads that
+call's option interfaces against the customization reference.`
     },
     {
         run: "check:subpath-imports",
