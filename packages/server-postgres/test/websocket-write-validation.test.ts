@@ -366,6 +366,7 @@ describe("a socket write through a parent's relation", () => {
     };
 
     let writes: unknown[];
+    let registry: ReturnType<typeof registryOf>;
 
     const adapter = fakeAuthAdapter({
         verifyToken: async (token: string) => ({ uid: `u-${token}`, email: "", roles: token.split(","), isAdmin: false })
@@ -390,9 +391,10 @@ describe("a socket write through a parent's relation", () => {
         jest.clearAllMocks();
         mockWssInstance = null;
         writes = [];
+        registry = registryOf(bands, members, posts, tags);
         const driver: SocketDataDriver = {
             ...fakeDataDriver(),
-            registry: registryOf(bands, members, posts, tags),
+            registry,
             save: async (props) => { writes.push(props); return {}; },
             delete: async (props) => { writes.push(props); }
         };
@@ -435,6 +437,24 @@ describe("a socket write through a parent's relation", () => {
         const { send } = await connect(["viewer"]);
         await send({ type: "SAVE", requestId: "u", payload: { path: "bands/7/members", id: 3, status: "existing", values: { name: "renamed" } } });
         expect(writes).toHaveLength(1);
+    });
+
+    // Fail closed: a nested path the check cannot judge is refused at the
+    // socket, never handed to the driver unjudged.
+    it("refuses a write through a relation the parent does not have", async () => {
+        const { send, last } = await connect(["hr", "editor"]);
+        await send({ type: "SAVE", requestId: "x", payload: { path: "bands/7/nothing", status: "new", values: { name: "x" } } });
+        expect(last().type).toBe("ERROR");
+        expect(writes).toEqual([]);
+    });
+
+    it("refuses a write through a hop whose target table is not served", async () => {
+        const getTable = registry.getTable.bind(registry);
+        jest.spyOn(registry, "getTable").mockImplementation(slug => slug === "members" ? undefined : getTable(slug));
+        const { send, last } = await connect(["hr", "editor"]);
+        await send({ type: "SAVE", requestId: "y", payload: { path: "bands/7/members", status: "new", values: { name: "x" } } });
+        expect(last()).toMatchObject({ type: "ERROR", payload: { error: { code: "FIELD_NOT_WRITABLE" } } });
+        expect(writes).toEqual([]);
     });
 });
 

@@ -1464,23 +1464,27 @@ roles: verifiedUser.roles }
                  * apply, from the same function. The body is checked by
                  * `assertWriteRequest`; this is what the address writes.
                  *
-                 * Silent for a root path, and for a nested one the registry
-                 * cannot walk: the driver refuses that with its own message.
+                 * Silent only for a root path. A nested path this check cannot
+                 * judge is refused here, never waved through to the driver: a
+                 * path the registry cannot walk throws the walk's own error
+                 * (the one the driver would answer with), and a hop whose
+                 * parent, relation or target has no served table is refused
+                 * outright — a skipped check is a write nobody judged.
                  */
                 const assertNestedWrite = (path: unknown, kind: NestedWriteKind): void => {
-                    if (typeof path !== "string" || !isNestedPath(path) || !driver.registry) return;
-                    let hop;
-                    try {
-                        hop = resolveNestedPath(path, driver.registry);
-                    } catch {
-                        return;
-                    }
-                    if (!hop) return;
+                    if (typeof path !== "string" || !isNestedPath(path)) return;
                     const registry = driver.registry;
-                    const parent = registry.getTable(hop.parentCollection.slug)?.descriptor;
-                    const relation = parent && relationOf(parent, hop.relation.relationName);
+                    if (!registry) throw ApiError.forbidden(`A write through '${path}' cannot be checked: this server has no table registry.`, "FIELD_NOT_WRITABLE");
+                    const hop = resolveNestedPath(path, registry);
+                    const parent = hop && registry.getTable(hop.parentCollection.slug)?.descriptor;
+                    const relation = parent && hop && relationOf(parent, hop.relation.relationName);
                     const target = relation && registry.getTable(relation.target)?.descriptor;
-                    if (!parent || !relation || !target) return;
+                    if (!parent || !relation || !target) {
+                        throw ApiError.forbidden(
+                            `A write through '${path}' is refused: its parent table, relation or target table is not served here.`,
+                            "FIELD_NOT_WRITABLE"
+                        );
+                    }
                     const session = clientSessions.get(clientId);
                     assertNestedWriteAllowed({ parent, relation, target }, kind, path, { roles: session?.user?.roles ?? ["anon"] });
                 };
