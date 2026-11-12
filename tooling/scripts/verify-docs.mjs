@@ -386,11 +386,11 @@ if (only === "both" || only === "names") {
 }
 
 if (only === "both" || only === "names") {
-    console.log(`\n${YELLOW}━━━ Config-package exports (all locales) ━━━${NC}`);
+    console.log(`\n${YELLOW}━━━ Backend-module exports (all locales) ━━━${NC}`);
     const { findings: bad, read, cells, scanned } = checkConfigExports(ROOT);
-    console.log(`${DIM}Checked ${cells} documented \`config/index.ts\` export(s) across ${scanned} file(s); the runtime reads ${read.join(", ")}.${NC}`);
+    console.log(`${DIM}Checked ${cells} documented backend-module export(s) across ${scanned} file(s); the runtime reads ${read.join(", ")}.${NC}`);
     if (!bad.length) {
-        console.log(`${GREEN}\u2713 Every export a page puts in \`config/index.ts\` is one the runtime reads.${NC}`);
+        console.log(`${GREEN}\u2713 Every export a page puts in a backend module is one the runtime reads out of it.${NC}`);
     } else {
         findings += bad.length;
         console.log(`${RED}\u2717 ${bad.length} documented export(s) the runtime does not read:${NC}`);

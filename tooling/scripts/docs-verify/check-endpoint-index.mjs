@@ -111,6 +111,9 @@ const MOUNTS = new Map([
     ["packages/server/src/api/live-schema-routes.ts#router", "/api/admin/schema"],
     ["packages/server/src/api/logs-routes.ts#app", "/api/admin/logs"],
     ["packages/server/src/api/contract-routes.ts#router", "/api/meta"],
+    // `GET /api/schema/tables` — the table descriptors, redacted per caller.
+    // Mounted beside `/api/meta` under the same `surfaces.meta` switch.
+    ["packages/server/src/api/schema-tables-routes.ts#router", "/api/schema"],
     ["packages/server/src/api/sql-export-routes.ts#router", "/api/admin/sql"],
     ["packages/server/src/auth/rls-simulator-routes.ts#router", "/api/admin/rls-simulator"],
     ["packages/server/src/api/branch-routes.ts#router", "/api/admin/branches"],
