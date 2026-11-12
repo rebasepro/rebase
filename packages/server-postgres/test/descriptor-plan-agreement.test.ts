@@ -20,7 +20,7 @@
 import { describe, expect, it } from "@jest/globals";
 import { col, defineAuthTable, defineTable, defineView, rel } from "@rebasepro/types";
 import type { AnyTableDef, AnyViewDef, ColumnDescriptor, DefaultRls, TableDescriptor } from "@rebasepro/types";
-import { collectionsToTableDefs, compileTables, isSchemaDefinitionError, lowerTables } from "@rebasepro/common";
+import { collectionsToTableDefs, compileTables, isSchemaDefinitionError, lowerTables, compileSchema } from "@rebasepro/common";
 
 import { planSchema } from "../src/schema/plan/plan-schema";
 import type { ColumnPlan, SchemaPlan, TablePlan } from "../src/schema/plan/types";
@@ -138,7 +138,7 @@ function agreementOf(defs: readonly Def[], defaultRls?: DefaultRls): string[] {
     return withPinnedPlannerWorld(() => {
         const options = defaultRls === undefined ? {} : { defaultRls };
         const descriptors = compileTables(defs, options);
-        const plan = planSchema(lowerTables(defs, options));
+        const plan = planSchema(compileSchema(defs, options));
         return disagreements(descriptors, plan);
     });
 }
@@ -226,7 +226,7 @@ describe("descriptor ↔ plan agreement", () => {
         const defs = [users, categories, tags, posts, comments];
         const lines = withPinnedPlannerWorld(() => {
             const descriptors = compileTables(defs, { defaultRls: "admin-only" });
-            const plan = planSchema(lowerTables(defs, { defaultRls: "admin-only" }));
+            const plan = planSchema(compileSchema(defs, { defaultRls: "admin-only" }));
             const tampered = descriptors.map(d => d.name !== "posts" ? d : {
                 ...d,
                 table: "articles",
@@ -267,7 +267,7 @@ describe("descriptor ↔ plan agreement on the plan-golden corpus", () => {
                 }
                 const options = lifted.defaultRls === undefined ? {} : { defaultRls: lifted.defaultRls };
                 const descriptors = compileTables(lifted.tables, options);
-                const plan = planSchema(lowerTables(lifted.tables, options));
+                const plan = planSchema(compileSchema(lifted.tables, options));
                 report[set.id] = disagreements(descriptors, plan);
             });
         }

@@ -62,6 +62,7 @@ import {
     customSqlTypeProblem,
     declaredSchemaOf,
     columnByKey,
+    relationOf,
     columnNameOf,
     tenantOf,
     compileTableRulePolicies,
@@ -125,8 +126,15 @@ import { sharedRelationName } from "../relation-names";
 import { SET_UPDATED_AT_FN, setUpdatedAtFunction } from "./updated-at-trigger";
 import { keepTenantFunction, keepTenantTriggerName } from "./tenant-keep-trigger";
 import { DEFAULT_VIEW_ROLES, viewRowsName } from "./view-names";
-import { tableBelongsToOf, tableColumnOf } from "./table-input";
+import { tableColumnOf } from "./table-input";
 import { lowerCompiledTables } from "../lowered-tables";
+import {
+    plannedColumnEntries,
+    referencingColumnType,
+    writtenWithoutConstraint,
+    type BelongsToDescriptor,
+    type PlannedColumnEntry
+} from "./column-order";
 import type {
     ColumnDefault,
     ColumnPlan,
@@ -614,6 +622,51 @@ export const definedPgType = (definition: ColumnDef, site: DefinedColumnSite): P
 /** The Postgres type a column descriptor states — the same renaming as {@link definedPgType}. */
 const describedPgType = (column: ColumnDescriptor, site: DefinedColumnSite): PgType =>
     pgTypeOf(column.type, site);
+
+/** Where a table's described column lands. */
+const describedSite = (descriptor: TableDescriptor, column: ColumnDescriptor): DefinedColumnSite => ({
+    schema: descriptor.schema,
+    table: descriptor.table,
+    owner: descriptor.slug,
+    propName: column.key,
+    column: column.column
+});
+
+/** The key a link points at: its column key, its SQL column, and the type a column pointing at it has. */
+interface TableKeyTarget {
+    key: string;
+    column: string;
+    type: PgType;
+}
+
+/**
+ * The single-column key of a table a link points at — a `belongsTo` foreign
+ * key, a junction endpoint — and the type the pointing column must have: the
+ * key's own type (a serial read as its plain integer, which would otherwise
+ * give every referencing column a sequence of its own). A table with no key
+ * is pointed at by the implicit `id TEXT`.
+ *
+ * @param via the link asking, named if the key is composite and so cannot be
+ *   pointed at.
+ */
+export const tableKeyTarget = (target: TableDescriptor, via: string): TableKeyTarget => {
+    const keys = target.columns.filter(column => column.primaryKey === true);
+    if (keys.length > 1) {
+        throw new Error(
+            `${via} points at table "${target.slug}", whose primary key spans ${keys.length} columns ` +
+            `(${keys.map(key => `"${key.key}"`).join(", ")}). A foreign key is one column and cannot reference a ` +
+            "composite key. Point the link at a table with a single-column key, or reach these rows with " +
+            "`rel.via(...)`, whose steps compare every key column."
+        );
+    }
+    const key = keys[0];
+    if (!key) return { key: "id", column: "id", type: { kind: "text" } };
+    return {
+        key: key.key,
+        column: key.column,
+        type: pgTypeOf(referencingColumnType(key.type), describedSite(target, key))
+    };
+};
 
 const pgTypeOf = (type: ColumnType, site: DefinedColumnSite): PgType => {
     switch (type.kind) {
@@ -1191,6 +1244,11 @@ export function planSchema(compiledTables: readonly CompiledTable[], options: Pl
     const descriptors = compiledTables.map(table => table.descriptor);
     const tableJunctions = resolveTableJunctions(descriptors);
     const resolvePolicyTable = policyTableResolver(descriptors);
+    const targetOf = (slug: string): TableDescriptor => {
+        const target = descriptorOf.get(slug);
+        if (!target) throw new Error(`Internal: a relation points at the table "${slug}", which is not among the planned tables.`);
+        return target;
+    };
 
     // A junction's payload may declare an enum too, and the type it names is
     // created by nobody else: no collection owns the table, so the loop above
@@ -1213,7 +1271,7 @@ export function planSchema(compiledTables: readonly CompiledTable[], options: Pl
             ? planJunctionTable(
                 tableName, entry.junction.relation, entry.junction.source,
                 junctionSpecs, tableJunctions, resolveCollection, resolvePolicyTable, triggerFunctionNeeded)
-            : planCollectionTable(entry.collection, requireDescriptor(entry.collection), resolveCollection, resolvePolicyTable, triggerFunctionNeeded));
+            : planCollectionTable(entry.collection, requireDescriptor(entry.collection), resolveCollection, resolvePolicyTable, targetOf, triggerFunctionNeeded));
     }
 
     assertNoTruncationCollisions(tables, enums);
@@ -1416,28 +1474,21 @@ function planCollectionTable(
     descriptor: TableDescriptor,
     resolveCollection: ResolveCollection,
     resolvePolicyTable: ResolvePolicyTable,
+    targetOf: (slug: string) => TableDescriptor,
     triggerFunctionNeeded: { value: boolean }
 ): TablePlan {
     const { schema, table, slug } = descriptor;
     const auth = descriptor.auth !== undefined;
     const columns: ColumnPlan[] = [];
     const triggers: TriggerPlan[] = [];
-    const relations = resolveCollectionRelations(collection);
 
-    for (const [propName, rawProp] of Object.entries(collection.properties ?? {})) {
-        const prop = rawProp as Property;
-
-        if (prop.type === "relation") {
-            const column = planRelationColumn(propName, prop as RelationProperty, collection, relations, schema, table);
-            if (column) columns.push(column);
+    // In the plan's order, read from the descriptor (`plannedColumnEntries`).
+    for (const entry of plannedColumnEntries(descriptor, targetOf)) {
+        if (entry.kind === "link") {
+            columns.push(planLinkColumn(entry, descriptor, targetOf));
             continue;
         }
-        if (prop.type === "reference") {
-            columns.push(planReferenceColumn(propName, prop as ReferenceProperty, collection, resolveCollection, schema, table));
-            continue;
-        }
-
-        columns.push(planPropertyColumn(propName, prop, {
+        columns.push(planDescribedColumn(entry.column, {
             collection,
             resolveCollection,
             schema,
@@ -1528,7 +1579,7 @@ function planCollectionTable(
 
     // Last among the columns, because it reads a nullability the two passes
     // above can still change.
-    settleDefaultOnDelete(collection, columns, relations);
+    settleDefaultOnDelete(descriptor, columns);
 
     // After every other index, because the foreign-key ones defer to them: a
     // declared index or the tenant index that already leads with the column
@@ -1538,13 +1589,13 @@ function planCollectionTable(
         // A `belongsTo` whose author opted out keeps its constraint and loses
         // only the index. Asked of the relation, not the column: the column a
         // declared property owns carries no relation of its own.
-        if (column.source.kind !== "relation" || !column.source.propName) return undefined;
-        const prop = collection.properties?.[column.source.propName] as RelationProperty | undefined;
-        const relation = findRelation(relations, prop?.relation?.relationName ?? column.source.propName);
-        if (relation?.kind !== "belongsTo" || !relation.index) return undefined;
+        const relation = linkRelationOf(descriptor, column);
+        if (!relation?.index) return undefined;
         // A link declared without its constraint is joined on all the same:
-        // its column is indexed as a foreign key's would be.
-        return column.foreignKey?.column ?? (isUnconstrainedLink(collection, column) ? column.column : undefined);
+        // its column is indexed as a foreign key's would be. A link into a
+        // view is not: nothing can be joined there by key.
+        return column.foreignKey?.column
+            ?? (writtenWithoutConstraint(descriptor, relation, targetOf(relation.target)) ? column.column : undefined);
     }));
 
     return {
@@ -1656,7 +1707,7 @@ interface PropertyColumnContext {
  * answering.
  *
  * `relation` and `reference` do not come through here; they own a foreign key
- * and are planned by {@link planRelationColumn} / {@link planReferenceColumn}.
+ * and are planned by {@link planLinkColumn}.
  * A junction payload may not declare either (config validation refuses it), so
  * this is the whole of a payload column.
  */
@@ -1872,22 +1923,18 @@ function findTenantColumn(
  * The `ON DELETE` a link gets when the author did not say, decided from the
  * column as it will be created.
  *
- * {@link planRelationColumn} and {@link planReferenceColumn} see only their own
- * property's `required`, and two later facts change the premise: `tenant` makes
+ * {@link planLinkColumn} sees only its own link's nullability, and two later facts change the premise: `tenant` makes
  * its column NOT NULL, and a declared property that owns a relation's column
  * decides that column's nullability itself. Defaulting before either produced
  * `NOT NULL … ON DELETE SET NULL` — a parent's delete that can only fail, and
  * fails with 23502 naming the child's column rather than as the foreign-key
  * refusal it is. An `onDelete` the author wrote is theirs and is kept.
  */
-function settleDefaultOnDelete(
-    collection: CollectionConfig,
-    columns: ColumnPlan[],
-    relations: Record<string, ResolvedRelation>
-): void {
+function settleDefaultOnDelete(descriptor: TableDescriptor, columns: ColumnPlan[]): void {
     for (const column of columns) {
         const fk = column.foreignKey;
-        if (!fk || declaresOnDelete(collection, relations, column)) continue;
+        // An `onDelete` the author wrote is theirs.
+        if (!fk || linkRelationOf(descriptor, column)?.onDelete !== undefined) continue;
         const created = columns.find(c => c.column === column.column && !c.columnOwnedByProperty) ?? column;
         const onDelete = defaultBelongsToOnDelete(!created.nullable);
         if (onDelete === fk.onDelete) continue;
@@ -1904,178 +1951,71 @@ function settleDefaultOnDelete(
     }
 }
 
-/** Whether the author wrote this link's `onDelete`. A `reference` has none to write. */
-const declaresOnDelete = (
-    collection: CollectionConfig,
-    relations: Record<string, ResolvedRelation>,
-    column: ColumnPlan
-): boolean => {
-    const propName = column.source.propName;
-    if (column.source.kind !== "relation" || !propName) return false;
-    const prop = collection.properties?.[propName] as RelationProperty | undefined;
-    const relation = findRelation(relations, prop?.relation?.relationName ?? propName);
-    return relation?.kind === "belongsTo" && relation.onDelete !== undefined;
-};
-
 /**
- * The column a `belongsTo` relation owns, or `undefined` when the relation puts
- * no column on this table.
+ * The column a `belongsTo` link plans, from its descriptor — one of the three
+ * forms {@link plannedColumnEntries} hands over:
  *
- * Every other kind is a column on the target, a junction row, or a join chain.
+ * - `absorbed`: the bound column is nothing but the foreign key, so this entry
+ *   IS the column, typed as the target's key;
+ * - `constraint`: the bound column is planned on its own; this entry carries
+ *   the constraint alone (`columnOwnedByProperty`, skipped as a column by the
+ *   renderers) and states the same type and nullability, so one column never
+ *   reads two ways in the plan;
+ * - `derived`: the relation derives the column, typed as the target's key.
+ *
+ * `constraint: false` keeps the column and plans no `FOREIGN KEY`; neither
+ * does a link into a view (Postgres refuses one), which the descriptor already
+ * records as `constraint: false`.
  */
-function planRelationColumn(
-    propName: string,
-    prop: RelationProperty,
-    collection: CollectionConfig,
-    relations: Record<string, ResolvedRelation>,
-    schema: string,
-    table: string
-): ColumnPlan | undefined {
-    const relation = findRelation(relations, prop.relation?.relationName ?? propName);
-    if (relation?.kind !== "belongsTo") return undefined;
-
-    let target: CollectionConfig;
-    try {
-        target = relation.target();
-    } catch {
-        // A relation whose target is not in this bundle yields no column and no
-        // constraint. Every emitter returned early here, and they must keep
-        // agreeing: a column with no constraint down one path is a schema fork.
-        return undefined;
-    }
-    if (!target) return undefined;
-
-    // The relation and an explicit FK property can both be declared; the
-    // explicit one owns the column, and the relation still owns the constraint.
-    // Asked of the *field key* rather than the column — `properties["post_id"]`
-    // is not where a property declared `postId: { columnName: "post_id" }`
-    // lives, so this used to emit the column twice and `CREATE TABLE` failed
-    // with "column specified more than once".
-    const fkFieldKey = fieldKeyForColumn(collection, relation.localKey);
-    const columnOwnedByProperty = Boolean(collection.properties?.[fkFieldKey]) && propName !== fkFieldKey;
-    const owner = columnOwnedByProperty ? collection.properties?.[fkFieldKey] : undefined;
-    const { required, unique, constrained } = linkColumnFacts(prop, owner);
-    // A declared column that owns the link's column says what that column is:
-    // the constraint-only entry beside it states the same type and
-    // nullability, so one column never reads two ways in the plan (a key
-    // column of a composite key is NOT NULL; an `integer` column pointing at a
-    // `bigint` key stays `integer`, which Postgres's integer comparison holds).
-    const ownerDefinition = owner?.type === "relation" ? undefined : tableColumnOf(owner);
+function planLinkColumn(
+    entry: Extract<PlannedColumnEntry, { kind: "link" }>,
+    descriptor: TableDescriptor,
+    targetOf: (slug: string) => TableDescriptor
+): ColumnPlan {
+    const { relation, column, form } = entry;
+    const { schema, table, slug } = descriptor;
+    const target = targetOf(relation.target);
+    const via = `relation "${slug}.${relation.name}"`;
+    const targetKey = tableKeyTarget(target, via);
+    const ownsColumn = form === "constraint";
+    const required = !column.nullable && column.primaryKey !== true;
 
     // Only a *derived* column name can be affected by the change to
     // `generateForeignKeyName`; one the author wrote is theirs.
-    const relationName = prop.relation?.relationName ?? propName;
-    const legacyKey = legacyForeignKeyName(relationName);
-    const derived = relation.localKey === generateForeignKeyName(relationName);
-    const via = linkLabel("relation", collection, propName);
+    const legacyKey = legacyForeignKeyName(relation.name);
+    const derivedName = relation.localKey === generateForeignKeyName(relation.name);
 
     return {
-        key: fkFieldKey,
+        key: column.key,
         column: relation.localKey,
-        type: ownerDefinition
-            ? definedPgType(ownerDefinition, collectionSite(collection, fkFieldKey, relation.localKey))
-            : primaryKeyPgType(target, via),
-        nullable: ownerDefinition ? !(ownerDefinition.notNull || ownerDefinition.primaryKey) : !required,
+        type: ownsColumn ? describedPgType(column, describedSite(descriptor, column)) : targetKey.type,
+        nullable: column.nullable,
         primaryKey: false,
-        // `validation.unique` on a link is a one-to-one, and all three emitters
-        // dropped it: the property said unique, the column was not, and a
-        // second row could point at the same parent.
-        unique,
-        columnOwnedByProperty: columnOwnedByProperty || undefined,
-        legacyColumn: derived && legacyKey !== relation.localKey ? legacyKey : undefined,
-        foreignKey: servesView(target) || !constrained ? undefined : foreignKeyPlan({
+        // UNIQUE on a link is a one-to-one. The constraint-only entry leaves
+        // it to the column planned beside it.
+        unique: !ownsColumn && column.unique === true,
+        columnOwnedByProperty: ownsColumn || undefined,
+        legacyColumn: derivedName && legacyKey !== relation.localKey ? legacyKey : undefined,
+        foreignKey: relation.constraint ? foreignKeyPlan({
             schema,
             table,
             column: relation.localKey,
-            targetSchema: schemaOf(target),
-            targetTable: bareTableName(getTableName(target)),
-            targetColumn: getPrimaryKeyColumn(target, via),
+            targetSchema: target.schema,
+            targetTable: target.table,
+            targetColumn: targetKey.column,
             onDelete: relation.onDelete ?? defaultBelongsToOnDelete(required),
             onUpdate: relation.onUpdate
-        }),
-        source: { kind: "relation", propName, slug: collection.slug }
+        }) : undefined,
+        source: { kind: "relation", propName: relation.name, slug }
     };
 }
 
-/**
- * Whether a `belongsTo`'s column is NOT NULL and UNIQUE, and whether it gets a
- * `FOREIGN KEY` — from its definitions when the relation property carries
- * them, from the property's `validation` otherwise.
- *
- * Three forms, as `lowerTables` produces them: the relation absorbed its
- * column (the column's own definition says), a declared column owns it (that
- * column says whether it is NOT NULL; the relation's entry is the constraint
- * alone, UNIQUE on the column's side), or the relation derives it (the
- * relation's `notNull` and `unique` say). `constraint: false` keeps the column
- * and drops the constraint.
- */
-function linkColumnFacts(
-    prop: RelationProperty,
-    owner: Property | undefined
-): { required: boolean; unique: boolean; constrained: boolean } {
-    const relation = tableBelongsToOf(prop);
-    if (!relation) {
-        return { required: prop.validation?.required === true, unique: prop.validation?.unique === true, constrained: true };
-    }
-    const constrained = relation.constraint !== false;
-    const absorbed = tableColumnOf(prop);
-    if (absorbed) return { required: absorbed.notNull && !absorbed.primaryKey, unique: absorbed.unique, constrained };
-    const declared = tableColumnOf(owner);
-    if (declared) return { required: declared.notNull && !declared.primaryKey, unique: false, constrained };
-    return { required: relation.notNull === true, unique: relation.unique === true, constrained };
-}
-
-/**
- * Whether a planned `belongsTo` column is one its relation declared without a
- * `FOREIGN KEY` (`constraint: false`) — still a link, so still indexed.
- */
-const isUnconstrainedLink = (collection: CollectionConfig, column: ColumnPlan): boolean => {
-    if (column.source.kind !== "relation" || !column.source.propName) return false;
-    return tableBelongsToOf(collection.properties?.[column.source.propName])?.constraint === false;
+/** The `belongsTo` a planned link column stands for, or `undefined` for any other column. */
+const linkRelationOf = (descriptor: TableDescriptor, column: ColumnPlan): BelongsToDescriptor | undefined => {
+    if (column.source.kind !== "relation" || !column.source.propName) return undefined;
+    const relation = relationOf(descriptor, column.source.propName);
+    return relation?.kind === "belongsTo" ? relation : undefined;
 };
-
-/** The column a `reference` property owns — a foreign key like any other. */
-function planReferenceColumn(
-    propName: string,
-    prop: ReferenceProperty,
-    collection: CollectionConfig,
-    resolveCollection: ResolveCollection,
-    schema: string,
-    table: string
-): ColumnPlan {
-    // A `reference` with no `path` names no collection, so it keeps its column
-    // (the id is still a string) and gets no constraint — the same shape as one
-    // whose target is not in this bundle.
-    const target = prop.path ? resolveCollection(prop.path) : undefined;
-    const column = resolveColumnName(propName, prop as Property);
-    const required = prop.validation?.required === true;
-    const via = linkLabel("reference", collection, propName);
-
-    return {
-        key: propName,
-        column,
-        // A `reference` whose target is not in the bundle keeps its column (the
-        // id is still a string) and gets no constraint.
-        type: target ? primaryKeyPgType(target, via) : { kind: "text" },
-        nullable: !required,
-        primaryKey: false,
-        unique: prop.validation?.unique === true,
-        foreignKey: target && !servesView(target)
-            ? foreignKeyPlan({
-                schema,
-                table,
-                column,
-                targetSchema: schemaOf(target),
-                targetTable: bareTableName(getTableName(target)),
-                targetColumn: getPrimaryKeyColumn(target, via),
-                // The same rule as `belongsTo`, from the same function. A
-                // `reference` carries no `onDelete` of its own to override it.
-                onDelete: defaultBelongsToOnDelete(required)
-            })
-            : undefined,
-        source: { kind: "reference", propName, slug: collection.slug }
-    };
-}
 
 /**
  * An auth-owned column's declared SQL type, as a tag.
