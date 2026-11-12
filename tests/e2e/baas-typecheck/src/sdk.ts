@@ -3,7 +3,7 @@
  */
 import { createRebaseClient } from "@rebasepro/client";
 
-import type { Post } from "./collection";
+import type { Post } from "./table";
 
 const rebase = createRebaseClient({ baseUrl: "https://api.example.com" });
 
@@ -25,7 +25,7 @@ export async function readAndWrite(): Promise<void> {
 
     await posts.create({ title: "Hello", status: "draft" });
 
-    // The fluent builder hangs directly off the collection client.
+    // The fluent builder hangs directly off the table client.
     const drafts = await posts.where("status", "==", "draft").limit(5).find();
     console.log(drafts.data.length);
 

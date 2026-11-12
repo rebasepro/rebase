@@ -1,6 +1,6 @@
 /**
  * A record's actions, run from where the collection draws them: the built-in
- * Edit, Copy and Delete, and the demo's own (`app/config/actions.ts`) — on a
+ * Edit, Copy and Delete, and the demo's own (`app/frontend/src/cms/lib/actions.ts`) — on a
  * table row, a card and a board card.
  *
  * Every action's `onClick`, `isEnabled` and `disabledReason` now get

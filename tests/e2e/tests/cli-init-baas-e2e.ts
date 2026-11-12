@@ -233,7 +233,7 @@ async function run() {
         check("authors are served", authorsRes.status === 200, `status ${authorsRes.status}`);
         check("author row data", authorsBody.data?.[0]?.name === "Ada Lovelace");
 
-        // Join tables are an edge between collections, not a collection.
+        // Join tables are an edge between tables, not a table of their own.
         const join = await api(base, "/api/data/posts_tags");
         check("join table is not served", join.status === 404, `status ${join.status}`);
 
@@ -246,7 +246,7 @@ async function run() {
         // unexplained 404 on a route the admin UI just called reads as a broken
         // deploy and gets debugged as one, so the server answers with the
         // reason instead. See `schemaEditorOff` in the server's `init.ts`.
-        const editor = await api(base, "/api/schema-editor/collection/save", { method: "POST" });
+        const editor = await api(base, "/api/admin/schema-editor/apply", { method: "POST" });
         check("schema editor is off", editor.status === 501, `status ${editor.status}`);
 
         const swagger = await fetch(`${base}/api/swagger`);

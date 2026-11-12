@@ -1,23 +1,16 @@
 import { expect, test } from "@playwright/test";
 import { AUTH_STATE, freshSession } from "../auth";
-import * as fs from "fs";
-import * as path from "path";
+import { removeStudioTable } from "./test-helpers";
 
 // Signed in by globalSetup, once for the suite. See e2e/auth.ts.
 test.use({ storageState: AUTH_STATE });
 test.beforeEach(({ context }) => freshSession(context));
 
 test.describe("Property Type Gates E2E", () => {
-  test.afterAll(async () => {
-    const filePath = path.resolve(__dirname, "../../../app/config/collections/e_2_e_property_gate_test.ts");
-    if (fs.existsSync(filePath)) {
-      try {
-        fs.unlinkSync(filePath);
-      } catch (err) {
-        console.error("Failed to clean up E2E collection file:", err);
-      }
-    }
-  });
+  // The schema editor writes app/backend/schema/e_2_e_property_gate_test.ts and an index line;
+  // the test cancels before that, but a failure midway must not leave a table
+  // behind in the checkout for the next `db push` to create.
+  test.afterAll(() => removeStudioTable("e_2_e_property_gate_test"));
 
   test.beforeEach(async ({ page }) => {
     // Fail on any console error
@@ -73,32 +66,32 @@ test.describe("Property Type Gates E2E", () => {
     // Verify the widget selector dialog opened
     await expect(page.getByText("Select a property widget", { exact: true }).first()).toBeVisible({ timeout: 10000 });
 
-    // 6. Verify that 'Reference (as string)' is NOT in the widget list — it was removed
+    // 6. A table's columns are the col.* types: a document reference (a
+    // Firestore path) is none of them, so the picker offers neither reference
+    // widget on a Postgres table — a table points at another with a relation.
     await expect(page.getByText("Reference (as string)")).not.toBeVisible();
+    await expect(page.getByRole("button", { name: /Reference The value refers to/i })).toHaveCount(0);
 
-    // 7. Verify that 'Reference' IS available and click it
-    const referenceOption = page.getByRole("button", { name: /Reference The value refers to/i }).first();
-    await expect(referenceOption).toBeVisible({ timeout: 5000 });
-    await referenceOption.click();
-
-    // Verify the reference property editor appears (wait for property settings to render)
+    // 7. 'Relation' IS available — the default engine is Postgres — and opens
+    // the relation editor with its target picker.
+    const relationOption = page.getByRole("button", { name: /^Relation\b/i }).first();
+    await expect(relationOption).toBeVisible({ timeout: 5000 });
+    await relationOption.click();
     await expect(page.getByPlaceholder("Field name")).toBeVisible({ timeout: 10000 });
     await expect(page.getByText("Target collection").first()).toBeVisible({ timeout: 10000 });
 
-    // Fill in the property name to ensure we can proceed
     const propertyTitleInput = page.getByPlaceholder("Field name");
     await page.waitForTimeout(500); // Wait for dialog animations & hydration
-    await propertyTitleInput.fill("Test Reference");
-    await expect(propertyTitleInput).toHaveValue("Test Reference", { timeout: 5000 });
+    await propertyTitleInput.fill("Test Relation");
+    await expect(propertyTitleInput).toHaveValue("Test Relation", { timeout: 5000 });
 
-    // Fill ID field explicitly
     const idInput = page.getByLabel("ID", { exact: true });
     await expect(idInput).toBeVisible();
     await page.waitForTimeout(200);
-    await idInput.fill("test_reference");
-    await expect(idInput).toHaveValue("test_reference", { timeout: 5000 });
+    await idInput.fill("test_relation");
+    await expect(idInput).toHaveValue("test_relation", { timeout: 5000 });
 
-    // Select a target collection to satisfy validation
+    // Point it at an existing table, so validation passes on the relation half.
     const targetSelect = page.getByRole("combobox", { name: "Target collection" });
     await expect(targetSelect).toBeVisible();
     await targetSelect.click();
@@ -106,21 +99,28 @@ test.describe("Property Type Gates E2E", () => {
     await expect(usersOption).toBeVisible();
     await usersOption.click();
 
+    // A belongsTo names the foreign-key column on this table.
+    const localKey = page.getByLabel("Local key (foreign key column on this table)");
+    if (await localKey.isVisible()) {
+      await localKey.fill("user_id");
+    }
+
     await page.waitForTimeout(500); // Wait for deferred state updates
 
-    // 8. Click Ok to add the reference property
+    // 8. Click Ok to add the relation property
     const okButton = page.getByRole("button", { name: "Ok" }).first();
     await expect(okButton).toBeVisible();
     await okButton.click();
 
     // Verify the property appears in the property list
-    await expect(page.getByText("Test Reference", { exact: true })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText("Test Relation", { exact: true })).toBeVisible({ timeout: 10000 });
 
-    // 9. Add another property — click 'Add new property' again
+    // 9. Open the picker again: the gate holds on every open, not just the first.
     await addPropertyButton.click();
     await expect(page.getByText("Select a property widget", { exact: true }).first()).toBeVisible({ timeout: 10000 });
 
-    // 10. Verify that 'Relation' IS available — default engine is Postgres
+    // 10. Still no reference widget, and Relation still offered.
+    await expect(page.getByRole("button", { name: /Reference The value refers to/i })).toHaveCount(0);
     await expect(page.getByText("Relation", { exact: true }).first()).toBeVisible({ timeout: 5000 });
 
     // 11. Close the dialog / cancel — no need to actually save the collection

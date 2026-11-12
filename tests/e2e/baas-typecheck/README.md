@@ -33,9 +33,10 @@ cannot see through a type alias, and the fixture cannot see an unused import.
 ## What it covers
 
 - `src/server.ts` — a BaaS backend: `initializeRebaseBackend` + Postgres adapter.
-- `src/collection.ts` — a collection file with properties, validation, relations,
-  security rules and callbacks, typed against core `CollectionConfig`. This is
-  the proof that the *schema* half of a collection is fully typed with no React.
+- `src/table.ts` — a `backend/schema` table (`defineTable`) with columns,
+  validation, a relation, every RLS rule flavour and hooks, typed against
+  `@rebasepro/types`. This is the proof that the *schema* half of a project is
+  fully typed with no React.
 - `src/sdk.ts` — `@rebasepro/client` usage, including typed accessors.
 - `src/typed-sdk/` — a typed client against a generated `Database`.
   `database.types.ts` is the codegen's output for the `defineTable`s in
@@ -49,10 +50,10 @@ cannot see through a type alias, and the fixture cannot see an unused import.
 - `registered-tables/` — a project that registers only its schema module
   (`Register.tables`, no codegen run): the same surfaces and a client typed by
   `DatabaseOf<typeof schema>`.
-- `src/admin_absent.ts` — the negative half: `admin` on a property or a
-  collection, and the `Admin*Options` types, must not compile from core.
-  `@ts-expect-error` is the assertion, so the file fails if any of them ever
-  starts to.
+- `src/admin_absent.ts` — the negative half: `admin` on a table, an `.admin()`
+  column modifier, `customizeTable` and the `Admin*Options` types must not
+  compile from core. `@ts-expect-error` is the assertion, so the file fails if
+  any of them ever starts to.
 
 ## Run
 

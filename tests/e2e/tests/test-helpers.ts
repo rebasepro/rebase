@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import path from "node:path";
 import type { Page } from "@playwright/test";
 import { AUTH_STATE } from "../auth";
 import { API_PORT } from "../playwright.config";
@@ -128,4 +129,29 @@ export function failOnPageErrors(page: Page): void {
             throw new Error(`API Request failed: ${response.url()} returned status ${response.status()}`);
         }
     });
+}
+
+/** The demo's schema directory, which the Studio's schema editor writes under `rebase dev`. */
+export const APP_SCHEMA_DIR = path.resolve(__dirname, "../../../app/backend/schema");
+
+/**
+ * Undo a table the Studio's schema editor created in `app/backend/schema`.
+ *
+ * Creating a table writes `<name>.ts` and appends one
+ * `export { … } from "./<name>";` line to `index.ts`. A run that stops before
+ * cancelling (or a deployment that saves without the review step) leaves both
+ * behind in this checkout, and the next `db push` would create the table. This
+ * removes exactly those two things — the file, and the index lines that import
+ * it — and leaves every other line of `index.ts` alone: the tree is shared, so
+ * restoring a snapshot of the whole index could undo somebody else's edit.
+ */
+export function removeStudioTable(name: string): void {
+    const file = path.join(APP_SCHEMA_DIR, `${name}.ts`);
+    if (fs.existsSync(file)) fs.rmSync(file);
+    const index = path.join(APP_SCHEMA_DIR, "index.ts");
+    if (!fs.existsSync(index)) return;
+    const text = fs.readFileSync(index, "utf8");
+    const kept = text.split("\n").filter(line => !line.includes(`from "./${name}"`));
+    const next = kept.join("\n");
+    if (next !== text) fs.writeFileSync(index, next, "utf8");
 }

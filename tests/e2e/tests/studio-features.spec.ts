@@ -1,23 +1,16 @@
 import { expect, test } from "@playwright/test";
 import { AUTH_STATE, freshSession } from "../auth";
-import * as fs from "fs";
-import * as path from "path";
+import { removeStudioTable } from "./test-helpers";
 
 // Signed in by globalSetup, once for the suite. See e2e/auth.ts.
 test.use({ storageState: AUTH_STATE });
 test.beforeEach(({ context }) => freshSession(context));
 
 test.describe("Rebase Studio Features E2E", () => {
-  test.afterAll(async () => {
-    const filePath = path.resolve(__dirname, "../../../app/config/collections/e_2_e_test_collection.ts");
-    if (fs.existsSync(filePath)) {
-      try {
-        fs.unlinkSync(filePath);
-      } catch (err) {
-        console.error("Failed to clean up E2E collection file:", err);
-      }
-    }
-  });
+  // The schema editor writes app/backend/schema/e_2_e_test_collection.ts and an index line;
+  // the test cancels before that, but a failure midway must not leave a table
+  // behind in the checkout for the next `db push` to create.
+  test.afterAll(() => removeStudioTable("e_2_e_test_collection"));
 
   test.beforeEach(async ({ page }) => {
     // Fail on any console error
