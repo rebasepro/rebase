@@ -92,15 +92,14 @@ import {
     isAuthCollection
 } from "../auth-users-columns";
 import {
-    assertSearchIsPostgresOnly,
-    buildSearchColumnSpec,
+    buildTableSearchColumnSpec,
     searchColumnTypeSql,
     searchExtensionStatements,
     searchHelperFunctions
 } from "../search-column";
 import {
-    buildVectorColumnSpecs,
-    buildVectorIndexPlan,
+    buildTableVectorColumnSpecs,
+    buildTableVectorIndexPlan,
     vectorExtensionDeclared,
     vectorExtensionStatement
 } from "../vector-index";
@@ -950,10 +949,7 @@ export function planSchema(compiledTables: readonly CompiledTable[], options: Pl
         if (!descriptor) throw new Error(`The planner lost the descriptor of table "${describe(collection)}".`);
         return descriptor;
     };
-    // Before the filter, deliberately: a `search` block on a collection this
-    // engine does not store would otherwise be dropped without a word.
-    assertSearchIsPostgresOnly(allCollections);
-    // Same reasoning, and a stronger reason to be loud: a `beforeQuery` that
+    // Before the filter, deliberately, and loudly: a `beforeQuery` that
     // does nothing is a row filter that does nothing.
     assertBeforeQueryIsPostgresOnly(allCollections);
 
@@ -1420,7 +1416,7 @@ function planCollectionTable(
     // Postgres recomputes it on every write of a source column and rejects any
     // attempt to write it directly, which is what makes it impossible for the
     // index to drift from the row.
-    const search = buildSearchColumnSpec(collection);
+    const search = buildTableSearchColumnSpec(descriptor);
     if (search) {
         columns.push({
             key: search.column,
@@ -1501,8 +1497,8 @@ function planCollectionTable(
         primaryKey,
         indexes,
         search,
-        vector: buildVectorIndexPlan(collection, resolveColumnName),
-        vectorColumns: buildVectorColumnSpecs(collection, resolveColumnName),
+        vector: buildTableVectorIndexPlan(descriptor),
+        vectorColumns: buildTableVectorColumnSpecs(descriptor),
         policies,
         triggers,
         auth

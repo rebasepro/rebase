@@ -58,7 +58,12 @@ import {
     DEFAULT_SEARCH_MODE,
     DEFAULT_SEARCH_LANGUAGE,
     DEFAULT_SEARCH_WEIGHT,
-    DEFAULT_FUZZY_THRESHOLD
+    DEFAULT_FUZZY_THRESHOLD,
+    columnTypeLabel,
+    isTextColumnType,
+    type ColumnDescriptor,
+    type ColumnType,
+    type TableDescriptor
 } from "@rebasepro/types";
 import { createHash } from "node:crypto";
 import { getTableName } from "@rebasepro/common";
@@ -247,6 +252,33 @@ const rawTextSql = (field: { column: string; jsonPath: string[]; kind: FieldKind
 const quote = (v: string): string => `'${v.replace(/'/g, "''")}'`;
 
 /**
+ * What a `search` field's first segment names, as the spec builder reads it:
+ * the column it starts at, how that column reaches text (`null`: it does
+ * not), and the noun a refusal calls it by.
+ */
+interface SearchFieldHead {
+    column: string;
+    classified: { kind: FieldKind; reason?: string } | null;
+    /** `\`text\` column`, `\`number\` property` — for a refusal. */
+    label: string;
+}
+
+/** The table a spec is built for, read through one interface by both doors. */
+interface SearchSpecSource {
+    slug: string;
+    schema: string;
+    table: string;
+    /** The noun a refusal uses for a field: "column" or "property". */
+    noun: string;
+    /** The field a path starts at, or `undefined` when the table declares none of that key. */
+    head(key: string): SearchFieldHead | undefined;
+    /** Every key a path may start at, for a refusal. */
+    knownKeys(): string[];
+    /** Whether a generated column of this name would collide with a declared one. */
+    collides(column: string): boolean;
+}
+
+/**
  * Resolve and validate one declared field path.
  *
  * A path that does not resolve throws. The whole point of an explicit block is
@@ -256,31 +288,32 @@ const quote = (v: string): string => `'${v.replace(/'/g, "''")}'`;
  */
 const resolveField = (
     entry: string | SearchField,
-    collection: CollectionConfig,
+    source: SearchSpecSource,
     cfg: SearchConfig
 ): ResolvedSearchField => {
     const path = typeof entry === "string" ? entry : entry.path;
     const weight = (typeof entry === "string" ? undefined : entry.weight) ?? DEFAULT_SEARCH_WEIGHT;
-    const where = `${collection.slug}.search`;
+    const where = `${source.slug}.search`;
+    const noun = source.noun;
 
     if (!path || typeof path !== "string") {
-        throw new SearchConfigError(`${where}: every entry in \`fields\` needs a property path.`);
+        throw new SearchConfigError(`${where}: every entry in \`fields\` needs a ${noun} path.`);
     }
 
     const [head, ...rest] = path.split(".");
-    const prop = collection.properties?.[head] as Property | undefined;
-    if (!prop) {
-        const known = Object.keys(collection.properties ?? {}).join(", ");
+    const field = source.head(head);
+    if (!field) {
+        const known = source.knownKeys().join(", ");
         throw new SearchConfigError(
-            `${where}: "${path}" starts at property "${head}", which this collection does not declare. Known properties: ${known}.`
+            `${where}: "${path}" starts at ${noun} "${head}", which this table does not declare. Known ${noun === "column" ? "columns" : "properties"}: ${known}.`
         );
     }
 
-    const classified = classify(prop);
+    const classified = field.classified;
     if (!classified) {
         throw new SearchConfigError(
-            `${where}: "${path}" is a \`${prop.type}\` property, which holds no text to search. ` +
-            `Searchable kinds are \`string\`, \`string[]\` and \`map\` (or a path inside one).`
+            `${where}: "${path}" is a ${field.label}, which holds no text to search. ` +
+            "Searchable kinds are text, text arrays and JSON documents (or a path inside one)."
         );
     }
     if (classified.reason === "enum") {
@@ -295,24 +328,24 @@ const resolveField = (
     }
     if (classified.reason === "json") {
         throw new SearchConfigError(
-            `${where}: "${path}" is a \`json\` column, and the cast from \`json\` to \`jsonb\` is not immutable, so it cannot feed a generated column. Declare the property as \`jsonb\` (the default) to search it.`
+            `${where}: "${path}" is a \`json\` column, and the cast from \`json\` to \`jsonb\` is not immutable, so it cannot feed a generated column. Declare it \`jsonb\` (the default) to search it.`
         );
     }
     if (classified.reason === "non_text_array") {
         throw new SearchConfigError(
-            `${where}: "${path}" is an array of numbers or booleans. Only \`string[]\` carries text to search.`
+            `${where}: "${path}" is an array of numbers or booleans. Only a text array carries text to search.`
         );
     }
 
     if (rest.length > 0 && classified.kind !== "jsonb") {
         throw new SearchConfigError(
-            `${where}: "${path}" addresses a path inside "${head}", but "${head}" is a \`${prop.type}\` property, not a \`map\`. Only map properties have paths inside them.`
+            `${where}: "${path}" addresses a path inside "${head}", but "${head}" is a ${field.label}, not a JSON document. Only JSON documents have paths inside them.`
         );
     }
 
-    const column = columnNameOf(head, prop);
-    const field = { column, jsonPath: rest, kind: classified.kind };
-    const raw = rawTextSql(field);
+    const column = field.column;
+    const resolved = { column, jsonPath: rest, kind: classified.kind };
+    const raw = rawTextSql(resolved);
     const textSql = normalize(raw, cfg.unaccent === true);
     const language = cfg.language ?? DEFAULT_SEARCH_LANGUAGE;
 
@@ -331,6 +364,12 @@ const resolveField = (
 /**
  * Build the full spec for a collection, or undefined when it has not opted in.
  *
+ * TRANSITIONAL (Postgres-first Stage B): the planner builds the spec from the
+ * table descriptor ({@link buildTableSearchColumnSpec}). This door stays for
+ * the readers outside the planner that still hold a collection (the query
+ * builder's search, the doctor, introspection) until they move; both doors
+ * build through one function, so they cannot disagree.
+ *
  * Throws {@link SearchConfigError} on a config that cannot be honoured. Callers
  * at boot surface that as a startup failure — a search block that half-works is
  * worse than one that refuses.
@@ -338,29 +377,95 @@ const resolveField = (
 export const buildSearchColumnSpec = (collection: CollectionConfig): SearchColumnSpec | undefined => {
     const cfg = getSearchConfig(collection);
     if (!cfg) return undefined;
+    const properties = collection.properties ?? {};
+    return searchColumnSpecFrom(cfg, {
+        slug: collection.slug,
+        schema: isPostgresCollectionConfig(collection) && collection.schema ? collection.schema : "public",
+        table: getTableName(collection),
+        noun: "property",
+        head: key => {
+            const prop = properties[key] as Property | undefined;
+            if (!prop) return undefined;
+            return { column: columnNameOf(key, prop), classified: classify(prop), label: `\`${prop.type}\` property` };
+        },
+        knownKeys: () => Object.keys(properties),
+        collides: column => Boolean(properties[column])
+    });
+};
 
+/**
+ * How a column reaches text, for search: the descriptor counterpart of
+ * {@link classify}. `null` for a column that holds no text (a number, a date,
+ * a geopoint document, a vector, bytes, a custom SQL type).
+ */
+const classifyColumnType = (column: ColumnDescriptor): { kind: FieldKind; reason?: string } | null => {
+    const type: ColumnType = column.type;
+    if (isTextColumnType(type)) return { kind: "text" };
+    switch (type.kind) {
+        case "enum": return { kind: "text", reason: "enum" };
+        case "uuid": return { kind: "text", reason: "uuid" };
+        case "json": return { kind: "jsonb", reason: "json" };
+        case "jsonb": return column.semantic === "geopoint" ? null : { kind: "jsonb" };
+        case "array": {
+            const element = type.of;
+            if (isTextColumnType(element)) return { kind: "text_array" };
+            if (element.kind === "integer" || element.kind === "boolean" || element.kind === "numeric") {
+                return { kind: "text_array", reason: "non_text_array" };
+            }
+            return null;
+        }
+        default: return null;
+    }
+};
+
+/**
+ * The search column a table's `search` block asks for, or `undefined` when
+ * it declares none — read from the table descriptor. What the planner calls.
+ *
+ * Throws {@link SearchConfigError} on a block that cannot be honoured; the
+ * compiler refuses most of them first (`checkSearch`).
+ */
+export const buildTableSearchColumnSpec = (table: TableDescriptor): SearchColumnSpec | undefined => {
+    const cfg = table.search;
+    if (!cfg) return undefined;
+    return searchColumnSpecFrom(cfg, {
+        slug: table.slug,
+        schema: table.schema,
+        table: table.table,
+        noun: "column",
+        head: key => {
+            const column = table.columns.find(candidate => candidate.key === key);
+            if (!column) return undefined;
+            return { column: column.column, classified: classifyColumnType(column), label: `\`${columnTypeLabel(column.type)}\` column` };
+        },
+        knownKeys: () => table.columns.map(column => column.key),
+        collides: name => table.columns.some(column => column.key === name || column.column === name)
+    });
+};
+
+/** The spec, from a `search` block and the table it is declared on. */
+const searchColumnSpecFrom = (cfg: SearchConfig, source: SearchSpecSource): SearchColumnSpec => {
+    const { slug, schema, table } = source;
     if (!Array.isArray(cfg.fields) || cfg.fields.length === 0) {
         throw new SearchConfigError(
-            `${collection.slug}.search: \`fields\` is empty. Name the properties to index, or remove the \`search\` block to keep the default ILIKE behaviour.`
+            `${slug}.search: \`fields\` is empty. Name the ${source.noun === "column" ? "columns" : "properties"} to index, or remove the \`search\` block to keep the default ILIKE behaviour.`
         );
     }
 
-    const table = getTableName(collection);
-    const schema = isPostgresCollectionConfig(collection) && collection.schema ? collection.schema : "public";
     const column = cfg.column ?? DEFAULT_SEARCH_COLUMN;
 
-    if (collection.properties?.[column]) {
+    if (source.collides(column)) {
         throw new SearchConfigError(
-            `${collection.slug}.search: the generated column "${column}" collides with a declared property of the same name. Set \`search.column\` to something else.`
+            `${slug}.search: the generated column "${column}" collides with a declared ${source.noun} of the same name. Set \`search.column\` to something else.`
         );
     }
 
-    const fields = cfg.fields.map(entry => resolveField(entry, collection, cfg));
+    const fields = cfg.fields.map(entry => resolveField(entry, source, cfg));
 
     const seen = new Set<string>();
     for (const f of fields) {
         if (seen.has(f.path)) {
-            throw new SearchConfigError(`${collection.slug}.search: "${f.path}" is listed twice.`);
+            throw new SearchConfigError(`${slug}.search: "${f.path}" is listed twice.`);
         }
         seen.add(f.path);
     }
@@ -390,9 +495,9 @@ export const buildSearchColumnSpec = (collection: CollectionConfig): SearchColum
 
     if (cfg.fuzzy) {
         const fuzzyColumn = `${column}_text`;
-        if (collection.properties?.[fuzzyColumn]) {
+        if (source.collides(fuzzyColumn)) {
             throw new SearchConfigError(
-                `${collection.slug}.search: \`fuzzy\` needs the column "${fuzzyColumn}", which collides with a declared property. Set \`search.column\` to something else.`
+                `${slug}.search: \`fuzzy\` needs the column "${fuzzyColumn}", which collides with a declared ${source.noun}. Set \`search.column\` to something else.`
             );
         }
         spec.fuzzy = {

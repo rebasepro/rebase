@@ -10,8 +10,12 @@
  *    database in the field carries whichever one created it;
  *  - a column too wide for pgvector is skipped rather than thrown, and says so.
  */
-import { CollectionConfig, PostgresCollectionConfig } from "@rebasepro/types";
+import { CollectionConfig, PostgresCollectionConfig, col, defineTable } from "@rebasepro/types";
+import { compileSchema, lowerTables } from "@rebasepro/common";
 import {
+    buildTableVectorColumnSpecs,
+    buildTableVectorIndexPlan,
+    buildVectorColumnSpecs,
     buildVectorIndexPlan,
     vectorIndexStatement,
     vectorIndexStatements,
@@ -223,5 +227,36 @@ describe("the two producers describe the same index", () => {
         const ddl = await generatePostgresDdl(compileSet([collection({ embedding: vector({ dimensions: 4096 }) })]));
         expect(ddl).toContain("-- No ANN index on");
         expect(ddl).not.toContain("USING hnsw");
+    });
+});
+
+describe("buildTableVectorIndexPlan / buildTableVectorColumnSpecs", () => {
+    const documents = defineTable("documents", {
+        columns: {
+            id: col.text().primaryKey(),
+            embedding: col.vector(3, { index: { method: "hnsw", metric: ["cosine", "ip"], m: 8 } }).notNull(),
+            summaryEmbedding: col.vector(3).unique(),
+            wide: col.vector(MAX_INDEXABLE_VECTOR_DIMENSIONS + 1),
+            unindexed: col.vector(3, { index: false })
+        },
+        rls: "admin-only"
+    });
+    const [compiled] = compileSchema([documents]);
+    const [lowered] = lowerTables([documents]);
+
+    it("plans the indexes the lowered collection plans, metrics renamed to pgvector distances", () => {
+        const fromTable = buildTableVectorIndexPlan(compiled.descriptor);
+        expect(fromTable).toEqual(buildVectorIndexPlan(lowered, resolveColumnName));
+        expect(fromTable.specs.map(spec => spec.distance)).toEqual(["cosine", "inner_product", "cosine"]);
+        expect(fromTable.specs.map(spec => spec.column)).toEqual(["embedding", "embedding", "summary_embedding"]);
+        expect(fromTable.skipped.map(entry => entry.column)).toEqual(["wide"]);
+    });
+
+    it("lists every vector column with its modifiers, as the lowered collection does", () => {
+        const fromTable = buildTableVectorColumnSpecs(compiled.descriptor);
+        expect(fromTable).toEqual(buildVectorColumnSpecs(lowered, resolveColumnName));
+        expect(fromTable.map(spec => [spec.column, spec.modifiers])).toEqual([
+            ["embedding", " NOT NULL"], ["summary_embedding", " UNIQUE"], ["wide", ""], ["unindexed", ""]
+        ]);
     });
 });

@@ -1,6 +1,8 @@
-import type { CollectionConfig, PostgresCollectionConfig } from "@rebasepro/types";
+import { col, defineTable, type CollectionConfig, type PostgresCollectionConfig, type SearchConfig } from "@rebasepro/types";
+import { compileSchema, lowerTables } from "@rebasepro/common";
 import {
     buildSearchColumnSpec,
+    buildTableSearchColumnSpec,
     searchColumnDefinition,
     fuzzyColumnDefinition,
     searchIndexStatements,
@@ -128,7 +130,7 @@ describe("buildSearchColumnSpec", () => {
 
         it("rejects a path inside a non-map property", () => {
             expect(() => buildSearchColumnSpec(talents({ fields: ["full_name.nested"] })))
-                .toThrow(/not a `map`/);
+                .toThrow(/not a JSON document/);
         });
 
         it("rejects an empty field list", () => {
@@ -233,5 +235,50 @@ describe("assertSearchIsPostgresOnly", () => {
             talents({ fields: ["full_name"] }),
             talents(undefined)
         ])).not.toThrow();
+    });
+});
+
+describe("buildTableSearchColumnSpec", () => {
+    const talentsTable = (search?: SearchConfig) => defineTable("talents", {
+        columns: {
+            id: col.uuid().primaryKey().defaultRandom(),
+            fullName: col.text(),
+            location: col.varchar(120),
+            leadStatus: col.enum(["new", "won"]),
+            interests: col.array(col.text()),
+            scores: col.array(col.integer()),
+            questionnaire: col.jsonb(),
+            seenAt: col.timestamptz()
+        },
+        ...(search ? { search } : {}),
+        rls: "admin-only"
+    });
+    const descriptorOf = (search?: SearchConfig) => compileSchema([talentsTable(search)])[0].descriptor;
+
+    it("returns undefined for a table that declares no search", () => {
+        expect(buildTableSearchColumnSpec(descriptorOf())).toBeUndefined();
+    });
+
+    it("builds the spec the lowered collection builds, column names and all", () => {
+        const search: SearchConfig = {
+            fields: ["fullName", { path: "location", weight: "B" }, "interests", "questionnaire.bio"],
+            unaccent: true,
+            fuzzy: true
+        };
+        const fromTable = buildTableSearchColumnSpec(descriptorOf(search))!;
+        const [lowered] = lowerTables([talentsTable(search)]);
+        expect(fromTable).toEqual(buildSearchColumnSpec(lowered));
+        expect(fromTable.fields.map(field => field.column)).toEqual(["full_name", "location", "interests", "questionnaire"]);
+    });
+
+    it("refuses what holds no text, naming the column type", () => {
+        expect(() => buildTableSearchColumnSpec(descriptorOf({ fields: ["seenAt"] }))).toThrow(/`timestamptz` column, which holds no text/);
+        expect(() => buildTableSearchColumnSpec(descriptorOf({ fields: ["leadStatus"] }))).toThrow(/fixed vocabulary/);
+        expect(() => buildTableSearchColumnSpec(descriptorOf({ fields: ["id"] }))).toThrow(/UUID/);
+        expect(() => buildTableSearchColumnSpec(descriptorOf({ fields: ["scores"] }))).toThrow(/numbers or booleans/);
+    });
+
+    it("refuses a generated column that collides with a declared column's SQL name", () => {
+        expect(() => buildTableSearchColumnSpec(descriptorOf({ fields: ["fullName"], column: "full_name" }))).toThrow(/collides/);
     });
 });
