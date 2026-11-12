@@ -8,8 +8,8 @@
  * store anything still fails.
  *
  * The two flavors are shaped differently on purpose:
- *   cms  — collections are declared in files, so `db push` creates the tables.
- *   baas — there are no collection files; a table is served only once it has
+ *   cms  — tables are declared in backend/schema, so `db push` creates them.
+ *   baas — there is no backend/schema; a table is served only once it has
  *          row-level security and a policy. The baas cases therefore assert
  *          the security posture too: an unprotected table must NOT be served,
  *          and `rebase.uid()` must isolate one user's rows from another's.
@@ -221,8 +221,8 @@ describe.each(CMS_CASES)("cms template: $preset", (testCase) => {
         try { await client?.end(); } catch { /* ignore */ }
     }, 60_000);
 
-    it("scaffolds the collections the preset promises", () => {
-        const collections = fs.readdirSync(path.join(projectDir, "config", "collections"));
+    it("scaffolds the tables the preset promises", () => {
+        const collections = fs.readdirSync(path.join(projectDir, "backend", "schema"));
         expect(collections).toContain("users.ts");
         if (testCase.preset === "blog") {
             expect(collections).toEqual(expect.arrayContaining(["posts.ts", "authors.ts", "tags.ts"]));
@@ -328,20 +328,15 @@ describe.each(BAAS_PRESETS)("baas template: %s", (preset) => {
         try { await client?.end(); } catch { /* ignore */ }
     }, 60_000);
 
-    it("scaffolds no collections and no admin UI", () => {
-        // "No collections" means no `config/collections` — not no `config`. The
-        // headless scaffold still ships a config package, and has since
-        // d71452ffa: storage does not run under row-level security and its keys
-        // share one flat namespace, so without an access model a deployment with
-        // file storage serves every user's files to every signed-in user. The
-        // server refuses to boot without it, and `config/index.ts` is the export
-        // it looks for. Asserting the whole directory away asserted that guard
-        // away with it.
-        expect(fs.existsSync(path.join(projectDir, "config", "collections"))).toBe(false);
+    it("scaffolds no tables and no admin UI", () => {
+        // "No tables" means no `backend/schema` — not no storage hook. Storage
+        // does not run under row-level security and its keys share one flat
+        // namespace, so without an access model a deployment with file storage
+        // serves every user's files to every signed-in user. The server refuses
+        // to boot without it, and `backend/storage.ts` is the export it looks for.
+        expect(fs.existsSync(path.join(projectDir, "backend", "schema"))).toBe(false);
         expect(fs.existsSync(path.join(projectDir, "frontend"))).toBe(false);
-        // The config package is present, and carries the storage access model.
-        expect(fs.existsSync(path.join(projectDir, "config", "index.ts"))).toBe(true);
-        expect(fs.readFileSync(path.join(projectDir, "config", "index.ts"), "utf-8"))
+        expect(fs.readFileSync(path.join(projectDir, "backend", "storage.ts"), "utf-8"))
             .toContain("storageAuthorize");
     });
 

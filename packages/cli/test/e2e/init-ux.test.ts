@@ -88,14 +88,14 @@ describe("--introspect reporting", () => {
         expect(out).toContain("schema generate");
     });
 
-    it("says the database will supply the collections", async () => {
+    it("says the database will supply the tables", async () => {
         const out = await init(["blank-by-introspect", "--yes", "--template", "blog",
             "--database-url", unreachable, "--introspect"]);
         expect(out).toContain("Using the blank template");
 
         // ...and the preset really is dropped, not merely announced.
-        const collections = fs.readdirSync(path.join(tempDir, "blank-by-introspect", "config", "collections"));
-        expect(collections.sort()).toEqual(["index.ts", "users.ts"]);
+        const tables = fs.readdirSync(path.join(tempDir, "blank-by-introspect", "backend", "schema"));
+        expect(tables.sort()).toEqual(["index.ts", "users.ts"]);
     });
 });
 
@@ -104,24 +104,22 @@ describe("--template against the baas flavor", () => {
         const out = await init(["baas-with-template", "--yes", "--template", "ecommerce", "--headless"]);
         expect(out).toContain("Ignoring --template ecommerce");
 
-        // The COLLECTIONS are what a preset supplies, and this flavour declares
+        // The TABLES are what a preset supplies, and this flavour declares
         // none — it introspects them from the live database instead.
         const project = path.join(tempDir, "baas-with-template");
-        expect(fs.existsSync(path.join(project, "config", "collections"))).toBe(false);
+        expect(fs.existsSync(path.join(project, "backend", "schema"))).toBe(false);
     });
 
-    it("keeps a config package for the storage hook, and only that", async () => {
+    it("keeps backend/storage.ts for the storage hook, and no frontend", async () => {
         // Storage is not under row-level security, so the server refuses to boot
         // with storage enabled and no access model — and the scaffold's own
-        // docker-compose.yml enables it. Deleting the config package outright
-        // (which this flavour used to do) left the boot guard nothing to find,
-        // and the first `docker compose up` crash-looped.
+        // docker-compose.yml enables it. Deleting the hook (which this flavour
+        // once did) left the boot guard nothing to find, and the first
+        // `docker compose up` crash-looped.
         const project = path.join(tempDir, "baas-with-template");
-        const config = path.join(project, "config");
 
-        expect(fs.existsSync(config)).toBe(true);
-        expect(fs.readFileSync(path.join(config, "index.ts"), "utf8")).toContain("storageAuthorize");
-        expect(fs.existsSync(path.join(config, "storage.ts"))).toBe(true);
+        expect(fs.readFileSync(path.join(project, "backend", "storage.ts"), "utf8")).toContain("export const storageAuthorize");
+        expect(fs.existsSync(path.join(project, "config"))).toBe(false);
         expect(fs.existsSync(path.join(project, "frontend"))).toBe(false);
     });
 });

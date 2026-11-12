@@ -106,8 +106,7 @@ export function linkLocalPackages(projectPath: string) {
     const pkgPaths = [
         path.join(projectPath, "package.json"),
         path.join(projectPath, "backend", "package.json"),
-        path.join(projectPath, "frontend", "package.json"),
-        path.join(projectPath, "config", "package.json")
+        path.join(projectPath, "frontend", "package.json")
     ];
 
     // Resolve where hono and drizzle-orm actually live inside the monorepo.
