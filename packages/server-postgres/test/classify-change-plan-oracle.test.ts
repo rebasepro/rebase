@@ -22,8 +22,8 @@
  * To see the oracle fail, make `classifyTable` ignore one column attribute.
  */
 import type { CollectionConfig } from "@rebasepro/types";
-import { classifyCollectionChanges, type SchemaFacts } from "../src/schema/classify-change";
-import { generateSchemaCommit } from "../src/schema/generate-schema-commit";
+import type { SchemaFacts } from "../src/schema/classify-change";
+import { classifyEditedTables, generateSchemaCommit } from "../src/schema/generate-schema-commit";
 import { planSchema } from "../src/schema/plan/plan-schema";
 import { renderPostgresDdl, renderTriggersDdl, renderPgType } from "../src/schema/plan/render-ddl";
 import type { SchemaPlan } from "../src/schema/plan/types";
@@ -212,7 +212,7 @@ const ROWS: Record<string, Row> = {
     "string: → number": {
         before: { posts: { views: str() } },
         after: { posts: { views: num() } },
-        verdict: "needs-migration", kind: "change-property-type", says: /string to number/
+        verdict: "needs-migration", kind: "change-property-type", says: /changes type — column "views" goes from TEXT to NUMERIC/
     },
     "string: added optional": {
         before: { posts: {} },
@@ -407,7 +407,7 @@ describe("classifying from the plan, attribute by attribute", () => {
         const afterPlan = planCollections(after);
         const facts = factsFrom(beforePlan, !row.empty);
 
-        const result = classifyCollectionChanges(before, after, facts);
+        const result = classifyEditedTables(before, after, facts);
 
         // The oracle: a schema that changed is a change.
         if (ddl(beforePlan) !== ddl(afterPlan)) {

@@ -8,8 +8,7 @@
  * it recorded the opposite of what happened.
  */
 import type { CollectionConfig, SecurityRule } from "@rebasepro/types";
-import { classifyCollectionChanges } from "../src/schema/classify-change";
-import { commitMessage, generateSchemaCommit } from "../src/schema/generate-schema-commit";
+import { classifyEditedTables, commitMessage, generateSchemaCommit } from "../src/schema/generate-schema-commit";
 
 const posts = (securityRules: SecurityRule[]): CollectionConfig => ({
     slug: "posts",
@@ -27,7 +26,7 @@ const ADMINS: SecurityRule[] = [{ name: "read", operation: "select", roles: ["ad
 
 describe("a security-rules edit", () => {
     it("is classified, safe, naming the collection", () => {
-        const classified = classifyCollectionChanges([posts(PUBLIC)], [posts(ADMINS)]);
+        const classified = classifyEditedTables([posts(PUBLIC)], [posts(ADMINS)]);
         expect(classified.changes).toHaveLength(1);
         expect(classified.changes[0]).toMatchObject({
             kind: "change-security-rules",
@@ -45,7 +44,7 @@ describe("a security-rules edit", () => {
 
     it("is not a change when the rules are only re-spelled into the same policies", () => {
         const respelled: SecurityRule[] = [{ name: "read", operations: ["select"], access: "public" }];
-        expect(classifyCollectionChanges([posts(PUBLIC)], [posts(respelled)]).changes).toEqual([]);
+        expect(classifyEditedTables([posts(PUBLIC)], [posts(respelled)]).changes).toEqual([]);
     });
 
     it("says what is in the commit when nothing else changed", () => {

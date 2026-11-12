@@ -21,11 +21,16 @@ import {
     additiveStatements,
     commitMessage,
     SchemaCommitError,
-    DEFAULT_COMMIT_PATHS
+    DEFAULT_COMMIT_PATHS,
+    classifyEditedTables
 } from "../src/schema/generate-schema-commit";
-import { classifyCollectionChanges } from "../src/schema/classify-change";
+import { compileEditedCollections } from "../src/schema/collection-input";
 import { planCollectionSchemaEnsure } from "../src/schema/ensure-collection-tables";
 import { compileSet } from "./helpers/plan-tables";
+
+/** `additiveStatements` over the fixtures compiled, as the editor's input is. */
+const additiveStatementsOf = (before: CollectionConfig[], after: CollectionConfig[]): string[] =>
+    additiveStatements(compileEditedCollections(before), compileEditedCollections(after));
 
 const collection = (slug: string, properties: PostgresProperties = {}): CollectionConfig =>
     ({
@@ -44,12 +49,12 @@ const planOf = (collections: CollectionConfig[]) =>
 
 describe("additiveStatements — the delta between two ensure plans", () => {
     it("a new collection brings its CREATE TABLE", () => {
-        const statements = additiveStatements([], [collection("posts", { title: str() })]);
+        const statements = additiveStatementsOf([], [collection("posts", { title: str() })]);
         expect(statements.some(s => /CREATE TABLE[\s\S]*posts/i.test(s))).toBe(true);
     });
 
     it("a new property brings only its ADD COLUMN, not the table again", () => {
-        const statements = additiveStatements(
+        const statements = additiveStatementsOf(
             [collection("posts", {})],
             [collection("posts", { subtitle: str() })]
         );
@@ -59,12 +64,12 @@ describe("additiveStatements — the delta between two ensure plans", () => {
 
     it("is empty when nothing changed", () => {
         const same = [collection("posts", { title: str() })];
-        expect(additiveStatements(same, same)).toEqual([]);
+        expect(additiveStatementsOf(same, same)).toEqual([]);
     });
 
     it("preserves the planner's dependency order", () => {
         const after = [collection("posts", { status: str({ enum: [{ id: "draft", label: "draft" }, { id: "live", label: "live" }] }) })];
-        const statements = additiveStatements([], after);
+        const statements = additiveStatementsOf([], after);
         const enumAt = statements.findIndex(s => /CREATE TYPE/i.test(s));
         const tableAt = statements.findIndex(s => /CREATE TABLE/i.test(s));
         // The column's type has to exist before the table that uses it.
@@ -95,13 +100,13 @@ describe("additiveStatements — the delta between two ensure plans", () => {
         ];
 
         it.each(cases)("%s", (_label, before, after) => {
-            const reached = new Set([...planOf(before), ...additiveStatements(before, after)]);
+            const reached = new Set([...planOf(before), ...additiveStatementsOf(before, after)]);
             const wanted = new Set(planOf(after));
 
             // Nothing the after-state needs is missing.
             for (const statement of wanted) expect(reached.has(statement)).toBe(true);
             // And the delta introduced nothing the after-state does not want.
-            for (const statement of additiveStatements(before, after)) {
+            for (const statement of additiveStatementsOf(before, after)) {
                 expect(wanted.has(statement)).toBe(true);
             }
         });
@@ -211,7 +216,7 @@ describe("refusing a change the ensure path will not produce", () => {
 
 describe("commitMessage", () => {
     const message = (before: CollectionConfig[], after: CollectionConfig[]) =>
-        commitMessage(classifyCollectionChanges(before, after));
+        commitMessage(classifyEditedTables(before, after));
 
     it("names a single new collection", () => {
         expect(message([], [collection("posts")])).toContain("add the posts table");

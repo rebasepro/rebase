@@ -13,8 +13,8 @@
  * collection met it as somebody else's work — 409, forever.
  */
 import type { CollectionConfig } from "@rebasepro/types";
-import { classifyCollectionChanges, type SchemaFacts } from "../src/schema/classify-change";
-import { generateSchemaCommit } from "../src/schema/generate-schema-commit";
+import type { SchemaFacts } from "../src/schema/classify-change";
+import { classifyEditedTables, generateSchemaCommit } from "../src/schema/generate-schema-commit";
 
 const products = (properties: Record<string, unknown>): CollectionConfig => ({
     slug: "products",
@@ -34,7 +34,7 @@ const facts = (notNull: string[] = [], defaults: string[] = []): SchemaFacts & {
 });
 
 const blocking = (before: CollectionConfig, after: CollectionConfig, f?: SchemaFacts) =>
-    classifyCollectionChanges([before], [after], f).changes.filter(c => c.verdict !== "safe");
+    classifyEditedTables([before], [after], f).changes.filter(c => c.verdict !== "safe");
 
 describe("what an Edit source only leaves behind", () => {
     it("warns that a NOT NULL column with no default makes every insert fail", () => {
@@ -78,7 +78,7 @@ describe("what an Edit source only leaves behind", () => {
     });
 
     it("is not offered for a proposal the planner refuses — the project would not start", () => {
-        const changes = classifyCollectionChanges(
+        const changes = classifyEditedTables(
             [products({ code: str() })],
             [products({ code: str({ enum: [] }) })]
         ).changes.filter(c => c.kind === "invalid-collection");

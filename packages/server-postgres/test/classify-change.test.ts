@@ -19,11 +19,11 @@
  */
 import type { CollectionConfig } from "@rebasepro/types";
 import {
-    classifyCollectionChanges,
     summarizeChanges,
     type ChangeVerdict,
     type SchemaFacts
 } from "../src/schema/classify-change";
+import { classifyEditedTables } from "../src/schema/generate-schema-commit";
 
 const collection = (slug: string, properties: Record<string, unknown>): CollectionConfig =>
     ({
@@ -55,18 +55,18 @@ const database = (options: {
 
 /** The single change a one-change diff produced. */
 const only = (before: CollectionConfig[], after: CollectionConfig[], facts?: SchemaFacts) => {
-    const result = classifyCollectionChanges(before, after, facts);
+    const result = classifyEditedTables(before, after, facts);
     expect(result.changes).toHaveLength(1);
     return result.changes[0];
 };
 
 const verdictOf = (before: CollectionConfig[], after: CollectionConfig[]): ChangeVerdict =>
-    classifyCollectionChanges(before, after).verdict;
+    classifyEditedTables(before, after).verdict;
 
 describe("no change", () => {
     it("is safe and applicable", () => {
         const c = [collection("posts", { title: str() })];
-        const result = classifyCollectionChanges(c, c);
+        const result = classifyEditedTables(c, c);
         expect(result.changes).toEqual([]);
         expect(result.verdict).toBe("safe");
         expect(result.applicable).toBe(true);
@@ -75,7 +75,7 @@ describe("no change", () => {
     it("does not care about the order of the collections", () => {
         const a = [collection("posts", {}), collection("tags", {})];
         const b = [collection("tags", {}), collection("posts", {})];
-        expect(classifyCollectionChanges(a, b).changes).toEqual([]);
+        expect(classifyEditedTables(a, b).changes).toEqual([]);
     });
 });
 
@@ -96,7 +96,7 @@ describe("safe — what the ensure path expresses exactly", () => {
     it("a required property on a *new* collection, because a fresh table takes its constraints", () => {
         // The whole collection is new, so there is no add-property change at
         // all — the table is created with its constraints intact.
-        const result = classifyCollectionChanges(
+        const result = classifyEditedTables(
             [],
             [collection("posts", { title: str({ validation: { required: true } }) })]
         );
@@ -200,7 +200,7 @@ describe("safe once the database is in view", () => {
     });
 
     it("is not applicable, so an editor cannot apply it unattended", () => {
-        expect(classifyCollectionChanges(
+        expect(classifyEditedTables(
             [collection("posts", {})],
             [collection("posts", { x: str({ validation: { required: true } }) })]
         ).applicable).toBe(false);
@@ -228,7 +228,7 @@ describe("needs-migration — the ensure path cannot express it at all", () => {
             [collection("posts", { views: { type: "number", name: "V" } })]
         );
         expect(change).toMatchObject({ kind: "change-property-type", verdict: "needs-migration" });
-        expect(change.detail).toContain("string to number");
+        expect(change.detail).toContain("changes type — column \"views\" goes from TEXT to NUMERIC");
     });
 
     it("narrowing a varchar's declared maximum, which changes the column width", () => {
@@ -244,7 +244,7 @@ describe("needs-migration — the ensure path cannot express it at all", () => {
     // counted `validation.max` as physical whatever the column. On a `text`
     // column it is a validation rule: the column has no width to change.
     it("a maximum on a text column is validation, not a column change", () => {
-        expect(classifyCollectionChanges(
+        expect(classifyEditedTables(
             [collection("posts", { title: str({ validation: { max: 500 } }) })],
             [collection("posts", { title: str({ validation: { max: 50 } }) })]
         ).changes).toEqual([]);
@@ -271,7 +271,7 @@ describe("needs-migration — the ensure path cannot express it at all", () => {
     // Moved, rather than added beside `id`: two primary keys is a collection
     // the planner refuses outright, which is its own refusal.
     it("changing the primary key", () => {
-        const result = classifyCollectionChanges(
+        const result = classifyEditedTables(
             [collection("posts", { code: str() })],
             [{
                 ...collection("posts", { code: str({ isId: true }) }),
@@ -283,7 +283,7 @@ describe("needs-migration — the ensure path cannot express it at all", () => {
     });
 
     it("a proposal the planner refuses is refused with the planner's reason", () => {
-        const result = classifyCollectionChanges(
+        const result = classifyEditedTables(
             [collection("posts", { code: str() })],
             [collection("posts", { code: str({ enum: [] }) })]
         );
@@ -308,7 +308,7 @@ describe("needs-migration — the ensure path cannot express it at all", () => {
     });
 
     it("a property added with `isId` joins the key, and is not applied as a plain new column", () => {
-        const result = classifyCollectionChanges(
+        const result = classifyEditedTables(
             [collection("posts", { title: str() })],
             [collection("posts", { title: str(), locale: str({ isId: true }) })],
             database({ columns: ["id", "title"] })
@@ -363,7 +363,7 @@ describe("moving a collection to another table", () => {
     });
 
     it("so the change is not applicable", () => {
-        expect(classifyCollectionChanges([at("posts")], [at("articles")], database({ rows: true })).applicable).toBe(false);
+        expect(classifyEditedTables([at("posts")], [at("articles")], database({ rows: true })).applicable).toBe(false);
     });
 
     it("counts a move to another schema too", () => {
@@ -374,7 +374,7 @@ describe("moving a collection to another table", () => {
 
     it("is not a move when the table is only spelled out", () => {
         // `posts` with no `table` already lives in `public.posts`.
-        expect(classifyCollectionChanges([collection("posts", { title: str() })], [at("posts", "public")]).changes)
+        expect(classifyEditedTables([collection("posts", { title: str() })], [at("posts", "public")]).changes)
             .toEqual([]);
     });
 });
@@ -384,7 +384,7 @@ describe("the overall verdict is the worst one present", () => {
         const before = [collection("posts", { old: str() })];
         const after = [collection("posts", { fresh: str() }), collection("tags", {})];
         // add-property (safe) + add-collection (safe) + remove-property (blocked)
-        const result = classifyCollectionChanges(before, after);
+        const result = classifyEditedTables(before, after);
         expect(result.changes.map(c => c.verdict).sort()).toEqual(["needs-migration", "safe", "safe"]);
         expect(result.verdict).toBe("needs-migration");
         expect(result.applicable).toBe(false);
@@ -404,13 +404,13 @@ describe("the overall verdict is the worst one present", () => {
 
 describe("summarizeChanges", () => {
     it("says nothing changed", () => {
-        expect(summarizeChanges(classifyCollectionChanges([], []))).toBe("No schema changes.");
+        expect(summarizeChanges(classifyEditedTables([], []))).toBe("No schema changes.");
     });
 
     it("counts by verdict, worst first", () => {
         const before = [collection("posts", { gone: str() })];
         const after = [collection("posts", { added: str() })];
-        const summary = summarizeChanges(classifyCollectionChanges(before, after));
+        const summary = summarizeChanges(classifyEditedTables(before, after));
         expect(summary).toContain("2 change(s)");
         expect(summary.indexOf("needs-migration")).toBeLessThan(summary.indexOf("safe"));
     });

@@ -1,5 +1,5 @@
 /**
- * What a collection change means for a live database.
+ * What a table change means for a live database.
  *
  * The live schema editor may only make changes the boot-time ensure path can
  * actually carry out, because that is the one mechanism that changes a schema
@@ -18,10 +18,10 @@
  * a database that does not match the configuration and says nothing about it.
  * Two of those exist today and both are documented in the code they come from:
  *
- * - **A required property added to an existing collection.** `ensure` withholds
+ * - **A required column added to an existing table.** `ensure` withholds
  *   `NOT NULL` on a table that already exists, because the constraint is checked
- *   against live rows. The column arrives nullable. The config says required;
- *   the database does not enforce it.
+ *   against live rows. The column arrives nullable. The definition says
+ *   NOT NULL; the database does not enforce it.
  * - **A value added to an existing enum.** `ensure` skips an enum type it
  *   already sees — `if (existing.enums.has(name)) continue`. The new value never
  *   reaches the database, and the first insert using it fails.
@@ -30,11 +30,11 @@
  * `diverges` is the whole point of this module: an editor that reports them as
  * safe is worse than one that refuses them.
  *
- * ## Read from the plan, not from the properties
+ * ## Read from the plan, not from the definitions
  *
  * Whether an edit changes the database is decided by comparing what
- * `planSchema` — the one reading of a `Property` every emitter renders — makes
- * of the collections before and after it: each table's columns, their types,
+ * `planSchema` — the one reading of a table every emitter renders — makes
+ * of the tables before and after it: each table's columns, their types,
  * nullability, defaults, uniqueness and foreign keys, the junction tables,
  * indexes and triggers. It used to be decided by a hand-picked list of property
  * fields, which knew nothing of `validation.integer`, of a string becoming an
@@ -44,8 +44,10 @@
  * of edit either changes the plan, and is classified here from the difference,
  * or it does not change the database.
  *
- * The property-level reading is still here, for the parts only it can name: a
- * property added or removed, a required flag, an enum's values, a key renamed.
+ * The field-level reading is still here, for the parts only it can name: a
+ * column or relation added or removed, NOT NULL, an enum's values, a key
+ * renamed. A field is what the definition names: a column by its key, a
+ * relation by its name (a `belongsTo` owns its foreign-key column).
  *
  * ## Why refusing is the right default for the rest
  *
@@ -54,22 +56,19 @@
  * somebody wrote and read. `needs-migration` says exactly that, and naming the
  * change is more useful than attempting it.
  */
-import {
-    hasForeignKeyOnTarget,
-    isManyToMany,
-    type CollectionConfig,
-    type Property,
-    type RelationProperty,
-    type ResolvedRelation,
-    type SchemaChange,
-    type SchemaChangeKind,
-    type SchemaChangeVerdict,
-    type ClassifiedSchemaChanges
+import type {
+    ColumnDescriptor,
+    CompiledTable,
+    RelationDescriptor,
+    SchemaChange,
+    SchemaChangeKind,
+    SchemaChangeVerdict,
+    ClassifiedSchemaChanges,
+    TableDescriptor
 } from "@rebasepro/types";
-import { findRelation, getTableName, resolveCollectionRelations } from "@rebasepro/common";
-import { resolveColumnName } from "./column-plan-helpers";
+import { toSnakeCase } from "@rebasepro/utils";
 import { planSchema } from "./plan/plan-schema";
-import { compileEditedCollections } from "./collection-input";
+import { plannedColumnEntries } from "./plan/column-order";
 import { renderPgType } from "./plan/render-ddl";
 import { typesAgree } from "./column-type-drift";
 import type { ColumnPlan, ForeignKeyPlan, SchemaPlan, TablePlan } from "./plan/types";
@@ -90,34 +89,80 @@ const VERDICT_RANK: Record<SchemaChangeVerdict, number> = {
     "needs-migration": 2
 };
 
-const bySlug = (collections: CollectionConfig[]): Map<string, CollectionConfig> => {
-    const map = new Map<string, CollectionConfig>();
-    for (const collection of collections) {
-        if (collection.slug) map.set(collection.slug, collection);
+const bySlug = (tables: readonly CompiledTable[]): Map<string, TableDescriptor> =>
+    new Map(tables.map(table => [table.descriptor.slug, table.descriptor]));
+
+/**
+ * One thing a definition names: a column by its key, or a relation by its
+ * name — a `belongsTo` together with the foreign-key column it owns. What the
+ * planner records as a column's `source.propName`.
+ */
+interface Field {
+    /** The column this field is, or the foreign key it owns (a `belongsTo`). */
+    column?: ColumnDescriptor;
+    relation?: RelationDescriptor;
+}
+
+/**
+ * A table's fields, keyed as the plan keys its columns: a `belongsTo` whose
+ * bound column is nothing but the foreign key, or derives it, owns that
+ * column; any other column is a field of its own.
+ */
+function fieldsOf(table: TableDescriptor, targetOf: (slug: string) => TableDescriptor | undefined): Map<string, Field> {
+    const fields = new Map<string, Field>();
+    let entries: ReturnType<typeof plannedColumnEntries> | undefined;
+    try {
+        entries = plannedColumnEntries(table, slug => {
+            const target = targetOf(slug);
+            if (!target) throw new Error(`No table "${slug}".`);
+            return target;
+        });
+    } catch {
+        entries = undefined;
     }
-    return map;
-};
+    if (entries) {
+        for (const entry of entries) {
+            if (entry.kind === "column") fields.set(entry.column.key, { column: entry.column });
+            else if (entry.form === "constraint") fields.set(entry.relation.name, { relation: entry.relation });
+            else fields.set(entry.relation.name, { column: entry.column, relation: entry.relation });
+        }
+    } else {
+        // A link whose target is not among the tables: every column is its own field.
+        for (const column of table.columns) fields.set(column.key, { column });
+    }
+    for (const relation of table.relations) {
+        if (!fields.has(relation.name)) fields.set(relation.name, { relation });
+    }
+    return fields;
+}
 
-const propertiesOf = (collection: CollectionConfig): Record<string, Property> =>
-    (collection.properties ?? {}) as Record<string, Property>;
+/** The enum labels a field's column declares, or undefined when it is not an enum. */
+const enumValuesOf = (field: Field): string[] | undefined =>
+    field.column?.type.kind === "enum" ? [...field.column.type.values] : undefined;
 
-/** Enum values a string property declares, or undefined when it is not an enum. */
-const enumValuesOf = (prop: Property): string[] | undefined => {
-    const values = (prop as { enum?: unknown }).enum;
-    if (!Array.isArray(values)) return undefined;
-    return values.map(value =>
-        typeof value === "string" ? value : String((value as { id?: unknown })?.id ?? value)
-    );
-};
+/** Whether the field is a column of the table's primary key. */
+const isKeyField = (table: TableDescriptor, field: Field): boolean =>
+    field.relation === undefined && field.column !== undefined && table.primaryKey.includes(field.column.key);
 
-const isRequired = (prop: Property): boolean => prop.validation?.required === true;
+/**
+ * Whether the field's column is NOT NULL by a rule of its own — the key's
+ * columns are NOT NULL as the key.
+ */
+const isRequired = (table: TableDescriptor, field: Field): boolean =>
+    field.column !== undefined && !field.column.nullable && !isKeyField(table, field);
 
-const isIdProperty = (prop: Property): boolean => Boolean((prop as { isId?: unknown }).isId);
+/** The SQL column a plain column field names; undefined for a relation. */
+const plainColumnOf = (field: Field): string | undefined =>
+    field.relation === undefined ? field.column?.column : undefined;
+
+/** A `hasOne`/`hasMany` reads its links from this column on the table it points at. */
+const foreignKeyOnTarget = (relation: RelationDescriptor | undefined): string | undefined =>
+    relation && (relation.kind === "hasOne" || relation.kind === "hasMany") ? relation.foreignKey : undefined;
 
 /**
  * Facts about the database a change is destined for.
  *
- * Three of the verdicts below cannot be reached from the collections alone:
+ * Three of the verdicts below cannot be reached from the tables alone:
  * whether a NOT NULL can be added comes down to whether the table holds rows,
  * and whether an enum value will land comes down to which values the type
  * already has. Without these, the classifier answers conservatively — the
@@ -142,7 +187,7 @@ export interface SchemaFacts {
 /**
  * The warning a column left behind needs when nothing will write it any more:
  * NOT NULL with no default rejects every insert that omits it — which, once no
- * property names it, is every insert. The `products.sku` case of 2026-09-08,
+ * definition names it, is every insert. The `products.sku` case of 2026-09-08,
  * where the demo seed died with 23502 and left every later table empty.
  */
 function orphanedNotNullWarning(table: string, column: string, facts: SchemaFacts | undefined): string {
@@ -154,22 +199,19 @@ function orphanedNotNullWarning(table: string, column: string, facts: SchemaFact
 }
 
 /** `products.sku`: the bare table and column, the way a commit subject names it. */
-const shortColumn = (collection: CollectionConfig, column: string): string => `${getTableName(collection)}.${column}`;
+const shortColumn = (table: TableDescriptor, column: string): string => `${table.table}.${column}`;
 
-/** Whether the table behind a collection exists and is empty. */
-const tableIsEmpty = (collection: CollectionConfig, facts?: SchemaFacts): boolean => {
+/** Whether the table exists and is empty. */
+const tableIsEmpty = (table: TableDescriptor, facts?: SchemaFacts): boolean => {
     if (!facts?.populatedTables) return false;
-    const key = qualifiedTable(collection);
+    const key = qualifiedTable(table);
     // A table the database does not have yet is one this change creates, and a
     // table being created has no rows to check a constraint against.
     if (!facts.tables.has(key)) return true;
     return !facts.populatedTables.has(key);
 };
 
-const qualifiedTable = (collection: CollectionConfig): string => {
-    const schema = (collection as { schema?: string }).schema ?? "public";
-    return `${schema}.${getTableName(collection)}`;
-};
+const qualifiedTable = (table: TableDescriptor): string => `${table.schema}.${table.table}`;
 
 /** The two plans a change is read from. `before` is absent when it cannot be planned. */
 interface Plans {
@@ -177,8 +219,8 @@ interface Plans {
     after: SchemaPlan;
 }
 
-const collectionTableOf = (plan: SchemaPlan | undefined, collection: CollectionConfig): TablePlan | undefined =>
-    plan?.tables.find(table => table.kind === "collection" && table.slug === collection.slug);
+const servedTableOf = (plan: SchemaPlan | undefined, slug: string): TablePlan | undefined =>
+    plan?.tables.find(table => table.kind === "collection" && table.slug === slug);
 
 const keyText = (table: TablePlan): string => `(${table.primaryKey.map(column => `"${column}"`).join(", ")})`;
 
@@ -186,8 +228,8 @@ const keyText = (table: TablePlan): string => `(${table.primaryKey.map(column =>
  * " The primary key goes from ("id") to ("id", "locale")." — or "" when the
  * plans do not say, or say the key is unchanged.
  *
- * Several `isId` properties are one composite key, so marking or unmarking one
- * of them moves the whole constraint, not one column's flag; naming the key on
+ * Several key columns are one composite key, so adding or removing one of
+ * them moves the whole constraint, not one column's flag; naming the key on
  * both sides is what tells the reader which constraint the migration replaces.
  */
 const keyMoveText = (before: TablePlan | undefined, after: TablePlan | undefined): string =>
@@ -203,18 +245,7 @@ const keyMoveRemedy = (before: TablePlan | undefined, after: TablePlan | undefin
           `ADD PRIMARY KEY ${keyText(after)} — after checking that no two rows share the new key.`
         : ".");
 
-/** The resolved relation behind a relation property, when it resolves. */
-const relationOf = (collection: CollectionConfig, propName: string, prop: Property): ResolvedRelation | undefined => {
-    if (prop.type !== "relation") return undefined;
-    const name = (prop as RelationProperty).relation?.relationName ?? propName;
-    try {
-        return findRelation(resolveCollectionRelations(collection), name);
-    } catch {
-        return undefined;
-    }
-};
-
-/** What one property puts in the database: its columns, and the junction tables it implies. */
+/** What one field puts in the database: its columns, and the junction tables it implies. */
 interface Footprint {
     columns: ColumnPlan[];
     junctions: TablePlan[];
@@ -222,13 +253,13 @@ interface Footprint {
 
 const PROPERTY_SOURCES = new Set(["property", "relation", "reference"]);
 
-function footprintOf(plan: SchemaPlan | undefined, collection: CollectionConfig, propName: string, prop: Property): Footprint {
-    const table = collectionTableOf(plan, collection);
-    const columns = table?.columns.filter(column =>
-        column.source.propName === propName && PROPERTY_SOURCES.has(column.source.kind)) ?? [];
+function footprintOf(plan: SchemaPlan | undefined, table: TableDescriptor, key: string, field: Field): Footprint {
+    const planned = servedTableOf(plan, table.slug);
+    const columns = planned?.columns.filter(column =>
+        column.source.propName === key && PROPERTY_SOURCES.has(column.source.kind)) ?? [];
     const junctions: TablePlan[] = [];
-    const relation = relationOf(collection, propName, prop);
-    if (plan && relation && isManyToMany(relation)) {
+    const relation = field.relation;
+    if (plan && relation?.kind === "manyToMany") {
         const junction = plan.tables.find(t => t.kind === "junction" && t.table === relation.through.table);
         if (junction) junctions.push(junction);
     }
@@ -272,28 +303,46 @@ function foreignKeyText(fk: ForeignKeyPlan | undefined): string | undefined {
         (fk.onUpdate ? ` ON UPDATE ${fk.onUpdate.toUpperCase()}` : "");
 }
 
-/** Plan a collection set, or say why it cannot be planned. */
-function tryPlan(collections: CollectionConfig[]): SchemaPlan | Error {
+/** Plan a set of tables, or say why it cannot be planned. */
+function tryPlan(tables: readonly CompiledTable[]): SchemaPlan | Error {
     try {
-        return planSchema(compileEditedCollections(collections));
+        return planSchema(tables);
     } catch (err) {
         return err instanceof Error ? err : new Error(String(err));
     }
 }
 
 /**
- * Classify the difference between two collection sets.
+ * The classification of a proposal that could not be compiled at all: the
+ * compiler's message is what says what to fix.
+ */
+export function uncompilableChanges(error: Error, slug: string): ClassifiedChanges {
+    return {
+        changes: [{
+            kind: "invalid-collection",
+            verdict: "needs-migration",
+            collection: slug,
+            detail: `The proposed tables cannot be planned: ${error.message}`,
+            remedy: "Fix the table definition so its schema can be generated, then try again."
+        }],
+        verdict: "needs-migration",
+        applicable: false
+    };
+}
+
+/**
+ * Classify the difference between two sets of tables.
  *
  * `before` is what the running database was built from; `after` is what the
  * editor is proposing. Order within each array is irrelevant.
  *
  * `facts` is what the database actually looks like. Supplied by the live
- * editor; omitted by callers reasoning about collections in the abstract, who
+ * editor; omitted by callers reasoning about tables in the abstract, who
  * get the conservative reading.
  */
-export function classifyCollectionChanges(
-    before: CollectionConfig[],
-    after: CollectionConfig[],
+export function classifyTableChanges(
+    before: readonly CompiledTable[],
+    after: readonly CompiledTable[],
     facts?: SchemaFacts
 ): ClassifiedChanges {
     const previous = bySlug(before);
@@ -318,28 +367,28 @@ export function classifyCollectionChanges(
         ? undefined
         : { before: beforePlan instanceof Error ? undefined : beforePlan, after: afterPlan };
 
-    for (const [slug, collection] of next) {
+    for (const [slug, table] of next) {
         if (!previous.has(slug)) {
             changes.push({
                 kind: "add-collection",
                 verdict: "safe",
                 collection: slug,
-                detail: `New table "${slug}" — creates table "${getTableName(collection)}".`
+                detail: `New table "${slug}" — creates table "${table.table}".`
             });
             continue;
         }
         const was = previous.get(slug)!;
-        // The slug is the identity, so a collection that kept it and changed
-        // its table is the same collection *moved*. The ensure path would
-        // create the new table and never touch the old one: the collection
-        // would come back empty, with every row it had left behind.
-        if (qualifiedTable(was) !== qualifiedTable(collection)) {
+        // The slug is the identity, so a table definition that kept it and
+        // changed its table is the same one *moved*. The ensure path would
+        // create the new table and never touch the old one: it would come
+        // back empty, with every row it had left behind.
+        if (qualifiedTable(was) !== qualifiedTable(table)) {
             changes.push({
                 kind: "rename-table",
                 verdict: "needs-migration",
                 collection: slug,
                 detail:
-                    `"${slug}" moves from table "${qualifiedTable(was)}" to "${qualifiedTable(collection)}", ` +
+                    `"${slug}" moves from table "${qualifiedTable(was)}" to "${qualifiedTable(table)}", ` +
                     "which would create the new table empty and leave every row in the old one.",
                 remedy:
                     "The ensure path never renames or moves a table. Do it in a migration you have read " +
@@ -347,13 +396,13 @@ export function classifyCollectionChanges(
             });
             continue;
         }
-        classifyProperties(was, collection, changes, facts, plans);
+        classifyFields(was, table, previous, next, changes, facts, plans);
         if (plans) {
-            classifyTable(was, collection, collectionTableOf(plans.before, was), collectionTableOf(plans.after, collection), changes, facts);
+            classifyTable(was, table, servedTableOf(plans.before, slug), servedTableOf(plans.after, slug), changes, facts);
         }
     }
 
-    for (const [slug, collection] of previous) {
+    for (const [slug, table] of previous) {
         if (next.has(slug)) continue;
         changes.push({
             kind: "remove-collection",
@@ -361,7 +410,7 @@ export function classifyCollectionChanges(
             collection: slug,
             detail:
                 `Table "${slug}" was removed from backend/schema, which would drop table ` +
-                `"${getTableName(collection)}" and everything in it.`,
+                `"${table.table}" and everything in it.`,
             remedy:
                 "The ensure path never drops anything, so this cannot be applied here. Remove the " +
                 "table in a migration you have read, or keep it and stop serving it."
@@ -394,8 +443,8 @@ export function classifyCollectionChanges(
  * column of the wrong type re-used, a proposal the planner refuses — each
  * leaves a project that does not start or reads its data wrong.
  */
-function sourceOnlyOf(change: SchemaChange, was: CollectionConfig | undefined): Pick<SchemaChange, "sourceOnly" | "kept"> {
-    const table = was ? getTableName(was) : change.collection;
+function sourceOnlyOf(change: SchemaChange, was: TableDescriptor | undefined): Pick<SchemaChange, "sourceOnly" | "kept"> {
+    const table = was ? was.table : change.collection;
     switch (change.kind) {
         case "remove-collection":
             return {
@@ -431,45 +480,47 @@ function sourceOnlyOf(change: SchemaChange, was: CollectionConfig | undefined): 
     }
 }
 
-/** A change on this property already refuses it — a second refusal would only repeat it. */
+/** A change on this field already refuses it — a second refusal would only repeat it. */
 const alreadyRefused = (changes: SchemaChange[], slug: string, property: string | undefined): boolean =>
     property !== undefined &&
     changes.some(change => change.collection === slug && change.property === property && change.verdict === "needs-migration");
 
-function classifyProperties(
-    before: CollectionConfig,
-    after: CollectionConfig,
+function classifyFields(
+    before: TableDescriptor,
+    after: TableDescriptor,
+    previousTables: Map<string, TableDescriptor>,
+    nextTables: Map<string, TableDescriptor>,
     changes: SchemaChange[],
     facts: SchemaFacts | undefined,
     plans: Plans | undefined
 ): void {
-    const slug = after.slug ?? "";
-    const previous = propertiesOf(before);
-    const next = propertiesOf(after);
+    const slug = after.slug;
+    const previous = fieldsOf(before, target => previousTables.get(target));
+    const next = fieldsOf(after, target => nextTables.get(target));
     const empty = tableIsEmpty(after, facts);
 
-    // A key renamed with its column kept — the editor sets `columnName` to the
-    // old column — moves no data: the database sees the same column, and the
-    // plans agree. It used to read as a removal plus an addition, and was
-    // refused as dropping a column nothing dropped.
+    // A key renamed with its column kept — `.column()` names the old column —
+    // moves no data: the database sees the same column, and the plans agree.
+    // It used to read as a removal plus an addition, and was refused as
+    // dropping a column nothing dropped.
     const renamed = new Map<string, string>();
     if (plans?.before) {
-        const removedKeys = Object.keys(previous).filter(key => !next[key]);
-        const addedKeys = Object.keys(next).filter(key => !previous[key]);
+        const removedKeys = [...previous.keys()].filter(key => !next.has(key));
+        const addedKeys = [...next.keys()].filter(key => !previous.has(key));
         for (const oldKey of removedKeys) {
-            const was = footprintOf(plans.before, before, oldKey, previous[oldKey]).columns.map(c => c.column).sort();
+            const was = footprintOf(plans.before, before, oldKey, previous.get(oldKey)!).columns.map(c => c.column).sort();
             if (was.length === 0) continue;
             const newKey = addedKeys.find(key => !renamed.has(key) &&
-                JSON.stringify(footprintOf(plans.after, after, key, next[key]).columns.map(c => c.column).sort()) === JSON.stringify(was));
+                JSON.stringify(footprintOf(plans.after, after, key, next.get(key)!).columns.map(c => c.column).sort()) === JSON.stringify(was));
             if (newKey) renamed.set(newKey, oldKey);
         }
     }
     const renamedFrom = new Set(renamed.values());
 
-    for (const [name, prop] of Object.entries(next)) {
+    for (const [name, field] of next) {
         const oldKey = renamed.get(name);
         if (oldKey) {
-            const columns = footprintOf(plans?.after, after, name, prop).columns.map(c => `"${c.column}"`).join(", ");
+            const columns = footprintOf(plans?.after, after, name, field).columns.map(c => `"${c.column}"`).join(", ");
             changes.push({
                 kind: "rename-property",
                 verdict: "safe",
@@ -479,37 +530,39 @@ function classifyProperties(
                     `"${oldKey}" is now "${name}" and keeps column ${columns} — no data moves. ` +
                     `API clients reading "${oldKey}" read "${name}" from now on.`
             });
-            classifyProperty(slug, after, name, previous[oldKey], prop, changes, facts, plans, oldKey);
+            classifyField(before, after, name, previous.get(oldKey)!, field, nextTables, changes, facts, plans, oldKey);
             continue;
         }
-        const old = previous[name];
+        const old = previous.get(name);
         if (!old) {
-            classifyAddedProperty(slug, after, name, prop, changes, empty, plans, facts);
+            classifyAddedField(after, name, field, nextTables, changes, empty, plans, facts);
             continue;
         }
-        classifyProperty(slug, after, name, old, prop, changes, facts, plans);
+        classifyField(before, after, name, old, field, nextTables, changes, facts, plans);
     }
 
-    for (const [name, prop] of Object.entries(previous)) {
-        if (next[name] || renamedFrom.has(name)) continue;
-        classifyRemovedProperty(slug, before, after, name, prop, changes, plans, facts);
+    for (const [name, field] of previous) {
+        if (next.has(name) || renamedFrom.has(name)) continue;
+        classifyRemovedField(before, after, name, field, changes, plans, facts);
     }
 }
 
-function classifyAddedProperty(
-    slug: string,
-    collection: CollectionConfig,
+function classifyAddedField(
+    table: TableDescriptor,
     name: string,
-    prop: Property,
+    field: Field,
+    tables: Map<string, TableDescriptor>,
     changes: SchemaChange[],
     empty: boolean,
     plans: Plans | undefined,
     facts: SchemaFacts | undefined
 ): void {
-    const footprint = footprintOf(plans?.after, collection, name, prop);
+    const slug = table.slug;
+    const required = isRequired(table, field);
+    const footprint = footprintOf(plans?.after, table, name, field);
     const physical = footprint.columns.length > 0;
-    if (refuseUnbackedRelation(slug, collection, name, prop, changes, plans)) return;
-    if (reusesLeftoverColumn(slug, collection, name, prop, footprint, changes, empty, facts)) return;
+    if (refuseUnbackedRelation(slug, name, field, tables, changes, plans)) return;
+    if (reusesLeftoverColumn(table, name, required, footprint, changes, empty, facts)) return;
 
     // A NOT NULL is checked against rows that are already there, so whether
     // this is safe is a question about the data, not about the configuration.
@@ -517,14 +570,14 @@ function classifyAddedProperty(
     // it; on a populated one it is withheld and the column arrives nullable,
     // which is a database that disagrees with its own config — still worth
     // refusing, now for a reason the reader can act on.
-    if (isRequired(prop) && physical && !empty) {
+    if (required && physical && !empty) {
         changes.push({
             kind: "add-property",
             verdict: "diverges",
             collection: slug,
             property: name,
             detail:
-                `"${name}" is required, but "${getTableName(collection)}" already holds rows, so ` +
+                `"${name}" is required, but "${table.table}" already holds rows, so ` +
                 "NOT NULL would be checked against data that has no value for it yet. The " +
                 "column would arrive nullable.",
             remedy:
@@ -535,45 +588,45 @@ function classifyAddedProperty(
     }
 
     const what = describeFootprint(footprint);
-    const relation = relationOf(collection, name, prop);
+    const onTarget = foreignKeyOnTarget(field.relation);
     const adds = what
         ? `adds ${what}`
-        : relation && hasForeignKeyOnTarget(relation)
-            ? `adds no column — its links are read from "${relation.foreignKeyOnTarget}" on the table it points at`
+        : onTarget
+            ? `adds no column — its links are read from "${onTarget}" on the table it points at`
             : "adds nothing to the database";
     changes.push({
         kind: "add-property",
         verdict: "safe",
         collection: slug,
         property: name,
-        detail: isRequired(prop) && physical
-            ? `New required property "${name}" — ${adds} NOT NULL, which "${getTableName(collection)}" ` +
+        detail: required && physical
+            ? `New required property "${name}" — ${adds} NOT NULL, which "${table.table}" ` +
               "can take because it holds no rows."
-            : `New ${isRequired(prop) ? "required" : "optional"} property "${name}" — ${adds}.`
+            : `New ${required ? "required" : "optional"} property "${name}" — ${adds}.`
     });
 }
 
 /**
- * A property added over a column the database already has.
+ * A field added over a column the database already has.
  *
- * "Edit source only" removes a property and leaves its column — that is what
+ * "Edit source only" removes a field and leaves its column — that is what
  * it is for — so the same name can come back later over a column holding the
  * old values. `ADD COLUMN IF NOT EXISTS` is then a no-op: the plan said "adds
- * column", nothing ran, and a property of another type read the old values as
+ * column", nothing ran, and a column of another type read the old values as
  * its own. Re-using a column of the same type is fine and is said; a column of
  * another type needs converting first.
  */
 function reusesLeftoverColumn(
-    slug: string,
-    collection: CollectionConfig,
+    descriptor: TableDescriptor,
     name: string,
-    prop: Property,
+    required: boolean,
     footprint: Footprint,
     changes: SchemaChange[],
     empty: boolean,
     facts: SchemaFacts | undefined
 ): boolean {
-    const table = qualifiedTable(collection);
+    const slug = descriptor.slug;
+    const table = qualifiedTable(descriptor);
     const present = facts?.tables.get(table);
     const leftover = footprint.columns.filter(column => present?.has(column.column));
     if (leftover.length === 0) return false;
@@ -593,13 +646,13 @@ function reusesLeftoverColumn(
                     "would be read as the wrong type.",
                 remedy:
                     `Drop or convert "${column.column}" in a migration you have read, or give "${name}" ` +
-                    "another `columnName`."
+                    "another column name (`.column(…)`)."
             });
             return true;
         }
     }
     const columns = leftover.map(c => `"${c.column}"`).join(", ");
-    changes.push(isRequired(prop) && !empty
+    changes.push(required && !empty
         ? {
             kind: "add-property",
             verdict: "diverges",
@@ -616,72 +669,67 @@ function reusesLeftoverColumn(
             collection: slug,
             property: name,
             detail:
-                `New ${isRequired(prop) ? "required" : "optional"} property "${name}" — re-uses column ` +
+                `New ${required ? "required" : "optional"} property "${name}" — re-uses column ` +
                 `${columns}, which is already there and keeps the values an earlier property left in it.`
         });
     return true;
 }
 
 /**
- * A `hasMany`/`hasOne` reads its links from a column on the collection it
- * points at. When nothing creates that column, the relation is empty forever,
- * and nothing about planning it said so: the plan was "safe", the detail said
- * it added a column it did not add, and no statement ran.
+ * A `hasMany`/`hasOne` reads its links from a column on the table it points
+ * at. When nothing creates that column, the relation is empty forever, and
+ * nothing about planning it said so: the plan was "safe", the detail said it
+ * added a column it did not add, and no statement ran.
  */
 function refuseUnbackedRelation(
     slug: string,
-    collection: CollectionConfig,
     name: string,
-    prop: Property,
+    field: Field,
+    tables: Map<string, TableDescriptor>,
     changes: SchemaChange[],
     plans: Plans | undefined
 ): boolean {
-    const relation = relationOf(collection, name, prop);
-    if (!plans || !relation || !hasForeignKeyOnTarget(relation)) return false;
-    let target: CollectionConfig | undefined;
-    try {
-        target = relation.target();
-    } catch {
-        return false;
-    }
-    const targetTable = target ? collectionTableOf(plans.after, target) : undefined;
-    if (!targetTable || targetTable.columns.some(column => column.column === relation.foreignKeyOnTarget)) return false;
+    const onTarget = foreignKeyOnTarget(field.relation);
+    if (!plans || !field.relation || !onTarget) return false;
+    const target = tables.get(field.relation.target);
+    const targetTable = target ? servedTableOf(plans.after, target.slug) : undefined;
+    if (!target || !targetTable || targetTable.columns.some(column => column.column === onTarget)) return false;
     changes.push({
         kind: "change-relation",
         verdict: "needs-migration",
         collection: slug,
         property: name,
         detail:
-            `"${name}" reads its links from column "${relation.foreignKeyOnTarget}" of "${targetTable.qualified}", ` +
+            `"${name}" reads its links from column "${onTarget}" of "${targetTable.qualified}", ` +
             "which nothing creates — the relation would always be empty.",
         remedy:
-            `Give "${target!.slug}" a belongsTo whose column is "${relation.foreignKeyOnTarget}", or point ` +
-            "`foreignKeyOnTarget` at the column that holds the link."
+            `Give "${target.slug}" a belongsTo whose column is "${onTarget}", or point ` +
+            "`foreignKey` at the column that holds the link."
     });
     return true;
 }
 
-function classifyRemovedProperty(
-    slug: string,
-    before: CollectionConfig,
-    after: CollectionConfig,
+function classifyRemovedField(
+    before: TableDescriptor,
+    after: TableDescriptor,
     name: string,
-    prop: Property,
+    field: Field,
     changes: SchemaChange[],
     plans: Plans | undefined,
     facts: SchemaFacts | undefined
 ): void {
-    const footprint = footprintOf(plans?.before, before, name, prop);
+    const slug = after.slug;
+    const footprint = footprintOf(plans?.before, before, name, field);
     // Only what the proposal no longer has is dropped. A column another
-    // property still produces, or a junction the far side still declares,
+    // field still produces, or a junction the far side still declares,
     // stays where it is.
-    const afterTable = collectionTableOf(plans?.after, after);
+    const afterTable = servedTableOf(plans?.after, after.slug);
     const dropped: Footprint = plans?.before
         ? {
             columns: footprint.columns.filter(c => !afterTable?.columns.some(a => a.column === c.column)),
             junctions: footprint.junctions.filter(j => !plans.after.tables.some(t => t.qualified === j.qualified))
         }
-        : { columns: [{ column: resolveColumnName(name, prop) } as ColumnPlan], junctions: [] };
+        : { columns: [{ column: field.column?.column ?? toSnakeCase(name) } as ColumnPlan], junctions: [] };
 
     if (dropped.columns.length === 0 && dropped.junctions.length === 0) {
         changes.push({
@@ -717,23 +765,25 @@ function classifyRemovedProperty(
     });
 }
 
-function classifyProperty(
-    slug: string,
-    collection: CollectionConfig,
+function classifyField(
+    wasTable: TableDescriptor,
+    table: TableDescriptor,
     name: string,
-    before: Property,
-    after: Property,
+    before: Field,
+    after: Field,
+    tables: Map<string, TableDescriptor>,
     changes: SchemaChange[],
     facts: SchemaFacts | undefined,
     plans: Plans | undefined,
     /** The key `before` had, when the key itself was renamed. */
     beforeName = name
 ): void {
-    // A relation's column is its `localKey`, which the plan comparison reads;
-    // `columnName` names the column of every other property.
-    if (before.type !== "relation" && after.type !== "relation") {
-        const beforeColumn = resolveColumnName(beforeName, before);
-        const afterColumn = resolveColumnName(name, after);
+    const slug = table.slug;
+    // A relation's column is its foreign key, which the plan comparison
+    // reads; every other column names its own.
+    const beforeColumn = plainColumnOf(before);
+    const afterColumn = plainColumnOf(after);
+    if (beforeColumn !== undefined && afterColumn !== undefined) {
         if (beforeColumn !== afterColumn) {
             changes.push({
                 kind: "rename-column",
@@ -748,15 +798,15 @@ function classifyProperty(
                 sourceOnly:
                     `The data stays in "${beforeColumn}". The next start adds "${afterColumn}" empty, and every ` +
                     `row already there reads blank until the values are copied across.` +
-                    orphanedNotNullWarning(qualifiedTable(collection), beforeColumn, facts),
-                kept: `data stays in ${shortColumn(collection, beforeColumn)}`
+                    orphanedNotNullWarning(qualifiedTable(table), beforeColumn, facts),
+                kept: `data stays in ${shortColumn(table, beforeColumn)}`
             });
         }
     }
 
-    if (isIdProperty(before) !== isIdProperty(after)) {
-        const tableBefore = collectionTableOf(plans?.before, collection);
-        const tableAfter = collectionTableOf(plans?.after, collection);
+    if (isKeyField(wasTable, before) !== isKeyField(table, after)) {
+        const tableBefore = servedTableOf(plans?.before, slug);
+        const tableAfter = servedTableOf(plans?.after, slug);
         changes.push({
             kind: "change-primary-key",
             verdict: "needs-migration",
@@ -768,10 +818,10 @@ function classifyProperty(
         return;
     }
 
-    if (before.type === "relation" && after.type === "relation") {
-        const was = relationOf(collection, name, before);
-        const is = relationOf(collection, name, after);
-        if (was && is && was.kind !== is.kind) {
+    if (before.relation && after.relation) {
+        const was = before.relation;
+        const is = after.relation;
+        if (was.kind !== is.kind) {
             changes.push({
                 kind: "change-relation",
                 verdict: "needs-migration",
@@ -790,14 +840,16 @@ function classifyProperty(
             });
             return;
         }
-        if (refuseUnbackedRelation(slug, collection, name, after, changes, plans)) return;
+        if (refuseUnbackedRelation(slug, name, after, tables, changes, plans)) return;
     }
 
-    const afterColumn = resolveColumnName(name, after);
-    if (!isRequired(before) && isRequired(after)) {
+    const requiredBefore = isRequired(wasTable, before);
+    const requiredAfter = isRequired(table, after);
+    const notNullColumn = after.column?.column ?? toSnakeCase(name);
+    if (!requiredBefore && requiredAfter) {
         // Tightening. `SET NOT NULL` scans the table, so this comes down to
         // whether anything in it is null — which on an empty table is nothing.
-        const empty = tableIsEmpty(collection, facts);
+        const empty = tableIsEmpty(table, facts);
         changes.push(empty
             ? {
                 kind: "change-required",
@@ -805,8 +857,8 @@ function classifyProperty(
                 collection: slug,
                 property: name,
                 detail:
-                    `"${name}" became required — sets NOT NULL on "${afterColumn}", which ` +
-                    `"${getTableName(collection)}" can take because it holds no rows.`
+                    `"${name}" became required — sets NOT NULL on "${notNullColumn}", which ` +
+                    `"${table.table}" can take because it holds no rows.`
             }
             : {
                 kind: "change-required",
@@ -814,16 +866,16 @@ function classifyProperty(
                 collection: slug,
                 property: name,
                 detail:
-                    `"${name}" became required, but "${getTableName(collection)}" holds rows and ` +
+                    `"${name}" became required, but "${table.table}" holds rows and ` +
                     "SET NOT NULL is checked against every one of them. The database would keep " +
                     "accepting nulls.",
                 remedy:
-                    `Backfill first — UPDATE the rows where "${afterColumn}" IS NULL — then apply ` +
+                    `Backfill first — UPDATE the rows where "${notNullColumn}" IS NULL — then apply ` +
                     "this again."
             });
     }
 
-    if (isRequired(before) && !isRequired(after)) {
+    if (requiredBefore && !requiredAfter) {
         // Relaxing. `DROP NOT NULL` cannot fail and cannot lose data, so this is
         // safe on any table; the editor plans it because a reviewed change is
         // the one context in which touching an existing column's constraints is
@@ -833,7 +885,7 @@ function classifyProperty(
             verdict: "safe",
             collection: slug,
             property: name,
-            detail: `"${name}" is no longer required — drops NOT NULL from "${afterColumn}".`
+            detail: `"${name}" is no longer required — drops NOT NULL from "${notNullColumn}".`
         });
     }
 
@@ -842,30 +894,33 @@ function classifyProperty(
 
 /**
  * Everything the plans say changed about a table that already exists — the
- * part no reading of the properties can be trusted to find.
+ * part no reading of the definitions can be trusted to find.
  *
  * Each difference is something the ensure path either does (a new index, a
  * new trigger, a default) or does not (a column's type, its uniqueness, its
  * foreign key, a column the plan no longer has). A difference already refused
- * by the property-level reading — a removed property, a renamed column — is not
+ * by the field-level reading — a removed column, a renamed column — is not
  * refused twice.
  */
 function classifyTable(
-    wasCollection: CollectionConfig,
-    collection: CollectionConfig,
+    wasTable: TableDescriptor,
+    table: TableDescriptor,
     before: TablePlan | undefined,
     after: TablePlan | undefined,
     changes: SchemaChange[],
     facts: SchemaFacts | undefined
 ): void {
     if (!before || !after) return;
-    const slug = collection.slug ?? "";
-    /** "string to number — " when the property's own type changed too. */
-    const propertyTypes = (property: string | undefined): string => {
+    const slug = table.slug;
+    /** "from a column to a relation — " when what the field is changed too. */
+    const fieldKinds = (property: string | undefined): string => {
         if (!property) return "";
-        const was = propertiesOf(wasCollection)[property]?.type;
-        const is = propertiesOf(collection)[property]?.type;
-        return was && is && was !== is ? `from ${was} to ${is} — ` : "";
+        const kindOf = (descriptor: TableDescriptor) =>
+            descriptor.relations.some(relation => relation.name === property) ? "relation"
+                : descriptor.columns.some(column => column.key === property) ? "column" : undefined;
+        const was = kindOf(wasTable);
+        const is = kindOf(table);
+        return was && is && was !== is ? `from a ${was} to a ${is} — ` : "type — ";
     };
     const push = (change: Omit<SchemaChange, "collection">) => {
         if (alreadyRefused(changes, slug, change.property)) return;
@@ -876,10 +931,10 @@ function classifyTable(
     // The key as a whole. A composite key is one constraint over several
     // columns, so a column joining or leaving it moves that constraint — and the
     // ensure path declares a primary key only when it creates the table. A
-    // property newly added with `isId` reaches here only: as a new column it
+    // column newly added to the key reaches here only: as a new column it
     // reads as an addition, and applied as one it would leave the key as it was.
-    // Reported once per collection; the property that changed its own `isId`
-    // has already said it.
+    // Reported once per table; a column that joined or left the key itself has
+    // already said it.
     if (keyText(before) !== keyText(after) && !changes.some(c => c.collection === slug && c.kind === "change-primary-key")) {
         const moved = [
             ...after.primaryKey.filter(column => !before.primaryKey.includes(column)),
@@ -907,7 +962,7 @@ function classifyTable(
                 kind: "change-property-type",
                 verdict: "needs-migration",
                 property,
-                detail: `${where} changes ${propertyTypes(property)}column "${column.column}" goes from ` +
+                detail: `${where} changes ${fieldKinds(property)}column "${column.column}" goes from ` +
                     `${typeText(was)} to ${typeText(column)}.`,
                 remedy:
                     "There is no ALTER COLUMN TYPE in the ensure path, and a cast can fail on data that " +
@@ -915,7 +970,7 @@ function classifyTable(
                 sourceOnly:
                     `Column "${column.column}" keeps its type, ${typeText(was)}: the property is read and written ` +
                     `through it, and a value ${typeText(was)} cannot hold is refused.`,
-                kept: `column ${shortColumn(collection, column.column)} stays ${typeText(was)}`
+                kept: `column ${shortColumn(table, column.column)} stays ${typeText(was)}`
             });
             continue;
         }
@@ -947,7 +1002,7 @@ function classifyTable(
                 sourceOnly: column.unique
                     ? `"${column.column}" keeps accepting duplicates until the constraint is added.`
                     : `The UNIQUE constraint on "${column.column}" stays and keeps refusing duplicates.`,
-                kept: `${shortColumn(collection, column.column)} uniqueness unchanged`
+                kept: `${shortColumn(table, column.column)} uniqueness unchanged`
             });
         }
         const fkWas = foreignKeyText(was.foreignKey);
@@ -976,7 +1031,7 @@ function classifyTable(
                         "Drop and re-create the constraint in a migration you have read — ALTER TABLE … DROP " +
                         "CONSTRAINT, then ADD CONSTRAINT.",
                     sourceOnly: `The constraint on "${column.column}" stays as it is: ${fkWas}.`,
-                    kept: `foreign key on ${shortColumn(collection, column.column)} unchanged`
+                    kept: `foreign key on ${shortColumn(table, column.column)} unchanged`
                 });
             }
         }
@@ -1000,8 +1055,8 @@ function classifyTable(
     for (const column of before.columns) {
         if (after.columns.some(c => c.column === column.column)) continue;
         const property = column.source.propName;
-        // A removed property, a column renamed through `columnName`, a
-        // relation whose kind changed: already refused, naming the property.
+        // A removed field, a column renamed through `.column()`, a relation
+        // whose kind changed: already refused, naming the field.
         if (alreadyRefused(changes, slug, property)) continue;
         push({
             kind: column.source.kind === "relation" ? "change-relation" : "remove-property",
@@ -1013,11 +1068,11 @@ function classifyTable(
                 : `Column "${column.column}" is no longer part of "${slug}", which would drop it and its data.`,
             remedy:
                 "Move the data in a migration you have read, or keep the relation's column where it is " +
-                "(`localKey`).",
+                "(its foreign-key column).",
             sourceOnly:
                 `Column "${column.column}" stays, holding its data, and nothing reads or writes it.` +
                 orphanedNotNullWarning(after.qualified, column.column, facts),
-            kept: `column ${shortColumn(collection, column.column)} kept`
+            kept: `column ${shortColumn(table, column.column)} kept`
         });
     }
 
@@ -1089,22 +1144,22 @@ function classifyTable(
 }
 
 /**
- * Junction tables that appear or disappear without a collection or a property
+ * Junction tables that appear or disappear without a table or a relation
  * being added or removed — a relation that changed kind, or the far side of a
  * many-to-many dropping out.
  */
 function classifyJunctions(
     before: SchemaPlan,
     after: SchemaPlan,
-    previous: Map<string, CollectionConfig>,
-    next: Map<string, CollectionConfig>,
+    previous: Map<string, TableDescriptor>,
+    next: Map<string, TableDescriptor>,
     changes: SchemaChange[]
 ): void {
     const mentioned = (table: string) => changes.some(change => change.detail.includes(`"${table}"`));
     for (const table of before.tables) {
         if (table.kind !== "junction" || after.tables.some(t => t.qualified === table.qualified)) continue;
         const slugs = table.declaringSlugs ?? [];
-        // A removed collection already says it takes everything with it.
+        // A removed table already says it takes everything with it.
         if (slugs.length > 0 && slugs.every(slug => !next.has(slug))) continue;
         if (mentioned(table.qualified)) continue;
         changes.push({
@@ -1136,7 +1191,7 @@ function classifyJunctions(
  * changed.
  *
  * Safe: the policies are replaced wholesale whenever the server starts
- * (`ensureCollectionPolicies`), and nothing about the table's data changes.
+ * (`ensureTablePolicies`), and nothing about the table's data changes.
  * But it is a change, with an effect on who can read what, and it was planned
  * as none and committed as `chore(schema): no change`.
  *
@@ -1176,8 +1231,8 @@ function classifySecurityRules(before: SchemaPlan, after: SchemaPlan, changes: S
 function classifyEnum(
     slug: string,
     name: string,
-    before: Property,
-    after: Property,
+    before: Field,
+    after: Field,
     changes: SchemaChange[],
     facts?: SchemaFacts
 ): void {
@@ -1236,8 +1291,8 @@ function classifyEnum(
  * no row — so a reviewed change may make them.
  */
 export function defaultChangeStatements(
-    before: CollectionConfig[],
-    after: CollectionConfig[],
+    before: readonly CompiledTable[],
+    after: readonly CompiledTable[],
     existingTables: Map<string, Set<string>>
 ): string[] {
     const beforePlan = tryPlan(before);

@@ -3,10 +3,10 @@
  * collections into the compiled tables the planner reads.
  *
  * The live schema editor (`planSchemaChange` → `generateSchemaCommit`, and
- * `classifyCollectionChanges` under it) still receives the edited schema as
+ * `classifyTableChanges` under it) still receives the edited schema as
  * collections from `@rebasepro/server`: the edits are not in the registry, so
  * they cannot be looked up as compiled tables. The boot appliers
- * (`ensureCollectionSchema`, `ensureCollectionPolicies`) are handed the
+ * (`ensureCollectionSchema`, `ensureCollectionPolicies` on the bootstrapper) are handed the
  * server's lowered collections before the driver opens, so there is no
  * registry to read them from either. Until the server hands the driver
  * compiled tables (slice B-R7), both are lifted here with the codemod's lift
@@ -25,6 +25,17 @@ import type { CollectionConfig, CompiledTable } from "@rebasepro/types";
 export function compileEditedCollections(collections: readonly CollectionConfig[]): CompiledTable[] {
     const { tables, defaultRls } = collectionsToTableDefs(collections);
     return compileSchema(tables, defaultRls ? { defaultRls } : {});
+}
+
+/**
+ * The edited schema, as the live editor hands it: compiled tables, or — until
+ * the server compiles them (B-R7) — its collections.
+ */
+export type EditedTables = readonly CompiledTable[] | readonly CollectionConfig[];
+
+/** The slugs of the edited tables, in order — for a refusal that has to name one. */
+export function editedSlugs(handed: EditedTables): string[] {
+    return handed.map(entry => isCompiledTable(entry) ? entry.descriptor.slug : entry.slug);
 }
 
 /** Whether a value the server handed over is a `CompiledTable`. */
