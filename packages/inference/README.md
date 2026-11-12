@@ -1,6 +1,6 @@
 # @rebasepro/inference
 
-Infer Rebase collection property schemas from sample data: field types, enums, `required`, `email` / `url`, storage fields, and nested maps and arrays.
+Infer admin-panel property schemas from sample data: field types, enums, `required`, `email` / `url`, storage fields, and nested maps and arrays.
 
 ## Installation
 
@@ -14,7 +14,7 @@ of it resolves too: Node has supported `require(esm)` since 22.12.
 
 ## What This Package Does
 
-`@rebasepro/inference` examines arrays of data objects and produces `Properties` definitions compatible with the Rebase collection schema. It counts the types each field holds to pick one: a column that mixes numbers with text that is not exactly a number is a string. It also detects enum values and builds nested map/array structures. A `"reference"` property is built only when your `getType` returns `"reference"`; the default `inferTypeFromValue` never does. The admin's "create a collection from a file" import is its consumer in Rebase; database introspection does not use it.
+`@rebasepro/inference` examines arrays of data objects and produces `Properties` definitions — the admin panel's view model of a collection's fields, the same shape a Firestore collection's `fields` (`defineFirestoreCollection`) and the CMS's data import read. It does not write Postgres tables: a table is declared with `defineTable` in `backend/schema/`, and the admin derives its fields from the table's descriptor. It counts the types each field holds to pick one: a column that mixes numbers with text that is not exactly a number is a string. It also detects enum values and builds nested map/array structures. A `"reference"` property is built only when your `getType` returns `"reference"`; the default `inferTypeFromValue` never does. The admin's "create a collection from a file" import and the collection editor's mapping step are its consumers in Rebase; database introspection (`rebase schema introspect`, which writes `backend/schema`) does not use it.
 
 ## Key Exports
 
