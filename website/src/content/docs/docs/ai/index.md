@@ -19,7 +19,7 @@ different problems. It is worth knowing which one you are reaching for:
 | [**MCP server**](/docs/ai/mcp) | A stdio Model Context Protocol server with 53 tools over your schema, data, users, storage, cron, dev server and Rebase Cloud project | An assistant, at runtime |
 | [**Agent skills**](/docs/ai/skills) | 24 Markdown skill files written into your repo by `rebase skills install` | An assistant, as reference material |
 | [**Instruction files**](/docs/ai/instruction-files) | `ai-instructions.md` plus per-assistant pointer files, written by `rebase init` | An assistant, as always-on rules |
-| [**API keys**](/docs/backend/api-keys) | Machine credentials holding [scopes](/docs/backend/roles-and-scopes), per collection and per operation | Anything calling the HTTP API |
+| [**API keys**](/docs/backend/api-keys) | Machine credentials holding [scopes](/docs/backend/roles-and-scopes), per table and per operation | Anything calling the HTTP API |
 
 The first four are about giving an assistant *knowledge* and *tools*. The
 fifth is the only one that decides what it may actually do.
@@ -35,7 +35,7 @@ constraint has to live below the agent, in the credential it carries.
 Rebase gives that credential two independent gates:
 
 1. **The key's scopes.** Declared per operation *and*, when you want, per
-   collection: `data:read:articles`, `data:write:articles`. `data:delete` is
+   table: `data:read:articles`, `data:write:articles`. `data:delete` is
    separate from `data:write`, which is usually the one you want to withhold
    from an agent that is otherwise allowed to edit.
 2. **Row-Level Security.** API keys do not bypass RLS. A key connects as the
@@ -43,10 +43,10 @@ Rebase gives that credential two independent gates:
    decide which rows come back.
 
 Both must allow a request. Neither is a substitute for the other, and the second
-one is the reason a key holding `data:read` on every collection can still return
+one is the reason a key holding `data:read` on every table can still return
 an empty result set.
 
-A point that catches people: a collection's `access: "public"` widens **which
+A point that catches people: a table's `access: "public"` widens **which
 rows a caller may see**, not **who may call**. It is a statement about row
 visibility, not about authentication. Granting it does not give a key a scope,
 and withholding it does not stop one.
@@ -60,7 +60,7 @@ past; the second gate is only as good as the policies you wrote.
 The two-gate model above describes what an API key does. It is **not** what
 `@rebasepro/mcp` uses unless you configure it to. Left alone, the MCP server
 authenticates with your dev server's **service key** — an unscoped admin
-credential that satisfies the default admin policies on every collection. See
+credential that satisfies the default admin policies on every table. See
 [What the MCP server can reach](/docs/ai/mcp#what-the-server-can-reach)
 before you point an assistant at anything you care about.
 :::
@@ -81,7 +81,7 @@ Three things to know before designing around it. **Rebase stores and searches
 embeddings; it does not compute them** — there is no embedding provider, model
 setting or API key anywhere in Rebase, so producing the vectors is your job.
 **pgvector is a prerequisite, and installing it is opt-in.**
-`database({ extensions: ["vector"] })` in `config/resources.ts` lets `rebase db
+`database({ extensions: ["vector"] })` in `backend/resources.ts` lets `rebase db
 push` and the boot schema-ensure run `CREATE EXTENSION IF NOT EXISTS vector` for
 you; without it they create the column and leave the extension to you. Either
 way the server needs an image carrying the library and a role allowed to install

@@ -24,11 +24,11 @@ fly launch --no-deploy
 
 `--no-deploy` because the secrets and the bundle have to be in place first.
 
-If your collections declare a `vector` property, enable the extension once against that database: `CREATE EXTENSION vector;`.
+If your tables declare a `col.vector()` column, enable the extension once against that database: `CREATE EXTENSION vector;`.
 
 ## 2. Build the bundle and point fly.toml at the runtime image
 
-There is **no application image to build from your source**. `rebase build` produces a `dist-bundle` directory with your compiled collections, functions, crons and — if your project declares a static app — your built frontend:
+There is **no application image to build from your source**. `rebase build` produces a `dist-bundle` directory with your compiled tables, functions, crons and — if your project declares a static app — your built frontend:
 
 ```bash
 rebase build
@@ -94,7 +94,7 @@ Then `fly open`.
 
 ## 5. The schema
 
-**The runtime creates missing tables at boot, including your collections'.** `REBASE_MIGRATE_ON_BOOT` defaults to `ensure`, which is additive across the whole schema — it creates missing tables, columns and enum types and applies their row-level security — so the first start against an empty database comes up serving your collections.
+**The runtime creates missing tables at boot, including the ones `backend/schema` declares.** `REBASE_MIGRATE_ON_BOOT` defaults to `ensure`, which is additive across the whole schema — it creates missing tables, columns and enum types and applies their row-level security — so the first start against an empty database comes up serving your collections.
 
 What `ensure` never does is change something that already exists: it does not alter a column type, drop anything, or edit an existing enum's labels, because a machine restarting must not reshape a schema as a side effect of a deploy.
 

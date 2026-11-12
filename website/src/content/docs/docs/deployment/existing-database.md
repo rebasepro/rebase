@@ -29,7 +29,7 @@ A database someone already runs often breaks both:
   `SELECT, INSERT, UPDATE, DELETE` on every table in `public` it may grant on,
   including tables another application owns.
 - **Default policies apply `TO public`.** The baseline policy Rebase adds to
-  every collection lets in any session that never set Rebase's identity. That
+  every table lets in any session that never set Rebase's identity. That
   is how the server's own queries pass, and it also lets in any other role
   that holds a grant on the table, such as Supabase's `anon` through its Data
   API.
@@ -55,7 +55,7 @@ reports:
   may switch to it;
 - other login roles that can switch into the request role;
 - whether every role on the cluster may connect to this database;
-- tables in Rebase's schemas that back no collection;
+- tables in Rebase's schemas that Rebase does not serve;
 - other roles holding privileges on Rebase's tables;
 - policies on Rebase's tables written `TO` a role the request role does not
   inherit;
@@ -73,7 +73,7 @@ a Rebase database it reads the request role the same way; name it with
 
 ## The settings
 
-Set them on the database declaration in `config/resources.ts`:
+Set them on the database declaration in `backend/resources.ts`:
 
 ```ts
 import { database } from "@rebasepro/types";
@@ -98,7 +98,7 @@ code, such as the role name when staging and production share a cluster.
 | `grants` | `REBASE_RLS_GRANTS` | `"schema"`: every table and sequence in the schemas Rebase serves that the connection may grant on, plus default privileges for tables created later | `"managed"`: only the tables Rebase serves, and no default privileges. `"none"`: Rebase grants nothing; a table you have not granted is refused. |
 | `policyTarget` | `REBASE_RLS_POLICY_TARGET` | `"public"` | `"requestRole"`: permissive policies apply only to the request role(s). Restrictive policies still apply to everyone. |
 | `adminPolicies` | `REBASE_RLS_ADMIN_POLICIES` | `"adminRole"`: policies only the server context or an admin can pass (the baseline, `roles: ["admin"]`) are written `TO rebase_admin`, and admin requests run as `<request role>_admin` | `"public"`: those policies are `TO public` and admins run as the request role, as before this setting existed. |
-| `defaultPolicies` | `REBASE_RLS_DEFAULT_POLICIES` | `true` | `false`: no collection gets the server-or-admin baseline. A collection's own `disableDefaultPolicies` still decides for it. |
+| `defaultPolicies` | `REBASE_RLS_DEFAULT_POLICIES` | `true` | `false`: no table gets the server-or-admin baseline. A table's own `defaultPolicies: false` still decides for it. |
 | `inheritRoles` | none | `[]` | Roles granted to the request role `WITH INHERIT TRUE`, so policies written `TO` them apply. With an `{ anonymous, signedIn }` request role, only the signed-in one gets them; with a function, the setting is refused. PostgreSQL 16 and newer; refused on 15 and older. |
 | `identity` | `REBASE_RLS_IDENTITY` (named forms) | `"rebase"`: `app.uid`, `app.user_roles`, `app.is_anonymous`, `app.jwt` | `"supabase"`: also `request.jwt.claims`, `request.jwt.claim.sub` and `request.jwt.claim.role`, so `auth.uid()` and `auth.jwt()` see the caller. In the driver's code, a function returning extra settings. The `app.*` settings are always set. |
 | `sharedRole` | `REBASE_RLS_SHARED_ROLE` | `"warn"` when another login can switch into the request role | `"refuse"`: fail the boot. `"ignore"`: say nothing. |
@@ -220,7 +220,7 @@ safe to run again.
 ### Admin requests and `rebase_admin`
 
 Postgres combines the permissive policies that apply to a role with OR. Written
-`TO public`, the baseline every collection carries (`rebase.uid() IS NULL OR`
+`TO public`, the baseline every table carries (`rebase.uid() IS NULL OR`
 the `admin` role) would apply to signed-in users too, and an OR whose other arm
 is constant for the whole statement cannot use an index: a user's owner-scoped
 list or count would scan the table. So policies that only the server context
@@ -297,13 +297,13 @@ When `public` holds tables Rebase should not reach:
 REBASE_RLS_GRANTS=managed
 ```
 
-Rebase then grants the request role only the tables it serves: collection
+Rebase then grants the request role only the tables it serves: declared
 tables, junction tables, and its own row-secured tables. It sets no default
 privileges in shared schemas and revokes nothing already granted.
-`rebase doctor --database` lists the tables in Rebase's schemas that back no
-collection.
+`rebase doctor --database` lists the tables in Rebase's schemas that it does
+not serve.
 
-Another way out is a schema of Rebase's own: set `schema` on each collection.
+Another way out is a schema of Rebase's own: set `schema` on each `defineTable`.
 
 ## Providers
 
@@ -328,4 +328,4 @@ we expect; check them with your provider.
 - [CLI reference](/docs/cli/#rebase-doctor): `rebase doctor --database`
 - [rls-check](/docs/rls-check/): audit the policies on any Postgres
 - [Security Rules (RLS)](/docs/collections/security-rules/): the policies
-  Rebase writes for each collection
+  Rebase writes for each table

@@ -16,9 +16,9 @@ afterSave: async ({ values, id, context }) => {
     const jobs = context.data.jobs;
     const users = context.data.users;
 
-    // Alternatively, use the .collection() method for dynamic slugs
+    // Alternatively, use the .table() method for dynamic slugs
     const slug = "jobs";
-    const accessor = context.data.collection(slug);
+    const accessor = context.data.table(slug);
 }
 ```
 

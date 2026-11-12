@@ -93,13 +93,13 @@ export const posts = defineTable("posts", {
     },
     tenant: {
         field: "siteId",
-        from: { membership: { collection: "site_members", userField: "userId", tenantField: "siteId" } },
+        from: { membership: { table: "site_members", userField: "userId", tenantField: "siteId" } },
     },
     rls: [{ operation: "all", access: "authenticated" }],
 });
 ```
 
-`membership.collection` is the slug of the membership table; `userField` and
+`membership.table` is the slug of the membership table; `userField` and
 `tenantField` are column keys on it.
 
 The policy is a correlated `EXISTS` over `site_members`: "is the caller a

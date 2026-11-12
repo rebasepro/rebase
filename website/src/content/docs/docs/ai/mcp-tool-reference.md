@@ -17,13 +17,13 @@ Spawn the Rebase CLI in the active project directory.
 
 | Tool | Required | Description |
 |---|---|---|
-| `rebase_schema_generate` | — | Generate Drizzle schema from collection definitions |
+| `rebase_schema_generate` | — | Generate the Drizzle schema from the tables in `backend/schema` |
 | `rebase_db_push` ⚠ | — | Apply the schema directly to the database (dev shortcut) |
-| `rebase_schema_introspect` | — | Introspect the live database into collection definitions |
+| `rebase_schema_introspect` | — | Write a `defineTable` into `backend/schema` for each table the live database holds |
 | `rebase_db_generate` | — | Generate SQL migration files from schema changes |
 | `rebase_db_migrate` ⚠ | — | Run all pending SQL migrations |
 | `rebase_generate_sdk` | — | Generate the fully-typed TypeScript SDK |
-| `rebase_doctor` | — | Detect drift between definitions, generated schema and the live database |
+| `rebase_doctor` | — | Detect drift between the tables in `backend/schema`, the generated schema and the live database |
 | `rebase_db_branch_create` ⚠ | `name` | Create a database branch (admins only) |
 | `rebase_db_branch_list` | — | List database branches (admins only) |
 | `rebase_db_branch_delete` ⚠ | `name` | Delete a database branch (admins only) |
@@ -39,17 +39,19 @@ which the Atlas-backed commands cannot.
 
 | Tool | Required | Description |
 |---|---|---|
-| `rebase_schema_plan` | `collectionId`, `collection` | The SQL one collection's change would run, and which statements destroy data |
+| `rebase_schema_plan` | `patches` | The SQL a list of `TablePatch` edits would run, and which statements destroy data — see [Live schema editing](/docs/backend/live-schema-editing/#the-edits-tablepatch) |
 
-## Documents (5)
+## Rows (5)
+
+<span class="since-badge" data-since="0.31">Since 0.31</span> The same names the remote `/mcp` uses; they were `list_documents`, `get_document`, `create_document`, `update_document` and `delete_document`, with a `collection` argument.
 
 | Tool | Required | Description |
 |---|---|---|
-| `list_documents` | `collection` | List rows, with optional `limit`, `offset`, `orderBy`, `where` |
-| `get_document` | `collection`, `id` | Fetch a single row by ID |
-| `create_document` ⚠ | `collection`, `data` | Create a row |
-| `update_document` ⚠ | `collection`, `id`, `data` | Update a row |
-| `delete_document` ⚠ | `collection`, `id` | Delete a row |
+| `query_table` | `table` | Read rows, with optional `limit`, `offset`, `orderBy`, `where`, as `data.table(name).find()` does |
+| `get_row` | `table`, `id` | Fetch a single row by ID |
+| `create_row` ⚠ | `table`, `data` | Create a row |
+| `update_row` ⚠ | `table`, `id`, `data` | Update a row; only the columns given are touched |
+| `delete_row` ⚠ | `table`, `id` | Delete a row |
 
 ## Users & roles (6)
 

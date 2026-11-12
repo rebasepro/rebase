@@ -136,11 +136,11 @@ COPY dist-bundle /bundle
 
 ## Creating the schema
 
-**The runtime creates missing tables at boot, including your collections'.**
+**The runtime creates missing tables at boot, including the ones `backend/schema` declares.**
 `REBASE_MIGRATE_ON_BOOT` defaults to `ensure`, which is additive across the whole
 schema: it creates missing tables, columns and enum types, and applies their
 row-level security. A first start against an empty database comes up serving
-your collections, with no separate step.
+your tables, with no separate step.
 
 What `ensure` deliberately never does is change anything that already exists. It
 does not alter a column type, does not drop a table or a column, and does not
@@ -167,13 +167,13 @@ image **refuses to boot** on `push`, for the reason above.
 
 ## When only your change process may change the database
 
-`REBASE_MIGRATE_ON_BOOT=none` leaves your collections alone. It does not leave
+`REBASE_MIGRATE_ON_BOOT=none` leaves your tables alone. It does not leave
 the database alone: the framework's own tables (auth, API keys, jobs, cron) are
 still created and kept current at every boot. When the database may only change
 through a reviewed change process, set `REBASE_PROVISION=false` on every process
 that serves:
 
-| Setting | Collection tables and policies | Framework tables |
+| Setting | Declared tables and policies | Framework tables |
 |---|---|---|
 | default (`REBASE_MIGRATE_ON_BOOT=ensure`) | created and kept current at boot | created and kept current |
 | `REBASE_MIGRATE_ON_BOOT=none` | left alone | created and kept current |
@@ -273,7 +273,7 @@ into a filesystem about to be destroyed. The variable is how you say the mount
 is durable.
 
 Mount the volume **above** `STORAGE_PATH`, not at it. `STORAGE_PATH` is the
-default bucket's directory, and every bucket declared in `config/resources.ts`
+default bucket's directory, and every bucket declared in `backend/resources.ts`
 gets its own beside it, `<STORAGE_PATH>__<key>`. A volume at `STORAGE_PATH`
 itself holds the default bucket only. Every other bucket writes to the
 container's filesystem and loses its files when the container is recreated.
@@ -296,7 +296,7 @@ only thing separating two users' files is key unguessability — which
 `GET /storage/list?prefix=` defeats. Any one of these satisfies it:
 
 - a **`storageAuthorize` hook** (or `storagePolicies`) in your project's config,
-  which is the real answer and what the scaffold ships in `config/storage.ts` —
+  which is the real answer and what the scaffold ships in `backend/storage.ts` —
   no environment variable can express "this user may read this key";
 - **`STORAGE_PUBLIC_READ=true`**, for a bucket that genuinely is a public
   read-only CDN;
@@ -464,7 +464,7 @@ REBASE_METRICS_TOKEN=<random string>
 ```
 
 Exposes Prometheus metrics at `/metrics`: request counts and latency histograms
-broken down by API surface (data, auth, storage, functions) and collection, plus
+broken down by API surface (data, auth, storage, functions) and table, plus
 process gauges. Without a token the endpoint is readable by anyone who can reach
 the port, so set one unless it is on a private network.
 
@@ -473,7 +473,7 @@ connection from the database pool, opening one included, labelled by data
 source key (`source="(default)"` in a project that declares no data sources). A
 healthy pool keeps it near zero. A tail that
 grows with traffic means requests are queueing for connections — most often
-held by write callbacks that await something slow; see
+held by write hooks that await something slow; see
 [A hook holds a connection](/docs/collections/context-data-api/#a-hook-holds-a-connection).
 
 The database itself, per data source:

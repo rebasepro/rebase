@@ -45,11 +45,11 @@ Rebase enforces row-level security by switching each signed-in request to a rest
 
 The second statement is the one that matters. On PostgreSQL 16 and newer, a user that creates a role without being a superuser is made a member of it, but not one that may switch into it. If the runtime creates the role itself, boot succeeds and every signed-in request then fails with `DB_PERMISSION_DENIED`. If that has already happened, run the `GRANT` line and restart the app.
 
-If your collections declare a `vector` property, enable **pgvector** under **Configuration → Extensions**. The scaffold declares none.
+If your tables declare a `col.vector()` column, enable **pgvector** under **Configuration → Extensions**. The scaffold declares none.
 
 ### 2. Create a bucket
 
-Create an S3-compatible bucket — Hostman's own S3 storage, or any other provider. From the bucket's settings, note the endpoint, region, access key and secret key. Keep the bucket **private**: Rebase signs every download, and `storageAuthorize` in `config/storage.ts` decides who may read, write and list.
+Create an S3-compatible bucket — Hostman's own S3 storage, or any other provider. From the bucket's settings, note the endpoint, region, access key and secret key. Keep the bucket **private**: Rebase signs every download, and `storageAuthorize` in `backend/storage.ts` decides who may read, write and list.
 
 ### 3. Add a Dockerfile
 
@@ -126,7 +126,7 @@ On a server, uploads stay on its disk: the Compose file keeps them on a named vo
 
 ## The schema
 
-**The runtime creates missing tables at boot, including your collections'.** `REBASE_MIGRATE_ON_BOOT` defaults to `ensure`, which is additive across the whole schema. It creates missing tables, columns and enum types and applies their row-level security, so a new collection is live on the next deploy.
+**The runtime creates missing tables at boot, including the ones `backend/schema` declares.** `REBASE_MIGRATE_ON_BOOT` defaults to `ensure`, which is additive across the whole schema. It creates missing tables, columns and enum types and applies their row-level security, so a new collection is live on the next deploy.
 
 `ensure` never changes something that already exists. It does not alter a column type, drop anything, or edit an existing enum's labels, because a deploy must not reshape a schema as a side effect.
 

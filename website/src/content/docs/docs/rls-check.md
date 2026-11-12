@@ -136,9 +136,9 @@ the exposed set, and `diagnostics.degraded` is how a consumer tells "nothing was
 finding names its check id and failing object (`target.table`, `target.policy`, …) and carries
 a `remediation`: `apply` (`sql`; `rebase-config` when Rebase re-makes the policy from a
 table's `rls` at every boot; or `manual`), runnable `sql` written per check, the
-`placeholders` to fill in first, and `rebase` — the same fix as a list of rules, or why rules
-cannot express it. The rules go in the table's `rls`; the excerpt `rebase` carries still
-shows them in the pre-0.31 `defineCollection({ securityRules })` form. Each finding's
+`placeholders` to fill in first, and `rebase` — the same fix as the table's `rls`, with a
+`defineTable(…, { rls })` excerpt for `backend/schema/`, or why rules cannot express it. Since
+0.31 that key is `rebase.rls` (it was `rebase.securityRules`) and the document's format version is 2. Each finding's
 `key` is stable across runs, so a re-run shows what was cleared. `--json` is unchanged.
 
 ## Running it on a schedule

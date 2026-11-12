@@ -138,7 +138,7 @@ not restart.
 
 `migrationJob.enabled` (the default) runs a `pre-install,pre-upgrade` Job that
 provisions and exits, and every pod boots with `REBASE_MIGRATE_ON_BOOT=none`.
-Nothing on the request path owns the collection schema, which is the cleanest
+Nothing on the request path owns the table schema, which is the cleanest
 available answer to "exactly one process provisions the schema" — it stops being
 a rule anyone has to remember. The pods still keep the framework's own tables
 (auth, API keys, jobs, cron) current at boot; `provision: false` stops that too,
@@ -147,7 +147,7 @@ renders no Job, and leaves the schema to a
 under your own change process.
 
 `mode: ensure` creates what is missing, additively, and is the only mode the
-runtime image accepts. `push` is refused at boot: applying collection schema
+runtime image accepts. `push` is refused at boot: applying table schema
 changes is destructive, and `rebase db push` from a checkout or CI dry-runs the
 change, refuses destructive ones without confirmation, and can take a backup
 first — none of which a pod starting unattended can do.
@@ -184,7 +184,7 @@ realtime: { bus: { type: "postgres" } }
 ```
 
 Set `sharedState.channelBusConfigured: true` to assert that you have — the chart
-uses it only to decide whether to warn. Ordinary collection subscriptions are
+uses it only to decide whether to warn. Ordinary table subscriptions are
 unaffected; those travel through Postgres CDC.
 
 The rest of what a process keeps to itself — local files, resumable uploads,

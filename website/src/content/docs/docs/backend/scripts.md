@@ -105,7 +105,7 @@ in the root `scripts/` folder cannot import it.
 in one module the scripts share, `backend/scripts/tables.ts`, after adding
 `@rebasepro/common` to `backend/package.json`:
 
-```typescript
+```typescript no-verify
 import { lowerTables } from "@rebasepro/common";
 import * as schema from "../schema";
 

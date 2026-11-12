@@ -16,7 +16,7 @@ runtime**:
 ```
 
 Managed means you ship a bundle, not an image. `rebase cloud deploy` builds your
-collections, `backend/functions/` and crons into `dist-bundle`, uploads it, and
+tables, `backend/functions/` and crons into `dist-bundle`, uploads it, and
 Rebase Cloud boots it on the published `rebasepro/server` image. You never write
 a Dockerfile, and you also cannot change what is in the image. This page lists
 what that allows, so you can plan a feature before you build it.
@@ -283,11 +283,11 @@ rebase cloud deploy           # the running backend gets the credentials at depl
 Or point the project at a bucket you already own with
 `rebase cloud storage attach` (S3, R2, MinIO, any S3-compatible bucket).
 Without either, uploads answer `501 STORAGE_NOT_CONFIGURED`. More buckets are
-declared in `config/resources.ts`; see
+declared in `backend/resources.ts`; see
 [Several Buckets](/docs/backend/storage/#several-buckets).
 
 A deploy with storage is refused until the project says who may read and write
-files. The scaffold's `config/storage.ts` exports a `storageAuthorize` hook for
+files. The scaffold's `backend/storage.ts` exports a `storageAuthorize` hook for
 this. See [Per-Object Authorization](/docs/backend/storage-authorization/).
 
 **How files are served.** Your backend serves every file at

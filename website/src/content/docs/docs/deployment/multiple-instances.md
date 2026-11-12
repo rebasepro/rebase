@@ -29,7 +29,7 @@ some clients never see, or a page that shows different logs on every refresh.
 | Signing secrets | Generated per process in development | `JWT_SECRET` and `REBASE_SERVICE_KEY`, set explicitly and **identical** everywhere |
 | Rate-limit counters | In memory | `REBASE_RATE_LIMIT_STORE=sql` |
 | Client address behind a proxy | `TRUSTED_PROXY_HOPS=0` | The number of proxies in front, the same everywhere |
-| Collection subscriptions | Shared through the database when CDC is on | `REALTIME_CDC=auto` (the default) |
+| Table subscriptions | Shared through the database when CDC is on | `REALTIME_CDC=auto` (the default) |
 | Broadcast channels and presence | In memory | `REALTIME_CHANNEL_BUS=postgres` |
 | Uploaded files, `STORAGE_TYPE=local` | The instance's own disk | S3 or GCS, or one shared volume on the parent of `STORAGE_PATH` |
 | Resumable (TUS) uploads in progress | The instance's disk, at `STORAGE_PATH/.tus-uploads` | One shared volume at `STORAGE_PATH`, or sticky sessions |
@@ -67,7 +67,7 @@ and every client shares one bucket. See
 
 ## Realtime
 
-**Collection subscriptions** work across instances when database-level change
+**Table subscriptions** work across instances when database-level change
 capture is on, which it is by default (`REALTIME_CDC=auto`): a trigger announces
 each committed write, and every instance's listener refetches for its own
 subscribers. If CDC is off, or `auto` could not provision it (the boot log says

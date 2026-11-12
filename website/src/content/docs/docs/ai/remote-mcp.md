@@ -41,28 +41,29 @@ to one user, the endpoint declines to mount and says why in the boot log. No
   (your app's "Forgot password"); the screen tells them so. It also names the host the authorization code is sent
   to, and says that host is not verified: anyone may register a client under
   any name, so the host is the part a person can check.
-- **Seventeen tools, three scopes.** The same [scopes](/docs/backend/roles-and-scopes/)
-  every credential uses. `data:read` offers `list_collections`, `describe_collection`,
-  `query_collection`, `count_documents`, `aggregate_documents`, `get_document`, the three views,
-  `show_collection`, `show_record` and `show_app`, `show_app_guide`, and the experimental
-  `list_apps` and `open_app`; `data:write` adds `create_document`, `update_document` and the
-  experimental `save_app` and `delete_app`; `data:delete` adds `delete_document`. A client that asks for
-  nothing gets `data:read`. Each one narrows to a collection: `data:read:posts`
+- **Seventeen tools, three scopes.** <span class="since-badge" data-since="0.31">Since 0.31</span> The same [scopes](/docs/backend/roles-and-scopes/)
+  every credential uses. `data:read` offers `list_tables`, `describe_table`,
+  `query_table`, `count_rows`, `aggregate_rows`, `get_row`, the three views,
+  `show_table`, `show_record` and `show_app`, `show_app_guide`, and the experimental
+  `list_apps` and `open_app`; `data:write` adds `create_row`, `update_row` and the
+  experimental `save_app` and `delete_app`; `data:delete` adds `delete_row`. A client that asks for
+  nothing gets `data:read`. Each one narrows to a table: `data:read:posts`
   lists, describes and reads `posts` and nothing else. A scope decides which tools are
-  offered and which collections they reach, not which rows: an empty list can be
+  offered and which tables they reach, not which rows: an empty list can be
   RLS working, and `data:write` still cannot write a row the person could not.
 - **Three tools put your admin panel in front of the person.** In a client that
   renders MCP Apps, such as Claude, they open the admin panel's own views in the
-  conversation, drawn from your collections: their fields, enums, validation,
-  relations, form sections and view settings.
-  - `show_collection` takes `query_collection`'s arguments, plus `view`
-    (`table`, `list`, `cards` or `kanban`), and opens the collection view: the
+  conversation, drawn from the table descriptors the backend serves to this
+  person — columns, enums, validation, relations — and your project's own
+  panel customizations, where the backend serves its MCP view.
+  - `show_table` takes `query_table`'s arguments, plus `view`
+    (`table`, `list`, `cards` or `kanban`), and opens the table's view: the
     person can search, filter, sort and page, open a row's form, and add rows.
   - `show_record` opens one row's form (`id`), or a form for a new row that
     starts from the `values` the model filled in, for the person to check and
     save themselves.
   - `show_app` runs an app the model writes for the task at hand: one React
-    component (`code`) and the `collections` it reads. It imports Rebase's
+    component (`code`) and the `tables` it reads. It imports Rebase's
     own packages, so the same code works in your project:
     - `@rebasepro/app`: `useRows`, `useRow`, `useRowCount`, `useAggregate`
       and `useRowWrites` over the project's rows;
@@ -70,7 +71,7 @@ to one user, the endpoint declines to mount and says why in the boot log. No
       `CollectionToolbar` and its pieces, and `onRowClick`, which hands the
       app the clicked row as `useRows` reads it), `RecordForm` and `FormField`,
       `RecordDetail`, `FieldValue` and `useSidePanel`, each naming its
-      collection by path, with your custom fields, views and actions;
+      table by path, with your custom fields, views and actions;
     - `@rebasepro/ui`, the whole UI kit, `SplitView` and the KPI tiles and
       charts included.
 
@@ -78,7 +79,7 @@ to one user, the endpoint declines to mount and says why in the boot log. No
     not serve, or a name it does not serve from `@rebasepro/cms` or
     `@rebasepro/app` is the call's error, with its line. An error while it
     runs is shown in its place and told to the model with the person's next
-    message. An app may use only the collections it lists. Its styles are
+    message. An app may use only the tables it lists. Its styles are
     Tailwind's standard utilities, built with the view before any app
     arrives: an arbitrary value such as `h-[560px]` does nothing there, so an
     exact size is a `style`.
@@ -99,12 +100,12 @@ to one user, the endpoint declines to mount and says why in the boot log. No
   and confirmed by the server. Within that, `useRowWrites` asks the person
   before it writes, so an app does not write without their click; the
   admin's own controls (a form's Save, a delete, a table edit) behave as they
-  do on a `show_collection` screen. The model is told what they changed. It reads the rows each tool answers, not the collection configs the
+  do on a `show_table` screen. The model is told what they changed. It reads the rows each tool answers, not the descriptors the
   view draws with. A client without MCP Apps, such as Claude Code or Cursor, shows nothing,
-  and the model reads the same rows it would from `query_collection`.
+  and the model reads the same rows it would from `query_table`.
 - **Experimental: apps saved to the project.** `save_app` keeps an app the
   model built with `show_app` so it opens again: it compiles the code as
-  `show_app` does and stores it with its `title`, `collections` and
+  `show_app` does and stores it with its `title`, `tables` and
   `visibility`, which is `personal` (its owner, the default), `roles` (anyone
   holding one of its `roles`) or `team` (everyone who signs in). Saving for
   more than yourself takes the admin role, since a shared app is code an AI
@@ -132,29 +133,33 @@ to one user, the endpoint declines to mount and says why in the boot log. No
 - **The SDK's vocabulary, REST's answers.** The tools take what the SDK takes —
   `where` (`{"status": ["==", "paid"]}`), `orderBy` (`["created_at", "desc"]` or
   `"created_at:desc"`), `limit`, `offset`, `searchString`, and `data` for a
-  write — and read through `GET /api/data/<collection>`'s path, so a row comes
+  write — and read through `GET /api/data/<table>`'s path, so a row comes
   back as REST serves it (ISO dates, a `belongsTo` as its foreign key, e.g.
-  `authorId`) and can be sent back in an update unchanged. `query_collection`
-  answers `{ data, meta }` with `meta.total` and `meta.hasMore`, and `count_documents`
-  `{ count }`; `tools/list` gives both, `aggregate_documents` and `get_document`
-  an `outputSchema`, loose where an answer varies. `aggregate_documents` is `GET /api/data/<collection>/aggregate`:
+  `authorId`) and can be sent back in an update unchanged. `query_table`
+  answers `{ data, meta }` with `meta.total` and `meta.hasMore`, and `count_rows`
+  `{ count }`; `tools/list` gives both, `aggregate_rows` and `get_row`
+  an `outputSchema`, loose where an answer varies. `aggregate_rows` is `GET /api/data/<table>/aggregate`:
   `select` is a list in REST's grammar (`["count()", "sum(total)"]`), `groupBy`
   a list of fields, and it answers `{ data }` with one row per group, plus
   `meta.hasMore` on a grouped call, whose groups page with `limit` and `offset`
-  and sort with `orderBy`. On a collection an `afterRead` callback rewrites it
+  and sort with `orderBy`. On a table an `afterRead` hook rewrites it
   serves `count()` alone, as REST does. As on REST, a `limit` above 1000, an undeclared argument and an
   edit or delete of a trashed row (404) are refused; setting the soft-delete
   field to `null` restores it. `deleted: "only"` (or `"include"`) on
-  `query_collection`, `count_documents` and `aggregate_documents` reads the trash, as REST's
-  `?deleted=` does, so a row `delete_document` trashed can be found again to
+  `query_table`, `count_rows` and `aggregate_rows` reads the trash, as REST's
+  `?deleted=` does, so a row `delete_row` trashed can be found again to
   restore. Its description tells the model the delete is permanent only where
-  the collection has no soft-delete field.
-- **The listing names the collections; `describe_collection` gives one's schema.**
-  `list_collections` answers each collection's `name`, `title` and `description`,
-  and `describe_collection { collection }` that collection's OpenAPI `row` and
-  `create` schemas, plus `softDeleteField` where rows go to a trash. The tool
-  descriptions tell the model to describe a collection before writing to it. A
-  200-collection project's listing is about 5k tokens, and each description
+  the table has no soft-delete field.
+- **The listing names the tables; `describe_table` gives one's schema.**
+  `list_tables` answers `{ tables: [{ name, description, kind? }] }` — no label:
+  the backend has no presentation — and `describe_table { table }` that table's
+  OpenAPI `row` (the columns this caller is served) and `create` (the writable
+  ones) schemas, its served `relations` and `rls` (raw SQL redacted without
+  `schema:read`), plus `softDeleteField` where rows go to a trash. What a
+  connection may learn about the schema is decided by the same serializer
+  `GET /api/schema/tables` uses. The tool descriptions tell the model to
+  describe a table before writing to it. A 200-table project's listing is
+  about 5k tokens, and each description
   under 1k; with every schema in the listing it was about 150k.
 - **A token for this endpoint only.** An MCP access token is refused by
   `/api/data`, `/api/admin` and the WebSocket, so connecting an assistant does not

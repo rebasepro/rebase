@@ -329,7 +329,7 @@ import { defineFunction, requireAuth, requireAdmin } from "@rebasepro/server/fun
 export default defineFunction((app, { rebase }) => {
     app.post("/:id/approve", requireAuth, requireAdmin, async (c) => {
         const id = c.req.param("id");
-        await rebase.dataAsAdmin.collection<Record<string, unknown>>("jobs").update(id, {
+        await rebase.dataAsAdmin.table<Record<string, unknown>>("jobs").update(id, {
             status: "published",
             approved_at: new Date().toISOString(),
         });

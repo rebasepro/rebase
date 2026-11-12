@@ -14,7 +14,7 @@ rebase skills install
 ```
 
 The skills are **reference material, not tools**. They tell an assistant how
-collections are defined, why migrations are two steps, and which mistakes the
+tables are declared, why migrations are two steps, and which mistakes the
 framework will not catch for it. For tools that act on your data, see the
 [MCP server](/docs/ai/mcp).
 

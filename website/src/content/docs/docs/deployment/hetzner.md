@@ -45,7 +45,7 @@ rebase build
 rsync -a docker-compose.yml .env dist-bundle root@<server-ip>:/opt/my-app/
 ```
 
-`rebase build` compiles your collections, functions and crons into `dist-bundle/`, with their dependencies and the built admin panel. There is no application image to build: the server runs the published runtime image with that directory mounted into it.
+`rebase build` compiles your tables, functions and crons into `dist-bundle/`, with their dependencies and the built admin panel. There is no application image to build: the server runs the published runtime image with that directory mounted into it.
 
 ### 4. Make the configuration production's
 
@@ -82,7 +82,7 @@ cd /opt/my-app
 docker compose up -d
 ```
 
-The first start creates every table it needs, your collections' included, along with their row-level security policies.
+The first start creates every table it needs, your tables included, along with their row-level security policies.
 
 ### 6. Terminate TLS with Caddy
 
@@ -166,7 +166,7 @@ The Terraform module takes the same choice as variables: an S3 bucket, or `force
 
 ## What boot does to your schema
 
-With `REBASE_MIGRATE_ON_BOOT` at its default of `ensure`, the runtime provisions your collection tables **and their row-level security policies** at boot, additively. A new collection is live on the next deploy, with no schema step to run first.
+With `REBASE_MIGRATE_ON_BOOT` at its default of `ensure`, the runtime provisions your tables **and their row-level security policies** at boot, additively. A new table is live on the next deploy, with no schema step to run first.
 
 What boot deliberately never does is anything destructive: it does not alter a column type, drop a column, or edit an existing enum label. A container restart must not be able to reshape a schema as a side effect.
 

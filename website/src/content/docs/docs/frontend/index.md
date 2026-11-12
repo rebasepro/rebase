@@ -95,7 +95,8 @@ browser. The backend imports nothing from the frontend.
 |------|-------------|
 | `tableCustomizations` | `customizeTable(...)` results, one per table at most. Two for the same table throw; one for a table the caller is not served is ignored, with a warning in development |
 | `externalCollections` | Collections whose rows live on another data source, such as `defineFirestoreCollection` results, shown beside the tables in the same navigation, search and reference pickers |
-| `collections` | Collections declared in code. One with the slug of a served table is shown instead of the table, with a warning in development |
+| `uiConfig` | The workspace's UI preferences as written in development: `import uiConfig from "./cms/ui-config.json"`. Folded over `tableCustomizations`, under each user's own preferences |
+| `tables` | For embedding and tests: the tables to render instead of the ones the server serves (`compileTables([...])`). Given, the server is asked for none |
 | `views` | Top-level pages in the navigation, or a builder of them — see [Custom Views](#custom-views) |
 | `homePage` | Replaces the content home page |
 | `entityViews` | Record tabs any table can name by `key` in its `entityViews` |
@@ -107,15 +108,14 @@ browser. The backend imports nothing from the frontend.
 <!-- rebase-cms-props:end -->
 
 The panel's collections are composed in this order, which is also the
-navigation's: the `collections` declared in code, then every served table none
-of them claims (with its customization applied), then the
-`externalCollections`. A slug names one collection only:
+navigation's: every served table (with its customization, then the workspace's
+and the user's UI preferences, applied), then the `externalCollections`. A slug
+names one collection only:
 
 | Collision | What happens |
 |---|---|
 | two `customizeTable` results for one slug | throws: merge them into one |
-| a declared collection and a served table | the declared collection is shown; development warns |
-| an external collection and a served table, a declared collection, or another external collection | the panel shows a loading error naming both; give one another slug |
+| an external collection and a served table, or another external collection | the panel shows a loading error naming both; give one another slug |
 
 How the panel waits for the tables, and what it shows when they cannot be
 loaded, is on [Tables in the CMS](/docs/collections/#loading-and-errors).

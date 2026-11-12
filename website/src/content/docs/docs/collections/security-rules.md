@@ -249,7 +249,7 @@ export const documents = defineTable("documents", {
         {
             operation: "select",
             condition: policy.existsIn({
-                collection: "team_members",
+                table: "team_members",
                 where: policy.and(
                     policy.compare(policy.field("team_id"), "eq", policy.outerField("teamId")),
                     policy.compare(policy.field("user_id"), "eq", policy.authUid())
@@ -274,7 +274,7 @@ correlated `EXISTS` subquery.
 | `policy.authenticated()` | a signed-in caller |
 | `policy.registered()` | a signed-in caller with an account, not a guest |
 | `policy.serverContext()` | `rebase.uid() IS NULL`; see the caution below |
-| `policy.existsIn({ collection, where })` | a correlated `EXISTS` over another table |
+| `policy.existsIn({ table, where })` | a correlated `EXISTS` over another table |
 | `policy.raw(sql)` | the SQL, inserted as written |
 
 | Operand | Means |

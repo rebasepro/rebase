@@ -268,11 +268,11 @@ export default defineCron({
     async handler(ctx) {
         ctx.log("Checking for expired trial users...");
 
-        // Fetch using the pre-initialized data driver. `collection<Row>(slug)`
+        // Fetch using the pre-initialized data driver. `table<Row>(slug)`
         // gives the query builder the row type — `where` keys are checked
         // against it. Every filter is an `[operator, value]` tuple; a bare
         // value is passed straight through and builds a malformed query.
-        const users = ctx.rebase.dataAsAdmin.collection<{
+        const users = ctx.rebase.dataAsAdmin.table<{
             id: string;
             email: string;
             trial_status: string;

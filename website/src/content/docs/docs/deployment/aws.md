@@ -21,11 +21,11 @@ Nothing on this page is AWS-specific about your project. A Rebase deployment is 
 7. Once provisioned, note the **Endpoint address** and assemble your URI:
    `postgresql://rebase_admin:YOUR_PASSWORD@YOUR_ENDPOINT:5432/postgres`
 
-If your collections declare a `vector` property, the instance needs the `pgvector` extension — RDS ships it, but it has to be enabled: `CREATE EXTENSION vector;` against the database, once.
+If your tables declare a `col.vector()` column, the instance needs the `pgvector` extension — RDS ships it, but it has to be enabled: `CREATE EXTENSION vector;` against the database, once.
 
 ## 2. Build the bundle and bake it into an image
 
-There is **no application image to build from your source**. `rebase build` produces a `dist-bundle` directory with your compiled collections, functions, crons and — if your project declares a static app — your built frontend. The published runtime image runs it:
+There is **no application image to build from your source**. `rebase build` produces a `dist-bundle` directory with your compiled tables, functions, crons and — if your project declares a static app — your built frontend. The published runtime image runs it:
 
 ```bash
 rebase build
@@ -80,7 +80,7 @@ AWS handles TLS termination, giving you an `https` URL out of the box.
 
 ## 4. The schema
 
-**The runtime creates missing tables at boot, including your collections'.** `REBASE_MIGRATE_ON_BOOT` defaults to `ensure`, which is additive across the whole schema — it creates missing tables, columns and enum types and applies their row-level security — so the first start against an empty RDS instance comes up serving your collections.
+**The runtime creates missing tables at boot, including the ones `backend/schema` declares.** `REBASE_MIGRATE_ON_BOOT` defaults to `ensure`, which is additive across the whole schema — it creates missing tables, columns and enum types and applies their row-level security — so the first start against an empty RDS instance comes up serving your collections.
 
 What `ensure` never does is change something that already exists: it does not alter a column type, drop anything, or edit an existing enum's labels, because a container restart must not reshape a schema as a side effect of a deploy.
 

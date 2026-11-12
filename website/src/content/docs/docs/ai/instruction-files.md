@@ -35,8 +35,8 @@ The Rebase skills for this assistant live in `.claude/skills/`. If they are not 
 
 These hold before you have opened ai-instructions.md, and in every session:
 
-- **A table is a collection.** Declare it in `config/collections/<name>.ts` with `defineCollection`, and `pnpm dev` creates it. Never `CREATE TABLE`, `ALTER TABLE` or `CREATE INDEX` in code, and never SQL as the database owner against an application table: `rebase.sql()` skips row-level security, validation and callbacks, so keep it for server work that needs every row and for reading a column marked `excludeFromApi`. When the SDK cannot express a query, run it as the caller with `getSql(c)` — the same row-level security as the SDK, read-only unless `{ write: true }`, every value in `params`. A table that already exists gets its collection from `pnpm schema:introspect`.
-- **Data goes through the SDK:** `rebase.dataAsAdmin.<slug>` in functions and crons, `getDriver(c)` to act as the caller.
+- **A table is a file in `backend/schema/`.** Declare it with `defineTable` from `@rebasepro/server/schema` — columns, relations and a required `rls` — export it from `backend/schema/index.ts`, and `pnpm dev` creates it. How it looks in the admin panel is a separate, optional file: `frontend/src/cms/<table>.tsx` with `customizeTable`, which imports the table as a type only. Never `CREATE TABLE`, `ALTER TABLE` or `CREATE INDEX` in code, and never SQL as the database owner against an application table: `rebase.sql()` skips row-level security, validation and hooks, so keep it for server work that needs every row and for reading a column marked `.private()`. When the SDK cannot express a query, run it as the caller with `getSql(c)` — the same row-level security as the SDK, read-only unless `{ write: true }`, every value in `params`. A table that already exists gets its file from `pnpm schema:introspect`. With no `backend/schema/` (a headless project) the database is the schema instead: ai-instructions.md says how to serve a table.
+- **Data goes through the SDK:** `rebase.dataAsAdmin.<table>` in functions and crons, `getDriver(c)` to act as the caller.
 - **A route in `backend/functions/` is public until you guard it** with `requireAuth` or `requireAdmin` from `@rebasepro/server/functions`.
 - **Never deploy, never edit `.env`, never edit generated files** (`backend/src/schema.generated.ts`, `rebase.resources.json`).
 - **When Rebase cannot do what the task needs, tell the human** what is missing instead of working around it.
@@ -94,7 +94,7 @@ The one exception is the **Before you write any code** block. An assistant does
 not reliably follow a link: one that is busy with a task writes the code first,
 and one started at the root of a repository whose Rebase project sits in a
 subfolder never loads these files at all. So the five rules whose breaking does
-the most damage (a table made in code instead of a collection, data read and
+the most damage (a table made in SQL instead of in `backend/schema`, data read and
 written around the SDK, an unguarded route, a deploy, an edited generated file)
 are written into every pointer, identically. A check in CI keeps the five
 copies the same.
@@ -109,19 +109,21 @@ The scaffolded file is deliberately short — it points at
 assistants get wrong often enough to be worth repeating at the top of every
 session:
 
-1. **Schema as code.** Collections are defined in `config/collections/`. Never
-   hand-edit the generated Drizzle schema or the Postgres tables — see
-   [Schema as Code](/docs/architecture/schema-as-code).
-2. **Applying a collection change** depends on the database. While `pnpm dev`
-   is running, saving the collection file is the whole step: boot regenerates the
-   Drizzle schema and creates the missing tables and columns. `pnpm db:push` is
-   only for what boot deliberately leaves alone — a renamed column, a narrowed
-   type, a removed field — on the managed development database as on your own
-   PostgreSQL. Production is `pnpm db:generate` then `pnpm db:migrate`.
-3. **Use the SDK.** Go through `rebase.dataAsAdmin.<slug>` for work done as the
+1. **Schema as code.** A table is a `defineTable` in `backend/schema/<table>.ts`,
+   exported from `backend/schema/index.ts` — only what the index exports is
+   served — with a required `rls`. Never hand-edit the generated Drizzle schema
+   or the Postgres tables — see [Schema as Code](/docs/architecture/schema-as-code).
+2. **Applying a schema change** depends on the database. While `pnpm dev`
+   is running, saving a file in `backend/schema/` is the whole step: it
+   regenerates the Drizzle schema and the SDK types, and boot creates the
+   missing tables and columns. `pnpm db:push` is only for what boot deliberately
+   leaves alone — a renamed column, a narrowed type, a removed column — on the
+   managed development database as on your own PostgreSQL. Production is
+   `pnpm db:generate` then `pnpm db:migrate`.
+3. **Use the SDK.** Go through `rebase.dataAsAdmin.<table>` for work done as the
    service identity, or `getDriver(c)` inside a function when the read should run
    as the caller. The server client has no plain `data` accessor. Raw SQL and direct
-   Drizzle calls bypass validation, callbacks and RLS.
+   Drizzle calls bypass validation, hooks and RLS.
 4. **Guard every custom route.** Routes in `backend/functions/` are mounted
    *without* authentication. Use `requireAuth` / `requireAdmin` from
    `@rebasepro/server/functions` in the route's own middleware slot — reading
@@ -152,7 +154,7 @@ to a public site or static app the project serves.
 `rebase skills install`. Project-specific conventions belong here.
 
 What earns its place is what an assistant cannot infer from the code: which
-collections are legacy, which service owns which table, the naming convention
+tables are legacy, which service owns which table, the naming convention
 that is not enforced anywhere, the migration that must not be re-run. Keep it
 short — instructions loaded into every request compete with the actual task for
 attention, and a long file is one an assistant skims.

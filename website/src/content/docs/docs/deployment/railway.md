@@ -20,11 +20,11 @@ Nothing on this page is Railway-specific about your project. A Rebase deployment
 2. Wait for it to provision.
 3. Railway exposes an internal `DATABASE_URL` variable on the Postgres widget's **Variables** tab.
 
-If your collections declare a `vector` property, enable the extension once against that database: `CREATE EXTENSION vector;`.
+If your tables declare a `col.vector()` column, enable the extension once against that database: `CREATE EXTENSION vector;`.
 
 ## 3. Build the bundle and bake it into an image
 
-There is **no application image to build from your source**. `rebase build` produces a `dist-bundle` directory with your compiled collections, functions, crons and — if your project declares a static app — your built frontend. The published runtime image runs it:
+There is **no application image to build from your source**. `rebase build` produces a `dist-bundle` directory with your compiled tables, functions, crons and — if your project declares a static app — your built frontend. The published runtime image runs it:
 
 ```bash
 rebase build
@@ -68,7 +68,7 @@ Railway sets `PORT` and the runtime binds to it, so there is no port to configur
 
 ## 6. The schema
 
-**The runtime creates missing tables at boot, including your collections'.** `REBASE_MIGRATE_ON_BOOT` defaults to `ensure`, which is additive across the whole schema — it creates missing tables, columns and enum types and applies their row-level security — so the first start against an empty database comes up serving your collections.
+**The runtime creates missing tables at boot, including the ones `backend/schema` declares.** `REBASE_MIGRATE_ON_BOOT` defaults to `ensure`, which is additive across the whole schema — it creates missing tables, columns and enum types and applies their row-level security — so the first start against an empty database comes up serving your collections.
 
 What `ensure` never does is change something that already exists: it does not alter a column type, drop anything, or edit an existing enum's labels, because a container restart must not reshape a schema as a side effect of a deploy.
 

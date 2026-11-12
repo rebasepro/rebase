@@ -77,9 +77,9 @@ Thirteen tools. The first nine only read:
 | `projects` | Lists your projects, their status and your role in each |
 | `project_status` | One project's status and latest deployment; optionally its recent deployments, its environment variable **names**, its cron jobs |
 | `logs` | The running app's output, a deployment's build log, or a cron job's runs |
-| `schema` | A project's collections, or one collection's fields |
+| `schema` | A project's tables, or one table's columns, relations and security rules |
 | `query` | Reads rows: one by id, a filtered page, or a count |
-| `show_collection` | Opens a collection in your admin panel's own view, in the conversation: a table, list, cards or kanban board you can search, filter and page, where a row opens its form |
+| `show_table` | Opens a table in your admin panel's own view, in the conversation: a table, list, cards or kanban board you can search, filter and page, where a row opens its form |
 | `show_record` | Opens one row's form, or a form for a new row Claude filled in, for you to check and save |
 | `show_app` | Builds a small app for the task at hand, such as a triage queue or a dashboard, and runs it on your data in the conversation. It can use your admin panel's views and forms, and asks you before it changes anything |
 | `show_app_guide` | How to write `show_app`'s code: the hooks, components and props an app may use, with an example. Claude reads it before building an app |
@@ -88,7 +88,7 @@ The other four change production, and each one asks first:
 
 | Tool | What it does |
 |---|---|
-| `write` | Creates, updates or deletes one row (users included: they are rows of your users collection) |
+| `write` | Creates, updates or deletes one row (users included: they are rows of your users table) |
 | `deploy` | Deploys a git branch, rolls back to an earlier deployment, or cancels one in progress |
 | `env` | Sets or removes environment variables; a change applies at the next deploy |
 | `cron` | Runs a cron job now, or switches one on or off |

@@ -271,7 +271,7 @@ app.route("/hooks", backend.routes.functions());   // getUser(c) and getDriver(c
 
 `tables` is a list of `defineTable`, `defineAuthTable` and `defineView` results — typically everything `backend/schema/index.ts` exports — and `defaultRls` is what its `rls: "inherit"` tables take, the `defaultRls` that index exports. Every table is compiled when the backend is created, and a problem in any of them (no `rls`, `"inherit"` with no `defaultRls`, a relation to a table not in the list) refuses it with one `SchemaDefinitionError` naming each. Pass `schemaDir` instead to load the directory the way the runtime does, index exports and `defaultRls` included; pass both and `tables` is what is served while `schemaDir` is what the schema editor writes to.
 
-```typescript
+```typescript no-verify
 import * as schema from "../schema";
 
 const tables = [schema.users, schema.posts];

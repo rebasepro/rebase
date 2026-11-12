@@ -111,7 +111,7 @@ rebase cloud init --claim
 ```
 
 That provisions a project on Rebase Cloud, sets `REBASE_BASE_URL` in `.env` to
-its live address, links the directory, and deploys the local collections with
+its live address, links the directory, and deploys the local tables with
 `rebase cloud deploy --bundle`. It prints the live URL, the admin panel URL and a
 **claim URL**. Whoever opens the claim URL and signs in can move the project into
 one of their organizations. The link works once. A project nobody claims within

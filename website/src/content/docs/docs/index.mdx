@@ -12,7 +12,7 @@ import { AdminDemoCarousel } from "../../../components/demos/AdminDemoCarousel";
 
 Rebase is the **open-source backend for PostgreSQL**, with an **admin panel** for your team, built with React and TypeScript. It gives you everything you need to build a production-ready application on **PostgreSQL**:
 
-- **Schema as Code** — Define your data models as TypeScript collections. Rebase generates PostgreSQL tables, a full CRUD UI, REST API endpoints, and a typed SDK from a single source of truth.
+- **Schema as Code** — Declare your Postgres tables in TypeScript, each with a required row-level security posture. Rebase generates the tables and their policies, REST API endpoints, a typed SDK and a full CRUD UI from that single source of truth.
 - **Instant Admin Panel** — A beautiful, fast React-based panel with spreadsheet tables, lists, forms, Kanban boards, inline editing, and real-time sync.
 - **Integrated Backend** — Authentication (passwords, magic links, one-time codes, MFA, API keys and twelve OAuth/OIDC providers), file storage (local, S3 or GCS), Row Level Security, entity history, and WebSocket real-time — all built in.
 - **Radically Extensible** — If you can build it in React, you can add it to Rebase. Custom fields, custom views, plugins, and full access to internal hooks.
@@ -28,11 +28,12 @@ came for:
 
 | I want… | Start here | What you get |
 |---|---|---|
-| **A backend and an admin panel** | [Quickstart](/docs/getting-started/quickstart/) | Collections in TypeScript, a generated CRUD UI, a REST API, auth, storage and realtime |
-| **Just the API, over my own database** | [Backend only](/docs/getting-started/headless/) | A headless REST API and SDK over your existing PostgreSQL — no admin panel, no collection files |
+| **A backend and an admin panel** | [Quickstart](/docs/getting-started/quickstart/) | Tables in TypeScript, a generated CRUD UI, a REST API, auth, storage and realtime |
+| **Just the API, over my own database** | [Backend only](/docs/getting-started/headless/) | A headless REST API and SDK over your existing PostgreSQL — no admin panel, no table files |
 
-Neither is a one-way door: a headless project grows an admin panel by adding
-collection files, and a full project can serve tables it has no collection for.
+Neither is a one-way door: a headless project grows an admin panel by adding a
+frontend, which renders every table the backend serves, and either can write its
+tables down in `backend/schema/` when it wants them in code.
 
 ## How It Works
 
@@ -75,7 +76,7 @@ pnpm run dev
 
 That is the whole first run. There is no database to install and no schema step:
 with no `DATABASE_URL` set, `rebase dev` starts a managed PostgreSQL (PGlite) in
-the project directory, generates the schema from your collections, and creates
+the project directory, generates the schema from your tables, and creates
 the tables at boot.
 
 **Read the URLs from the output.** `rebase dev` picks a free port per project
@@ -94,17 +95,17 @@ To use your own Postgres instead, uncomment `DATABASE_URL` in `.env` and run
 | Feature | Description |
 |---------|-------------|
 | **Spreadsheet Views** | Fast, virtualized table with inline editing, filtering, sorting, and text search |
-| **List View** | Clean, responsive vertical list view for collections |
-| **Kanban Board** | Drag-and-drop board view grouped by any enum property |
+| **List View** | Clean, responsive vertical list view for any table |
+| **Kanban Board** | Drag-and-drop board view grouped by any enum column |
 | **Relations** | One-to-one, one-to-many, many-to-many with junction tables and multi-hop joins |
-| **Row Level Security** | Supabase-style RLS policies defined in your collection config |
+| **Row Level Security** | Postgres RLS policies compiled from the `rls` every table must declare |
 | **Authentication** | JWT + refresh tokens, twelve OAuth/OIDC providers, magic links, one-time codes, TOTP MFA, scoped API keys, role-based access control |
 | **File Storage** | Local filesystem, S3-compatible or Google Cloud Storage, with upload fields and browser |
 | **Real-time Sync** | WebSocket-powered live updates across all connected clients |
 | **Entity History** | Full audit trail for every create, update, and delete |
-| **REST API** | Auto-generated CRUD endpoints for every collection |
+| **REST API** | Auto-generated CRUD endpoints for every table |
 | **Data Import/Export** | CSV, JSON, and Excel import with field mapping; CSV/JSON export |
-| **Collection Editor** | Visual schema editor that generates TypeScript via AST manipulation |
+| **Collection Editor** | Visual schema editor that writes your `backend/schema` TypeScript via AST manipulation |
 | **Typed SDK** | Type-safe JavaScript SDK for your frontend apps |
 | **Plugin System** | Extend every part of the UI — toolbar, forms, fields, home page |
 | **AI Data Enhancement** | LLM-powered autocompletion for text fields |
@@ -121,7 +122,7 @@ To use your own Postgres instead, uncomment `DATABASE_URL` in `.env` and run
 - **[Quickstart](/docs/getting-started/quickstart)** — Get running in 2 minutes
 - **[Backend only](/docs/getting-started/headless/)** — The headless API over a database you already have
 - **[Project Structure](/docs/getting-started/project-structure)** — Understand the generated code,
-  and the five words the rest of these pages assume
-- **[Collections](/docs/collections)** — Define your data schema
+  and the words the rest of these pages assume
+- **[Tables](/docs/schema/)** — Define your data schema
 - **[Backend](/docs/backend)** — Configure auth, storage, and the API
 - **[Architecture](/docs/architecture)** — Understand how it all fits together

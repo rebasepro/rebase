@@ -194,16 +194,16 @@ Options 2 and 3 are the **service key** — an unscoped admin secret. The backen
 resolves it to `uid: "service"`, `roles: ["admin"]`, `isAdmin: true`. That
 identity holds every [scope](/docs/backend/roles-and-scopes/), and it satisfies the
 `_default_admin_read` / `_default_admin_write` policies that Rebase injects into
-every collection that has not set `disableDefaultPolicies`.
+every table that has not set `defaultPolicies: false`.
 
 So the honest answer to "does RLS still constrain it?" is: RLS *runs* — the
 driver does downgrade to the `rebase_user` role — and then a policy Rebase
 itself wrote grants that identity everything. Reading every row of every
-collection is the **designed behaviour of the default configuration**, not a
+table is the **designed behaviour of the default configuration**, not a
 bypass.
 
 With the zero-config setup, an agent holding these tools can read and write every
-row of every collection, list every user, reset any password, invoke any backend
+row of every table, list every user, reset any password, invoke any backend
 function, and run DDL against whatever `DATABASE_URL` the project resolves.
 :::
 
@@ -263,41 +263,39 @@ means editing `.env` and restarting the server.
 See [Agents and MCP Servers](/docs/backend/api-keys#agents-and-mcp-servers) for the
 key-scoping guidance in full.
 
-### Putting a collection out of reach entirely
+### Putting a table out of reach entirely
 
 The reason an admin credential reads everything is the baseline policy Rebase
-injects into each collection, granting the trusted server context and the
-`admin` role. A collection can opt out of that baseline and take full
+injects into each table, granting the trusted server context and the
+`admin` role. A table can opt out of that baseline and take full
 responsibility for its own RLS:
 
-```typescript
-import { defineCollection } from "@rebasepro/cms-types";
+```ts
+import { defineTable, col } from "@rebasepro/server/schema";
 
-export const medicalRecordsCollection = defineCollection({
-    slug: "medical_records",
-    name: "Medical records",
-    table: "medical_records",
-    properties: {
-        patient_id: { name: "Patient", type: "string" },
-        notes: { name: "Notes", type: "string" }
+export const medicalRecords = defineTable("medical_records", {
+    columns: {
+        id:        col.uuid().primaryKey().defaultRandom(),
+        patientId: col.text(),
+        notes:     col.text(),
     },
     // Remove the injected admin/server baseline — nothing is readable
     // except what the rules below allow.
-    disableDefaultPolicies: true,
-    securityRules: [
-        { operations: ["select", "update"], ownerField: "patient_id" }
-    ]
+    defaultPolicies: false,
+    rls: [
+        { operations: ["select", "update"], ownerField: "patientId" },
+    ],
 });
 ```
 
-Now the only way in is to match `patient_id`. The service key's uid is the
+Now the only way in is to match `patientId`. The service key's uid is the
 literal string `service`, so an owner rule never matches it — reads return zero
 rows and writes are rejected by Postgres. This is the one control that constrains
 the MCP server's default credential rather than assuming it away.
 
 Remember that this is a real RLS change, not a documentation one: it takes effect
 only once `rebase schema generate` and a migration have applied the policies. See
-[Security Rules (RLS)](/docs/collections/security-rules).
+[Row-level security](/docs/collections/security-rules).
 
 ## The loopback gate
 
@@ -311,8 +309,8 @@ on the loopback interface.** The gate is written as a list of what is *not*
 gated, so a tool added later arrives protected by default.
 
 - **Not gated — reads:** `rebase_schema_plan`, `rebase_doctor`,
-  `rebase_db_branch_list`, `rebase_db_branch_info`, `rebase_db_branch_diff`, `list_documents`,
-  `get_document`, `list_users`, `list_roles`, `storage_list_objects`,
+  `rebase_db_branch_list`, `rebase_db_branch_info`, `rebase_db_branch_diff`, `query_table`,
+  `get_row`, `list_users`, `list_roles`, `storage_list_objects`,
   `storage_get_download_url`, `cron_list_jobs`, `cron_get_job`, `cron_get_job_logs`,
   `rebase_dev_logs`, and the Rebase Cloud reads `rebase_cloud_status`,
   `rebase_cloud_logs`, `rebase_cloud_env_list`, `rebase_cloud_deployments_list`.
@@ -327,7 +325,7 @@ gated, so a tool added later arrives protected by default.
 - **Gated against `DATABASE_URL`:** the remaining CLI tools — `rebase_db_push`,
   `rebase_db_migrate`, `rebase_db_branch_create`, `rebase_db_branch_delete`.
 - **Gated against the project `baseUrl`:** the remaining SDK tools —
-  `create_document`, `update_document`, `delete_document`, `create_user`,
+  `create_row`, `update_row`, `delete_row`, `create_user`,
   `update_user`, `delete_user`, `rebase_auth_reset_password`,
   `storage_delete_object`, `cron_trigger_job`, `cron_toggle_job`,
   and `invoke_function`.
@@ -339,7 +337,7 @@ the database, not the backend.
 A refusal looks like this:
 
 ```text
-Error: Refusing to run "delete_document": project "default" points at
+Error: Refusing to run "delete_row": project "default" points at
 https://api.example.com/, which is not local. Set REBASE_MCP_ALLOW_REMOTE_WRITES=true
 to allow destructive tools against remote environments.
 ```
@@ -353,8 +351,8 @@ the opt-out:
 ```text
 Error: Refusing to run "rebase_db_push": project "default" sets no DATABASE_URL, so the
 CLI would use the managed development database (PGlite, started by `rebase dev`). You
-most likely do not need this tool: the dev server applies the collections to that
-database at boot, additively. After changing a collection, restart it with
+most likely do not need this tool: the dev server applies the tables in backend/schema to
+that database at boot, additively. After changing a table, restart it with
 rebase_dev_stop and rebase_dev_start. …
 ```
 
@@ -378,7 +376,7 @@ Rows, user records, storage listings, cron jobs, function responses and CLI
 output come back wrapped in an explicit envelope:
 
 ```text
-<<<UNTRUSTED_DATA source="list_documents" id="9b2f4c1e-…">>>
+<<<UNTRUSTED_DATA source="query_table" id="9b2f4c1e-…">>>
 [ … rows … ]
 <<<END_UNTRUSTED_DATA id="9b2f4c1e-…">>>
 ```
@@ -395,8 +393,8 @@ outside.
 
 The [remote endpoint](/docs/ai/remote-mcp/) fences its tool results the same
 way and says so to the client; its `structuredContent` carries the plain result.
-`list_collections` and
-`describe_collection` are the exceptions: only a model reads them, so they are
+`list_tables` and
+`describe_table` are the exceptions: only a model reads them, so they are
 sent once, in the text.
 
 It is a marker, not a sandbox. An assistant holding these tools is only as safe
@@ -490,7 +488,7 @@ project, set `REBASE_TOKEN` in the server's environment to a token without the
 To read another one's data — any project in any organization the signed-in
 account belongs to, linked here or not — `rebase_cloud_projects_list` lists them
 and `rebase_project_use_cloud` (with an id, slug or name) points the data and
-admin tools at it: `list_documents`, `get_document`, `list_users`, `list_roles`,
+admin tools at it: `query_table`, `get_row`, `list_users`, `list_roles`,
 `cron_list_jobs`, `storage_list_objects`. Those calls go through the console's
 Studio proxy, bearing the CLI's own credential (`rebase cloud access-token`, read
 per call and never stored); the control plane checks the person's access and
@@ -543,12 +541,12 @@ context without spending a tool call:
 
 | URI | Description |
 |---|---|
-| `rebase://collections/{name}` | TypeScript source of a collection definition |
+| `rebase://tables/{name}` | TypeScript source of a table definition (`defineTable`) |
 | `rebase://schema` | The generated Drizzle schema (`schema.generated.ts`) |
 
-Collections are discovered from `app/config/collections/`,
-`config/collections/` or `collections/` under the active project directory —
-whichever exists.
+Table files are the modules of the schema directory, its `index.ts` aside: the
+`tables` key of the backend app in `rebase.json`, `backend/schema` by default,
+under the active project directory or its `app/`.
 
 `rebase://schema` is listed **only if** the generated schema exists.
 `findBackendDir` looks for `backend/` and then `app/backend/` under the active

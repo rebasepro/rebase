@@ -105,7 +105,7 @@ On the pod's **Git** tab, connect the repository and branch, then set the comman
 Why each one looks the way it does:
 
 - **Install** runs pnpm through `npx`, because the project ships a `pnpm-lock.yaml` and the pod may not have pnpm installed. `--prod=false` keeps the dev dependencies — the Rebase CLI and TypeScript, which the build needs — even if `NODE_ENV` is already `production` during the install.
-- **Build** runs `rebase build`. It compiles your collections, functions and crons into `dist-bundle/`, and builds the admin panel into the same bundle. It peaks at about 1 GB of memory.
+- **Build** runs `rebase build`. It compiles your tables, functions and crons into `dist-bundle/`, and builds the admin panel into the same bundle. It peaks at about 1 GB of memory.
 - **Start** runs the built bundle. `NODE_ENV=production` is set in the command itself, so the runtime never starts in development mode — where the first stranger to register would become the administrator.
 
 Deploy. Every later push to the branch deploys again.
@@ -114,7 +114,7 @@ Deploy. Every later push to the branch deploys again.
 
 Open the pod's URL. One process serves the admin panel at `/` and the API at `/api`. Sign in with `REBASE_ADMIN_EMAIL` and `REBASE_ADMIN_PASSWORD`.
 
-The first start creates every table it needs, your collections' included, along with their row-level security policies. There is no migration to run first.
+The first start creates every table it needs, your tables included, along with their row-level security policies. There is no migration to run first.
 
 If the log says `Failed to create the "rebase_user" role`, the step at the end of [Add PostgreSQL](#3-add-postgresql) was skipped: run it, then `instapods pods restart my-app`.
 
@@ -139,11 +139,11 @@ instapods env set my-app STORAGE_TYPE=s3 S3_BUCKET=my-uploads S3_REGION=... \
   S3_ENDPOINT=https://... S3_ACCESS_KEY_ID=... S3_SECRET_ACCESS_KEY=...
 ```
 
-Files already on the pod do not move by themselves: copy them to the bucket, keeping their keys. Who may read, write and list files is decided by `storageAuthorize` in `config/storage.ts`, whichever backend holds them. See [Storage](/docs/backend/storage).
+Files already on the pod do not move by themselves: copy them to the bucket, keeping their keys. Who may read, write and list files is decided by `storageAuthorize` in `backend/storage.ts`, whichever backend holds them. See [Storage](/docs/backend/storage).
 
 ## The schema
 
-**The runtime creates missing tables at boot, including your collections'.** `REBASE_MIGRATE_ON_BOOT` defaults to `ensure`, which is additive across the whole schema. It creates missing tables, columns and enum types and applies their row-level security, so a new collection is live on the next deploy.
+**The runtime creates missing tables at boot, including the ones `backend/schema` declares.** `REBASE_MIGRATE_ON_BOOT` defaults to `ensure`, which is additive across the whole schema. It creates missing tables, columns and enum types and applies their row-level security, so a new collection is live on the next deploy.
 
 `ensure` never changes something that already exists. It does not alter a column type, drop anything, or edit an existing enum's labels, because a deploy must not reshape a schema as a side effect.
 
@@ -168,7 +168,7 @@ Read the SQL the dry run prints, then run it again without `--dry-run`. A change
 
 For versioned migrations, commit migration files with `rebase db generate` and put `node_modules/.bin/rebase db migrate` in the **Release** field, which InstaPods runs on every deploy.
 
-If your collections declare a `vector` property, the pod's Postgres needs the pgvector extension: installed on the pod, then created by the superuser with `sudo -u postgres psql -d instapod -c "CREATE EXTENSION vector;"`. The scaffold declares none.
+If your tables declare a `col.vector()` column, the pod's Postgres needs the pgvector extension: installed on the pod, then created by the superuser with `sudo -u postgres psql -d instapod -c "CREATE EXTENSION vector;"`. The scaffold declares none.
 
 ## Next steps
 

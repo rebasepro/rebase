@@ -162,7 +162,7 @@ In a
 `provision` option of `createRebaseBackend`: `true` in the process that owns the
 schema, and `{ collections: false, realtime: false }` in every other one, which
 still keeps the framework's own tables. `REBASE_MIGRATE_ON_BOOT=none` turns the
-collection schema off there as well. Background work is decided the same way:
+table schema off there as well. Background work is decided the same way:
 a process that never calls `start()` runs no cron scheduler and no job workers,
 and one that does runs those its `ownership` option gives it.
 
@@ -281,7 +281,7 @@ when `bundle.mode: url`.
 
 ### The rule
 
-Two units on different builds are two sets of collections against **one**
+Two units on different builds are two sets of tables against **one**
 database, and only one unit provisions it. So:
 
 > **The unit that owns the schema rolls first. A unit may lag; it must never
@@ -296,12 +296,12 @@ rollout in progress.
 ### What checks it
 
 The process that provisions records the schema version it applied, in the
-database. Every other process computes its own from the collections it loaded and
+database. Every other process computes its own from the tables it loaded and
 compares. On a disagreement it says so, naming both:
 
 ```
 ⚠️ [schema] The database was last provisioned from a different set of collections
-   than this process was built from (database v1:6f2a…, this process v1:91cd…).
+   than this process was built from (database v2:6f2a…, this process v2:91cd…).
 ```
 
 It warns and serves, because during a rollout that disagreement is *correct* —
