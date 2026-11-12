@@ -9,3 +9,4 @@ export * from "./table";
 export * from "./descriptor";
 export * from "./infer";
 export * from "./table_patch";
+export * from "./compiled";
