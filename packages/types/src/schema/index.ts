@@ -8,3 +8,4 @@ export * from "./table_options";
 export * from "./table";
 export * from "./descriptor";
 export * from "./infer";
+export * from "./table_patch";

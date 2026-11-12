@@ -464,6 +464,22 @@ export function printIndexes(indexes: readonly TableIndex[]): string {
 }
 
 /**
+ * A data value as source, the way the table printer writes every data-valued
+ * key: a table-level option (`tenant`, `search`, `softDelete`, `metadata`…),
+ * or one rule of an `rls` list. Objects keep the key order they were given (a
+ * rule is never reordered: its policy's name is a hash of the rule as
+ * written). Throws a {@link TablePrintError} for a function or a value with no
+ * literal form.
+ *
+ * @param path Where the value sits, for the error: `posts.tenant`.
+ *
+ * @group Schema
+ */
+export function printSchemaValue(value: unknown, path: string): string {
+    return render(valueDoc(value, path));
+}
+
+/**
  * One relation as source: `rel.belongsTo(() => users, { onDelete: "restrict" })`.
  *
  * A definition prints with the options it was written with; a descriptor
