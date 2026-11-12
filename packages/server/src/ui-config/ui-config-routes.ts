@@ -142,6 +142,18 @@ async function writeUiConfigFile(file: string, config: UiPreferences): Promise<v
     await fs.rename(temporary, file);
 }
 
+/**
+ * Merge (or replace) one table's preferences in the file, creating the file
+ * and its directory when they are missing; returns what is now stored. What
+ * `PUT /workspace/:slug` does on a server that may write the project's source.
+ */
+export async function saveToUiConfigFile(file: string, slug: string, preferences: UiTablePreferences, replace = false): Promise<UiTablePreferences> {
+    const current = await readUiConfigFile(file);
+    const next = replace ? preferences : mergeUiTablePreferences(current.tables[slug] ?? {}, preferences);
+    await writeUiConfigFile(file, { tables: { ...current.tables, [slug]: next } });
+    return next;
+}
+
 /** One write to the file at a time: each reads, merges and rewrites it whole. */
 function serialized(): <T>(run: () => Promise<T>) => Promise<T> {
     let tail: Promise<unknown> = Promise.resolve();
@@ -189,12 +201,7 @@ export function createUiConfigRoutes({ store, workspaceFile }: UiConfigRoutesOpt
         const slug = slugOf(c);
         const { preferences, replace } = await bodyOf(c);
         if (workspaceFile) {
-            const stored = await oneFileWriteAtATime(async () => {
-                const current = await readUiConfigFile(workspaceFile);
-                const next = replace ? preferences : mergeUiTablePreferences(current.tables[slug] ?? {}, preferences);
-                await writeUiConfigFile(workspaceFile, { tables: { ...current.tables, [slug]: next } });
-                return next;
-            });
+            const stored = await oneFileWriteAtATime(() => saveToUiConfigFile(workspaceFile, slug, preferences, replace));
             return c.json({ slug, preferences: stored, target: "file", file: UI_CONFIG_FILE });
         }
         const updatedBy = uidOf(c) ?? "service";

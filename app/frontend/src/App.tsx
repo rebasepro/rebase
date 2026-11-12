@@ -22,6 +22,8 @@ import { insightSlots } from "./InsightSlots";
 import { RebaseStudio } from "@rebasepro/studio";
 import { createRebaseClient } from "@rebasepro/client";
 import { tableCustomizations } from "./cms";
+// How the collection editor laid out the tables in development (labels, columns, views).
+import uiConfig from "./cms/ui-config.json";
 import { BlogEntryPreview } from "./BlogEntryPreview";
 import { ProductPriceMapView } from "./ProductPriceMapView";
 import { DemoLoginView } from "./DemoLoginView";
@@ -113,6 +115,7 @@ export function App() {
                 these are only what this demo changes about how they look. */}
             <RebaseCMS
                 tableCustomizations={tableCustomizations}
+                uiConfig={uiConfig}
                 collectionEditor={collectionEditor}
                 entityViews={entityViews}
                 collectionViews={collectionViews}

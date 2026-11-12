@@ -391,7 +391,10 @@ describe("template tables", () => {
 
     it("App.tsx hands RebaseCMS the customizations, and there is no collections plugin", () => {
         const app = fs.readFileSync(path.join(TEMPLATE_DIR, "frontend", "src", "App.tsx"), "utf-8");
-        expect(app).toContain("<RebaseCMS tableCustomizations={[postsCms, authorsCms, tagsCms, usersCms]} />");
+        expect(app).toContain("<RebaseCMS tableCustomizations={[postsCms, authorsCms, tagsCms, usersCms]} uiConfig={uiConfig} />");
+        // What the collection editor saves in development is shipped with the frontend.
+        expect(app).toContain("import uiConfig from \"./cms/ui-config.json\";");
+        expect(JSON.parse(fs.readFileSync(path.join(TEMPLATE_DIR, "frontend", "src", "cms", "ui-config.json"), "utf-8"))).toEqual({ tables: {} });
         expect(app).not.toContain("virtual:rebase-collections");
         const vite = fs.readFileSync(path.join(TEMPLATE_DIR, "frontend", "vite.config.ts"), "utf-8");
         expect(vite).not.toContain("rebaseCollectionsPlugin");
@@ -428,6 +431,9 @@ describe("template presets", () => {
         const app = fs.readFileSync(path.join(project, "frontend", "src", "App.tsx"), "utf-8");
         expect(app).toContain("tableCustomizations={[usersCms]}");
         expect(app).not.toContain("postsCms");
+        // The UI config is not a blog file: every preset keeps it, and imports it.
+        expect(app).toContain("uiConfig={uiConfig}");
+        expect(fs.existsSync(path.join(project, "frontend", "src", "cms", "ui-config.json"))).toBe(true);
     });
 
     it("applying the ecommerce preset replaces the blog tables with its own", async () => {

@@ -8,6 +8,8 @@ import { ErrorBoundary } from "@rebasepro/ui";
 import { RebaseStudio } from "@rebasepro/studio";
 import { createRebaseClient } from "@rebasepro/client";
 import { usersCms } from "./cms/users";
+// How the collection editor laid out the tables in development (labels, columns, views).
+import uiConfig from "./cms/ui-config.json";
 
 // `rebase dev` injects VITE_API_URL with the port it actually bound, and that
 // port is derived from this project's path rather than fixed — so a
@@ -45,7 +47,7 @@ export function App() {
                 {/* Every table the backend serves gets an admin view with no
                     code. A file in ./cms changes how one of them looks:
                     labels, icons, enum colours, custom fields and actions. */}
-                <RebaseCMS tableCustomizations={[usersCms]} />
+                <RebaseCMS tableCustomizations={[usersCms]} uiConfig={uiConfig} />
                 <RebaseStudio/>
                 <RebaseShell title="Rebase"/>
             </Rebase>

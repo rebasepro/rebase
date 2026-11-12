@@ -6,6 +6,8 @@ import { ErrorBoundary } from "@rebasepro/ui";
 import { firebaseApp } from "./firebase";
 import { firestoreEvents } from "./cms/events";
 import { ordersCms } from "./cms/orders";
+// How the collection editor laid out the tables in development (labels, columns, views).
+import uiConfig from "./cms/ui-config.json";
 
 // One client for the page: the default data source, the Postgres tables the
 // backend serves at /api/schema/tables.
@@ -34,6 +36,7 @@ export function App() {
                     beside them, in the same navigation and reference router. */}
                 <RebaseCMS
                     tableCustomizations={[ordersCms]}
+                    uiConfig={uiConfig}
                     externalCollections={[firestoreEvents]}
                 />
                 <RebaseShell title="Hybrid example"/>
