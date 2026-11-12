@@ -109,6 +109,7 @@
         "packages/server/src/api/table-source-editor.ts",
         "packages/server/src/api/live-schema-routes.ts",
         "packages/server/src/api/schema-editor-routes.ts",
+        "packages/server/src/api/frontend-source-routes.ts",
         "packages/server/src/api/logs-routes.ts",
         "packages/server/src/api/sql-export-routes.ts"
       ],
