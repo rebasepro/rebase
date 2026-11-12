@@ -7,7 +7,10 @@ import { RebaseCMS, RebaseShell } from "@rebasepro/cms";
 import { ErrorBoundary } from "@rebasepro/ui";
 import { RebaseStudio } from "@rebasepro/studio";
 import { createRebaseClient } from "@rebasepro/client";
-import { collections } from "virtual:rebase-collections";
+import { postsCms } from "./cms/posts";
+import { authorsCms } from "./cms/authors";
+import { tagsCms } from "./cms/tags";
+import { usersCms } from "./cms/users";
 
 // `rebase dev` injects VITE_API_URL with the port it actually bound, and that
 // port is derived from this project's path rather than fixed — so a
@@ -42,9 +45,10 @@ export function App() {
                 {/* The sign-in screen. On its own this changes nothing —
                     it is where you pass `loginView` to replace it. */}
                 <RebaseAuth />
-                <RebaseCMS
-                    collections={collections}
-                />
+                {/* Every table the backend serves gets an admin view with no
+                    code. A file in ./cms changes how one of them looks:
+                    labels, icons, enum colours, custom fields and actions. */}
+                <RebaseCMS tableCustomizations={[postsCms, authorsCms, tagsCms, usersCms]} />
                 <RebaseStudio/>
                 <RebaseShell title="Rebase"/>
             </Rebase>

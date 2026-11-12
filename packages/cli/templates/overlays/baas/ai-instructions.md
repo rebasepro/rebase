@@ -1,6 +1,6 @@
 # Rebase AI Coding Rules
 
-This is a **headless** Rebase project: a REST API, auth, storage and realtime over your PostgreSQL database, with no admin panel. There are no collection files and no generated schema — the server reads the database schema at boot and serves each table that has row-level security enabled. `README.md` shows the SQL.
+This is a **headless** Rebase project: a REST API, auth, storage and realtime over your PostgreSQL database, with no admin panel. There is no `backend/schema/` and no generated schema — the server reads the database schema at boot and serves each table that has row-level security enabled. `README.md` shows the SQL.
 
 `.mcp.json` in this directory wires the Rebase MCP server up already — no login, no token: it reads `.rebase/state.json` while `pnpm dev` is running. For the full skills (auth, RLS, functions, storage, deployment), run `pnpm skills:install`, or `rebase skills install --agent <claude|cursor|windsurf|gemini|codex|kiro|copilot>` to pick one.
 
@@ -10,29 +10,29 @@ This is a **headless** Rebase project: a REST API, auth, storage and realtime ov
 |---|---|
 | `pnpm dev` | The backend and the managed development database, together |
 | `rebase db url` | Print the connection string in use — it pipes straight into `psql` |
-| `pnpm db:migrate` | Apply the migration files in `backend/drizzle/migrations`, on the managed development database or your own PostgreSQL. A headless project has no collections, so nothing writes those files for it — `rebase db generate` has no schema to generate from — and until you add one there is nothing to apply. A file you write by hand needs `pnpm exec atlas migrate hash --dir file://drizzle/migrations`, run in `backend/`, before it applies |
-| `pnpm schema:introspect` | Existing tables → collection definitions in `config/collections/`. That directory ends headless mode; see rule 1 |
-| `pnpm generate:sdk` | Regenerate the typed client from `config/collections/` — so in a headless project it has nothing to read until you introspect. Once there are collections, `pnpm dev` does this on start and on every save; the script is for CI and for when `pnpm dev` is not running |
+| `pnpm db:migrate` | Apply the migration files in `backend/drizzle/migrations`, on the managed development database or your own PostgreSQL. A headless project declares no tables, so nothing writes those files for it — `rebase db generate` has no schema to generate from — and until you add one there is nothing to apply. A file you write by hand needs `pnpm exec atlas migrate hash --dir file://drizzle/migrations`, run in `backend/`, before it applies |
+| `pnpm schema:introspect` | Existing tables → `defineTable(...)` files in `backend/schema/`. That directory makes the code the schema; see rule 1 |
+| `pnpm generate:sdk` | Regenerate the typed client from `backend/schema/` — so in a headless project it has nothing to read until you introspect. Once there are tables there, `pnpm dev` does this on start and on every save; the script is for CI and for when `pnpm dev` is not running |
 | `pnpm build` then `pnpm start` | Build the deployable bundle, then run it |
 | `pnpm skills:install` | Install the Rebase skills for your assistant |
 | `pnpm example` | Run `scripts/example.ts` against the running backend: a health check, and an SDK call to uncomment |
 | `rebase doctor` | Checks the environment and the database connection — run this before guessing |
-| `rebase resources --write` | After declaring a database, bucket or topic in `config/resources.ts`: regenerate `rebase.resources.json` and commit it (`pnpm build` does this too) |
+| `rebase resources --write` | After declaring a database, bucket or topic in `backend/resources.ts`: regenerate `rebase.resources.json` and commit it (`pnpm build` does this too) |
 | `pnpm deploy` | Deploys this project. Never run it; see below |
 
 ## Never
 
 - **Never deploy.** `pnpm deploy`, `rebase cloud deploy`, `firebase deploy`, `gcloud run deploy` — print the command and let the human run it, even when the task list ends in "deploy" and the tests are green.
 - **Never edit `.env`.** It holds generated secrets and the connection string. Add a variable by asking, and document it in `.env.example`.
-- **Never edit `rebase.resources.json`.** It is generated from `config/resources.ts` — declare there, then `rebase resources --write`.
+- **Never edit `rebase.resources.json`.** It is generated from `backend/resources.ts` — declare there, then `rebase resources --write`.
 - **Never pass `--allow-destructive`** to anything pointed at a database that is not the local development one. It drops columns and tables.
 - **Never read or write application rows as the database owner from code.** The schema is SQL here; owner-level data access (`rebase.sql()`, a Drizzle client) is not, because it skips row-level security, validation and hooks. Analytics have an SDK form — `aggregate()` with `countDistinct`, `mode`, `percentile`, `distinct`, groups by `lower(…)`, `day(…)` or `unnest(tags)`, and `fingerprint()` to know whether a table changed — and bulk writes are `createMany` / `updateMany`, one statement per batch. When those do not fit, `getSql(c)` in a function runs one statement as the caller, under the same policies as the API: read-only unless `{ write: true }`, the query text yours and every value in `params`.
 
 ## Core rules
 
-1. **The database is the schema.** Change it with SQL — `rebase db url` gives `psql` the connection string — or with migration files, then restart `pnpm dev`: the server reads the tables at boot. Do not create `config/collections/` to describe a table; a project with collection files serves those instead of reading the database, which is a different project (`README.md`, "Adding an admin UI later").
+1. **The database is the schema.** Change it with SQL — `rebase db url` gives `psql` the connection string — or with migration files, then restart `pnpm dev`: the server reads the tables at boot. Do not create `backend/schema/` to describe a table; a project with `backend/schema/index.ts` serves the tables declared there instead of reading the database, which is a different project (`README.md`, "Declaring your tables in code").
 2. **A table is served only with row-level security enabled.** Until then the server skips it and logs why — deliberately, so a table is never exposed just by existing — and with RLS on but no policy it is served and returns no rows. The policy *is* the authorization model: write the rule that says whose row it is, using the `rebase` schema's SQL functions `uid()`, `roles()` and `jwt()`, never a policy that admits everyone just to make rows appear.
-3. **Storage is not under row-level security.** `config/storage.ts` exports `storageAuthorize`, the whole access model for files, and a production deployment with file storage enabled refuses to boot without one. Change the rule there to match your application; do not delete it.
+3. **Storage is not under row-level security.** `backend/storage.ts` exports `storageAuthorize`, the whole access model for files, and a production deployment with file storage enabled refuses to boot without one. Change the rule there to match your application; do not delete it.
 4. **Use the SDK**: server-side that is `rebase.dataAsAdmin.<table>` for work done as the service identity, or `getDriver(c)` inside a function when the read should run as the caller. The server client has no plain `data` accessor — it is omitted precisely so that the choice of identity is written down.
 5. **Guard every custom route**: routes in `backend/functions/` are mounted **without** an auth requirement — webhook receivers need that — so each one is public until you guard it. Import `requireAuth` / `requireAdmin` from `@rebasepro/server/functions` and pass them in the route's own middleware slot (`app.post("/", requireAuth, handler)`), not via `app.use()`, which only covers routes declared below it. Reading `getUser(c)` is not a guard: an anonymous caller gets `undefined` and the handler still runs. See `backend/functions/hello.ts` for all three tiers.
 6. **In `backend/functions/`, always import from `@rebasepro/server/functions`** — never from `@rebasepro/server`. Both work today; the subpath is the portable one, and it also gives you the typed context accessors (`getUser`, `getDriver`, `requireDriver`) instead of casting `c.get("user")`. The package root is for a server entrypoint, not for route handlers.

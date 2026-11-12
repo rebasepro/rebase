@@ -3,7 +3,7 @@ import type { StorageAuthorize } from "@rebasepro/types";
 /**
  * Who may do what to files in storage.
  *
- * Storage is **not** under row-level security. Collections are: a request runs as
+ * Storage is **not** under row-level security. Tables are: a request runs as
  * `rebase_user` and Postgres decides row by row. Object storage has no equivalent,
  * so keys share one flat namespace and this hook is the whole authorization model.
  * Without it the server refuses to boot in production, because "authenticated"
@@ -14,7 +14,7 @@ import type { StorageAuthorize } from "@rebasepro/types";
  * ## The model this starter ships
  *
  * A CMS's files are **shared content**, not private per-user documents: hero
- * images, author pictures, product photos. The collections in this template upload
+ * images, author pictures, product photos. The tables in this template upload
  * to `author_pictures/`, `posts/hero/`, `product_images/` — paths named after the
  * content, not after a user. So the boundary that matters here is not *whose file
  * is this* but *who is allowed to change the library*:
@@ -45,7 +45,7 @@ import type { StorageAuthorize } from "@rebasepro/types";
  *     if (operation === "list") return key.startsWith(`users/${user.uid}/`);
  *
  *     // Reads and deletes check the row that owns the object.
- *     const attachment = (await data?.collection("attachments").find({
+ *     const attachment = (await data?.table("attachments").find({
  *         where: { storage_key: ["==", key] }, limit: 1
  *     }))?.data?.[0];
  *     return attachment?.owner_id === user.uid;
@@ -85,7 +85,7 @@ export const storageAuthorize: StorageAuthorize = ({ key, user, operation }) => 
     }
 
     // Changing or enumerating the library is an editor's job. Matches the roles in
-    // `collections/users.ts` — widen this if you add your own.
+    // `schema/users.ts` — widen this if you add your own.
     const roles = user.roles ?? [];
     return roles.includes("admin") || roles.includes("editor");
 };

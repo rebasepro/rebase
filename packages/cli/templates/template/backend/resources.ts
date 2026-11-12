@@ -43,7 +43,7 @@ export const main = database();
  * export const files = bucket({ engine: "s3" });
  * export const media = bucket("media", { engine: "s3" });
  *
- * An upload whose property names no `storageSource` goes to the default
+ * An upload whose column names no `source` goes to the default
  * bucket, which keeps its own variables — `STORAGE_PATH` (else `./uploads`),
  * `S3_BUCKET` / `GCS_BUCKET` — whatever you declare here, so adding
  * `bucket("media")` never moves the files already there. To send those
@@ -51,10 +51,10 @@ export const main = database();
  * `bucket("media", { engine: "s3", default: true })`. Two buckets may not
  * share a directory or a bucket; boot refuses if they would.
  *
- * Point a property at it by handle — the same name, spelled once:
+ * Point a column at it by handle — the same name, spelled once:
  *
  * import { media } from "../resources";
- * cover: { type: "string", storage: { storageSource: media } }
+ * cover: col.storage({ source: media, path: "covers/" })
  *
  * ## When you have several on one provider
  *

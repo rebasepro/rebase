@@ -5,8 +5,7 @@
     "private": true,
     "type": "module",
     "workspaces": [
-        "backend",
-        "config"
+        "backend"
     ],
     "scripts": {
         "dev": "rebase dev",

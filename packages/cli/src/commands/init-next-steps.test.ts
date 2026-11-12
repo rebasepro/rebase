@@ -187,7 +187,7 @@ describe("the steps, per flavour", () => {
             "  # In production (docker compose) that window is shut and the account named by",
             "  # REBASE_ADMIN_EMAIL in .env is created at boot instead.",
             "",
-            "This starts a headless API (Hono + PostgreSQL). There are no collection files: the API is derived from your database schema. Once it serves a table, docs are at /api/swagger.",
+            "This starts a headless API (Hono + PostgreSQL). There is no backend/schema: the API is derived from your database schema. Once it serves a table, docs are at /api/swagger.",
           ]
         `);
     });
@@ -214,7 +214,7 @@ describe("the steps, per flavour", () => {
             "  # In production (docker compose) that window is shut and the account named by",
             "  # REBASE_ADMIN_EMAIL in .env is created at boot instead.",
             "",
-            "This starts a headless API (Hono + PostgreSQL). There are no collection files: the API is derived from your database schema. Once it serves a table, docs are at /api/swagger.",
+            "This starts a headless API (Hono + PostgreSQL). There is no backend/schema: the API is derived from your database schema. Once it serves a table, docs are at /api/swagger.",
           ]
         `);
     });
@@ -224,7 +224,7 @@ describe("the steps, per flavour", () => {
           [
             "  cd my-app",
             "",
-            "  # Database has been introspected & collections generated!",
+            "  # Database introspected: its tables are in backend/schema.",
             "  # Start the API over it:",
             "  pnpm run dev",
             "",
@@ -232,7 +232,7 @@ describe("the steps, per flavour", () => {
             "  # In production (docker compose) that window is shut and the account named by",
             "  # REBASE_ADMIN_EMAIL in .env is created at boot instead.",
             "",
-            "This starts a headless API (Hono + PostgreSQL) over the collections just generated from your database in config/collections. Edit them to change what the API exposes; docs are at /api/swagger.",
+            "This starts a headless API (Hono + PostgreSQL) over the tables just generated from your database in backend/schema. Edit them to change what the API exposes; docs are at /api/swagger.",
           ]
         `);
     });

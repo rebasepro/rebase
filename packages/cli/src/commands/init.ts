@@ -65,7 +65,6 @@ export const TEMPLATE_PLACEHOLDER_FILES = [
     "package.json",
     "frontend/package.json",
     "backend/package.json",
-    "config/package.json",
     "frontend/index.html",
     "pnpm-workspace.yaml",
     "docker-compose.yml",
@@ -89,14 +88,15 @@ export type TemplatePreset = "blog" | "ecommerce" | "blank";
  * A boolean, not a named pair. It was `--flavor cms|baas`, and neither word
  * survived what they described: "cms" is a product category rather than a thing
  * this tool builds, and "baas" was the same value that used to appear as
- * `backend.mode` — which is now derived from whether collections are declared.
- * What is left is one question: does this project get an admin UI?
+ * `backend.mode` — which is now derived from whether tables are declared in
+ * `backend/schema/`. What is left is one question: does this project get an
+ * admin UI?
  */
 const HEADLESS_CHOICES: Array<{ name: string; value: boolean; short: string }> = [
-    { name: "Backend + admin  — API plus an admin UI, driven by collections you define (like Payload/Directus)",
+    { name: "Backend + admin  — API plus an admin UI, over tables you define in backend/schema (like Payload/Directus)",
 value: false,
 short: "Backend + admin" },
-    { name: "Backend only     — headless API over your database. No collections, no UI (like Supabase)",
+    { name: "Backend only     — headless API over your database. No schema files, no UI (like Supabase)",
 value: true,
 short: "Backend only" }
 ];
@@ -125,7 +125,7 @@ export interface InitOptions {
     preset: TemplatePreset;
     /** Whether `preset` came from an explicit --template rather than the default. */
     explicitPreset?: boolean;
-    /** Scaffold the backend alone, with no admin panel and no collections. */
+    /** Scaffold the backend alone, with no admin panel and no `backend/schema/`. */
     headless: boolean;
     /** Detected package manager (pnpm or npm). */
     pm: PackageManager;
@@ -237,7 +237,7 @@ export function buildInitQuestions(params: BuildQuestionsParams): InitQuestion[]
             message: "Choose a starter template:",
             choices: PRESET_CHOICES,
             default: "blog",
-            // A headless project has no collection files, so a preset is moot.
+            // A headless project has no schema files, so a preset is moot.
             when: (answers: Record<string, unknown>) => !(headlessArg ?? answers.headless)
         });
     }
@@ -280,7 +280,7 @@ export function buildInitQuestions(params: BuildQuestionsParams): InitQuestion[]
     questions.push({
         type: "confirm",
         name: "introspect",
-        message: "Would you like to introspect this database to automatically generate collections?",
+        message: "Would you like to introspect this database to generate backend/schema from its tables?",
         default: true,
         when: (answers: Record<string, unknown>) => !!(answers.databaseUrl as string)?.trim()
     });
@@ -312,7 +312,7 @@ ${chalk.bold("Usage")}
 
 ${chalk.bold("Options")}
   ${chalk.blue("-t, --template")} ${chalk.gray("<preset>")}   blog | ecommerce | blank ${chalk.gray("(default: blog)")}
-  ${chalk.blue("--headless")}                Backend only — no admin panel, no collections
+  ${chalk.blue("--headless")}                Backend only — no admin panel, no backend/schema
   ${chalk.blue("-y, --yes")}                 Never prompt ${chalk.gray("(required for CI / non-TTY)")}: take every default,
                             ${chalk.gray("except that git init and the install are skipped unless")}
                             ${chalk.gray("--git / --install is passed")}
@@ -322,7 +322,7 @@ ${chalk.bold("Options")}
   ${chalk.blue("-g, --git")}                 Initialize a git repository and make an initial commit.
                             ${chalk.gray("Without it, init asks (default yes); under --yes, no repository")}
   ${chalk.blue("--database-url")} ${chalk.gray("<url>")}      Use an existing database instead of the generated one
-  ${chalk.blue("--introspect")}              Generate collections from that database ${chalk.gray("(implies --template blank; needs --install)")}
+  ${chalk.blue("--introspect")}              Generate backend/schema from that database ${chalk.gray("(implies --template blank; needs --install)")}
   ${chalk.blue("--project")} ${chalk.gray("<slug>")}          Link the scaffold to a Rebase Cloud project
   ${chalk.blue("--setup-key")} ${chalk.gray("<key>")}         One-time key authenticating the cloud link ${chalk.gray("(use with --project)")}
   ${chalk.blue("-a, --agent")} ${chalk.gray("<name>")}        Set up an AI coding agent: Rebase skills + the MCP server.
@@ -331,9 +331,9 @@ ${chalk.bold("Options")}
                             ${chalk.gray("machine; under --yes, none unless named.")}
 
 ${chalk.bold("What gets scaffolded")}
-  ${chalk.gray("default")}     Backend + an admin UI, driven by collections you define ${chalk.gray("(like Payload/Directus)")}
-  ${chalk.blue("--headless")}  Backend only, over your existing database ${chalk.gray("(like Supabase)")}
-              ${chalk.gray("--template has no effect: there are no collections to seed.")}
+  ${chalk.gray("default")}     backend/ (tables in backend/schema) + frontend/ (the admin UI) ${chalk.gray("(like Payload/Directus)")}
+  ${chalk.blue("--headless")}  backend/ only, over your existing database ${chalk.gray("(like Supabase)")}
+              ${chalk.gray("--template has no effect: there are no tables to seed.")}
 
 ${chalk.bold("Examples")}
   ${chalk.gray("$")} rebase init my-shop --template ecommerce --install
@@ -684,7 +684,7 @@ setupKey: options.setupKey })
  * new scaffold whose first `git status` is dirty invites the reader to conclude
  * the lockfile is deliberately ignored and never commit it at all.
  *
- * Introspection has the same shape: it generates `config/collections` and
+ * Introspection has the same shape: it generates `backend/schema` and
  * `schema.generated.ts`, which belong in the commit describing the scaffold that
  * produced them.
  *
@@ -727,7 +727,7 @@ export interface InitNextStepsInput {
     ownDatabase: boolean;
     /** Introspection was asked for. */
     introspect: boolean;
-    /** Introspection ran and produced collections. */
+    /** Introspection ran and produced `backend/schema`. */
     introspected: boolean;
     /** Dependencies were installed. */
     installed: boolean;
@@ -759,14 +759,14 @@ export function initNextSteps(input: InitNextStepsInput): string[] {
     lines.push("");
 
     if (introspected) {
-        lines.push(note("Database has been introspected & collections generated!"));
+        lines.push(note("Database introspected: its tables are in backend/schema."));
         lines.push(note(headless
             ? "Start the API over it:"
             : "Start the development server (frontend + backend):"));
         lines.push(runDev);
     } else if (introspect) {
         // Introspection was requested but did not run. Point at the steps that
-        // finish the job rather than claiming collections exist.
+        // finish the job rather than claiming backend/schema exists.
         lines.push(note("Introspection did not run — finish it with:"));
         lines.push(cmd(pm.exec("rebase", ["schema", "introspect", "--force"])));
         lines.push(cmd(pm.exec("rebase", ["schema", "generate"])));
@@ -776,7 +776,7 @@ export function initNextSteps(input: InitNextStepsInput): string[] {
     } else if (headless) {
         // One step, then the thing that is actually this mode's job. `dev`
         // starts the database itself when none is named; a headless project has
-        // no collections, so there is no schema to push and the tables are the
+        // no backend/schema, so there is no schema to push and the tables are the
         // developer's to create — on their own database or the managed one.
         lines.push(note(ownDatabase
             ? "Your database is configured in .env (DATABASE_URL)."
@@ -817,8 +817,8 @@ export function initNextSteps(input: InitNextStepsInput): string[] {
         // required a daemon it does not.
         //
         // "schema" covers two things `dev` does before serving: generating the
-        // Drizzle schema from the collections, and applying the collections to
-        // the database. The push-and-Docker steps are documented under
+        // Drizzle schema from backend/schema, and applying the tables to the
+        // database. The push-and-Docker steps are documented under
         // `rebase dev --help`.
         lines.push(note("A local database configuration has been generated in .env."));
         lines.push(note("Start everything — the database and schema are set up for you,"));
@@ -843,14 +843,14 @@ export function initNextSteps(input: InitNextStepsInput): string[] {
 
     lines.push("");
     // `--headless --introspect` had these two claims fighting: the step above
-    // announced "collections generated!" and this line then said there are none.
+    // announced the generated schema and this line then said there is none.
     // Both were reachable at once, and the reader has to believe one of them.
     lines.push(headless
         ? introspected
-            ? chalk.gray("This starts a headless API (Hono + PostgreSQL) over the collections just ")
-                + chalk.gray("generated from your database in config/collections. Edit them to change what the ")
+            ? chalk.gray("This starts a headless API (Hono + PostgreSQL) over the tables just ")
+                + chalk.gray("generated from your database in backend/schema. Edit them to change what the ")
                 + chalk.gray("API exposes; docs are at /api/swagger.")
-            : chalk.gray("This starts a headless API (Hono + PostgreSQL). There are no collection files: ")
+            : chalk.gray("This starts a headless API (Hono + PostgreSQL). There is no backend/schema: ")
                 + chalk.gray("the API is derived from your database schema. Once it serves a table, docs are at /api/swagger.")
         : chalk.gray("This starts both the backend (Hono + PostgreSQL)")
             + chalk.gray(" and the frontend (Vite + React) concurrently."));
@@ -1016,19 +1016,20 @@ async function createProject(options: InitOptions) {
         }
     }
 
-    // Apply the selected template preset (swap collection files)
+    // Apply the selected template preset (swap the tables and their customizations)
     if (options.headless && options.explicitPreset) {
-        // baas has no collections, so there is nothing for a preset to swap.
-        // Say so rather than accepting the flag and silently dropping it.
-        console.log(chalk.yellow(`  Ignoring --template ${options.preset}: a headless project declares no collections.`));
+        // A headless project declares no tables, so there is nothing for a
+        // preset to swap. Say so rather than accepting the flag and silently
+        // dropping it.
+        console.log(chalk.yellow(`  Ignoring --template ${options.preset}: a headless project declares no tables (no backend/schema).`));
     }
     let applied: TemplatePreset | null = null;
     if (!options.headless) {
         // When introspecting, the database is the source of truth: start from
-        // the blank preset so example collections never register on top of
-        // tables the database doesn't have.
+        // the blank preset so example tables never register on top of the
+        // tables the database has.
         if (options.introspect && options.preset !== "blank") {
-            console.log(chalk.gray("  Using the blank template: collections will come from your database."));
+            console.log(chalk.gray("  Using the blank template: backend/schema will come from your database."));
         }
         applied = await applyPreset(options.targetDirectory, options.introspect ? "blank" : options.preset);
         writeShippedSchema(options.targetDirectory, applied);
@@ -1037,7 +1038,7 @@ async function createProject(options: InitOptions) {
     // Reduce the project to the selected shape
     await applyHeadless(options.targetDirectory, options.headless);
 
-    // Not when introspecting: the collections are about to come from the
+    // Not when introspecting: the tables are about to come from the
     // database, and `rebase build` writes the graph they declare.
     if (!options.introspect) {
         writeShippedResourceGraph(options.targetDirectory, options.headless ? "headless" : applied ?? "blog");
@@ -1076,7 +1077,7 @@ async function createProject(options: InitOptions) {
     const { pm, pmCommands } = options;
     const installCmd = pmCommands.install;
     const execCmd = pmCommands.exec("rebase", ["schema", "introspect", "--force"]);
-    // No --collections: config/collections is the default, and a path written
+    // No --schema-dir: backend/schema is the default, and a path written
     // here is resolved from where the reader runs it — the project root.
     const generateCmd = pmCommands.exec("rebase", ["schema", "generate"]);
 
@@ -1097,7 +1098,7 @@ async function createProject(options: InitOptions) {
         }
     }
 
-    // Whether introspection actually ran and produced collections. The next
+    // Whether introspection actually ran and produced backend/schema. The next
     // steps below report what really happened, so a skipped or failed
     // introspection is never announced as a success.
     let introspected = false;
@@ -1105,16 +1106,16 @@ async function createProject(options: InitOptions) {
     if (options.introspect) {
         console.log("");
         if (options.installDeps) {
-            console.log(chalk.gray("  Introspecting database and generating collections..."));
+            console.log(chalk.gray("  Introspecting the database into backend/schema..."));
             console.log("");
             try {
-                // --force overwrites template example collections with real ones
+                // --force replaces the blank preset's schema with the database's tables
                 await execa(execCmd[0], execCmd.slice(1), {
                     cwd: options.targetDirectory,
                     stdio: "inherit"
                 });
                 // The scaffold holds the blank preset's schema.generated.ts;
-                // regenerate it from the introspected collections or the
+                // regenerate it from the introspected tables or the
                 // backend serves a schema that doesn't match the database.
                 await execa(generateCmd[0], generateCmd.slice(1), {
                     cwd: options.targetDirectory,
@@ -1190,47 +1191,38 @@ async function createProject(options: InitOptions) {
 }
 
 /**
- * Apply a template preset by replacing the default collection files.
- *
- * The template ships with blog collections at the top level and
- * preset alternatives under `config/collections/presets/<name>/`.
- * This function swaps the active collection files and removes the
- * presets directory so the final project is clean.
- */
-/**
  * Reduce the scaffolded project to the chosen shape.
  *
- * The base template is the full triad. `--headless` drops the frontend and the
- * declared collections — there is nothing to define, since the server derives
- * its API from the database — and overlays the files that differ.
+ * The base template is Mode B: `backend/` and `frontend/`. `--headless` is
+ * Mode A: it drops `frontend/` and `backend/schema/` — there is nothing to
+ * declare, since the server derives its API from the database — and overlays
+ * the files that differ (`templates/overlays/baas/`).
  *
- * The config *package* stays, holding only `storageAuthorize`. Storage is not
- * under row-level security, so a deployment with file storage enabled and no
- * access model serves every user's files to every signed-in user; the server
- * refuses to boot in that state. Deleting the package outright would leave a
- * headless project with nowhere to put the hook, and the scaffold's own
- * docker-compose.yml enables storage — so the first `docker compose up` would
- * crash-loop.
+ * `backend/storage.ts` stays, replaced by the overlay's stricter default.
+ * Storage is not under row-level security, so a deployment with file storage
+ * enabled and no access model serves every user's files to every signed-in
+ * user; the server refuses to boot in that state, and the scaffold's own
+ * docker-compose.yml enables storage — without the hook the first
+ * `docker compose up` would crash-loop.
+ *
+ * Declaring tables later is one step: create `backend/schema/index.ts`. The
+ * overlay's README says so.
  */
 async function applyHeadless(targetDirectory: string, headless: boolean): Promise<void> {
     if (!headless) return;
 
     fs.rmSync(path.join(targetDirectory, "frontend"), { recursive: true,
 force: true });
-    // Collections only. `rebase build` reads the absence of this directory as
-    // "introspect from the database", and the overlay replaces config/index.ts
-    // with one that exports the storage hook alone.
-    fs.rmSync(path.join(targetDirectory, "config", "collections"), { recursive: true,
+    // `rebase dev` and `rebase build` read the absence of this directory as
+    // "introspect from the database".
+    fs.rmSync(path.join(targetDirectory, "backend", "schema"), { recursive: true,
 force: true });
-    for (const stray of ["cms.d.ts", "frontend-assets.d.ts"]) {
-        fs.rmSync(path.join(targetDirectory, "config", stray), { force: true });
-    }
-    // Generated from collection files; a headless project reads the live schema.
+    // Generated from backend/schema; a headless project reads the live schema.
     fs.rmSync(path.join(targetDirectory, "backend", "src", "schema.generated.ts"), { force: true });
 
     const overlayDir = path.resolve(cliRoot!, "templates", "overlays", "baas");
     if (!fs.existsSync(overlayDir)) {
-        console.error(`${chalk.red.bold("ERROR")} BaaS template overlay not found at ${overlayDir}`);
+        console.error(`${chalk.red.bold("ERROR")} Headless template overlay not found at ${overlayDir}`);
         process.exit(1);
     }
 
@@ -1281,40 +1273,49 @@ async function writeProjectPackageManagerIntoManifest(
     }
 }
 
-/** Swap in the preset's collection files. Returns the preset actually applied. */
+/**
+ * The blog preset's own files: the template ships the blog preset, and these
+ * are what another preset takes out before laying its own files over it.
+ * `users` — the table and its customization — is shared by every preset, and
+ * `backend/schema/index.ts` and `frontend/src/App.tsx` are replaced by the
+ * preset's copies.
+ *
+ * Exported for `check:templates` and the init tests, which materialise each
+ * preset exactly as this does.
+ */
+export const BLOG_PRESET_FILES: readonly string[] = [
+    "backend/schema/posts.ts",
+    "backend/schema/authors.ts",
+    "backend/schema/tags.ts",
+    "frontend/src/cms/posts.tsx",
+    "frontend/src/cms/authors.tsx",
+    "frontend/src/cms/tags.tsx"
+];
+
+/** Where a non-blog preset's files ship: `templates/presets/<preset>/`, laid out as in a project. */
+export function presetOverlayPath(preset: Exclude<TemplatePreset, "blog">): string {
+    return path.resolve(cliRoot!, "templates", "presets", preset);
+}
+
+/**
+ * Lay the preset's tables and customizations over the blog preset the template
+ * ships. Returns the preset actually applied.
+ */
 async function applyPreset(targetDirectory: string, preset: TemplatePreset): Promise<TemplatePreset> {
-    const collectionsDir = path.join(targetDirectory, "config", "collections");
-    const presetsDir = path.join(collectionsDir, "presets");
-
-    if (preset !== "blog") {
-        const presetDir = path.join(presetsDir, preset);
-        if (!fs.existsSync(presetDir)) {
-            console.warn(chalk.yellow(`  Warning: Preset "${preset}" not found, falling back to blog template.`));
-            cleanupPresets(presetsDir);
-            return "blog";
-        }
-
-        // Remove the default blog collection files (keep users.ts — it's shared)
-        const blogFiles = ["posts.ts", "authors.ts", "tags.ts", "index.ts"];
-        for (const file of blogFiles) {
-            const filePath = path.join(collectionsDir, file);
-            if (fs.existsSync(filePath)) {
-                fs.unlinkSync(filePath);
-            }
-        }
-
-        // Copy preset files into the collections directory
-        const presetFiles = fs.readdirSync(presetDir).filter(f => f.endsWith(".ts"));
-        for (const file of presetFiles) {
-            fs.copyFileSync(
-                path.join(presetDir, file),
-                path.join(collectionsDir, file)
-            );
-        }
+    if (preset === "blog") return preset;
+    const presetDir = presetOverlayPath(preset);
+    if (!fs.existsSync(presetDir)) {
+        console.warn(chalk.yellow(`  Warning: Preset "${preset}" not found, falling back to the blog template.`));
+        return "blog";
     }
-
-    // Always clean up the presets directory — it shouldn't ship with the final project
-    cleanupPresets(presetsDir);
+    for (const file of BLOG_PRESET_FILES) {
+        fs.rmSync(path.join(targetDirectory, file), { force: true });
+    }
+    await cp(presetDir, targetDirectory, {
+        recursive: true,
+        force: true,
+        filter: (source: string) => path.basename(source) !== ".DS_Store"
+    });
     return preset;
 }
 
@@ -1330,12 +1331,12 @@ async function applyPreset(targetDirectory: string, preset: TemplatePreset): Pro
  * edit was refused with `SCHEMA_EDIT_DIRTY_TREE` before its owner had changed
  * a thing.
  *
- * The file cannot be generated here: generation loads the collection files,
- * and they import `@rebasepro/cms-types`, which the project does not have
+ * The file cannot be generated here: generation loads `backend/schema`, and
+ * its files import `@rebasepro/server/schema`, which the project does not have
  * until it is installed — `init --git` without `--install` commits first. So
  * each preset's output is generated in this repository and shipped, and
  * `init-generated-schema.test.ts` fails the moment one of them differs from
- * what the generator writes for that preset's collections.
+ * what the generator writes for that preset's tables.
  *
  * Outside `templates/template` on purpose: a preset's schema must not be
  * copied into a project that chose another preset.
@@ -1358,15 +1359,15 @@ export type ScaffoldShape = TemplatePreset | "headless";
  * Where each scaffold shape's `rebase.resources.json` ships, beside the template.
  *
  * `rebase resources --check` is the CI gate for that file, and a fresh
- * scaffold failed it before anything had changed: `config/resources.ts`
+ * scaffold failed it before anything had changed: `backend/resources.ts`
  * declares `main = database()`, `backend/functions/hello.ts` is a function,
  * and nothing had written the graph — `rebase build` does, on its first run.
  * So `init` writes it, and a fresh project starts consistent with its own
  * gate, with the file in its first commit.
  *
  * It cannot be derived here for the reason the schema cannot (see
- * `shippedSchemaPath`): deriving evaluates the collection files, which import
- * `@rebasepro/cms-types`, and the project has none until it is installed. So
+ * `shippedSchemaPath`): deriving evaluates `backend/schema`, which imports
+ * `@rebasepro/server/schema`, and the project has none until it is installed. So
  * each shape's graph is derived in this repository and shipped, and
  * `init-resource-graph.test.ts` fails the moment one differs from what
  * `rebase resources --write` writes for that shape.
@@ -1378,13 +1379,6 @@ export function shippedResourceGraphPath(shape: ScaffoldShape): string {
 /** Write the shape's resource graph to `rebase.resources.json`. */
 function writeShippedResourceGraph(targetDirectory: string, shape: ScaffoldShape): void {
     fs.copyFileSync(shippedResourceGraphPath(shape), path.join(targetDirectory, "rebase.resources.json"));
-}
-
-function cleanupPresets(presetsDir: string): void {
-    if (fs.existsSync(presetsDir)) {
-        fs.rmSync(presetsDir, { recursive: true,
-force: true });
-    }
 }
 
 /**

@@ -11,9 +11,8 @@ import type { StorageAuthorize } from "@rebasepro/types";
  * they can `GET /storage/list?prefix=` to enumerate every key, then read, overwrite
  * or delete any of them.
  *
- * It lives in `backend/src/` rather than a config package because BaaS mode has no
- * config package: collections come from the live database, so there is nothing to
- * declare and nowhere else to put this.
+ * The runtime reads it from `backend/storage.ts`, whether or not this project
+ * declares its tables in `backend/schema/`.
  *
  * ## The default this starter ships
  *
@@ -41,7 +40,7 @@ import type { StorageAuthorize } from "@rebasepro/types";
  * export const storageAuthorize: StorageAuthorize = async ({ key, user, operation, data }) => {
  *     if (operation === "read" && key.startsWith("public/")) return true;
  *     if (!user) return false;
- *     const row = (await data?.collection("attachments").find({
+ *     const row = (await data?.table("attachments").find({
  *         where: { storage_key: ["==", key] }, limit: 1
  *     }))?.data?.[0];
  *     return row?.owner_id === user.uid;

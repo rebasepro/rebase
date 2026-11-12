@@ -22,11 +22,11 @@ import fs from "node:fs";
 import path from "node:path";
 import * as dotenv from "dotenv";
 import { createRebaseClient } from "@rebasepro/client";
-// Optional: fully typed collections. `rebase dev` writes these under
+// Optional: fully typed tables. `rebase dev` writes these under
 // ./generated/sdk (`rebase generate-sdk` outside it) — the dictionary is what
 // maps a hyphenated slug to the property name, so a client built without it
 // 404s at runtime.
-// import { collectionsDictionary, type Database } from "../generated/sdk/database.types";
+// import { tablesDictionary, type Database } from "../generated/sdk/database.types";
 
 // Load .env from project root (same file the backend uses)
 // `quiet`: dotenv 17 otherwise prints its own advertisement banner.
@@ -86,7 +86,7 @@ async function run() {
         console.log("✅ Backend health:", health);
 
         // Example: Fetch some data (requires auth if backend is secure-by-default)
-        // const items = await rebase.data.collection("users").find({ limit: 5 });
+        // const items = await rebase.data.table("users").find({ limit: 5 });
         // console.log("Items:", items);
 
         console.log("✨ Script finished successfully.");

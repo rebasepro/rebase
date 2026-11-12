@@ -406,8 +406,12 @@ export async function promptForAgents(home?: string): Promise<AgentKey[]> {
 
 /**
  * The guardrail every scaffold ships for Claude Code: a PostToolUse hook that
- * runs `rebase verify --quiet` after each edit under `config/collections/` and
- * hands any problem back to the agent (exit 2, the message on stderr).
+ * runs `rebase verify --quiet` after each edit under `backend/schema/` (or the
+ * `tables` directory rebase.json names) or `frontend/src/cms/`, and hands any
+ * problem back to the agent (exit 2, the message on stderr).
+ *
+ * The script keeps the file name it first shipped with: it is how
+ * {@link installAgentHooks} and the settings entry find a copy already installed.
  *
  * The files live in the template, under `.claude/`, so `rebase init` copies
  * them like everything else and `rebase skills --hooks` installs the very same
@@ -508,7 +512,8 @@ export const SHIPPED_HOOK_SCRIPT_SHA256S: readonly string[] = [
     "d624f805e1eb635d87cf769ad5e6f877d07d6aa8d547052d2d7ce9d6d6b3a27b", // ac7c5059d2 — Windows paths
     "25c307e0c9a8838703c6e59ab5ea62ff249966823f071d26dd0dd8c2508f83a4", // c694488bfe — CLI predating verify
     "7a0eeaa301f3cb6b90d5675199ccfcb8fe1c2a80a327e3f7b53bc82c3f4541c2", // af6eac33cb — rebase.json config dir
-    "dbdbfcec9c4c4e1d2643900a615585594869f6ba9fc19b5652013526367363f6" // 08a7cd9ec8 — skip when not installed
+    "dbdbfcec9c4c4e1d2643900a615585594869f6ba9fc19b5652013526367363f6", // 08a7cd9ec8 — skip when not installed
+    "beda0ca36c3700933aab02162bca47b582a6c231bf94e494bbe84131d5e72fa8" // backend/schema and frontend/src/cms, not config/collections
 ];
 
 /** The hash {@link SHIPPED_HOOK_SCRIPT_SHA256S} records for a script's text. */

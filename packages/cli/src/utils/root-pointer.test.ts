@@ -69,7 +69,7 @@ describe("root pointer", () => {
         expect(claude).toContain("`cloud/` is a Rebase project");
         expect(claude).toContain("`cloud/ai-instructions.md`");
         expect(claude).toContain("### Before you write any code in `cloud/`");
-        expect(claude).toContain("**A table is a collection.**");
+        expect(claude).toContain("**A table is a file in `backend/schema/`.**");
         expect(claude).toContain(scaffoldRules(TEMPLATE).split("\n").at(-1));
         expect(claude).toContain("edits between these markers are overwritten");
     });

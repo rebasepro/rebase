@@ -5,12 +5,10 @@
     "moduleResolution": "bundler",
     "lib": ["ES2022"],
     "outDir": "./dist",
-    // The program includes `../config/**`, so tsc's common source directory is
-    // the project root and the emit already lands at `dist/backend/src/…` —
-    // which is what `scripts.start` runs. Saying so explicitly is required from
-    // TypeScript 6, which refuses to infer it (TS5011), and changes nothing
-    // about the layout.
-    "rootDir": "..",
+    // Everything this program compiles lives under backend/, so the emit
+    // mirrors it: `dist/schema/…`, `dist/functions/…`, `dist/src/…`. Saying so
+    // is required from TypeScript 6, which refuses to infer it (TS5011).
+    "rootDir": ".",
     "strict": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
@@ -36,20 +34,15 @@
     // and the faster compile.
     "types": ["node"]
   },
-  // `functions/` is included so `tsc` actually checks your custom routes. It
-  // was omitted here (the baas flavour has always had it), which meant the one
-  // place you write server code by hand was the one place a type error went
-  // unnoticed until runtime. The inferred common root is already the project
-  // root because of `../config`, so this adds no `rootDir` and moves nothing
-  // that dist/ already contains.
+  // Every directory you write server code in, so `tsc` checks all of it:
   //
-  // `crons/` for the same reason, and for one more: `rebase build` compiles it
-  // through a generated tsconfig, but an ejected project builds with *this*
-  // file — so leaving crons out meant an ejected server had no compiled jobs to
-  // load and stopped running every schedule, nightly backups included.
-  //
+  // `schema/` holds the tables, and `resources.ts` / `storage.ts` what the
+  // runtime reads beside them. `functions/` are your routes — the one place
+  // you write server code by hand, so the one place a type error must not wait
+  // until runtime. `crons/`: `rebase build` compiles it through a generated
+  // tsconfig, but an ejected project builds with *this* file, so leaving it out
+  // meant an ejected server had no compiled jobs and stopped every schedule.
   // `scripts/` because that is where the Scripts page puts a script that opens
-  // the project with `openRebase`: typed by the same `Database` as a function,
-  // which only holds if `tsc` reads it.
-  "include": ["src/**/*", "functions/**/*", "crons/**/*", "scripts/**/*", "../config/**/*", "drizzle.config.ts"]
+  // the project with `openRebase`, typed by the same `Database` as a function.
+  "include": ["src/**/*", "schema/**/*", "functions/**/*", "crons/**/*", "scripts/**/*", "resources.ts", "storage.ts"]
 }

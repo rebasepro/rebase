@@ -1,6 +1,7 @@
 /**
  * The Claude Code guardrail: the PostToolUse hook every scaffold ships, which
- * runs `rebase verify --quiet` after an edit under `config/collections/`.
+ * runs `rebase verify --quiet` after an edit under `backend/schema/` or
+ * `frontend/src/cms/`.
  *
  * Two halves. `installAgentHooks` — what `rebase skills --hooks` does to a
  * project that predates the hook — must add the hook without disturbing a
@@ -137,51 +138,58 @@ describe("post-edit-collection.sh", () => {
         });
     }
 
-    it("ignores an edit outside config/collections without running anything", () => {
+    it("ignores an edit outside backend/schema and frontend/src/cms without running anything", () => {
         fakeRebase(1, "should not run");
         const result = runHook(path.join(project, "frontend", "src", "App.tsx"));
         expect(result.status).toBe(0);
         expect(fs.existsSync(path.join(project, "ran"))).toBe(false);
     });
 
-    it("runs `rebase verify --quiet` after a collection edit and stays silent when it passes", () => {
+    it("runs `rebase verify --quiet` after a table edit and stays silent when it passes", () => {
         fakeRebase(0, "");
-        const result = runHook(path.join(project, "config", "collections", "posts.ts"));
+        const result = runHook(path.join(project, "backend", "schema", "posts.ts"));
         expect(result.status).toBe(0);
         expect(fs.readFileSync(path.join(project, "ran"), "utf-8").trim()).toBe("verify --quiet");
         expect(result.stderr).toBe("");
     });
 
     it("hands the verifier's findings to the agent with exit 2 when it fails", () => {
-        const finding = "✗ config/collections/posts.ts → posts.properties.title.widget  `widget` is no longer read here.";
+        const finding = "✗ backend/schema/posts.ts → posts.rls  `rls: []` denies everyone: write \"admin-only\".";
         fakeRebase(1, finding);
-        const result = runHook(path.join(project, "config", "collections", "posts.ts"));
+        const result = runHook(path.join(project, "backend", "schema", "posts.ts"));
         expect(result.status).toBe(2);
-        expect(result.stderr).toContain("rebase verify failed after editing config/collections/posts.ts");
+        expect(result.stderr).toContain("rebase verify failed after editing backend/schema/posts.ts");
         expect(result.stderr).toContain(finding);
-        expect(result.stderr).toContain("Fix them in config/collections/");
+        expect(result.stderr).toContain("Fix them in backend/schema/ or frontend/src/cms/");
+    });
+
+    it("checks an edit to a table's customization in frontend/src/cms", () => {
+        fakeRebase(0, "");
+        const result = runHook(path.join(project, "frontend", "src", "cms", "posts.tsx"));
+        expect(result.status).toBe(0);
+        expect(fs.readFileSync(path.join(project, "ran"), "utf-8").trim()).toBe("verify --quiet");
     });
 
     it("does not block the edit when the project's CLI predates `rebase verify`", () => {
         fakeRebase(1, "✗ Unknown command \"verify\" — did you mean `version`? Run `rebase --help` for the rest.");
-        const result = runHook(path.join(project, "config", "collections", "posts.ts"));
+        const result = runHook(path.join(project, "backend", "schema", "posts.ts"));
         expect(result.status).toBe(0);
         expect(result.stderr).toContain("predates `rebase verify`");
-        expect(result.stderr).not.toContain("Fix them in config/collections/");
+        expect(result.stderr).not.toContain("Fix them in");
     });
 
-    it("checks the collections where rebase.json moved the backend's config", () => {
+    it("checks the tables where rebase.json moved them", () => {
         fs.writeFileSync(path.join(project, "rebase.json"), JSON.stringify({
-            rebase: "^1", apps: { backend: { type: "backend", runtime: "managed", config: "shared" } }
+            rebase: "^1", apps: { backend: { type: "backend", runtime: "managed", tables: "./db/tables/" } }
         }));
-        fakeRebase(1, "✗ shared/collections/posts.ts → posts.securityRules  missing.");
-        const result = runHook(path.join(project, "shared", "collections", "posts.ts"));
+        fakeRebase(1, "✗ db/tables/posts.ts → posts.rls  missing.");
+        const result = runHook(path.join(project, "db", "tables", "posts.ts"));
         expect(result.status).toBe(2);
         expect(fs.readFileSync(path.join(project, "ran"), "utf-8").trim()).toBe("verify --quiet");
-        expect(result.stderr).toContain("Fix them in shared/collections/");
+        expect(result.stderr).toContain("Fix them in db/tables/");
 
         fs.rmSync(path.join(project, "ran"));
-        expect(runHook(path.join(project, "config", "collections", "posts.ts")).status).toBe(0);
+        expect(runHook(path.join(project, "backend", "schema", "posts.ts")).status).toBe(0);
         expect(fs.existsSync(path.join(project, "ran"))).toBe(false);
     });
 
@@ -197,7 +205,7 @@ describe("post-edit-collection.sh", () => {
             "exit 1"
         ].join("\n"), { mode: 0o755 });
         const result = spawnSync("bash", [path.join(TEMPLATE, AGENT_HOOK_SCRIPT)], {
-            input: JSON.stringify({ tool_name: "Edit", tool_input: { file_path: path.join(project, "config", "collections", "posts.ts") } }),
+            input: JSON.stringify({ tool_name: "Edit", tool_input: { file_path: path.join(project, "backend", "schema", "posts.ts") } }),
             env: { ...process.env, CLAUDE_PROJECT_DIR: project, PATH: `${bin}${path.delimiter}${process.env.PATH ?? ""}` },
             encoding: "utf-8"
         });
@@ -208,8 +216,8 @@ describe("post-edit-collection.sh", () => {
     });
 
     it("checks an edit Claude Code reports with a Windows path", () => {
-        fakeRebase(1, "✗ config/collections/posts.ts → posts.securityRules  missing.");
-        const result = runHook("C:\\Users\\me\\shop\\config\\collections\\posts.ts");
+        fakeRebase(1, "✗ backend/schema/posts.ts → posts.rls  missing.");
+        const result = runHook("C:\\Users\\me\\shop\\backend\\schema\\posts.ts");
         expect(result.status).toBe(2);
         expect(fs.readFileSync(path.join(project, "ran"), "utf-8").trim()).toBe("verify --quiet");
     });

@@ -3,8 +3,8 @@ import * as path from "path";
 import { fileURLToPath } from "url";
 
 import { detectStorageAuthorize } from "../bundle";
-import { storageAuthorize } from "../../templates/template/config/storage";
-import { storageAuthorize as baasStorageAuthorize } from "../../templates/overlays/baas/config/storage";
+import { storageAuthorize } from "../../templates/template/backend/storage";
+import { storageAuthorize as baasStorageAuthorize } from "../../templates/overlays/baas/backend/storage";
 import type { StorageAuthorizeContext } from "@rebasepro/types";
 
 /**
@@ -35,12 +35,12 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const templateRoot = path.resolve(here, "../../templates/template");
 
 describe("the scaffolded project declares a storage access model", () => {
-    it("exports storageAuthorize from the config package", () => {
+    it("exports storageAuthorize from backend/storage.ts", () => {
         // The *real* detector, not a copy of its regex. This is the same function
         // `rebase build` uses to fill in the bundle manifest, and the same signal
         // the cloud intake gate refuses a deploy on — so the template and the host
         // cannot disagree about whether a hook exists.
-        expect(detectStorageAuthorize(path.join(templateRoot, "config"))).toBe(true);
+        expect(detectStorageAuthorize(path.join(templateRoot, "backend", "storage"))).toBe(true);
     });
 
     it("passes it to initializeRebaseBackend once ejected", () => {
@@ -55,7 +55,7 @@ describe("the scaffolded project declares a storage access model", () => {
             "utf8"
         );
         expect(backend).toMatch(/^\s*storageAuthorize,?\s*$/m);
-        expect(backend).toContain('from "../../config/storage"');
+        expect(backend).toContain('from "../storage"');
     });
 
     it("still enables storage under NODE_ENV=production, so the guard does apply", () => {
@@ -126,7 +126,7 @@ roles }
         }
     });
 
-    it("accepts every path the template's own collections upload to", () => {
+    it("accepts every path the template's own tables upload to", () => {
         // A hook that rejects the starter's first upload is worse than no hook: the
         // boot guard passes and the failure moves to a user clicking "upload".
         const uploadPaths = [
@@ -154,8 +154,8 @@ roles }
 /**
  * The headless flavour has the same exposure and less covering it.
  *
- * `applyHeadless` deletes `config/collections` — headless derives collections from the
- * live database — but keeps the config *package*, because that is the only place the
+ * `applyHeadless` deletes `backend/schema` — headless derives its tables from the
+ * live database — but keeps `backend/storage.ts`, because that is the only place the
  * managed runtime looks for the hook. The overlay ships no docker-compose.yml of its
  * own either, so it *inherits* the one that sets `NODE_ENV: production` and
  * `FORCE_LOCAL_STORAGE: true`, and the boot guard applies exactly as it does to the
@@ -165,18 +165,18 @@ roles }
  * runs `docker compose up`, so the crash-loop would only ever be found by a user.
  */
 describe("the scaffolded BaaS project declares a storage access model", () => {
-    const overlayConfig = path.resolve(here, "../../templates/overlays/baas/config");
+    const overlayBackend = path.resolve(here, "../../templates/overlays/baas/backend");
 
-    it("exports storageAuthorize from the config package the runtime reads", () => {
+    it("exports storageAuthorize from backend/storage.ts, which the runtime reads", () => {
         // The real detector, exactly as in the full flavour above.
-        expect(detectStorageAuthorize(overlayConfig)).toBe(true);
+        expect(detectStorageAuthorize(path.join(overlayBackend, "storage"))).toBe(true);
     });
 
-    it("declares no collections, which is what makes this flavour headless", () => {
+    it("declares no tables, which is what makes this flavour headless", () => {
         // `rebase build` reads the absence of this directory as "introspect from
-        // the live database". The config package itself must survive.
-        expect(fs.existsSync(path.join(overlayConfig, "collections"))).toBe(false);
-        expect(fs.existsSync(path.join(overlayConfig, "index.ts"))).toBe(true);
+        // the live database". The storage hook itself must survive.
+        expect(fs.existsSync(path.join(overlayBackend, "schema"))).toBe(false);
+        expect(fs.existsSync(path.join(overlayBackend, "storage.ts"))).toBe(true);
     });
 
     const ask = (

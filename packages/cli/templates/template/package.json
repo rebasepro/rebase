@@ -6,8 +6,7 @@
     "type": "module",
     "workspaces": [
         "frontend",
-        "backend",
-        "config"
+        "backend"
     ],
     "scripts": {
         "dev": "rebase dev",

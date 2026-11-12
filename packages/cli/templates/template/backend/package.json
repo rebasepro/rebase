@@ -8,8 +8,6 @@
     },
     "dependencies": {
         "@ariga/atlas": "^1.2.3",
-        "{{PROJECT_NAME}}-config": "*",
-        "@rebasepro/cms-types": "workspace:*",
         "@rebasepro/server": "workspace:*",
         "@rebasepro/server-postgres": "workspace:*",
         "@rebasepro/types": "workspace:*",

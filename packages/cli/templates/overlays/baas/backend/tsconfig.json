@@ -13,18 +13,16 @@
     "resolveJsonModule": true,
     "declaration": true,
     "sourceMap": true,
-    "rootDir": ".."
+    "rootDir": "."
   },
-  // `functions/` as well as `src/`, because this flavour has nothing in src:
-  // it declares no collections, so there is no generated schema, and the server
-  // entrypoint lives behind `rebase eject`. An include matching only an empty
-  // directory is TS18003 — tsc reports "no inputs" as an error, not a no-op.
+  // `functions/` as well as `src/`, because this project has nothing in src:
+  // its tables come from the database, so there is no generated schema, and
+  // the server entrypoint lives behind `rebase eject`. An include matching only
+  // an empty directory is TS18003 — tsc reports "no inputs" as an error.
   //
-  // `rootDir` is `..`, not `.`: `rebase eject` writes an entrypoint that imports
-  // `../../config/resources`, and tsc emits every file it pulls into the
-  // program — so the common source directory is the project root and the emit
-  // lands at `dist/backend/src/…`, which is what `scripts.start` runs. Inferring
-  // it stopped being an option in TypeScript 6 (TS5011).
+  // `rootDir` is `.`: everything compiled lives under backend/, so the emit
+  // mirrors it (`dist/functions/…`, `dist/src/…`). Inferring it stopped being
+  // an option in TypeScript 6 (TS5011).
   //
   // `crons/` too: `rebase build` compiles it through a generated tsconfig, but
   // an ejected project builds with *this* file, so leaving it out meant an
@@ -33,6 +31,6 @@
   //
   // `scripts/` because that is where the Scripts page puts a script that opens
   // the project with `openRebase`, and a type error there should be one `tsc`
-  // reports.
-  "include": ["src/**/*", "functions/**/*", "crons/**/*", "scripts/**/*"]
+  // reports. `schema/` for the day you declare tables in code (see the README).
+  "include": ["src/**/*", "schema/**/*", "functions/**/*", "crons/**/*", "scripts/**/*", "resources.ts", "storage.ts"]
 }

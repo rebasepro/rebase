@@ -54,6 +54,6 @@ backups/
 dist-bundle*/
 .rebase/
 
-# Generated SDK (`rebase generate-sdk`) — regenerated from the collections,
+# Generated SDK (`rebase generate-sdk`) — regenerated from backend/schema,
 # and stale copies in review diffs are noise nobody reads.
 generated/

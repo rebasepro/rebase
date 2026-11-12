@@ -677,7 +677,7 @@ async function installHooksAndReport(projectDir: string, force: boolean): Promis
             console.log(chalk.yellow(`  ! ${shown(file)} is not plain JSON, so it was left alone — register ${AGENT_HOOK_SCRIPT} as a PostToolUse hook (matcher "Edit|MultiEdit|Write") by hand.`));
         }
     }
-    console.log(chalk.gray("  Claude Code now runs `rebase verify --quiet` after each edit under config/collections/."));
+    console.log(chalk.gray("  Claude Code now runs `rebase verify --quiet` after each edit under backend/schema/ or frontend/src/cms/."));
 }
 
 /**
@@ -916,7 +916,7 @@ ${chalk.green.bold("Options")}
                 Servers already in the file are kept.
   ${chalk.blue("--hooks")}       Also install the Claude Code guardrail: a PostToolUse hook in
                 .claude/settings.json that runs ${chalk.cyan("rebase verify --quiet")} after each edit
-                under config/collections/ and hands any problem back to the agent.
+                under backend/schema/ or frontend/src/cms/ and hands any problem back.
                 ${chalk.cyan("rebase skills --hooks")} installs the hook alone.
   ${chalk.blue("--agent, -a")}   Agent(s) to install for, skipping detection and the prompt.
                 Repeat the flag or pass a comma-separated list, or ${chalk.bold("all")}.

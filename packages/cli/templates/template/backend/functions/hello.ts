@@ -51,7 +51,7 @@ import {
  * `functions:invoke` scope (or `functions:invoke:hello`), it passes
  * `requireAuth`, and a service key created with `--roles admin` passes
  * `requireAdmin`. To let a key do one thing here and not another, declare a
- * scope under `auth.scopes` on the users collection and add
+ * scope under `auth.scopes` on the users table (`backend/schema/users.ts`) and add
  * `requireScope("reports:read")` to that route — every signed-in person holds
  * every app scope, so it narrows keys, not people.
  *

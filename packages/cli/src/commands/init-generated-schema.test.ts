@@ -2,7 +2,7 @@
  * A fresh `rebase init --git` project stays clean through its first `rebase dev`.
  *
  * `rebase dev` regenerates `backend/src/schema.generated.ts` from the
- * collections on every start, and the Studio's schema editor refuses to commit
+ * tables on every start, and the Studio's schema editor refuses to commit
  * over a dirty copy of it (`SCHEMA_EDIT_DIRTY_TREE`). The scaffold used to ship
  * that file as a stub, commit it, and let the first `dev` rewrite it — so every
  * new project's first Studio edit was refused, because of a change the project's
@@ -12,7 +12,7 @@
  * to two things, per preset:
  *
  *   - the shipped `templates/generated-schemas/<preset>.ts` is exactly what the
- *     generator writes for that preset's collections, today;
+ *     generator writes for that preset's tables, today;
  *   - a real `init --git` followed by the regeneration `dev` runs leaves
  *     `git status` empty — not only the schema file, the whole tree.
  *
@@ -28,26 +28,22 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { execFileSync } from "child_process";
-import { loadCollectionsFromDirectory } from "@rebasepro/server";
+import { compileLoadedSchema, loadBackendSchema } from "@rebasepro/server";
 import { generateSchema } from "@rebasepro/server-postgres";
 import { createRebaseApp, shippedSchemaPath, type TemplatePreset } from "./init";
-
-// The scaffold's collection files import `defineCollection` from
-// `@rebasepro/cms-types`, which the CLI does not depend on and which a scaffold
-// only has once it is installed. The builder is all they import from it.
-vi.mock("@rebasepro/cms-types", async () => import("../../../cms-types/src/define_collection"));
 
 const PRESETS: TemplatePreset[] = ["blog", "ecommerce", "blank"];
 
 /**
- * What `rebase schema generate` writes for a collections directory.
+ * What `rebase schema generate` writes for a schema directory.
  *
- * The same two calls `writeDrizzleSchema` (server-postgres
- * `schema/generate-files.ts`) makes, in the same order: the shared loader, then
- * slug order, so the output does not depend on the directory listing.
+ * The calls `writeDrizzleSchema` (server-postgres `schema/generate-files.ts`,
+ * through `loadTables`) makes, in the same order: the loader server boot uses,
+ * the compiler, then slug order, so the output does not depend on the order of
+ * the index's exports.
  */
-async function generatedSchemaFor(collectionsDir: string): Promise<string> {
-    const collections = [...await loadCollectionsFromDirectory(collectionsDir)];
+async function generatedSchemaFor(schemaDir: string): Promise<string> {
+    const collections = [...compileLoadedSchema(await loadBackendSchema(schemaDir)).collections];
     collections.sort((a, b) => a.slug.localeCompare(b.slug));
     return String(generateSchema(collections));
 }
@@ -79,7 +75,7 @@ describe.each(PRESETS)("the %s preset", (preset) => {
         await createRebaseApp(["node", "rebase", "init", project, "--yes", "--git", "--template", preset]);
 
         const schemaFile = path.join(project, "backend", "src", "schema.generated.ts");
-        const generated = await generatedSchemaFor(path.join(project, "config", "collections"));
+        const generated = await generatedSchemaFor(path.join(project, "backend", "schema"));
         if (process.env.REBASE_WRITE_FIXTURE === "1") {
             fs.writeFileSync(shippedSchemaPath(preset), generated, "utf-8");
         }

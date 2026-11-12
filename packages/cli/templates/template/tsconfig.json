@@ -1,7 +1,7 @@
 {
   // The project root's own program: `scripts/`, which no workspace compiles.
   //
-  // frontend/, backend/ and config/ each typecheck on their own, with the
+  // frontend/ and backend/ each typecheck on their own, with the
   // tsconfig in that folder — `cd backend && tsc --noEmit` — and this file
   // does not reach into them: it would compile their code under options that
   // are not theirs. Without it, `tsc --noEmit` here printed tsc's help and

@@ -1,7 +1,6 @@
 packages:
   - "frontend"
   - "backend"
-  - "config"
 linkWorkspacePackages: true
 # Without this, pnpm takes a higher version from the registry over a workspace
 # package on a "*" range, and this project's own package names are free for

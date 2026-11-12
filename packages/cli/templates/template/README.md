@@ -17,7 +17,7 @@ point for this project.
 
 That is the whole list. There is no database to install: with no `DATABASE_URL`
 set, `rebase dev` starts a managed PostgreSQL (PGlite) inside this project, and
-the runtime creates your collections' tables at boot.
+the runtime creates your tables at boot.
 
 ### Run it
 
@@ -34,8 +34,8 @@ pnpm dev   # or: npm run dev
 ```
 
 That is the whole first run. `rebase dev` generates the Drizzle schema and the
-SDK types from `config/collections`, starts the database, creates a table for
-every collection declared there, and serves the API and the admin panel.
+SDK types from `backend/schema`, starts the database, creates every table
+declared there, and serves the API and the admin panel.
 
 `rebase dev` prints the two URLs it actually bound. The first account you
 register becomes the admin. `REBASE_ADMIN_EMAIL` and `REBASE_ADMIN_PASSWORD` in
@@ -64,7 +64,7 @@ pnpm run db:push
 
 Boot already creates missing tables and columns, and their row-level security,
 additively, so `db push` is for what it deliberately leaves alone: any change
-that is not purely additive — a renamed column, a narrowed type, a removed field.
+that is not purely additive — a renamed column, a narrowed type, a removed column.
 
 The `docker-compose.yml` in this project runs PostgreSQL in a container if you
 would rather not install one:
@@ -76,12 +76,14 @@ docker compose up -d db
 ## Project Structure
 
 ```
-├── frontend/           # Your admin panel (React + Vite)
-├── backend/            # Server code
+├── backend/            # The API — no admin-panel code in here
+│   ├── schema/         # Your tables: defineTable(...), one per file, exported from index.ts
 │   ├── functions/      # Custom API endpoints (auto-discovered)
+│   ├── resources.ts    # Databases, buckets and topics this project needs
+│   ├── storage.ts      # Who may read and write files in storage
 │   └── src/            # Generated database schema
-├── config/             # Shared collection definitions
-│   └── collections/    # Schema-as-Code TypeScript files
+├── frontend/           # Your admin panel (React + Vite)
+│   └── src/cms/        # customizeTable(...): how a table looks in the admin panel
 ├── scripts/            # Scripts that call the API, e.g. example.ts
 ├── rebase.json         # Which apps this repository contains
 ├── docker-compose.yml  # Self-hosting stack (Postgres + the Rebase runtime)
@@ -91,11 +93,11 @@ docker compose up -d db
 ```
 
 Each workspace typechecks on its own, with its own `tsconfig.json`:
-`cd backend && npx tsc --noEmit`, and the same in `config/` and `frontend/`.
+`cd backend && npx tsc --noEmit`, and the same in `frontend/`.
 `tsc --noEmit` at the root checks `scripts/`.
 
 There is no Dockerfile, and that is deliberate: `rebase build` produces a
-**bundle** — your compiled collections, functions, crons and admin assets — and
+**bundle** — your compiled tables, functions, crons and admin assets — and
 the published `rebasepro/server` image boots it. The artifact you self-host is
 the artifact Rebase Cloud runs, so moving between them changes nothing in this
 repository.
@@ -138,9 +140,41 @@ caller simply gets `undefined` and the handler runs. Put `requireAuth` /
 `requireAdmin` in the route's own middleware slot rather than in `app.use()`,
 which only covers routes declared below it.
 
-### Shared Collections
+### Tables and the admin panel
 
-Collections are defined once in `config/collections/` and used by both the frontend and backend. This ensures your schema stays in sync across the stack.
+A table is declared once, in `backend/schema/<table>.ts`, with its columns,
+relations and row-level security:
+
+```typescript
+// backend/schema/tags.ts
+import { defineTable, col } from "@rebasepro/server/schema";
+
+export const tags = defineTable("tags", {
+    columns: {
+        id: col.integer().primaryKey().identity(),
+        name: col.text().notNull()
+    },
+    rls: "inherit" // the defaultRls exported from backend/schema/index.ts
+});
+```
+
+The admin panel lists every table the backend serves, with no code. To change
+how one looks — labels, icons, enum colours, a custom field — add
+`frontend/src/cms/<table>.tsx`, which imports the table as a type only, so no
+server code reaches the browser:
+
+```tsx
+// frontend/src/cms/tags.tsx
+import { customizeTable } from "@rebasepro/cms";
+import type { tags } from "../../../backend/schema/tags";
+
+export const tagsCms = customizeTable<typeof tags>("tags", {
+    icon: "Tag",
+    fields: { name: { name: "Tag Name" } }
+});
+```
+
+and list it in `frontend/src/App.tsx`: `<RebaseCMS tableCustomizations={[tagsCms]} />`.
 
 ## Environment Configuration
 
@@ -168,7 +202,7 @@ compose database is a database of your own, so step 0 is the same one line.
 # 1. Build your project into ./dist-bundle
 pnpm run build          # or: npm run build
 
-# 2. Start the database. Boot creates the tables from your collections;
+# 2. Start the database. Boot creates the tables from backend/schema;
 #    `db:push` is for what it leaves alone — any change that is not purely
 #    additive.
 docker compose up -d db

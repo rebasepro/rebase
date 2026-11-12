@@ -13,7 +13,7 @@ import inquirer from "inquirer";
 import net from "net";
 import ts from "typescript";
 import { stripVTControlCharacters } from "util";
-import { chooseComposeDbPort, composeDbPortStart, configureEnvFile, buildInitQuestions, validateProjectName, formatCdTarget, printInitHelp, resolveRuntimeImageTag, isPortAvailable, TEMPLATE_PLACEHOLDER_FILES, INIT_FLAGS, scaffoldDirectoryConflicts, scaffoldConflictMessage, initGitRepository, SCAFFOLD_TOLERATED_ENTRIES, agentNextSteps, shippedSchemaPath } from "./init.js";
+import { chooseComposeDbPort, composeDbPortStart, configureEnvFile, buildInitQuestions, validateProjectName, formatCdTarget, printInitHelp, resolveRuntimeImageTag, isPortAvailable, TEMPLATE_PLACEHOLDER_FILES, INIT_FLAGS, scaffoldDirectoryConflicts, scaffoldConflictMessage, initGitRepository, SCAFFOLD_TOLERATED_ENTRIES, agentNextSteps, shippedSchemaPath, createRebaseApp } from "./init.js";
 import { getPMCommands } from "../utils/package-manager.js";
 import { execFileSync } from "child_process";
 import { SCAFFOLD_DEFAULT_PORT } from "./dev.js";
@@ -126,8 +126,11 @@ describe("template structure", () => {
     it("contains all required directories", () => {
         expect(fs.existsSync(path.join(TEMPLATE_DIR, "backend"))).toBe(true);
         expect(fs.existsSync(path.join(TEMPLATE_DIR, "frontend"))).toBe(true);
-        expect(fs.existsSync(path.join(TEMPLATE_DIR, "config"))).toBe(true);
-        expect(fs.existsSync(path.join(TEMPLATE_DIR, "config", "collections"))).toBe(true);
+        expect(fs.existsSync(path.join(TEMPLATE_DIR, "backend", "schema", "index.ts"))).toBe(true);
+        expect(fs.existsSync(path.join(TEMPLATE_DIR, "frontend", "src", "cms"))).toBe(true);
+        // Mode B has no third workspace: the backend owns the tables, the
+        // frontend imports them as types.
+        expect(fs.existsSync(path.join(TEMPLATE_DIR, "config"))).toBe(false);
     });
 
     it("contains essential config files", () => {
@@ -271,12 +274,6 @@ describe("placeholder replacement", () => {
         expect(pkg.name).toBe("test-project-frontend");
     });
 
-    it("replaces {{PROJECT_NAME}} in config package.json", async () => {
-        const targetDir = await simulateInit("test-project");
-        const pkg = JSON.parse(fs.readFileSync(path.join(targetDir, "config", "package.json"), "utf-8"));
-        expect(pkg.name).toBe("test-project-config");
-    });
-
     it("replaces {{PROJECT_NAME}} in README.md", async () => {
         const targetDir = await simulateInit("my-blog");
         const readme = fs.readFileSync(path.join(targetDir, "README.md"), "utf-8");
@@ -290,7 +287,6 @@ describe("placeholder replacement", () => {
             "package.json",
             "frontend/package.json",
             "backend/package.json",
-            "config/package.json",
             "README.md"
         ];
 
@@ -305,232 +301,159 @@ describe("placeholder replacement", () => {
 });
 
 // =============================================================================
-// Collection definitions
+// Tables and their customizations
 // =============================================================================
 
-describe("template collections", () => {
-    it("has a collections index that exports an array", () => {
-        const indexPath = path.join(TEMPLATE_DIR, "config", "collections", "index.ts");
-        const content = fs.readFileSync(indexPath, "utf-8");
-        expect(content).toContain("export");
-        expect(content).toContain("collections");
+const SCHEMA_DIR = path.join(TEMPLATE_DIR, "backend", "schema");
+const CMS_DIR = path.join(TEMPLATE_DIR, "frontend", "src", "cms");
+const PRESETS_DIR = path.join(findCliRoot(), "templates", "presets");
+
+/** A real `rebase init --yes --template <preset>` into the test's directory. */
+async function scaffoldPreset(preset: "blog" | "ecommerce" | "blank", name = `${preset}-app`): Promise<string> {
+    const target = path.join(tmpDir, name);
+    const previous = process.env.REBASE_E2E;
+    // The release probe asks npm whether this version is published; the
+    // scaffold under test does not need the answer.
+    process.env.REBASE_E2E = "1";
+    const log = console.log;
+    console.log = () => {};
+    try {
+        await createRebaseApp(["node", "rebase", "init", target, "--yes", "--template", preset]);
+    } finally {
+        console.log = log;
+        if (previous === undefined) delete process.env.REBASE_E2E;
+        else process.env.REBASE_E2E = previous;
+    }
+    return target;
+}
+
+function files(dir: string): string[] {
+    return fs.existsSync(dir) ? fs.readdirSync(dir).filter(f => /\.tsx?$/.test(f)).sort() : [];
+}
+
+describe("template tables", () => {
+    it("exports every table from backend/schema/index.ts, and declares defaultRls beside them", () => {
+        const index = fs.readFileSync(path.join(SCHEMA_DIR, "index.ts"), "utf-8");
+        for (const table of ["posts", "authors", "tags", "users"]) {
+            expect(index).toContain(`export { ${table} } from "./${table}";`);
+        }
+        expect(index).toMatch(/export const defaultRls: DefaultRls = \[/);
     });
 
-    it("blog preset has posts, authors, tags, and users collections", () => {
-        const collectionsDir = path.join(TEMPLATE_DIR, "config", "collections");
-        const files = fs.readdirSync(collectionsDir).filter(f => f.endsWith(".ts") && f !== "index.ts");
-        const basenames = files.map(f => f.replace(".ts", ""));
-
-        expect(basenames).toContain("posts");
-        expect(basenames).toContain("authors");
-        expect(basenames).toContain("tags");
-        expect(basenames).toContain("users");
+    it("blog preset has posts, authors, tags, and users tables", () => {
+        expect(files(SCHEMA_DIR)).toEqual(["authors.ts", "index.ts", "posts.ts", "tags.ts", "users.ts"]);
     });
 
-    // The template is the first Rebase code anyone reads, so it has to model the
-    // idiom we actually recommend. A bare `const x: CollectionConfig = {…}`
-    // annotation typechecks but infers nothing, which costs completion on
-    // `admin.display.title` / `sort` / `propertiesOrder` — the whole reason
-    // `defineCollection` exists.
-    it("each blog collection is declared with defineCollection", () => {
-        const collectionsDir = path.join(TEMPLATE_DIR, "config", "collections");
-        const files = fs.readdirSync(collectionsDir).filter(f => f.endsWith(".ts") && f !== "index.ts");
-
-        for (const file of files) {
-            const content = fs.readFileSync(path.join(collectionsDir, file), "utf-8");
-            expect(content).toContain("name:");
-            expect(content).toContain("properties:");
-            expect(content).toContain("defineCollection(");
-            expect(content).toContain("@rebasepro/cms-types");
-            // Removed in 0.11 — a template must never reintroduce them.
-            expect(content).not.toContain("buildCollection");
-            expect(content).not.toContain("buildProperty");
+    it("declares each table with defineTable from @rebasepro/server/schema, and users with defineAuthTable", () => {
+        for (const file of files(SCHEMA_DIR).filter(f => f !== "index.ts")) {
+            const content = fs.readFileSync(path.join(SCHEMA_DIR, file), "utf-8");
+            expect(content, file).toMatch(/from "@rebasepro\/server\/schema";/);
+            expect(content, file).toMatch(file === "users.ts" ? /defineAuthTable\("users"/ : /defineTable\("/);
+            // Mandatory, and a CMS concern never leaks into the backend.
+            expect(content, file).toMatch(/\n {4}rls: /);
+            expect(content, file).not.toMatch(/@rebasepro\/cms|admin:|enumLabels|markdown/);
         }
     });
 
-    it("posts collection uses markdown for content", () => {
-        const postsPath = path.join(TEMPLATE_DIR, "config", "collections", "posts.ts");
-        const content = fs.readFileSync(postsPath, "utf-8");
-        expect(content).toContain("markdown: true");
-        expect(content).not.toContain("multiline: true");
+    it("posts keeps drafts out of public reads", () => {
+        const posts = fs.readFileSync(path.join(SCHEMA_DIR, "posts.ts"), "utf-8");
+        // Its own rules: inheriting defaultRls would hand drafts to every reader.
+        expect(posts).toContain("using: \"{status} = 'published'\"");
+        expect(posts).not.toContain("rls: \"inherit\"");
     });
 
-    it("posts collection demonstrates an enum property", () => {
-        const postsPath = path.join(TEMPLATE_DIR, "config", "collections", "posts.ts");
-        const content = fs.readFileSync(postsPath, "utf-8");
-        expect(content).toContain("enum:");
-        expect(content).toContain("draft");
-        expect(content).toContain("published");
+    it("posts demonstrates an enum, a belongsTo and a manyToMany", () => {
+        const posts = fs.readFileSync(path.join(SCHEMA_DIR, "posts.ts"), "utf-8");
+        expect(posts).toContain("col.enum([\"draft\", \"review\", \"published\"])");
+        expect(posts).toContain("rel.belongsTo(() => authors)");
+        expect(posts).toContain("rel.manyToMany(() => tags)");
     });
 
-    // Without rules of its own, posts inherits `access: "public"` reads from
-    // index.ts, and a draft is readable by anyone who can read a published post.
-    it("posts collection keeps drafts out of public reads", () => {
-        const postsPath = path.join(TEMPLATE_DIR, "config", "collections", "posts.ts");
-        const content = fs.readFileSync(postsPath, "utf-8");
-        expect(content).toContain("securityRules:");
-        expect(content).toContain("using: \"{status} = 'published'\"");
-        expect(content).not.toContain('access: "public"');
+    it("posts' presentation lives in frontend/src/cms/posts.tsx: markdown and enum colours", () => {
+        const cms = fs.readFileSync(path.join(CMS_DIR, "posts.tsx"), "utf-8");
+        expect(cms).toContain("customizeTable<typeof posts>(\"posts\"");
+        expect(cms).toContain("import type { posts } from \"../../../backend/schema/posts\";");
+        expect(cms).toMatch(/markdown: true/);
+        expect(cms).toMatch(/enumLabels/);
     });
 
-    it("posts collection demonstrates a relation to authors", () => {
-        const postsPath = path.join(TEMPLATE_DIR, "config", "collections", "posts.ts");
-        const content = fs.readFileSync(postsPath, "utf-8");
-        expect(content).toContain('type: "relation"');
-        expect(content).toContain("authorsCollection");
+    it("every customization imports its table as a type only", () => {
+        const dirs = [CMS_DIR, path.join(PRESETS_DIR, "ecommerce", "frontend", "src", "cms")];
+        for (const dir of dirs) {
+            for (const file of files(dir)) {
+                const content = fs.readFileSync(path.join(dir, file), "utf-8");
+                for (const line of content.split("\n").filter(l => l.includes("backend/"))) {
+                    expect(line, `${dir}/${file}`).toMatch(/^import type /);
+                }
+            }
+        }
     });
 
-    it("posts collection demonstrates a many-to-many relation to tags", () => {
-        const postsPath = path.join(TEMPLATE_DIR, "config", "collections", "posts.ts");
-        const content = fs.readFileSync(postsPath, "utf-8");
-        expect(content).toContain("tagsCollection");
-        // The kind, not the old `cardinality: "many"` string it replaced —
-        // which `"many"` also matched inside `manyToMany`, so this assertion
-        // would have kept passing on a half-migrated template.
-        expect(content).toContain('kind: "manyToMany"');
+    it("App.tsx hands RebaseCMS the customizations, and there is no collections plugin", () => {
+        const app = fs.readFileSync(path.join(TEMPLATE_DIR, "frontend", "src", "App.tsx"), "utf-8");
+        expect(app).toContain("<RebaseCMS tableCustomizations={[postsCms, authorsCms, tagsCms, usersCms]} />");
+        expect(app).not.toContain("virtual:rebase-collections");
+        const vite = fs.readFileSync(path.join(TEMPLATE_DIR, "frontend", "vite.config.ts"), "utf-8");
+        expect(vite).not.toContain("rebaseCollectionsPlugin");
     });
 });
 
 describe("template presets", () => {
-    it("ecommerce preset has products, categories, orders, and index", () => {
-        const presetDir = path.join(TEMPLATE_DIR, "config", "collections", "presets", "ecommerce");
-        expect(fs.existsSync(presetDir)).toBe(true);
-        const files = fs.readdirSync(presetDir).filter(f => f.endsWith(".ts"));
-        const basenames = files.map(f => f.replace(".ts", ""));
-        expect(basenames).toContain("products");
-        expect(basenames).toContain("categories");
-        expect(basenames).toContain("orders");
-        expect(basenames).toContain("index");
-    });
-
-    it("ecommerce preset index imports usersCollection", () => {
-        const indexPath = path.join(TEMPLATE_DIR, "config", "collections", "presets", "ecommerce", "index.ts");
-        const content = fs.readFileSync(indexPath, "utf-8");
-        expect(content).toContain("usersCollection");
-        expect(content).toContain("export");
-        expect(content).toContain("collections");
-    });
-
-    it("ecommerce products collection demonstrates a relation to categories", () => {
-        const productsPath = path.join(TEMPLATE_DIR, "config", "collections", "presets", "ecommerce", "products.ts");
-        const content = fs.readFileSync(productsPath, "utf-8");
-        expect(content).toContain('type: "relation"');
-        expect(content).toContain("categoriesCollection");
-    });
-
-    it("blank preset has only an index with usersCollection", () => {
-        const presetDir = path.join(TEMPLATE_DIR, "config", "collections", "presets", "blank");
-        expect(fs.existsSync(presetDir)).toBe(true);
-        const indexPath = path.join(presetDir, "index.ts");
-        const content = fs.readFileSync(indexPath, "utf-8");
-        expect(content).toContain("usersCollection");
-        expect(content).toContain("export");
-        expect(content).not.toContain("postsCollection");
-        expect(content).not.toContain("productsCollection");
-    });
-
-    it("users.ts is always present at the top level (shared by all presets)", () => {
-        const usersPath = path.join(TEMPLATE_DIR, "config", "collections", "users.ts");
-        expect(fs.existsSync(usersPath)).toBe(true);
-    });
-
-    it("applying blank preset removes blog files and keeps users.ts", async () => {
-        const targetDir = await simulateInit("blank-test-app");
-        const collectionsDir = path.join(targetDir, "config", "collections");
-        const presetsDir = path.join(collectionsDir, "presets");
-        const presetDir = path.join(presetsDir, "blank");
-
-        const blogFiles = ["posts.ts", "authors.ts", "tags.ts", "index.ts"];
-        for (const file of blogFiles) {
-            const filePath = path.join(collectionsDir, file);
-            if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    it("ship their own tables, customizations, schema index and App.tsx, never users", () => {
+        expect(files(path.join(PRESETS_DIR, "ecommerce", "backend", "schema"))).toEqual(["categories.ts", "index.ts", "orders.ts", "products.ts"]);
+        expect(files(path.join(PRESETS_DIR, "ecommerce", "frontend", "src", "cms"))).toEqual(["categories.tsx", "orders.tsx", "products.tsx"]);
+        expect(files(path.join(PRESETS_DIR, "blank", "backend", "schema"))).toEqual(["index.ts"]);
+        expect(files(path.join(PRESETS_DIR, "blank", "frontend", "src", "cms"))).toEqual([]);
+        for (const preset of ["ecommerce", "blank"]) {
+            expect(fs.existsSync(path.join(PRESETS_DIR, preset, "frontend", "src", "App.tsx")), preset).toBe(true);
         }
-        const presetFiles = fs.readdirSync(presetDir).filter(f => f.endsWith(".ts"));
-        for (const file of presetFiles) {
-            fs.copyFileSync(path.join(presetDir, file), path.join(collectionsDir, file));
-        }
-        fs.rmSync(presetsDir, { recursive: true,
-force: true });
+    });
 
-        expect(fs.existsSync(path.join(collectionsDir, "users.ts"))).toBe(true);
-        expect(fs.existsSync(path.join(collectionsDir, "index.ts"))).toBe(true);
-        expect(fs.existsSync(path.join(collectionsDir, "posts.ts"))).toBe(false);
-        expect(fs.existsSync(path.join(collectionsDir, "authors.ts"))).toBe(false);
-        expect(fs.existsSync(path.join(collectionsDir, "tags.ts"))).toBe(false);
-        expect(fs.existsSync(path.join(collectionsDir, "presets"))).toBe(false);
+    it("ecommerce products demonstrates a relation to categories", () => {
+        const products = fs.readFileSync(path.join(PRESETS_DIR, "ecommerce", "backend", "schema", "products.ts"), "utf-8");
+        expect(products).toContain("rel.belongsTo(() => categories)");
+    });
 
-        const indexContent = fs.readFileSync(path.join(collectionsDir, "index.ts"), "utf-8");
-        expect(indexContent).toContain("usersCollection");
-        expect(indexContent).not.toContain("postsCollection");
+    it("users is shared by every preset, and the template is not left with a presets directory", () => {
+        expect(fs.existsSync(path.join(SCHEMA_DIR, "users.ts"))).toBe(true);
+        expect(fs.existsSync(path.join(CMS_DIR, "users.tsx"))).toBe(true);
+        expect(fs.existsSync(path.join(SCHEMA_DIR, "presets"))).toBe(false);
+        expect(fs.existsSync(path.join(TEMPLATE_DIR, "config"))).toBe(false);
+    });
+
+    it("applying the blank preset removes the blog tables and keeps users", async () => {
+        const project = await scaffoldPreset("blank");
+        expect(files(path.join(project, "backend", "schema"))).toEqual(["index.ts", "users.ts"]);
+        expect(files(path.join(project, "frontend", "src", "cms"))).toEqual(["users.tsx"]);
+        const app = fs.readFileSync(path.join(project, "frontend", "src", "App.tsx"), "utf-8");
+        expect(app).toContain("tableCustomizations={[usersCms]}");
+        expect(app).not.toContain("postsCms");
+    });
+
+    it("applying the ecommerce preset replaces the blog tables with its own", async () => {
+        const project = await scaffoldPreset("ecommerce");
+        expect(files(path.join(project, "backend", "schema"))).toEqual(["categories.ts", "index.ts", "orders.ts", "products.ts", "users.ts"]);
+        expect(files(path.join(project, "frontend", "src", "cms"))).toEqual(["categories.tsx", "orders.tsx", "products.tsx", "users.tsx"]);
+        expect(fs.readFileSync(path.join(project, "frontend", "src", "App.tsx"), "utf-8"))
+            .toContain("tableCustomizations={[productsCms, categoriesCms, ordersCms, usersCms]}");
     });
 
     it("every relative import resolves after applying each preset", async () => {
-        // Preset files are authored under presets/<name>/ but scaffolded flat
-        // into config/collections/, so an import that resolves in the template
-        // tree can still dangle after init (e.g. "../../users.js").
-        for (const preset of ["blog", "blank", "ecommerce"] as const) {
-            const targetDir = await simulateInit(`imports-${preset}-app`);
-            const collectionsDir = path.join(targetDir, "config", "collections");
-            const presetsDir = path.join(collectionsDir, "presets");
-
-            if (preset !== "blog") {
-                for (const file of ["posts.ts", "authors.ts", "tags.ts", "index.ts"]) {
-                    const filePath = path.join(collectionsDir, file);
-                    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-                }
-                const presetDir = path.join(presetsDir, preset);
-                for (const file of fs.readdirSync(presetDir).filter(f => f.endsWith(".ts"))) {
-                    fs.copyFileSync(path.join(presetDir, file), path.join(collectionsDir, file));
-                }
-            }
-            fs.rmSync(presetsDir, { recursive: true,
-force: true });
-
-            for (const file of fs.readdirSync(collectionsDir).filter(f => f.endsWith(".ts"))) {
-                const content = fs.readFileSync(path.join(collectionsDir, file), "utf-8");
-                const specs = [...content.matchAll(/from\s+"(\.[^"]+)"/g)].map(m => m[1]);
-                for (const spec of specs) {
-                    // The scaffold writes extensionless specifiers, which is
-                    // what `moduleResolution: "bundler"` asks for and what the
-                    // build completes for Node afterwards. A `.js` specifier
-                    // still resolves here, so this keeps working for a project
-                    // written the other way.
-                    const base = path.resolve(collectionsDir, spec.replace(/\.js$/, ""));
-                    const resolved = [`${base}.ts`, `${base}.tsx`, path.join(base, "index.ts")]
-                        .find(candidate => fs.existsSync(candidate));
-                    expect(
-                        resolved !== undefined,
-                        `${preset} preset: ${file} imports "${spec}", which does not exist after scaffolding`
-                    ).toBe(true);
+        // A preset's files are copied over the blog preset, so an import that
+        // resolves in templates/presets/ proves nothing; resolve it where it lands.
+        for (const preset of ["blog", "ecommerce", "blank"] as const) {
+            const project = await scaffoldPreset(preset, `imports-${preset}-app`);
+            for (const dir of [path.join(project, "backend", "schema"), path.join(project, "frontend", "src", "cms"), path.join(project, "frontend", "src")]) {
+                for (const file of files(dir)) {
+                    const content = fs.readFileSync(path.join(dir, file), "utf-8");
+                    for (const match of content.matchAll(/from\s+["'](\.[^"']+)["']/g)) {
+                        const base = path.resolve(dir, match[1]);
+                        const resolved = [".ts", ".tsx", "/index.ts", ""].some(ext => fs.existsSync(base + ext) && fs.statSync(base + ext).isFile());
+                        expect(resolved, `${preset}: ${path.relative(project, path.join(dir, file))} imports ${match[1]}`).toBe(true);
+                    }
                 }
             }
         }
-    });
-
-    it("applying ecommerce preset replaces blog files with ecommerce collections", async () => {
-        const targetDir = await simulateInit("ecom-test-app");
-        const collectionsDir = path.join(targetDir, "config", "collections");
-        const presetsDir = path.join(collectionsDir, "presets");
-        const presetDir = path.join(presetsDir, "ecommerce");
-
-        const blogFiles = ["posts.ts", "authors.ts", "tags.ts", "index.ts"];
-        for (const file of blogFiles) {
-            const filePath = path.join(collectionsDir, file);
-            if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-        }
-        const presetFiles = fs.readdirSync(presetDir).filter(f => f.endsWith(".ts"));
-        for (const file of presetFiles) {
-            fs.copyFileSync(path.join(presetDir, file), path.join(collectionsDir, file));
-        }
-        fs.rmSync(presetsDir, { recursive: true,
-force: true });
-
-        expect(fs.existsSync(path.join(collectionsDir, "users.ts"))).toBe(true);
-        expect(fs.existsSync(path.join(collectionsDir, "products.ts"))).toBe(true);
-        expect(fs.existsSync(path.join(collectionsDir, "categories.ts"))).toBe(true);
-        expect(fs.existsSync(path.join(collectionsDir, "orders.ts"))).toBe(true);
-        expect(fs.existsSync(path.join(collectionsDir, "posts.ts"))).toBe(false);
-        expect(fs.existsSync(path.join(collectionsDir, "presets"))).toBe(false);
     });
 });
 
@@ -542,7 +465,7 @@ describe("template package.json contracts", () => {
     it("root package.json has all expected scripts", () => {
         const pkg = JSON.parse(fs.readFileSync(path.join(TEMPLATE_DIR, "package.json"), "utf-8"));
         expect(pkg.scripts.dev).toBe("rebase dev");
-        // No --collections: config/collections is the default, and a path here
+        // No --schema-dir: backend/schema is the default, and a path here
         // would be resolved from the root, where these scripts run.
         expect(pkg.scripts["db:push"]).toBe("rebase db push");
         expect(pkg.scripts["db:generate"]).toBe("rebase db generate");
@@ -578,21 +501,24 @@ describe("template package.json contracts", () => {
         expect(pkg.dependencies).toHaveProperty("react-dom");
     });
 
-    it("config package.json depends on @rebasepro/types", () => {
-        const pkg = JSON.parse(fs.readFileSync(path.join(TEMPLATE_DIR, "config", "package.json"), "utf-8"));
-        expect(pkg.dependencies).toHaveProperty("@rebasepro/types");
+    it("neither workspace depends on @rebasepro/cms-types or a config package", () => {
+        for (const ws of ["backend", "frontend"]) {
+            const pkg = JSON.parse(fs.readFileSync(path.join(TEMPLATE_DIR, ws, "package.json"), "utf-8"));
+            expect(Object.keys(pkg.dependencies), ws).not.toContain("@rebasepro/cms-types");
+            expect(Object.keys(pkg.dependencies).filter(name => name.endsWith("-config")), ws).toEqual([]);
+        }
     });
 
     it("pnpm-workspace.yaml references all workspace packages", () => {
         const workspace = fs.readFileSync(path.join(TEMPLATE_DIR, "pnpm-workspace.yaml"), "utf-8");
         expect(workspace).toContain("backend");
         expect(workspace).toContain("frontend");
-        expect(workspace).toContain("config");
+        expect(workspace).not.toContain("config\"");
     });
 
     it("the .gitignore ignores the generated SDK", () => {
-        // `rebase generate-sdk` writes ./generated/sdk from the collections.
-        // A committed copy is a stale copy the moment a collection changes.
+        // `rebase generate-sdk` writes ./generated/sdk from backend/schema.
+        // A committed copy is a stale copy the moment a table changes.
         const ignore = fs.readFileSync(path.join(TEMPLATE_DIR, "gitignore"), "utf-8");
         expect(ignore).toMatch(/^generated\/$/m);
     });
@@ -669,7 +595,7 @@ describe("dual PM compatibility", () => {
             // Both must coexist for the project to work with either PM
             expect(fs.existsSync(path.join(TEMPLATE_DIR, "pnpm-workspace.yaml"))).toBe(true);
             const pkg = JSON.parse(fs.readFileSync(path.join(TEMPLATE_DIR, "package.json"), "utf-8"));
-            expect(pkg.workspaces).toEqual(["frontend", "backend", "config"]);
+            expect(pkg.workspaces).toEqual(["frontend", "backend"]);
         });
 
         it("pnpm-workspace.yaml and package.json workspaces define the same packages", () => {
@@ -722,26 +648,6 @@ describe("dual PM compatibility", () => {
         it("deploy script deploys", () => {
             const pkg = JSON.parse(fs.readFileSync(path.join(TEMPLATE_DIR, "package.json"), "utf-8"));
             expect(pkg.scripts.deploy).toBe("rebase cloud deploy");
-        });
-    });
-
-    describe("internal dependencies use '*' (not workspace:*)", () => {
-        it("backend config dependency uses '*'", () => {
-            const pkg = JSON.parse(fs.readFileSync(path.join(TEMPLATE_DIR, "backend", "package.json"), "utf-8"));
-            const configDep = Object.entries(pkg.dependencies).find(
-                ([name]) => name.includes("-config")
-            );
-            expect(configDep).toBeTruthy();
-            expect(configDep![1]).toBe("*");
-        });
-
-        it("frontend config dependency uses '*'", () => {
-            const pkg = JSON.parse(fs.readFileSync(path.join(TEMPLATE_DIR, "frontend", "package.json"), "utf-8"));
-            const configDep = Object.entries(pkg.dependencies).find(
-                ([name]) => name.includes("-config")
-            );
-            expect(configDep).toBeTruthy();
-            expect(configDep![1]).toBe("*");
         });
     });
 
@@ -1367,42 +1273,42 @@ describe("docker-compose.yml", () => {
 // =============================================================================
 
 describe("scaffold security defaults", () => {
-    describe("users collection", () => {
-        it("has securityRules defined", () => {
-            const usersPath = path.join(TEMPLATE_DIR, "config", "collections", "users.ts");
+    describe("users table", () => {
+        it("has rls rules defined", () => {
+            const usersPath = path.join(TEMPLATE_DIR, "backend", "schema", "users.ts");
             const content = fs.readFileSync(usersPath, "utf-8");
-            expect(content).toContain("securityRules");
+            expect(content).toContain("rls: [");
         });
 
         it("restricts all operations to admin role", () => {
-            const usersPath = path.join(TEMPLATE_DIR, "config", "collections", "users.ts");
+            const usersPath = path.join(TEMPLATE_DIR, "backend", "schema", "users.ts");
             const content = fs.readFileSync(usersPath, "utf-8");
             expect(content).toContain('"admin"');
             // Should not have access: "public" on users (sensitive fields)
             expect(content).not.toContain('access: "public"');
         });
 
-        it("has autoValue on createdAt", () => {
-            const usersPath = path.join(TEMPLATE_DIR, "config", "collections", "users.ts");
+        it("stamps createdAt on create", () => {
+            const usersPath = path.join(TEMPLATE_DIR, "backend", "schema", "users.ts");
             const content = fs.readFileSync(usersPath, "utf-8");
-            expect(content).toContain('autoValue: "on_create"');
+            expect(content).toContain("createdAt: col.timestamptz().onCreateNow()");
         });
     });
 
-    describe("collections defaults", () => {
-        it("declares defaultSecurityRules beside the collections", () => {
-            // They must live here, not in the backend config: `db push`
-            // generates the Postgres policies from these files and never sees
-            // the running server.
-            const indexPath = path.join(TEMPLATE_DIR, "config", "collections", "index.ts");
+    describe("table defaults", () => {
+        it("declares defaultRls beside the tables", () => {
+            // They must live here, not on the server: `db push` generates the
+            // Postgres policies from these files and never sees the running
+            // server.
+            const indexPath = path.join(TEMPLATE_DIR, "backend", "schema", "index.ts");
             const content = fs.readFileSync(indexPath, "utf-8");
 
-            expect(content).toContain("export const defaultSecurityRules");
+            expect(content).toContain("export const defaultRls");
             expect(content).toContain('access: "public"');
             expect(content).toContain('roles: ["admin"]');
         });
 
-        it("does not set defaultSecurityRules on the backend, where it would not reach the database", () => {
+        it("does not set default rules on the eject entrypoint, where they would not reach the database", () => {
             // The entrypoint is the eject payload now — a managed project has none.
             const indexPath = path.resolve(__dirname, "..", "..", "templates", "eject", "backend", "src", "index.ts");
             const content = fs.readFileSync(indexPath, "utf-8");
@@ -1549,7 +1455,7 @@ pm: "pnpm"
         expect(q).toBeDefined();
         // A boolean, not a named pair: "cms" was a product category rather than
         // a thing this tool builds, and "baas" was the manifest value that is
-        // now derived from whether collections exist.
+        // now derived from whether backend/schema declares tables.
         expect((q as { choices: { value: boolean }[] }).choices.map((c) => c.value).sort())
             .toEqual([false, true]);
         // Backend + admin is the safer thing to land on for someone unsure.
@@ -1568,7 +1474,7 @@ pm: "pnpm"
         expect(questions.find((q) => q.name === "headless")).toBeUndefined();
     });
 
-    it("skips the collections preset when headless, which declares none", () => {
+    it("skips the preset when headless, which declares no tables", () => {
         const questions = buildInitQuestions({
             nameArg: "x",
 headlessArg: true,
@@ -1601,8 +1507,8 @@ describe("baas overlay", () => {
     const overlay = path.resolve(__dirname, "..", "..", "templates", "overlays", "baas");
 
     it("declares a managed backend and no frontend", () => {
-        // Headless is now expressed by the manifest and by the absence of a
-        // `config/collections` directory, not by a hand-written entrypoint that
+        // Headless is expressed by the manifest and by the absence of a
+        // `backend/schema` directory, not by a hand-written entrypoint that
         // passes `mode: "baas"`.
         const manifest = JSON.parse(fs.readFileSync(path.join(overlay, "rebase.json"), "utf8"));
 
@@ -1612,12 +1518,13 @@ runtime: "managed" });
         expect(fs.existsSync(path.join(overlay, "backend", "src", "index.ts"))).toBe(false);
     });
 
-    it("keeps a config package for the storage hook, but declares no collections", () => {
-        // Storage is not under row-level security, so deleting the config
-        // package outright would leave the boot guard nothing to find and the
+    it("keeps backend/storage.ts for the storage hook, and declares no tables", () => {
+        // Storage is not under row-level security, so a headless project
+        // without the hook would leave the boot guard nothing to find and the
         // scaffold's own docker-compose.yml would crash-loop.
-        expect(fs.existsSync(path.join(overlay, "config", "index.ts"))).toBe(true);
-        expect(fs.existsSync(path.join(overlay, "config", "collections"))).toBe(false);
+        expect(fs.readFileSync(path.join(overlay, "backend", "storage.ts"), "utf8")).toContain("export const storageAuthorize");
+        expect(fs.existsSync(path.join(overlay, "backend", "schema"))).toBe(false);
+        expect(fs.existsSync(path.join(overlay, "config"))).toBe(false);
     });
 
     it("ships the SDK, which its example script imports", () => {
@@ -1626,7 +1533,7 @@ runtime: "managed" });
         // tooling/scripts/example.ts imports @rebasepro/client; with no frontend in a
         // baas project, nothing else would pull it in.
         expect(pkg.dependencies?.["@rebasepro/client"]).toBeDefined();
-        expect(pkg.workspaces).toEqual(["backend", "config"]);
+        expect(pkg.workspaces).toEqual(["backend"]);
     });
 
     /**
