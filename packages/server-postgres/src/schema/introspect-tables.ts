@@ -120,13 +120,18 @@ export interface IntrospectTablesOptions {
 }
 
 /**
- * What one table's description could not say exactly, for the generator to
- * print: a column `rebase db push` would not reproduce, a foreign key no
- * relation can hold.
+ * What one table's description says about itself, by table, for the generator
+ * to print: `drift` — what `rebase db push` would not reproduce exactly (a
+ * column no builder states as it is, a foreign key no relation can hold) — and
+ * `remark` — a decision the file states and the reader may want to undo
+ * (`index: false`, a many-to-many declared on one end only).
  *
  * @group Schema
  */
-export type IntrospectionNotes = Map<string, string[]>;
+export interface IntrospectionNotes {
+    drift: Map<string, string[]>;
+    remark: Map<string, string[]>;
+}
 
 /**
  * Options of {@link describeTables}.
@@ -211,11 +216,11 @@ export function describeTables(metadata: SchemaMetadata, options: DescribeTables
     const enumMap = buildEnumMap(metadata.enumValues);
     const joinTables = options.joinTables ?? identifyJoinTables(tablesMap);
     const leaveOut = options.leaveOut ?? new Set<string>();
-    const notes: IntrospectionNotes = new Map();
-    const note = (table: string, text: string): void => {
-        const list = notes.get(table) ?? [];
+    const notes: IntrospectionNotes = { drift: new Map(), remark: new Map() };
+    const note = (table: string, text: string, kind: keyof IntrospectionNotes = "drift"): void => {
+        const list = notes[kind].get(table) ?? [];
         list.push(text);
-        notes.set(table, list);
+        notes[kind].set(table, list);
     };
 
     const skipped: SkippedTable[] = [];
@@ -278,7 +283,7 @@ interface TableContext {
     joinTables: ReadonlySet<string>;
     servedNames: ReadonlySet<string>;
     checkFacts: CheckFactsByTable;
-    note: (table: string, text: string) => void;
+    note: (table: string, text: string, kind?: keyof IntrospectionNotes) => void;
 }
 
 /** A foreign key that becomes a `belongsTo`. */
@@ -740,7 +745,7 @@ function foreignKeyIndexed(table: string, column: string, meta: TableMeta, conte
     const servedBy = indexes.find(index => index.leading_column === column && index.serves_leading_column);
     context.note(table, servedBy
         ? `${servedBy.index_name} already indexes "${column}", so its relation says \`index: false\`: without it \`rebase db push\` would build a second index.`
-        : `the database has no index on "${column}", so its relation says \`index: false\`; drop that to have one built.`);
+        : `the database has no index on "${column}", so its relation says \`index: false\`; drop that to have one built.`, "remark");
     return false;
 }
 
@@ -802,7 +807,7 @@ function inverseRelations(table: string, shape: TableShape, shapes: ReadonlyMap<
         const leading = jt.fks.find(fk => fk.column_name === jt.pks[0])?.foreign_table_name;
         const sortsFirst = [table, otherEnd.foreign_table_name].sort()[0];
         if (leading && leading !== sortsFirst && leading !== table) {
-            context.note(table, `the many-to-many with ${otherEnd.foreign_table_name} through ${junction} is declared on ${otherEnd.foreign_table_name} only: declaring it here too would re-key ${junction} from (${jt.pks.join(", ")}).`);
+            context.note(table, `the many-to-many with ${otherEnd.foreign_table_name} through ${junction} is declared on ${otherEnd.foreign_table_name} only: declaring it here too would re-key ${junction} from (${jt.pks.join(", ")}).`, "remark");
             continue;
         }
         out.push({

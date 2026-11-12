@@ -112,9 +112,9 @@ describe("tables generated from a real schema", () => {
         expect(moduleOf("pagila", "actor")).toContain("through: \"film_actor\"");
     });
 
-    it("writes no file for a partition, and one for the partitioned table — its composite key now declared", () => {
+    it("writes no file for a partition, and leaves out a partitioned table keyed on an instant, saying why", () => {
         expect(of("pagila").tables.filter(t => t.table.startsWith("payment_p"))).toEqual([]);
-        expect(moduleOf("pagila", "payment")).toMatch(/paymentId: col\.integer\(\)\.primaryKey\(\)[\s\S]*paymentDate: col\.timestamptz\(\)\.primaryKey\(\)/);
+        expect(of("pagila").failed).toEqual([{ table: "payment", reason: expect.stringContaining("its key includes \"payment_date\" (timestamptz)") }]);
     });
 
     it("declares the foreign-key column and its belongsTo beside it", () => {
@@ -293,7 +293,7 @@ const INTENDED: { pattern: RegExp; reason: string }[] = [
     { pattern: /: default \{"kind":"sql","expression":"(''::character varying|0)"\} → \{"kind":"literal","value":(""|0),"sql":"('')?0?"\}$/, reason: "a literal default is stated as the literal (the same DEFAULT, without the cast)" },
     { pattern: /: default undefined → \{"kind":"literal",/, reason: "a foreign-key column's DEFAULT is kept (a legacy relation property could not state one, so the push dropped it)" },
     { pattern: /^public\.(film_actor|film_category)\.last_update: column only in the new generation$/, reason: "a junction's own columns are its pivot (legacy declared none, so the push dropped them)" },
-    { pattern: /^public\.(payment|nodes|ways|relations): table only in the new generation$/, reason: "a composite key of any scalar type is declared (legacy left out a table keyed on a timestamp or pointed at)" },
+    { pattern: /^public\.(nodes|ways|relations): table only in the new generation$/, reason: "a composite key pointed at by another table is declared (legacy left it out); the links into it stay plain columns" },
     { pattern: /^public\.gps_points: table only in the legacy generation$/, reason: "a table with no primary key is not generated (legacy gave it an implicit `id`, which the push would have added)" }
 ];
 

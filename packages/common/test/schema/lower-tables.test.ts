@@ -660,6 +660,12 @@ describe("lowerTables — an introspected database (`introspected: true`)", () =
             .toEqual([expect.stringMatching(/^t\.codes: is `\.primaryKey\(\)` on a `citext\[\]` column/)]);
     });
 
+    it("lowers a table with no primary key, as the database holds it, where a planned one is refused", () => {
+        const keyless = defineTable("log", { columns: { line: col.text() }, rls: "admin-only" });
+        expect(Object.keys(lowerTables([keyless], { introspected: true })[0].properties)).toEqual(["line"]);
+        expect(refusal(() => lowerTables([keyless]))).toEqual([expect.stringMatching(/^log: declares no primary key/)]);
+    });
+
     it("still refuses `col.custom()` for a definition that is planned", () => {
         expect(refusal(() => lowerTables([defineTable("t", { columns: { id, ip: col.custom("inet") }, rls: "admin-only" })])))
             .toEqual([expect.stringContaining("t.ip: uses a feature that cannot be lowered to the collection model yet [custom-sql-type]")]);

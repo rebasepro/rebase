@@ -1,6 +1,6 @@
 /**
  * Adopting a database keeps its row-level security: `rebase schema introspect`
- * carries each policy into the collection's `securityRules`, and the
+ * carries each policy into the table's `rls`, and the
  * `rebase db push` after it leaves every policy as it was.
  *
  * Introspection read the tables and none of their policies. The generated
@@ -74,6 +74,9 @@ function cleanEnv(connectionString: string): Record<string, string> {
         if (/^(npm_|PNPM_|pnpm_|NPM_)/i.test(key)) delete env[key];
     }
     env.DATABASE_URL = connectionString;
+    // The generated modules import `@rebasepro/server/schema` from outside the
+    // workspace: the typecheck config maps every `@rebasepro/*` onto source.
+    env.TSX_TSCONFIG_PATH = path.join(monorepoRoot, "tsconfig.typecheck.json");
     return env;
 }
 
@@ -83,7 +86,7 @@ describe("introspect, then push: a database's own policies survive", () => {
     let container: PgContainer;
     let admin: pg.Client;
     let backend: string;
-    let collections: string;
+    let schemaDir: string;
     let before: LivePolicy[];
 
     const cli = (args: string[]) =>
@@ -115,11 +118,10 @@ describe("introspect, then push: a database's own policies survive", () => {
 
         const base = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-introspect-policies-"));
         backend = path.join(base, "backend");
-        collections = path.join(base, "config", "collections");
-        fs.mkdirSync(backend, { recursive: true });
-        fs.mkdirSync(collections, { recursive: true });
+        schemaDir = path.join(backend, "schema");
+        fs.writeFileSync(path.join(base, "rebase.json"), JSON.stringify({ rebase: "^1" }));
+        fs.mkdirSync(schemaDir, { recursive: true });
         fs.writeFileSync(path.join(backend, "package.json"), JSON.stringify({ name: "introspect-policies-backend", type: "module" }));
-        fs.writeFileSync(path.join(collections, "package.json"), JSON.stringify({ type: "module" }));
     }, 120_000);
 
     afterAll(async () => {
@@ -127,13 +129,13 @@ describe("introspect, then push: a database's own policies survive", () => {
         if (container) await stopPgContainer(container.containerName);
     }, 30_000);
 
-    it("writes each table's policies into its collection, and reads per-user rows as the app's data", async () => {
-        const introspected = await cli(["schema", "introspect", "--output", collections, "--force"]);
+    it("writes each table's policies into its `rls`, and reads per-user rows as the app's data", async () => {
+        const introspected = await cli(["schema", "introspect", "--schema-dir", schemaDir, "--force"]);
         expect(introspected.exitCode, introspected.all).toBe(0);
 
-        const customers = fs.readFileSync(path.join(collections, "customers.ts"), "utf8");
-        const orders = fs.readFileSync(path.join(collections, "orders.ts"), "utf8");
-        expect(customers).toMatch(/securityRules: \[/);
+        const customers = fs.readFileSync(path.join(schemaDir, "customers.ts"), "utf8");
+        const orders = fs.readFileSync(path.join(schemaDir, "orders.ts"), "utf8");
+        expect(customers).toMatch(/\n {4}rls: \[/);
         expect(customers).toContain(`name: "customers_owner"`);
         expect(orders).toContain(`name: "orders_owner"`);
         expect(orders).toContain(`name: "orders_select_1a2b3c4"`);
@@ -146,51 +148,51 @@ describe("introspect, then push: a database's own policies survive", () => {
 
     it("plans no change to row-level security, and says so", async () => {
         for (const table of ["customers", "orders"]) {
-            expect(fs.readFileSync(path.join(collections, `${table}.ts`), "utf8")).toContain("disableDefaultPolicies: true");
+            expect(fs.readFileSync(path.join(schemaDir, `${table}.ts`), "utf8")).toContain("defaultPolicies: false");
         }
-        const planned = await cli(["db", "push", "--dry-run", "--collections", collections]);
+        const planned = await cli(["db", "push", "--dry-run", "--schema-dir", schemaDir]);
         expect(planned.exitCode, planned.all).toBe(0);
-        expect(planned.all).toMatch(/No changes: the database already matches these collections/);
+        expect(planned.all).toMatch(/No changes: the database already matches these tables/);
         expect(planned.all).not.toMatch(/Planned row-level security changes|create policy/);
         expect(await handWritten()).toEqual(before);
     }, 300_000);
 
     it("pushes without dropping, rewriting or disowning a single policy", async () => {
-        const pushed = await cli(["db", "push", "--collections", collections]);
+        const pushed = await cli(["db", "push", "--schema-dir", schemaDir]);
         expect(pushed.exitCode, pushed.all).toBe(0);
         expect(pushed.all).not.toMatch(/Dropped superseded policy/);
-        expect(pushed.all).not.toMatch(/no collection describes/);
+        expect(pushed.all).not.toMatch(/no table describes/);
 
         // Recreated from the rules, each policy reads as it did.
         expect(await handWritten()).toEqual(before);
 
-        const doctor = await cli(["doctor", "--policies", "--collections", collections]);
+        const doctor = await cli(["doctor", "--policies", "--schema-dir", schemaDir]);
         expect(doctor.all).not.toMatch(/Orphaned/);
     }, 300_000);
 
     // Deleting the line asks for the baseline, and the dry run says what the
     // push then does, policy by policy.
     it("lists the admin baseline a collection asks for, and the push adds exactly that", async () => {
-        const ordersFile = path.join(collections, "orders.ts");
-        fs.writeFileSync(ordersFile, fs.readFileSync(ordersFile, "utf8").replace(/\n {4}disableDefaultPolicies: true,/, ""));
+        const ordersFile = path.join(schemaDir, "orders.ts");
+        fs.writeFileSync(ordersFile, fs.readFileSync(ordersFile, "utf8").replace(/,\n {4}defaultPolicies: false/, ""));
         const baseline = ["orders_default_admin_read", "orders_default_admin_write_delete",
             "orders_default_admin_write_insert", "orders_default_admin_write_update"];
 
-        const planned = await cli(["db", "push", "--dry-run", "--collections", collections]);
+        const planned = await cli(["db", "push", "--dry-run", "--schema-dir", schemaDir]);
         expect(planned.exitCode, planned.all).toBe(0);
         expect(planned.all).toMatch(/Planned row-level security changes:/);
         for (const name of baseline) expect(planned.all).toContain(`create policy   public.orders → "${name}"`);
         expect(planned.all).not.toMatch(/No changes/);
         expect(await handWritten()).toEqual(before);
 
-        const pushed = await cli(["db", "push", "--collections", collections]);
+        const pushed = await cli(["db", "push", "--schema-dir", schemaDir]);
         expect(pushed.exitCode, pushed.all).toBe(0);
         expect(pushed.all).toMatch(/Row-level security: 4 policies to create\./);
         const after = await handWritten();
         expect(after.map(p => `${p.tablename}.${p.policyname}`).filter(name => !before.some(b => `${b.tablename}.${b.policyname}` === name)))
             .toEqual(baseline.map(name => `orders.${name}`));
 
-        const again = await cli(["db", "push", "--dry-run", "--collections", collections]);
-        expect(again.all).toMatch(/No changes: the database already matches these collections/);
+        const again = await cli(["db", "push", "--dry-run", "--schema-dir", schemaDir]);
+        expect(again.all).toMatch(/No changes: the database already matches these tables/);
     }, 300_000);
 });

@@ -1,6 +1,6 @@
 import { defineTable, col } from "@rebasepro/server/schema";
 
-// ⚠ Not reproduced exactly by `rebase db push` — read before pushing:
+// Introspection notes:
 //   - the many-to-many with customers through customer_customer_demo is declared on customers only: declaring it here too would re-key customer_customer_demo from (customer_id, customer_type_id).
 export const customerDemographics = defineTable("customer_demographics", {
     columns: {

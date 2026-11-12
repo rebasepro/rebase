@@ -326,7 +326,7 @@ describe("describeTables (runtime) — relations", () => {
         const child = tableOf(described, "child");
         expect(child.relations).toEqual([]);
         expect(child.columns.map(c => c.key)).toEqual(["id", "pa", "pb", "parentCode"]);
-        expect(notes.get("child")).toEqual([
+        expect(notes.drift.get("child")).toEqual([
             expect.stringContaining("the foreign key child_p_fkey spans (pa, pb)"),
             expect.stringContaining("\"parent_code\" references parent(code)")
         ]);

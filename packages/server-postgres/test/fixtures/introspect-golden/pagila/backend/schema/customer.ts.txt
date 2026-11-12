@@ -1,7 +1,6 @@
 import { defineTable, col, rel } from "@rebasepro/server/schema";
 import { address } from "./address";
 import { store } from "./store";
-import { payment } from "./payment";
 import { rental } from "./rental";
 
 export const customer = defineTable("customer", {
@@ -21,7 +20,6 @@ export const customer = defineTable("customer", {
     relations: {
         address: rel.belongsTo(() => address),
         store: rel.belongsTo(() => store),
-        payment: rel.hasMany(() => payment),
         rental: rel.hasMany(() => rental)
     },
     rls: "admin-only"

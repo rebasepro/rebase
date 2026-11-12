@@ -60,6 +60,9 @@ function cleanEnv(connectionString: string): Record<string, string> {
         if (/^(npm_|PNPM_|pnpm_|NPM_)/i.test(key)) delete env[key];
     }
     env.DATABASE_URL = connectionString;
+    // The generated modules import `@rebasepro/server/schema` from outside the
+    // workspace: the typecheck config maps every `@rebasepro/*` onto source.
+    env.TSX_TSCONFIG_PATH = path.join(monorepoRoot, "tsconfig.typecheck.json");
     return env;
 }
 
@@ -69,7 +72,7 @@ describe("introspect, then push: CHECK and EXCLUDE constraints, triggers and fun
     let container: PgContainer;
     let admin: pg.Client;
     let backend: string;
-    let collections: string;
+    let schemaDir: string;
     let before: LiveConstraint[];
 
     const cli = (args: string[]) =>
@@ -111,11 +114,10 @@ describe("introspect, then push: CHECK and EXCLUDE constraints, triggers and fun
 
         const base = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-introspect-checks-"));
         backend = path.join(base, "backend");
-        collections = path.join(base, "config", "collections");
-        fs.mkdirSync(backend, { recursive: true });
-        fs.mkdirSync(collections, { recursive: true });
+        schemaDir = path.join(backend, "schema");
+        fs.writeFileSync(path.join(base, "rebase.json"), JSON.stringify({ rebase: "^1" }));
+        fs.mkdirSync(schemaDir, { recursive: true });
         fs.writeFileSync(path.join(backend, "package.json"), JSON.stringify({ name: "introspect-checks-backend", type: "module" }));
-        fs.writeFileSync(path.join(collections, "package.json"), JSON.stringify({ type: "module" }));
     }, 120_000);
 
     afterAll(async () => {
@@ -124,9 +126,9 @@ describe("introspect, then push: CHECK and EXCLUDE constraints, triggers and fun
     }, 30_000);
 
     it("introspects the table", async () => {
-        const introspected = await cli(["schema", "introspect", "--output", collections, "--force"]);
+        const introspected = await cli(["schema", "introspect", "--schema-dir", schemaDir, "--force"]);
         expect(introspected.exitCode, introspected.all).toBe(0);
-        expect(fs.existsSync(path.join(collections, "orders.ts"))).toBe(true);
+        expect(fs.existsSync(path.join(schemaDir, "orders.ts"))).toBe(true);
     }, 180_000);
 
     it("pushes without dropping a constraint, and the database still refuses what they refuse", async () => {
@@ -135,7 +137,7 @@ describe("introspect, then push: CHECK and EXCLUDE constraints, triggers and fun
         // a table into one `ALTER TABLE`, and a drop would ride in it.
         await admin.query("ALTER TABLE public.orders DROP COLUMN note");
 
-        const pushed = await cli(["db", "push", "--collections", collections]);
+        const pushed = await cli(["db", "push", "--schema-dir", schemaDir]);
         expect(pushed.exitCode, pushed.all).toBe(0);
         expect(pushed.all).not.toMatch(/DROP CONSTRAINT/);
         expect((await admin.query(
@@ -162,7 +164,7 @@ describe("introspect, then push: CHECK and EXCLUDE constraints, triggers and fun
     });
 
     it("plans nothing on a second push", async () => {
-        const dryRun = await cli(["db", "push", "--dry-run", "--collections", collections]);
+        const dryRun = await cli(["db", "push", "--dry-run", "--schema-dir", schemaDir]);
         expect(dryRun.exitCode, dryRun.all).toBe(0);
         expect(dryRun.all).not.toMatch(/DROP CONSTRAINT/);
         expect(dryRun.all).not.toMatch(/destroy/i);

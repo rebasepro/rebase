@@ -77,7 +77,7 @@ describe("schema introspect with data inference", () => {
     it("takes --data-inference, and samples every table over one connection without a warning", async () => {
         const output = path.join(base, "inferred");
 
-        const run = await introspect("--data-inference", "--output", output);
+        const run = await introspect("--data-inference", "--schema-dir", output);
 
         expect(run.all).not.toContain("has no option");
         expect(run.all).not.toContain("DeprecationWarning");
@@ -87,7 +87,7 @@ describe("schema introspect with data inference", () => {
     }, 120_000);
 
     it("takes --no-data-inference", async () => {
-        const run = await introspect("--no-data-inference", "--output", path.join(base, "structure"));
+        const run = await introspect("--no-data-inference", "--schema-dir", path.join(base, "structure"));
 
         expect(run.exitCode, run.all).toBe(0);
         expect(run.all).not.toContain("Sampling database rows");
@@ -97,10 +97,10 @@ describe("schema introspect with data inference", () => {
         const output = path.join(base, "inferred");
 
         // Every file is there already, and nothing forces an overwrite.
-        const run = await introspect("--no-data-inference", "--output", output);
+        const run = await introspect("--no-data-inference", "--schema-dir", output);
 
         expect(run.exitCode, run.all).toBe(0);
-        expect(run.all).toContain("generated 0 collection(s)");
+        expect(run.all).toContain("generated 0 table(s)");
         expect(run.all).not.toContain("Review the generated files");
     }, 120_000);
 });

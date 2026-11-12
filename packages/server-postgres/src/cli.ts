@@ -269,7 +269,8 @@ export async function runPluginCommand(args: string[]) {
     // destructive gate stood between a typo and the whole schema. The loader
     // reads a missing *default* directory as "no tables" (the headless
     // layout); a directory somebody typed is refused here, before any write.
-    assertSchemaDirExists(schemaDirIn(args));
+    // `schema introspect` is the exception: it writes the directory it names.
+    if (!(domain === "schema" && subcommand === "introspect")) assertSchemaDirExists(schemaDirIn(args));
 
     try {
         if (domain === "db") {

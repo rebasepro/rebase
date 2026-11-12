@@ -8,6 +8,7 @@ import { diaryComments } from "./diary_comments";
 //   - "created_at" is timestamp without time zone, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
 //   - "updated_at" is timestamp without time zone, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
 //   - "language_code" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
+// Introspection notes:
 //   - the many-to-many with users through diary_entry_subscriptions is declared on users only: declaring it here too would re-key diary_entry_subscriptions from (user_id, diary_entry_id).
 export const diaryEntries = defineTable("diary_entries", {
     columns: {

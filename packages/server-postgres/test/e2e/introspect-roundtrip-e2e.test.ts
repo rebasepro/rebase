@@ -14,14 +14,13 @@
  *
  * So this runs the real doors in order against a real Postgres:
  *
- *   1. a database Rebase built (`db push` of a property × relation matrix),
- *      introspected into fresh collection files, planned again — no changes;
- *   2. a hand-written legacy database of shapes a property can state,
- *      introspected and planned — no schema change. A table keyed on two
- *      columns is one composite key, `isId` on each column; one keyed on a
- *      column no `isId` can mark is left out with its reason. Its tables have
- *      row-level security off, which no collection keeps: the push switches
- *      it on, and both the introspection and the dry run say so.
+ *   1. a database Rebase built (`db push` of a column × relation matrix),
+ *      introspected into a fresh `backend/schema`, planned again — no changes;
+ *   2. a hand-written legacy database, introspected and planned — no schema
+ *      change. A table keyed on several columns is one composite key; one
+ *      keyed on an instant is left out with its reason. Its tables have
+ *      row-level security off, which no table keeps: the push switches it on,
+ *      and both the introspection and the dry run say so.
  *
  * Requires Docker. Spins up a throwaway Postgres container and tears it down.
  */
@@ -40,117 +39,113 @@ const monorepoRoot = path.resolve(pkgRoot, "../..");
 const cliScript = path.join(pkgRoot, "src", "cli.ts");
 const tsxBin = path.join(monorepoRoot, "node_modules", ".bin", "tsx");
 
-/** The matrix: every property kind and every relation kind `db push` builds. */
+/** The matrix: every column kind and every relation kind `db push` builds, as `backend/schema`. */
 const MATRIX: Record<string, string> = {
-    "people.js": `
-import categories from "./categories.js";
-import addresses from "./addresses.js";
-import profiles from "./profiles.js";
-export default {
-    name: "People", slug: "people", table: "people",
+    "people.ts": `
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { categories } from "./categories";
+import { addresses } from "./addresses";
+import { profiles } from "./profiles";
+export const people = defineTable("people", {
+    columns: {
+        id: col.uuid().primaryKey().defaultRandom(),
+        name: col.text().notNull(),
+        email: col.text().unique(),
+        bio: col.text(),
+        nickname: col.varchar(40),
+        age: col.integer(),
+        rating: col.numeric(5, 2),
+        score: col.numeric(),
+        big: col.bigint(),
+        active: col.boolean().default(true),
+        born: col.date(),
+        wakeAt: col.time(),
+        createdAt: col.timestamptz().onCreateNow(),
+        status: col.enum(["new", "old"]).default("new"),
+        aliases: col.array(col.text()),
+        lucky: col.array(col.integer()),
+        meta: col.jsonb(),
+        prefs: col.json()
+    },
+    relations: {
+        categories: rel.manyToMany(() => categories),
+        addresses: rel.hasMany(() => addresses),
+        profile: rel.hasOne(() => profiles)
+    },
     search: { fields: [{ path: "name", weight: "A" }, { path: "bio", weight: "B" }] },
-    properties: {
-        id: { name: "ID", type: "string", isId: "uuid" },
-        name: { name: "Name", type: "string", validation: { required: true } },
-        email: { name: "Email", type: "string", validation: { unique: true } },
-        bio: { name: "Bio", type: "string", columnType: "text" },
-        nickname: { name: "Nickname", type: "string", columnType: "varchar", validation: { max: 40 } },
-        age: { name: "Age", type: "number", validation: { integer: true } },
-        rating: { name: "Rating", type: "number", precision: 5, scale: 2 },
-        score: { name: "Score", type: "number" },
-        big: { name: "Big", type: "number", columnType: "bigint" },
-        active: { name: "Active", type: "boolean", defaultValue: true },
-        born: { name: "Born", type: "date", columnType: "date" },
-        wakeAt: { name: "Wake", type: "date", columnType: "time" },
-        createdAt: { name: "Created", type: "date", autoValue: "on_create" },
-        status: { name: "Status", type: "string", defaultValue: "new", enum: [{ id: "new", label: "New" }, { id: "old", label: "Old" }] },
-        aliases: { name: "Aliases", type: "array", of: { type: "string" } },
-        lucky: { name: "Lucky", type: "array", columnType: "integer[]", of: { type: "number" } },
-        meta: { name: "Meta", type: "map", keyValue: true },
-        prefs: { name: "Prefs", type: "map", columnType: "json", keyValue: true },
-        categories: { name: "Categories", type: "relation", relation: { kind: "manyToMany", target: () => categories } },
-        addresses: { name: "Addresses", type: "relation", relation: { kind: "hasMany", target: () => addresses } },
-        profile: { name: "Profile", type: "relation", relation: { kind: "hasOne", target: () => profiles } }
-    }
-};`,
-    "categories.js": `
-import people from "./people.js";
-export default {
-    name: "Categories", slug: "categories", table: "categories",
+    rls: "admin-only"
+});`,
+    "categories.ts": `
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { people } from "./people";
+export const categories = defineTable("categories", {
+    columns: { id: col.integer().primaryKey().identity(), title: col.text() },
+    relations: { people: rel.manyToMany(() => people) },
     // The scaffold's default rules: reads for everyone, writes for admins.
-    securityRules: [
+    rls: [
         { operation: "select", access: "public" },
         { operations: ["insert", "update", "delete"], roles: ["admin"] }
-    ],
-    properties: {
-        id: { name: "ID", type: "number", isId: "increment" },
-        title: { name: "Title", type: "string" },
-        people: { name: "People", type: "relation", relation: { kind: "manyToMany", target: () => people } }
-    }
-};`,
-    "addresses.js": `
-import people from "./people.js";
-export default {
-    name: "Addresses", slug: "addresses", table: "addresses",
-    properties: {
-        id: { name: "ID", type: "string", isId: "uuid" },
-        line: { name: "Line", type: "string" },
-        person: { name: "Person", type: "relation", validation: { required: true },
-            relation: { kind: "belongsTo", target: () => people, onDelete: "cascade" } }
-    }
-};`,
-    "profiles.js": `
-import people from "./people.js";
-export default {
-    name: "Profiles", slug: "profiles", table: "profiles",
-    properties: {
-        id: { name: "ID", type: "string", isId: "uuid" },
-        handle: { name: "Handle", type: "string" },
-        person: { name: "Person", type: "relation", relation: { kind: "belongsTo", target: () => people } }
-    }
-};`,
-    "orders.js": `
-import orders from "./orders.js";
-export default {
-    name: "Orders", slug: "orders", table: "order",
-    properties: {
-        id: { name: "ID", type: "number", isId: "increment" },
-        select: { name: "Select", type: "string" },
-        group: { name: "Group", type: "string", enum: [{ id: "a", label: "A" }, { id: "b", label: "B" }] },
-        friends: { name: "Friends", type: "relation", relation: { kind: "manyToMany", target: () => orders } }
-    }
-};`,
-    "series.js": `
-import news from "./news.js";
-export default {
-    name: "Series", slug: "series", table: "series",
-    properties: {
-        id: { name: "ID", type: "string", isId: "uuid" },
-        title: { name: "Title", type: "string" },
-        news: { name: "News", type: "relation", relation: { kind: "manyToMany", target: () => news } }
-    }
-};`,
-    "news.js": `
-import series from "./series.js";
-export default {
-    name: "News", slug: "news", table: "news",
-    properties: {
-        id: { name: "ID", type: "string", isId: "uuid" },
-        headline: { name: "Headline", type: "string" },
-        series: { name: "Series", type: "relation", relation: { kind: "belongsTo", target: () => series } }
-    }
-};`,
-    "long_things.js": `
-export default {
-    name: "Long", slug: "long_things", table: "long_things_tbl",
-    properties: {
-        id: { name: "ID", type: "string", isId: "uuid" },
-        a_status_column_with_quite_a_long_name_that_keeps_going_on: { name: "S", type: "string", enum: [{ id: "x", label: "X" }] }
-    }
-};`
+    ]
+});`,
+    "addresses.ts": `
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { people } from "./people";
+export const addresses = defineTable("addresses", {
+    columns: { id: col.uuid().primaryKey().defaultRandom(), line: col.text() },
+    relations: { person: rel.belongsTo(() => people, { notNull: true, onDelete: "cascade" }) },
+    rls: "admin-only"
+});`,
+    "profiles.ts": `
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { people } from "./people";
+export const profiles = defineTable("profiles", {
+    columns: { id: col.uuid().primaryKey().defaultRandom(), handle: col.text() },
+    relations: { person: rel.belongsTo(() => people) },
+    rls: "admin-only"
+});`,
+    "orders.ts": `
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+export const orders = defineTable("orders", {
+    table: "order",
+    columns: { id: col.integer().primaryKey().identity(), select: col.text(), group: col.enum(["a", "b"]) },
+    relations: { friends: rel.manyToMany(() => orders) },
+    rls: "admin-only"
+});`,
+    "series.ts": `
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { news } from "./news";
+export const series = defineTable("series", {
+    columns: { id: col.uuid().primaryKey().defaultRandom(), title: col.text() },
+    relations: { news: rel.manyToMany(() => news) },
+    rls: "admin-only"
+});`,
+    "news.ts": `
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { series } from "./series";
+export const news = defineTable("news", {
+    columns: { id: col.uuid().primaryKey().defaultRandom(), headline: col.text() },
+    relations: { series: rel.belongsTo(() => series) },
+    rls: "admin-only"
+});`,
+    "long_things.ts": `
+import { defineTable, col } from "@rebasepro/server/schema";
+export const longThings = defineTable("long_things", {
+    table: "long_things_tbl",
+    columns: {
+        id: col.uuid().primaryKey().defaultRandom(),
+        aStatusColumnWithQuiteALongNameThatKeepsGoingOn: col.enum(["x"]).column("a_status_column_with_quite_a_long_name_that_keeps_going_on")
+    },
+    rls: "admin-only"
+});`
 };
 
-/** A hand-written schema, made only of shapes a property can state. */
+const MATRIX_INDEX = Object.keys(MATRIX).map(file => {
+    const name = file.replace(/\.ts$/, "");
+    const identifier = name === "long_things" ? "longThings" : name;
+    return `export { ${identifier} } from "./${name}";`;
+}).join("\n") + "\n";
+
+/** A hand-written schema of the shapes a column builder states. */
 const LEGACY_SQL = `
 CREATE TABLE customers (
   id serial PRIMARY KEY,
@@ -204,19 +199,22 @@ function cleanEnv(connectionString: string): Record<string, string> {
         if (/^(npm_|PNPM_|pnpm_|NPM_)/i.test(key)) delete env[key];
     }
     env.DATABASE_URL = connectionString;
+    // The schema modules import `@rebasepro/server/schema` from a directory
+    // outside the workspace; the typecheck config maps every `@rebasepro/*`
+    // onto source, so the driver and the modules share one copy of the builders.
+    env.TSX_TSCONFIG_PATH = path.join(monorepoRoot, "tsconfig.typecheck.json");
     return env;
 }
 
-/** A backend dir and an empty collections dir beside it, as a project lays them out. */
-function scratchProject(name: string): { backend: string; collections: string } {
+/** A backend dir and its schema dir, as a project lays them out. */
+function scratchProject(name: string): { backend: string; schema: string } {
     const base = fs.mkdtempSync(path.join(os.tmpdir(), `rebase-${name}-`));
+    fs.writeFileSync(path.join(base, "rebase.json"), JSON.stringify({ rebase: "^1" }));
     const backend = path.join(base, "backend");
-    const collections = path.join(base, "config", "collections");
-    fs.mkdirSync(backend, { recursive: true });
-    fs.mkdirSync(collections, { recursive: true });
+    const schema = path.join(backend, "schema");
+    fs.mkdirSync(schema, { recursive: true });
     fs.writeFileSync(path.join(backend, "package.json"), JSON.stringify({ name: `${name}-backend`, type: "module" }));
-    fs.writeFileSync(path.join(collections, "package.json"), JSON.stringify({ type: "module" }));
-    return { backend, collections };
+    return { backend, schema };
 }
 
 describe("introspect, then push: adopting a database changes nothing", () => {
@@ -241,27 +239,25 @@ describe("introspect, then push: adopting a database changes nothing", () => {
     async function introspectAndPlan(database: string) {
         const adopted = scratchProject(`${database}-adopted`);
         const introspected = await cli(adopted.backend, database,
-            ["schema", "introspect", "--output", adopted.collections, "--force"]);
+            ["schema", "introspect", "--schema-dir", adopted.schema, "--force"]);
         expect(introspected.exitCode, introspected.all).toBe(0);
         const planned = await cli(adopted.backend, database,
-            ["db", "push", "--dry-run", "--collections", adopted.collections]);
+            ["db", "push", "--dry-run", "--schema-dir", adopted.schema]);
         return { introspected, planned, adopted };
     }
 
     it("a database Rebase built plans no changes after a round trip", async () => {
         await admin.query("CREATE DATABASE built");
         const made = scratchProject("built");
-        for (const [file, source] of Object.entries(MATRIX)) fs.writeFileSync(path.join(made.collections, file), source);
-        fs.writeFileSync(path.join(made.collections, "index.js"),
-            Object.keys(MATRIX).map((file, i) => `import c${i} from "./${file}";`).join("\n")
-            + `\nexport default [${Object.keys(MATRIX).map((_, i) => `c${i}`).join(", ")}];\n`);
-        const pushed = await cli(made.backend, "built", ["db", "push", "--collections", made.collections]);
+        for (const [file, source] of Object.entries(MATRIX)) fs.writeFileSync(path.join(made.schema, file), source);
+        fs.writeFileSync(path.join(made.schema, "index.ts"), MATRIX_INDEX);
+        const pushed = await cli(made.backend, "built", ["db", "push", "--schema-dir", made.schema]);
         expect(pushed.exitCode, pushed.all).toBe(0);
 
         const { introspected, planned, adopted } = await introspectAndPlan("built");
-        expect(introspected.all).not.toMatch(/will not round-trip/);
+        expect(introspected.all).not.toMatch(/would not reproduce exactly/);
         expect(planned.exitCode, planned.all).toBe(0);
-        expect(planned.all).toMatch(/No changes: the database already matches these collections/);
+        expect(planned.all).toMatch(/No changes: the database already matches these tables/);
         // A role rule reads back deparsed — `( SELECT (string_to_array(
         // rebase.roles(), ','::text) && ARRAY['admin'::text]))` — and the stamp
         // over the statement it renders then differed from the push's, so each
@@ -273,9 +269,9 @@ describe("introspect, then push: adopting a database changes nothing", () => {
         // derived from categories' update rule. Read back as SQL that did not
         // parse as a role check, the rule could not be carried into the
         // junction, so its three policies were left in force as ones no
-        // collection describes — and would never follow the rule again.
-        expect(planned.all).not.toMatch(/no collection describes/);
-        const doctor = await cli(adopted.backend, "built", ["doctor", "--policies", "--collections", adopted.collections]);
+        // table describes — and would never follow the rule again.
+        expect(planned.all).not.toMatch(/no table describes/);
+        const doctor = await cli(adopted.backend, "built", ["doctor", "--policies", "--schema-dir", adopted.schema]);
         expect(doctor.all).not.toMatch(/Orphaned/);
         expect(doctor.all).not.toMatch(/categories_people_default_edge_write/);
     }, 300_000);
@@ -291,17 +287,17 @@ describe("introspect, then push: adopting a database changes nothing", () => {
         }
 
         const { introspected, planned } = await introspectAndPlan("legacy");
-        // Generated, with `isId` on both key columns: one composite key.
+        // A composite key is declared on every one of its columns.
         expect(introspected.all).not.toMatch(/Skipping table "order_lines"/);
         expect(introspected.all).toMatch(/✓ .*order_lines\.ts/);
-        // A timestamp cannot carry `isId`, so this key cannot be stated.
-        expect(introspected.all).toMatch(/Skipping table "readings": it is keyed on \(sensor_id, taken_at\), and its key column "taken_at" cannot carry `isId`/);
-        expect(introspected.all).not.toMatch(/will not round-trip/);
+        // An instant is no key a row can be addressed by: left out, with why.
+        expect(introspected.all).toMatch(/Skipping table "readings": its key includes "taken_at" \(timestamptz\)/);
+        expect(introspected.all).not.toMatch(/would not reproduce exactly/);
         expect(planned.exitCode, planned.all).toBe(0);
         // Nothing for Atlas: no column, key or constraint moves.
         expect(planned.all).not.toMatch(/Planned changes:/);
         // What does change, said in both places: RLS goes on, and with it
-        // the admin baseline every collection keeps.
+        // the admin baseline every table keeps.
         expect(introspected.all).toMatch(/5 table\(s\) have row-level security off, so every request reaches every row: UserAccounts, codes, customers, order, order_lines\./);
         expect(planned.all).toMatch(/Planned row-level security changes:/);
         for (const table of ["UserAccounts", "codes", "customers", "order", "order_lines"]) {

@@ -2,7 +2,7 @@
  * E2E: a join table with row-level security off, in a project that declares no
  * collections, is not reachable by a caller.
  *
- * No collection is ever derived for a join table (`buildCollectionsFromSchema`),
+ * No table is ever described for a join table (`introspectTables`),
  * so every door that starts from a collection has no address for it. Boot also
  * drops one with RLS off from the Drizzle schema and names it, so that skip is
  * not the only thing between a caller and its rows.
@@ -343,12 +343,12 @@ body })).status).toBe(404);
         const answer = await call("/api/data/_batch", {
             method: "POST",
             body: { operations: [{ op: "create",
-collection: "memberships",
+table: "memberships",
 values: { personId: "bob",
 projectId: SENTINEL } }] }
         });
         expect(answer.status).toBe(400);
-        expect(answer.text).toContain("unknown collection");
+        expect(answer.text).toContain("unknown table");
         const { rows } = await admin.query("SELECT 1 FROM public.memberships WHERE person_id = 'bob'");
         expect(rows).toHaveLength(1);
     });

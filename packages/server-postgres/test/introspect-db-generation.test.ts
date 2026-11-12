@@ -226,7 +226,7 @@ describe("relations", () => {
     it("says `index: false` where the database has no index on the key, and why", () => {
         const g = generate({ ...blog, indexes: [] });
         expect(moduleOf(g, "posts")).toContain("author: rel.belongsTo(() => authors, { onDelete: \"cascade\", index: false })");
-        expect(g.tables.find(t => t.table === "posts")?.notes).toEqual(expect.arrayContaining([
+        expect(g.tables.find(t => t.table === "posts")?.remarks).toEqual(expect.arrayContaining([
             expect.stringContaining("the database has no index on \"author_id\"")
         ]));
     });

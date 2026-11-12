@@ -7,7 +7,7 @@
  * no process.exit.  It is imported by introspect-db.ts (the CLI entry-point)
  * and consumed directly by tests.
  */
-import type { ColumnType, TableDescriptor } from "@rebasepro/types";
+import { columnTypeLabel, type ColumnType, type TableDescriptor } from "@rebasepro/types";
 import { printIndexModule, printTableModule, tableIdentifier } from "@rebasepro/common";
 import { toWireKey } from "@rebasepro/utils";
 import { inferColumnHints } from "./introspect-db-inference";
@@ -556,6 +556,8 @@ export interface GeneratedTable {
     customization?: string;
     /** What `rebase db push` would not reproduce exactly, each also at the top of the module. */
     notes: string[];
+    /** Decisions the module states that the reader may want to undo (`index: false`, …), each also at its top. */
+    remarks: string[];
 }
 
 /**
@@ -568,6 +570,9 @@ export interface SchemaGeneration {
     /** The generated tables whose row-level security is off: the first push switches it on. */
     rlsOff: string[];
 }
+
+/** The column types a declared key may not have (`defineTable` refuses them). */
+const UNKEYABLE_KINDS: ReadonlySet<ColumnType["kind"]> = new Set(["timestamptz", "time", "json", "jsonb", "vector", "bytea", "array", "other"]);
 
 /** The `PropertyOrderingContext` property type of a column type. */
 function orderingType(type: ColumnType): string {
@@ -725,12 +730,24 @@ export function generateSchemaModules(input: SchemaGenerationInput): SchemaGener
     // A table with no primary key cannot be declared: a row is addressed by
     // its key in every URL, filter and foreign key.
     const keyless = [...tablesMap.values()].filter(meta => meta.pks.length === 0 && !joinTables.has(meta.name) && !(input.leaveOut?.has(meta.name) ?? false));
-    const described = describeTables(metadata, {
+    const describe = (leaveOut: ReadonlySet<string>) => describeTables(metadata, {
         purpose: "generate",
         joinTables,
-        leaveOut: new Set([...(input.leaveOut ?? []), ...keyless.map(meta => meta.name)]),
+        leaveOut: new Set([...(input.leaveOut ?? []), ...keyless.map(meta => meta.name), ...leaveOut]),
         checkFacts: input.checkFacts
     });
+    // A key column a row cannot be addressed by — an instant, a document, a
+    // list, a type Rebase does not create — cannot be declared either; the
+    // table is left out, and described again without it so nothing points at it.
+    const unkeyable = new Map<string, string>();
+    for (const table of describe(new Set()).tables) {
+        const bad = table.columns.filter(column => column.primaryKey && UNKEYABLE_KINDS.has(column.type.kind));
+        if (bad.length > 0) {
+            unkeyable.set(table.table, `its key includes ${bad.map(column => `"${column.column}" (${columnTypeLabel(column.type)})`).join(", ")}, and a key ` +
+                "column is a value a row is addressed by — text, a number, a uuid, a date, a boolean or an enum. Key the table on such a column and introspect again.");
+        }
+    }
+    const described = describe(new Set(unkeyable.keys()));
     const bySlug = new Map(described.tables.map(table => [table.slug, table]));
     const resolveTarget = (target: { name?: string; slug: string }) => {
         const found = bySlug.get(target.slug);
@@ -739,16 +756,20 @@ export function generateSchemaModules(input: SchemaGenerationInput): SchemaGener
 
     const out: SchemaGeneration = {
         tables: [],
-        failed: keyless.map(meta => ({
-            table: meta.name,
-            reason: "it has no primary key, and a table is declared with the column (or columns) that identify a row. Add one (`ALTER TABLE … ADD PRIMARY KEY (…)`) and introspect again."
-        })),
+        failed: [
+            ...keyless.map(meta => ({
+                table: meta.name,
+                reason: "it has no primary key, and a table is declared with the column (or columns) that identify a row. Add one (`ALTER TABLE … ADD PRIMARY KEY (…)`) and introspect again."
+            })),
+            ...[...unkeyable].map(([table, reason]) => ({ table, reason }))
+        ],
         rlsOff: []
     };
     for (const descriptor of described.tables) {
         const meta = tablesMap.get(descriptor.table);
         if (!meta) continue;
-        const notes = [...(described.notes.get(descriptor.table) ?? [])];
+        const notes = [...(described.notes.drift.get(descriptor.table) ?? [])];
+        const remarks = [...(described.notes.remark.get(descriptor.table) ?? [])];
 
         // What the rows and the names add to each column.
         const rows = input.samples?.get(descriptor.table);
@@ -779,6 +800,7 @@ export function generateSchemaModules(input: SchemaGenerationInput): SchemaGener
                 ? [`Introspected as ${/^[aeiou]/.test(classification.role) ? "an" : "a"} ${classification.role}: ${classification.reason}.`]
                 : []),
             ...(notes.length > 0 ? ["⚠ Not reproduced exactly by `rebase db push` — read before pushing:", ...notes.map(note => `  - ${note}`)] : []),
+            ...(remarks.length > 0 ? ["Introspection notes:", ...remarks.map(remark => `  - ${remark}`)] : []),
             ...rlsOffComment(row)
         ];
         if (header.length > 0) {
@@ -800,7 +822,7 @@ export function generateSchemaModules(input: SchemaGenerationInput): SchemaGener
                 });
             }
         }
-        out.tables.push({ table: descriptor.table, identifier, schemaModule, notes, ...(customization ? { customization } : {}) });
+        out.tables.push({ table: descriptor.table, identifier, schemaModule, notes, remarks, ...(customization ? { customization } : {}) });
     }
     return out;
 }

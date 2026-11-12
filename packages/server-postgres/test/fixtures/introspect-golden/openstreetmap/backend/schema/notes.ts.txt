@@ -7,6 +7,7 @@ import { noteComments } from "./note_comments";
 //   - "created_at" is timestamp without time zone, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
 //   - "closed_at" is timestamp without time zone, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
 //   - "user_ip" is inet, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
+// Introspection notes:
 //   - the many-to-many with users through note_subscriptions is declared on users only: declaring it here too would re-key note_subscriptions from (user_id, note_id).
 export const notes = defineTable("notes", {
     columns: {
