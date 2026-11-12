@@ -12,8 +12,10 @@
  * The tables are the descriptors the tool result carries, redacted by the
  * server for this person: `<RebaseCMS>` renders them in place of the ones
  * its client would fetch, projected and customized exactly as on the
- * project's own page. With no customizations (the generic view, or a project
- * that has none) they render with the CMS's zero-config defaults.
+ * project's own page — the project's code customizations, then the UI
+ * preferences the result carries (`ui-config.json` as the server knows it,
+ * the workspace's, the person's), folded by the panel's own composition. The
+ * generic view has no code customizations; the preferences still apply.
  *
  * ```ts
  * // the project's view entry (the Vite plugin generates it)
@@ -49,7 +51,7 @@ export type { HostContext, ToolResult, DisplayMode, ViewBridge } from "./bridge"
 export { createToolDriver, DEFAULT_ACTIONS, SaveCancelledError, describeChanges, describeFailedWrite, describeRefusal, needsConfirmation } from "./tool_driver";
 export type { CallTool, SeedPage, ToolDriver, ViewActions, WritePlan, WriteIntent, ViewChange, WriteFailure } from "./tool_driver";
 export { parseResult, actionsOf, filterOf } from "./payload";
-export type { Screen, Block, TableGrant } from "./payload";
+export type { Screen, Block, TableGrant, ScreenPreferences } from "./payload";
 
 export interface McpViewOptions {
     /**
@@ -150,6 +152,7 @@ function embedHost(bridge: ViewBridge, screen: Screen): RebaseEmbedHost {
         storageSource: VIEW_STORAGE_SOURCE,
         mode: bridge.hostContext.theme === "dark" ? "dark" : "light",
         tables: screen.tables,
+        uiPreferences: screen.preferences,
         narrowCollections: collections => {
             drawn = narrowCollections(collections, screen.grants);
             return [...drawn];

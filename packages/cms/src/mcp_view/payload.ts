@@ -7,12 +7,16 @@
  * already left out), and what the connection was granted on each. The view
  * renders them as the admin panel renders the tables `GET /api/schema/tables`
  * serves: projected, with the project's `customizeTable` customizations where
- * the view was built from the project's frontend.
+ * the view was built from the project's frontend, then the UI preferences the
+ * payload carries (the workspace's and the caller's), folded as the panel
+ * folds them.
  */
 import {
     ALL_WHERE_FILTER_OPS,
+    isUiTablePreferences,
     type FilterValues,
     type TableDescriptor,
+    type UiPreferences,
     type WhereFilterOp
 } from "@rebasepro/types";
 import type { AdminCollection } from "@rebasepro/cms-types";
@@ -60,6 +64,20 @@ export interface TableGrant {
     delete: boolean;
 }
 
+/**
+ * How the screen's tables are presented: the UI preference layers the server
+ * holds, folded by `<RebaseCMS>` as on the project's page — `file` as its
+ * `uiConfig`, then `workspace`, then `user`.
+ */
+export interface ScreenPreferences {
+    /** `ui-config.json`, as the server knows it. */
+    file: UiPreferences;
+    /** The workspace's, stored by the server. */
+    workspace: UiPreferences;
+    /** The person's own. */
+    user: UiPreferences;
+}
+
 export interface Screen {
     title?: string;
     blocks: Block[];
@@ -67,6 +85,8 @@ export interface Screen {
     tables: TableDescriptor[];
     /** What the connection was granted on each table in {@link tables}, by slug. */
     grants: Record<string, TableGrant>;
+    /** How the tables are presented: the server's UI preference layers. */
+    preferences: ScreenPreferences;
     viewer: { uid: string; roles: string[] };
     actions: ViewActions;
     /** The page show_table read for the model: what the table block reads first. */
@@ -85,7 +105,7 @@ export type Parsed =
  * the listing it holds (its address carries the document's hash), so a
  * mismatch is a host holding a stale document.
  */
-export const PAYLOAD_VERSION = 2;
+export const PAYLOAD_VERSION = 3;
 
 export function parseResult(result: ToolResult): Parsed {
     if (result.isError) return { kind: "error", message: textOf(result) ?? "The view could not be opened." };
@@ -120,6 +140,7 @@ export function parseResult(result: ToolResult): Parsed {
             blocks,
             tables,
             grants: grantsOf(view.grants, tables),
+            preferences: preferencesOf(view.preferences),
             viewer: {
                 uid: typeof viewer.uid === "string" ? viewer.uid : "",
                 roles: Array.isArray(viewer.roles) ? viewer.roles.filter((role): role is string => typeof role === "string") : []
@@ -140,6 +161,22 @@ function isTableDescriptor(value: unknown): value is TableDescriptor {
         && Array.isArray(value.relations)
         && Array.isArray(value.primaryKey)
         && isRecord(value.rls);
+}
+
+/** One layer as sent, keeping only valid table preferences: data from the wire, narrowed like the panel's. */
+function layerOf(raw: unknown): UiPreferences {
+    const tables: UiPreferences["tables"] = {};
+    const listed = isRecord(raw) && isRecord(raw.tables) ? raw.tables : {};
+    for (const [slug, preferences] of Object.entries(listed)) {
+        if (isUiTablePreferences(preferences)) tables[slug] = preferences;
+    }
+    return { tables };
+}
+
+/** The preference layers as sent; an absent layer is empty. */
+function preferencesOf(raw: unknown): ScreenPreferences {
+    const sent = isRecord(raw) ? raw : {};
+    return { file: layerOf(sent.file), workspace: layerOf(sent.workspace), user: layerOf(sent.user) };
 }
 
 /** Each table's grant as sent; a table the server sent none for is read-only. */

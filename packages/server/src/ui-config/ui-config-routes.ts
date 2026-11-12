@@ -3,7 +3,9 @@
  * preferences.
  *
  * - `GET /` — the workspace's preferences and the caller's own, by table
- *   slug, and where workspace preferences are written (`workspaceTarget`).
+ *   slug, where workspace preferences are written (`workspaceTarget`), and
+ *   `shipped`: the `ui-config.json` this server knows (see
+ *   `ui-preference-layers.ts`).
  * - `PUT /workspace/:slug` `{ preferences, replace? }` — merge (or replace)
  *   the workspace's preferences for a table. Needs `schema:write`: it changes
  *   how the table looks for everybody.
@@ -34,6 +36,7 @@ import { ApiError, errorHandler } from "../api/errors";
 import type { HonoEnv } from "../api/types";
 import { hasScope, scopeMissing } from "../auth/access";
 import type { UiPreferencesStore } from "./ui-preferences-store";
+import { readUiPreferenceLayers } from "./ui-preference-layers";
 
 /** The file workspace preferences are written to in development, relative to the project root. */
 export const UI_CONFIG_FILE = "frontend/src/cms/ui-config.json";
@@ -48,6 +51,12 @@ export interface UiConfigRoutesOptions {
      * preferences are then written there instead of to the database.
      */
     workspaceFile?: string;
+    /**
+     * The copy of `ui-config.json` a built bundle carries (`entry.uiConfig`):
+     * the presentation the deployed frontend ships, served as `shipped` so a
+     * server-side consumer reads the same baseline the panel folds in.
+     */
+    shippedFile?: string;
 }
 
 /** A table slug, as the routes take it: what a slug may be, and nothing that reaches a path. */
@@ -172,7 +181,7 @@ function serialized(): <T>(run: () => Promise<T>) => Promise<T> {
  * needs a signed-in caller, and the workspace's writes check `schema:write`
  * here.
  */
-export function createUiConfigRoutes({ store, workspaceFile }: UiConfigRoutesOptions): Hono<HonoEnv> {
+export function createUiConfigRoutes({ store, workspaceFile, shippedFile }: UiConfigRoutesOptions): Hono<HonoEnv> {
     const router = new Hono<HonoEnv>();
     router.onError(errorHandler);
     const oneFileWriteAtATime = serialized();
@@ -183,16 +192,16 @@ export function createUiConfigRoutes({ store, workspaceFile }: UiConfigRoutesOpt
 
     router.get("/", async (c) => {
         const uid = c.get("apiKey") === undefined ? uidOf(c) : undefined;
-        const workspace = workspaceFile
-            ? await readUiConfigFile(workspaceFile)
-            : store ? await store.list({ scope: "workspace" }) : { tables: {} };
-        const own = uid && store ? await store.list({ scope: "user", uid }) : { tables: {} };
+        const layers = await readUiPreferenceLayers({ store, workspaceFile, shippedFile }, uid);
         return c.json({
-            workspace,
-            user: own,
-            workspaceTarget: workspaceFile ? "file" : store ? "database" : "none",
+            workspace: layers.workspace,
+            user: layers.user,
+            // `ui-config.json` as this server knows it: the project's file in
+            // development, the copy a built bundle carries deployed.
+            shipped: layers.shipped,
+            workspaceTarget: layers.workspaceTarget,
             ...(workspaceFile ? { file: UI_CONFIG_FILE } : {}),
-            userTarget: uid && store ? "database" : "none",
+            userTarget: layers.userTarget,
             canWriteWorkspace: hasScope(c, "schema:write") && (Boolean(workspaceFile) || store !== null)
         });
     });

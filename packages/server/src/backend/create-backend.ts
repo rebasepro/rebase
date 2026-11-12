@@ -148,9 +148,11 @@ import { createOAuthStore, type OAuthStore } from "../mcp/oauth-store";
 import { createDeviceLoginStore } from "../auth/device-login-store";
 import { createUiPreferencesStore } from "../ui-config/ui-preferences-store";
 import { createUiConfigRoutes, UI_CONFIG_FILE } from "../ui-config/ui-config-routes";
+import { composableLayers, readUiPreferenceLayers, type UiPreferenceSources } from "../ui-config/ui-preference-layers";
 import { findProjectRoot } from "../schema-edit/project-root";
 import { createOAuthRoutes, grantIdentityFromRepository } from "../mcp/oauth-routes";
 import { createMcpRoutes, createMcpWellKnownRoutes } from "../mcp/mcp-routes";
+import type { McpCaller } from "../mcp/mcp-tools";
 import { createPlatformMcpRoutes, PLATFORM_MCP_PATH } from "../mcp/platform-mcp";
 import { ADMIN_APPS_MCP_PATH, createAdminAppsMcpRoutes } from "../mcp/admin-apps-mcp";
 import {
@@ -1791,6 +1793,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         // the same revocation, roles and account a session does — at consent,
         // every refresh, and every `/mcp` request.
         const identity = grantIdentityFromRepository(adminIdentityRepo);
+        const preferenceSources = uiPreferenceSources;
         const mcpConfig = {
             // Tokens this backend's OAuth server minted, with its own key.
             jwt,
@@ -1803,6 +1806,14 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             // serializer `GET /schema/tables` serves; the registry, so a
             // schema change after boot reaches the next call.
             getTables: () => tableRegistry.list(),
+            // How the views and describe_table present the tables: the
+            // workspace's UI preferences and the caller's own, read as
+            // `/api/admin/ui-config` reads them. A key is not a person, and
+            // has no preferences of its own.
+            ...(preferenceSources && {
+                getUiPreferences: async (caller: McpCaller) => composableLayers(
+                    await readUiPreferenceLayers(preferenceSources, caller.credential ? undefined : caller.uid))
+            }),
             // The RESOLVED set the data path reads, not `config.collections`.
             driverCollection,
             // The write tools' door into the users table answers to the
@@ -2493,6 +2504,9 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     // write the project's source — the schema editor's gate — and to
     // `rebase.ui_preferences` everywhere else.
     let uiConfigSurface: Hono<HonoEnv> | undefined;
+    // Where the layers are read from: the routes below and the MCP views read
+    // them through `readUiPreferenceLayers`, one reading for both.
+    let uiPreferenceSources: UiPreferenceSources | undefined;
     if (surfaces.admin) {
         let uiPreferencesStore = createUiPreferencesStore(defaultDriver, { provision: provision.database });
         if (uiPreferencesStore) {
@@ -2517,7 +2531,8 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             tables: () => tableRegistry.list(),
             persons: config.schemaTables?.persons ?? "granted"
         }));
-        uiConfigRouter.route("/", createUiConfigRoutes({ store: uiPreferencesStore, workspaceFile }));
+        uiPreferenceSources = { store: uiPreferencesStore, workspaceFile, shippedFile: config.uiConfigFile };
+        uiConfigRouter.route("/", createUiConfigRoutes(uiPreferenceSources));
         uiConfigSurface = uiConfigRouter;
     }
 

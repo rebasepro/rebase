@@ -3,7 +3,9 @@ import os from "os";
 import path from "path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+    BUNDLED_UI_CONFIG,
     buildBundle,
+    bundleUiConfig,
     bundledNpmrc,
     collectDeclaredDependencies,
     detectDeclaredDepConflicts,
@@ -689,6 +691,32 @@ entry: {} });
  * driver comes from these declarations. A build warning is the only moment a
  * developer can be told.
  */
+describe("carrying the frontend's ui-config.json to the server", () => {
+    it("copies frontend/src/cms/ui-config.json into the bundle, for entry.uiConfig", () => {
+        const text = JSON.stringify({ tables: { posts: { name: "Articles" } } });
+        write("frontend/src/cms/ui-config.json", text);
+        const outDir = path.join(scratch, "dist-bundle");
+        fs.mkdirSync(outDir);
+        const carried = bundleUiConfig(scratch, outDir);
+        expect(carried?.entry).toBe(BUNDLED_UI_CONFIG);
+        expect(fs.readFileSync(path.join(outDir, BUNDLED_UI_CONFIG), "utf8")).toBe(text);
+    });
+
+    it("carries nothing for a project without one", () => {
+        const outDir = path.join(scratch, "dist-bundle");
+        fs.mkdirSync(outDir);
+        expect(bundleUiConfig(scratch, outDir)).toBeUndefined();
+        expect(fs.existsSync(path.join(outDir, BUNDLED_UI_CONFIG))).toBe(false);
+    });
+
+    it("refuses one that is not a JSON object, naming the file", () => {
+        write("frontend/src/cms/ui-config.json", "[1, 2]");
+        const outDir = path.join(scratch, "dist-bundle");
+        fs.mkdirSync(outDir);
+        expect(() => bundleUiConfig(scratch, outDir)).toThrow(/frontend\/src\/cms\/ui-config\.json must be a JSON object/);
+    });
+});
+
 describe("detectFrameworkDepDrift", () => {
     it("flags a pin that can never reach the CLI's own version", () => {
         write("package.json", JSON.stringify({

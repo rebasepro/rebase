@@ -10,7 +10,8 @@
  * renders it from these descriptors exactly as the admin panel renders the
  * tables `GET /api/schema/tables` serves: projected by the CMS, with the
  * project's `customizeTable` customizations where the view was built from the
- * project's frontend. The backend holds no presentation; the descriptors are
+ * project's frontend, and the presentation the workspace and the caller saved
+ * (`preferences`, folded as the panel folds them). The descriptors are
  * {@link serializeTables}' output for the caller's view, so a column the caller
  * may not read, a private column, a relation into a table the caller is not
  * served and raw policy SQL (without `schema:read`) are not in them — one
@@ -25,7 +26,7 @@
  *
  * @module
  */
-import type { TableDescriptor } from "@rebasepro/types";
+import type { TableDescriptor, UiPreferences } from "@rebasepro/types";
 import { serializeTables, type SchemaView } from "../api/schema-tables.js";
 
 /** The ways a table block lays out its rows, as the admin panel names them. */
@@ -41,8 +42,9 @@ export type McpViewMode = (typeof VIEW_MODES)[number];
  *
  * 2: descriptors (`tables`) and per-table `grants` in place of serialized
  * collections; blocks and seeds name a `table`.
+ * 3: `preferences` — the UI preference layers for the tables in the payload.
  */
-export const MCP_VIEW_PAYLOAD_VERSION = 2;
+export const MCP_VIEW_PAYLOAD_VERSION = 3;
 
 /** A table block: rows of one table, opened in the admin panel's collection view (show_table). */
 export interface McpTableBlock {
@@ -86,6 +88,34 @@ export interface McpViewGrant {
     delete: boolean;
 }
 
+/**
+ * How the tables of a screen are presented, as UI preference layers — the
+ * data the collection editor and the views save (`UiTablePreferences`), for
+ * the tables in the payload only. The view folds them over the projected
+ * tables and the project's code customizations exactly as the admin panel
+ * does (`composeCollections` in `@rebasepro/cms`): `file` as
+ * `<RebaseCMS uiConfig>`, then `workspace`, then `user`.
+ *
+ * Presentation, not permission: a column a preference marks read-only is
+ * shown read-only, and the write tools still decide what may be written.
+ */
+export interface McpViewPreferences {
+    /** `frontend/src/cms/ui-config.json` as the server knows it: the project's file, or the copy its bundle carries. */
+    file: UiPreferences;
+    /** What the workspace saved on the server (`rebase.ui_preferences`). Empty in development, where it is the file. */
+    workspace: UiPreferences;
+    /** The caller's own; empty for a connection that is not a person's. */
+    user: UiPreferences;
+}
+
+/** The layers of {@link McpViewPreferences}, narrowed to the tables a payload carries. */
+export function preferencesFor(layers: McpViewPreferences, slugs: readonly string[]): McpViewPreferences {
+    const only = (preferences: UiPreferences): UiPreferences => ({
+        tables: Object.fromEntries(slugs.flatMap(slug => preferences.tables[slug] ? [[slug, preferences.tables[slug]]] : []))
+    });
+    return { file: only(layers.file), workspace: only(layers.workspace), user: only(layers.user) };
+}
+
 /** What a show_* tool hands its view, besides what the model reads. */
 export interface McpViewPayload {
     /** {@link MCP_VIEW_PAYLOAD_VERSION}. */
@@ -100,6 +130,8 @@ export interface McpViewPayload {
     tables: TableDescriptor[];
     /** What the connection was granted on each table in {@link tables}, by slug. */
     grants: Record<string, McpViewGrant>;
+    /** How the tables in {@link tables} are presented: the workspace's and the caller's UI preferences. */
+    preferences: McpViewPreferences;
     /** Who the security rules are evaluated for, as the server knows them. */
     viewer: { uid: string; roles: string[] };
     /**

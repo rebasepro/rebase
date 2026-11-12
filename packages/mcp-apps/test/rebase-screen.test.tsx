@@ -63,7 +63,7 @@ function ok(structuredContent: unknown): ToolResult {
 function screenResult(blocks: unknown[], extra: Record<string, unknown> = {}, title?: string): ToolResult {
     return ok({
         view: {
-            version: 2,
+            version: 3,
             title,
             blocks,
             tables: [ORDERS],
@@ -218,10 +218,45 @@ describe("the tables, from the descriptors the result carries", () => {
         await findText("Shipped");
     }, 20000);
 
+    it("render with the UI preferences the result carries — the server's ui-config.json, the workspace's, the person's — in the generic view", async () => {
+        open(screenResult([{ key: "rows", type: "table", table: "orders", view: "table" }], {
+            data: ROWS, meta: { limit: 50, offset: 0, hasMore: false }
+        }), own);
+        await findText("ORD-41");
+        // Without preferences: the projector's defaults.
+        await findText("Notes");
+        expect(document.body.textContent).not.toContain("Awaiting");
+        act(() => {
+            for (const root of mounted.roots.splice(0)) root.unmount();
+        });
+        container.replaceChildren();
+
+        const result = screenResult([{ key: "rows", type: "table", table: "orders", view: "table" }], {
+            data: ROWS, meta: { limit: 50, offset: 0, hasMore: false }
+        });
+        const content = result.structuredContent as { view: Record<string, unknown> };
+        content.view.preferences = {
+            // frontend/src/cms/ui-config.json, as the server knows it: an enum label.
+            file: { tables: { orders: { fields: { status: { enumLabels: { pending: { label: "Awaiting", color: "orange" } } } } } } },
+            // The workspace's: a hidden column and the field order.
+            workspace: { tables: { orders: { fieldOrder: ["status", "number", "tracking_number", "notes"], fields: { notes: { hidden: true } } } } },
+            // The person's own, over both.
+            user: { tables: { orders: { fields: { number: { name: "Order no." } } } } }
+        };
+        open(result, own);
+        await findText("Awaiting");
+        const statusHeader = await findText("Status");
+        const numberHeader = await findText("Order no.");
+        // The workspace's order: Status before the number.
+        expect(statusHeader.compareDocumentPosition(numberHeader) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        // The hidden column is not drawn.
+        expect(Array.from(document.querySelectorAll("body *")).some(element => element.children.length === 0 && element.textContent === "Notes")).toBe(false);
+    }, 20000);
+
     it("close what the connection was not granted", async () => {
         const readOnly = ok({
             view: {
-                version: 2,
+                version: 3,
                 blocks: [{ key: "record", type: "record", table: "orders", id: "o1" }],
                 tables: [ORDERS],
                 grants: { orders: { read: true, write: false, delete: false } },
@@ -230,7 +265,7 @@ describe("the tables, from the descriptors the result carries", () => {
         });
         const writable = ok({
             view: {
-                version: 2,
+                version: 3,
                 blocks: [{ key: "record", type: "record", table: "orders", id: "o1" }],
                 tables: [ORDERS],
                 grants: { orders: { read: true, write: true, delete: true } },

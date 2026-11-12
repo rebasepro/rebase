@@ -48,6 +48,7 @@ import {
     type McpScopeVocabulary
 } from "./oauth-metadata.js";
 import { toolsForScopes, declaredArgumentsOnly, McpToolError, MCP_TOOLS, type McpCaller, type McpToolDefinition } from "./mcp-tools.js";
+import type { McpViewPreferences } from "./mcp-view.js";
 import { memoryConfirmationStore, withConfirmation, type McpConfirmationStore } from "./confirmation.js";
 import {
     MCP_APP_MIME_TYPE,
@@ -131,6 +132,14 @@ export interface McpRoutesConfig {
      * change after boot.
      */
     getTables(): readonly TableDescriptor[];
+    /**
+     * The UI preference layers a caller's views and describe_table present
+     * the tables with: the workspace's (`ui-config.json` as the server knows
+     * it, then `rebase.ui_preferences`) and the caller's own — read as
+     * `/api/admin/ui-config` reads them. Absent, the tables are presented
+     * with the panel's defaults.
+     */
+    getUiPreferences?(caller: McpCaller): Promise<McpViewPreferences>;
     /** What a data driver call names a table by (see `DriverCollectionOf`). Deleted with slice B-R7. */
     driverCollection: DriverCollectionOf;
     /**
@@ -643,6 +652,7 @@ export function createMcpRoutes(config: McpRoutesConfig): Hono<HonoEnv> {
             return rpcError(id, INTERNAL_ERROR, "The data layer is not ready.");
         }
 
+        const getUiPreferences = config.getUiPreferences;
         try {
             const result = await tool.run(args, {
                 driver,
@@ -650,7 +660,8 @@ export function createMcpRoutes(config: McpRoutesConfig): Hono<HonoEnv> {
                 driverCollection: config.driverCollection,
                 authAdapter: config.getAuthAdapter?.(),
                 caller,
-                ...(compileApp && { compileApp })
+                ...(compileApp && { compileApp }),
+                ...(getUiPreferences && { uiPreferences: () => getUiPreferences(caller) })
             });
             // The text is the one a model reads, so it is fenced: a row was
             // written by somebody, and arrives on the channel the model takes

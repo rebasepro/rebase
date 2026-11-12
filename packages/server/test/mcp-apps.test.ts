@@ -17,7 +17,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, it, expect, beforeAll, jest } from "@jest/globals";
-import { col, defineTable, rel, type TableDescriptor } from "@rebasepro/types";
+import { col, defineTable, rel, type TableDescriptor, type UiPreferences } from "@rebasepro/types";
 import { configureJwt, generateMcpAccessToken } from "../src/auth/jwt";
 import { MCP_APP_MIME_TYPE, mcpAppBaseUri, versionedMcpAppUri, withProjectView, type McpAppResource } from "../src/mcp/mcp-apps";
 import { MCP_APP_URI, SHOW_APP_CODE_GUIDE, SHOW_APP_GUIDE_TOOL } from "../src/mcp/mcp-tools";
@@ -225,6 +225,7 @@ type ViewPayload = {
     grants: Record<string, { read: boolean; write: boolean; delete: boolean }>;
     viewer: unknown;
     readAt?: number;
+    preferences: { file: UiPreferences; workspace: UiPreferences; user: UiPreferences };
 };
 
 /** The served descriptor of `slug` in a payload. */
@@ -262,7 +263,7 @@ describe("show_table", () => {
         const before = Date.now();
         const { result } = await show("data:read");
         const view = (result?.structuredContent as { view: ViewPayload }).view;
-        expect(view.version).toBe(2);
+        expect(view.version).toBe(3);
         // When the page it carries was read: the view serves it only while
         // that is recent, however late the host draws the result.
         expect(view.readAt).toBeGreaterThanOrEqual(before);
@@ -317,6 +318,94 @@ async function screen(scope: string, name: string, args: Record<string, unknown>
     const text = (res.result?.content as { text: string }[] | undefined)?.[0]?.text ?? "";
     return { content, text, error: res.result?.isError === true ? text : undefined, stub };
 }
+
+describe("the project's presentation, from its UI preferences", () => {
+    const tokenFor = (uid: string, scope: string) => generateMcpAccessToken({
+        uid, roles: ["recruiter"], scope, clientId: "c", aud: `${PUBLIC_URL}/mcp`, iss: PUBLIC_URL
+    }, 3600);
+
+    /** The layers as `/api/admin/ui-config` reads them: the shipped file, the workspace's rows, each person's own. */
+    const asked: string[] = [];
+    const getUiPreferences = async (caller: { uid: string }) => {
+        asked.push(caller.uid);
+        return {
+            file: { tables: { candidates: { name: "Pipeline", fields: { stage: { enumLabels: { applied: { label: "New", color: "blue" } } } } } } },
+            workspace: { tables: {
+                candidates: { fieldOrder: ["stage", "name"], fields: { hired: { hidden: true }, name: { name: "Full name", readOnly: true } } },
+                // Not a table of the screen: not sent.
+                elsewhere: { name: "Elsewhere" }
+            } },
+            user: { tables: caller.uid === "user-2" ? { candidates: { fields: { name: { name: "Who" } } } } : {} }
+        };
+    };
+
+    async function showAs(uid: string, scope: string) {
+        const stub = stubDriver();
+        const { app } = buildApp({ apps: withViews, driver: stub.driver, ...SCHEMA, getUiPreferences });
+        const res = await call(app, await tokenFor(uid, scope), "tools/call", { name: "show_table", arguments: { table: "candidates" } });
+        return { result: res.result, app, stub };
+    }
+
+    it("hands the view the caller's layers, for the tables it draws only", async () => {
+        const { result } = await showAs("user-1", "data:read");
+        const content = result?.structuredContent as { view: ViewPayload; title?: string };
+        expect(content.view.preferences.file.tables.candidates.fields?.stage?.enumLabels?.applied).toEqual({ label: "New", color: "blue" });
+        expect(content.view.preferences.workspace.tables).toEqual({
+            candidates: { fieldOrder: ["stage", "name"], fields: { hired: { hidden: true }, name: { name: "Full name", readOnly: true } } }
+        });
+        expect(content.view.preferences.user).toEqual({ tables: {} });
+        // The model is told the table's title, not the layers.
+        expect(content.title).toBe("Pipeline");
+        const text = JSON.stringify(result?.content);
+        expect(text).not.toContain("enumLabels");
+    });
+
+    it("reads each caller's own layer", async () => {
+        const { result } = await showAs("user-2", "data:read");
+        const view = (result?.structuredContent as { view: ViewPayload }).view;
+        expect(view.preferences.user).toEqual({ tables: { candidates: { fields: { name: { name: "Who" } } } } });
+        expect(asked).toContain("user-2");
+    });
+
+    it("tells describe_table's reader each column's label, value labels, and what the project hides or presents read-only", async () => {
+        const stub = stubDriver();
+        const { app } = buildApp({ apps: withViews, driver: stub.driver, ...SCHEMA, getUiPreferences });
+        const res = await call(app, await tokenFor("user-2", "data:read"), "tools/call", { name: "describe_table", arguments: { table: "candidates" } });
+        const text = (res.result?.content as { text: string }[])[0].text;
+        const described = JSON.parse(text.slice(text.indexOf("{"), text.lastIndexOf("}") + 1)) as Record<string, unknown>;
+        expect(described.title).toBe("Pipeline");
+        expect(described.presentation).toEqual({
+            stage: { valueLabels: { applied: "New" } },
+            hired: { hidden: true },
+            // The workspace's label, under the person's own.
+            name: { label: "Who", readOnly: true }
+        });
+    });
+
+    it("is presentation only: a read-only connection still cannot write a column the workspace leaves editable", async () => {
+        const { result, app, stub } = await showAs("user-1", "data:read");
+        expect((result?.structuredContent as { view: ViewPayload }).view.grants.candidates).toEqual({ read: true, write: false, delete: false });
+        const res = await rpc(app, await tokenFor("user-1", "data:read"), {
+            jsonrpc: "2.0", id: 1, method: "tools/call",
+            params: { name: "update_row", arguments: { table: "candidates", id: "c1", data: { stage: "interview" } } }
+        });
+        const body = await res.json() as { error?: { message: string } };
+        expect(body.error?.message).toBe("\"update_row\" requires the data:write scope, which this token does not hold.");
+        // Only show_table's read reached the driver: no write.
+        expect(stub.calls.map(entry => entry.method)).toEqual(["fetchCollection"]);
+    });
+
+    it("leaves the defaults where the preferences cannot be read, and opens the screen", async () => {
+        const stub = stubDriver();
+        const { app } = buildApp({
+            apps: withViews, driver: stub.driver, ...SCHEMA,
+            getUiPreferences: async () => { throw new Error("store down"); }
+        });
+        const res = await call(app, await tokenFor("user-1", "data:read"), "tools/call", { name: "show_table", arguments: { table: "candidates" } });
+        expect((res.result?.structuredContent as { view: ViewPayload }).view.preferences)
+            .toEqual({ file: { tables: {} }, workspace: { tables: {} }, user: { tables: {} } });
+    });
+});
 
 describe("show_record", () => {
     it("opens a row's form with the row, and the tables its relations reach", async () => {

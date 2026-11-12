@@ -36,6 +36,7 @@ import { useBuildNavigationStateController } from "../hooks/navigation/useBuildN
 import { useBuildUrlController } from "../hooks/navigation/useBuildUrlController";
 import { useBuildCollectionRegistryController } from "../hooks/navigation/useBuildCollectionRegistryController";
 import { composeCollectionsInput } from "../hooks/navigation/compose_collections_input";
+import { withUserLayer } from "../hooks/navigation/ui_preferences";
 import { usePanelTables } from "../hooks/navigation/usePanelTables";
 
 import { CollectionRegistryContext } from "../hooks/navigation/contexts/CollectionRegistryContext";
@@ -114,7 +115,12 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
     const externalCollections = registry.cmsConfig?.externalCollections ?? NO_EXTERNAL_COLLECTIONS;
     const descriptors = usePanelTables(registry.cmsConfig?.tables, registry.cmsConfig !== null);
     const servedTables = descriptors.tables;
-    const uiConfig = registry.cmsConfig?.uiConfig;
+    // In an embedding (an MCP App view) the panel asks the server for no
+    // preferences: the embedding received them with the screen, and they are
+    // folded here exactly as the panel's own — the server's `ui-config.json`
+    // where the app passes no `uiConfig` of its own.
+    const embeddedPreferences = useRebaseEmbedHost()?.uiPreferences;
+    const uiConfig = registry.cmsConfig?.uiConfig ?? embeddedPreferences?.file;
 
     // ── UI preferences: the workspace's, and the signed-in user's own ──
     // How each table is presented, as the collection editor saved it for
@@ -131,8 +137,13 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
         enabled: registry.cmsConfig !== null && Boolean(preferencesAuth?.user) && !inEmbedding,
         local: browserUserConfigPersistence
     });
-    const userConfigPersistence = uiPreferences.userPersistence;
-    const workspacePreferences = uiPreferences.controller.workspace;
+    const embeddedUser = embeddedPreferences?.user;
+    const userConfigPersistence = useMemo(
+        () => embeddedUser && uiPreferences.userPersistence
+            ? withUserLayer(uiPreferences.userPersistence, embeddedUser)
+            : uiPreferences.userPersistence,
+        [embeddedUser, uiPreferences.userPersistence]);
+    const workspacePreferences = embeddedPreferences?.workspace ?? uiPreferences.controller.workspace;
 
     // What the composition last produced, for the collection editor, which
     // lists and edits the collections the panel shows.

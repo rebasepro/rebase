@@ -27,8 +27,8 @@
  * second lock, not the main one: a `data:write` token still cannot write a row
  * the user could not write themselves.
  */
-import type { AuthAdapter, CallerCredential, DataDriver, OrderBySpec, TableDescriptor } from "@rebasepro/types";
-import { ALL_WHERE_FILTER_OPS, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT, scopeGrants, scopeGrantsAny } from "@rebasepro/types";
+import type { AuthAdapter, CallerCredential, DataDriver, OrderBySpec, TableDescriptor, UiTablePreferences } from "@rebasepro/types";
+import { ALL_WHERE_FILTER_OPS, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT, mergeUiTablePreferences, scopeGrants, scopeGrantsAny } from "@rebasepro/types";
 import { type FieldViewer, OrderBySpecError, canWriteColumn, columnByKey, isSoftDeleteRestore, serializeOrderBy } from "@rebasepro/common";
 import { scopeDataDriver } from "../auth/rls-scope.js";
 import { ApiError } from "../api/errors.js";
@@ -54,10 +54,12 @@ import type { McpConfirmationPlan } from "./confirmation.js";
 import {
     MCP_VIEW_PAYLOAD_VERSION,
     VIEW_MODES,
+    preferencesFor,
     viewTables,
     type McpViewBlock,
     type McpViewMode,
     type McpViewPayload,
+    type McpViewPreferences,
     type McpViewSeed
 } from "./mcp-view.js";
 import { SHOW_APP_CODE_GUIDE, SHOW_APP_ESSENTIALS, SHOW_APP_GUIDE_TOOL, showAppArtifactGuide } from "./show-app-guide.js";
@@ -105,6 +107,13 @@ export interface McpToolContext {
      * the views are served.
      */
     compileApp?: (source: string) => Promise<{ ok: true; code: string } | { ok: false; error: string }>;
+    /**
+     * The UI preference layers for this caller — the workspace's and their
+     * own — as `/api/admin/ui-config` reads them. What the views draw the
+     * tables with, and what describe_table says of a column's presentation.
+     * Absent, the tables are presented with the panel's defaults.
+     */
+    uiPreferences?: () => Promise<McpViewPreferences>;
 }
 
 /**
@@ -650,7 +659,7 @@ function narrowedSchema(schema: Record<string, unknown>, keep: (key: string) => 
  * their roles may write. The relations and the row-level rules are the served
  * descriptor's: a rule's raw SQL only with `schema:read`.
  */
-function describeTable(resolved: ResolvedTable, ctx: McpToolContext): Record<string, unknown> {
+async function describeTable(resolved: ResolvedTable, ctx: McpToolContext): Promise<Record<string, unknown>> {
     const { descriptor, served } = resolved;
     const servedKeys = new Set([
         ...descriptor.columns.map(column => column.key),
@@ -659,8 +668,10 @@ function describeTable(resolved: ResolvedTable, ctx: McpToolContext): Record<str
     const viewer = viewerOf(ctx);
     const softDeleteField = served.table.softDelete?.field;
     const { policies: _policies, junctions: _junctions, ...rls } = descriptor.rls;
+    const shown = presentationOf(descriptor, await composedPreferences(ctx, descriptor.slug));
     return {
         name: descriptor.slug,
+        ...(shown.title && { title: shown.title }),
         description: descriptor.description ?? null,
         ...(descriptor.kind === "view" && { kind: "view" }),
         primaryKey: descriptor.primaryKey,
@@ -674,7 +685,80 @@ function describeTable(resolved: ResolvedTable, ctx: McpToolContext): Record<str
             }),
         relations: descriptor.relations.map(relation => ({ name: relation.name, kind: relation.kind, target: relation.target })),
         rls,
-        ...(softDeleteField && { softDeleteField })
+        ...(softDeleteField && { softDeleteField }),
+        ...(shown.fields && { presentation: shown.fields })
+    };
+}
+
+/** The layers of the caller's UI preferences, read once per call; empty where the endpoint has none. */
+const preferencesRead = new WeakMap<McpToolContext, Promise<McpViewPreferences>>();
+const NO_PREFERENCES: McpViewPreferences = { file: { tables: {} }, workspace: { tables: {} }, user: { tables: {} } };
+
+function layersOf(ctx: McpToolContext): Promise<McpViewPreferences> {
+    let read = preferencesRead.get(ctx);
+    if (!read) {
+        read = ctx.uiPreferences
+            ? ctx.uiPreferences().catch((error: unknown) => {
+                // Presentation only: a broken file or an unreachable store
+                // leaves the defaults, never fails the call.
+                logger.warn("[mcp] The UI preferences could not be read; the tables are presented with the defaults.", { error });
+                return NO_PREFERENCES;
+            })
+            : Promise.resolve(NO_PREFERENCES);
+        preferencesRead.set(ctx, read);
+    }
+    return read;
+}
+
+/**
+ * One table's preferences, the layers folded in the panel's order (file,
+ * workspace, user). The project's code customizations are the frontend's and
+ * not known here: this is what the server holds.
+ */
+async function composedPreferences(ctx: McpToolContext, slug: string): Promise<UiTablePreferences> {
+    const { file, workspace, user } = await layersOf(ctx);
+    return [file, workspace, user].reduce<UiTablePreferences>(
+        (composed, layer) => layer.tables[slug] ? mergeUiTablePreferences(composed, layer.tables[slug]) : composed, {});
+}
+
+/** What a model is told of one column's presentation. */
+interface ColumnPresentation {
+    label?: string;
+    /** The panel's table view does not show it. Presentation, not access: the column is still read and written. */
+    hidden?: true;
+    /** The panel's form does not show it. */
+    hiddenInForm?: true;
+    /** The workspace presents it read-only: leave it as it is unless the user asks to change it. */
+    readOnly?: true;
+    /** Each value's label, where the workspace named them. */
+    valueLabels?: Record<string, string>;
+}
+
+/**
+ * The presentation a model acts on — the table's title, and per served
+ * column its label, whether the panel hides it, and whether the workspace
+ * presents it read-only — from the composed preferences. Only what is set.
+ */
+function presentationOf(descriptor: TableDescriptor, preferences: UiTablePreferences): { title?: string; fields?: Record<string, ColumnPresentation> } {
+    const fields: Record<string, ColumnPresentation> = {};
+    const keys = new Set([...descriptor.columns.map(column => column.key), ...descriptor.relations.map(relation => relation.name)]);
+    for (const [key, field] of Object.entries(preferences.fields ?? {})) {
+        if (!keys.has(key)) continue;
+        const valueLabels = field.enumLabels
+            ? Object.fromEntries(Object.entries(field.enumLabels).map(([value, label]) => [value, typeof label === "string" ? label : label.label]))
+            : undefined;
+        const shown: ColumnPresentation = {
+            ...(field.name && { label: field.name }),
+            ...(field.hidden === true && { hidden: true }),
+            ...(field.hiddenInForm === true && { hiddenInForm: true }),
+            ...((field.readOnly === true || field.disabled === true) && { readOnly: true }),
+            ...(valueLabels && Object.keys(valueLabels).length > 0 && { valueLabels })
+        };
+        if (Object.keys(shown).length > 0) fields[key] = shown;
+    }
+    return {
+        ...(preferences.name && { title: preferences.name }),
+        ...(Object.keys(fields).length > 0 && { fields })
     };
 }
 
@@ -804,7 +888,7 @@ function pick(args: Record<string, unknown>, names: readonly string[]): Record<s
 }
 
 /** A screen's payload for its view: its block, and the descriptors it is drawn from, for this caller. */
-function viewPayload(resolved: ResolvedBlock, ctx: McpToolContext, title?: string, readAt?: number): McpViewPayload {
+async function viewPayload(resolved: ResolvedBlock, ctx: McpToolContext, title?: string, readAt?: number): Promise<McpViewPayload> {
     const schema = servedSchema(ctx);
     const { tables, grants } = viewTables(resolved.tables, ctx.tables, schema.tables, schema.view, slug => ({
         read: reaches(ctx, "data:read", slug),
@@ -818,6 +902,7 @@ function viewPayload(resolved: ResolvedBlock, ctx: McpToolContext, title?: strin
         blocks: [resolved.block],
         tables,
         grants,
+        preferences: preferencesFor(await layersOf(ctx), tables.map(table => table.slug)),
         viewer: { uid: ctx.caller.uid, roles: ctx.caller.roles }
     };
 }
@@ -878,6 +963,10 @@ const TOOLS: McpToolDefinition[] = [
             + "any subset of it. `relations` names the tables a row links to; `rls` is who may read and write "
             + "which rows. `softDeleteField`, when present, is the column a delete stamps: a deleted row is "
             + "hidden, and update_row setting that column to null restores it. A table of kind \"view\" is read-only. "
+            + "`title` and `presentation` are how the project's admin panel presents the table: a column's `label`, "
+            + "its `valueLabels`, whether the panel hides it, and `readOnly` for a column the project presents "
+            + "read-only — leave such a column as it is unless the user asks to change it. Use the labels when you "
+            + "talk to the user; the tools take the column names. "
             + "Call this before writing to a table.",
         requiredScope: SCHEMA_SCOPE,
         annotations: READS,
@@ -892,7 +981,7 @@ const TOOLS: McpToolDefinition[] = [
         async run(args, ctx) {
             // The listing's own gate (`SCHEMA_SCOPE` through `reaches`): a
             // table is describable exactly when it is listed.
-            return describeTable(resolveTable(ctx, args.table, SCHEMA_SCOPE), ctx);
+            return await describeTable(resolveTable(ctx, args.table, SCHEMA_SCOPE), ctx);
         }
     },
 
@@ -949,10 +1038,12 @@ const TOOLS: McpToolDefinition[] = [
                     ...pick(readArgs, ["where", "orderBy", "searchString", "limit"])
                 }
             };
+            const { title } = presentationOf(descriptor, await composedPreferences(ctx, descriptor.slug));
             return {
                 table: descriptor.slug,
+                ...(title && { title }),
                 ...page,
-                view: viewPayload(block, ctx, undefined, readAt)
+                view: await viewPayload(block, ctx, undefined, readAt)
             };
         }
     },
@@ -982,7 +1073,7 @@ const TOOLS: McpToolDefinition[] = [
         modelResult: withoutView,
         async run(args, ctx) {
             const block = await recordBlock(args, ctx);
-            return { ...block.summary, view: viewPayload(block, ctx) };
+            return { ...block.summary, view: await viewPayload(block, ctx) };
         }
     },
 
@@ -1024,7 +1115,7 @@ const TOOLS: McpToolDefinition[] = [
             return {
                 ...(title && { title }),
                 ...block.summary,
-                view: { ...viewPayload(block, ctx, title, seeds.length > 0 ? readAt : undefined), ...(seeds.length > 0 && { seeds }) }
+                view: { ...await viewPayload(block, ctx, title, seeds.length > 0 ? readAt : undefined), ...(seeds.length > 0 && { seeds }) }
             };
         }
     },
@@ -1133,7 +1224,7 @@ const TOOLS: McpToolDefinition[] = [
                 app: { id: app.id, title: app.title },
                 title: app.title,
                 ...block.summary,
-                view: { ...viewPayload(block, ctx, app.title), ...(seeds.length > 0 && { seeds }) }
+                view: { ...await viewPayload(block, ctx, app.title), ...(seeds.length > 0 && { seeds }) }
             };
         }
     },

@@ -14,9 +14,10 @@
  *   beside what the code declares, not instead of it: code can hold objects a
  *   preference cannot, and a preference must not delete them.
  */
-import type { AnyFieldCustomization, EnumLabel, TableCustomizationOptions } from "@rebasepro/cms-types";
+import type { AnyFieldCustomization, EnumLabel, TableCustomizationOptions, UserConfigurationPersistence } from "@rebasepro/cms-types";
 import type { ColorKey, EnumValueConditions, PropertyConditions, UiFieldPreferences, UiPreferences, UiTablePreferences } from "@rebasepro/types";
-import { isUiTablePreferences } from "@rebasepro/types";
+import { isUiTablePreferences, mergeUiTablePreferences } from "@rebasepro/types";
+import { stripCollectionPath } from "@rebasepro/common";
 
 import { customizeTable } from "../../tables/customize_table";
 import { applyTableCustomization, type TableCollection } from "../../tables/apply_customization";
@@ -163,4 +164,21 @@ export function uiConfigPreferences(config: { tables?: { [slug: string]: object 
         }
     }
     return { tables };
+}
+
+/**
+ * A user's persistence with a layer of their preferences beneath it: what
+ * the server stores for them, received by an embedding that asks the server
+ * for nothing itself. What they change there is kept by `persistence` and
+ * read over the layer.
+ */
+export function withUserLayer(persistence: UserConfigurationPersistence, user: UiPreferences): UserConfigurationPersistence {
+    return {
+        ...persistence,
+        getTablePreferences: (path: string) => {
+            const stored = user.tables[stripCollectionPath(path)];
+            const local = persistence.getTablePreferences(path);
+            return stored ? mergeUiTablePreferences(stored, local) : local;
+        }
+    };
 }

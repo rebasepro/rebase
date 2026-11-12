@@ -19,6 +19,7 @@ import { mergeUiTablePreferences } from "@rebasepro/types";
 import type { HonoEnv } from "../src/api/types";
 import { errorHandler } from "../src/api/errors";
 import { createUiConfigRoutes, UI_CONFIG_FILE } from "../src/ui-config/ui-config-routes";
+import { composableLayers, readUiPreferenceLayers } from "../src/ui-config/ui-preference-layers";
 import type { UiPreferenceOwner, UiPreferencesStore } from "../src/ui-config/ui-preferences-store";
 
 /** The store, in memory: rows keyed by scope, owner and slug. */
@@ -46,7 +47,7 @@ function memoryStore(): UiPreferencesStore & { rows: Map<string, UiTablePreferen
 const ADMIN = { uid: "u_admin", roles: ["admin"] };
 const EDITOR = { uid: "u_editor", roles: ["editor"] };
 
-function harness(options: { user?: HonoEnv["Variables"]["user"]; apiKey?: boolean; workspaceFile?: string; store?: UiPreferencesStore | null } = {}) {
+function harness(options: { user?: HonoEnv["Variables"]["user"]; apiKey?: boolean; workspaceFile?: string; shippedFile?: string; store?: UiPreferencesStore | null } = {}) {
     const store = options.store === undefined ? memoryStore() : options.store;
     const app = new Hono<HonoEnv>();
     app.onError(errorHandler);
@@ -56,7 +57,7 @@ function harness(options: { user?: HonoEnv["Variables"]["user"]; apiKey?: boolea
         if (options.apiKey) c.set("apiKey", { id: "key_1", name: "ci", scopes: ["schema:write"] });
         await next();
     });
-    app.route("/api/admin/ui-config", createUiConfigRoutes({ store, workspaceFile: options.workspaceFile }));
+    app.route("/api/admin/ui-config", createUiConfigRoutes({ store, workspaceFile: options.workspaceFile, shippedFile: options.shippedFile }));
     const call = (method: string, route: string, body?: unknown) => app.fetch(new Request(`http://localhost/api/admin/ui-config${route}`, {
         method,
         headers: { "Content-Type": "application/json" },
@@ -201,5 +202,53 @@ describe("the file target (development)", () => {
         await call("PUT", "/workspace/posts", { preferences: { name: "Articles" } });
         await call("DELETE", "/workspace/posts");
         expect(JSON.parse(fs.readFileSync(file, "utf8"))).toEqual({ tables: {} });
+    });
+});
+
+describe("the shipped layer: ui-config.json as the server knows it", () => {
+    let dir: string;
+    let shippedFile: string;
+    beforeEach(() => {
+        dir = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-ui-shipped-"));
+        // The copy a built bundle carries (`entry.uiConfig`).
+        shippedFile = path.join(dir, "ui-config.json");
+        fs.writeFileSync(shippedFile, JSON.stringify({ tables: { posts: { name: "Articles", fields: { status: { enumLabels: { draft: "WIP" } } } } } }));
+    });
+    afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+    it("a deployed server serves the bundle's copy as `shipped`, beside the workspace's rows", async () => {
+        const { call } = harness({ user: ADMIN, shippedFile });
+        await call("PUT", "/workspace/posts", { preferences: { icon: "Article" } });
+        const listed = await (await call("GET", "")).json();
+        expect(listed).toMatchObject({
+            workspaceTarget: "database",
+            shipped: { tables: { posts: { name: "Articles", fields: { status: { enumLabels: { draft: "WIP" } } } } } },
+            workspace: { tables: { posts: { icon: "Article" } } }
+        });
+    });
+
+    it("a server with neither file serves an empty shipped layer", async () => {
+        const listed = await (await harness({ user: ADMIN }).call("GET", "")).json();
+        expect(listed.shipped).toEqual({ tables: {} });
+    });
+
+    it("the layers a consumer folds itself: the file, the rows, the person's — the file once in development", async () => {
+        const store = memoryStore();
+        await store.save({ scope: "workspace" }, "posts", { icon: "Article" }, { updatedBy: "u_admin" });
+        await store.save({ scope: "user", uid: "u_editor" }, "posts", { defaultSize: "s" }, { updatedBy: "u_editor" });
+
+        const deployed = composableLayers(await readUiPreferenceLayers({ store, shippedFile }, "u_editor"));
+        expect(deployed).toEqual({
+            file: { tables: { posts: { name: "Articles", fields: { status: { enumLabels: { draft: "WIP" } } } } } },
+            workspace: { tables: { posts: { icon: "Article" } } },
+            user: { tables: { posts: { defaultSize: "s" } } }
+        });
+        // A caller that is not a person (an API key) has no user layer.
+        expect((await readUiPreferenceLayers({ store, shippedFile })).user).toEqual({ tables: {} });
+
+        // In development the workspace layer is the file: not folded twice.
+        const dev = composableLayers(await readUiPreferenceLayers({ store, workspaceFile: shippedFile, shippedFile: path.join(dir, "absent.json") }, "u_editor"));
+        expect(dev.file.tables.posts?.name).toBe("Articles");
+        expect(dev.workspace).toEqual({ tables: {} });
     });
 });

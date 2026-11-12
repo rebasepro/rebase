@@ -443,6 +443,8 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
         schemaDir: bundle.tablesDir,
         functionsDir: bundle.functionsDir,
         cronsDir: bundle.cronsDir,
+        // The presentation the frontend ships, for the server's views.
+        uiConfigFile: bundle.uiConfigFile,
         requireFilesLoaded: env.REBASE_REQUIRE_FILES_LOADED,
         surfaces: runtimeRole.surfaces,
         ownership: runtimeRole.ownership,

@@ -707,7 +707,7 @@ describe("the pages a show_app result reads ahead", () => {
         const parsed = parseResult(ok({
             tables: ["orders"],
             view: {
-                version: 2,
+                version: 3,
                 blocks: [{ key: "app", type: "app", code: "module.exports = {}", tables: ["orders"] }],
                 tables: [],
                 grants: {},
@@ -793,7 +793,7 @@ describe("the page a show_table result carries", () => {
         const parsed = parseResult(ok({
             data: [{ id: "o1" }],
             view: {
-                version: 2,
+                version: 3,
                 readAt,
                 blocks: [{ key: "rows", type: "table", table: "orders" }],
                 tables: [],
@@ -818,7 +818,7 @@ describe("the page a show_table result carries", () => {
             data: [{ id: "o1" }],
             meta: { limit: 50, offset: 0, hasMore: false },
             view: {
-                version: 2,
+                version: 3,
                 blocks: [{ key: "rows", type: "table", table: "orders", where: { status: ["==", "paid"] }, orderBy: "placed:desc" }],
                 tables: [],
                 grants: {},
@@ -866,7 +866,7 @@ describe("reading a show_* result", () => {
     });
 
     it("refuses a payload of a version it does not know, rather than misdraw it", () => {
-        const newer = parseResult(ok({ view: { version: 3, blocks: [] } }));
+        const newer = parseResult(ok({ view: { version: 4, blocks: [] } }));
         expect(newer).toEqual({ kind: "error", message: expect.stringContaining("older than the server") });
         // The serialized collections of version 1 are not read as tables.
         const older = parseResult(ok({ view: { version: 1, blocks: [{ key: "rows", type: "collection", collection: "orders" }], collections: [] } }));
@@ -877,7 +877,7 @@ describe("reading a show_* result", () => {
         const [customers, orders] = compileTables([CUSTOMERS_TABLE, ORDERS_TABLE]);
         const parsed = parseResult(ok({
             view: {
-                version: 2,
+                version: 3,
                 blocks: [{ key: "rows", type: "table", table: "orders" }],
                 tables: [customers, orders, { slug: "broken" }],
                 grants: { orders: { read: true, write: true, delete: false } },
@@ -891,6 +891,31 @@ describe("reading a show_* result", () => {
             orders: { read: true, write: true, delete: false }
         });
         expect(parsed.screen.viewer).toEqual({ uid: "u1", roles: ["admin"] });
+        // No preferences sent: every layer empty, the tables drawn with the defaults.
+        expect(parsed.screen.preferences).toEqual({ file: { tables: {} }, workspace: { tables: {} }, user: { tables: {} } });
+    });
+
+    it("reads the UI preference layers, an entry that is not a table preference left out", () => {
+        const parsed = parseResult(ok({
+            view: {
+                version: 3,
+                blocks: [{ key: "rows", type: "table", table: "orders" }],
+                tables: [],
+                grants: {},
+                preferences: {
+                    file: { tables: { orders: { name: "Order book" } } },
+                    workspace: { tables: { orders: { fields: { notes: { hidden: true } } }, broken: { columnType: "text" } } },
+                    user: { tables: { orders: { fieldOrder: ["status", "number"] } } }
+                },
+                viewer: { uid: "u1", roles: [] }
+            }
+        }));
+        if (parsed.kind !== "screen") throw new Error(`parsed as ${parsed.kind}`);
+        expect(parsed.screen.preferences).toEqual({
+            file: { tables: { orders: { name: "Order book" } } },
+            workspace: { tables: { orders: { fields: { notes: { hidden: true } } } } },
+            user: { tables: { orders: { fieldOrder: ["status", "number"] } } }
+        });
     });
 
     it("keeps the conditions of a block's filter the read tools take", () => {

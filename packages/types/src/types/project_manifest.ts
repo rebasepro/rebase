@@ -561,6 +561,18 @@ export interface RebaseBundleEntrypoints {
     /** Compiled Drizzle schema module. */
     schema?: string;
     /**
+     * A copy of the frontend's `src/cms/ui-config.json` — the presentation the
+     * collection editor saved in development and the frontend ships as
+     * `<RebaseCMS uiConfig>` — so the server knows it too: it is the workspace
+     * baseline of what the server serves about presentation (the MCP views,
+     * `GET /api/admin/ui-config`'s `shipped`).
+     *
+     * Optional and additive within format 3: absent when the project has no
+     * such file, and on bundles built before it existed, which boot as before
+     * (the server then knows only the preferences it stores).
+     */
+    uiConfig?: string;
+    /**
      * Built static apps to serve from this process, in declaration order.
      *
      * A list rather than a single directory because one process serves several

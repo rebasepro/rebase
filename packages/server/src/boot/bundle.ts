@@ -41,6 +41,12 @@ export interface LoadedBundle {
     functionsDir?: string;
     cronsDir?: string;
     /**
+     * Absolute path to the copy of the frontend's `ui-config.json` the bundle
+     * carries (`entry.uiConfig`), when it carries one: the workspace baseline
+     * of the presentation the server serves. Absent on older bundles.
+     */
+    uiConfigFile?: string;
+    /**
      * Built static apps to serve from this process, in mount order.
      *
      * A list, not a single directory: one process serves a site at `/` and an
@@ -283,6 +289,7 @@ export function loadBundle(bundleDir: string): LoadedBundle {
         hooksModule: resolveModule(entry.hooks, "hooks"),
         functionsDir: resolveEntry(entry.functions, "functions"),
         cronsDir: resolveEntry(entry.crons, "crons"),
+        uiConfigFile: resolveEntry(entry.uiConfig, "uiConfig"),
         staticApps: (entry.static ?? [])
             .map(item => {
                 // Before the directory check, so a bad hostname is reported

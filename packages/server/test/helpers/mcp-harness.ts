@@ -248,6 +248,8 @@ export interface HarnessOptions {
     instructions?: McpRoutesConfig["instructions"];
     /** Where confirmed calls are spent. This process's memory when absent. */
     confirmations?: McpRoutesConfig["confirmations"];
+    /** The UI preference layers a caller's views and describe_table present the tables with. */
+    getUiPreferences?: McpRoutesConfig["getUiPreferences"];
 }
 
 export function buildApp(options: HarnessOptions = {}) {
@@ -274,7 +276,8 @@ export function buildApp(options: HarnessOptions = {}) {
         tools: options.tools,
         vocabulary: options.vocabulary,
         instructions: options.instructions,
-        confirmations: options.confirmations
+        confirmations: options.confirmations,
+        getUiPreferences: options.getUiPreferences
     };
     app.route("/", createMcpWellKnownRoutes(mcpConfig));
     app.route("/mcp", createMcpRoutes(mcpConfig));

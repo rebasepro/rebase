@@ -31,7 +31,7 @@
 import type { ReactNode } from "react";
 import { useSyncExternalStore } from "react";
 import type { AdminCollection, AuthController } from "@rebasepro/cms-types";
-import type { DataDriver, StorageSource, TableDescriptor } from "@rebasepro/types";
+import type { DataDriver, StorageSource, TableDescriptor, UiPreferences } from "@rebasepro/types";
 
 /** @internal */
 export interface RebaseEmbedHost {
@@ -58,6 +58,22 @@ export interface RebaseEmbedHost {
      * the app's own page. Tables handed to `<RebaseCMS tables>` still win.
      */
     tables?: readonly TableDescriptor[];
+    /**
+     * How the tables are presented, as the server holds it for this person:
+     * the UI preference layers the embedding received, folded by
+     * `<RebaseCMS>` exactly as on the app's own page — `file` where the app
+     * passes no `uiConfig` of its own, then `workspace`, then `user` (with
+     * what the person changes in the embedding over it). The panel asks the
+     * server for none itself in an embedding.
+     */
+    uiPreferences?: {
+        /** `ui-config.json` as the server knows it. */
+        file: UiPreferences;
+        /** The workspace's, stored by the server. */
+        workspace: UiPreferences;
+        /** The person's own. */
+        user: UiPreferences;
+    };
     /**
      * The app's collections as the embedding may show them to this person —
      * what their connection was not granted closed. Applied to the

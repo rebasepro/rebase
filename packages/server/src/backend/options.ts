@@ -522,6 +522,17 @@ export interface RebaseBackendOptions {
     schemaEditor?: boolean;
 
     /**
+     * The presentation the project's frontend ships — a copy of
+     * `frontend/src/cms/ui-config.json` — for a server that cannot read the
+     * project's tree: a built bundle carries it (`entry.uiConfig`). Read as
+     * the workspace baseline by the server-side consumers of UI preferences:
+     * `GET /api/admin/ui-config` (`shipped`) and the MCP views, which fold it
+     * as the panel folds `<RebaseCMS uiConfig>`. Where the schema editor may
+     * write the project's source, the project's own file is read instead.
+     */
+    uiConfigFile?: string;
+
+    /**
      * Live schema editing — changing the database and committing the change.
      *
      * Distinct from `schemaEditor`, which only rewrites collection source on

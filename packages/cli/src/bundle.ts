@@ -31,6 +31,7 @@ import {
     type RebaseBackendAppConfig
 } from "@rebasepro/types";
 import { compareMountOrder, resolveBackendPaths } from "./manifest";
+import { cmsDirectories } from "./commands/verify-cms";
 import { schemaDirArgs } from "./utils/schema-dir";
 import { loadProjectSchema, type ModuleAliases } from "./utils/project-schema";
 import { cliVersion } from "./utils/version";
@@ -1322,6 +1323,37 @@ export function findUnusedServerEntry(projectRoot: string, functionsDir: string)
 /**
  * Compile and assemble a bundle.
  */
+/** Where a bundle carries the frontend's `ui-config.json` (`entry.uiConfig`). */
+export const BUNDLED_UI_CONFIG = "ui-config.json";
+
+/**
+ * Copy the frontend's `src/cms/ui-config.json` into the bundle, for
+ * `entry.uiConfig`: the reviewed presentation the frontend ships as
+ * `<RebaseCMS uiConfig>`, which a deployed server cannot read from the
+ * project's tree. Looked for in each `cmsDirectories` (the static apps'
+ * `src/cms`, and `frontend/src/cms`); the first found is carried. Nothing
+ * when there is none. A file that is not a JSON object is refused: the
+ * frontend's own build would fail on it too.
+ */
+export function bundleUiConfig(projectRoot: string, outDir: string): { source: string; entry: string } | undefined {
+    const source = cmsDirectories(projectRoot)
+        .map(dir => path.join(dir, "ui-config.json"))
+        .find(file => fs.existsSync(file) && fs.statSync(file).isFile());
+    if (!source) return undefined;
+    const text = fs.readFileSync(source, "utf8");
+    let parsed: unknown;
+    try {
+        parsed = JSON.parse(text);
+    } catch {
+        throw new Error(`${path.relative(projectRoot, source)} is not valid JSON. Fix it, or delete it to start the presentation over.`);
+    }
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+        throw new Error(`${path.relative(projectRoot, source)} must be a JSON object (\`{ "tables": { … } }\`).`);
+    }
+    fs.writeFileSync(path.join(outDir, BUNDLED_UI_CONFIG), text, "utf8");
+    return { source, entry: BUNDLED_UI_CONFIG };
+}
+
 /** What `composeBundleManifest` needs: every input, already resolved. */
 export interface ComposeManifestInput {
     runtimeRange: string;
@@ -1585,6 +1617,11 @@ stdio: toolStdio(options.quietStdout) });
     const relative = (target: string): string | undefined =>
         fs.existsSync(path.join(outDir, target)) ? target : undefined;
 
+    // The presentation the frontend ships, for the server too: its MCP views
+    // and `GET /api/admin/ui-config` fold it as the panel folds `uiConfig`.
+    const uiConfig = bundleUiConfig(projectRoot, outDir);
+    if (uiConfig) log(options, chalk.dim(`  carried ${path.relative(projectRoot, uiConfig.source)} for the server's views`));
+
     // What is in the functions directory, and what each one needs from its
     // host. Read from the *source*, not the compiled output, because the answer
     // is about imports and `tsc` has already resolved some of them away.
@@ -1627,7 +1664,8 @@ stdio: toolStdio(options.quietStdout) });
             hooks: relative(compiledModule(paths.hooks)),
             functions: relative(paths.functions),
             crons: relative(paths.crons),
-            schema: relative(schemaOut)
+            schema: relative(schemaOut),
+            ...(uiConfig && { uiConfig: uiConfig.entry })
         },
         tableSlugs: tables.map(table => table.slug),
         functions: bundledFunctions,
