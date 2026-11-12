@@ -143,6 +143,8 @@ import { ErrorBoundary } from "@rebasepro/ui";
 import { RebaseStudio } from "@rebasepro/studio";
 import { createRebaseClient } from "@rebasepro/client";
 import { postsCms } from "./cms/posts";
+// How the collection editor laid out the tables in development (labels, columns, views).
+import uiConfig from "./cms/ui-config.json";
 
 const API_URL = import.meta.env.VITE_API_URL;
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
@@ -167,7 +169,7 @@ export function App() {
                 <RebaseAuth />
                 {/* Every table the backend serves gets an admin view with no
                     code. A file in ./cms changes how one of them looks. */}
-                <RebaseCMS tableCustomizations={[postsCms]} />
+                <RebaseCMS tableCustomizations={[postsCms]} uiConfig={uiConfig} />
                 <RebaseStudio/>
                 <RebaseShell title="Rebase"/>
             </Rebase>
@@ -186,7 +188,7 @@ one value without it being written down three times.
 <span class="since-badge" data-since="0.31">Since 0.31</span>
 
 - **`createRebaseClient`** — Creates the SDK client that handles HTTP requests, WebSocket connections, and auth token management. Call it once, at module scope: inside a component, even in a `useMemo`, `<React.StrictMode>` builds a second client in development
-- **`<RebaseCMS tableCustomizations>`** — the panel renders every table the backend serves at `GET /api/schema/tables`; the `customizeTable` objects from `frontend/src/cms/` change how some of them look. See [Customizing a table](/docs/frontend/customize-table/)
+- **`<RebaseCMS tableCustomizations>`** — the panel renders every table the backend serves at `GET /api/schema/tables`; the `customizeTable` objects from `frontend/src/cms/` change how some of them look, and `uiConfig` carries what the collection editor saved in development. See [Customizing a table](/docs/frontend/customize-table/#customizations-ui-configjson-and-preferences)
 - **`useRebaseAuthController`** — Holds the signed-in user and the token lifecycle, and is what `<Rebase>` distributes to everything below it
 
 ## Backend (`backend/`)

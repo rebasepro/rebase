@@ -434,6 +434,46 @@ are typed by the document's keys. See [Arrays and JSON](/docs/collections/arrays
 
 See [Relations in the panel](/docs/collections/relations-in-the-admin-panel/).
 
+## Customizations, `ui-config.json` and preferences
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+What the panel shows for a table is composed in a fixed order, each layer over
+the one before it:
+
+1. **The derived collection**: what the panel reads off the table the server
+   serves.
+2. **Code**: the `customizeTable` results you pass as `tableCustomizations`.
+3. **`frontend/src/cms/ui-config.json`**: the workspace's presentation as the
+   collection editor saved it in development, passed as `uiConfig`. It is a
+   file in the frontend, so it is reviewed and deployed with it.
+4. **Workspace preferences**: what an admin saves on a deployment, in the
+   `rebase.ui_preferences` table through
+   [`/api/admin/ui-config`](/docs/backend/endpoints/). Writing them needs
+   `schema:write`.
+5. **User preferences**: one person's own column widths, view switches and
+   hidden columns. Kept in the browser while signed out.
+
+A scaffolded `App.tsx` already wires the file:
+
+```tsx
+import { RebaseCMS } from "@rebasepro/cms";
+import { tableCustomizations } from "./cms";
+import uiConfig from "./cms/ui-config.json";
+
+export const Admin = () => <RebaseCMS tableCustomizations={tableCustomizations} uiConfig={uiConfig} />;
+```
+
+Preferences hold presentation only: labels, icon, view modes, column order,
+hidden columns, enum labels and colours, kanban and query defaults. A schema
+fact never lands there; the [collection editor](/docs/studio/) writes those to
+`backend/schema` instead.
+
+`rebase verify` reads every `customizeTable` call in `frontend/src/cms` against
+the tables, without running it: it catches a customization for a table or a
+field that does not exist, a required column the form hides, and a table
+customized twice. See [`rebase verify`](/docs/cli/#rebase-verify).
+
 ## Next steps
 
 <span class="since-badge" data-since="0.31">Since 0.31</span>

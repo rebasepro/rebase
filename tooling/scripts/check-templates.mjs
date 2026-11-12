@@ -795,7 +795,8 @@ function checkGettingStartedPathsExist() {
     const NOT_SHIPPED = new Map([
         ["backend/src/schema.generated.ts", "`rebase init` writes the chosen preset's copy from packages/cli/templates/generated-schemas/"],
         ["backend/src/index.ts", "only after `rebase eject`; the pages name it to say a scaffold has none"],
-        ["backend/src/env.ts", "only after `rebase eject`, where the project owns its own env schema"]
+        ["backend/src/env.ts", "only after `rebase eject`, where the project owns its own env schema"],
+        ["backend/hooks.ts", "optional: the project creates it for global table hooks, and the pages say so"]
     ]);
 
     const EXT = /\.(ts|tsx|json|md|mdx|mjs|cjs|js|yml|yaml|example|toml)$/;

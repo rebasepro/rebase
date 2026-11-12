@@ -19,7 +19,7 @@
 - **CLI: `--schema-dir`, not `--collections`.** `--collections` / `-c` are refused; `schema introspect` writes `backend/schema` (`--output` removed); `REBASE_STRICT_COLLECTION_CONFIG` is no longer read.
 - **The schema editor edits `backend/schema` with `TablePatch`.** `schema-editor/collection/*` and `property/*` routes → `GET /tables`, `POST /preview`, `POST /apply`; live schema `/plan` and `/apply` take `{ patches }`; `REBASE_LIVE_SCHEMA_COLLECTIONS_PATH` → `REBASE_LIVE_SCHEMA_PATH`; `liveSchema.repository.collectionsPath` → `schemaPath`.
 - **A component slot is a component.** String paths and lazy thunks are refused; `ComponentRef`, `ComponentLike`, `LazyComponentRef`, `isLazyComponentRef`, `asComponentRef`, `asReactComponent`, `resolveComponentRef`, `useResolvedComponent` removed.
-- **Panel preferences are UI preferences.** `UserConfigurationPersistence` takes `getTablePreferences` / `saveTablePreferences`; `PartialCollectionConfig` removed; stored browser preferences reset once; `userSelect` → a `.userId()` column.
+- **Panel preferences are UI preferences.** `UserConfigurationPersistence` takes `getTablePreferences` / `saveTablePreferences`; `PartialCollectionConfig` removed; `StudioSchemaEditing.updateCollection` → `applyTablePatches` (the collection editor sends `{ patches }`); stored browser preferences reset once; `userSelect` → a `.userId()` column.
 - **MongoDB is retired.** `@rebasepro/server-mongo` and the Mongo model are removed; Postgres is the only server engine.
 - **Firestore collections live in the frontend.** `defineFirestoreCollection` from `@rebasepro/firebase` in `frontend/src/cms`; cross-source references are stored as ids, and a Firestore reference whose `path` is also a Postgres slug now targets the table.
 - **MCP tools are named for tables.** Remote and local: `list_tables`, `describe_table`, `query_table`, `show_table`, `count_rows`, `aggregate_rows`, `get_row`, `create_row`, `update_row`, `delete_row`; the `collection` argument → `table`; `rebase_schema_plan` takes `patches`; resources `rebase://tables/{name}`. The MCP Apps view payload is version 2 (caller-redacted table descriptors and per-table grants), and the `collection-table` view is removed.
@@ -29,6 +29,7 @@
 - **`@rebasepro/plugin-review`: `reviewSecurityRules` → `reviewRls`**, and the config checks take table descriptors.
 - **`@rebasepro/codegen` reads descriptors.** `generateSDK(tables)` / `generateTypedefs(tables)` take `TableDescriptor[]`.
 - **The agent skill `rebase-collections` is renamed `rebase-tables`.** `rebase skills install` removes the old copy — including from installs made before the skills manifest existed — and keeps any directory of that name you wrote yourself.
+- **`useJsonCollectionsConfigController` is removed from `@rebasepro/cms`**, with `UseJsonCollectionsConfigControllerOptions` and `JsonCollectionStore`. A table's schema lives in `backend/schema`, and its presentation in UI preferences.
 
 ### Added
 
@@ -36,7 +37,11 @@
 - **`GET /api/schema/tables` (+ `/:slug`)**: the tables, redacted per caller, with ETag; `schemaTables: { public: true }`; codes `SCHEMA_UNAVAILABLE`, `TABLE_NOT_FOUND`. `/api/meta/contract` serves `tables`.
 - **`rebase migrate collections-to-tables`** (`--dry-run`, `--check`, `--json`, `--force`, `--skip-sdk-calls`) with a byte-identical SQL check, and **`rebase migrate sdk-calls`**.
 - **`customizeTable`** and zero-config `<RebaseCMS />`; `frontend/src/cms/`.
-- **UI preferences**: `rebase.ui_preferences`, `/api/admin/ui-config`, `frontend/src/cms/ui-config.json`; codes `UI_PREFERENCES_NEED_A_PERSON`, `UI_PREFERENCES_UNSUPPORTED`, `UI_CONFIG_FILE_INVALID`.
+- **UI preferences**: `rebase.ui_preferences`, `/api/admin/ui-config`, `frontend/src/cms/ui-config.json` passed as `<RebaseCMS uiConfig>`, `useUiPreferences`; codes `UI_PREFERENCES_NEED_A_PERSON`, `UI_PREFERENCES_UNSUPPORTED`, `UI_CONFIG_FILE_INVALID`. The collection editor asks before a table that inherits `defaultRls` takes rules of its own, and says why a field or table is read-only.
+- **New projects ship `frontend/src/cms/ui-config.json`** and pass it as `uiConfig` (every `rebase init` preset, the demo and `examples/hybrid`): presentation the collection editor saves in development is reviewed and deployed with the frontend.
+- **`rebase verify` checks `frontend/src/cms`**: `cms-unknown-table`, `cms-unknown-field`, `cms-hidden-required`, `cms-duplicate-customization`, `cms-not-static`. Findings carry `line`.
+- **The codemod rewrites rule sources**: `existsIn` and `membership` take `table` instead of `collection` (`collections-to-tables` and `sdk-calls`).
+- **The codemod ends with a manual step to run `rebase skills install`** when the project holds installed agent skills.
 - **`TablePatch`** (`@rebasepro/types`); `SCHEMA_EDIT_DOES_NOT_COMPILE`; a live apply serves the change without a restart.
 - **`Register.tables`**: server-side data typed from `backend/schema` with no codegen; `DatabaseOf`.
 - **`backend.setTableHooks`, `getTableDescriptors()`, `routes.schema()`, `services.tables()`, `loadBackendSchema`.**
@@ -58,6 +63,7 @@
 
 - **`@rebasepro/server-mongo`**, `MongoDBCollectionConfig` and the Mongo model.
 - **The Vite collections plugin** (`rebaseCollectionsPlugin`, `virtual:rebase-collections`).
+- **`collection_wire` and `saveSecurityRulesToCodebase`** from the collection editor: it saves through `TablePatch` and UI preferences.
 - **`loadCollectionsFromDirectory`, `findCollectionConfigProblems`, `assertCollectionConfigs`, `loadUsersCollection`** and the legacy manifest fields.
 - **Docs: `backend/mongodb`** (301 to `/docs/compatibility/`).
 
@@ -66,6 +72,7 @@
 - **A Firestore reference to a Postgres row** was written as a pointer to a Firestore document that does not exist; references between data sources are stored as ids and routed by their driver.
 - **A bare `access: "authenticated"` rule** compiled to deny-all; it admits any signed-in caller.
 - **Introspection keeps a declared temporal precision.** A `timestamptz(3)` or `time(0)` column is generated as `col.custom()` of that type, so a push no longer widens it to Postgres's default precision.
+- **A bare `rebase migrate` printed "Unknown migrate command".** It prints the help for both subcommands; `rebase --help` lists `migrate sdk-calls`, and the migrate help explains `--check`, `--dry-run`, `--force` and the manual steps.
 
 ## [0.30.1] - 2026-11-11
 

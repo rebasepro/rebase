@@ -92,6 +92,13 @@ or a project outside git is refused too, so the migration is one reviewable
 diff. `--json` prints the whole report for a script or an agent. See
 [`rebase migrate`](/docs/cli/#rebase-migrate) and [Tables](/docs/schema/).
 
+The `sdk-calls` pass that follows also rewrites rule sources:
+`existsIn({ collection })` and `membership: { collection }` become `table`
+(section 123); `--skip-sdk-calls` skips that too. What is left to you is
+printed as numbered manual steps, and when the project holds installed agent
+skills the last one is the `rebase skills install` line that refreshes them
+(section 128). A bare `rebase migrate` prints the help for both subcommands.
+
 ## 109. There is no config package
 
 **Who this hits:** every project — `config/` was a workspace of its own.
@@ -304,7 +311,12 @@ the partial collection-config type it took is removed. The browser store keeps t
 user's column widths and view modes reset once. `userSelect` on a field is
 gone: a `.userId()` column is the user picker.
 
-**What to do:** port a custom persistence to the two methods.
+Studio's bridge follows: `StudioSchemaEditing.updateCollection` is
+`applyTablePatches(slug, patches)`, and the collection editor sends
+`{ patches }` to the schema editor.
+
+**What to do:** port a custom persistence to the two methods, and a custom
+`StudioSchemaEditing` to `applyTablePatches`.
 
 ## 120. MongoDB is retired
 
@@ -426,3 +438,18 @@ of that name you wrote yourself.
 **What to do:** run `rebase skills install` after upgrading. The steps
 `rebase migrate collections-to-tables` prints say so too. Rename the skill in
 any instruction file that names it. See [Agent Skills](/docs/ai/skills/).
+
+## 129. `useJsonCollectionsConfigController` is removed
+
+**Who this hits:** a project that stored collection definitions as JSON
+through `@rebasepro/cms`.
+
+**What changed:** `useJsonCollectionsConfigController` is gone, with its
+options type and the JSON store class behind it. A table's schema lives in `backend/schema`, and how the panel shows it
+lives in UI preferences: `frontend/src/cms/ui-config.json` in development, the
+`rebase.ui_preferences` table on a deployment.
+
+**What to do:** declare the tables with `defineTable`
+(`rebase migrate collections-to-tables` writes them from collection
+definitions), and pass the scaffold's `uiConfig` to `<RebaseCMS>`. See
+[Customizing a table](/docs/frontend/customize-table/#customizations-ui-configjson-and-preferences).

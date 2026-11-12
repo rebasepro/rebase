@@ -59,8 +59,13 @@ A visual editor for a table and how the panel shows it. A save is split in two:
 A slug, SQL table or database change is refused as a migration. A table whose
 rules come from `defaultRls` asks before taking rules of its own. A caller
 served redacted rules gets a read-only editor, and a Firestore collection is
-read-only here: it is defined in the frontend. It is the screenshot at the top
-of this page.
+read-only here: it is defined in the frontend. A save the server cannot
+compile lists each problem against the field it names, and nothing is written.
+A file changed on disk since the editor read it offers a reload instead of
+overwriting the change. A field whose definition is built in code — a helper,
+a shared variable — is shown read-only, with the reason. Column order is
+presentation only: reordering never moves a column in the table. It is the
+screenshot at the top of this page.
 
 The editor is on wherever Studio is mounted — a scaffold's `<RebaseStudio/>` is
 enough, and there is no prop to add. `collectionEditor` tunes it rather than
