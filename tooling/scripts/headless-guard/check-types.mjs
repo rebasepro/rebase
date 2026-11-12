@@ -242,6 +242,57 @@ for (const pkg of CORE_PACKAGES) {
     }
 }
 
+/**
+ * The CMS view model left the kernel symbol by symbol (`cms-only-symbols.json`,
+ * written as each move lands). A module ban cannot see a name drifting back —
+ * someone re-adding `resolveProperty` to `@rebasepro/common` names no UI module —
+ * so the source half also refuses any of those names declared or exported from
+ * the kernel's sources, and says where the symbol lives now.
+ */
+const KERNEL_SOURCES = ["types", "common"];
+function movedSymbolViolations() {
+    const listPath = path.join(import.meta.dirname, "cms-only-symbols.json");
+    const { moved } = JSON.parse(fs.readFileSync(listPath, "utf8"));
+    const homeOf = new Map();
+    for (const [home, names] of Object.entries(moved)) for (const name of names) homeOf.set(name, home);
+    const hits = [];
+    for (const pkg of KERNEL_SOURCES) {
+        for (const file of filesToCheck(path.join(repoRoot, "packages", pkg))) {
+            if (!file.includes(`${path.sep}src${path.sep}`)) continue;
+            const source = ts.createSourceFile(file, fs.readFileSync(file, "utf8"), ts.ScriptTarget.Latest, true);
+            const exportedName = (node) => {
+                const modifiers = ts.canHaveModifiers(node) ? ts.getModifiers(node) ?? [] : [];
+                if (!modifiers.some(m => m.kind === ts.SyntaxKind.ExportKeyword)) return [];
+                if (ts.isVariableStatement(node)) return node.declarationList.declarations.map(d => d.name.getText(source));
+                return node.name ? [node.name.getText(source)] : [];
+            };
+            for (const statement of source.statements) {
+                const names = ts.isExportDeclaration(statement) && statement.exportClause && ts.isNamedExports(statement.exportClause)
+                    ? statement.exportClause.elements.map(e => e.name.text)
+                    : exportedName(statement);
+                for (const name of names) {
+                    if (!homeOf.has(name)) continue;
+                    const line = source.getLineAndCharacterOfPosition(statement.getStart(source)).line + 1;
+                    hits.push(`  ${path.relative(repoRoot, file)}:${line} — exports \`${name}\`, which lives in ${homeOf.get(name)}`);
+                }
+            }
+        }
+    }
+    return hits;
+}
+
+const movedHits = scanSrc ? movedSymbolViolations() : [];
+if (movedHits.length > 0) {
+    console.error("\nCMS view-model symbols exported from the kernel again:\n");
+    console.error(movedHits.join("\n"));
+    console.error(
+        "\nThese moved to the admin packages because no backend code uses them; the kernel\n" +
+        "(@rebasepro/types, @rebasepro/common) must not carry CMS concepts. Import the symbol\n" +
+        "from its home instead. The list is tooling/scripts/headless-guard/cms-only-symbols.json."
+    );
+    process.exit(1);
+}
+
 if (report.length > 0) {
     console.error("\nType-level headless violations:\n");
     for (const { pkg, badFiles, badDeps } of report) {
