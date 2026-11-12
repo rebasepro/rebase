@@ -153,6 +153,26 @@
         "source": "/:lang(es|de|fr|it|pt)/docs/upgrading/0-18-to-next",
         "destination": "/:lang/docs/upgrading/0-18-to-0-21/",
         "type": 301
+      },
+      {
+        "source": "/docs/backend/mongodb",
+        "destination": "/docs/compatibility/",
+        "type": 301
+      },
+      {
+        "source": "/docs/backend/mongodb/",
+        "destination": "/docs/compatibility/",
+        "type": 301
+      },
+      {
+        "source": "/:lang(es|de|fr|it|pt)/docs/backend/mongodb",
+        "destination": "/:lang/docs/compatibility/",
+        "type": 301
+      },
+      {
+        "source": "/:lang(es|de|fr|it|pt)/docs/backend/mongodb/",
+        "destination": "/:lang/docs/compatibility/",
+        "type": 301
       }
     ],
     "headers": [

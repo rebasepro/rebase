@@ -80,21 +80,21 @@ Was Sie committen, sind die Migrationen. Alle Flags finden Sie unter
 
 ### Beispiel
 
-Gegeben diese Sammlung:
+Gegeben diese Tabelle:
 
-<!-- schema-sample: collection -->
-```typescript
-import { defineCollection } from "@rebasepro/cms-types";
-const productsCollection = defineCollection({
-    slug: "products",
-    name: "Products",
-    table: "products",
-    properties: {
-        name: { type: "string", name: "Name", validation: { required: true } },
-        price: { type: "number", name: "Price", columnType: "numeric" },
-        active: { type: "boolean", name: "Active", defaultValue: true },
-        createdAt: { type: "date", name: "Created", autoValue: "on_create" }
-    }
+<!-- schema-sample: table -->
+```ts
+import { defineTable, col } from "@rebasepro/server/schema";
+
+export const products = defineTable("products", {
+    columns: {
+        id: col.text().primaryKey().defaultSql("gen_random_uuid()::text"),
+        name: col.text().notNull(),
+        price: col.numeric(),
+        active: col.boolean().default(true),
+        createdAt: col.timestamptz().onCreateNow()
+    },
+    rls: "admin-only"
 });
 ```
 

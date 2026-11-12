@@ -115,6 +115,7 @@ export default defineConfig({
                             collapsed: true,
                             items: [
                                 { label: "Which hop", slug: "docs/upgrading" },
+                                { label: "0.30 → 0.31", slug: "docs/upgrading/0-30-to-0-31" },
                                 { label: "0.29 → 0.30", slug: "docs/upgrading/0-29-to-0-30" },
                                 { label: "0.27 → 0.29", slug: "docs/upgrading/0-27-to-0-29" },
                                 { label: "0.26 → 0.27", slug: "docs/upgrading/0-26-to-0-27" },
@@ -151,29 +152,48 @@ export default defineConfig({
                         { label: "REST API filtering", slug: "docs/backend/filtering" },
                         { label: "Writing over REST", slug: "docs/backend/writes" },
                         { label: "Typed SDK", slug: "docs/sdk" },
-                        { label: "Security Rules (RLS)", slug: "docs/collections/security-rules" },
+                        { label: "Row-level security", slug: "docs/collections/security-rules" },
                         { label: "Field access", slug: "docs/collections/field-access" },
                         { label: "Tenancy", slug: "docs/collections/tenancy" }
                     ]
                 },
                 {
-                    label: "Collections",
+                    // The tables are the backend: API, auth, RLS, realtime, the
+                    // SDK and MCP all read what `backend/schema` declares. They
+                    // come before the admin panel because the panel reads them too.
+                    label: "Schema",
+                    translations: { de: "Schema", es: "Esquema", fr: "Schéma", it: "Schema", pt: "Esquema" },
                     collapsed: false,
                     items: [
-                        { label: "Defining Collections", slug: "docs/collections" },
-                        { label: "Properties", slug: "docs/collections/properties" },
-                        { label: "Arrays and maps", slug: "docs/collections/arrays-and-maps" },
+                        { label: "Tables", slug: "docs/schema" },
+                        { label: "Columns", slug: "docs/schema/columns" },
+                        { label: "JSON documents", slug: "docs/schema/json" },
+                        { label: "Relations", slug: "docs/collections/relations" },
+                        { label: "Users table", slug: "docs/schema/auth-table" },
+                        { label: "Views", slug: "docs/collections/views" },
+                        { label: "Soft delete", slug: "docs/collections/soft-delete" },
+                        { label: "Table hooks", slug: "docs/collections/callbacks" },
+                        { label: "The context.data API", slug: "docs/collections/context-data-api" },
+                        { label: "Row-level security", slug: "docs/collections/security-rules" },
+                        { label: "Field access", slug: "docs/collections/field-access" },
+                        { label: "Tenancy", slug: "docs/collections/tenancy" },
+                        { label: "Type inference", slug: "docs/schema/types" }
+                    ]
+                },
+                {
+                    // What the admin panel derives from those tables, and how a
+                    // project customizes it with `customizeTable`.
+                    label: "Admin panel",
+                    translations: { de: "Admin-Panel", es: "Panel de administración", fr: "Panneau d'administration", it: "Pannello di amministrazione", pt: "Painel de administração" },
+                    collapsed: false,
+                    items: [
+                        { label: "Tables in the CMS", slug: "docs/collections" },
+                        { label: "customizeTable", slug: "docs/frontend/customize-table" },
+                        { label: "Fields", slug: "docs/collections/properties" },
+                        { label: "Arrays and JSON", slug: "docs/collections/arrays-and-maps" },
                         { label: "File uploads", slug: "docs/collections/file-uploads" },
                         { label: "Validation & conditions", slug: "docs/collections/validation-and-conditions" },
-                        { label: "Relations", slug: "docs/collections/relations" },
-                        { label: "Relations in the admin panel", slug: "docs/collections/relations-in-the-admin-panel" },
-                        { label: "Soft delete", slug: "docs/collections/soft-delete" },
-                        { label: "Views", slug: "docs/collections/views" },
-                        { label: "Entity Callbacks", slug: "docs/collections/callbacks" },
-                        { label: "The context.data API", slug: "docs/collections/context-data-api" },
-                        { label: "Security Rules (RLS)", slug: "docs/collections/security-rules" },
-                        { label: "Field access", slug: "docs/collections/field-access" },
-                        { label: "Tenancy", slug: "docs/collections/tenancy" }
+                        { label: "Relations in the admin panel", slug: "docs/collections/relations-in-the-admin-panel" }
                     ]
                 },
                 {
@@ -200,7 +220,6 @@ export default defineConfig({
                         { label: "Storage caching and CDNs", slug: "docs/backend/storage-caching" },
                         { label: "Resumable uploads (TUS)", slug: "docs/backend/storage-resumable-uploads" },
                         { label: "Multiple Sources", slug: "docs/backend/multiple-sources" },
-                        { label: "MongoDB", slug: "docs/backend/mongodb" },
                         { label: "Realtime & WebSocket", slug: "docs/backend/realtime" },
                         { label: "Realtime across instances", slug: "docs/backend/realtime-transports" },
                         { label: "Database change capture", slug: "docs/backend/realtime-cdc" },
@@ -471,7 +490,6 @@ export default defineConfig({
                 "@rebasepro/plugin-ai",
                 "@rebasepro/plugin-insights",
                 "@rebasepro/rls-check",
-                "@rebasepro/server-mongo",
                 "@rebasepro/server-postgres",
                 "@rebasepro/server",
                 "@rebasepro/studio",

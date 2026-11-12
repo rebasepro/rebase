@@ -61,8 +61,8 @@ The three ratings mean:
 | Auth — MFA (TOTP) | Beta | Enrolment, verification and recovery work and are tested. Key rotation is implemented for the encryption key; there is no admin surface for resetting a locked-out user's factor |
 | Row-level security | Stable | The wedge of the product. `pnpm rls:check` audits a live database against fifteen checks, and the RLS e2e suite runs on every push |
 | Storage | Stable | Local, S3 and GCS. Default-deny in production since 0.17.0, and the scaffold ships an authorize hook |
-| Realtime | **Beta** | Subscriptions are matched by collection path only, so N subscribers on one collection cost N RLS-scoped refetches per write. That caps a deployment at low hundreds of concurrent subscribers. Correct at any scale; expensive past that one |
-| Vector search (pgvector) | Beta | Every vector column gets an HNSW index for cosine distance by default, tunable per property through `VectorIndexConfig` (method, distances, build parameters) or turned off, which leaves an exact scan. pgvector cannot index a column wider than 2,000 dimensions, so those are left unindexed and scan |
+| Realtime | **Beta** | Subscriptions are matched by table path only, so N subscribers on one table cost N RLS-scoped refetches per write. That caps a deployment at low hundreds of concurrent subscribers. Correct at any scale; expensive past that one |
+| Vector search (pgvector) | Beta | Every vector column gets an HNSW index for cosine distance by default, tunable per column through `col.vector(dims, { index })` (method, distances, build parameters) or turned off, which leaves an exact scan. pgvector cannot index a column wider than 2,000 dimensions, so those are left unindexed and scan |
 | Offline sync | Beta | Mutations carry idempotency keys the server honours, and the data-loss defects found in the July audit are fixed. The conflict model is last-write-wins with no per-field merge |
 | Entity history | Stable | Snapshot-based, gated by its own suite |
 | Functions and crons | Stable | The portable entry point (`@rebasepro/server/functions`) is a versioned contract with its own API-surface section |
@@ -71,8 +71,7 @@ The three ratings mean:
 | CMS + admin panel | Beta | Complete for CRUD, relations, storage fields and roles. **The data table has no grid semantics** — no `role`, no `aria-rowindex`, `tabIndex` stripped — so keyboard and screen-reader users cannot operate the main view. No drafts, no per-locale content, no block rich-text |
 | PGlite managed dev database | Beta | Zero-setup `rebase dev` with no Docker. One session at a time, so requests serialize and concurrency cannot be reproduced against it; Atlas-backed commands (`db push`, `generate`, `migrate`) plan against a throwaway second PGlite started for the command; `db branch` does not work there and says so |
 | Helm chart | Beta | Renders the split-process topology and is published to the OCI registry at each release. The default remains a single container |
-| `@rebasepro/server-mongo` | **Experimental** | A working driver with change-stream realtime and snapshot history. **No row-level security** — the whole isolation model above does not apply to it — and no relations. Change streams need a replica set: on a standalone `mongod` nothing replaces them, so a subscription sees writes made through that Rebase process and misses every other. No MFA: enrolment answers 501, and the checks answer "no factor", so sign-in never asks for one. The admin aggregate cannot target a collection — it reads the name from a `$from` stage MongoDB does not have — so it returns nothing |
-| `@rebasepro/firebase` | Experimental | Runs the admin panel and SDK against Firestore. No RLS, no SQL surface; the Postgres feature set does not carry over. The Firestore driver ignores `or(...)`/`and(...)` filter groups, so a query that uses one reads every row its plain filters allow |
+| `@rebasepro/firebase` | Experimental | Firestore as a source the admin panel reads directly, beside the backend's tables: `defineFirestoreCollection` in `frontend/src/cms`, passed as `externalCollections`. No RLS, no SQL surface; the Postgres feature set does not carry over. The Firestore driver ignores `or(...)`/`and(...)` filter groups, so a query that uses one reads every row its plain filters allow |
 | Rebase Cloud | **Private beta** | Live, running real tenants, opened in batches. Not self-serve |
 
 Two entries above are the honest cost of publishing this table at all: the
@@ -126,7 +125,7 @@ grep -n "AUTH_SCHEMA_VERSION =" packages/server-postgres/src/auth/schema-version
 | # | Contract | Declared in | Checked in | Compatibility direction |
 |---|---|---|---|---|
 | 1 | `rebase` range in `rebase.json` | the user's project | CLI at build | project states which runtimes it accepts |
-| 2 | `BUNDLE_FORMAT_VERSION` | `packages/types/src/types/project_manifest.ts` | `packages/server/src/boot/bundle.ts` | **backward compatible** — new runtime reads old bundles |
+| 2 | `BUNDLE_FORMAT_VERSION` | `packages/types/src/types/project_manifest.ts` | `packages/server/src/boot/bundle.ts` | **backward compatible** where the layout allows — format 3 refuses formats 1 and 2 |
 | 3 | `RUNTIME_CONTRACT_VERSION` | same file | same file | **exact match, both directions** |
 | 4 | `AUTH_SCHEMA_VERSION` | `packages/server-postgres/src/auth/schema-version.ts` | at boot, against `rebase.schema_meta` | **forward only** — new runtime migrates old databases |
 | 5 | `manifest.schemaVersion` | emitted by `rebase build` | sent by the SDK as `x-rebase-schema` when configured | advisory — identifies which schema a client was built against |
@@ -138,22 +137,32 @@ A semver range, read like `engines` in a `package.json`: which runtime versions
 this project accepts. Named `rebase` rather than `runtime` deliberately, because
 `runtime` already means *who owns the process* (`managed` | `custom`) on an app.
 
-### 2 — `BUNDLE_FORMAT_VERSION` (currently 2)
+### 2 — `BUNDLE_FORMAT_VERSION` (currently 3)
 
-The on-disk layout of a built bundle. A runtime accepts any bundle whose format
-is **less than or equal to** its own, which is what lets the managed tier move a
-tenant onto a new image without anyone rebuilding their project.
+The on-disk layout of a built bundle. A runtime refuses a bundle whose format is
+newer than its own, and reads an older one where the layout allows it, which is
+what lets the managed tier move a tenant onto a new image without anyone
+rebuilding their project.
 
 - **1** — `mode: "cms" | "baas" | "static"`, `entry.static` a single directory,
   `entry.admin` for a bundled admin.
 - **2** — `kind: "backend" | "static"`, `entry.static` a list, `entry.admin`
-  removed. Format 1 is still read, via `upgradeLegacyManifest`.
+  removed.
+- **3** (0.31) — the schema is `entry.tables`, the compiled `backend/schema`,
+  beside `entry.resources`, `entry.storage` and `entry.hooks`; `entry.config`,
+  `entry.collections` and `entry.usersCollection` are gone. **Formats 1 and 2
+  are refused, not upgraded**: they carry `config/collections`, which a runtime
+  that reads `backend/schema` has nothing to read with, and booting one would
+  introspect the database and serve a different API. The refusal names
+  `rebase migrate collections-to-tables`; migrate the source and rebuild. This
+  was the one break of backward compatibility, taken with the runtime contract
+  bump below.
 
 **Bump it when** the layout changes such that an older runtime would misread a
 newer bundle. The bump is what converts "boots and serves nothing" into a
 refusal to start.
 
-### 3 — `RUNTIME_CONTRACT_VERSION` (currently 1)
+### 3 — `RUNTIME_CONTRACT_VERSION` (currently 2)
 
 The bundle↔runtime contract major. Distinct from the `@rebasepro/server` package
 version, which may release any number of minors and patches while this stays put.
@@ -168,7 +177,9 @@ lever — but it means a bump is a fleet-wide migration, not a release note. For
 the managed tier it must be sequenced with a rebuild of every tenant's bundle.
 
 If a change is *additive* and old bundles would still be correct, it wants
-`BUNDLE_FORMAT_VERSION` (or nothing at all), not this.
+`BUNDLE_FORMAT_VERSION` (or nothing at all), not this. 0.31 bumped it to 2,
+with bundle format 3: the schema model changed, and every tenant's bundle is
+rebuilt from migrated source.
 
 ### 4 — `AUTH_SCHEMA_VERSION` (currently 2)
 
@@ -189,7 +200,7 @@ judgement in `packages/server-postgres/src/auth/ensure-tables.ts`.
 
 ### 5 — `manifest.schemaVersion`
 
-A hash of the compiled collection definitions, emitted into the bundle manifest
+A hash of the compiled table descriptors (`v2:…` since 0.31), emitted into the bundle manifest
 and echoed by a generated SDK in the `x-rebase-schema` header
 (`SCHEMA_VERSION_HEADER`). It exists so the platform can say "this app was built
 against an older schema" instead of failing mysteriously at the first request.
@@ -202,7 +213,7 @@ import { SCHEMA_VERSION } from "./generated/sdk/schema.meta";
 
 const rebase = createRebaseClient<Database>({
     baseUrl: "http://localhost:3001",
-    collections: collectionsDictionary,
+    tables: tablesDictionary,
     schemaVersion: SCHEMA_VERSION,
 });
 ```
@@ -216,12 +227,12 @@ fails with a 400 or a 404, the error carries the drift as its cause:
 {
   "error": {
     "code": "BAD_REQUEST",
-    "message": "Unknown field \"authorName\" on collection \"posts\"",
+    "message": "Unknown field \"authorName\" on table \"posts\"",
     "cause": {
       "code": "SCHEMA_DRIFT",
-      "clientSchema": "v1:0e1c…",
-      "serverSchema": "v1:9ab4…",
-      "message": "This client was generated against schema v1:0e1c…; this backend serves v1:9ab4…"
+      "clientSchema": "v2:0e1c…",
+      "serverSchema": "v2:9ab4…",
+      "message": "This client was generated against schema v2:0e1c…; this backend serves v2:9ab4…"
     }
   }
 }
@@ -230,8 +241,12 @@ fails with a 400 or a 404, the error carries the drift as its cause:
 So a renamed column reads as "your SDK is stale, regenerate it" rather than as
 a field your own types insist exists. A request that succeeds is never told.
 
-It covers **collections only**. A hook or function edit does not change a
-client's contract and must not invalidate every generated SDK.
+It covers **tables only** — their compiled descriptors, in which a hook is a
+presence flag. A hook's code or a function edit does not change a client's
+contract and must not invalidate every generated SDK. Because 0.31 moved the
+hash from collections to descriptors, every database stamped `v1:` reports the
+change once, with the restamp (boot the schema owner, or `rebase db push`), and
+every generated SDK reads as stale once.
 
 ### Who is calling
 
@@ -250,7 +265,10 @@ Two more identifying signals, neither of which gates anything on its own:
 
 Every name this framework works out for itself rather than being told: a foreign
 key column, a foreign key constraint, a junction table and its two key columns, an
-enum type, a policy name, a `camelCase` property's `snake_case` column.
+enum type, a policy name, a `camelCase` column key's `snake_case` column. Since
+0.31 tables are declared with `defineTable`, which derives exactly the names a
+collection derived for an equivalent schema; `rebase migrate collections-to-tables`
+proves it per project by comparing the generated SQL byte for byte.
 
 > **A derived identifier is frozen the moment a release emits it.**
 
@@ -269,7 +287,7 @@ project's checked-in `schema.generated.ts` did not, and the boot died on a colum
 that existed. Three commits, a new seam test, and a permanent entry in the upgrade
 notes, in exchange for a nicer-looking column name nobody had asked about.
 
-**If a derivation is genuinely wrong**, it changes for collections created
+**If a derivation is genuinely wrong**, it changes for tables created
 *afterwards*, behind a naming strategy recorded in the project — never
 retroactively, and never as a side effect of improving the function underneath.
 
@@ -312,22 +330,23 @@ baseline cannot drift underneath anyone.
 
 It also pins that `rebase db push` and the managed runtime's boot-ensure derive
 the *same* names, which is a second contract hiding inside the first: they compile
-the same collections through different code, and a project pushed once and booted
+the same tables through different code, and a project pushed once and booted
 later must not end up with two schemas.
 
 ## What is *not* frozen
 
 Said plainly, so nobody infers a promise that was never made:
 
-- The authored TypeScript API — collection config, `initializeRebaseBackend`
-  options, admin props, SDK method names. Breaking changes land in minors and
+- The authored TypeScript API — `defineTable` and `customizeTable`, `initializeRebaseBackend`
+  options, admin props, SDK method names. 0.31 replaced collections with tables in a
+  minor, with a codemod that proves the generated SQL unchanged. Breaking changes land in minors and
   are announced in the changelog.
 - `@rebasepro/studio`, `@rebasepro/mcp`, `@rebasepro/inference`,
   `@rebasepro/plugin-*` — these move fastest and have the fewest consumers.
 - Anything under a package's `src/` that is not re-exported from its barrel.
   `packages/client/src/index.ts` carries a note explaining that its export list
   is curated precisely so an internal export cannot become public by accident.
-- The database schema of *your* collections. That is yours; Rebase only owns the
+- The database schema of *your* tables. That is yours; Rebase only owns the
   `rebase` schema (and, on a database provisioned before 0.13, the old `auth`
   schema until boot retires it).
 
