@@ -165,6 +165,18 @@ describe("what the blog fixture says about routing", () => {
         const table = report.files.find(file => file.path === "backend/schema/posts.ts");
         expect(table?.content).toContain("({ values: row }) => {");
         expect(table?.content).toContain(`import { slugify } from "../lib/slugify";`);
+        // Comments move with what they describe.
+        expect(table?.content).toContain("        // Unique, so a URL names one post.\n        slug: col.text()");
+        expect(table?.content).toContain("        // Tags are shared between posts.\n        tags: rel.manyToMany");
+        expect(table?.content).toContain("    // The public feed: newest first.\n    indexes:");
+        expect(table?.content).toContain("        // Derive the slug once, from the first title.\n        beforeSave:");
+        expect(posts?.content).toContain("    // The editorial board.");
+        const users = report.files.find(file => file.path === "backend/schema/users.ts");
+        expect(users?.content).toContain("        // Only admins list users.\n        { operation: \"select\"");
+        expect(report.files.find(file => file.path === "backend/schema/index.ts")?.content).toContain("/** Anyone reads, admins write. */\nexport const defaultRls");
+        // With config/ gone the backend compiles from its own directory, and runs from dist/src.
+        expect(report.files.find(file => file.path === "backend/tsconfig.json")?.content).toContain(`"rootDir": "."`);
+        expect(report.files.find(file => file.path === "backend/entrypoint.sh")?.content).toContain("exec node dist/src/index.js");
     }, 120_000);
 });
 

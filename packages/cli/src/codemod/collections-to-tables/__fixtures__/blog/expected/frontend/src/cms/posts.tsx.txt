@@ -10,6 +10,8 @@ export const postsCms = customizeTable<typeof posts>("posts", {
     icon: "FileText",
     group: "Content",
     defaultViewMode: "cards",
+    // The editorial board.
+    // One column per status.
     kanban: {
         columnField: "status",
         orderField: "__order"

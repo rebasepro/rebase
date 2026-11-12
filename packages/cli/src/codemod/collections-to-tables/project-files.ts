@@ -181,20 +181,101 @@ export function planWorkspace(plan: PlanContext, configDir: string, frontendRoot
     }
 }
 
-/** backend/tsconfig.json: `../config/**` out of `include`, the new modules in. */
+/** The comment the scaffold now writes above `rootDir`. */
+const ROOT_DIR_COMMENT = [
+    "    // Everything this program compiles lives under backend/, so the emit",
+    "    // mirrors it: `dist/schema/…`, `dist/functions/…`, `dist/src/…`. Saying so",
+    "    // is required from TypeScript 6, which refuses to infer it (TS5011)."
+];
+
+/** The `//` comment lines directly above line `index`. */
+function commentBlockAbove(lines: readonly string[], index: number): { start: number; end: number } {
+    let start = index;
+    while (start > 0 && /^\s*\/\//.test(lines[start - 1])) start--;
+    return { start, end: index };
+}
+
+/** Drop the paragraphs of a `//` comment block that talk about the config package. */
+function withoutConfigParagraphs(block: readonly string[]): string[] {
+    const paragraphs: string[][] = [[]];
+    for (const line of block) {
+        if (/^\s*\/\/\s*$/.test(line)) paragraphs.push([line]);
+        else paragraphs[paragraphs.length - 1].push(line);
+    }
+    const kept = paragraphs.filter(paragraph => !paragraph.some(line => /\.\.\/config\b|config\/\*\*|\bconfig (package|workspace)\b/.test(line)));
+    const out = kept.flat();
+    while (out.length > 0 && /^\s*\/\/\s*$/.test(out[0])) out.shift();
+    return out;
+}
+
+/**
+ * backend/tsconfig.json once `config/` is gone: `../config/**` out of
+ * `include` and the new modules in; `rootDir ".."` (which existed only so the
+ * program could reach ../config) back to `"."`, its comment and the include's
+ * comment rid of the config package; a `drizzle.config.ts` include that names
+ * no file dropped. With `rootDir "."` the emit moves from `dist/backend/src` to
+ * `dist/src`, so the scripts, `entrypoint.sh` and Dockerfile that name the old
+ * path follow. A tsconfig not in that shape is a manual step.
+ */
 export function planBackendTsconfig(plan: PlanContext, wanted: readonly string[]): void {
-    const file = path.join(plan.root, "backend", "tsconfig.json");
+    const backendDir = path.join(plan.root, "backend");
+    const file = path.join(backendDir, "tsconfig.json");
     if (!fs.existsSync(file)) return;
-    const text = fs.readFileSync(file, "utf8");
-    const match = /"include"\s*:\s*\[([^\]]*)\]/.exec(text);
-    if (!match) return;
-    const entries = [...match[1].matchAll(/"((?:[^"\\]|\\.)*)"/g)].map(found => found[1]);
-    const kept = entries.filter(entry => !entry.startsWith("../config"));
-    if (kept.length === entries.length) return;
+    const original = fs.readFileSync(file, "utf8");
+    const match = /"include"\s*:\s*\[([^\]]*)\]/.exec(original);
+    const entries = match ? [...match[1].matchAll(/"((?:[^"\\]|\\.)*)"/g)].map(found => found[1]) : [];
+    const namesConfig = entries.some(entry => entry.startsWith("../config"));
+    const rootUp = /"rootDir"\s*:\s*"\.\."/.test(original);
+    if (!namesConfig && !rootUp) return;
+    if (!match) {
+        plan.manualSteps.push({
+            title: "Point backend/tsconfig.json at the backend only",
+            detail: "backend/tsconfig.json has `rootDir: \"..\"` (it compiled ../config) but no `include` the codemod can read. Set `rootDir` to `\".\"`, include `schema/**/*` and the other backend modules, and run the built entry from `dist/src/` (it was `dist/backend/src/`).",
+            file: relativeToRoot(plan, file)
+        });
+        return;
+    }
+    const kept = entries.filter(entry => !entry.startsWith("../config") && !(entry === "drizzle.config.ts" && !fs.existsSync(path.join(backendDir, entry))));
     const covers = (pattern: string): boolean => kept.includes(pattern) || kept.includes("**/*") || kept.includes("**/*.ts");
     const next = [...kept, ...wanted.filter(entry => !covers(entry))];
-    const replaced = `${text.slice(0, match.index)}"include": [${next.map(entry => JSON.stringify(entry)).join(", ")}]${text.slice(match.index + match[0].length)}`;
-    planFile(plan, file, replaced, "backend/tsconfig.json");
+    let text = `${original.slice(0, match.index)}"include": [${next.map(entry => JSON.stringify(entry)).join(", ")}]${original.slice(match.index + match[0].length)}`;
+
+    const lines = text.split("\n");
+    const includeLine = lines.findIndex(line => /"include"\s*:/.test(line));
+    if (includeLine >= 0) {
+        const block = commentBlockAbove(lines, includeLine);
+        lines.splice(block.start, block.end - block.start, ...withoutConfigParagraphs(lines.slice(block.start, block.end)));
+    }
+    let movedEmit = false;
+    const rootLine = lines.findIndex(line => /"rootDir"\s*:\s*"\.\."/.test(line));
+    if (rootLine >= 0) {
+        lines[rootLine] = lines[rootLine].replace(/"rootDir"\s*:\s*"\.\."/, `"rootDir": "."`);
+        const block = commentBlockAbove(lines, rootLine);
+        const comments = lines.slice(block.start, block.end);
+        if (comments.length === 0 || comments.some(line => /config/.test(line))) lines.splice(block.start, block.end - block.start, ...ROOT_DIR_COMMENT);
+        movedEmit = true;
+    }
+    text = lines.join("\n");
+    planFile(plan, file, text, "backend/tsconfig.json");
+    if (movedEmit) planEmitPathMove(plan);
+}
+
+/** `dist/backend/src` → `dist/src` wherever the project names the old emit path. */
+function planEmitPathMove(plan: PlanContext): void {
+    const candidates = [
+        path.join(plan.root, "package.json"),
+        path.join(plan.root, "backend", "package.json"),
+        path.join(plan.root, "backend", "entrypoint.sh"),
+        path.join(plan.root, "backend", "Dockerfile"),
+        path.join(plan.root, "Dockerfile")
+    ];
+    for (const candidate of candidates) {
+        const planned = plan.files.get(candidate);
+        const current = planned?.content ?? (fs.existsSync(candidate) ? fs.readFileSync(candidate, "utf8") : undefined);
+        if (current === undefined || !current.includes("dist/backend/")) continue;
+        const next = current.split("dist/backend/").join("dist/");
+        plan.files.set(candidate, { content: next, role: planned ? `${planned.role}, emit path` : `${relativeToRoot(plan, candidate)} (emit path dist/src)` });
+    }
 }
 
 /** A legacy config module that moves to `backend/`, with its imports moved. */

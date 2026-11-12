@@ -30,6 +30,7 @@
     }
   ],
   "files": [
+    "update backend/entrypoint.sh",
     "create backend/lib/slugify.ts",
     "update backend/package.json",
     "create backend/resources.ts",

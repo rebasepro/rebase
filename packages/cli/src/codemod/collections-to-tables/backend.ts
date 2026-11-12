@@ -182,32 +182,6 @@ function carryCallbacks(
     return { members, failed };
 }
 
-/** Insert comment lines above the entries of a top-level block (`columns`, `relations`) of printed source. */
-function insertComments(code: string, block: string, comments: ReadonlyMap<string, string[]>, used: Set<string>): string {
-    if (comments.size === 0) return code;
-    const lines = code.split("\n");
-    const open = lines.findIndex(line => line === `    ${block}: {`);
-    if (open < 0) return code;
-    const out = lines.slice(0, open + 1);
-    let index = open + 1;
-    for (; index < lines.length; index++) {
-        const line = lines[index];
-        if (/^ {4}\}/.test(line)) break;
-        const match = /^ {8}("?)([^":\s]+)\1: /.exec(line);
-        if (match && comments.has(match[2]) && !used.has(match[2])) {
-            used.add(match[2]);
-            for (const comment of comments.get(match[2]) ?? []) out.push(`        ${reindent(comment, "        ")}`);
-        }
-        out.push(line);
-    }
-    return [...out, ...lines.slice(index)].join("\n");
-}
-
-/** A comment's text with its original indentation removed from its later lines. */
-function commentText(text: string, indent: string): string {
-    return dedent(text, indent);
-}
-
 export interface BackendPlanInput {
     /** The Postgres collections, in the order they were lifted. */
     entries: CollectionEntry[];
@@ -398,7 +372,7 @@ function planTableModule(plan: PlanContext, entry: CollectionEntry, def: AnyTabl
     let statementTexts: string[];
     try {
         statementTexts = statements.map(statement => {
-            const text = nodeText(statement);
+            const text = [...leadingComments(statement), nodeText(statement)].join("\n");
             return text.includes("import(") ? plan.relocator.moveSpecifiersInText(text, entry.file, name.file, "backend") : text;
         });
     } catch (error) {
@@ -410,10 +384,6 @@ function planTableModule(plan: PlanContext, entry: CollectionEntry, def: AnyTabl
     const header = fileHeader(plan, entry);
     const own = site ? site.statements.flatMap(statement => leadingComments(statement)).filter(comment => !header.includes(comment)) : [];
     let code = printed.code;
-    const propertyComments = propertyCommentMap(plan, entry);
-    const used = new Set<string>();
-    code = insertComments(code, "columns", propertyComments, used);
-    code = insertComments(code, "relations", propertyComments, used);
     code = splices.apply(code);
     if (code.includes("__REBASE_MIGRATE_SPLICE_")) {
         refuse(plan, entry, "a spliced source was not placed by the printer (internal): report this.");
@@ -458,28 +428,6 @@ function fileHeader(plan: PlanContext, entry: CollectionEntry): string[] {
     const first = entry.sourceFile.getStatements()[0];
     if (!first || !plan.ast.tsm.Node.isImportDeclaration(first)) return [];
     return leadingComments(first);
-}
-
-/** The comments above each top-level property of the collection literal, by key. */
-function propertyCommentMap(plan: PlanContext, entry: CollectionEntry): Map<string, string[]> {
-    const out = new Map<string, string[]>();
-    const site = entry.site;
-    if (!site) return out;
-    const properties = memberOf(plan.ast, site.literal, "properties");
-    if (!properties.node) return out;
-    const object = resolveObject(plan.ast, properties.node.value);
-    if (!object.node) return out;
-    for (const member of object.node.getProperties()) {
-        if (plan.ast.tsm.Node.isSpreadAssignment(member)) continue;
-        const nameNode = "getNameNode" in member ? member.getNameNode() : undefined;
-        if (!nameNode) continue;
-        const key = nameNode.getText().replace(/^["']|["']$/g, "");
-        const comments = leadingComments(member);
-        if (comments.length === 0) continue;
-        const indent = /^[ \t]*/.exec(member.getSourceFile().getFullText().slice(member.getSourceFile().getFullText().lastIndexOf("\n", member.getStart() - 1) + 1, member.getStart()))?.[0] ?? "";
-        out.set(key, comments.map(comment => commentText(comment, indent)));
-    }
-    return out;
 }
 
 /** The relative module path of a table, from a file in another directory. */

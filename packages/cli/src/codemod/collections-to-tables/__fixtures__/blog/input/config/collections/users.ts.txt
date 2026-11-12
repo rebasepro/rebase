@@ -8,6 +8,7 @@ export default defineCollection({
     table: "users",
     schema: "rebase",
     securityRules: [
+        // Only admins list users.
         { operation: "select", roles: ["admin"] },
         { operations: ["insert", "update", "delete"], roles: ["admin"] }
     ],

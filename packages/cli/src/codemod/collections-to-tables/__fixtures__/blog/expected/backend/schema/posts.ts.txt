@@ -12,6 +12,7 @@ export const posts = defineTable("posts", {
         id: col.uuid().primaryKey().defaultRandom(),
         // Shown as the page heading.
         title: col.text().notNull(),
+        // Unique, so a URL names one post.
         slug: col.text().unique(),
         status: col.enum(["draft", "published"]).default("draft"),
         body: col.text(),
@@ -20,14 +21,20 @@ export const posts = defineTable("posts", {
         __order: col.text()
     },
     relations: {
+        // Tags are shared between posts.
         tags: rel.manyToMany(() => tags, { through: "posts_tags" }),
         author: rel.belongsTo(() => authors, { onDelete: "set null" })
     },
     rls: "inherit",
+    // Shown in the history panel too.
+    history: true,
+    // The public feed: newest first.
+    indexes: [{ columns: ["status"], reason: "the public feed filters by status" }],
     hooks: {
         afterRead: ({ values: row }) => {
             return row;
         },
+        // Derive the slug once, from the first title.
         beforeSave: ({ values, previousValues }) => {
             const merged = { ...previousValues, ...values };
             if (typeof merged.title === "string" && !merged.slug) values.slug = slugify(merged.title);

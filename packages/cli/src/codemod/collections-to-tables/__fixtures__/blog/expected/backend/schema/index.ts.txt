@@ -3,6 +3,7 @@ export { authors } from "./authors";
 export { tags } from "./tags";
 export { users } from "./users";
 
+/** Anyone reads, admins write. */
 export const defaultRls = [
     { operation: "select", access: "public" },
     { operations: ["insert", "update", "delete"], roles: ["admin"] }

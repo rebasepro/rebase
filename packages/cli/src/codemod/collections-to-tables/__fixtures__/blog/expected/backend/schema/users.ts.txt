@@ -11,6 +11,7 @@ export const users = defineAuthTable("users", {
         createdAt: col.timestamptz().onCreateNow()
     },
     rls: [
+        // Only admins list users.
         { operation: "select", roles: ["admin"] },
         { operations: ["insert", "update", "delete"], roles: ["admin"] }
     ]

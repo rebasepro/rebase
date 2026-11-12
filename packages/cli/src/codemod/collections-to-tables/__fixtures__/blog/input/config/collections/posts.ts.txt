@@ -21,7 +21,7 @@ const postsCollection = defineCollection({
             validation: { required: true },
             admin: { multiline: true }
         },
-        slug: { name: "Slug", type: "string", validation: { unique: true } },
+        slug: { name: "Slug", type: "string", validation: { unique: true } }, // Unique, so a URL names one post.
         status: {
             name: "Status",
             type: "string",
@@ -53,6 +53,7 @@ const postsCollection = defineCollection({
         __order: { name: "Order", type: "string", admin: { hideFromCollection: true } }
     },
     relations: [
+        // Tags are shared between posts.
         {
             relationName: "tags",
             kind: "manyToMany",
@@ -61,7 +62,14 @@ const postsCollection = defineCollection({
             overrides: { admin: { hideFromNavigation: false } }
         }
     ],
+    // Shown in the history panel too.
+    history: true,
+    indexes: [
+        // The public feed: newest first.
+        { on: ["status"], reason: "the public feed filters by status" }
+    ],
     callbacks: {
+        // Derive the slug once, from the first title.
         beforeSave: ({ values, previousValues }) => {
             const merged = { ...previousValues, ...values };
             if (typeof merged.title === "string" && !merged.slug) values.slug = slugify(merged.title);
@@ -74,7 +82,11 @@ const postsCollection = defineCollection({
     admin: {
         group: "Content",
         defaultViewMode: "cards",
-        kanban: { columnProperty: "status" },
+        // The editorial board.
+        kanban: {
+            // One column per status.
+            columnProperty: "status"
+        },
         orderProperty: "__order",
         propertiesOrder: ["title", "slug", "status", "body", "cover", "author", "tags"],
         entityActions: [

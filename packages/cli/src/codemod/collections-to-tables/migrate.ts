@@ -23,6 +23,7 @@ import { isPostgresCollectionConfig, type CollectionConfig } from "@rebasepro/ty
 
 import { addSourceFile, createAstContext, findCollectionSite, postDeclarationAssignments, toPosix, type TsMorph } from "./ast";
 import { nameTables, planBackend } from "./backend";
+import { addUnattached, collectComments, placeComments, placeIndexComments } from "./comments";
 import { planCustomizations, printCmsIndex } from "./customization";
 import { planFirestoreCollection } from "./firestore";
 import { findSplitConstants, planSplitConstants } from "./split-constants";
@@ -190,7 +191,9 @@ export async function migrateCollectionsToTables(options: MigrateOptions): Promi
                 const outcome = outcomes.get(module.slug);
                 if (outcome) outcome.frontendFile = relativeToRoot(plan, module.file);
             }
-        } else if (lift.notCarried.some(item => item.kind === "ui" || item.kind === "browser")) {
+        }
+        placeCollectionComments(plan, postgres, lift, names, customizationModules);
+        if (!cmsDir && lift.notCarried.some(item => item.kind === "ui" || item.kind === "browser")) {
             plan.manualSteps.push({
                 title: "Presentation not carried",
                 detail: "The project has no frontend app (rebase.json declares no static app with `cms`, and there is no frontend/src), so the collections' admin presentation — labels, icons, `admin` blocks — had nowhere to go and was not written. Add a frontend and run the codemod again from the git history if you want it."
@@ -224,6 +227,17 @@ export async function migrateCollectionsToTables(options: MigrateOptions): Promi
             planFile(plan, path.join(cmsDir, "index.ts"), printCmsIndex(cmsDir, customizationModules, external), "the CMS index");
         }
         planFrontendWiring(plan, frontendDir, external.length > 0);
+    }
+
+    // The legacy index's comments, onto the two indexes.
+    const legacyIndexFile = ["index.ts", "index.js"].map(file => path.join(legacy.collectionsDir, file)).find(file => fs.existsSync(file));
+    const schemaIndex = plan.files.get(path.join(schemaDir, "index.ts"));
+    if (legacyIndexFile && schemaIndex) {
+        const cmsIndexPath = cmsDir ? path.join(cmsDir, "index.ts") : undefined;
+        const cmsIndex = cmsIndexPath ? plan.files.get(cmsIndexPath) : undefined;
+        const placed = placeIndexComments(ast, addSourceFile(ast, legacyIndexFile, fs.readFileSync(legacyIndexFile, "utf8")), schemaIndex.content, cmsIndex?.content, root);
+        plan.files.set(path.join(schemaDir, "index.ts"), { ...schemaIndex, content: placed.schemaIndex });
+        if (cmsIndexPath && cmsIndex && placed.cmsIndex !== undefined) plan.files.set(cmsIndexPath, { ...cmsIndex, content: placed.cmsIndex });
     }
 
     // The rest of config/.
@@ -405,6 +419,37 @@ export async function migrateCollectionsToTables(options: MigrateOptions): Promi
     report.status = pending.length === 0 ? "already-migrated" : "migrated";
     report.removeCommand = removeCommand(plan, configDir);
     return report;
+}
+
+/** Every collection file's comments, into the table and customization files it became (see `comments.ts`). */
+function placeCollectionComments(
+    plan: PlanContext,
+    entries: readonly CollectionEntry[],
+    lift: LiftResult,
+    names: ReadonlyMap<string, { file: string }>,
+    customizations: readonly { file: string; slug: string }[]
+): void {
+    entries.forEach((entry, index) => {
+        const def = lift.tables[index];
+        const name = names.get(entry.collection.slug);
+        const backend = name ? plan.files.get(name.file) : undefined;
+        if (!def || !name || !backend) return;
+        const cmsFile = customizations.find(module => module.slug === entry.collection.slug)?.file;
+        const cms = cmsFile ? plan.files.get(cmsFile) : undefined;
+        const comments = collectComments(plan.ast, entry, def, new Set());
+        const fresh = (text: string, content: string): boolean => !content.includes(text);
+        const forBackend = comments
+            .filter(comment => comment.target.side === "backend" || !cms)
+            .map(comment => (comment.target.side === "cms" ? { text: comment.text, target: { side: "backend" as const } } : comment))
+            .filter(comment => fresh(comment.text, backend.content));
+        const placedBackend = placeComments(backend.content, forBackend);
+        plan.files.set(name.file, { ...backend, content: addUnattached(placedBackend.text, placedBackend.leftover, entry.file, plan.root) });
+        if (cms && cmsFile) {
+            const forCms = comments.filter(comment => comment.target.side === "cms" && fresh(comment.text, cms.content));
+            const placedCms = placeComments(cms.content, forCms);
+            plan.files.set(cmsFile, { ...cms, content: addUnattached(placedCms.text, placedCms.leftover, entry.file, plan.root) });
+        }
+    });
 }
 
 function rank(order: readonly CollectionConfig[], collection: CollectionConfig): number {
