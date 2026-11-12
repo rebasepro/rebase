@@ -144,6 +144,9 @@ import {
 import { supportsRlsScoping } from "../auth/rls-scope";
 import { createOAuthStore, type OAuthStore } from "../mcp/oauth-store";
 import { createDeviceLoginStore } from "../auth/device-login-store";
+import { createUiPreferencesStore } from "../ui-config/ui-preferences-store";
+import { createUiConfigRoutes, UI_CONFIG_FILE } from "../ui-config/ui-config-routes";
+import { findProjectRoot } from "../schema-edit/project-root";
 import { createOAuthRoutes, grantIdentityFromRepository } from "../mcp/oauth-routes";
 import { createMcpRoutes, createMcpWellKnownRoutes } from "../mcp/mcp-routes";
 import { createPlatformMcpRoutes, PLATFORM_MCP_PATH } from "../mcp/platform-mcp";
@@ -1974,16 +1977,17 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
      * private docs) takes the same list.
      */
     type SurfaceScopes = AdminScope | { read: AdminScope; write: AdminScope };
-    const adminGate = (scopes: SurfaceScopes): MiddlewareHandler<HonoEnv>[] => [
+    /** `undefined` scopes: any signed-in caller, each route checking what it needs (UI preferences). */
+    const adminGate = (scopes: SurfaceScopes | undefined): MiddlewareHandler<HonoEnv>[] => [
         // This backend's keys and roles judge the caller, wherever the gate is
         // mounted — the docs route sits outside every group.
         provideServices,
         ...(apiKeyPreAuth ? [apiKeyPreAuth] : []),
         platformTokenPreAuth,
         createRequireAuth({ serviceKey: internalServiceKey, ...adminGateIdentity }),
-        typeof scopes === "string" ? requireScope(scopes) : requireScopeByMethod(scopes)
+        ...(scopes === undefined ? [] : [typeof scopes === "string" ? requireScope(scopes) : requireScopeByMethod(scopes)])
     ];
-    const applyAdminGate = (router: Hono<HonoEnv>, surface: string, scopes: SurfaceScopes, mountedWith: MountGroup = "admin"): void => {
+    const applyAdminGate = (router: Hono<HonoEnv>, surface: string, scopes: SurfaceScopes | undefined, mountedWith: MountGroup = "admin"): void => {
         if (!adminSurfacesGated) {
             // No adapter and no `jwtSecret`: there is no credential this server
             // could check a caller against, so it cannot tell an admin from the
@@ -2462,6 +2466,35 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         if (!schemaEditorRoutes) {
             logger.debug("Schema Editor unavailable", { code: schemaEditorOff!.code });
         }
+    }
+
+    // ── UI preferences: how the panel presents each table ─────────────
+    // Any signed-in caller reads them and writes their own; the workspace's
+    // writes need `schema:write` (checked by the routes). Workspace
+    // preferences go to frontend/src/cms/ui-config.json where this server may
+    // write the project's source — the schema editor's gate — and to
+    // `rebase.ui_preferences` everywhere else.
+    let uiConfigSurface: Hono<HonoEnv> | undefined;
+    if (surfaces.admin) {
+        let uiPreferencesStore = createUiPreferencesStore(defaultDriver, { provision: provision.database });
+        if (uiPreferencesStore) {
+            try {
+                await uiPreferencesStore.ensureTables();
+            } catch (error) {
+                logger.warn("[ui-config] The UI preferences table is not available — preferences are kept in the browser.", { error });
+                uiPreferencesStore = null;
+            }
+        }
+        const projectRoot = config.schemaDir
+            ? findProjectRoot(config.schemaDir) ?? nodePath.dirname(nodePath.dirname(nodePath.resolve(config.schemaDir)))
+            : undefined;
+        const workspaceFile = schemaEditorUnavailable() === undefined && projectRoot
+            ? nodePath.join(projectRoot, UI_CONFIG_FILE)
+            : undefined;
+        const uiConfigRouter = new Hono<HonoEnv>();
+        applyAdminGate(uiConfigRouter, "UI preferences", undefined);
+        uiConfigRouter.route("/", createUiConfigRoutes({ store: uiPreferencesStore, workspaceFile }));
+        uiConfigSurface = uiConfigRouter;
     }
 
     // Filled in once the native data plane exists (below). The storage
@@ -4048,6 +4081,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             // editor's gate, which answers 501 itself when no auth is configured.
             if (liveSchemaSurface) adminGroup.route("/schema", liveSchemaSurface);
             if (schemaEditorSurface) adminGroup.route("/schema-editor", schemaEditorSurface);
+            if (uiConfigSurface) adminGroup.route("/ui-config", uiConfigSurface);
             if (storageMaintenanceSurface) adminGroup.route("/storage", storageMaintenanceSurface);
             if (backupSurface) adminGroup.route("/backups", backupSurface);
             if (rlsAuditSurface) adminGroup.route("/rls-audit", rlsAuditSurface);

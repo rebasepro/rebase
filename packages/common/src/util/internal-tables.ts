@@ -109,6 +109,9 @@ export const REBASE_INTERNAL_TABLES: readonly string[] = [
     "entity_history",
     "branches",
     "metric_samples",
+    // how the panel presents each table, per workspace and per user — read and
+    // written by the server on the caller's behalf
+    "ui_preferences",
     // realtime channels — authorization for these lives in the channel rules the
     // server evaluates before it reads or writes, never in a row policy
     "channel_messages",

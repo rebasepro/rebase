@@ -44,7 +44,8 @@ describe("internal table access", () => {
                 "entity_history",
                 "idempotency_keys",
                 "jobs",
-                "rate_limit_hits"
+                "rate_limit_hits",
+                "ui_preferences"
             ];
 
             const missing = revokedAtCreation.filter((table) => !REBASE_INTERNAL_TABLES.includes(table));
