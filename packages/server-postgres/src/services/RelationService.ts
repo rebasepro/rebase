@@ -1275,7 +1275,7 @@ export class RelationService {
                 recordTotal(window, parentId, row);
                 const arr = resultMap.get(parentId) || [];
                 const related = await this.toRelatedRow(targetData, targetCollection, targetPks, render);
-                if (pivot.length > 0) related.pivot = readPivotColumns(junctionData, pivot);
+                if (pivot.length > 0) related.pivot = readPivotColumns(junctionData, pivot, render.rest ? "rest" : "admin");
                 arr.push(related);
                 resultMap.set(parentId, arr);
             }

@@ -169,7 +169,7 @@ function restKeyStep(collection: CollectionConfig, table: RuntimeTable, key: str
  * RFC 3339, everything else — and a key the table does not declare — exactly
  * as the database returned it.
  */
-function toRestScalar(value: unknown, column: ColumnDescriptor | undefined): unknown {
+export function toRestScalar(value: unknown, column: ColumnDescriptor | undefined): unknown {
     const step = restScalarStep(column);
     return step ? step(value) : value;
 }

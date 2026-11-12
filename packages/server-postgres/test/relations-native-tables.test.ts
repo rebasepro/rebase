@@ -72,7 +72,7 @@ const posts = defineTable("posts", {
             through: "post_tags",
             sourceKey: "post_id",
             targetKey: "tag_id",
-            pivot: { position: col.integer(), role: col.text() }
+            pivot: { position: col.integer(), role: col.text(), weight: col.numeric(), addedAt: col.timestamptz() }
         })
     },
     rls: "admin-only"
@@ -219,24 +219,29 @@ describe("rel.manyToMany({ pivot })", () => {
         await driver.save({
             path: "posts",
             id: 1,
-            values: { tags: [{ id: 1, _pivot: { position: 2, role: "lead" } }, { id: 2, _pivot: { position: 1 } }] },
+            values: { tags: [
+                { id: 1, _pivot: { position: 2, role: "lead", weight: 1.5, addedAt: "2024-03-01T10:00:00.000Z" } },
+                { id: 2, _pivot: { position: 1 } }
+            ] },
             status: "existing"
         });
 
-        const stored = await db.query<{ tag_id: number; position: number | null; role: string | null }>(
-            "SELECT tag_id, position, role FROM post_tags WHERE post_id = 1 ORDER BY tag_id"
+        const stored = await db.query<{ tag_id: number; position: number | null; role: string | null; weight: string | null; added_at: string | null }>(
+            "SELECT tag_id, position, role, weight::text AS weight, to_char(added_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI') AS added_at FROM post_tags WHERE post_id = 1 ORDER BY tag_id"
         );
         expect(stored.rows).toEqual([
-            { tag_id: 1, position: 2, role: "lead" },
-            { tag_id: 2, position: 1, role: null }
+            { tag_id: 1, position: 2, role: "lead", weight: "1.5", added_at: "2024-03-01 10:00" },
+            { tag_id: 2, position: 1, role: null, weight: null, added_at: null }
         ]);
 
         const post = await one("posts", 1, ["tags"]);
         const links = (post.tags as Record<string, unknown>[]).map(tag => ({ label: tag.label, pivot: tag._pivot }));
-        expect(links.sort((a, b) => String(a.label).localeCompare(String(b.label)))).toEqual([
-            { label: "green", pivot: { position: 1, role: null } },
-            { label: "red", pivot: { position: 2, role: "lead" } }
-        ]);
+        const sorted = links.sort((a, b) => String(a.label).localeCompare(String(b.label)));
+        expect(sorted[0]).toEqual({ label: "green", pivot: { position: 1, role: null, weight: null, addedAt: null } });
+        // REST-rendered like the target's own columns: a numeric as a number,
+        // an instant as RFC 3339.
+        const red = sorted[1].pivot as Record<string, unknown>;
+        expect(red).toEqual({ position: 2, role: "lead", weight: 1.5, addedAt: "2024-03-01T10:00:00.000Z" });
     });
 
 
@@ -245,7 +250,7 @@ describe("rel.manyToMany({ pivot })", () => {
         await expect(driver.save({
             path: "posts",
             id: 1,
-            values: { tags: [{ id: 1, _pivot: { weight: 3 } }] },
+            values: { tags: [{ id: 1, _pivot: { score: 3 } }] },
             status: "existing"
         })).rejects.toMatchObject({ code: "VALIDATION_UNKNOWN_FIELDS" });
     });

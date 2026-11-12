@@ -2,12 +2,14 @@ import { and, eq, inArray, sql, type SQL } from "drizzle-orm";
 import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 import { ApiError, logger } from "@rebasepro/server";
 import { JUNCTION_PIVOT_KEY, soleJoinCondition, type ColumnDescriptor, type JoinStep } from "@rebasepro/types";
-import { canReadColumn, isJsNumberType, isNativeArrayType, type RelationOfKind } from "@rebasepro/common";
+import { canReadColumn, type RelationOfKind } from "@rebasepro/common";
 import { DrizzleClient } from "../interfaces";
 import { PostgresTableRegistry } from "../model/PostgresTableRegistry";
 import { relationMisconfigured } from "./collection-helpers";
 import { explainZeroRowWrite } from "./write-denial";
 import { currentFieldViewer } from "./field-viewer";
+import { parseColumnFromServer, serializeColumnToServer } from "../data-transformer";
+import { toRestScalar } from "./row-pipeline";
 
 /**
  * Writing a many-to-many means writing rows in a junction table, and doing that
@@ -483,47 +485,25 @@ async function removeLinks(
  *
  * Only the `pivot` columns: the two foreign keys are the link's identity, and
  * the caller already has both. A column the caller may not read
- * (`access.read`, `private`) is left out, as it is on any row; a NUMERIC that
- * declares a JavaScript number comes back as one, as the target's own columns
- * do (`toRestRow`).
+ * (`access.read`, `private`) is left out, as it is on any row; each value goes
+ * through its column's codec, in the style the target row is rendered in.
  *
  * @param junctionRow The junction row, keyed as its catalogue table keys it.
  */
 export function readPivotColumns(
     junctionRow: Record<string, unknown>,
-    pivot: readonly ColumnDescriptor[]
+    pivot: readonly ColumnDescriptor[],
+    /** `"rest"`: as REST serves a value (`toRestScalar`); `"admin"`: the view model (`parseColumnFromServer`). */
+    style: "rest" | "admin"
 ): Record<string, unknown> {
     const viewer = currentFieldViewer();
     const values: Record<string, unknown> = {};
     for (const column of pivot) {
         if (!(column.key in junctionRow) || !canReadColumn(column, viewer)) continue;
         const value = junctionRow[column.key];
-        if (isJsNumberType(column.type) && typeof value === "string") {
-            const parsed = parseFloat(value);
-            values[column.key] = isNaN(parsed) ? null : parsed;
-        } else {
-            values[column.key] = value;
-        }
+        values[column.key] = style === "rest" ? toRestScalar(value, column) : parseColumnFromServer(value, column);
     }
     return values;
-}
-
-/**
- * The value written into one pivot column: `"NaN"` into a number column is no
- * number (`null`), and an array column takes an array or nothing — a scalar
- * there is refused (400) rather than stored as something else.
- */
-function pivotValueToServer(value: unknown, column: ColumnDescriptor, label: string): unknown {
-    if (value === null || value === undefined) return value;
-    if (isJsNumberType(column.type) && typeof value === "string" && value.trim().toLowerCase() === "nan") return null;
-    if (isNativeArrayType(column.type) && !Array.isArray(value)) {
-        throw ApiError.badRequest(
-            `The pivot column '${column.key}' of relation '${label}' expects an array.`,
-            "VALIDATION_INVALID_VALUE",
-            { relation: label, field: column.key }
-        );
-    }
-    return value;
 }
 
 /**
@@ -563,7 +543,7 @@ export function serializePivot(
             );
         }
         if (value === undefined) continue;
-        const serialized = pivotValueToServer(value, column, label);
+        const serialized = serializeColumnToServer(value, column, key);
         if (serialized !== undefined) values[key] = serialized;
     }
     return values;
