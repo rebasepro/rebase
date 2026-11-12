@@ -265,7 +265,7 @@ import { createRebaseClient } from "@rebasepro/client";
 const rebase = createRebaseClient({ baseUrl: "${base}", token: "${serviceKey}" });
 
 // No collections option, no config, no generated types — just a table name.
-const posts = await rebase.data.collection("posts").find({ limit: 5 });
+const posts = await rebase.data.table("posts").find({ limit: 5 });
 const rows = (posts as { data?: unknown[] }).data ?? posts;
 const first = (Array.isArray(rows) ? rows[0] : undefined) as Record<string, unknown> | undefined;
 if (first?.title !== "Hello BaaS") {
@@ -274,7 +274,7 @@ if (first?.title !== "Hello BaaS") {
 }
 
 // A write, so this isn't read-only proof.
-const created = await rebase.data.collection("authors").create({ name: "Grace Hopper" });
+const created = await rebase.data.table("authors").create({ name: "Grace Hopper" });
 if (!created) { console.error("SDK_FAIL create returned nothing"); process.exit(1); }
 
 // The typed proxy accessor, still with no collections map configured.

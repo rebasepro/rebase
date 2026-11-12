@@ -47,7 +47,7 @@ export async function callContextProbes(): Promise<void> {
 
     // The accessor of a snake_case slug, and a kebab one by its slug.
     await context.data.orderItems.create({ sku: "A-1" });
-    const note = await context.data.collection("my-notes").findById("n1");
+    const note = await context.data.table("my-notes").findById("n1");
     const body: string | null | undefined = note?.body;
     void body;
 
@@ -102,7 +102,7 @@ export const cron = defineCron({
 
 /**
  * The client: `client.data.<accessor>` typed from the same registration, with
- * no generated `Database` or `collectionsDictionary` (the client derives a
+ * no generated `Database` or `tablesDictionary` (the client derives a
  * snake_case slug from the accessor; a kebab slug is reached by its slug).
  */
 export async function clientProbes(): Promise<void> {
@@ -114,5 +114,5 @@ export async function clientProbes(): Promise<void> {
     await client.data.posts.create({ subtitle: "s", author: 1 });
     // @ts-expect-error — a view-less table still refuses an unknown column
     await client.data.tags.create({ label: "l", colour: "red" });
-    await client.data.collection("my-notes").create({ id: "n1", body: "b" });
+    await client.data.table("my-notes").create({ id: "n1", body: "b" });
 }

@@ -230,7 +230,7 @@ DATABASE_URL: databaseUrl },
         const anon = newClient();
         let anonStatus = 0;
         try {
-            await anon.data.collection("posts").find({ limit: 1 });
+            await anon.data.table("posts").find({ limit: 1 });
         } catch (err) {
             anonStatus = (err as { status?: number }).status ?? -1;
         }
@@ -284,7 +284,7 @@ password: "BobSecret1!" };
         // applies the policy. Any one of them failing shows up here as a row
         // count — the number is the whole assertion.
         console.log("\n🛡️  Step 6: RLS scopes rows to the signed-in user");
-        const aliceRows = await fresh.data.collection("users").find({ limit: 50 });
+        const aliceRows = await fresh.data.table("users").find({ limit: 50 });
         const aliceList = (aliceRows as { data?: Record<string, unknown>[] }).data ?? [];
         check("a signed-in user sees exactly their own row", aliceList.length === 1, `${aliceList.length} row(s)`);
 
@@ -300,7 +300,7 @@ password: "BobSecret1!" };
         check("and it is their row", aliceList[0]?.id === aliceSignUp.user?.uid,
             `${String(aliceList[0]?.id)} vs ${String(aliceSignUp.user?.uid)}`);
 
-        const bobRows = await bobClient.data.collection("users").find({ limit: 50 });
+        const bobRows = await bobClient.data.table("users").find({ limit: 50 });
         const bobList = (bobRows as { data?: Record<string, unknown>[] }).data ?? [];
         check("a different user sees a different single row",
             bobList.length === 1 && bobList[0]?.id === bobSignUp.user?.uid,
@@ -317,7 +317,7 @@ password: "BobSecret1!" };
 
         // The admin arm of the same policy. Without this, a policy that denied
         // everyone would pass every check above.
-        const adminRows = await adminClient.data.collection("users").find({ limit: 50 });
+        const adminRows = await adminClient.data.table("users").find({ limit: 50 });
         const adminList = (adminRows as { data?: Record<string, unknown>[] }).data ?? [];
         check("an admin sees all three", adminList.length >= 3, `${adminList.length} row(s)`);
 
@@ -329,7 +329,7 @@ password: "BobSecret1!" };
         // is a *request after the refresh*, never the refresh's own return.
         console.log("\n🔄 Step 7: token refresh");
         await fresh.auth.refreshSession();
-        const afterRefresh = await fresh.data.collection("users").find({ limit: 50 });
+        const afterRefresh = await fresh.data.table("users").find({ limit: 50 });
         const afterList = (afterRefresh as { data?: Record<string, unknown>[] }).data ?? [];
         check("a read still succeeds after refreshing", afterList.length === 1, `${afterList.length} row(s)`);
 
@@ -371,7 +371,7 @@ password: "BobSecret1!" };
         // Held in a local because the implementation is an arrow function
         // closed over the socket, so detaching it from the collection is safe,
         // and it lets the type narrow for the call below.
-        const postsCollection = adminClient.data.collection("posts");
+        const postsCollection = adminClient.data.table("posts");
         const listen = postsCollection.listen;
         check("the collection exposes a realtime listener", typeof listen === "function");
 
@@ -406,7 +406,7 @@ password: "BobSecret1!" };
             // Written after the subscription is established, by a different
             // client, so arrival proves propagation and not an echo.
             setTimeout(() => {
-                void adminClient.data.collection("posts")
+                void adminClient.data.table("posts")
                     .create({ title, status: "draft" })
                     .catch(() => undefined);
             }, 2000);
@@ -425,7 +425,7 @@ password: "BobSecret1!" };
         await fresh.auth.signOut();
         let afterSignOut = 0;
         try {
-            await fresh.data.collection("users").find({ limit: 1 });
+            await fresh.data.table("users").find({ limit: 1 });
             afterSignOut = 200;
         } catch (err) {
             afterSignOut = (err as { status?: number }).status ?? -1;

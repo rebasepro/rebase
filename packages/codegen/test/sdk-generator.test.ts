@@ -1,7 +1,7 @@
 import { describe, it, expect, jest } from "@jest/globals";
 import { compileTables } from "@rebasepro/common";
 import { col, defineAuthTable, defineTable, defineView, json, rel } from "@rebasepro/types";
-import { toPascalCase, toCamelCase, toSafeIdentifier, toCollectionAccessor, indent } from "../src/utils";
+import { toPascalCase, toCamelCase, toSafeIdentifier, toTableAccessor, indent } from "../src/utils";
 import { generateTypedefs } from "../src/generate-types";
 import { generateSDK } from "../src/index";
 import { block, compiledOnly, generate, keysOf, rawTable } from "./helpers/tables";
@@ -65,14 +65,16 @@ describe("Utils", () => {
         });
     });
 
-    describe("toCollectionAccessor", () => {
+    describe("toTableAccessor", () => {
         it("is the safe identifier for an ordinary slug", () => {
-            expect(toCollectionAccessor("my-notes")).toBe("myNotes");
+            expect(toTableAccessor("my-notes")).toBe("myNotes");
+            // `collection` is an ordinary name now that the dynamic accessor is `table`.
+            expect(toTableAccessor("collection")).toBe("collection");
         });
         it("renames an accessor the client proxy reserves", () => {
-            expect(toCollectionAccessor("collection")).toBe("collectionCollection");
-            expect(toCollectionAccessor("then")).toBe("thenCollection");
-            expect(toCollectionAccessor("toJSON")).toBe("toJSONCollection");
+            expect(toTableAccessor("table")).toBe("tableTable");
+            expect(toTableAccessor("then")).toBe("thenTable");
+            expect(toTableAccessor("toJSON")).toBe("toJSONTable");
         });
     });
     describe("indent", () => {
@@ -654,7 +656,7 @@ describe("generateSDK configurations", () => {
         const readme = generateSDK(tables, { baseUrl: "http://localhost:3755" }).find(f => f.path === "README.md")!.content;
         expect(readme).toContain("baseUrl: 'http://localhost:3755'");
         expect(readme).not.toContain("3001");
-        expect(readme).toContain("collections: collectionsDictionary");
+        expect(readme).toContain("tables: tablesDictionary");
     });
 
     it("always emits the typedefs, and they reflect the tables passed in", () => {
@@ -699,31 +701,31 @@ describe("generateTypedefs is independent of table order", () => {
 });
 
 describe("a slug the client proxy reserves gets a renamed accessor", () => {
-    // `client.data.collection` is the dynamic `collection(slug)` function, and
+    // `client.data.table` is the dynamic `table(slug)` function, and
     // `then`, `toJSON` and `$$typeof` are answered `undefined` so promise and
     // serialisation probes do not mistake the proxy for something else.
-    const slugs = ["collection", "then", "toJSON", "posts"];
+    const slugs = ["table", "then", "toJSON", "posts"];
     const tables = compileTables(slugs.map(slug => defineTable(slug, {
         table: `t_${slug.toLowerCase()}`,
         columns: { id: col.uuid().primaryKey(), title: col.text() },
         rls: "admin-only"
     })));
 
-    it("emits `<name>Collection` and maps it back to the slug", () => {
+    it("emits `<name>Table` and maps it back to the slug", () => {
         const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
         try {
             const output = generateTypedefs(tables);
-            expect(output).toContain("  collectionCollection: \"collection\",");
-            expect(output).toContain("  thenCollection: \"then\",");
-            expect(output).toContain("  toJSONCollection: \"toJSON\",");
+            expect(output).toContain("  tableTable: \"table\",");
+            expect(output).toContain("  thenTable: \"then\",");
+            expect(output).toContain("  toJSONTable: \"toJSON\",");
             expect(output).toContain("  posts: \"posts\",");
-            expect(output).toMatch(/^ {2}collectionCollection: \{$/m);
-            expect(output).not.toMatch(/^ {2}collection: /m);
+            expect(output).toMatch(/^ {2}tableTable: \{$/m);
+            expect(output).not.toMatch(/^ {2}table: /m);
             expect(output).not.toMatch(/^ {2}then: /m);
 
             const messages = warn.mock.calls.map(call => String(call[0]));
-            expect(messages.some(m => m.includes("\"collection\"") && m.includes("collectionCollection"))).toBe(true);
-            expect(messages.some(m => m.includes("\"then\"") && m.includes("thenCollection"))).toBe(true);
+            expect(messages.some(m => m.includes("\"table\"") && m.includes("tableTable"))).toBe(true);
+            expect(messages.some(m => m.includes("\"then\"") && m.includes("thenTable"))).toBe(true);
             expect(messages.some(m => m.includes("posts"))).toBe(false);
         } finally {
             warn.mockRestore();
@@ -731,10 +733,10 @@ describe("a slug the client proxy reserves gets a renamed accessor", () => {
     });
 
     it("refuses when the renamed accessor collides with another slug's", () => {
-        const clash = [tables[0], rawTable("collection_collection")];
+        const clash = [tables[0], rawTable("table_table")];
         const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
         try {
-            expect(() => generateTypedefs(clash)).toThrow(/collectionCollection/);
+            expect(() => generateTypedefs(clash)).toThrow(/tableTable/);
         } finally {
             warn.mockRestore();
         }

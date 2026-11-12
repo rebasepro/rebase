@@ -179,7 +179,7 @@ function topLevelDeclarations(source: string): string[] {
  * they are still declarations, so they are still listed.
  */
 const EXPECTED_DECLARATIONS = [
-    "Database", "CollectionName", "collectionsDictionary", "CollectionsDictionary",
+    "Database", "TableName", "tablesDictionary", "TablesDictionary",
     "RelationsOf", "RelationKeys", "RelationTarget", "Prev",
     "IncludeOptionsFor", "IncludeFor", "IncludedKeys", "RowWith"
 ];
@@ -188,7 +188,7 @@ describe("untrusted input cannot inject TypeScript", () => {
     /**
      * `--from <url>` generates from a remote contract, so slugs, property names
      * and enum values are whatever that server said. They were interpolated
-     * raw. A slug closing the string literal in `collectionsDictionary`
+     * raw. A slug closing the string literal in `tablesDictionary`
      * produced a file that compiled *cleanly* and carried an attacker-authored
      * module-level initializer into the developer's bundle.
      *
@@ -228,7 +228,7 @@ describe("untrusted input cannot inject TypeScript", () => {
     }
 
     it("leaves a hostile slug intact as the wire value, merely escaped", () => {
-        // The slug still has to reach `collectionsDictionary` verbatim — it is
+        // The slug still has to reach `tablesDictionary` verbatim — it is
         // what the request path uses. Escaping is the fix; sanitising the value
         // would generate a client that asks for a collection that is not there.
         const slug = 'posts", OWNED: 1, x: "';
@@ -239,7 +239,7 @@ describe("untrusted input cannot inject TypeScript", () => {
 
 describe("schemas that cannot be generated are rejected, not emitted", () => {
     it("refuses two slugs that produce the same accessor", () => {
-        // The interface would not compile, and `collectionsDictionary` — an
+        // The interface would not compile, and `tablesDictionary` — an
         // object literal — would silently keep only the last, sending one
         // table's reads to the other's.
         const clash = [rawTable("my-notes", [ID]), rawTable("my_notes", [ID])];

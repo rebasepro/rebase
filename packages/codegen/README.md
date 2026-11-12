@@ -43,7 +43,7 @@ This is typically invoked via the CLI (`pnpm rebase generate-sdk`) rather than c
 
 1. **`database.types.ts`** — A `Database` interface keyed by each collection's
    *accessor* (`my-notes` → `myNotes`, the property name on `client.data`),
-   alongside a `collectionsDictionary` const mapping each accessor back to the
+   alongside a `tablesDictionary` const mapping each accessor back to the
    slug the wire uses. Each entry contains:
    - `Row` — what a read serves, keyed by each field's **wire** name: a property
      keyed `createdAt` is `row.createdAt` whatever its `columnName` says, and a
@@ -74,7 +74,7 @@ camelCase: the collection accessor, and a foreign key that comes from a relation
 
 Generation **fails** rather than emitting a broken file when two slugs would
 produce the same accessor: the interface would not compile, and
-`collectionsDictionary` would silently keep only one, routing a collection's
+`tablesDictionary` would silently keep only one, routing a collection's
 reads to another's table.
 
 ### Untrusted schemas

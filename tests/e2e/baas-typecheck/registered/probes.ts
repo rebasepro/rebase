@@ -48,19 +48,19 @@ export const callbacks: CollectionCallbacks = {
 
         // A literal slug is typed through `collection()` as through its
         // accessor: the `my-notes` collection's rows, and its columns only.
-        const note = await context.data.collection("my-notes").findById("n1");
+        const note = await context.data.table("my-notes").findById("n1");
         const body: string | null | undefined = note?.body;
         void body;
         // @ts-expect-error — `nmae` is not a column of authors
-        await context.data.collection("authors").find({ where: { nmae: ["==", "Ada"] } });
+        await context.data.table("authors").find({ where: { nmae: ["==", "Ada"] } });
         // @ts-expect-error — `sku` is required on a create of order_items
-        await rebase.dataAsAdmin.collection("order_items").create({ quantity: 1 });
+        await rebase.dataAsAdmin.table("order_items").create({ quantity: 1 });
 
         // A slug the caller computes stays untyped, and so does one the
         // schema does not declare.
         const computed: string = String(values.kind);
-        await context.data.collection(computed).find({ where: { anything: ["==", 1] } });
-        await context.data.collection("audit_log").find({ where: { anything: ["==", 1] } });
+        await context.data.table(computed).find({ where: { anything: ["==", 1] } });
+        await context.data.table("audit_log").find({ where: { anything: ["==", 1] } });
 
         return { ...values, note: name };
     }

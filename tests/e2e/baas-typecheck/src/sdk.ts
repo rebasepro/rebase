@@ -8,7 +8,7 @@ import type { Post } from "./collection";
 const rebase = createRebaseClient({ baseUrl: "https://api.example.com" });
 
 export async function readAndWrite(): Promise<void> {
-    const posts = rebase.data.collection<Post>("posts");
+    const posts = rebase.data.table<Post>("posts");
 
     // `where` takes [op, value] tuples — a bare string is passed straight
     // through to PostgREST and silently builds a malformed query.
@@ -42,13 +42,13 @@ export async function readAndWrite(): Promise<void> {
  * comments: this file failing to compile means the check came back off.
  *
  * The chain that has to stay intact is `createRebaseClient<DB>` ->
- * `SDKCollectionClient<M>` -> `FindParams<M>` -> `FilterValues<FieldPath<M>>`.
+ * `SDKTableClient<M>` -> `FindParams<M>` -> `FilterValues<FieldPath<M>>`.
  * A non-generic alias anywhere along it flattens `M` to its default and every
  * assertion here goes quiet — which is exactly how the alias in
  * `client/src/transport.ts` hid this for as long as it did.
  */
 export async function queryParamsAreChecked(): Promise<void> {
-    const posts = rebase.data.collection<Post>("posts");
+    const posts = rebase.data.table<Post>("posts");
 
     // Legitimate: real columns only.
     // (The dotted-path arm — `"profile.city"` into a `map` column — is asserted in

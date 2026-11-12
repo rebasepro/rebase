@@ -6,7 +6,7 @@
  * The naming rules shared with the server's data proxies, which resolve a
  * generated accessor back to its slug: one home, so the two cannot drift.
  */
-export { toPascalCase, toCamelCase, toSafeIdentifier, toCollectionAccessor } from "@rebasepro/common";
+export { toPascalCase, toCamelCase, toSafeIdentifier, toTableAccessor } from "@rebasepro/common";
 
 /**
  * Indent a block of text by a given number of spaces

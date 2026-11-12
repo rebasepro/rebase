@@ -4,7 +4,7 @@ import * as path from "node:path";
 import { isSchemaDefinitionError } from "@rebasepro/common";
 import type { AnyCollectionConfig, CollectionConfig, TableDescriptor } from "@rebasepro/types";
 import { generateTypedefs } from "../src/generate-types";
-import { toCollectionAccessor } from "../src/utils";
+import { toTableAccessor } from "../src/utils";
 import { LEGACY_FIXTURES } from "./fixtures/legacy-collections";
 import { collections as baasCollections } from "./fixtures/legacy-baas-collections";
 import { descriptorsFromCollections } from "./helpers/from-collections";
@@ -160,7 +160,7 @@ describe("the descriptor generator reproduces the collection generator's goldens
             expect(generated.startsWith("THROWS: CodegenError")).toBe(true);
             return;
         }
-        const byAccessor = new Map(tables.map(table => [toCollectionAccessor(table.slug), table]));
+        const byAccessor = new Map(tables.map(table => [toTableAccessor(table.slug), table]));
         const differences = compareSdk(golden, generated)
             .filter(difference => !(adjustment && adjustedAway(difference, adjustment.removed)));
         const { unexplained } = unexplainedDifferences(differences, byAccessor);

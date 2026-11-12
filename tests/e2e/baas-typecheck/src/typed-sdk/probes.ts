@@ -14,11 +14,11 @@
  */
 import { createRebaseClient } from "@rebasepro/client";
 
-import { collectionsDictionary, type Database } from "./database.types";
+import { tablesDictionary, type Database } from "./database.types";
 
 const client = createRebaseClient<Database>({
     baseUrl: "https://api.example.com",
-    collections: collectionsDictionary,
+    tables: tablesDictionary,
     realtime: false
 });
 
@@ -28,30 +28,30 @@ const client = createRebaseClient<Database>({
  */
 export async function batchProbes(): Promise<void> {
     // The accessor of a snake_case slug: the client sends `order_items`.
-    await client.batch([{ op: "create", collection: "orderItems", values: { sku: "A-1" } }]);
+    await client.batch([{ op: "create", table: "orderItems", values: { sku: "A-1" } }]);
 
     // A backward reference stands in for a value the server will know.
     await client.batch([
-        { op: "create", collection: "authors", values: { name: "Ada" }, ref: "author" },
-        { op: "create", collection: "posts", values: { title: "t", authorId: { $ref: "author.id" } } }
+        { op: "create", table: "authors", values: { name: "Ada" }, ref: "author" },
+        { op: "create", table: "posts", values: { title: "t", authorId: { $ref: "author.id" } } }
     ]);
 
     // A field operation on an update.
-    await client.batch([{ op: "update", collection: "orderItems", id: 1, values: { quantity: { $inc: 1 } } }]);
+    await client.batch([{ op: "update", table: "orderItems", id: 1, values: { quantity: { $inc: 1 } } }]);
 
     await client.batch([
         // @ts-expect-error — not a column of order_items (VALIDATION_UNKNOWN_FIELDS)
-        { op: "create", collection: "orderItems", values: { sku: "A-1", skuu: "x" } }
+        { op: "create", table: "orderItems", values: { sku: "A-1", skuu: "x" } }
     ]);
 
     await client.batch([
         // @ts-expect-error — `sku` is required on a create
-        { op: "create", collection: "orderItems", values: { quantity: 1 } }
+        { op: "create", table: "orderItems", values: { quantity: 1 } }
     ]);
 
     await client.batch([
         // @ts-expect-error — not a column of order_items, on an update either
-        { op: "update", collection: "orderItems", id: 1, values: { skuu: "x" } }
+        { op: "update", table: "orderItems", id: 1, values: { skuu: "x" } }
     ]);
 }
 
@@ -122,19 +122,19 @@ export async function returningProbes(): Promise<void> {
 
 /** SDK-13: a typed client knows its collections. */
 export function accessorProbes(): void {
-    // @ts-expect-error — no such collection (UNKNOWN_COLLECTION)
+    // @ts-expect-error — no such collection (UNKNOWN_TABLE)
     void client.data.nopeCollection;
-    void client.data.collection("posts");
+    void client.data.table("posts");
 }
 
 /** SDK-19: a collection reached by slug is typed, whatever the slug's spelling. */
 export async function slugProbes(): Promise<string> {
     // Each of these is `unknown` — a compile error to assign — on an untyped row.
-    const items = await client.data.collection("order_items").find();
+    const items = await client.data.table("order_items").find();
     const sku: string = items.data[0].sku;
-    const notes = await client.data.collection("my-notes").find();
+    const notes = await client.data.table("my-notes").find();
     const body: string | null | undefined = notes.data[0].body;
-    const top = await client.collection("order_items").find();
+    const top = await client.table("order_items").find();
     const topSku: string = top.data[0].sku;
     return sku + body + topSku;
 }
@@ -181,10 +181,10 @@ export async function requiredBelongsToProbes(): Promise<string> {
     await comments.create({ body: "b", postId: "p1" });
     await comments.create({ body: "b", post: "p1" });
     await comments.create({ body: "b", postId: "p1", post: "p1" });
-    await client.batch([{ op: "create", collection: "comments", values: { body: "b", post: "p1" } }]);
+    await client.batch([{ op: "create", table: "comments", values: { body: "b", post: "p1" } }]);
     await client.batch([
-        { op: "create", collection: "posts", values: { title: "t" }, ref: "post" },
-        { op: "create", collection: "comments", values: { body: "b", postId: { $ref: "post.id" } } }
+        { op: "create", table: "posts", values: { title: "t" }, ref: "post" },
+        { op: "create", table: "comments", values: { body: "b", postId: { $ref: "post.id" } } }
     ]);
     await comments.update(1, { post: "p2" });
     await comments.update(1, { body: "c" });
@@ -194,7 +194,7 @@ export async function requiredBelongsToProbes(): Promise<string> {
     await comments.create({ body: "b", postId: null });
     await client.batch([
         // @ts-expect-error — nor in a batch
-        { op: "create", collection: "comments", values: { body: "b" } }
+        { op: "create", table: "comments", values: { body: "b" } }
     ]);
     const { data } = await comments.find();
     return data[0].postId;

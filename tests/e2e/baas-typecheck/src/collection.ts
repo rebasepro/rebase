@@ -124,7 +124,7 @@ const posts: PostgresCollectionConfig<Post> = {
         beforeSave: async ({ values, context, previousValues }) => {
             // `context` is RebaseCallContext — the both-sides context. Reaching
             // a UI controller off it here must not compile.
-            await context.data.collection("audit").create({
+            await context.data.table("audit").create({
                 what: values.title,
                 was: previousValues?.title
             });

@@ -23,7 +23,7 @@ export const callbacks: CollectionCallbacks = {
         assertType<Equal<typeof context.data, RebaseSdkData>>();
         const { data: rows } = await context.data.anyCollection.find({ where: { anyColumn: ["==", 1] } });
         const open: Record<string, unknown> = rows[0];
-        await context.data.collection("whatever").create({ whatever: true });
+        await context.data.table("whatever").create({ whatever: true });
         await context.client.dataAsAdmin?.otherCollection.update("1", { field: "x" });
         return { ...values, seen: open.anyColumn };
     }

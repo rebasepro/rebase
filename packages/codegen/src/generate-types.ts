@@ -1,7 +1,7 @@
 import type { ColumnDescriptor, ColumnType, JsonShape, RelationDescriptor, TableDescriptor } from "@rebasepro/types";
 import { isNumericColumnType, isTemporalColumnType } from "@rebasepro/types";
 import { sortCollectionsBySlug } from "@rebasepro/common";
-import { toCollectionAccessor, toSafeIdentifier } from "./utils";
+import { toTableAccessor, toSafeIdentifier } from "./utils";
 
 /**
  * A schema that cannot be expressed as a valid TypeScript file.
@@ -223,7 +223,7 @@ interface Run {
  * Map every slug to the property name it is reachable under on `client.data`.
  *
  * The accessor is a safe identifier because `client.data.myNotes` is the point
- * of generating this at all, and `collectionsDictionary` maps it back to the
+ * of generating this at all, and `tablesDictionary` maps it back to the
  * slug the wire uses. Two slugs that safe down to the same identifier cannot
  * both have it: the interface would not compile, and the dictionary — an object
  * literal — would silently keep only the last, routing one table's reads to
@@ -251,12 +251,12 @@ function buildAccessors(tables: readonly TableDescriptor[]): Map<string, string>
             );
         }
 
-        const accessor = toCollectionAccessor(slug);
+        const accessor = toTableAccessor(slug);
         if (accessor !== safe) {
             console.warn(
                 `[codegen] The table ${emitString(slug)} would be \`client.data.${safe}\`, a name ` +
                 `the client reserves, so its typed accessor is \`client.data.${accessor}\`. ` +
-                `\`client.data.collection(${emitString(slug)})\` reaches it too.`
+                `\`client.data.table(${emitString(slug)})\` reaches it too.`
             );
         }
 
@@ -426,7 +426,7 @@ function includedRelationType(relation: RelationDescriptor, run: Run): string {
  * reports.
  *
  * Emits `Database` (per table: `Row`, `Insert`, `Update`, `Relations`, `Slug`),
- * `CollectionName`, `collectionsDictionary`, `CollectionsDictionary` and the
+ * `TableName`, `tablesDictionary`, `TablesDictionary` and the
  * `include` helpers `RelationsOf`, `RelationKeys`, `RelationTarget`,
  * `IncludeOptionsFor`, `IncludeFor` and `RowWith`.
  *
@@ -475,7 +475,7 @@ export function generateTypedefs(input: readonly TableDescriptor[]): string {
         // ── Slug ──
         //
         // The name the wire knows this table by. The entry is keyed by the
-        // accessor (`orderItems`), and the client's typed `collection(slug)`
+        // accessor (`orderItems`), and the client's typed `table(slug)`
         // has to get from one to the other. Written by the one function that
         // chose the accessor, so the two cannot disagree.
         lines.push(`    Slug: ${emitString(table.slug)};`);
@@ -484,18 +484,18 @@ export function generateTypedefs(input: readonly TableDescriptor[]): string {
 
     lines.push("}");
     lines.push("");
-    lines.push("export type CollectionName = keyof Database;");
+    lines.push("export type TableName = keyof Database;");
     lines.push("");
-    lines.push("export const collectionsDictionary = {");
+    lines.push("export const tablesDictionary = {");
     for (const table of tables) {
         lines.push(`  ${emitKey(run.accessors.get(table.slug)!)}: ${emitString(table.slug)},`);
     }
     lines.push("} as const;");
     lines.push("");
     // Describes the const above rather than restating its keys: `myNotes`
-    // maps to `"my-notes"`, so a `{ [K in CollectionName]: K }` would be false
+    // maps to `"my-notes"`, so a `{ [K in TableName]: K }` would be false
     // for every slug that is not already an identifier.
-    lines.push("export type CollectionsDictionary = typeof collectionsDictionary;");
+    lines.push("export type TablesDictionary = typeof tablesDictionary;");
     lines.push("");
     lines.push(...includeHelperLines());
 
@@ -630,16 +630,16 @@ function emitRelations(lines: string[], plan: TablePlan, run: Run): void {
  */
 function includeHelperLines(): string[] {
     return [
-        "/** Which collection each of `A`'s relations reaches. */",
-        "export type RelationsOf<A extends CollectionName> =",
+        "/** Which table each of `A`'s relations reaches. */",
+        "export type RelationsOf<A extends TableName> =",
         "  Database[A] extends { Relations: infer R } ? R : Record<string, never>;",
         "",
         "/** The names of `A`'s relations. */",
-        "export type RelationKeys<A extends CollectionName> = keyof RelationsOf<A> & string;",
+        "export type RelationKeys<A extends TableName> = keyof RelationsOf<A> & string;",
         "",
-        "/** The collection a relation reaches, or `never` when it left this project. */",
-        "export type RelationTarget<A extends CollectionName, K extends RelationKeys<A>> =",
-        "  RelationsOf<A>[K] extends CollectionName ? RelationsOf<A>[K] : never;",
+        "/** The table a relation reaches, or `never` when it left this project. */",
+        "export type RelationTarget<A extends TableName, K extends RelationKeys<A>> =",
+        "  RelationsOf<A>[K] extends TableName ? RelationsOf<A>[K] : never;",
         "",
         "/** Counts `IncludeFor` down; TypeScript has no arithmetic. */",
         "type Prev = [never, 0, 1, 2, 3];",
@@ -647,32 +647,32 @@ function includeHelperLines(): string[] {
         "/**",
         " * Per-relation options, minus `include` — which `IncludeFor` supplies at",
         " * the next depth so the nested keys are checked against the *target's*",
-        " * relations rather than this collection's.",
+        " * relations rather than this table's.",
         " */",
-        "export interface IncludeOptionsFor<A extends CollectionName, K extends RelationKeys<A>, D extends number> {",
+        "export interface IncludeOptionsFor<A extends TableName, K extends RelationKeys<A>, D extends number> {",
         "  limit?: number;",
         "  where?: Record<string, unknown>;",
         "  logical?: unknown;",
         "  orderBy?: unknown;",
         "  fields?: string[];",
-        "  include?: RelationTarget<A, K> extends CollectionName",
+        "  include?: RelationTarget<A, K> extends TableName",
         "    ? IncludeFor<RelationTarget<A, K>, Prev[D]>",
         "    : never;",
         "}",
         "",
         "/**",
-        " * An `include` for collection `A`: its relation names, dotted paths, or the",
+        " * An `include` for table `A`: its relation names, dotted paths, or the",
         " * parametrised tree — with every key checked against the relations that",
         " * actually exist, at every level.",
         " */",
-        "export type IncludeFor<A extends CollectionName, D extends number = 3> =",
+        "export type IncludeFor<A extends TableName, D extends number = 3> =",
         "  D extends 0",
         "    ? never",
         "    : | readonly (RelationKeys<A> | \"*\")[]",
         "      | { [K in RelationKeys<A>]?: true | IncludeOptionsFor<A, K, D> };",
         "",
         "/** The relation names an include asks for at the top level. */",
-        "type IncludedKeys<A extends CollectionName, I> =",
+        "type IncludedKeys<A extends TableName, I> =",
         "  I extends readonly (infer K)[]",
         "    ? Extract<K, RelationKeys<A>>",
         "    : Extract<keyof I, RelationKeys<A>>;",
@@ -686,7 +686,7 @@ function includeHelperLines(): string[] {
         " * to write `row.author?.name` after asking for the author is the type",
         " * describing a possibility the query already ruled out.",
         " */",
-        "export type RowWith<A extends CollectionName, I> =",
+        "export type RowWith<A extends TableName, I> =",
         "  Database[A][\"Row\"] & Required<Pick<Database[A][\"Row\"], IncludedKeys<A, I> & keyof Database[A][\"Row\"]>>;",
         ""
     ];

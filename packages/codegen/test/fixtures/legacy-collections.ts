@@ -330,7 +330,7 @@ export const LEGACY_FIXTURES: Record<string, () => CollectionConfig[]> = {
         { slug: "authors", name: "authors", properties: { name: { type: "string" } } },
         { slug: "articles", name: "articles", properties: { title: { type: "string" } } }
     ]),
-    "reserved-accessors": () => loose(["collection", "then", "toJSON", "posts"].map(slug => ({
+    "reserved-accessors": () => loose(["table", "collection", "then", "toJSON", "posts"].map(slug => ({
         slug, name: slug, properties: { title: { type: "string" } }
     }))),
     "realistic": () => {

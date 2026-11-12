@@ -10,7 +10,7 @@ import type { TableDescriptor } from "@rebasepro/types";
 import { generateTypedefs } from "./generate-types";
 
 export { generateTypedefs, CodegenError } from "./generate-types";
-export { toPascalCase, toCamelCase, toSafeIdentifier, toCollectionAccessor, indent } from "./utils";
+export { toPascalCase, toCamelCase, toSafeIdentifier, toTableAccessor, indent } from "./utils";
 
 // ─── Public API ────────────────────────────────────────────────────
 
@@ -79,13 +79,13 @@ export function generateSDK(
 2. Initialize with your generated types:
    \`\`\`typescript
     import { createRebaseClient } from '@rebasepro/client';
-    import { collectionsDictionary, type Database } from './database.types';
+    import { tablesDictionary, type Database } from './database.types';
 
     const rebase = createRebaseClient<Database>({
         baseUrl: '${options.baseUrl ?? "http://localhost:3001"}',
         // Maps each accessor back to the slug the wire uses. Without it a
         // hyphenated slug is not resolvable from the property name alone.
-        collections: collectionsDictionary,
+        tables: tablesDictionary,
     });
 
    // Property access is the typed surface: rows, filters and sorts are all
@@ -106,9 +106,9 @@ JSON — and nothing here renames anything.
   the wire carries. A \`belongsTo\` named \`author\` gives you \`row.authorId\`, not
   the column spelling.
 - **A table accessor is camelCase too** (\`my-notes\` → \`rebase.data.myNotes\`),
-  which is what \`collectionsDictionary\` maps back to the slug.
-  A slug whose accessor the client reserves (\`collection\`, \`then\`, \`toJSON\`)
-  is generated as \`<name>Collection\`: \`rebase.data.collectionCollection\`.
+  which is what \`tablesDictionary\` maps back to the slug.
+  A slug whose accessor the client reserves (\`table\`, \`then\`, \`toJSON\`)
+  is generated as \`<name>Table\`: \`rebase.data.tableTable\`.
 
 \`where\` and \`orderBy\` are keyed off the same type, so what compiles is what the
 backend answers to.
@@ -127,7 +127,7 @@ read never serves the column and a write naming it is refused — so this is a
 guarantee rather than a description, and nothing generated names a password
 hash.
 
-If you need an untyped escape hatch, \`rebase.data.collection(slug)\` still works —
+If you need an untyped escape hatch, \`rebase.data.table(slug)\` still works —
 but it is generic over \`Record<string, unknown>\` and gives up everything above.
 `
         });
