@@ -923,7 +923,7 @@ A file inside a JSON document is `json.storage({ … })` with the same options.
 
 Browser-side upload functions (a computed path, `processFile`, `postProcess`)
 are presentation: `fields.<key>.storage` in the table's `customizeTable`
-(see `rebase-collections`). The orphan sweep (`rebase storage orphans`) counts a
+(see `rebase-tables`). The orphan sweep (`rebase storage orphans`) counts a
 file as referenced while a row holds its path.
 
 ## Frontend Storage Sources

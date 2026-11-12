@@ -16,7 +16,7 @@ Tables (backend/schema, TypeScript) → Drizzle Schema (generated) → PostgreSQ
 ```
 
 The backend uses a **two-step process**:
-1. **`rebase schema generate`** compiles the tables in `backend/schema/` (`defineTable`, see `rebase-collections`) and generates a Drizzle ORM schema file (`schema.generated.ts`)
+1. **`rebase schema generate`** compiles the tables in `backend/schema/` (`defineTable`, see `rebase-tables`) and generates a Drizzle ORM schema file (`schema.generated.ts`)
 2. **`rebase db push`** or **`rebase db generate` + `rebase db migrate`** applies the schema to the database
 
 The backend also applies the additive part at every boot, on any database: missing
@@ -679,7 +679,7 @@ The `shutdown(timeoutMs?: number, options?: { server })` method (default timeout
   prompt, and a `.` in a table's or an index's name failed every push (`too many parts in pattern`)
 - **Indexes are declared too** — a table's `indexes` array is emitted into `schema.sql` by
   `db push`/`db generate` *and* created at boot with `CREATE INDEX CONCURRENTLY IF NOT EXISTS`,
-  so a deployment that never runs `db push` still gets them. See the `rebase-collections` skill.
+  so a deployment that never runs `db push` still gets them. See the `rebase-tables` skill.
 - **A hand-written index on a managed table used to be dropped by `db push`.** Push is
   declarative: an index absent from `schema.sql` was drift, Atlas planned `DROP INDEX`, and that
   is not a destructive pattern, so the auto-approved apply took it with no prompt. Ownership is

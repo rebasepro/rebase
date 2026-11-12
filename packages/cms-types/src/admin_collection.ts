@@ -564,7 +564,7 @@ export type AdminCollectionOptions<
      * migration or the REST API lands with this property null, and the board
      * shows an **Initialize** bar until someone clicks it. Backends that
      * create rows for a board should append a key themselves — see the
-     * "Kanban boards" section of the `rebase-collections` skill.
+     * "Kanban boards" section of the `rebase-tables` skill.
      *
      * Used by Kanban view for ordering within columns and can be used for
      * general ordering purposes.

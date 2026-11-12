@@ -214,6 +214,36 @@ describe("re-running the install", () => {
         expect(result.kept).toEqual([]);
     });
 
+    it("removes a retired Rebase skill an install from before manifests left behind", () => {
+        // Such an install recorded nothing, so the manifest sweep cannot see it;
+        // `rebase-collections` (now `rebase-tables`) would stay beside its
+        // replacement and be picked for the removed collection model.
+        const { dir } = project();
+        const body = path.join(dir, ".claude/skills", bodyOf("rebase-collections"));
+        fs.mkdirSync(path.dirname(body), { recursive: true });
+        fs.writeFileSync(body, "---\nname: rebase-collections\ndescription: Old.\n---\n\n# Collections\n");
+
+        const result = installForAgent("claude", loadSkills(fixture()), dir);
+
+        expect(fs.existsSync(path.join(dir, ".claude/skills/rebase-collections"))).toBe(false);
+        expect(result.removed).toEqual([bodyOf("rebase-collections")]);
+    });
+
+    it("keeps a directory named like a retired skill that Rebase did not write", () => {
+        const { dir } = project();
+        const own = path.join(dir, ".claude/skills", bodyOf("rebase-collections"));
+        const extra = path.join(dir, ".claude/skills/rebase-collections/notes.md");
+        fs.mkdirSync(path.dirname(own), { recursive: true });
+        fs.writeFileSync(own, "---\nname: our-collections\n---\n\n# Ours\n");
+        fs.writeFileSync(extra, "# Notes\n");
+
+        const result = installForAgent("claude", loadSkills(fixture()), dir);
+
+        expect(fs.readFileSync(own, "utf-8")).toContain("# Ours");
+        expect(fs.existsSync(extra)).toBe(true);
+        expect(result.removed).toEqual([]);
+    });
+
     it("leaves files it never installed alone", () => {
         const { dir } = project();
         const own = path.join(dir, ".claude/skills/our-skill/SKILL.md");

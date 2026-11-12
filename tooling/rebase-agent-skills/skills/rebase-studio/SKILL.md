@@ -807,7 +807,7 @@ tables the backend serves from `GET /api/schema/tables` and derives a
 collection for each, then layers the `tableCustomizations` over them
 (`customizeTable` results from `frontend/src/cms/`) and adds any
 `externalCollections` (Firestore, via `defineFirestoreCollection`). See
-`rebase-collections`.
+`rebase-tables`.
 
 ## Running the Studio
 

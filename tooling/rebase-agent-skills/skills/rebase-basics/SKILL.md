@@ -47,7 +47,7 @@ Please adhere to these principles when working with Rebase, as they ensure relia
 
 2. **Never convert to `any`:** TypeScript strictness is critical. Never use `as any` type assertions. Use proper typing, `unknown`, or explicit type narrowing instead.
 
-3. **Follow the Schema-as-Code approach:** Tables are TypeScript files in `backend/schema/` — `defineTable` / `defineAuthTable` / `defineView` from `@rebasepro/server/schema`, exported from `backend/schema/index.ts`, each with a required `rls`. How a table looks in the admin panel is a separate, optional file in `frontend/src/cms/` (`customizeTable`). The visual Studio edits those files via AST manipulation — it does NOT run raw SQL. Always define tables in code first; see `rebase-collections`. A project that still has `config/collections/` has not been migrated: `rebase migrate collections-to-tables` (see `rebase-collections/references/migrate-from-collections.md`).
+3. **Follow the Schema-as-Code approach:** Tables are TypeScript files in `backend/schema/` — `defineTable` / `defineAuthTable` / `defineView` from `@rebasepro/server/schema`, exported from `backend/schema/index.ts`, each with a required `rls`. How a table looks in the admin panel is a separate, optional file in `frontend/src/cms/` (`customizeTable`). The visual Studio edits those files via AST manipulation — it does NOT run raw SQL. Always define tables in code first; see `rebase-tables`. A project that still has `config/collections/` has not been migrated: `rebase migrate collections-to-tables` (see `rebase-tables/references/migrate-from-collections.md`).
 
 4. **Know which schema loop this project is on:**
    - `rebase schema generate` — compiles the tables in `backend/schema/` to the Drizzle ORM schema.

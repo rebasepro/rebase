@@ -130,7 +130,7 @@ import only package entry points, so they compile as copied.
   original's.
 - **Server-side behaviour (validation that must hold, derived fields, side
   effects) belongs in the table's `hooks` (or a column's `.transform()`) in
-  `backend/schema/`**, not only in a component — see the `rebase-collections`
+  `backend/schema/`**, not only in a component — see the `rebase-tables`
   skill.
 
 ## Copying a built-in part

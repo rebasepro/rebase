@@ -317,7 +317,7 @@ rebase auth reset-password user@example.com MyNewPass!
 | `rebase generate view <slug>` | Scaffold a custom admin screen; `--collection <slug>` makes it a record tab (`--name`, `--icon`, `--dry-run`, `--force`) |
 | `rebase storage orphans` | List the stored files no row names (`--delete` to delete them) |
 | `rebase storage move` | Copy a folder of files to another storage source (`--from`, `--to`, `--prefix`, `--delete-source`) |
-| `rebase migrate collections-to-tables [dir]` | Move a project from `config/collections` to `backend/schema` + `frontend/src/cms`, proven by byte-identical SQL. `--dry-run`, `--check`, `--json`, `--force`, `--skip-sdk-calls`. See `rebase-collections/references/migrate-from-collections.md` |
+| `rebase migrate collections-to-tables [dir]` | Move a project from `config/collections` to `backend/schema` + `frontend/src/cms`, proven by byte-identical SQL. `--dry-run`, `--check`, `--json`, `--force`, `--skip-sdk-calls`. See `rebase-tables/references/migrate-from-collections.md` |
 | `rebase migrate sdk-calls [dir]` | Rewrite the project's own SDK calls for the rename: `data.collection("x")` → `data.table("x")` and the rest. `--dry-run`, `--json`, `--force` |
 | `rebase cloud …` | Rebase Cloud: `login`, `link`, `deploy`, `tokens create`, and more — `rebase cloud --help` (see the `rebase-cloud` skill) |
 

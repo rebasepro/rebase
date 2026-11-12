@@ -62,7 +62,7 @@ const REFUSAL = `{ "error": {
       "requiredScope": "data:write:articles" } } }`;
 
 const SKILLS = [
-    "rebase-basics", "rebase-collections", "rebase-security", "rebase-sdk", "rebase-api", "rebase-auth",
+    "rebase-basics", "rebase-tables", "rebase-security", "rebase-sdk", "rebase-api", "rebase-auth",
     "rebase-realtime", "rebase-storage", "rebase-custom-functions", "rebase-cron-jobs", "rebase-webhooks",
     "rebase-email", "rebase-entity-history", "rebase-studio", "rebase-admin", "rebase-custom-views",
     "rebase-customize-admin", "rebase-ui-components", "rebase-design-language", "rebase-deployment",

@@ -46,7 +46,7 @@ test("the refused strategies are read from the validator, warnings excluded", ()
 
 test("a strategy table that offers a refused strategy is a finding", () => {
     const findings = idFindings({
-        "tooling/rebase-agent-skills/skills/rebase-collections/SKILL.md":
+        "tooling/rebase-agent-skills/skills/rebase-tables/SKILL.md":
             "### String isId Strategies\n\n| Value | Behavior |\n|---|---|\n" +
             "| `\"uuid\"` | Auto-generated UUID |\n| `\"cuid\"` | Auto-generated CUID |\n"
     });
@@ -68,7 +68,7 @@ test("an isId type or snippet that names it is a finding, in a page or the scaff
 
 test("a line that says the strategy is refused is the correction, not the drift", () => {
     assert.deepEqual(idFindings({
-        "tooling/rebase-agent-skills/skills/rebase-collections/SKILL.md":
+        "tooling/rebase-agent-skills/skills/rebase-tables/SKILL.md":
             "### String isId Strategies\n\n`\"cuid\"` is refused at config load: there is no `cuid()` function.\n",
         "website/src/content/docs/docs/collections/properties.mdx":
             "| `isId` | `boolean \\| string` | `\"cuid\"` is refused at config load |\n"

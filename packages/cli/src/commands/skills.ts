@@ -320,15 +320,15 @@ export function renderSkillIndex(skills: LoadedSkill[], agentKey: AgentKey): str
         "",
         `This project uses [Rebase](https://rebase.pro). ${skills.length} reference skills are`,
         "installed beside this file. **Read the one that covers the task before writing",
-        "code** — they are the difference between a collection that compiles and one that",
-        "does not.",
+        "code** — they are the difference between a table the server accepts and one it",
+        "refuses.",
         "",
         "| Skill | Covers | Read |",
         "|---|---|---|",
         rows,
         "",
         "Start with `rebase-basics` if you are not sure: it opens with the recipes for",
-        "adding a collection, a function and an RLS rule, and names the commands.",
+        "adding a table, a function and an RLS rule, and names the commands.",
         ""
     ].join("\n");
 }
@@ -431,6 +431,15 @@ export function detectInstalledAgents(home: string = os.homedir()): InstalledAge
  * as a rule.
  */
 export const SKILLS_MANIFEST = ".rebase-skills.json";
+
+/**
+ * Skills the bundle once shipped under these names and no longer does. An
+ * install with a manifest removes them by its record; this list reaches the
+ * installs made before manifests existed, which recorded nothing.
+ * `rebase-collections` became `rebase-tables` when the schema moved to
+ * `defineTable` (0.31).
+ */
+export const RETIRED_SKILLS: readonly string[] = ["rebase-collections"];
 
 interface SkillsManifest {
     version: 1;
@@ -567,6 +576,28 @@ export function installForAgent(
         fs.rmSync(target);
         removed.push(relPath);
         // Empty directories the removal leaves behind, up to the target dir.
+        for (let dir = path.dirname(target); dir.startsWith(targetBase + path.sep); dir = path.dirname(dir)) {
+            if (fs.readdirSync(dir).length > 0) break;
+            fs.rmdirSync(dir);
+        }
+    }
+
+    // Retired skills an install from before manifests left behind: nothing
+    // records them, so the sweep above cannot see them. A body is removed only
+    // when its front matter still names the retired skill — the file Rebase
+    // wrote, not a directory of the same name someone made — and, as for any
+    // unrecorded file, an earlier install would have overwritten it anyway.
+    const shipped = new Set(skills.map((skill) => skill.name));
+    for (const retired of RETIRED_SKILLS) {
+        if (shipped.has(retired)) continue;
+        const relPath = agent.transformFile(retired, "").fileName;
+        if (relPath in (previous?.files ?? {})) continue;
+        const target = path.join(targetBase, relPath);
+        if (!fs.existsSync(target)) continue;
+        const named = /^name:[ \t]*["']?([\w-]+)["']?[ \t]*$/m.exec(fs.readFileSync(target, "utf-8").split("---")[1] ?? "");
+        if (named?.[1] !== retired) continue;
+        fs.rmSync(target);
+        removed.push(relPath);
         for (let dir = path.dirname(target); dir.startsWith(targetBase + path.sep); dir = path.dirname(dir)) {
             if (fs.readdirSync(dir).length > 0) break;
             fs.rmdirSync(dir);

@@ -82,7 +82,7 @@ is the one the backend answers to.
 
 A column without `.notNull()` is `T | null` on `Row`. The same types are
 available from the table itself with `InferRow<typeof posts>` (see
-`rebase-collections`).
+`rebase-tables`).
 
 A relation is typed as the **target's own `Row`, inlined** — that is what
 `include` serves. It is optional on every read, because it is only loaded when
@@ -523,7 +523,7 @@ for bulk reads, since it costs a `ts_headline` per field per row. The snippet
 carries markup and user-typed text: split on `<mark>` and render the parts
 rather than injecting it as HTML.
 
-To make a table searchable, add `search` to its `defineTable` — see the `rebase-collections`
+To make a table searchable, add `search` to its `defineTable` — see the `rebase-tables`
 skill. `where` + `like` is not the workaround it looks like: the operator does
 exist, but a pattern beginning with `%` cannot use an index and scans the table.
 

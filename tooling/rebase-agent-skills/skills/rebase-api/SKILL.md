@@ -482,7 +482,7 @@ fields: `table` (the descriptor), `path`, `values`, `id`, `previousValues`,
 > its columns' `.transform()`.
 
 See the **rebase-security** skill for where they sit beside row-level security,
-the **rebase-collections** skill for writing them, and
+the **rebase-tables** skill for writing them, and
 `packages/types/src/schema/hooks.ts` for the types.
 
 ## REST API Examples

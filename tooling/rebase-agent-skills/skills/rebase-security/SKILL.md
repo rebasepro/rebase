@@ -361,7 +361,7 @@ export const orders = defineTable("orders", {
 });
 ```
 
-For the full hook reference, see the `rebase-collections` skill → Table hooks.
+For the full hook reference, see the `rebase-tables` skill → Table hooks.
 
 ---
 
@@ -768,5 +768,5 @@ Use this checklist when setting up security for a Rebase project:
 - **Rule Types**: `packages/types/src/types/security_rules.ts` (`SecurityRule`), `packages/types/src/schema/table_options.ts` (`RlsPosture`, `DefaultRls`), `packages/types/src/types/policy.ts` (`policy`)
 - **Backend Options**: `packages/server/src/backend/options.ts` — `RebaseBackendOptions.hooks`, the global hooks
 - **Reserved Identity Values**: See Identity Types table above — `"service"`, `"anonymous"`, `"api-key:{id}"` are system-assigned identities in `context.user`
-- **Table hooks**: See `rebase-collections` skill → Table hooks section
+- **Table hooks**: See `rebase-tables` skill → Table hooks section
 - **Auth Configuration**: See `rebase-auth` skill → Server-Side Configuration section

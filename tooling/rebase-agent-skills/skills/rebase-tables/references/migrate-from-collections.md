@@ -156,6 +156,13 @@ For reading old code, issues and blog posts:
 | MCP `list_collections` / `query_collection` / `*_document` | `list_tables` / `query_table` / `*_row` |
 | MongoDB data source | retired; Postgres only on the server |
 
+## The agent skills
+
+The skill that taught collections, `rebase-collections`, is now `rebase-tables`.
+`rebase skills install` replaces it: the installer removes a Rebase skill the
+package no longer ships (one it recorded, or a `rebase-collections` body still
+carrying its own name) and keeps anything you wrote or edited.
+
 ## Verify
 
 After the manual steps: `rebase migrate collections-to-tables --check`

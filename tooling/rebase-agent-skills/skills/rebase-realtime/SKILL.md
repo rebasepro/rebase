@@ -888,7 +888,7 @@ with it ("handleUpgrade() was called more than once").
 
 ### Multiple data sources
 
-With more than one Postgres database in a single instance (`database("warehouse")` beside the default), the single WebSocket server routes each subscription to the provider owning the subscribed collection — each database via its own `LISTEN/NOTIFY` — based on the collection's resolved data source. Broadcast channels and presence use a provider that implements them. Firestore (`direct` transport) realtime is handled entirely **client-side** by its SDK and never reaches the backend WebSocket. No extra configuration is needed beyond declaring the databases; single-database setups are unaffected. See the **rebase-collections** skill for the data-source model.
+With more than one Postgres database in a single instance (`database("warehouse")` beside the default), the single WebSocket server routes each subscription to the provider owning the subscribed collection — each database via its own `LISTEN/NOTIFY` — based on the collection's resolved data source. Broadcast channels and presence use a provider that implements them. Firestore (`direct` transport) realtime is handled entirely **client-side** by its SDK and never reaches the backend WebSocket. No extra configuration is needed beyond declaring the databases; single-database setups are unaffected. See the **rebase-tables** skill for the data-source model.
 
 ### Cross-Instance Broadcasting
 

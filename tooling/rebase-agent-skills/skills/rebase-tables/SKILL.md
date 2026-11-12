@@ -1,9 +1,9 @@
 ---
-name: rebase-collections
-description: Define a Rebase data model — tables in backend/schema (defineTable, col, rel, json, a required rls), hooks, views, search and indexes — and how each table looks in the CMS (customizeTable, defineFirestoreCollection). Use it whenever the user creates or changes a table, a column, a relation or a hook (defineTable / defineAuthTable / defineView, table hooks, column transforms), makes a table searchable (including when search finds nothing for content stored in a JSON column), declares an index, changes how a table looks in the admin (labels, icons, enum colours, kanban, form layout, custom fields in frontend/src/cms), or is migrating a project from config/collections (read references/migrate-from-collections.md for that).
+name: rebase-tables
+description: Authoring a Rebase schema — tables in backend/schema with defineTable, columns (col.*), JSON shapes (json.*), relations (rel.*), the required rls posture, table hooks and column transforms, the users table (defineAuthTable), views (defineView), search and indexes — and the CMS layer on top of it (customizeTable in frontend/src/cms, kanban boards, Firestore collections with defineFirestoreCollection). Use it whenever the user creates or changes a table, a column, a relation or a hook, makes a table searchable (including when search finds nothing for content stored in a JSON column), declares an index, changes how a table looks in the admin, or is migrating a project from config/collections (read references/migrate-from-collections.md for that).
 ---
 
-# Rebase tables and collections
+# Rebase tables (and their CMS collections)
 
 A Rebase project's data model is **tables**, declared in TypeScript in
 `backend/schema/`. That declaration is the only thing the backend knows about
