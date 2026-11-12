@@ -492,6 +492,8 @@ substitutions. Entries marked **(unsure)** are the ones to review first.
 
 ## B. Authoring surface — the complete contract
 
+Column spelling follows Drizzle's pg-core since 2026-11-13 — see `drizzle-alignment`.
+
 Authoritative source: `packages/types/src/schema/`. Summary:
 
 ### `defineTable(name, config)`
@@ -518,8 +520,30 @@ roles?, columns, schema?, slug?, indexes? })`.
 
 ### `col.*`
 
-Every builder of §4.2, plus `col.smallserial()` (it is a `PgType` member).
-`col.varchar()`/`col.char()` default to length 255 (today's default).
+Every builder of §4.2, plus `col.smallserial()` (it is a `PgType` member),
+spelled as Drizzle's `pg-core` spells it: an optional SQL column name first,
+then Drizzle's config object, then the chain. §4.2's spellings map to:
+
+| §4.2 | Canonical |
+|---|---|
+| `.column("legacy_col_name")` | the builder's leading argument: `col.text("legacy_col_name")` |
+| `col.varchar(n)` / `col.char(n)` | `col.varchar({ length: n })` / `col.char({ length: n })` — the length is required |
+| `col.enum(values, { name })` | `const status = pgEnum(name, values)`, then `status()`; `col.enum(values)` (type `<table>_<column>`) unchanged |
+| `col.bigint()` / `col.bigserial()` | `col.bigint({ mode: "number" })` / `col.bigserial({ mode: "number" })` |
+| `col.numeric(p?, s?)` | `col.numeric({ precision, scale })` (`col.decimal` is an alias) |
+| `col.timestamptz()` | `col.timestamp({ withTimezone: true })` |
+| `col.jsonb<T>()` / `col.json<T>()` | `col.jsonb().$type<T>()` / `col.json().$type<T>()` |
+| `col.array(innerCol)` | `innerCol.array()` — item rules before `.array()`, column modifiers after |
+| `col.vector(dims, opts?)` | `col.vector({ dimensions, index? })` |
+| `.defaultSql("gen_short_id()")` | `` .default(sql`gen_short_id()`) ``; `.defaultNow()` is `` .default(sql`now()`) `` |
+| `.generatedAs(sqlExpr)` | `` .generatedAlwaysAs(sql`…`) `` |
+| `.identity()` | `.generatedByDefaultAsIdentity()` |
+| — | `col.custom({ dataType: "inet" })` for a type no builder names |
+
+A Drizzle spelling that would mean something else here does not compile, with
+a message saying what to write (`col.timestamp()` without time zone,
+`.references()` — a foreign key is a `rel.belongsTo` —, `.$defaultFn()`,
+`.generatedAlwaysAsIdentity()`, `numeric`'s `mode: "string"`, …).
 
 Universal modifiers of §4.2, plus **(gap)**:
 
@@ -530,9 +554,9 @@ Universal modifiers of §4.2, plus **(gap)**:
 | `.onCreateUser()` / `.onUpdateUser()` | `autoValue: "user_on_create" \| "user_on_update"`. |
 | `.dbDefault()` | `databaseDefault: true` — the database owns a default Rebase does not state. |
 | `.describe(text)` | Column description for OpenAPI/MCP. |
-| `.oneOf([...])` | A closed value set that is *not* a Postgres enum type: number enums, and `TEXT[]` of known strings (`col.array(col.text().oneOf([...]))`). |
+| `.oneOf([...])` | A closed value set that is *not* a Postgres enum type, on a number column. On text it is Drizzle's `col.text({ enum: [...] })`, also for `TEXT[]` of known strings (`col.text({ enum: [...] }).array()`). |
 | `.validate({...})` extras | `length`, `uppercase`, `lessThan`, `moreThan`, `positive`, `negative`, date `min`/`max`, `requiredMessage`, `matchesMessage`, `uniqueItems`. |
-| `col.vector(d, { index })` | `index.metric` may be an array (one index per metric); `m`, `efConstruction`, `lists` kept; `index: false` kept. `"ip"` is today's `inner_product`. |
+| `col.vector({ dimensions, index })` | `index.metric` may be an array (one index per metric); `m`, `efConstruction`, `lists` kept; `index: false` kept. `"ip"` is today's `inner_product`. |
 | `col.storage({...})` extras | `public`, `fileName` (template), `metadata`, `includeBucketUrl`, `storeUrl`. Browser-only options (`processFile`, `postProcess`, `previewUrl`, function-valued paths) move to `customizeTable`. |
 
 `.notNull()` is exactly today's `validation.required` (NOT NULL and "required"
@@ -541,7 +565,7 @@ today. Stamp columns stay nullable unless `.notNull()` is written.
 
 ### `json.*` **(gap)** — nested JSON shapes
 
-`col.jsonb<T>()` types a document statically; `col.jsonb(json.object({...}))`
+`col.jsonb().$type<T>()` types a document statically; `col.jsonb(json.object({...}))`
 also tells the server its shape, which today's nested `map.properties`,
 `array.of` and `array.oneOf` do: per-field validation, defaults, stamps,
 transforms, storage files inside blocks, search over JSON paths. Builders:

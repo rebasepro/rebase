@@ -88,7 +88,7 @@ export const posts = defineTable("posts", {
         // to a table that has rows needs a default.
         excerpt: col.text().validate({ max: 300 }),
         status: col.enum(["draft", "published"]).notNull().default("draft"),
-        createdAt: col.timestamptz().onCreateNow()
+        createdAt: col.timestamp({ withTimezone: true }).onCreateNow()
     },
     relations: {
         author: rel.belongsTo(() => authors)
@@ -98,8 +98,8 @@ export const posts = defineTable("posts", {
 ```
 
 The column's key is its name on the wire and in the SDK; its SQL name is the
-snake_case of the key (`createdAt` → `created_at`) unless `.column("name")`
-says otherwise. How the column looks in the CMS — its label, a multiline
+snake_case of the key (`createdAt` → `created_at`) unless the builder's
+leading argument says otherwise (`col.text("name")`, as in Drizzle). How the column looks in the CMS — its label, a multiline
 editor, enum colours — is not here: it goes in `frontend/src/cms/posts.tsx`
 with `customizeTable<typeof posts>("posts", { fields: { … } })`, and needs no
 migration.
@@ -193,14 +193,14 @@ Locally, `rebase db push` does the same through its destructive-change gate.
 > [!CAUTION]
 > Changing existing column types may cause data loss. Review the generated migration carefully!
 
-1. Change the builder (`col.integer()` → `col.bigint()`, `col.varchar(100)` → `col.text()`, …)
+1. Change the builder (`col.integer()` → `col.bigint({ mode: "number" })`, `col.varchar({ length: 100 })` → `col.text()`, …)
 2. Run `rebase schema generate` → `rebase db generate`
 3. **Review the migration SQL** for any `ALTER COLUMN` or `DROP COLUMN` statements
 4. Run `rebase db migrate` only if you're satisfied with the changes
 
 Renaming a column's key renames the SQL column too, which `db push` plans as a
-drop and an add. To rename only the wire name, keep the SQL name with
-`.column("old_name")`.
+drop and an add. To rename only the wire name, keep the SQL name as the
+builder's leading argument: `col.text("old_name")`.
 
 ### Adding a New Table
 
