@@ -269,7 +269,7 @@
         "packages/server/src/services/outbound-url-guard.ts",
         "packages/server/src/services/outbound-post.ts",
         "packages/server/src/init/callback-client.ts",
-        "packages/server/src/init/global-callbacks.ts",
+        "packages/server/src/init/global-hooks.ts",
         "packages/server-postgres/src/history/**",
         "packages/common/src/util/callbacks.ts",
         "packages/common/src/util/callback-errors.ts",
