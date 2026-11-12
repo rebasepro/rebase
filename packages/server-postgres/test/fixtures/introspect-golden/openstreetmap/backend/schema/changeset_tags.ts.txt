@@ -1,0 +1,18 @@
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { changesets } from "./changesets";
+
+// Introspected as an owned-child: belongs to changesets (its only foreign key inside the primary key) and nothing else references it.
+// ⚠ Not reproduced exactly by `rebase db push` — read before pushing:
+//   - "k" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
+//   - "v" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
+export const changesetTags = defineTable("changeset_tags", {
+    columns: {
+        changesetId: col.bigint().primaryKey(),
+        k: col.text().primaryKey().default(""),
+        v: col.text().notNull().default("")
+    },
+    relations: {
+        changeset: rel.belongsTo(() => changesets, { onDelete: "no action" })
+    },
+    rls: "admin-only"
+});

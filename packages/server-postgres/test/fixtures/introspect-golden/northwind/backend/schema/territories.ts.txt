@@ -1,0 +1,16 @@
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { region } from "./region";
+import { employees } from "./employees";
+
+export const territories = defineTable("territories", {
+    columns: {
+        territoryId: col.varchar(20).primaryKey(),
+        territoryDescription: col.varchar(60).notNull(),
+        regionId: col.smallint().notNull()
+    },
+    relations: {
+        region: rel.belongsTo(() => region, { onDelete: "no action" }),
+        employees: rel.manyToMany(() => employees, { through: "employee_territories" })
+    },
+    rls: "admin-only"
+});

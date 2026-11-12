@@ -1,0 +1,16 @@
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { film } from "./film";
+
+// Introspected as a lookup: a 6-row code list: referenced by 2 table(s), references none, 3 or fewer simple columns.
+export const language = defineTable("language", {
+    columns: {
+        languageId: col.serial().primaryKey(),
+        name: col.text().notNull(),
+        lastUpdate: col.timestamptz().notNull().onCreateNow()
+    },
+    relations: {
+        film: rel.hasMany(() => film),
+        film_by_original_language_id: rel.hasMany(() => film, { foreignKey: "original_language_id" })
+    },
+    rls: "admin-only"
+});

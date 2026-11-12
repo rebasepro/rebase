@@ -1,0 +1,18 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { country } from "../../../backend/schema/country";
+
+export const countryCms = customizeTable<typeof country>("country", {
+    display: {
+        title: "country"
+    },
+    sort: ["lastUpdate", "desc"],
+    fields: {
+        country: {
+            multiline: true
+        },
+        lastUpdate: {
+            readOnly: true
+        }
+    },
+    fieldOrder: ["countryId", "lastUpdate", "country"]
+});

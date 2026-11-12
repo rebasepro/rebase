@@ -1,0 +1,33 @@
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { users } from "./users";
+import { oauthApplications } from "./oauth_applications";
+import { oauthOpenidRequests } from "./oauth_openid_requests";
+
+// ⚠ Not reproduced exactly by `rebase db push` — read before pushing:
+//   - "token" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
+//   - "created_at" is timestamp without time zone, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
+//   - "revoked_at" is timestamp without time zone, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
+//   - "scopes" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
+//   - "code_challenge" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
+//   - "code_challenge_method" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
+export const oauthAccessGrants = defineTable("oauth_access_grants", {
+    columns: {
+        id: col.bigserial().primaryKey(),
+        resourceOwnerId: col.bigint().notNull(),
+        applicationId: col.bigint().notNull(),
+        token: col.text().notNull().unique(),
+        expiresIn: col.integer().notNull(),
+        redirectUri: col.text().notNull().validate({ url: true }),
+        createdAt: col.custom("timestamp without time zone").notNull(),
+        revokedAt: col.custom("timestamp without time zone"),
+        scopes: col.text().notNull().default(""),
+        codeChallenge: col.text(),
+        codeChallengeMethod: col.text()
+    },
+    relations: {
+        resourceOwner: rel.belongsTo(() => users, { onDelete: "no action" }),
+        application: rel.belongsTo(() => oauthApplications, { onDelete: "no action" }),
+        oauth_openid_requests: rel.hasMany(() => oauthOpenidRequests, { foreignKey: "access_grant_id" })
+    },
+    rls: "admin-only"
+});

@@ -1,0 +1,37 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { customer } from "../../../backend/schema/customer";
+
+export const customerCms = customizeTable<typeof customer>("customer", {
+    icon: "Users",
+    display: {
+        title: "uuid"
+    },
+    listFields: ["customerId", "firstName", "lastName", "email", "uuid", "activebool"],
+    fields: {
+        firstName: {
+            multiline: true
+        },
+        lastName: {
+            multiline: true
+        },
+        email: {
+            multiline: true
+        },
+        lastUpdate: {
+            readOnly: true
+        }
+    },
+    fieldOrder: [
+        "customerId",
+        "firstName",
+        "lastName",
+        "email",
+        "uuid",
+        "activebool",
+        "active",
+        "createDate",
+        "lastUpdate",
+        "store",
+        "address"
+    ]
+});

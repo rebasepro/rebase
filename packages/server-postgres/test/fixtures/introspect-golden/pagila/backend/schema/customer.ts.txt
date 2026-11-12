@@ -1,0 +1,28 @@
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { address } from "./address";
+import { store } from "./store";
+import { payment } from "./payment";
+import { rental } from "./rental";
+
+export const customer = defineTable("customer", {
+    columns: {
+        customerId: col.serial().primaryKey(),
+        storeId: col.integer().notNull(),
+        firstName: col.text().notNull(),
+        lastName: col.text().notNull(),
+        email: col.text(),
+        addressId: col.integer().notNull(),
+        activebool: col.boolean().notNull().default(true),
+        createDate: col.date().notNull().defaultSql("CURRENT_DATE"),
+        lastUpdate: col.timestamptz().onCreateNow(),
+        active: col.integer(),
+        uuid: col.uuid().notNull().unique().defaultSql("uuidv7()")
+    },
+    relations: {
+        address: rel.belongsTo(() => address),
+        store: rel.belongsTo(() => store),
+        payment: rel.hasMany(() => payment),
+        rental: rel.hasMany(() => rental)
+    },
+    rls: "admin-only"
+});

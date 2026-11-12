@@ -1,0 +1,28 @@
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { address } from "./address";
+import { store } from "./store";
+import { payment } from "./payment";
+import { rental } from "./rental";
+
+export const staff = defineTable("staff", {
+    columns: {
+        staffId: col.serial().primaryKey(),
+        firstName: col.text().notNull(),
+        lastName: col.text().notNull(),
+        addressId: col.integer().notNull(),
+        email: col.text(),
+        storeId: col.integer().notNull(),
+        active: col.boolean().notNull().default(true),
+        username: col.text().notNull(),
+        password: col.text(),
+        lastUpdate: col.timestamptz().notNull().onCreateNow(),
+        picture: col.bytea()
+    },
+    relations: {
+        address: rel.belongsTo(() => address),
+        store: rel.belongsTo(() => store, { onDelete: "no action" }),
+        payment: rel.hasMany(() => payment),
+        rental: rel.hasMany(() => rental)
+    },
+    rls: "admin-only"
+});

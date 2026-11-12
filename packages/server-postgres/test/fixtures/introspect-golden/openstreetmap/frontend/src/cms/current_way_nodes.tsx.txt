@@ -1,0 +1,7 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { currentWayNodes } from "../../../backend/schema/current_way_nodes";
+
+export const currentWayNodesCms = customizeTable<typeof currentWayNodes>("current_way_nodes", {
+    hideFromNavigation: true,
+    fieldOrder: ["wayId", "sequenceId", "node"]
+});

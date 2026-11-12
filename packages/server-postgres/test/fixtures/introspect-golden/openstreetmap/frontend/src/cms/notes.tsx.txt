@@ -1,0 +1,28 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { notes } from "../../../backend/schema/notes";
+
+// A board over "status" fits this table, but a board needs a text column to keep each card's order in. Add one, then declare kanban: { columnField: "status", orderField: "<that column>" }.
+export const notesCms = customizeTable<typeof notes>("notes", {
+    display: {
+        title: "description"
+    },
+    listFields: ["id", "status", "closedAt", "userIp", "latitude", "longitude"],
+    fields: {
+        description: {
+            multiline: true
+        }
+    },
+    fieldOrder: [
+        "id",
+        "status",
+        "closedAt",
+        "userIp",
+        "latitude",
+        "longitude",
+        "tile",
+        "user",
+        "description",
+        "createdAt",
+        "updatedAt"
+    ]
+});

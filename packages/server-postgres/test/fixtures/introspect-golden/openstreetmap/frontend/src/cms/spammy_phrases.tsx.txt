@@ -1,0 +1,10 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { spammyPhrases } from "../../../backend/schema/spammy_phrases";
+
+export const spammyPhrasesCms = customizeTable<typeof spammyPhrases>("spammy_phrases", {
+    fields: {
+        phrase: {
+            multiline: true
+        }
+    }
+});

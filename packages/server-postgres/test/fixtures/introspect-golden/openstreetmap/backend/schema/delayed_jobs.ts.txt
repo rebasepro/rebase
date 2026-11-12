@@ -1,0 +1,27 @@
+import { defineTable, col } from "@rebasepro/server/schema";
+
+// ⚠ Not reproduced exactly by `rebase db push` — read before pushing:
+//   - "run_at" is timestamp without time zone, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
+//   - "locked_at" is timestamp without time zone, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
+//   - "failed_at" is timestamp without time zone, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
+//   - "locked_by" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
+//   - "queue" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
+//   - "created_at" is timestamp without time zone, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
+//   - "updated_at" is timestamp without time zone, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
+export const delayedJobs = defineTable("delayed_jobs", {
+    columns: {
+        id: col.bigserial().primaryKey(),
+        priority: col.integer().notNull().default(0),
+        attempts: col.integer().notNull().default(0),
+        handler: col.text().notNull(),
+        lastError: col.text(),
+        runAt: col.custom("timestamp without time zone"),
+        lockedAt: col.custom("timestamp without time zone"),
+        failedAt: col.custom("timestamp without time zone"),
+        lockedBy: col.text(),
+        queue: col.text(),
+        createdAt: col.custom("timestamp without time zone"),
+        updatedAt: col.custom("timestamp without time zone")
+    },
+    rls: "admin-only"
+});

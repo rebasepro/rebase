@@ -1,0 +1,29 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { issues } from "../../../backend/schema/issues";
+
+// A board over "status" fits this table, but a board needs a text column to keep each card's order in. Add one, then declare kanban: { columnField: "status", orderField: "<that column>" }.
+export const issuesCms = customizeTable<typeof issues>("issues", {
+    display: {
+        title: "reportableType"
+    },
+    listFields: ["id", "status", "assignedRole", "reportableType", "resolvedAt", "reportableId"],
+    fields: {
+        reportableType: {
+            multiline: true
+        }
+    },
+    fieldOrder: [
+        "id",
+        "status",
+        "assignedRole",
+        "reportableType",
+        "resolvedAt",
+        "reportableId",
+        "reportsCount",
+        "reportedUser",
+        "resolvedByRelation",
+        "updatedByRelation",
+        "createdAt",
+        "updatedAt"
+    ]
+});

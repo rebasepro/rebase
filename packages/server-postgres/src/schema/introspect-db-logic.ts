@@ -1,20 +1,19 @@
 /**
  * Introspection logic — pure functions and the pipeline that transforms
- * raw PostgreSQL metadata into Rebase collection definition files.
+ * raw PostgreSQL metadata into `backend/schema` source (and, for a project
+ * with a frontend, `frontend/src/cms` customizations).
  *
  * This module contains NO side-effects: no fs writes, no pg.Client creation,
  * no process.exit.  It is imported by introspect-db.ts (the CLI entry-point)
  * and consumed directly by tests.
  */
-import { firstFreeKey, toPostgresIdentifier, toWireKey } from "@rebasepro/utils";
-import { getGeneratedPolicyNames, policyToSecurityRule } from "@rebasepro/common";
-import { inferPropertyFromData } from "./introspect-db-inference";
-import { humanize } from "./introspect-db-naming";
+import type { ColumnType, TableDescriptor } from "@rebasepro/types";
+import { printIndexModule, printTableModule, tableIdentifier } from "@rebasepro/common";
+import { toWireKey } from "@rebasepro/utils";
+import { inferColumnHints } from "./introspect-db-inference";
 import { mapPgType } from "./introspect-db-types";
-import { arrayStorage, columnStorage, literalDefaultOf, onDeleteOf, primaryKeyStorage } from "./introspect-db-storage";
-import { reconstructSearchBlock } from "./introspect-db-search";
-import { SEARCH_STAMP_PREFIX } from "./search-column";
-import { foreignKeyIndexSpec } from "./collection-index";
+import { printCustomizationModule, type CustomizationValue } from "./introspect-db-customization";
+import { describeTables } from "./introspect-tables";
 import type { CheckFactsByTable } from "./introspect-db-constraints";
 import type { TableClassification } from "./introspect-db-structure";
 import {
@@ -24,8 +23,7 @@ import {
     deriveListProperties,
     deriveSort,
     deriveTitleProperty,
-    isDerivedIndexColumn,
-    isReadOnlyColumn
+    isDerivedIndexColumn
 } from "./introspect-db-structure";
 
 // ── Typed interfaces for SQL query results ────────────────────────────
@@ -169,45 +167,6 @@ export interface SchemaMetadata {
     rowCounts: Record<string, number>;
 }
 
-/**
- * Why a table keyed on several columns is not generated as a collection, or
- * `undefined` when it is.
- *
- * Several `isId` properties are one composite key, and the planner builds that
- * table under the same `PRIMARY KEY (a, b)` — so such a table round-trips when
- * two things hold:
- *
- * - **Every key column can carry `isId`,** which exists on string and number
- *   properties, and on a date property over a `date` column (a calendar day).
- *   Read from the column's SQL type, not a data sample: a
- *   `line_no` holding only 1s is not a boolean. A key with a column of another
- *   type — pagila's `payment` is keyed on a timestamp too — can be marked on
- *   some of its columns only, and those would be read as the whole key.
- * - **Nothing points at it.** A foreign key into it, or a junction, is a link
- *   into a composite key, which the planner refuses: the relation has one
- *   column to point with.
- */
-export function compositeKeySkipReason(meta: TableMeta, allFks: ForeignKeyRow[]): string | undefined {
-    if (meta.pks.length < 2) return undefined;
-    const unmarkable = meta.pks.filter(pk => {
-        const column = meta.columns.find(c => c.column_name === pk);
-        const type = column ? mapPgType(column.data_type) : undefined;
-        return type !== "string" && type !== "number" && !(type === "date" && column?.data_type.toLowerCase() === "date");
-    });
-    if (unmarkable.length > 0) {
-        return `its key column${unmarkable.length > 1 ? "s" : ""} ${unmarkable.map(c => `"${c}"`).join(", ")} ` +
-            `cannot carry \`isId\`, which a string or number property takes, or a date property on a \`date\` column`;
-    }
-    const referencing = [...new Set(allFks
-        .filter(fk => fk.foreign_table_name === meta.name && fk.table_name !== meta.name)
-        .map(fk => fk.table_name))];
-    if (referencing.length > 0) {
-        return `${referencing.map(t => `"${t}"`).join(", ")} point${referencing.length > 1 ? "" : "s"} at it, ` +
-            "and a link cannot point at a composite key";
-    }
-    return undefined;
-}
-
 export interface TableMeta {
     name: string;
     columns: TableColumn[];
@@ -215,107 +174,10 @@ export interface TableMeta {
     fks: ForeignKeyRow[];
 }
 
-// ── Irregular plurals that naive rules can't handle ───────────────────
-
-const IRREGULAR_SINGULARS: Record<string, string> = {
-    people: "person",
-    children: "child",
-    men: "man",
-    women: "woman",
-    mice: "mouse",
-    geese: "goose",
-    teeth: "tooth",
-    feet: "foot",
-    data: "datum",
-    media: "medium",
-    criteria: "criterion",
-    phenomena: "phenomenon"
-};
-
 /**
- * Plurals in "-ves" whose singular really ends in f/fe, and which of the two.
- *
- * A blanket "-ves" -> "-f" rule gets `knives` -> `knif`, and mangles every
- * ordinary "-ive" noun that happens to be plural along with it: `archives` ->
- * `archif`, `objectives` -> `objectif`. The set of English words that genuinely
- * swap f/fe for ves is small and closed, so it is listed rather than guessed —
- * anything else ending in "ves" drops the trailing 's' like any other plural.
- *
- * Matched on the whole word, not on the suffix: `olives` ends in `lives`.
+ * The icon a table's name suggests, for its panel customization: `Database`
+ * when the name suggests none (and then no icon is written).
  */
-const VES_SINGULAR_ENDINGS: Record<string, "f" | "fe"> = {
-    calves: "f", dwarves: "f", elves: "f", halves: "f", hooves: "f",
-    leaves: "f", loaves: "f", scarves: "f", selves: "f", sheaves: "f",
-    shelves: "f", thieves: "f", wharves: "f", wolves: "f",
-    knives: "fe", lives: "fe", wives: "fe"
-};
-
-/** Words ending in 's' that are already singular. */
-const UNCOUNTABLE = new Set([
-    "status", "campus", "virus", "bus", "plus", "census",
-    "diagnosis", "analysis", "basis", "crisis", "thesis",
-    "synopsis", "parenthesis", "hypothesis", "emphasis",
-    "news", "series", "species", "means", "athletics",
-    "economics", "electronics", "mathematics", "physics",
-    "politics", "statistics"
-]);
-
-export function singularize(word: string): string {
-    const lower = word.toLowerCase();
-
-    // Check irregular forms
-    if (IRREGULAR_SINGULARS[lower]) {
-        // Preserve the original casing of the first character
-        const singular = IRREGULAR_SINGULARS[lower];
-        return word[0] === word[0].toUpperCase()
-            ? singular.charAt(0).toUpperCase() + singular.slice(1)
-            : singular;
-    }
-
-    // Check uncountable
-    if (UNCOUNTABLE.has(lower)) return word;
-
-    // Latin/Greek -es endings (diagnosis -> diagnosis is uncountable, but "addresses" -> "address")
-    if (lower.endsWith("ices") && lower.length > 5) {
-        // e.g. "indices" -> "index", "vertices" -> "vertex"
-        return word.slice(0, -4) + "ex";
-    }
-    if (lower.endsWith("ies") && lower.length > 3) {
-        return word.slice(0, -3) + "y";
-    }
-    if (VES_SINGULAR_ENDINGS[lower]) {
-        // e.g. "wolves" -> "wolf", "knives" -> "knife"
-        return word.slice(0, -3) + VES_SINGULAR_ENDINGS[lower];
-    }
-    if (lower.endsWith("ches") || lower.endsWith("shes") || lower.endsWith("sses") || lower.endsWith("xes") || lower.endsWith("zes")) {
-        return word.slice(0, -2);
-    }
-    if (lower.endsWith("ses") && !lower.endsWith("sses")) {
-        // e.g. "responses" -> "response", "databases" -> "database"
-        return word.slice(0, -1);
-    }
-    if (lower.endsWith("s") && !lower.endsWith("ss") && !lower.endsWith("us") && !lower.endsWith("is")) {
-        return word.slice(0, -1);
-    }
-
-    return word;
-}
-
-/**
- * Convert a snake_case table name to a camelCase + "Collection" variable name.
- * e.g. "company_token" -> "companyTokenCollection"
- */
-export function toCollectionVarName(tableName: string): string {
-    const camel = tableName.replace(/_([a-z])/g, (_g, letter: string) => letter.toUpperCase()) + "Collection";
-    // Only reshapes names that are not identifiers already, so every table that
-    // generated a working file keeps the exact variable name it had. A table
-    // called `2024 archive` used to emit `const 2024 archiveCollection`, which
-    // is three syntax errors rather than a declaration.
-    if (JS_IDENTIFIER.test(camel)) return camel;
-    const sanitized = camel.replace(/[^A-Za-z0-9_$]/g, "_");
-    return /^[0-9]/.test(sanitized) ? `_${sanitized}` : sanitized;
-}
-
 export function getIconForTable(tableName: string): string {
     const table = tableName.toLowerCase();
     if (table.includes("user") || table.includes("account") || table.includes("member") || table.includes("customer") || table.includes("client") || table.includes("patient")) return "Users";
@@ -381,9 +243,10 @@ export function buildTablesMap(
  * quantity and discount — because it recognises `id`, `created_at` and
  * `updated_at` by name and calls everything else a foreign key.
  *
- * Still used by `./introspect-runtime`, which builds collections in memory from
- * a narrower set of catalog queries and has no unique-constraint or row-count
- * data to reason with.
+ * Still the runtime's rule (`describeTables(…, { purpose: "serve" })`): what a
+ * backend with no `backend/schema` has always folded away, kept so the set of
+ * tables it serves does not move. Row counts, which `classifyTables` needs,
+ * are not read at boot.
  */
 export function identifyJoinTables(tablesMap: Map<string, TableMeta>): Set<string> {
     const joinTables = new Set<string>();
@@ -650,164 +513,311 @@ export function sortPropertiesOrder(entries: PropertyOrderEntry[]): string[] {
         .map((e) => e.key);
 }
 
-// ── Generate collection file content ──────────────────────────────────
-
-export interface GeneratedFile {
-    tableName: string;
-    fileName: string;
-    content: string;
-}
+// ── Generate backend/schema (and frontend/src/cms) source ─────────────
 
 /**
- * The structural analysis a run can hand the generator.
+ * What one `schema introspect` run hands the generator.
  *
- * Optional in full, and the generator degrades to exactly its previous output
- * without it. That is not politeness towards old callers: three existing test
- * suites and the `rebase init` scaffold path build a `TableMeta` by hand and
- * have no database to read constraints or row counts from, and they must keep
- * producing a valid collection.
+ * Everything but `metadata` is optional, and the generator degrades without
+ * it: no classification is no table roles and no presentation heuristics, no
+ * CHECK facts is no bounds, no samples is no data hints, no `cms` is no
+ * `customizeTable` files.
  */
-/**
- * Which `defineCollection` — if any — the project being generated into can import.
- *
- * A bare `const x: PostgresCollectionConfig = { … }` annotation widens `properties`
- * to `Record<string, …>`, and every key-shaped field in the admin block —
- * `titleProperty`, `sort`, `propertiesOrder`, `listProperties`, `fixedFilter` — is
- * derived from those keys. Annotated, they accept any string: introspection was
- * emitting a `propertiesOrder` array that nothing checked, so renaming a column and
- * re-introspecting left a stale key that compiled silently. `defineCollection` is
- * the identity function whose `const P` type parameter keeps the keys literal, which
- * is what turns that checking on.
- *
- * There are two of them and they are not interchangeable:
- *
- * - `admin-types` — `@rebasepro/cms-types`. Its index side-effect-imports
- *   `augment.ts`, so importing it is also what *declares* the `admin` block. Only a
- *   project that depends on the package can resolve it.
- * - `common` — `@rebasepro/common`. Same key inference, no admin surface, no React
- *   anywhere in its graph (`scripts/headless-guard` lists it as core). This is the
- *   headless flavour.
- * - `annotation` — neither package is declared, so neither import would resolve and
- *   the old annotation is the only honest thing to emit. Projects scaffolded before
- *   `@rebasepro/common` joined the headless config package land here.
- *
- * The last two emit **no admin block, on the collection or on any property**. That is
- * not a downgrade: `@rebasepro/types` declares no `admin` field at all, so the block
- * introspection used to emit was a type error in every headless project it was
- * written into. See `packages/cms-types/src/augment.ts`.
- */
-export type CollectionBuilder = "admin-types" | "common" | "annotation";
-
-/**
- * The package specifiers the generated files name, spelled once.
- *
- * Written as constants rather than inline in the import templates below because
- * `scripts/headless-guard/check-types.mjs` scans core sources for `from
- * "@rebasepro/cms-types"` and cannot tell a real import from one this module
- * *writes*. It is right to be that blunt — the guard's whole value is that it
- * cannot be reasoned around — so the string simply never appears in that shape
- * here. Inlining them back into the templates re-breaks `check:types-headless`.
- */
-export const ADMIN_TYPES_PACKAGE = "@rebasepro/cms-types";
-export const COMMON_PACKAGE = "@rebasepro/common";
-export const TYPES_PACKAGE = "@rebasepro/types";
-
-export interface GenerationContext {
-    metadata?: SchemaMetadata;
+export interface SchemaGenerationInput {
+    metadata: SchemaMetadata;
+    /** Each table's role (`classifyTables`): junctions fold into `manyToMany`, the rest steer the panel. */
     classifications?: Map<string, TableClassification>;
+    /** The CHECK constraints, parsed (`parseCheckConstraints`). */
     checkFacts?: CheckFactsByTable;
+    /** Sampled rows by table (`--data-inference`). */
+    samples?: ReadonlyMap<string, readonly Record<string, unknown>[]>;
+    /** Tables not to generate, which nothing may then point at (a name that is no file name). */
+    leaveOut?: ReadonlySet<string>;
     /**
-     * Defaults to `admin-types`, which is what the generator has always emitted.
-     * The CLI never relies on the default — `introspect-db.ts` detects the flavour
-     * from the target project and passes it. See `detectCollectionBuilder`.
+     * Present when the project has a frontend that imports `@rebasepro/cms`:
+     * the import path from a `frontend/src/cms/<table>.tsx` to the table's
+     * schema module. Absent, no customization is written.
      */
-    builder?: CollectionBuilder;
-    /**
-     * Collects one line per column the planner will not reproduce exactly —
-     * what `rebase db push` would do to it, and how to avoid that when there is
-     * a way. The CLI prints them; the same lines are written at the top of the
-     * generated file.
-     */
-    notes?: string[];
-    /**
-     * Tables this run does not generate a collection for, so nothing may point
-     * at them: a relation whose target file does not exist is an import that
-     * does not resolve.
-     */
-    skippedTables?: ReadonlySet<string>;
+    cms?: { tableImport: (table: string) => string };
+    /** Where the builders are imported from. `@rebasepro/server/schema` when omitted. */
+    specifier?: string;
 }
 
 /**
- * The table's row-level security policies, as the collection's `securityRules`.
- *
- * A table's policies are its access model, and a collection that describes
- * none leaves every one of them an "orphan": `doctor` fails on it, every push
- * warns about it, and a push drops one whose name has the shape an unnamed
- * rule compiles to (`<table>_<op>_<hash>`, which is every rule on a database
- * Rebase built). Described here, each is recreated from its rule as it was.
- *
- * Read back with `policyToSecurityRule` — what Studio's "Import from table"
- * and "Import to codebase" use — so the `TO` list, the mode and both clauses
- * come back as they are. The framework's own defaults
- * (`<table>_default_admin_read` and friends) are left out when the collection
- * keeps them (see {@link ownsItsAccess}): it is given them anyway, and
- * described twice they would be written twice.
+ * The source written for one table.
  */
-function renderSecurityRules(tableName: string, policies: readonly PolicyRow[], keepsBaseline: boolean): string {
-    const injected = keepsBaseline ? adminBaselineNames(tableName) : new Set<string>();
-    const own = policies.filter((policy) => policy.table_name === tableName && !injected.has(policy.policy_name));
-    if (own.length === 0) return "";
+export interface GeneratedTable {
+    table: string;
+    /** What `backend/schema/<table>.ts` exports, and `index.ts` re-exports. */
+    identifier: string;
+    /** `backend/schema/<table>.ts`. */
+    schemaModule: string;
+    /** `frontend/src/cms/<table>.tsx`, when a presentation heuristic fired and the project has a frontend. */
+    customization?: string;
+    /** What `rebase db push` would not reproduce exactly, each also at the top of the module. */
+    notes: string[];
+}
 
-    const rules = own.map((policy) => {
-        const rule = policyToSecurityRule({
-            policyname: policy.policy_name,
-            cmd: toPolicyCommand(policy.cmd),
-            permissive: policy.permissive.toUpperCase() === "RESTRICTIVE" ? "RESTRICTIVE" : "PERMISSIVE",
-            roles: policy.roles,
-            qual: policy.qual,
-            with_check: policy.with_check
+/**
+ * What {@link generateSchemaModules} returns.
+ */
+export interface SchemaGeneration {
+    tables: GeneratedTable[];
+    /** Tables whose descriptor could not be printed, each with why. */
+    failed: { table: string; reason: string }[];
+    /** The generated tables whose row-level security is off: the first push switches it on. */
+    rlsOff: string[];
+}
+
+/** The `PropertyOrderingContext` property type of a column type. */
+function orderingType(type: ColumnType): string {
+    switch (type.kind) {
+        case "smallint": case "integer": case "bigint": case "smallserial": case "serial": case "bigserial":
+        case "real": case "doublePrecision": case "numeric":
+            return "number";
+        case "timestamptz": case "date": case "time": return "date";
+        case "json": case "jsonb": return "map";
+        case "array": return "array";
+        case "boolean": return "boolean";
+        case "vector": return "vector";
+        case "bytea": return "binary";
+        default: return "string";
+    }
+}
+
+/** A `CustomizationValue` object, built up key by key. */
+type FieldOptions = Record<string, CustomizationValue>;
+
+/**
+ * The panel options a table's structure and names suggest — what the
+ * generator used to write into the collection's `admin` block — or
+ * `undefined` when none fired (an icon of its own, a role, a title, a board, a
+ * sort, a capped list, an option on a field).
+ */
+function customizationOf(
+    descriptor: TableDescriptor,
+    meta: TableMeta,
+    input: SchemaGenerationInput,
+    enumMap: Map<string, string[]>,
+    fieldHints: ReadonlyMap<string, FieldOptions>
+): { options: Record<string, CustomizationValue>; comments: string[] } | undefined {
+    const table = descriptor.table;
+    const classification = input.classifications?.get(table);
+    const options: Record<string, CustomizationValue> = {};
+    const comments: string[] = [];
+    const keyOf = new Map(descriptor.columns.map(column => [column.column, column.key]));
+    const relationOf = new Map(descriptor.relations
+        .filter(relation => relation.kind === "belongsTo")
+        .map(relation => [relation.kind === "belongsTo" ? relation.localKey : "", relation.name]));
+
+    const icon = getIconForTable(table);
+    if (icon !== "Database") options.icon = icon;
+    if (classification?.role === "owned-child") options.hideFromNavigation = true;
+    if (classification?.role === "lookup") options.group = "Reference";
+
+    // Field options, by column key, from the column's name and kind.
+    const fields: Record<string, FieldOptions> = {};
+    const hidden = new Set<string>();
+    for (const column of descriptor.columns) {
+        const col = meta.columns.find(candidate => candidate.column_name === column.column);
+        if (!col || column.foreignKeyOf !== undefined) continue;
+        const name = column.column.toLowerCase();
+        const field: FieldOptions = {};
+        if (column.stamp?.value === "now") {
+            field.readOnly = true;
+            if (name === "created_at" || name === "createdat" || name === "updated_at" || name === "updatedat") {
+                field.hidden = true;
+                hidden.add(column.key);
+            }
+        } else if (isDerivedIndexColumn(col)) {
+            field.hidden = true;
+            hidden.add(column.key);
+        } else if ((column.type.kind === "text" || column.type.kind === "varchar") && column.validate?.url !== true && !column.primaryKey) {
+            if (name === "content" || name === "body") {
+                field.multiline = true;
+                field.markdown = true;
+            } else if (column.type.kind === "text" || name === "description" || name === "summary" || name === "excerpt") {
+                field.multiline = true;
+            }
+        }
+        Object.assign(field, fieldHints.get(column.key) ?? {});
+        if (Object.keys(field).length > 0) fields[column.key] = field;
+    }
+
+    // The order fields are listed in, by the same priority the generator has
+    // always used; a link is placed where its relation is.
+    const entries: PropertyOrderEntry[] = [];
+    descriptor.columns.forEach((column, index) => {
+        const col = meta.columns.find(candidate => candidate.column_name === column.column);
+        const relation = relationOf.get(column.column);
+        const isPk = column.primaryKey === true;
+        entries.push({
+            key: relation !== undefined && !isPk ? relation : column.key,
+            ctx: {
+                propType: relation !== undefined && !isPk ? "relation" : orderingType(column.type),
+                isPk,
+                isEnum: column.type.kind === "enum",
+                isStorage: false,
+                pgDataType: col?.data_type ?? "",
+                originalIndex: index
+            }
         });
-        const fields = Object.entries(rule).map(([key, value]) => {
-            const rendered = Array.isArray(value)
-                ? `[${value.map((item) => quote(String(item))).join(", ")}]`
-                : quote(String(value));
-            return `            ${key}: ${rendered}`;
-        });
-        return `\n        {\n${fields.join(",\n")}\n        },`;
     });
-    return "\n    // The table's row-level security policies, read from the database. `rebase db push`" +
-        "\n    // recreates each from its rule, so a policy is changed here from now on." +
-        `\n    securityRules: [${rules.join("")}\n    ],`;
+    const defaultOrder = entries.map(entry => entry.key);
+    const order = sortPropertiesOrder(entries);
+
+    if (classification && input.metadata) {
+        const facts = buildColumnFacts(meta, input.metadata, enumMap, input.checkFacts ?? new Map());
+        const asKey = (column: string): string => keyOf.get(column) ?? toWireKey(column);
+        const title = deriveTitleProperty(facts);
+        if (title) options.display = { title: asKey(title) };
+        const kanban = deriveKanbanProperty(facts);
+        const orderField = kanban ? deriveKanbanOrderProperty(facts) : undefined;
+        if (kanban && orderField) options.kanban = { columnField: asKey(kanban), orderField: asKey(orderField) };
+        else if (kanban) {
+            comments.push(
+                `A board over "${asKey(kanban)}" fits this table, but a board needs a text column to keep each card's order in. ` +
+                `Add one, then declare kanban: { columnField: "${asKey(kanban)}", orderField: "<that column>" }.`
+            );
+        }
+        const sort = deriveSort(facts);
+        if (sort) options.sort = [asKey(sort[0]), "desc"];
+        const listFields = deriveListProperties(order, hidden);
+        if (listFields) options.listFields = listFields;
+    }
+    if (Object.keys(fields).length > 0) options.fields = fields;
+    if (Object.keys(options).length === 0 && comments.length === 0) return undefined;
+    if (order.join("\n") !== defaultOrder.join("\n")) options.fieldOrder = order;
+    return { options, comments };
 }
 
-/** The policies every collection is given unless it opts out: `<table>_default_admin_read` and friends. */
-const adminBaselineNames = (tableName: string): Set<string> =>
-    getGeneratedPolicyNames({ name: tableName, slug: tableName, table: tableName, properties: {} });
+/** The comment a table whose row-level security is off opens with. */
+function rlsOffComment(table: TableRow | undefined): string[] {
+    if (table?.rls_enabled !== false) return [];
+    return [
+        "⚠ Row-level security is off on this table, so every request reaches every row. `rebase db push`",
+        "switches it on: from then on the server and admins reach its rows, and anyone else what `rls` grants."
+    ];
+}
+
+/** Comment lines, safe after `//`. */
+const commentLines = (lines: readonly string[]): string =>
+    lines.map(line => `// ${line.replace(/\s*[\r\n]+\s*/g, " ")}`.trimEnd()).join("\n");
 
 /**
- * Whether a table's access is its own, so that its collection must opt out of
- * the admin baseline: row-level security on, and not every baseline policy
- * there.
+ * The source `rebase schema introspect` writes for a database: one
+ * `backend/schema/<table>.ts` per table through the one table printer
+ * (`printTableModule`), and a `frontend/src/cms/<table>.tsx` beside a table
+ * whose structure suggested how the panel should show it.
  *
- * Every collection is given the baseline (`<table>_default_admin_read`,
- * `_write_insert`, `_update`, `_delete`), permissive policies that let the
- * server and the `admin` role read and write every row. On a table whose
- * policies grant no such thing, the push after an introspection created them,
- * and an admin who had read no row of `orders` read them all. With
- * `disableDefaultPolicies: true` the push writes the table's own policies and
- * nothing else; a table that does hold the baseline (one Rebase built) keeps
- * it as it is.
- *
- * A table with RLS off keeps the baseline: the push switches RLS on whatever
- * the collection says, and that table had no policy narrowing anyone to begin
- * with. {@link describeRlsOffTables} says so. `undefined` RLS — a caller that did not
- * read it — is decided by the policies alone.
+ * The tables are described with `describeTables(…, { purpose: "generate" })`:
+ * columns as their Postgres types, foreign keys as `belongsTo` with the column
+ * declared, the reverse `hasMany`, a junction as `manyToMany`, the policies as
+ * `rls` (or `"admin-only"` when the table holds only the admin baseline). Pure.
  */
-function ownsItsAccess(tableName: string, table: TableRow | undefined, policies: readonly PolicyRow[] | undefined): boolean {
-    if (!policies || table?.rls_enabled === false) return false;
-    const present = new Set(policies.filter((policy) => policy.table_name === tableName).map((policy) => policy.policy_name));
-    if (table?.rls_enabled !== true && present.size === 0) return false;
-    return ![...adminBaselineNames(tableName)].every((name) => present.has(name));
+export function generateSchemaModules(input: SchemaGenerationInput): SchemaGeneration {
+    const { metadata } = input;
+    const tablesMap = buildTablesMap(metadata.tables, metadata.columns, metadata.pks, metadata.fks);
+    const enumMap = buildEnumMap(metadata.enumValues);
+    const joinTables = input.classifications
+        ? new Set([...input.classifications.values()].filter(c => c.role === "junction").map(c => c.table))
+        : identifyJoinTables(tablesMap);
+    // A table with no primary key cannot be declared: a row is addressed by
+    // its key in every URL, filter and foreign key.
+    const keyless = [...tablesMap.values()].filter(meta => meta.pks.length === 0 && !joinTables.has(meta.name) && !(input.leaveOut?.has(meta.name) ?? false));
+    const described = describeTables(metadata, {
+        purpose: "generate",
+        joinTables,
+        leaveOut: new Set([...(input.leaveOut ?? []), ...keyless.map(meta => meta.name)]),
+        checkFacts: input.checkFacts
+    });
+    const bySlug = new Map(described.tables.map(table => [table.slug, table]));
+    const resolveTarget = (target: { name?: string; slug: string }) => {
+        const found = bySlug.get(target.slug);
+        return { identifier: tableIdentifier(target.slug), importPath: `./${target.slug}`, ...(found ? { table: found.table, kind: found.kind } : {}) };
+    };
+
+    const out: SchemaGeneration = {
+        tables: [],
+        failed: keyless.map(meta => ({
+            table: meta.name,
+            reason: "it has no primary key, and a table is declared with the column (or columns) that identify a row. Add one (`ALTER TABLE … ADD PRIMARY KEY (…)`) and introspect again."
+        })),
+        rlsOff: []
+    };
+    for (const descriptor of described.tables) {
+        const meta = tablesMap.get(descriptor.table);
+        if (!meta) continue;
+        const notes = [...(described.notes.get(descriptor.table) ?? [])];
+
+        // What the rows and the names add to each column.
+        const rows = input.samples?.get(descriptor.table);
+        const fieldHints = new Map<string, FieldOptions>();
+        const columns = descriptor.columns.map(column => {
+            const hints = rows ? inferColumnHints(column.column, column.type, rows.map(row => row[column.column])) : {};
+            if (hints.field) fieldHints.set(column.key, { ...hints.field });
+            let validate = hints.validate;
+            const name = column.column.toLowerCase();
+            const text = column.type.kind === "text" || column.type.kind === "varchar" || column.type.kind === "char";
+            if (!validate && !rows && text && column.foreignKeyOf === undefined && /_(url|uri|link)$/.test(name)) validate = { url: true };
+            return validate ? { ...column, validate: { ...column.validate, ...validate } } : column;
+        });
+        const table: TableDescriptor = { ...descriptor, columns };
+
+        let schemaModule: string;
+        try {
+            schemaModule = printTableModule(table, { resolveTarget, ...(input.specifier ? { specifier: input.specifier } : {}) });
+        } catch (error) {
+            out.failed.push({ table: descriptor.table, reason: error instanceof Error ? error.message : String(error) });
+            continue;
+        }
+        const row = metadata.tables.find(candidate => candidate.table_name === descriptor.table);
+        if (row?.rls_enabled === false) out.rlsOff.push(descriptor.table);
+        const classification = input.classifications?.get(descriptor.table);
+        const header = [
+            ...(classification && classification.role !== "entity"
+                ? [`Introspected as ${/^[aeiou]/.test(classification.role) ? "an" : "a"} ${classification.role}: ${classification.reason}.`]
+                : []),
+            ...(notes.length > 0 ? ["⚠ Not reproduced exactly by `rebase db push` — read before pushing:", ...notes.map(note => `  - ${note}`)] : []),
+            ...rlsOffComment(row)
+        ];
+        if (header.length > 0) {
+            const split = schemaModule.indexOf("\n\nexport const ");
+            schemaModule = `${schemaModule.slice(0, split)}\n\n${commentLines(header)}${schemaModule.slice(split + 1)}`;
+        }
+
+        const identifier = tableIdentifier(descriptor.slug);
+        let customization: string | undefined;
+        if (input.cms) {
+            const options = customizationOf(table, meta, input, enumMap, fieldHints);
+            if (options) {
+                customization = printCustomizationModule({
+                    slug: descriptor.slug,
+                    tableIdentifier: identifier,
+                    tableImport: input.cms.tableImport(descriptor.table),
+                    options: options.options,
+                    comments: options.comments
+                });
+            }
+        }
+        out.tables.push({ table: descriptor.table, identifier, schemaModule, notes, ...(customization ? { customization } : {}) });
+    }
+    return out;
+}
+
+/**
+ * `backend/schema/index.ts` with an export line added for each table it does
+ * not export yet — what a run without `--force` does to an index that exists.
+ */
+export function mergeIndexModule(existing: string, tables: readonly { identifier: string; importPath: string }[]): string {
+    const exported = new Set([...existing.matchAll(/from\s+["']\.\/([^"']+)["']/g)].map(match => match[1]));
+    const missing = tables.filter(table => !exported.has(table.importPath.replace(/^\.\//, "")));
+    if (missing.length === 0) return existing;
+    const lines = printIndexModule(missing).trimEnd().split("\n");
+    const lastExport = [...existing.matchAll(/^export \{[^}]*\} from [^\n]*$/gm)].pop();
+    if (!lastExport || lastExport.index === undefined) return `${lines.join("\n")}\n${existing.startsWith("\n") ? "" : "\n"}${existing}`;
+    const at = lastExport.index + lastExport[0].length;
+    return `${existing.slice(0, at)}\n${lines.join("\n")}${existing.slice(at)}`;
 }
 
 /**
@@ -819,1005 +829,7 @@ export function describeRlsOffTables(tableNames: readonly string[]): string | un
     return `${tableNames.length} table(s) have row-level security off, so every request reaches every row: ` +
         `${[...tableNames].sort().join(", ")}.\n` +
         "`rebase db push` switches it on: from then on the server and admins reach their rows, and anyone else " +
-        "what each collection's securityRules grant.";
-}
-
-/** The comment a collection whose table has row-level security off opens with. */
-function rlsOffComment(table: TableRow | undefined): string {
-    if (table?.rls_enabled !== false) return "";
-    return "\n// ⚠ Row-level security is off on this table, so every request reaches every row. `rebase db push`" +
-        "\n// switches it on: from then on the server and admins reach its rows, and anyone else what" +
-        "\n// securityRules grant.\n";
-}
-
-/** `pg_policies.cmd`, narrowed to the commands a policy can have. */
-function toPolicyCommand(cmd: string): "SELECT" | "INSERT" | "UPDATE" | "DELETE" | "ALL" | undefined {
-    switch (cmd.toUpperCase()) {
-        case "SELECT": return "SELECT";
-        case "INSERT": return "INSERT";
-        case "UPDATE": return "UPDATE";
-        case "DELETE": return "DELETE";
-        case "ALL": return "ALL";
-        default: return undefined;
-    }
-}
-
-/** Adds entries to a property's `validation` block, creating it if absent. */
-function withValidation(extra: string, entries: string[]): string {
-    if (entries.length === 0) return extra;
-    const block = entries.map((e) => `                ${e}`).join(",\n");
-    if (extra.includes("validation: {")) {
-        return extra.replace("validation: {", `validation: {\n${block},`);
-    }
-    return `${extra}\n            validation: {\n${block}\n            },`;
-}
-
-/**
- * Whether a property's generated text already sets `key:` as an object key.
- *
- * A bare `extra.includes("min:")` looks like it answers this and does not:
- * `admin:` ends in `min:`, so every property with an admin block claimed to
- * have a minimum already and silently lost the one the database declared. The
- * leading-delimiter requirement is the whole point — a key is preceded by a
- * newline, a brace or a comma, never by another identifier character.
- */
-function hasGeneratedKey(extra: string, key: string): boolean {
-    return new RegExp(`(^|[\\s{,])${key}\\s*:`).test(extra);
-}
-
-/**
- * Adds entries to a property's `admin` block, creating it if absent.
- *
- * `emitAdmin` is false for the headless flavours, where `BaseProperty` has no
- * `admin` field to put them in — see {@link CollectionBuilder}. The options are
- * dropped rather than relocated: every one of them (`readOnly`, `multiline`,
- * `hideFromCollection`, `urlPreview`) describes a form widget, and there is no
- * form.
- */
-function withAdminOptions(extra: string, entries: string[], emitAdmin = true): string {
-    if (!emitAdmin) return extra;
-    if (entries.length === 0) return extra;
-    const block = entries.map((e) => `                ${e}`).join(",\n");
-    if (extra.includes("admin: {")) {
-        return extra.replace("admin: {", `admin: {\n${block},`);
-    }
-    return `${extra}\n            admin: {\n${block}\n            },`;
-}
-
-/** A SQL string literal. */
-const quoteSqlString = (value: string): string => `'${value.replace(/'/g, "''")}'`;
-
-/** A TypeScript string literal, escaped. */
-function quote(value: string): string {
-    return JSON.stringify(value);
-}
-
-const JS_IDENTIFIER = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
-
-/**
- * An object key for the generated file: verbatim when the name is a JavaScript
- * identifier, quoted otherwise.
- *
- * Postgres constrains an identifier only by quoting, so `order`, `full name`
- * and `2fa_enabled` are all ordinary column names — and all three produced a
- * file that did not parse when written as a bare key.
- *
- * Still needed now that keys are camel-cased rather than copied from the
- * column: `toWireKey` splits on separators and joins, which fixes `full name`
- * but cannot fix a name that is not an identifier for some other reason —
- * `2fa_enabled` becomes `2faEnabled`, still leading with a digit, and `order`
- * was never a separator problem at all.
- */
-function propKey(name: string): string {
-    return JS_IDENTIFIER.test(name) ? name : quote(name);
-}
-
-/**
- * Text safe to put after `//`.
- *
- * A table comment or a classification reason is free text out of the database.
- * A newline in one ended the comment and let the rest of the value continue as
- * code.
- */
-function commentText(value: string): string {
-    return value.replace(/\s*[\r\n]+\s*/g, " ");
-}
-
-/** A property-key array, one key per line, indented for the admin block. */
-function formatKeyList(keys: string[]): string {
-    if (keys.length === 0) return "[]";
-    return `[\n${keys.map((k) => `            ${quote(k)}`).join(",\n")}\n        ]`;
-}
-
-/**
- * Generate the full TypeScript file content for a single collection.
- * Pure function — no I/O.
- */
-export function generateCollectionFile(
-    tableName: string,
-    meta: TableMeta,
-    allFks: ForeignKeyRow[],
-    joinTables: Set<string>,
-    tablesMap: Map<string, TableMeta>,
-    enumMap: Map<string, string[]>,
-    sampleData?: Record<string, unknown>[],
-    context: GenerationContext = {}
-): string {
-    const collectionName = humanize(tableName);
-    const singular = singularize(collectionName);
-    const icon = getIconForTable(tableName);
-
-    const classification = context.classifications?.get(tableName);
-    const checkFacts: CheckFactsByTable = context.checkFacts ?? new Map();
-    const tableChecks = checkFacts.get(tableName);
-    const columnComments = new Map<string, string>();
-    let tableComment: string | undefined;
-    for (const comment of context.metadata?.comments ?? []) {
-        if (comment.table_name !== tableName) continue;
-        if (comment.column_name === null) tableComment = comment.comment;
-        else columnComments.set(comment.column_name, comment.comment);
-    }
-    const singleColumnUniques = new Set(
-        (context.metadata?.uniques ?? [])
-            .filter((u) => u.table_name === tableName && u.column_names.length === 1)
-            .map((u) => u.column_names[0])
-    );
-
-    const builder: CollectionBuilder = context.builder ?? "admin-types";
-    /** Whether the target project has an `admin` field to write into at all. */
-    const emitAdmin = builder === "admin-types";
-
-    const BUILDER_IMPORT: Record<CollectionBuilder, string> = {
-        "admin-types": `import { defineCollection } from ${quote(ADMIN_TYPES_PACKAGE)};`,
-        common: `import { defineCollection } from ${quote(COMMON_PACKAGE)};`,
-        annotation: `import { PostgresCollectionConfig } from ${quote(TYPES_PACKAGE)};`
-    };
-    const imports = new Set<string>([BUILDER_IMPORT[builder]]);
-
-    /**
-     * Imports the collection a relation points at — unless it is this one.
-     *
-     * A self-referencing key (`employees.reports_to -> employees`, which both
-     * northwind and chinook have) otherwise made the file import its own default
-     * export under the name it declares three lines later: `TS2440: Import
-     * declaration conflicts with local declaration`. The relation target is a
-     * thunk, so referring to the local const directly is fine — it is only
-     * dereferenced after the module has finished evaluating.
-     */
-    const importCollection = (otherTable: string): string => {
-        const varName = toCollectionVarName(otherTable);
-        if (otherTable !== tableName) imports.add(`import ${varName} from ${quote(`./${otherTable}`)};`);
-        return varName;
-    };
-
-    /**
-     * A relation's `target` thunk, with its return type spelled out.
-     *
-     * The annotation is what makes `defineCollection` survive a relational schema.
-     * Without an explicit type on the const, the collection's type is *inferred*,
-     * and a relation cycle — `posts` belongs to `authors`, `authors` has many
-     * `posts`; or `employees.reports_to -> employees`, which northwind, chinook and
-     * musicbrainz all have — makes that inference circular: `TS7022: implicitly has
-     * type 'any' because it is referenced directly or indirectly in its own
-     * initializer`, plus `TS7023` on the thunk and `TS2303` on the import alias.
-     * Naming the return type lets the checker type the thunk without resolving the
-     * collection it points at, which breaks the cycle. Nothing else is given up:
-     * the inference that matters runs over `properties`, not over `relations`.
-     *
-     * The annotated flavour has no cycle to break — its const is already typed — so
-     * it keeps the plainer thunk it has always emitted.
-     */
-    const relationTarget = (targetVarName: string): string => {
-        if (builder === "annotation") return `() => ${targetVarName}`;
-        imports.add(`import type { AnyCollectionConfig } from ${quote(TYPES_PACKAGE)};`);
-        return `(): AnyCollectionConfig => ${targetVarName}`;
-    };
-
-    let propsOutput = "";
-    let relationsOutput = "";
-    /** What the planner will not reproduce exactly, column by column. */
-    const fileNotes: string[] = [];
-    const skippedTables = context.skippedTables ?? new Set<string>();
-    const orderEntries: PropertyOrderEntry[] = [];
-    const propertyBlocks = new Map<string, string>();
-    /**
-     * Column → the property key it was generated under.
-     *
-     * Needed because the structural helpers below (`deriveTitleProperty`,
-     * `deriveKanbanProperty`, `deriveSort`) answer in *columns* — they read
-     * `pg_attribute` — while `display.title`, `kanban.columnProperty` and
-     * `sort` name **properties**. The two used to be the same string, so
-     * nothing carried the translation; now `full_name` is generated as
-     * `fullName` and a title pointing at `full_name` points at nothing.
-     */
-    const keyByColumn = new Map<string, string>();
-    /** Properties the list view will not render, so `listProperties` skips them. */
-    const hiddenFromCollection = new Set<string>();
-    let columnIndex = 0;
-
-    // Detect composite primary keys
-    const isCompositePk = meta.pks.length > 1;
-
-    /**
-     * The property type a column is generated as, with what the data sample
-     * adds to it. A column of a composite key keeps its SQL type's reading:
-     * it carries `isId`, which only a string or number property takes, and a
-     * key column holding only 1s and 0s is still a key, not a boolean.
-     */
-    const propertyTypeOf = (col: TableColumn): { propType: string; finalPropType: string; inferenceExtra: string } => {
-        const isEnumColumn = col.data_type === "USER-DEFINED" && enumMap.get(col.udt_name) !== undefined;
-        const propType = isEnumColumn ? "string" : (col.udt_name === "vector" ? "vector" : mapPgType(col.data_type));
-        if (isEnumColumn || !sampleData || sampleData.length === 0 || (isCompositePk && meta.pks.includes(col.column_name))) {
-            return { propType, finalPropType: propType, inferenceExtra: "" };
-        }
-        const values = sampleData.map(r => r[col.column_name]);
-        const inferred = inferPropertyFromData(col.column_name, col.data_type, propType, values, meta.pks.includes(col.column_name), emitAdmin);
-        return { propType, finalPropType: inferred.propType || propType, inferenceExtra: inferred.extra || "" };
-    };
-
-    // A composite key is marked on every one of its columns or on none of them:
-    // marked on some, the marked columns would be read as the whole key and
-    // address the wrong rows. `isId` exists on string and number properties,
-    // and on a date property over a `date` column; a key with a column of any
-    // other type — pagila's `payment` is keyed
-    // on a timestamp as well — stays unmarked; `rebase schema introspect` does
-    // not generate that table at all (`compositeKeySkipReason`), since the
-    // planner would key it on an implicit `id` instead.
-    const compositeKeyMarkable = isCompositePk && meta.pks.every(pk => {
-        const keyColumn = meta.columns.find(c => c.column_name === pk);
-        if (!keyColumn) return false;
-        const { finalPropType } = propertyTypeOf(keyColumn);
-        return finalPropType === "string" || finalPropType === "number"
-            || (finalPropType === "date" && keyColumn.data_type.toLowerCase() === "date");
-    });
-
-    // Map columns
-    for (const col of meta.columns) {
-        // A Rebase search column is the collection's `search` block, not a
-        // property — read back below. As a property it planned a `text`
-        // column, and the first push dropped the generated expression.
-        if (col.is_generated === "ALWAYS" && (columnComments.get(col.column_name) ?? "").startsWith(SEARCH_STAMP_PREFIX)) {
-            continue;
-        }
-
-        // Skip foreign keys since we handle them as relations
-        // Exception: Do not skip if it's part of the primary key!
-        if (meta.fks.some((fk) => fk.column_name === col.column_name) && !meta.pks.includes(col.column_name)) continue;
-
-        const currentIndex = columnIndex++;
-
-        // The key this column is generated under — its *wire* name, which is
-        // not its column name. `columnName` below carries the column, so the
-        // two never have to agree and the API stops carrying `user_id` next to
-        // `displayName`.
-        //
-        // Camel-casing makes collisions possible where none existed: `user_id`
-        // and `userId` are two columns and one key, which is a duplicate key in
-        // an object literal — a TypeScript error that stops the whole generated
-        // collection compiling. Resolved the same way the foreign-key loop
-        // below resolves its own: first free candidate, then a numbered tail,
-        // so no column is ever dropped. The raw column name is the second
-        // candidate, so the loser of a collision still gets a name that means
-        // something. Deterministic for a given database: the columns arrive in
-        // ordinal order, so the same schema always yields the same keys.
-        const propertyKey = firstFreeKey([toWireKey(col.column_name), col.column_name], propertyBlocks);
-        keyByColumn.set(col.column_name, propertyKey);
-
-        // Check if this column uses a PostgreSQL enum type
-        const colEnumValues = enumMap.get(col.udt_name);
-        const isEnumColumn = col.data_type === "USER-DEFINED" && colEnumValues !== undefined;
-
-        let extra = "";
-
-        const colNameLower = col.column_name.toLowerCase();
-
-        // ── Data Inference Engine ────────────────────────────────────────────
-        const { propType, finalPropType, inferenceExtra } = propertyTypeOf(col);
-
-        const columnChecks = tableChecks?.get(col.column_name);
-
-        // Enum values — generate real enum from the PG enum
-        if (isEnumColumn && colEnumValues) {
-            const enumEntries = colEnumValues
-                .map((v) => `{ id: ${quote(v)}, label: ${quote(humanize(v))} }`)
-                .join(", ");
-            extra += `\n            enum: [${enumEntries}],`;
-        } else if (columnChecks?.enumValues && !inferenceExtra.includes("enum:") && propType === "string") {
-            // `CHECK (col IN (…))` is the other way a schema declares a closed
-            // set. It is the same statement as a Postgres enum type, made by an
-            // author who did not want a type — and until now the form offered a
-            // free-text box for it and let the database reject the write.
-            const enumEntries = columnChecks.enumValues
-                .map((v) => `{ id: ${quote(v)}, label: ${quote(humanize(v))} }`)
-                .join(", ");
-            extra += `\n            enum: [${enumEntries}],`;
-            // A string `enum` is a Postgres enum type, and this column is text
-            // with a CHECK. A push would plan that conversion and Postgres
-            // refuses to cast it implicitly — so say what makes the two agree.
-            const enumType = toPostgresIdentifier(`${tableName}_${col.column_name}`);
-            const labels = columnChecks.enumValues.map((v) => `'${v.replace(/'/g, "''")}'`).join(", ");
-            const check = (context.metadata?.checks ?? [])
-                .find((c) => c.table_name === tableName && c.definition.includes(col.column_name));
-            const table = `"${tableName}"`;
-            const column = `"${col.column_name}"`;
-            const restoreDefault = literalDefaultOf(col, "string");
-            fileNotes.push(
-                `"${col.column_name}" is text with CHECK (… IN …), declared here as an \`enum\`, which Rebase stores ` +
-                `as the enum type "${enumType}". Convert the column before pushing: CREATE TYPE "${enumType}" AS ENUM (${labels}); ` +
-                `ALTER TABLE ${table} ${check ? `DROP CONSTRAINT "${check.constraint_name}", ` : ""}ALTER COLUMN ${column} DROP DEFAULT, ` +
-                `ALTER COLUMN ${column} TYPE "${enumType}" USING ${column}::"${enumType}"` +
-                (restoreDefault && "source" in restoreDefault ? `, ALTER COLUMN ${column} SET DEFAULT ${quoteSqlString(JSON.parse(restoreDefault.source) as string)}` : "") +
-                "; — or delete the `enum` to keep the column as it is."
-            );
-        }
-
-        // Date auto-value heuristics
-        if (finalPropType === "date") {
-            if (colNameLower === "created_at" || colNameLower === "createdat") {
-                extra += "\n            autoValue: \"on_create\",";
-                extra = withAdminOptions(extra, ["readOnly: true", "hideFromCollection: true"], emitAdmin);
-                hiddenFromCollection.add(propertyKey);
-            } else if (colNameLower === "updated_at" || colNameLower === "updatedat") {
-                extra += "\n            autoValue: \"on_update\",";
-                extra = withAdminOptions(extra, ["readOnly: true", "hideFromCollection: true"], emitAdmin);
-                hiddenFromCollection.add(propertyKey);
-            } else if (col.column_default && (col.column_default.includes("now()") || col.column_default.includes("CURRENT_TIMESTAMP"))) {
-                extra += "\n            autoValue: \"on_create\",";
-                extra = withAdminOptions(extra, ["readOnly: true"], emitAdmin);
-            }
-        }
-
-        // Array/Map heuristics (Fallback if not inferred)
-        if (finalPropType === "array" && !inferenceExtra.includes("of: {")) {
-            // Only the four element types the planner stores natively. Reading
-            // `bigint[]` as `integer[]` and `varchar[]` as `text[]` — what this
-            // did — planned a type change on the first push.
-            const stored = arrayStorage(col);
-            if (stored.columnType) {
-                extra += `\n            columnType: ${quote(stored.columnType)},`;
-            }
-            if (stored.note) fileNotes.push(stored.note);
-            extra += `\n            of: { name: ${quote(`${humanize(col.column_name)} Item`)}, type: ${quote(stored.innerType)} },`;
-        } else if (finalPropType === "map" && !inferenceExtra.includes("keyValue: true") && !inferenceExtra.includes("properties: {")) {
-            extra += "\n            keyValue: true,";
-        }
-
-        // String sub-type heuristics (Fallback if not handled by inference or enum)
-        if (finalPropType === "string" && !isEnumColumn && !inferenceExtra) {
-            const isUrl = colNameLower.endsWith("_url") || colNameLower.endsWith("_uri") || colNameLower.endsWith("_link");
-            const isMedia = colNameLower.includes("image") || colNameLower.includes("avatar") || colNameLower.includes("photo") || colNameLower.includes("logo") || colNameLower.includes("cover");
-
-            if (isMedia) {
-                extra += `\n            storage: {\n                storagePath: ${quote(`${tableName}/${col.column_name}`)}\n            },`;
-            } else if (isUrl) {
-                extra += "\n            url: true,";
-            } else if (colNameLower === "description" || colNameLower === "summary" || colNameLower === "excerpt") {
-                extra = withAdminOptions(extra, ["multiline: true"], emitAdmin);
-            } else if (colNameLower === "content" || colNameLower === "body") {
-                // Inside `admin`, because that is where both options live. At the
-                // top of the property — where these were — the generated file
-                // does not compile: `StringProperty` declares neither. Six of
-                // OpenStreetMap's tables have a `body` column, which is how this
-                // surfaced.
-                extra = withAdminOptions(extra, ["multiline: true", "markdown: true"], emitAdmin);
-            } else if (col.data_type === "text") {
-                extra = withAdminOptions(extra, ["multiline: true"], emitAdmin);
-            }
-        }
-
-        // Append inference results
-        if (inferenceExtra) {
-            extra += inferenceExtra;
-            if (!extra.endsWith(",")) extra += ",";
-        }
-
-        // ── What the planner needs to build this same column ─────────────────
-        // A key's storage is decided with its `isId`, below; a composite key's
-        // columns are not generated as a collection at all.
-        const isPkColumn = meta.pks.includes(col.column_name);
-        if (!isPkColumn && !isReadOnlyColumn(col)) {
-            const enumTypeName = toPostgresIdentifier(`${tableName}_${col.column_name}`);
-            const enumTypeShared = isEnumColumn && (context.metadata?.columns ?? meta.columns)
-                .filter((other) => other.udt_name === col.udt_name && other.data_type === "USER-DEFINED").length > 1;
-            const stored = finalPropType === "array"
-                ? { keys: [] as string[] }
-                : columnStorage(col, finalPropType, { isEnumColumn, enumTypeName, enumTypeShared });
-            for (const key of stored.keys) {
-                const name = key.slice(0, key.indexOf(":"));
-                if (!hasGeneratedKey(extra, name) && !hasGeneratedKey(inferenceExtra, name)) extra += `\n            ${key},`;
-            }
-            if (stored.note) fileNotes.push(stored.note);
-
-            // A literal DEFAULT the database holds. Leaving it out planned
-            // `DROP DEFAULT` on the first push.
-            if (!hasGeneratedKey(extra, "autoValue") && !hasGeneratedKey(extra, "defaultValue")) {
-                const fallback = literalDefaultOf(col, finalPropType);
-                if (fallback && "source" in fallback) extra += `\n            defaultValue: ${fallback.source},`;
-                else if (fallback) {
-                    // An expression only the database evaluates: on a NOT NULL
-                    // column, a required value a create may leave to it. The
-                    // expression is carried, so the planner writes it back.
-                    const expression = col.column_default?.trim();
-                    if (col.is_nullable === "NO" && expression) {
-                        extra += `\n            databaseDefault: ${JSON.stringify(`sql\`${expression}\``)},`;
-                    } else {
-                        fileNotes.push(fallback.note);
-                    }
-                }
-            }
-        }
-
-        // ── Rules the database already enforces ──────────────────────────────
-        // Everything below is read from the catalog, not guessed from the data
-        // or the column's name. Each one is a constraint a write would hit
-        // anyway; surfacing it means the form says no before the database does.
-        const declaredValidation: string[] = [];
-
-        // `varchar(n)` — a bound the author wrote down and nothing has read.
-        if (finalPropType === "string" &&
-            typeof col.character_maximum_length === "number" &&
-            col.character_maximum_length > 0 &&
-            !hasGeneratedKey(extra, "max")) {
-            declaredValidation.push(`max: ${col.character_maximum_length}`);
-        }
-
-        if (columnChecks) {
-            if (finalPropType === "number") {
-                if (columnChecks.min !== undefined && !hasGeneratedKey(extra, "min")) declaredValidation.push(`min: ${columnChecks.min}`);
-                if (columnChecks.max !== undefined && !hasGeneratedKey(extra, "max")) declaredValidation.push(`max: ${columnChecks.max}`);
-                if (columnChecks.moreThan !== undefined) declaredValidation.push(`moreThan: ${columnChecks.moreThan}`);
-                if (columnChecks.lessThan !== undefined) declaredValidation.push(`lessThan: ${columnChecks.lessThan}`);
-            }
-            if (finalPropType === "string") {
-                if (columnChecks.lengthMin !== undefined && !hasGeneratedKey(extra, "min")) declaredValidation.push(`min: ${columnChecks.lengthMin}`);
-                if (columnChecks.lengthMax !== undefined && !declaredValidation.some((v) => v.startsWith("max:")) && !hasGeneratedKey(extra, "max")) {
-                    declaredValidation.push(`max: ${columnChecks.lengthMax}`);
-                }
-            }
-        }
-
-        // A single-column unique index is the same promise `validation.unique`
-        // makes. Composite uniqueness is not: it constrains the combination, and
-        // marking either column unique on its own would reject valid rows.
-        if (singleColumnUniques.has(col.column_name) && !meta.pks.includes(col.column_name)) {
-            declaredValidation.push("unique: true");
-        }
-
-        extra = withValidation(extra, declaredValidation);
-
-        // A generated column rejects every write, and a tsvector holds lexeme
-        // positions rather than text, so an editable field for either is a field
-        // that can only ever produce an error.
-        if (isReadOnlyColumn(col) && !hasGeneratedKey(extra, "readOnly")) {
-            const options = ["readOnly: true"];
-            if (isDerivedIndexColumn(col) && !hasGeneratedKey(extra, "hideFromCollection")) {
-                options.push("hideFromCollection: true");
-                hiddenFromCollection.add(propertyKey);
-            }
-            extra = withAdminOptions(extra, options, emitAdmin);
-        }
-
-        // `COMMENT ON COLUMN` — documentation the author already wrote, which
-        // introspection has never carried across.
-        const columnComment = columnComments.get(col.column_name);
-        if (columnComment) {
-            extra = `\n            description: ${quote(columnComment)},${extra}`;
-        }
-
-        // Identify IDs (unless already inferred as UUID/CUID by inferenceEngine)
-        if (meta.pks.includes(col.column_name)) {
-            if (isCompositePk) {
-                // Every column of the key is marked, so the collection addresses
-                // a row by all of them (`1:::en_US`) on the server and in the
-                // admin alike, and the planner builds one `PRIMARY KEY (a, b)`.
-                extra += `\n            // Part of composite primary key (${commentText(meta.pks.join(", "))})`;
-                if (compositeKeyMarkable && !inferenceExtra.includes("isId:")) {
-                    // The same reading a single key gets — the strategy the
-                    // column has (`"manual"` for a value the caller supplies,
-                    // which is most composite keys) and the storage the planner
-                    // needs to build it as it is — so a push plans no change.
-                    const stored = primaryKeyStorage(col, finalPropType);
-                    for (const key of stored.keys) {
-                        const name = key.slice(0, key.indexOf(":"));
-                        if (!hasGeneratedKey(extra, name)) extra += `\n            ${key},`;
-                    }
-                    if (stored.note) fileNotes.push(stored.note);
-                }
-            } else if (!inferenceExtra.includes("isId:")) {
-                // The strategy the column actually has. `"increment"` is an
-                // INTEGER identity and nothing else; a serial key is `SERIAL`,
-                // a key with no default is `"manual"`. Calling every number key
-                // `"increment"` and every other key `"uuid"` planned a type
-                // change on any key that was not exactly that.
-                const stored = primaryKeyStorage(col, finalPropType);
-                for (const key of stored.keys) {
-                    const name = key.slice(0, key.indexOf(":"));
-                    if (!hasGeneratedKey(extra, name)) extra += `\n            ${key},`;
-                }
-                if (stored.note) fileNotes.push(stored.note);
-            }
-        }
-
-        if (finalPropType === "vector") {
-            const dims = col.atttypmod && col.atttypmod > 0 ? col.atttypmod : 1536;
-            extra += `\n            dimensions: ${dims},`;
-        }
-
-        // `required` on a column the user cannot write is a form that cannot be
-        // submitted: pagila's `film.fulltext` is NOT NULL and maintained by a
-        // trigger, so demanding it of the user blocks every create.
-        // With a default too: NOT NULL is NOT NULL, and leaving `required` off a
-        // column that has a default planned `DROP NOT NULL` on the first push.
-        if (col.is_nullable === "NO" && !meta.pks.includes(col.column_name) && !isReadOnlyColumn(col)) {
-            if (extra.includes("validation: {")) {
-                extra = extra.replace("validation: {", "validation: {\n                required: true,");
-            } else {
-                extra += "\n            validation: {\n                required: true\n            },";
-            }
-        }
-
-        const humanName = humanize(col.column_name);
-
-        orderEntries.push({
-            key: propertyKey,
-            ctx: {
-                propType: finalPropType,
-                isPk: meta.pks.includes(col.column_name),
-                isEnum: isEnumColumn,
-                isStorage: extra.includes("storage: {") || inferenceExtra.includes("storage: {"),
-                pgDataType: col.data_type,
-                originalIndex: currentIndex
-            }
-        });
-
-        propertyBlocks.set(propertyKey, `
-        ${propKey(propertyKey)}: {
-            name: ${quote(humanName)},
-            columnName: ${quote(col.column_name)},
-            type: ${quote(finalPropType)},${extra}
-        },`);
-    }
-
-    // Map Owning Relations (from this table's FKs to other tables)
-    for (const fk of meta.fks) {
-        const targetTableName = fk.foreign_table_name;
-        if (skippedTables.has(targetTableName)) continue;
-        if (!joinTables.has(targetTableName)) {
-            // The relation gets its own property key, and it must not be one this
-            // file has already used — a duplicate key in an object literal is a
-            // TypeScript error, so the whole collection stops compiling.
-            //
-            // The collision needs three things at once and is invisible without
-            // all three: a foreign key column that does *not* end in `_id`, that
-            // column also being part of the primary key (which is what keeps it
-            // as a property of its own rather than folding it into the relation),
-            // and the stripped name matching the target table. MusicBrainz names
-            // every foreign key after the table it points at — `area_tag (area,
-            // tag)` — so 67 of its 339 collections came out with a property
-            // declared twice.
-            //
-            // Camel-cased for the same reason the columns above are: this is a
-            // property key, it sits in the same object literal, and a
-            // `blog_author` beside a `publishedAt` is the two-conventions
-            // defect reproduced inside a single collection.
-            const stripped = toWireKey(fk.column_name.replace(/_id$/, ""));
-            const relName = firstFreeKey(
-                [
-                    stripped,
-                    toWireKey(targetTableName),
-                    `${stripped}Relation`
-                ],
-                propertyBlocks
-            );
-            // Push the relation property key, not the FK column name
-            orderEntries.push({
-                key: relName,
-                ctx: {
-                    propType: "relation",
-                    isPk: false,
-                    isEnum: false,
-                    isStorage: false,
-                    pgDataType: "",
-                    originalIndex: columnIndex++
-                }
-            });
-
-            const targetCollectionCamel = importCollection(targetTableName);
-
-            const relHumanName = humanize(relName);
-
-            // The key column's NOT NULL and its ON DELETE, which the planner
-            // reads from `validation.required` and `onDelete`. Without them a
-            // required link came back optional and every `ON DELETE CASCADE`
-            // came back as `SET NULL`.
-            const fkColumn = meta.columns.find((c) => c.column_name === fk.column_name);
-            const required = fkColumn?.is_nullable === "NO";
-            const onDelete = onDeleteOf(fk, required);
-            const requiredLine = required ? "\n            validation: { required: true }," : "";
-            const onDeleteLine = onDelete ? `,\n                onDelete: ${quote(onDelete)}` : "";
-            // A `belongsTo` gets a btree on its key by default, under a name
-            // derived from the column. A database that does not already hold
-            // that index would have one built by the first push — which is a
-            // change, and "introspect, then push, changes nothing". So the
-            // relation says `index: false` and says why; deleting the line is
-            // how to ask for the index. Not where the key leads the primary
-            // key: the planner derives nothing there to begin with.
-            //
-            // Another index the key leads (a hand-written `orders_customer_id_idx`,
-            // a composite, a unique one) already serves the lookups, and the line
-            // stays: the planner reads only the collections, so deleting it would
-            // build a second index doing the first one's job.
-            const derivedIndex = foreignKeyIndexSpec(context.metadata?.schema ?? "public", tableName, fk.column_name);
-            const tableIndexes = context.metadata?.indexes?.filter(i => i.table_name === tableName);
-            const indexMissing = tableIndexes !== undefined
-                && meta.pks[0] !== fk.column_name
-                && !tableIndexes.some(i => i.index_name === derivedIndex.indexName);
-            const servedBy = tableIndexes?.find(i => i.leading_column === fk.column_name && i.serves_leading_column);
-            const indexReason = servedBy
-                ? `${commentText(servedBy.index_name)} already indexes ${commentText(fk.column_name)}, so Rebase builds none of its own. ` +
-                  "Without this line, `rebase db push` would build a second."
-                : `The database has no index on ${commentText(fk.column_name)}. Delete this line to have one built.`;
-            const indexLine = indexMissing
-                ? `,\n                // ${indexReason}\n                index: false`
-                : "";
-
-            propertyBlocks.set(relName, `
-        ${propKey(relName)}: {
-            name: ${quote(relHumanName)},
-            type: "relation",${requiredLine}
-            // mapped from foreign key: ${commentText(fk.column_name)} -> ${commentText(targetTableName)}(${commentText(fk.foreign_column_name)})
-            relation: {
-                kind: "belongsTo",
-                target: ${relationTarget(targetCollectionCamel)},
-                localKey: ${quote(fk.column_name)}${onDeleteLine}${indexLine}
-            }
-        },`);
-        }
-    }
-
-    // Map Inverse Relations (1-to-many where OTHER table points to THIS table)
-    // These go into the `relations` array so they render as subcollection tabs.
-    /**
-     * A name for an entry in the `relations` array that no property and no
-     * earlier entry has taken.
-     *
-     * Relations and properties share one namespace — a relation is found by
-     * name — so a `belongsTo` property called `series` beside a many-to-many
-     * also called `series` left one of them unreachable: the planner resolved
-     * the property's name to the many-to-many, planned no `series_id` column,
-     * and the first push dropped it.
-     */
-    const usedRelationNames = new Set<string>();
-    const relationNameFor = (preferred: string, fallback: string): string => {
-        const taken = { has: (key: string) => propertyBlocks.has(key) || usedRelationNames.has(key) };
-        const name = firstFreeKey([preferred, fallback], taken);
-        usedRelationNames.add(name);
-        return name;
-    };
-
-    const inverseFks = allFks.filter((fk) => fk.foreign_table_name === tableName && !joinTables.has(fk.table_name) && !skippedTables.has(fk.table_name));
-    for (const fk of inverseFks) {
-        const sourceTableName = fk.table_name;
-
-        const targetCollectionCamel = importCollection(sourceTableName);
-
-        relationsOutput += `
-        {
-            kind: "hasMany",
-            relationName: ${quote(relationNameFor(sourceTableName, `${sourceTableName}_by_${fk.column_name}`))},
-            target: ${relationTarget(targetCollectionCamel)},
-            // the ${commentText(sourceTableName)}.${commentText(fk.column_name)} FK points back here
-            foreignKeyOnTarget: ${quote(fk.column_name)}
-        },`;
-    }
-
-    // Map Many-to-Many Relations (Join Tables)
-    // These also go into the `relations` array so they render as subcollection tabs.
-    const relatedJoinTables = Array.from(joinTables).filter((jt) => {
-        const jtMeta = tablesMap.get(jt);
-        return jtMeta ? jtMeta.fks.some((fk) => fk.foreign_table_name === tableName) : false;
-    });
-
-    for (const jt of relatedJoinTables) {
-        const jtMeta = tablesMap.get(jt);
-        if (!jtMeta) continue;
-
-        const joinFks = jtMeta.fks;
-
-        // Handle self-referencing M2M: both FKs point to the same table.
-        // Ordered by the junction's own key, so the source column is the one
-        // the key leads with — the planner keys the junction (source, target),
-        // and constraint-name order re-keyed it on the first push.
-        const keyPosition = (fk: ForeignKeyRow) => {
-            const position = jtMeta.pks.indexOf(fk.column_name);
-            return position === -1 ? Number.MAX_SAFE_INTEGER : position;
-        };
-        const selfRefFks = joinFks
-            .filter((fk) => fk.foreign_table_name === tableName)
-            .sort((a, b) => keyPosition(a) - keyPosition(b));
-        if (selfRefFks.length === 2) {
-            // Self-referencing M2M — generate a single owning relation
-            const thisFk = selfRefFks[0];
-            const otherFk = selfRefFks[1];
-
-            const relPropName = `${tableName}_via_${otherFk.column_name.replace(/_id$/, "")}`;
-
-            relationsOutput += `
-        {
-            kind: "manyToMany",
-            relationName: ${quote(relationNameFor(relPropName, `${relPropName}_${jt}`))},
-            target: ${relationTarget(toCollectionVarName(tableName))},
-            through: {
-                table: ${quote(jt)},
-                sourceColumn: ${quote(thisFk.column_name)},
-                targetColumn: ${quote(otherFk.column_name)}
-            }
-        },`;
-            continue;
-        }
-
-        const otherFk = joinFks.find((fk) => fk.foreign_table_name !== tableName);
-
-        // Which ends declare the link decides how the planner keys the
-        // junction: from the one declaring side, or — when both declare it —
-        // from the side whose table sorts first. So the link is declared on
-        // both ends only when that keys it the way the database already has
-        // it; otherwise only on the end whose column leads the key, and the
-        // other end says why.
-        const leadingFk = joinFks.find((fk) => fk.column_name === jtMeta.pks[0]);
-        const leadingTable = leadingFk?.foreign_table_name;
-        const sortsFirst = otherFk ? [tableName, otherFk.foreign_table_name].sort()[0] : tableName;
-        const declareHere = !leadingTable || leadingTable === sortsFirst || leadingTable === tableName;
-        if (otherFk && !declareHere) {
-            relationsOutput += `
-        // The many-to-many with ${commentText(otherFk.foreign_table_name)} through ${commentText(jt)} is declared on
-        // ${commentText(otherFk.foreign_table_name)} only: declaring it here too would re-key ${commentText(jt)}
-        // from (${commentText(jtMeta.pks.join(", "))}) on the next push.`;
-        }
-
-        if (otherFk && declareHere && !skippedTables.has(otherFk.foreign_table_name)) {
-            const targetTableName = otherFk.foreign_table_name;
-
-            const targetCollectionCamel = importCollection(targetTableName);
-
-            // Both sides of a many-to-many are `manyToMany`. There is no owning
-            // and inverse side to pick between any more, so this no longer
-            // guesses one from table-name ordering and no longer emits a
-            // half-configured relation on the losing side with a comment asking
-            // the reader to finish it by hand. Introspection already knows both
-            // junction columns; each side just names them from its own end.
-            const thisFk = joinFks.find((fk) => fk.foreign_table_name === tableName);
-
-            const throughCode = thisFk
-                ? `\n            through: {\n                table: ${quote(jt)},\n                sourceColumn: ${quote(thisFk.column_name)},\n                targetColumn: ${quote(otherFk.column_name)}\n            }`
-                : "";
-
-            relationsOutput += `
-        {
-            kind: "manyToMany",
-            relationName: ${quote(relationNameFor(targetTableName, `${targetTableName}_via_${jt}`))},
-            target: ${relationTarget(targetCollectionCamel)},${throughCode}
-        },`;
-        }
-    }
-
-    const search = reconstructSearchBlock({
-        schema: context.metadata?.schema ?? "public",
-        table: tableName,
-        columns: meta.columns,
-        comments: columnComments,
-        keyByColumn
-    });
-    if (search.note) fileNotes.push(search.note);
-    const searchBlock = search.block ?? "";
-
-    const relationsBlock = relationsOutput
-        ? `\n    relations: [${relationsOutput}\n    ],`
-        : "";
-
-    const tableRow = context.metadata?.tables?.find((table) => table.table_name === tableName);
-    const ownsAccess = ownsItsAccess(tableName, tableRow, context.metadata?.policies);
-    const securityRulesBlock = renderSecurityRules(tableName, context.metadata?.policies ?? [], !ownsAccess);
-    const defaultPoliciesBlock = ownsAccess
-        ? "\n    // The table's policies are its whole access model: without this line `rebase db push`" +
-          "\n    // would add the admin baseline (`<table>_default_admin_*`), letting the server and" +
-          "\n    // admins read and write every row. Delete it to give them that." +
-          "\n    disableDefaultPolicies: true,"
-        : "";
-
-    const sortedPropertiesOrder = sortPropertiesOrder(orderEntries);
-    for (const key of sortedPropertiesOrder) {
-        propsOutput += propertyBlocks.get(key) || "";
-    }
-
-    // ── The admin block ──────────────────────────────────────────────────
-    // `icon` and `propertiesOrder` used to be emitted at the *top level* of the
-    // config, where they have not belonged since the admin block was split out:
-    // `PostgresCollectionConfig` does not declare them, so every generated file
-    // was a type error, and the panel — which reads the block — never saw them.
-    const adminEntries: string[] = [`icon: ${quote(icon)}`];
-
-    if (classification) {
-        const derivedFacts = context.metadata
-            ? buildColumnFacts(meta, context.metadata, enumMap, checkFacts)
-            : undefined;
-
-        if (classification.role === "owned-child") {
-            // The rows are already reachable: every inbound foreign key renders
-            // as a tab on the parent. A second, top-level entry for them is what
-            // turns a navigation of eight nouns into a list of thirty tables.
-            adminEntries.push("hideFromNavigation: true");
-        } else if (classification.role === "lookup") {
-            adminEntries.push('group: "Reference"');
-        }
-
-        if (derivedFacts) {
-            // Each of these comes back as a column and is emitted as a property.
-            const asProperty = (column: string): string => keyByColumn.get(column) ?? toWireKey(column);
-
-            const titleProperty = deriveTitleProperty(derivedFacts);
-            if (titleProperty) adminEntries.push(`display: { title: ${quote(asProperty(titleProperty))} }`);
-
-            const kanbanProperty = deriveKanbanProperty(derivedFacts);
-            const orderProperty = kanbanProperty ? deriveKanbanOrderProperty(derivedFacts) : undefined;
-            if (kanbanProperty && orderProperty) {
-                adminEntries.push(`kanban: {\n            columnProperty: ${quote(asProperty(kanbanProperty))}\n        }`);
-                adminEntries.push(`orderProperty: ${quote(asProperty(orderProperty))}`);
-            } else if (kanbanProperty) {
-                // No column to keep a card's position in, so no board: one
-                // without `orderProperty` is a validator warning on every
-                // generate. Said here, where the owner reads the collection.
-                adminEntries.push(
-                    `// A board over ${quote(asProperty(kanbanProperty))} fits this table, but a board needs a string column ` +
-                    "to keep each card's order in. Add one, then declare " +
-                    `kanban: { columnProperty: ${quote(asProperty(kanbanProperty))} } and orderProperty: "<that property>".`
-                );
-            }
-
-            const sort = deriveSort(derivedFacts);
-            if (sort) adminEntries.push(`sort: [${quote(asProperty(sort[0]))}, "desc"]`);
-        }
-
-        const listProperties = deriveListProperties(sortedPropertiesOrder, hiddenFromCollection);
-        if (listProperties) {
-            adminEntries.push(`listProperties: ${formatKeyList(listProperties)}`);
-        }
-    }
-
-    adminEntries.push(`propertiesOrder: ${formatKeyList(sortedPropertiesOrder)}`);
-
-    // Every entry above names a property key, and with `defineCollection` those
-    // keys are now checked against `properties` — a stale `propertiesOrder` entry
-    // left behind by a renamed column is a compile error rather than a silent
-    // no-op. Which is also why the block cannot be emitted where the field is not
-    // declared: see {@link CollectionBuilder}.
-    const adminBlock = emitAdmin
-        ? `\n    admin: {\n        ${adminEntries.join(",\n        ")}\n    }`
-        : "";
-
-    const descriptionBlock = tableComment
-        ? `\n    description: ${quote(tableComment)},`
-        : "";
-
-    // The schema the table was read from. `public` is what an absent `schema`
-    // means, so it is left out; any other is load-bearing — without it the
-    // runtime serves, and boot creates, a table of the same name in `public`.
-    const pgSchema = context.metadata?.schema;
-    const schemaBlock = pgSchema && pgSchema !== "public"
-        ? `\n    schema: ${quote(pgSchema)},`
-        : "";
-
-    // The classification is stated in the file because it is a *decision*, and a
-    // decision the reader may disagree with. Naming the evidence tells them
-    // which line to delete when they do.
-    const classificationNote = classification && classification.role !== "entity"
-        ? `\n// Introspected as ${/^[aeiou]/.test(classification.role) ? "an" : "a"} ${commentText(classification.role)}: ${commentText(classification.reason)}.\n`
-        : "";
-
-    // What `rebase db push` would change, said where the reader looks first.
-    for (const note of fileNotes) context.notes?.push(`${tableName}: ${note}`);
-    const storageNote = fileNotes.length > 0
-        ? `\n// ⚠ Not reproduced exactly by \`rebase db push\` — read before pushing:\n${fileNotes.map((n) => `//   - ${commentText(n)}`).join("\n")}\n`
-        : "";
-
-    const collectionVarName = toCollectionVarName(tableName);
-    // `const x = defineCollection({ … })` is also the shape the ts-morph schema
-    // editor in `@rebasepro/server` expects — `COLLECTION_FACTORIES` — so an
-    // introspected collection is now editable from the panel the way a scaffolded
-    // one is.
-    const [open, close] = builder === "annotation"
-        ? [`const ${collectionVarName}: PostgresCollectionConfig = {`, "};"]
-        : [`const ${collectionVarName} = defineCollection({`, "});"];
-    // Package imports first, then siblings. `AnyCollectionConfig` is added the
-    // moment the first relation needs it — which is after the sibling collections
-    // it points at have already been added — and only when a relation needs it, so
-    // a project with `noUnusedLocals` never sees an import it does not use.
-    const importLines = Array.from(imports);
-    const orderedImports = [
-        ...importLines.filter((line) => !line.includes('from "./')),
-        ...importLines.filter((line) => line.includes('from "./'))
-    ];
-    const fileContent = `${orderedImports.join("\n")}
-${classificationNote}${storageNote}${rlsOffComment(tableRow)}
-${open}
-    name: ${quote(collectionName)},
-    singularName: ${quote(singular)},
-    slug: ${quote(tableName)},
-    table: ${quote(tableName)},${schemaBlock}${descriptionBlock}${searchBlock}
-    properties: {${propsOutput}
-    },${relationsBlock}${defaultPoliciesBlock}${securityRulesBlock}${adminBlock}
-${close}
-
-export default ${collectionVarName};
-`;
-
-    return fileContent;
-}
-
-/**
- * Generate the content for an index.ts file that re-exports all collections.
- */
-export function generateIndexContent(fileNames: string[]): string {
-    const sorted = [...fileNames].sort();
-    let imports = "";
-    let arrayElements = "";
-    for (const f of sorted) {
-        const varName = toCollectionVarName(f);
-        imports += `import ${varName} from ${quote(`./${f}`)};\n`;
-        arrayElements += `    ${varName},\n`;
-    }
-    return `${imports}\nexport const collections = [\n${arrayElements}];\n`;
-}
-
-/**
- * Merge new exports into existing index.ts content.
- * Returns the merged content string.
- */
-export function mergeIndexContent(existingContent: string, newFileNames: string[]): string {
-    const existingImports = new Set(
-        [...existingContent.matchAll(/import\s+([a-zA-Z0-9_]+)\s+from\s+"\.\/([^"]+)"/g)].map((m) => m[2])
-    );
-    const sorted = [...newFileNames].sort();
-
-    let newImports = "";
-    let newElements = "";
-
-    for (const f of sorted) {
-        if (!existingImports.has(f)) {
-            const varName = toCollectionVarName(f);
-            newImports += `import ${varName} from ${quote(`./${f}`)};\n`;
-            newElements += `    ${varName},\n`;
-        }
-    }
-
-    if (!newImports) return existingContent;
-
-    // Simple injection logic:
-    // Add new imports below the last import or at the top
-    const importRegex = /import\s+.*?;/g;
-    let lastImportMatch;
-    let match;
-    while ((match = importRegex.exec(existingContent)) !== null) {
-        lastImportMatch = match;
-    }
-
-    let contentWithImports = existingContent;
-    if (lastImportMatch) {
-        const pos = lastImportMatch.index + lastImportMatch[0].length;
-        contentWithImports = existingContent.slice(0, pos) + "\n" + newImports.trimEnd() + existingContent.slice(pos);
-    } else {
-        contentWithImports = newImports + "\n" + existingContent;
-    }
-
-    // Inject into the `collections = [...]` array
-    const arrayRegex = /export\s+const\s+collections\s*=\s*\[([\s\S]*?)\];/;
-    return contentWithImports.replace(arrayRegex, (fullMatch, arrayContent) => {
-        let mergedArray = arrayContent.trimEnd();
-        if (mergedArray && !mergedArray.endsWith(",")) mergedArray += ",";
-        if (mergedArray) mergedArray += "\n";
-        mergedArray += newElements.trimEnd();
-        return `export const collections = [\n    ${mergedArray.trim()}\n];`;
-    });
+        "what each table's `rls` grants.";
 }
 
 /**

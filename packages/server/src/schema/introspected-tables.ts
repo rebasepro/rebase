@@ -1,128 +1,76 @@
-import type { PostgresCollectionConfig, PostgresProperties, RlsDescriptor, TableDescriptor } from "@rebasepro/types";
-import { collectionsToTableDefs, compileTables, getTableName, isSchemaDefinitionError } from "@rebasepro/common";
+import type { CollectionConfig, TableDescriptor } from "@rebasepro/types";
 
 /**
- * Descriptors for the tables a backend introspected from its database.
+ * The descriptors of the tables a backend introspected from its database.
  *
- * A backend with no `backend/schema` serves whatever tables the database
- * holds (those with row-level security on), and the driver hands back the
- * collections it built from the catalogue. They have no descriptors of their
- * own — nothing was declared — so `GET /api/schema/tables`, the schema version
- * and global hooks had nothing to read. This lifts them with the same bridge
- * the codemod uses (`collectionsToTableDefs`) and compiles them with the same
- * compiler a declared table goes through.
+ * A backend with no `backend/schema` serves the tables its database holds
+ * (those with row-level security on), and the driver hands back, per table, the
+ * descriptor it read from the catalogue (`InitializedDriver.tables`: columns as
+ * Postgres types, relations from foreign keys, row-level security from
+ * `pg_policies`) beside the collection the request-time code reads. Those
+ * descriptors are what `GET /api/schema/tables`, the schema version and global
+ * hooks read — nothing is lifted or re-derived here.
  *
  * @module
  */
 
 /**
- * The row-level security of an introspected table.
- *
- * The database's own policies decide every row, and the runtime does not read
- * them: introspection notes only that RLS is enabled. So the rules are one
- * `redacted: true` marker (`RedactedSecurityRule`) covering every operation —
- * the honest "there are policies, and they are not stated here". A client
- * evaluates it as *unknown* (the panel offers the action and lets Postgres
- * answer; an enforcement caller refuses), and no policies are listed for it:
- * Rebase did not generate them. `defaultPolicies: false`, because Rebase
- * injected no admin baseline either.
+ * What one introspecting driver reported: its collections and their
+ * descriptors.
  *
  * @group Schema
  */
-export function introspectedRls(): RlsDescriptor {
-    return { posture: "rules", rules: [{ operations: ["all"], redacted: true }], defaultPolicies: false };
+export interface IntrospectedDriverResult {
+    /** The driver's name, for the error. */
+    driver: string;
+    collections: readonly CollectionConfig[];
+    tables: readonly TableDescriptor[] | undefined;
 }
 
 /**
- * What {@link describeIntrospectedTables} returns.
+ * The descriptors of every table the drivers introspected, each one's
+ * auth-secret columns made private (`excluded`, what
+ * `enforceAuthSecretExclusion` stripped from the collections — the same
+ * columns must never be described as served).
+ *
+ * Throws, naming the driver and the tables, when a driver served a collection
+ * without its descriptor or described a table it does not serve: the two lists
+ * are one answer, and a table with no descriptor would break every reader of
+ * `GET /api/schema/tables` and every global hook on it.
  *
  * @group Schema
  */
-export interface IntrospectedTables {
-    /** One descriptor per table that could be described, in the order given. */
-    descriptors: TableDescriptor[];
-    /** The tables that could not be, each with why. They are still served by the data API. */
-    skipped: { table: string; reason: string }[];
-}
-
-/** A collection's relation properties, re-pointed at the copies and without the ones into `removed`. */
-function rewire(collections: readonly PostgresCollectionConfig[], removed: ReadonlySet<PostgresCollectionConfig>): PostgresCollectionConfig[] {
-    const copies = new Map<PostgresCollectionConfig, PostgresCollectionConfig>();
-    for (const collection of collections) copies.set(collection, { ...collection });
-    for (const collection of collections) {
-        const properties: PostgresProperties = {};
-        for (const [key, property] of Object.entries(collection.properties ?? {})) {
-            if (property.type !== "relation" || !property.relation) {
-                properties[key] = property;
-                continue;
-            }
-            let original: unknown;
-            try {
-                original = property.relation.target();
-            } catch {
-                original = undefined;
-            }
-            const target = collections.find(candidate => candidate === original);
-            if (!target) {
-                if (![...removed].some(candidate => candidate === original)) properties[key] = property;
-                continue;
-            }
-            const copy = copies.get(target);
-            if (copy) properties[key] = { ...property, relation: { ...property.relation, target: () => copy } };
+export function introspectedDescriptors(
+    results: readonly IntrospectedDriverResult[],
+    excluded: readonly { slug: string; columns: readonly string[] }[] = []
+): TableDescriptor[] {
+    const out: TableDescriptor[] = [];
+    for (const { driver, collections, tables } of results) {
+        if (collections.length === 0) continue;
+        if (tables === undefined) {
+            throw new Error(
+                `Driver "${driver}" introspected ${collections.length} table(s) and described none of them. A driver ` +
+                "that derives tables from the database reports their descriptors on `InitializedDriver.tables`."
+            );
         }
-        const copy = copies.get(collection);
-        if (copy) copy.properties = properties;
-    }
-    return collections.map(collection => copies.get(collection) ?? collection);
-}
-
-/**
- * Describe introspected collections as table descriptors, with
- * {@link introspectedRls} as their row-level security.
- *
- * A table that cannot be described faithfully is left out (and so are its
- * relations from the others), the rest are described, and the caller logs
- * {@link IntrospectedTables.skipped}. Never throws: an introspected database
- * boots whatever this makes of it.
- *
- * @group Schema
- */
-export function describeIntrospectedTables(collections: readonly PostgresCollectionConfig[]): IntrospectedTables {
-    const skipped: IntrospectedTables["skipped"] = [];
-    const removed = new Set<PostgresCollectionConfig>();
-    let remaining: PostgresCollectionConfig[] = [...collections];
-    let input: PostgresCollectionConfig[] = remaining;
-
-    while (remaining.length > 0) {
-        try {
-            const { tables } = collectionsToTableDefs(input);
-            const descriptors = compileTables(tables).map(descriptor => ({ ...descriptor, rls: introspectedRls() }));
-            return { descriptors, skipped };
-        } catch (error) {
-            const reasons = new Map<PostgresCollectionConfig, string[]>();
-            if (isSchemaDefinitionError(error)) {
-                for (const problem of error.problems) {
-                    const collection = remaining.find(candidate =>
-                        candidate.slug === problem.table || getTableName(candidate) === problem.table);
-                    if (!collection) continue;
-                    const list = reasons.get(collection) ?? [];
-                    list.push(problem.key ? `${problem.key}: ${problem.message}` : problem.message);
-                    reasons.set(collection, list);
-                }
-            }
-            if (reasons.size === 0) {
-                // Nothing to single out: describe none rather than guess.
-                const reason = error instanceof Error ? error.message : String(error);
-                for (const collection of remaining) skipped.push({ table: collection.slug, reason });
-                return { descriptors: [], skipped };
-            }
-            for (const [collection, list] of reasons) {
-                removed.add(collection);
-                skipped.push({ table: collection.slug, reason: list.join("; ") });
-            }
-            remaining = remaining.filter(collection => !removed.has(collection));
-            input = rewire(remaining, removed);
+        const described = new Set(tables.map(table => table.slug));
+        const served = new Set(collections.map(collection => collection.slug));
+        const undescribed = [...served].filter(slug => !described.has(slug));
+        const unserved = [...described].filter(slug => !served.has(slug));
+        if (undescribed.length > 0 || unserved.length > 0) {
+            throw new Error(
+                `Driver "${driver}" reported tables and descriptors that do not match` +
+                (undescribed.length > 0 ? `; served without a descriptor: ${undescribed.join(", ")}` : "") +
+                (unserved.length > 0 ? `; described but not served: ${unserved.join(", ")}` : "") + "."
+            );
+        }
+        for (const table of tables) {
+            const secret = new Set(excluded.find(entry => entry.slug === table.slug)?.columns ?? []);
+            out.push(secret.size === 0 ? table : {
+                ...table,
+                columns: table.columns.map(column => secret.has(column.key) ? { ...column, private: true } : column)
+            });
         }
     }
-    return { descriptors: [], skipped };
+    return out;
 }

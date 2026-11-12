@@ -1,0 +1,31 @@
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { customers } from "./customers";
+import { employees } from "./employees";
+import { shippers } from "./shippers";
+import { orderDetails } from "./order_details";
+
+export const orders = defineTable("orders", {
+    columns: {
+        orderId: col.smallint().primaryKey(),
+        customerId: col.varchar(5),
+        employeeId: col.smallint(),
+        orderDate: col.date(),
+        requiredDate: col.date(),
+        shippedDate: col.date(),
+        shipVia: col.smallint(),
+        freight: col.real(),
+        shipName: col.varchar(40),
+        shipAddress: col.varchar(60),
+        shipCity: col.varchar(15),
+        shipRegion: col.varchar(15),
+        shipPostalCode: col.varchar(10),
+        shipCountry: col.varchar(15)
+    },
+    relations: {
+        customer: rel.belongsTo(() => customers, { onDelete: "no action" }),
+        employee: rel.belongsTo(() => employees, { onDelete: "no action" }),
+        shipViaRelation: rel.belongsTo(() => shippers, { localKey: "ship_via", onDelete: "no action" }),
+        order_details: rel.hasMany(() => orderDetails)
+    },
+    rls: "admin-only"
+});

@@ -1,0 +1,7 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { invoiceLine } from "../../../backend/schema/invoice_line";
+
+export const invoiceLineCms = customizeTable<typeof invoiceLine>("invoice_line", {
+    icon: "ShoppingCart",
+    fieldOrder: ["invoiceLineId", "unitPrice", "quantity", "invoice", "track"]
+});

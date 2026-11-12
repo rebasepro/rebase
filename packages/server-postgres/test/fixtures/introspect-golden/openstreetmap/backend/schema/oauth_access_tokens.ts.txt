@@ -1,0 +1,31 @@
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { oauthApplications } from "./oauth_applications";
+import { users } from "./users";
+
+// Introspected as an owned-child: belongs to oauth_applications (its only NOT NULL foreign key) and nothing else references it.
+// ⚠ Not reproduced exactly by `rebase db push` — read before pushing:
+//   - "token" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
+//   - "refresh_token" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
+//   - "revoked_at" is timestamp without time zone, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
+//   - "created_at" is timestamp without time zone, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
+//   - "scopes" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
+//   - "previous_refresh_token" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
+export const oauthAccessTokens = defineTable("oauth_access_tokens", {
+    columns: {
+        id: col.bigserial().primaryKey(),
+        resourceOwnerId: col.bigint(),
+        applicationId: col.bigint().notNull(),
+        token: col.text().notNull().unique(),
+        refreshToken: col.text().unique(),
+        expiresIn: col.integer(),
+        revokedAt: col.custom("timestamp without time zone"),
+        createdAt: col.custom("timestamp without time zone").notNull(),
+        scopes: col.text(),
+        previousRefreshToken: col.text().notNull().default("")
+    },
+    relations: {
+        application: rel.belongsTo(() => oauthApplications, { onDelete: "no action" }),
+        resourceOwner: rel.belongsTo(() => users, { onDelete: "no action" })
+    },
+    rls: "admin-only"
+});

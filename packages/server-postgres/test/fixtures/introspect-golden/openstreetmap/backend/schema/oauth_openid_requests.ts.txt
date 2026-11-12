@@ -1,0 +1,17 @@
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { oauthAccessGrants } from "./oauth_access_grants";
+
+// Introspected as an owned-child: belongs to oauth_access_grants (its only ON DELETE CASCADE foreign key) and nothing else references it.
+// ⚠ Not reproduced exactly by `rebase db push` — read before pushing:
+//   - "nonce" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
+export const oauthOpenidRequests = defineTable("oauth_openid_requests", {
+    columns: {
+        id: col.bigserial().primaryKey(),
+        accessGrantId: col.bigint().notNull(),
+        nonce: col.text().notNull()
+    },
+    relations: {
+        accessGrant: rel.belongsTo(() => oauthAccessGrants, { onDelete: "cascade" })
+    },
+    rls: "admin-only"
+});

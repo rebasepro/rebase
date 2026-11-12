@@ -1,0 +1,10 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { arInternalMetadata } from "../../../backend/schema/ar_internal_metadata";
+
+export const arInternalMetadataCms = customizeTable<typeof arInternalMetadata>("ar_internal_metadata", {
+    fields: {
+        value: {
+            multiline: true
+        }
+    }
+});

@@ -1,0 +1,29 @@
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { area } from "./area";
+import { areaTagRaw } from "./area_tag_raw";
+
+export const editor = defineTable("editor", {
+    columns: {
+        id: col.serial().primaryKey(),
+        name: col.varchar(64).notNull(),
+        privs: col.integer().default(0),
+        email: col.varchar(64),
+        website: col.varchar(),
+        bio: col.text(),
+        memberSince: col.timestamptz().onCreateNow(),
+        emailConfirmDate: col.timestamptz(),
+        lastLoginDate: col.timestamptz().onCreateNow(),
+        lastUpdated: col.timestamptz().onCreateNow(),
+        birthDate: col.date(),
+        gender: col.integer(),
+        area: col.integer(),
+        password: col.varchar(128).notNull(),
+        ha1: col.char(32).column("ha1").notNull(),
+        deleted: col.boolean().notNull().default(false)
+    },
+    relations: {
+        areaRelation: rel.belongsTo(() => area, { localKey: "area", onDelete: "no action" }),
+        area_tag_raw: rel.hasMany(() => areaTagRaw, { foreignKey: "editor" })
+    },
+    rls: "admin-only"
+});

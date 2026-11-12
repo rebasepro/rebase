@@ -1,0 +1,39 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { oauthApplications } from "../../../backend/schema/oauth_applications";
+
+export const oauthApplicationsCms = customizeTable<typeof oauthApplications>("oauth_applications", {
+    display: {
+        title: "uid"
+    },
+    listFields: ["id", "name", "ownerType", "uid", "secret", "scopes"],
+    fields: {
+        ownerType: {
+            multiline: true
+        },
+        name: {
+            multiline: true
+        },
+        uid: {
+            multiline: true
+        },
+        secret: {
+            multiline: true
+        },
+        scopes: {
+            multiline: true
+        }
+    },
+    fieldOrder: [
+        "id",
+        "name",
+        "ownerType",
+        "uid",
+        "secret",
+        "scopes",
+        "confidential",
+        "owner",
+        "redirectUri",
+        "createdAt",
+        "updatedAt"
+    ]
+});

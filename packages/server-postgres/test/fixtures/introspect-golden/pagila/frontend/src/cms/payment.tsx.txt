@@ -1,0 +1,10 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { payment } from "../../../backend/schema/payment";
+
+export const paymentCms = customizeTable<typeof payment>("payment", {
+    display: {
+        title: "uuid"
+    },
+    listFields: ["paymentId", "paymentDate", "uuid", "amount", "customer", "staff"],
+    fieldOrder: ["paymentId", "paymentDate", "uuid", "amount", "customer", "staff", "rental"]
+});

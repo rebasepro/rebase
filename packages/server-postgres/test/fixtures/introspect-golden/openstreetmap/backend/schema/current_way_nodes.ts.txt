@@ -1,0 +1,17 @@
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { currentWays } from "./current_ways";
+import { currentNodes } from "./current_nodes";
+
+// Introspected as an owned-child: belongs to current_ways (its only foreign key inside the primary key) and nothing else references it.
+export const currentWayNodes = defineTable("current_way_nodes", {
+    columns: {
+        wayId: col.bigint().primaryKey(),
+        nodeId: col.bigint().notNull(),
+        sequenceId: col.bigint().primaryKey()
+    },
+    relations: {
+        way: rel.belongsTo(() => currentWays, { onDelete: "no action" }),
+        node: rel.belongsTo(() => currentNodes, { onDelete: "no action" })
+    },
+    rls: "admin-only"
+});

@@ -1,0 +1,25 @@
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { customer } from "./customer";
+import { inventory } from "./inventory";
+import { staff } from "./staff";
+import { payment } from "./payment";
+
+export const rental = defineTable("rental", {
+    columns: {
+        rentalId: col.serial().primaryKey(),
+        rentalDate: col.timestamptz().notNull(),
+        inventoryId: col.integer().notNull(),
+        customerId: col.integer().notNull(),
+        returnDate: col.timestamptz(),
+        staffId: col.integer().notNull(),
+        lastUpdate: col.timestamptz().notNull().onCreateNow(),
+        uuid: col.uuid().notNull().unique().defaultSql("uuidv7()")
+    },
+    relations: {
+        customer: rel.belongsTo(() => customer),
+        inventory: rel.belongsTo(() => inventory),
+        staff: rel.belongsTo(() => staff),
+        payment: rel.hasMany(() => payment)
+    },
+    rls: "admin-only"
+});

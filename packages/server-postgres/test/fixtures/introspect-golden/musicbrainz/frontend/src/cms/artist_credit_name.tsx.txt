@@ -1,0 +1,18 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { artistCreditName } from "../../../backend/schema/artist_credit_name";
+
+export const artistCreditNameCms = customizeTable<typeof artistCreditName>("artist_credit_name", {
+    hideFromNavigation: true,
+    display: {
+        title: "name"
+    },
+    fields: {
+        name: {
+            multiline: true
+        },
+        joinPhrase: {
+            multiline: true
+        }
+    },
+    fieldOrder: ["artistCredit", "position", "name", "artistRelation", "joinPhrase"]
+});

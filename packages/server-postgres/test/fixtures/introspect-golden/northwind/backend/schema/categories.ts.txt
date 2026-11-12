@@ -1,0 +1,15 @@
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { products } from "./products";
+
+export const categories = defineTable("categories", {
+    columns: {
+        categoryId: col.smallint().primaryKey(),
+        categoryName: col.varchar(15).notNull(),
+        description: col.text(),
+        picture: col.bytea()
+    },
+    relations: {
+        products: rel.hasMany(() => products)
+    },
+    rls: "admin-only"
+});

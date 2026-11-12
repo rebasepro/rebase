@@ -1,0 +1,27 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { redactions } from "../../../backend/schema/redactions";
+
+// A board over "descriptionFormat" fits this table, but a board needs a text column to keep each card's order in. Add one, then declare kanban: { columnField: "descriptionFormat", orderField: "<that column>" }.
+export const redactionsCms = customizeTable<typeof redactions>("redactions", {
+    display: {
+        title: "title"
+    },
+    listFields: ["id", "title", "descriptionFormat", "user", "description", "createdAt"],
+    fields: {
+        title: {
+            multiline: true
+        },
+        description: {
+            multiline: true
+        }
+    },
+    fieldOrder: [
+        "id",
+        "title",
+        "descriptionFormat",
+        "user",
+        "description",
+        "createdAt",
+        "updatedAt"
+    ]
+});

@@ -1,0 +1,19 @@
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { area } from "./area";
+
+export const areaType = defineTable("area_type", {
+    columns: {
+        id: col.serial().primaryKey(),
+        name: col.varchar().notNull(),
+        parent: col.integer(),
+        childOrder: col.integer().notNull().default(0),
+        description: col.text(),
+        gid: col.uuid().notNull()
+    },
+    relations: {
+        parentRelation: rel.belongsTo(() => areaType, { localKey: "parent", onDelete: "no action" }),
+        area: rel.hasMany(() => area, { foreignKey: "type" }),
+        area_type: rel.hasMany(() => areaType, { foreignKey: "parent" })
+    },
+    rls: "admin-only"
+});

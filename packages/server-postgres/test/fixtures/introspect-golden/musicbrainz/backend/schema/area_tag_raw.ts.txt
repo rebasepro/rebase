@@ -1,0 +1,20 @@
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { area } from "./area";
+import { editor } from "./editor";
+import { tag } from "./tag";
+
+// Introspected as an owned-child: belongs to area (the leading column of a primary key made only of foreign keys) and nothing else references it.
+export const areaTagRaw = defineTable("area_tag_raw", {
+    columns: {
+        area: col.integer().primaryKey(),
+        editor: col.integer().primaryKey(),
+        tag: col.integer().primaryKey(),
+        isUpvote: col.boolean().notNull().default(true)
+    },
+    relations: {
+        areaRelation: rel.belongsTo(() => area, { localKey: "area", onDelete: "no action" }),
+        editorRelation: rel.belongsTo(() => editor, { localKey: "editor", onDelete: "no action" }),
+        tagRelation: rel.belongsTo(() => tag, { localKey: "tag", onDelete: "no action" })
+    },
+    rls: "admin-only"
+});

@@ -1,0 +1,13 @@
+import { defineTable, col } from "@rebasepro/server/schema";
+
+// Introspected as a lookup: a 16-row code list: referenced by 1 table(s), references none, 3 or fewer simple columns.
+// ⚠ Not reproduced exactly by `rebase db push` — read before pushing:
+//   - the many-to-many with film through film_category is declared on film only: declaring it here too would re-key film_category from (film_id, category_id).
+export const category = defineTable("category", {
+    columns: {
+        categoryId: col.serial().primaryKey(),
+        name: col.text().notNull(),
+        lastUpdate: col.timestamptz().notNull().onCreateNow()
+    },
+    rls: "admin-only"
+});

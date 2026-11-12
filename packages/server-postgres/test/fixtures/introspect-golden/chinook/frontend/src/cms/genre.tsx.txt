@@ -1,0 +1,6 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { genre } from "../../../backend/schema/genre";
+
+export const genreCms = customizeTable<typeof genre>("genre", {
+    group: "Reference"
+});

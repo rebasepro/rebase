@@ -1,0 +1,14 @@
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { territories } from "./territories";
+
+// Introspected as a lookup: a 4-row code list: referenced by 1 table(s), references none, 3 or fewer simple columns.
+export const region = defineTable("region", {
+    columns: {
+        regionId: col.smallint().primaryKey(),
+        regionDescription: col.varchar(60).notNull()
+    },
+    relations: {
+        territories: rel.hasMany(() => territories)
+    },
+    rls: "admin-only"
+});

@@ -56,6 +56,8 @@ describe("a removed --collections", () => {
         [["db", "generate", "--collections=../config/collections", "init"], "--collections"],
         [["schema", "generate", "-c", "../config/collections"], "-c"],
         [["schema", "stale", "--collections", "x"], "--collections"],
+        [["schema", "introspect", "--collections", "../config/collections"], "--collections"],
+        [["schema", "introspect", "-c", "x"], "-c"],
         [["doctor", "--collections", "x"], "--collections"],
         [["console", "-c", "x"], "-c"]
     ])("is refused on %j with its replacement and the codemod", (line, flag) => {
@@ -71,9 +73,6 @@ describe("a removed --collections", () => {
     });
 
     it("is left alone where it still means something, and past `--`", () => {
-        // `schema introspect --collections` is the introspector's output
-        // directory until the introspection slice moves it.
-        expect(removedCollectionsFlagSentence(["schema", "introspect", "--collections", "x"])).toBeNull();
         expect(removedCollectionsFlagSentence(["db", "migrate", "--", "-c"])).toBeNull();
         expect(removedCollectionsFlagSentence(["db", "push", "--", "--collections"])).toBeNull();
         expect(removedCollectionsFlagSentence(["db", "push", "--schema-dir", "x"])).toBeNull();

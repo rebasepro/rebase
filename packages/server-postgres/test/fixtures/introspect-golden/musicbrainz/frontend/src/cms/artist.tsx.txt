@@ -1,0 +1,42 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { artist } from "../../../backend/schema/artist";
+
+export const artistCms = customizeTable<typeof artist>("artist", {
+    display: {
+        title: "comment"
+    },
+    sort: ["lastUpdated", "desc"],
+    listFields: ["id", "name", "sortName", "type", "gid", "comment"],
+    fields: {
+        name: {
+            multiline: true
+        },
+        sortName: {
+            multiline: true
+        },
+        lastUpdated: {
+            readOnly: true
+        }
+    },
+    fieldOrder: [
+        "id",
+        "name",
+        "sortName",
+        "type",
+        "gid",
+        "comment",
+        "ended",
+        "beginDateYear",
+        "beginDateMonth",
+        "beginDateDay",
+        "endDateYear",
+        "endDateMonth",
+        "endDateDay",
+        "gender",
+        "editsPending",
+        "lastUpdated",
+        "areaRelation",
+        "beginAreaRelation",
+        "endAreaRelation"
+    ]
+});

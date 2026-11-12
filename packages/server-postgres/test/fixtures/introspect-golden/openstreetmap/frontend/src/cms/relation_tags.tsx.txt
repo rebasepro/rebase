@@ -1,0 +1,15 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { relationTags } from "../../../backend/schema/relation_tags";
+
+export const relationTagsCms = customizeTable<typeof relationTags>("relation_tags", {
+    icon: "Tag",
+    display: {
+        title: "v"
+    },
+    fields: {
+        v: {
+            multiline: true
+        }
+    },
+    fieldOrder: ["relationId", "k", "version", "v"]
+});

@@ -1,0 +1,24 @@
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { diaryEntries } from "./diary_entries";
+import { users } from "./users";
+
+// ⚠ Not reproduced exactly by `rebase db push` — read before pushing:
+//   - "created_at" is timestamp without time zone, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
+//   - "updated_at" is timestamp without time zone, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
+export const diaryComments = defineTable("diary_comments", {
+    columns: {
+        id: col.bigserial().primaryKey(),
+        diaryEntryId: col.bigint().notNull(),
+        userId: col.bigint().notNull(),
+        body: col.text().notNull(),
+        createdAt: col.custom("timestamp without time zone").notNull(),
+        updatedAt: col.custom("timestamp without time zone").notNull(),
+        visible: col.boolean().notNull().default(true),
+        bodyFormat: col.enum(["html", "markdown", "text"], { name: "format_enum" }).notNull().default("markdown")
+    },
+    relations: {
+        diaryEntry: rel.belongsTo(() => diaryEntries, { onDelete: "no action" }),
+        user: rel.belongsTo(() => users, { onDelete: "no action" })
+    },
+    rls: "admin-only"
+});

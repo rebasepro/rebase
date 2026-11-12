@@ -1,0 +1,33 @@
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { orders } from "./orders";
+import { territories } from "./territories";
+
+export const employees = defineTable("employees", {
+    columns: {
+        employeeId: col.smallint().primaryKey(),
+        lastName: col.varchar(20).notNull(),
+        firstName: col.varchar(10).notNull(),
+        title: col.varchar(30),
+        titleOfCourtesy: col.varchar(25),
+        birthDate: col.date(),
+        hireDate: col.date(),
+        address: col.varchar(60),
+        city: col.varchar(15),
+        region: col.varchar(15),
+        postalCode: col.varchar(10),
+        country: col.varchar(15),
+        homePhone: col.varchar(24),
+        extension: col.varchar(4),
+        photo: col.bytea(),
+        notes: col.text(),
+        reportsTo: col.smallint(),
+        photoPath: col.varchar()
+    },
+    relations: {
+        reportsToRelation: rel.belongsTo(() => employees, { localKey: "reports_to", onDelete: "no action" }),
+        employees: rel.hasMany(() => employees, { foreignKey: "reports_to" }),
+        orders: rel.hasMany(() => orders),
+        territories: rel.manyToMany(() => territories, { through: "employee_territories" })
+    },
+    rls: "admin-only"
+});

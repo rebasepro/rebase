@@ -1,0 +1,21 @@
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { artist } from "./artist";
+import { artistCredit } from "./artist_credit";
+
+// Introspected as an owned-child: belongs to artist_credit (its only foreign key inside the primary key) and nothing else references it.
+// ⚠ Not reproduced exactly by `rebase db push` — read before pushing:
+//   - "name" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
+export const artistCreditName = defineTable("artist_credit_name", {
+    columns: {
+        artistCredit: col.integer().primaryKey(),
+        position: col.smallint().primaryKey(),
+        artist: col.integer().notNull(),
+        name: col.text().notNull(),
+        joinPhrase: col.text().notNull().default("")
+    },
+    relations: {
+        artistRelation: rel.belongsTo(() => artist, { localKey: "artist", onDelete: "cascade" }),
+        artistCreditRelation: rel.belongsTo(() => artistCredit, { localKey: "artist_credit", onDelete: "cascade" })
+    },
+    rls: "admin-only"
+});

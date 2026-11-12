@@ -1,0 +1,37 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { delayedJobs } from "../../../backend/schema/delayed_jobs";
+
+export const delayedJobsCms = customizeTable<typeof delayedJobs>("delayed_jobs", {
+    display: {
+        title: "handler"
+    },
+    listFields: ["id", "priority", "runAt", "lockedAt", "failedAt", "lockedBy"],
+    fields: {
+        handler: {
+            multiline: true
+        },
+        lastError: {
+            multiline: true
+        },
+        lockedBy: {
+            multiline: true
+        },
+        queue: {
+            multiline: true
+        }
+    },
+    fieldOrder: [
+        "id",
+        "priority",
+        "runAt",
+        "lockedAt",
+        "failedAt",
+        "lockedBy",
+        "queue",
+        "attempts",
+        "handler",
+        "lastError",
+        "createdAt",
+        "updatedAt"
+    ]
+});

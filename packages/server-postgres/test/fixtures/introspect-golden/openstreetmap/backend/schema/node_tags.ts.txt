@@ -1,0 +1,15 @@
+import { defineTable, col } from "@rebasepro/server/schema";
+
+// ⚠ Not reproduced exactly by `rebase db push` — read before pushing:
+//   - the foreign key node_tags_id_fkey spans (node_id, version); a relation holds one column, so its columns are plain columns.
+//   - "k" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
+//   - "v" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
+export const nodeTags = defineTable("node_tags", {
+    columns: {
+        nodeId: col.bigint().primaryKey(),
+        version: col.bigint().primaryKey(),
+        k: col.text().primaryKey().default(""),
+        v: col.text().notNull().default("")
+    },
+    rls: "admin-only"
+});

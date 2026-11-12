@@ -1,0 +1,16 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { languages } from "../../../backend/schema/languages";
+
+export const languagesCms = customizeTable<typeof languages>("languages", {
+    display: {
+        title: "englishName"
+    },
+    fields: {
+        englishName: {
+            multiline: true
+        },
+        nativeName: {
+            multiline: true
+        }
+    }
+});

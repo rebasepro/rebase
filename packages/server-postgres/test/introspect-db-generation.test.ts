@@ -1,781 +1,293 @@
-import {
-    generateCollectionFile, buildTablesMap, buildEnumMap, compositeKeySkipReason,
-    identifyJoinTables, TableRow, TableColumn, PrimaryKeyRow,
-    ForeignKeyRow, EnumValue, TableMeta, CollectionBuilder
-} from "../src/schema/introspect-db-logic";
-
-// ── Helpers ───────────────────────────────────────────────────────────
-
-const mkCol = (table: string, col: string, opts: Partial<TableColumn> = {}): TableColumn => ({
-    table_name: table,
-column_name: col,
-data_type: "character varying",
-    udt_name: "varchar",
-is_nullable: "YES",
-column_default: null,
-...opts
-});
-
-const mkFk = (table: string, col: string, fTable: string, fCol = "id"): ForeignKeyRow => ({
-    table_name: table,
-column_name: col,
-foreign_table_name: fTable,
-foreign_column_name: fCol
-});
-
-function makeSimpleTable(name: string, columns: TableColumn[], pks: string[] = ["id"], fks: ForeignKeyRow[] = []): TableMeta {
-    return { name,
-columns,
-pks,
-fks };
-}
-
 /**
- * Slice out the generated block for one property. Assertions about a mapped
- * column type have to be anchored to the column they belong to: a whole-file
- * `toContain('type: "number"')` is satisfied by ANY numeric column, so a
- * generator that swapped two columns' type mappings would still pass.
+ * What `rebase schema introspect` writes for one table, column by column.
+ *
+ * Built inputs, so each case states exactly the catalogue it reads; the real
+ * schemas are `introspect-real-generation.test.ts`. Every generated module is
+ * also evaluated and compiled (`compileTables`), so what is asserted as text is
+ * a table the backend accepts.
  */
-function propertyBlock(generated: string, propertyKey: string): string {
-    const open = generated.indexOf(`\n        ${propertyKey}: {`);
-    if (open === -1) throw new Error(`No generated property "${propertyKey}" in:\n${generated}`);
-    const close = generated.indexOf("\n        },", open);
-    if (close === -1) throw new Error(`Unterminated generated property "${propertyKey}" in:\n${generated}`);
-    return generated.slice(open, close);
+import { compileTables } from "@rebasepro/common";
+
+import { generateSchemaModules, type SchemaGeneration, type SchemaGenerationInput } from "../src/schema/introspect-db-logic";
+import { classifyTables } from "../src/schema/introspect-db-structure";
+import { evaluateSchemaModules } from "./helpers/introspect-generation";
+import { autoStamp, buildSchema, column, foreignKey, serialPk, unique, type SchemaSpec } from "./helpers/schema-metadata";
+
+const CMS = { tableImport: (table: string) => `../../../backend/schema/${table}` };
+
+function generate(spec: SchemaSpec, extra: Partial<SchemaGenerationInput> = {}): SchemaGeneration {
+    const { metadata, tables } = buildSchema(spec);
+    return generateSchemaModules({ metadata, classifications: classifyTables(metadata, tables), cms: CMS, ...extra });
 }
 
-// ═══════════════════════════════════════════════════════════════════════
-// generateCollectionFile() — property generation
-// ═══════════════════════════════════════════════════════════════════════
-describe("generateCollectionFile", () => {
-    describe("basic property generation", () => {
-        it("generates a simple collection with slug, name, singularName and table", () => {
-            const meta = makeSimpleTable("products", [
-                mkCol("products", "id", { data_type: "uuid",
-udt_name: "uuid",
-is_nullable: "NO" }),
-                mkCol("products", "name", { is_nullable: "NO" })
-            ]);
-            const result = generateCollectionFile("products", meta, [], new Set(), new Map([["products", meta]]), new Map());
-            expect(result).toContain('slug: "products"');
-            expect(result).toContain('name: "Products"');
-            expect(result).toContain('singularName: "Product"');
-            expect(result).toContain('table: "products"');
-        });
+const moduleOf = (generation: SchemaGeneration, table: string): string => {
+    const found = generation.tables.find(t => t.table === table);
+    if (!found) throw new Error(`no module for ${table}: ${JSON.stringify(generation.failed)}`);
+    return found.schemaModule;
+};
 
-        it("generates correct property types from columns", () => {
-            const meta = makeSimpleTable("items", [
-                mkCol("items", "id", { data_type: "uuid",
-udt_name: "uuid",
-is_nullable: "NO" }),
-                mkCol("items", "count", { data_type: "integer",
-udt_name: "int4" }),
-                mkCol("items", "active", { data_type: "boolean",
-udt_name: "bool" }),
-                mkCol("items", "created_at", { data_type: "timestamp",
-udt_name: "timestamp" }),
-                mkCol("items", "metadata", { data_type: "jsonb",
-udt_name: "jsonb" })
-            ]);
-            const result = generateCollectionFile("items", meta, [], new Set(), new Map([["items", meta]]), new Map());
-            expect(propertyBlock(result, "id")).toContain('type: "string"');
-            expect(propertyBlock(result, "count")).toContain('type: "number"');
-            expect(propertyBlock(result, "active")).toContain('type: "boolean"');
-            expect(propertyBlock(result, "createdAt")).toContain('type: "date"');
-            expect(propertyBlock(result, "metadata")).toContain('type: "map"');
-        });
+/** Every module evaluates and compiles. */
+function compiles(generation: SchemaGeneration): void {
+    expect(() => compileTables(evaluateSchemaModules(generation.tables.map(t => t.schemaModule)))).not.toThrow();
+}
 
-        it("skips FK columns from properties (they become relations)", () => {
-            const fks = [mkFk("posts", "author_id", "users")];
-            const meta = makeSimpleTable("posts", [
-                mkCol("posts", "id", { data_type: "uuid",
-udt_name: "uuid",
-is_nullable: "NO" }),
-                mkCol("posts", "title", { is_nullable: "NO" }),
-                mkCol("posts", "author_id", { is_nullable: "NO" })
-            ], ["id"], fks);
-            const result = generateCollectionFile("posts", meta, fks, new Set(), new Map([["posts", meta]]), new Map());
-            // author_id should NOT appear as a regular property
-            expect(result).not.toMatch(/author_id:\s*\{[^}]*type:\s*"string"/);
-            // but author should appear as a relation
-            expect(result).toContain('type: "relation"');
-        });
+describe("a generated table", () => {
+    it("is a defineTable module named after its table, importing the builders it uses", () => {
+        const g = generate({ tables: [{ name: "blog_posts", columns: [serialPk("blog_posts"), column("blog_posts", "title", { is_nullable: "NO" })] }] });
+        expect(moduleOf(g, "blog_posts")).toBe([
+            "import { defineTable, col } from \"@rebasepro/server/schema\";",
+            "",
+            "export const blogPosts = defineTable(\"blog_posts\", {",
+            "    columns: {",
+            "        id: col.serial().primaryKey(),",
+            "        title: col.text().notNull()",
+            "    },",
+            "    rls: \"admin-only\"",
+            "});",
+            ""
+        ].join("\n"));
+        expect(g.tables[0].identifier).toBe("blogPosts");
+        compiles(g);
     });
 
-    describe("propertiesOrder correctness", () => {
-        it("includes relation property key, not FK column name", () => {
-            const fks = [mkFk("posts", "author_id", "users")];
-            const meta = makeSimpleTable("posts", [
-                mkCol("posts", "id", { data_type: "uuid",
-udt_name: "uuid",
-is_nullable: "NO" }),
-                mkCol("posts", "title"),
-                mkCol("posts", "author_id")
-            ], ["id"], fks);
-            const result = generateCollectionFile("posts", meta, fks, new Set(), new Map([["posts", meta]]), new Map());
-            // propertiesOrder should contain "author" (the relation key), not "author_id" (the FK column)
-            const orderMatch = result.match(/propertiesOrder:\s*(\[[\s\S]*?\])/);
-            expect(orderMatch).toBeTruthy();
-            const orderBlock = orderMatch![1];
-            expect(orderBlock).toContain('"author"');
-            // author_id should NOT appear in propertiesOrder (it may appear in localKey elsewhere)
-            expect(orderBlock).not.toContain('"author_id"');
+    it("states each key the way the database fills it", () => {
+        const g = generate({
+            tables: [
+                { name: "a", columns: [column("a", "id", { data_type: "uuid", udt_name: "uuid", is_nullable: "NO", column_default: "gen_random_uuid()" })] },
+                { name: "b", columns: [column("b", "id", { data_type: "uuid", udt_name: "uuid", is_nullable: "NO" })] },
+                { name: "c", columns: [column("c", "id", { data_type: "integer", udt_name: "int4", is_nullable: "NO", is_identity: "YES" })] },
+                { name: "d", columns: [column("d", "id", { data_type: "bigint", udt_name: "int8", is_nullable: "NO", column_default: "nextval('d_id_seq'::regclass)" })] },
+                { name: "e", columns: [column("e", "id", { data_type: "integer", udt_name: "int4", is_nullable: "NO", column_default: "nextval('shared_seq'::regclass)" })] }
+            ]
         });
+        expect(moduleOf(g, "a")).toContain("id: col.uuid().primaryKey().defaultRandom()");
+        expect(moduleOf(g, "b")).toContain("id: col.uuid().primaryKey()");
+        expect(moduleOf(g, "c")).toContain("id: col.integer().primaryKey().identity()");
+        expect(moduleOf(g, "d")).toContain("id: col.bigserial().primaryKey()");
+        // A sequence Rebase did not create: the database keeps the default.
+        expect(moduleOf(g, "e")).toContain("id: col.integer().primaryKey().dbDefault()");
+        compiles(g);
     });
 
-    describe("ID detection", () => {
-        it("marks a uuid PK the database generates as isId uuid", () => {
-            const meta = makeSimpleTable("users", [
-                mkCol("users", "id", { data_type: "uuid",
-udt_name: "uuid",
-is_nullable: "NO",
-column_default: "gen_random_uuid()" })
-            ]);
-            const result = generateCollectionFile("users", meta, [], new Set(), new Map([["users", meta]]), new Map());
-            expect(result).toContain('isId: "uuid"');
+    it("declares a composite key in key order, whatever the key columns' types", () => {
+        const g = generate({
+            tables: [{
+                name: "rates",
+                columns: [
+                    column("rates", "currency", { data_type: "character", udt_name: "bpchar", character_maximum_length: 3, is_nullable: "NO" }),
+                    column("rates", "day", { data_type: "date", udt_name: "date", is_nullable: "NO" }),
+                    column("rates", "rate", { data_type: "numeric", udt_name: "numeric", numeric_precision: 12, numeric_scale: 6 })
+                ],
+                pks: ["day", "currency"]
+            }]
         });
-
-        it("marks a uuid PK with no default as manual, so push does not invent one", () => {
-            // Was `isId: "uuid"` — which plans `SET DEFAULT gen_random_uuid()`.
-            const meta = makeSimpleTable("users", [
-                mkCol("users", "id", { data_type: "uuid", udt_name: "uuid", is_nullable: "NO" })
-            ]);
-            const block = propertyBlock(generateCollectionFile("users", meta, [], new Set(), new Map([["users", meta]]), new Map()), "id");
-            expect(block).toContain('isId: "manual"');
-            expect(block).toContain('columnType: "uuid"');
-        });
-
-        it("marks an integer identity PK as isId increment", () => {
-            const meta = makeSimpleTable("counters", [
-                mkCol("counters", "id", { data_type: "integer",
-udt_name: "int4",
-is_nullable: "NO",
-is_identity: "YES" })
-            ]);
-            const result = generateCollectionFile("counters", meta, [], new Set(), new Map([["counters", meta]]), new Map());
-            expect(result).toContain('isId: "increment"');
-        });
-
-        it("declares a serial PK as SERIAL, not as an identity", () => {
-            // `"increment"` is `GENERATED BY DEFAULT AS IDENTITY`; a serial key
-            // is an integer with a sequence default, and a bigserial was read
-            // as an INTEGER identity — a narrowing.
-            const meta = makeSimpleTable("orders", [
-                mkCol("orders", "id", { data_type: "bigint", udt_name: "int8", is_nullable: "NO",
-                    column_default: "nextval('orders_id_seq'::regclass)" })
-            ]);
-            const block = propertyBlock(generateCollectionFile("orders", meta, [], new Set(), new Map([["orders", meta]]), new Map()), "id");
-            expect(block).toContain('isId: "manual"');
-            expect(block).toContain('columnType: "bigserial"');
-        });
-
-        it("flags composite primary keys with a comment", () => {
-            const meta = makeSimpleTable("scores", [
-                mkCol("scores", "user_id", { data_type: "uuid",
-udt_name: "uuid",
-is_nullable: "NO" }),
-                mkCol("scores", "game_id", { data_type: "uuid",
-udt_name: "uuid",
-is_nullable: "NO" }),
-                mkCol("scores", "score", { data_type: "integer",
-udt_name: "int4" })
-            ], ["user_id", "game_id"]);
-            const result = generateCollectionFile("scores", meta, [], new Set(), new Map([["scores", meta]]), new Map());
-            expect(result).toContain("composite primary key");
-            expect(result).toContain("user_id, game_id");
-        });
-
-        it("marks every column of a composite key with the strategy it has, a number and a string alike", () => {
-            // Unmarked, the admin resolves no address for the rows and the
-            // server warns at boot; marked with a generating strategy, the
-            // admin withholds the fields on create and the insert has no key.
-            // Neither column has a default, so each is `"manual"` — a value the
-            // caller supplies — with the storage the planner needs to build it.
-            const meta = makeSimpleTable("company_translation", [
-                mkCol("company_translation", "id", { data_type: "integer",
-udt_name: "int4",
-is_nullable: "NO" }),
-                mkCol("company_translation", "locale", { data_type: "character varying",
-udt_name: "varchar",
-character_maximum_length: 10,
-is_nullable: "NO" }),
-                mkCol("company_translation", "name", { data_type: "text",
-udt_name: "text" })
-            ], ["id", "locale"]);
-            const result = generateCollectionFile(
-                "company_translation", meta, [], new Set(), new Map([["company_translation", meta]]), new Map()
-            );
-            expect(result.match(/isId: "manual",/g)).toHaveLength(2);
-            expect(result).toContain("columnType: \"integer\"");
-            expect(result).toContain("columnType: \"varchar\"");
-            expect(result).not.toContain("isId: \"increment\"");
-            expect(result).not.toContain("isId: \"uuid\"");
-        });
-
-        it("keeps a composite key column a number when its sample holds only 1s and 0s", () => {
-            const meta = makeSimpleTable("order_lines", [
-                mkCol("order_lines", "order_id", { data_type: "integer",
-udt_name: "int4",
-is_nullable: "NO" }),
-                mkCol("order_lines", "line_no", { data_type: "integer",
-udt_name: "int4",
-is_nullable: "NO" })
-            ], ["order_id", "line_no"]);
-            const result = generateCollectionFile(
-                "order_lines", meta, [], new Set(), new Map([["order_lines", meta]]), new Map(),
-                [{ order_id: 7, line_no: 1 }, { order_id: 8, line_no: 0 }]
-            );
-            expect(result).not.toContain("type: \"boolean\"");
-            expect(result.match(/isId: "manual",/g)).toHaveLength(2);
-        });
-
-        describe("which composite-keyed tables introspection generates", () => {
-            const orderLines = makeSimpleTable("order_lines", [
-                mkCol("order_lines", "order_id", { data_type: "bigint",
-udt_name: "int8",
-is_nullable: "NO" }),
-                mkCol("order_lines", "line_no", { data_type: "integer",
-udt_name: "int4",
-is_nullable: "NO" })
-            ], ["order_id", "line_no"], [mkFk("order_lines", "order_id", "order")]);
-
-            it("generates one whose key columns are numbers or strings and that nothing points at", () => {
-                expect(compositeKeySkipReason(orderLines, orderLines.fks)).toBeUndefined();
-            });
-
-            it("generates one keyed on a calendar day: a date property on a `date` column, `isId: \"manual\"`", () => {
-                const daily = makeSimpleTable("solo_daily", [
-                    mkCol("solo_daily", "day", { data_type: "date", udt_name: "date", is_nullable: "NO" }),
-                    mkCol("solo_daily", "sid", { data_type: "text", udt_name: "text", is_nullable: "NO" })
-                ], ["day", "sid"]);
-                expect(compositeKeySkipReason(daily, [])).toBeUndefined();
-                const result = generateCollectionFile(
-                    "solo_daily", daily, [], new Set(), new Map([["solo_daily", daily]]), new Map()
-                );
-                expect(result.match(/isId: "manual",/g)).toHaveLength(2);
-                expect(result).toMatch(/type: "date",[\s\S]*columnType: "date"/);
-            });
-
-            it("leaves out one with a key column no `isId` can mark, naming it", () => {
-                const payment = makeSimpleTable("payment", [
-                    mkCol("payment", "payment_id", { data_type: "integer",
-udt_name: "int4" }),
-                    mkCol("payment", "payment_date", { data_type: "timestamp with time zone",
-udt_name: "timestamptz" })
-                ], ["payment_id", "payment_date"]);
-                expect(compositeKeySkipReason(payment, [])).toMatch(/"payment_date" cannot carry `isId`/);
-            });
-
-            it("leaves out one a foreign key points at: a link cannot point at a composite key", () => {
-                const notes = mkFk("line_notes", "order_id", "order_lines", "order_id");
-                expect(compositeKeySkipReason(orderLines, [...orderLines.fks, notes]))
-                    .toMatch(/"line_notes" points at it/);
-            });
-
-            it("says nothing about a table keyed on one column", () => {
-                const products = makeSimpleTable("products", [mkCol("products", "id")]);
-                expect(compositeKeySkipReason(products, [mkFk("orders", "product_id", "products")])).toBeUndefined();
-            });
-        });
-
-        it("marks none of a composite key's columns when one of them cannot carry `isId`", () => {
-            // pagila's `payment` is keyed on `(payment_id, payment_date)`. A date
-            // property has no `isId`, and marking `payment_id` alone would make
-            // it the whole key — so the key is left to the table's constraint.
-            const meta = makeSimpleTable("payment", [
-                mkCol("payment", "payment_id", { data_type: "integer",
-udt_name: "int4",
-is_nullable: "NO" }),
-                mkCol("payment", "payment_date", { data_type: "timestamp with time zone",
-udt_name: "timestamptz",
-is_nullable: "NO" })
-            ], ["payment_id", "payment_date"]);
-            const result = generateCollectionFile("payment", meta, [], new Set(), new Map([["payment", meta]]), new Map());
-            expect(result).toContain("composite primary key");
-            expect(result).not.toContain("isId");
-        });
+        expect(moduleOf(g, "rates")).toContain("currency: col.char(3).primaryKey()");
+        expect(moduleOf(g, "rates")).toContain("day: col.date().primaryKey()");
+        expect(moduleOf(g, "rates")).toContain("rate: col.numeric(12, 6)");
+        compiles(g);
     });
 
-    describe("validation.required", () => {
-        it("adds required when is_nullable is NO, not a PK, and no default", () => {
-            const meta = makeSimpleTable("items", [
-                mkCol("items", "id", { data_type: "uuid",
-udt_name: "uuid",
-is_nullable: "NO" }),
-                mkCol("items", "name", { is_nullable: "NO" })
-            ]);
-            const result = generateCollectionFile("items", meta, [], new Set(), new Map([["items", meta]]), new Map());
-            // name should have required
-            expect(result).toContain("required: true");
+    it("keeps NOT NULL and the default together, and a generated column read-only", () => {
+        const g = generate({
+            tables: [{
+                name: "items",
+                columns: [
+                    serialPk("items"),
+                    column("items", "qty", { data_type: "integer", udt_name: "int4", is_nullable: "NO", column_default: "1" }),
+                    column("items", "code", { is_nullable: "NO", column_default: "gen_code()" }),
+                    column("items", "doubled", { data_type: "integer", udt_name: "int4", is_generated: "ALWAYS", generation_expression: "(qty * 2)" }),
+                    column("items", "sku")
+                ]
+            }],
+            uniques: [unique("items", "sku")]
         });
-
-        it("does NOT add required for nullable columns", () => {
-            const meta = makeSimpleTable("items", [
-                mkCol("items", "id", { data_type: "uuid",
-udt_name: "uuid",
-is_nullable: "NO" }),
-                mkCol("items", "bio", { is_nullable: "YES" })
-            ]);
-            const result = generateCollectionFile("items", meta, [], new Set(), new Map([["items", meta]]), new Map());
-            const bioSection = result.split("bio:")[1].split("},")[0];
-            expect(bioSection).not.toContain("required");
-        });
-
-        it("keeps NOT NULL on a column with a default, and the default with it", () => {
-            // This used to leave `required` off whenever a default existed, so
-            // the first push planned `DROP NOT NULL` — and `DROP DEFAULT`, since
-            // the default was not carried either.
-            const meta = makeSimpleTable("items", [
-                mkCol("items", "id", { data_type: "uuid",
-udt_name: "uuid",
-is_nullable: "NO" }),
-                mkCol("items", "role", { data_type: "text", udt_name: "text", is_nullable: "NO",
-column_default: "'user'::text" })
-            ]);
-            const result = generateCollectionFile("items", meta, [], new Set(), new Map([["items", meta]]), new Map());
-            const roleSection = propertyBlock(result, "role");
-            expect(roleSection).toContain("required: true");
-            expect(roleSection).toContain('defaultValue: "user"');
-        });
-
-        it("marks a NOT NULL column with an expression default databaseDefault", () => {
-            // `code text NOT NULL DEFAULT lower(md5(random()::text))`: required,
-            // and a value only the database can produce, so a create may
-            // leave it out.
-            const meta = makeSimpleTable("items", [
-                mkCol("items", "id", { data_type: "uuid",
-udt_name: "uuid",
-is_nullable: "NO" }),
-                mkCol("items", "code", { data_type: "text", udt_name: "text", is_nullable: "NO",
-column_default: "lower(md5((random())::text))" }),
-                mkCol("items", "hint", { data_type: "text", udt_name: "text", is_nullable: "YES",
-column_default: "lower(md5((random())::text))" }),
-                mkCol("items", "role", { data_type: "text", udt_name: "text", is_nullable: "NO",
-column_default: "'user'::text" })
-            ]);
-            const result = generateCollectionFile("items", meta, [], new Set(), new Map([["items", meta]]), new Map());
-            expect(propertyBlock(result, "code")).toContain('databaseDefault: "sql`lower(md5((random())::text))`"');
-            expect(propertyBlock(result, "code")).toContain("required: true");
-            expect(propertyBlock(result, "hint")).not.toContain("databaseDefault");
-            expect(propertyBlock(result, "role")).not.toContain("databaseDefault");
-        });
+        const items = moduleOf(g, "items");
+        expect(items).toContain("qty: col.integer().notNull().default(1)");
+        expect(items).toContain("code: col.text().notNull().defaultSql(\"gen_code()\")");
+        expect(items).toContain("doubled: col.integer().generatedAs(\"(qty * 2)\")");
+        expect(items).toContain("sku: col.text().unique()");
+        compiles(g);
     });
 
-    describe("enum support", () => {
-        it("generates enum for USER-DEFINED columns with matching enum", () => {
-            const enumMap = new Map([["order_status", ["pending", "shipped", "delivered"]]]);
-            const meta = makeSimpleTable("orders", [
-                mkCol("orders", "id", { data_type: "uuid",
-udt_name: "uuid",
-is_nullable: "NO" }),
-                mkCol("orders", "status", { data_type: "USER-DEFINED",
-udt_name: "order_status" })
-            ]);
-            const result = generateCollectionFile("orders", meta, [], new Set(), new Map([["orders", meta]]), enumMap);
-            expect(result).toContain("enum:");
-            expect(result).toContain('{ id: "pending", label: "Pending" }');
-            expect(result).toContain('{ id: "shipped", label: "Shipped" }');
-            expect(result).toContain('{ id: "delivered", label: "Delivered" }');
-            expect(result).toContain('type: "string"');
+    it("stamps created_at, updated_at and a now() default the way the generator always has", () => {
+        const g = generate({
+            tables: [{
+                name: "posts",
+                columns: [serialPk("posts"), autoStamp("posts", "created_at"), autoStamp("posts", "updated_at"), autoStamp("posts", "published_at")]
+            }]
         });
-
-        it("does NOT add enum for USER-DEFINED without matching enum", () => {
-            const meta = makeSimpleTable("things", [
-                mkCol("things", "id", { data_type: "uuid",
-udt_name: "uuid",
-is_nullable: "NO" }),
-                mkCol("things", "geom", { data_type: "USER-DEFINED",
-udt_name: "geometry" })
-            ]);
-            const result = generateCollectionFile("things", meta, [], new Set(), new Map([["things", meta]]), new Map());
-            expect(result).not.toContain("enum");
-        });
-
-        it("humanizes enum value labels with underscores", () => {
-            const enumMap = new Map([["my_enum", ["in_progress", "on_hold"]]]);
-            const meta = makeSimpleTable("tasks", [
-                mkCol("tasks", "id", { data_type: "uuid",
-udt_name: "uuid",
-is_nullable: "NO" }),
-                mkCol("tasks", "state", { data_type: "USER-DEFINED",
-udt_name: "my_enum" })
-            ]);
-            const result = generateCollectionFile("tasks", meta, [], new Set(), new Map([["tasks", meta]]), enumMap);
-            expect(result).toContain('label: "In Progress"');
-            expect(result).toContain('label: "On Hold"');
-        });
+        const posts = moduleOf(g, "posts");
+        expect(posts).toContain("createdAt: col.timestamptz().notNull().onCreateNow()");
+        expect(posts).toContain("updatedAt: col.timestamptz().notNull().onUpdateNow()");
+        expect(posts).toContain("publishedAt: col.timestamptz().notNull().onCreateNow()");
+        compiles(g);
     });
 
-    describe("date auto-value heuristics", () => {
-        it("sets autoValue on_create for created_at", () => {
-            const meta = makeSimpleTable("items", [
-                mkCol("items", "id", { data_type: "uuid",
-udt_name: "uuid",
-is_nullable: "NO" }),
-                mkCol("items", "created_at", { data_type: "timestamp",
-udt_name: "timestamp" })
-            ]);
-            const result = generateCollectionFile("items", meta, [], new Set(), new Map([["items", meta]]), new Map());
-            expect(result).toContain('autoValue: "on_create"');
-            expect(result).toContain("hideFromCollection: true");
-        });
-
-        it("sets autoValue on_update for updated_at", () => {
-            const meta = makeSimpleTable("items", [
-                mkCol("items", "id", { data_type: "uuid",
-udt_name: "uuid",
-is_nullable: "NO" }),
-                mkCol("items", "updated_at", { data_type: "timestamp",
-udt_name: "timestamp" })
-            ]);
-            const result = generateCollectionFile("items", meta, [], new Set(), new Map([["items", meta]]), new Map());
-            expect(result).toContain('autoValue: "on_update"');
-        });
-
-        it("sets autoValue on_create for columns with now() default", () => {
-            const meta = makeSimpleTable("items", [
-                mkCol("items", "id", { data_type: "uuid",
-udt_name: "uuid",
-is_nullable: "NO" }),
-                mkCol("items", "published_at", { data_type: "timestamp",
-udt_name: "timestamp",
-column_default: "now()" })
-            ]);
-            const result = generateCollectionFile("items", meta, [], new Set(), new Map([["items", meta]]), new Map());
-            expect(result).toContain('autoValue: "on_create"');
-        });
+    it("validates a `_url` column as a URL", () => {
+        const g = generate({ tables: [{ name: "links", columns: [serialPk("links"), column("links", "target_url")] }] });
+        expect(moduleOf(g, "links")).toContain("targetUrl: col.text().validate({ url: true })");
     });
 
-    describe("string sub-type heuristics", () => {
-        it("adds storage config for image-like column names", () => {
-            for (const name of ["profile_image", "avatar", "photo_url", "logo", "cover_image"]) {
-                const meta = makeSimpleTable("t", [
-                    mkCol("t", "id", { data_type: "uuid",
-udt_name: "uuid",
-is_nullable: "NO" }),
-                    mkCol("t", name)
-                ]);
-                const result = generateCollectionFile("t", meta, [], new Set(), new Map([["t", meta]]), new Map());
-                expect(result).toContain("storagePath:");
+    it("keeps an enum's own type name and labels", () => {
+        const g = generate({
+            tables: [{ name: "orders", columns: [serialPk("orders"), column("orders", "state", { data_type: "USER-DEFINED", udt_name: "order_state", is_nullable: "NO" })] }],
+            enumValues: [
+                { enum_name: "order_state", enum_value: "new", sort_order: 1 },
+                { enum_name: "order_state", enum_value: "paid_up", sort_order: 2 }
+            ]
+        });
+        expect(moduleOf(g, "orders")).toContain("state: col.enum([\"new\", \"paid_up\"], { name: \"order_state\" }).notNull()");
+        compiles(g);
+    });
+
+    it("declares a type no other builder names with col.custom, and notes that a push refuses it", () => {
+        const g = generate({ tables: [{ name: "hits", columns: [serialPk("hits"), column("hits", "ip", { data_type: "inet", udt_name: "inet" })] }] });
+        expect(moduleOf(g, "hits")).toContain("ip: col.custom(\"inet\")");
+        expect(g.tables[0].notes).toEqual([expect.stringContaining("\"ip\" is inet, declared with `col.custom()`")]);
+        expect(moduleOf(g, "hits")).toContain("// ⚠ Not reproduced exactly by `rebase db push` — read before pushing:");
+    });
+
+    it("leaves out a table with no primary key, saying why", () => {
+        const g = generate({ tables: [{ name: "log", columns: [column("log", "line")], pks: [] }] });
+        expect(g.tables).toEqual([]);
+        expect(g.failed).toEqual([{ table: "log", reason: expect.stringContaining("it has no primary key") }]);
+    });
+});
+
+describe("relations", () => {
+    const blog: SchemaSpec = {
+        tables: [
+            { name: "authors", columns: [serialPk("authors"), column("authors", "name", { is_nullable: "NO" })] },
+            {
+                name: "posts",
+                columns: [
+                    serialPk("posts"),
+                    column("posts", "author_id", { data_type: "integer", udt_name: "int4", is_nullable: "NO" }),
+                    column("posts", "editor_id", { data_type: "integer", udt_name: "int4" })
+                ]
+            },
+            { name: "tags", columns: [serialPk("tags"), column("tags", "label", { is_nullable: "NO" })] },
+            {
+                name: "posts_tags",
+                columns: [
+                    column("posts_tags", "post_id", { data_type: "integer", udt_name: "int4", is_nullable: "NO" }),
+                    column("posts_tags", "tag_id", { data_type: "integer", udt_name: "int4", is_nullable: "NO" })
+                ],
+                pks: ["post_id", "tag_id"]
             }
-        });
+        ],
+        fks: [
+            foreignKey("posts", "author_id", "authors", { delete_rule: "CASCADE" }),
+            foreignKey("posts", "editor_id", "authors", { delete_rule: "SET NULL" }),
+            foreignKey("posts_tags", "post_id", "posts", { delete_rule: "CASCADE" }),
+            foreignKey("posts_tags", "tag_id", "tags", { delete_rule: "CASCADE" })
+        ],
+        uniques: [unique("posts_tags", "post_id", "tag_id")]
+    };
 
-        it("adds multiline for description/summary/excerpt", () => {
-            for (const name of ["description", "summary", "excerpt"]) {
-                const meta = makeSimpleTable("t", [
-                    mkCol("t", "id", { data_type: "uuid",
-udt_name: "uuid",
-is_nullable: "NO" }),
-                    mkCol("t", name)
-                ]);
-                const result = generateCollectionFile("t", meta, [], new Set(), new Map([["t", meta]]), new Map());
-                expect(result).toContain("multiline: true");
-            }
-        });
-
-        it("adds markdown for content/body", () => {
-            for (const name of ["content", "body"]) {
-                const meta = makeSimpleTable("t", [
-                    mkCol("t", "id", { data_type: "uuid",
-udt_name: "uuid",
-is_nullable: "NO" }),
-                    mkCol("t", name)
-                ]);
-                const result = generateCollectionFile("t", meta, [], new Set(), new Map([["t", meta]]), new Map());
-                expect(result).toContain("markdown: true");
-            }
-        });
-
-        it("adds multiline for text data_type columns", () => {
-            const meta = makeSimpleTable("t", [
-                mkCol("t", "id", { data_type: "uuid",
-udt_name: "uuid",
-is_nullable: "NO" }),
-                mkCol("t", "notes", { data_type: "text",
-udt_name: "text" })
-            ]);
-            const result = generateCollectionFile("t", meta, [], new Set(), new Map([["t", meta]]), new Map());
-            expect(result).toContain("multiline: true");
-        });
-
-        it("does NOT apply string heuristics to enum columns", () => {
-            const enumMap = new Map([["img_type", ["png", "jpg"]]]);
-            const meta = makeSimpleTable("t", [
-                mkCol("t", "id", { data_type: "uuid",
-udt_name: "uuid",
-is_nullable: "NO" }),
-                mkCol("t", "image_type", { data_type: "USER-DEFINED",
-udt_name: "img_type" })
-            ]);
-            const result = generateCollectionFile("t", meta, [], new Set(), new Map([["t", meta]]), enumMap);
-            expect(result).not.toContain("storagePath");
-            expect(result).toContain("enum:");
-        });
+    it("turns a foreign key into the declared column and a belongsTo, ON DELETE when it is not the default", () => {
+        const posts = moduleOf(generate(blog), "posts");
+        expect(posts).toContain("authorId: col.integer().notNull()");
+        expect(posts).toContain("author: rel.belongsTo(() => authors, { onDelete: \"cascade\" })");
+        expect(posts).toContain("editor: rel.belongsTo(() => authors)");
+        expect(posts).toContain("import { authors } from \"./authors\";");
+        expect(posts.match(/import \{ authors \}/g)).toHaveLength(1);
     });
 
-    describe("owning relation (FK -> other table)", () => {
-        it("generates a one-to-one owning relation with correct import", () => {
-            const fks = [mkFk("posts", "author_id", "users")];
-            const meta = makeSimpleTable("posts", [
-                mkCol("posts", "id", { data_type: "uuid",
-udt_name: "uuid",
-is_nullable: "NO" }),
-                mkCol("posts", "author_id")
-            ], ["id"], fks);
-            const result = generateCollectionFile("posts", meta, fks, new Set(), new Map([["posts", meta]]), new Map());
-            expect(result).toContain('import usersCollection from "./users"');
-            expect(result).toContain("author: {");
-            expect(result).toContain('kind: "belongsTo"');
-            expect(result).toContain('localKey: "author_id"');
-            // The link nests under `relation` — it is not spread across the property.
-            expect(result).toContain("relation: {");
-            expect(result).not.toContain("cardinality:");
-            expect(result).not.toContain("direction:");
-        });
+    it("gives the target a hasMany back, and folds the junction into a manyToMany on both ends", () => {
+        const g = generate(blog);
+        expect(g.tables.map(t => t.table)).toEqual(["authors", "posts", "tags"]);
+        expect(moduleOf(g, "authors")).toContain("posts: rel.hasMany(() => posts)");
+        expect(moduleOf(g, "posts")).toContain("tags: rel.manyToMany(() => tags)");
+        expect(moduleOf(g, "tags")).toContain("posts: rel.manyToMany(() => posts)");
+        compiles(g);
     });
 
-    describe("inverse relation (other table -> this table)", () => {
-        it("generates a one-to-many inverse relation in the relations array", () => {
-            const allFks: ForeignKeyRow[] = [mkFk("comments", "post_id", "posts")];
-            const meta = makeSimpleTable("posts", [
-                mkCol("posts", "id", { data_type: "uuid",
-udt_name: "uuid",
-is_nullable: "NO" })
-            ]);
-            const result = generateCollectionFile("posts", meta, allFks, new Set(), new Map([["posts", meta]]), new Map());
-            expect(result).toContain('import commentsCollection from "./comments"');
-            // Should be in the relations array, not as an inline property
-            expect(result).toContain("relations: [");
-            expect(result).toContain('relationName: "comments"');
-            expect(result).toContain('kind: "hasMany"');
-            expect(result).toContain('foreignKeyOnTarget: "post_id"');
-            expect(result).not.toContain("direction:");
-            // Should NOT appear as an inline property with type: "relation"
-            const propsSection = result.split("properties:")[1].split("relations:")[0];
-            expect(propsSection).not.toContain('"relation"');
+    it("names a self-referencing many-to-many after the column it goes through", () => {
+        const g = generate({
+            tables: [
+                { name: "people", columns: [serialPk("people")] },
+                {
+                    name: "people_friends",
+                    columns: [
+                        column("people_friends", "person_id", { data_type: "integer", udt_name: "int4", is_nullable: "NO" }),
+                        column("people_friends", "friend_id", { data_type: "integer", udt_name: "int4", is_nullable: "NO" })
+                    ],
+                    pks: ["person_id", "friend_id"]
+                }
+            ],
+            fks: [foreignKey("people_friends", "person_id", "people"), foreignKey("people_friends", "friend_id", "people")],
+            uniques: [unique("people_friends", "person_id", "friend_id")]
         });
-
-        it("does NOT include inverse relations in propertiesOrder", () => {
-            const allFks: ForeignKeyRow[] = [mkFk("comments", "post_id", "posts")];
-            const meta = makeSimpleTable("posts", [
-                mkCol("posts", "id", { data_type: "uuid",
-udt_name: "uuid",
-is_nullable: "NO" })
-            ]);
-            const result = generateCollectionFile("posts", meta, allFks, new Set(), new Map([["posts", meta]]), new Map());
-            const orderMatch = result.match(/propertiesOrder:\s*(\[[\s\S]*?\])/);
-            expect(orderMatch).toBeTruthy();
-            const orderBlock = orderMatch![1];
-            expect(orderBlock).not.toContain('"comments"');
-        });
+        expect(moduleOf(g, "people")).toMatch(/people_via_friend: rel\.manyToMany\(\(\) => people, \{[\s\S]*through: "people_friends"/);
+        compiles(g);
     });
 
-    describe("many-to-many relations", () => {
-        it("generates owning M2M with through config in relations array", () => {
-            const jtFks: ForeignKeyRow[] = [
-                mkFk("articles_tags", "article_id", "articles"),
-                mkFk("articles_tags", "tag_id", "tags")
-            ];
-            const jtMeta: TableMeta = {
-                name: "articles_tags",
-pks: [],
-                columns: [mkCol("articles_tags", "article_id"), mkCol("articles_tags", "tag_id")],
-                fks: jtFks
-            };
-            const articlesMeta = makeSimpleTable("articles", [
-                mkCol("articles", "id", { data_type: "uuid",
-udt_name: "uuid",
-is_nullable: "NO" })
-            ]);
-            const tablesMap = new Map([["articles", articlesMeta], ["articles_tags", jtMeta]]);
-            const joinTables = new Set(["articles_tags"]);
+    it("says `index: false` where the database has no index on the key, and why", () => {
+        const g = generate({ ...blog, indexes: [] });
+        expect(moduleOf(g, "posts")).toContain("author: rel.belongsTo(() => authors, { onDelete: \"cascade\", index: false })");
+        expect(g.tables.find(t => t.table === "posts")?.notes).toEqual(expect.arrayContaining([
+            expect.stringContaining("the database has no index on \"author_id\"")
+        ]));
+    });
+});
 
-            const result = generateCollectionFile("articles", articlesMeta, [], joinTables, tablesMap, new Map());
-            expect(result).toContain("relations: [");
-            expect(result).toContain('relationName: "tags"');
-            expect(result).toContain('kind: "manyToMany"');
-            expect(result).toContain('table: "articles_tags"');
-            expect(result).toContain('sourceColumn: "article_id"');
-            expect(result).toContain('targetColumn: "tag_id"');
-        });
+describe("row-level security", () => {
+    const one = (rls: Record<string, boolean> | undefined, policies?: SchemaSpec["policies"]) => moduleOf(generate({
+        tables: [{ name: "notes", columns: [serialPk("notes")] }],
+        ...(rls ? { rls } : {}),
+        ...(policies ? { policies } : {})
+    }), "notes");
 
-        it("generates inverse M2M in relations array", () => {
-            const jtFks: ForeignKeyRow[] = [
-                mkFk("articles_tags", "article_id", "articles"),
-                mkFk("articles_tags", "tag_id", "tags")
-            ];
-            const jtMeta: TableMeta = {
-                name: "articles_tags",
-pks: [],
-                columns: [mkCol("articles_tags", "article_id"), mkCol("articles_tags", "tag_id")],
-                fks: jtFks
-            };
-            const tagsMeta = makeSimpleTable("tags", [
-                mkCol("tags", "id", { data_type: "uuid",
-udt_name: "uuid",
-is_nullable: "NO" })
-            ]);
-            const tablesMap = new Map([["tags", tagsMeta], ["articles_tags", jtMeta]]);
-            const joinTables = new Set(["articles_tags"]);
-
-            const result = generateCollectionFile("tags", tagsMeta, [], joinTables, tablesMap, new Map());
-            expect(result).toContain("relations: [");
-            expect(result).toContain('kind: "manyToMany"');
-        });
+    it("is \"admin-only\" for a table with RLS off, and says the push switches it on", () => {
+        const notes = one({ notes: false }, []);
+        expect(notes).toContain("rls: \"admin-only\"");
+        expect(notes).toContain("// ⚠ Row-level security is off on this table");
     });
 
-    describe("self-referencing M2M", () => {
-        it("generates self-ref M2M with _via_ relation name in relations array", () => {
-            const jtFks: ForeignKeyRow[] = [
-                mkFk("user_friends", "user_id", "users"),
-                mkFk("user_friends", "friend_id", "users")
-            ];
-            const jtMeta: TableMeta = {
-                name: "user_friends",
-pks: [],
-                columns: [mkCol("user_friends", "user_id"), mkCol("user_friends", "friend_id")],
-                fks: jtFks
-            };
-            const usersMeta = makeSimpleTable("users", [
-                mkCol("users", "id", { data_type: "uuid",
-udt_name: "uuid",
-is_nullable: "NO" })
-            ]);
-            const tablesMap = new Map([["users", usersMeta], ["user_friends", jtMeta]]);
-            const joinTables = new Set(["user_friends"]);
+    it("is a rule that grants nothing for RLS on with no policy, which no one but the owner reads today", () => {
+        const notes = one({ notes: true }, []);
+        expect(notes).toContain("rls: [\n        { name: \"notes_closed\", operation: \"all\", using: \"false\" }\n    ],\n    defaultPolicies: false");
+    });
+});
 
-            const result = generateCollectionFile("users", usersMeta, [], joinTables, tablesMap, new Map());
-            expect(result).toContain("relations: [");
-            expect(result).toContain('relationName: "users_via_friend"');
-            expect(result).toContain('table: "user_friends"');
-            expect(result).toContain('sourceColumn: "user_id"');
-            expect(result).toContain('targetColumn: "friend_id"');
-            // Self-ref should reference its own collection variable
-            expect(result).toContain("usersCollection");
-        });
+describe("panel customizations", () => {
+    it("are written only for a project with a frontend, and only when a heuristic fired", () => {
+        const spec: SchemaSpec = { tables: [{ name: "products", columns: [serialPk("products"), column("products", "description", { data_type: "text" })] }] };
+        const withCms = generate(spec);
+        expect(withCms.tables[0].customization).toBe([
+            "import { customizeTable } from \"@rebasepro/cms\";",
+            "import type { products } from \"../../../backend/schema/products\";",
+            "",
+            "export const productsCms = customizeTable<typeof products>(\"products\", {",
+            "    icon: \"Package\",",
+            "    fields: {",
+            "        description: {",
+            "            multiline: true",
+            "        }",
+            "    }",
+            "});",
+            ""
+        ].join("\n"));
+        const headless = generate(spec, { cms: undefined });
+        expect(headless.tables[0].customization).toBeUndefined();
+        const plain = generate({ tables: [{ name: "widgets", columns: [serialPk("widgets"), column("widgets", "code", { data_type: "character varying", udt_name: "varchar", character_maximum_length: 8 })] }] });
+        expect(plain.tables[0].customization).toBeUndefined();
     });
 
-    describe("icon mapping", () => {
-        it("assigns correct icons based on table name", () => {
-            const make = (name: string) => {
-                const meta = makeSimpleTable(name, [mkCol(name, "id", { data_type: "uuid",
-udt_name: "uuid",
-is_nullable: "NO" })]);
-                return generateCollectionFile(name, meta, [], new Set(), new Map([[name, meta]]), new Map());
-            };
-            expect(make("users")).toContain('icon: "Users"');
-            expect(make("blog_posts")).toContain('icon: "FileText"');
-            expect(make("products")).toContain('icon: "Package"');
-            expect(make("orders")).toContain('icon: "ShoppingCart"');
-            expect(make("app_settings")).toContain('icon: "Settings"');
-            expect(make("random_xyz")).toContain('icon: "Database"');
+    it("hide the stamps from the list and make them read-only, and carry what sampled rows suggest", () => {
+        const g = generate({
+            tables: [{ name: "articles", columns: [serialPk("articles"), autoStamp("articles", "created_at"), column("articles", "body", { data_type: "text" }), column("articles", "cover", { data_type: "text" }), column("articles", "views", { data_type: "integer", udt_name: "int4" })] }]
+        }, {
+            samples: new Map([["articles", [
+                { id: 1, body: "# Title\n\nSome **bold** text.", cover: "https://cdn.example.com/a.png", views: 3 },
+                { id: 2, body: "Plain", cover: "https://cdn.example.com/b.jpg", views: 10 }
+            ]]])
         });
-    });
-
-    describe("humanized names", () => {
-        it("uses Title Case for collection name from snake_case table", () => {
-            const meta = makeSimpleTable("user_profiles", [
-                mkCol("user_profiles", "id", { data_type: "uuid",
-udt_name: "uuid",
-is_nullable: "NO" })
-            ]);
-            const result = generateCollectionFile("user_profiles", meta, [], new Set(), new Map([["user_profiles", meta]]), new Map());
-            expect(result).toContain('name: "User Profiles"');
-            expect(result).toContain('singularName: "User Profile"');
-        });
-
-        it("humanizes property names", () => {
-            const meta = makeSimpleTable("t", [
-                mkCol("t", "id", { data_type: "uuid",
-udt_name: "uuid",
-is_nullable: "NO" }),
-                mkCol("t", "first_name")
-            ]);
-            const result = generateCollectionFile("t", meta, [], new Set(), new Map([["t", meta]]), new Map());
-            expect(result).toContain('name: "First Name"');
-        });
-    });
-
-    describe("import generation", () => {
-        /**
-         * The import has to name a builder the target project can resolve, and
-         * `defineCollection` is what keeps the property keys literal — without it
-         * the `admin` block's key-shaped fields (`propertiesOrder`, `sort`,
-         * `listProperties`) are checked against `string` and a stale key left by a
-         * renamed column compiles silently. See `CollectionBuilder`.
-         */
-        it("imports the builder the project can resolve", () => {
-            const meta = makeSimpleTable("t", [mkCol("t", "id", { data_type: "uuid",
-udt_name: "uuid",
-is_nullable: "NO" })]);
-            const gen = (builder: CollectionBuilder) => generateCollectionFile(
-                "t", meta, [], new Set(), new Map([["t", meta]]), new Map(), undefined, { builder }
-            );
-
-            expect(gen("admin-types")).toContain('import { defineCollection } from "@rebasepro/cms-types"');
-            expect(gen("admin-types")).toContain("const tCollection = defineCollection({");
-
-            // No admin-types in a headless project, so the headless builder — same
-            // key inference, no admin surface, nothing React in its graph.
-            expect(gen("common")).toContain('import { defineCollection } from "@rebasepro/common"');
-            expect(gen("common")).not.toContain("@rebasepro/cms-types");
-
-            // Neither package declared: neither import would resolve, so the old
-            // annotation is the only honest thing to emit.
-            expect(gen("annotation")).toContain('import { PostgresCollectionConfig } from "@rebasepro/types"');
-            expect(gen("annotation")).toContain("const tCollection: PostgresCollectionConfig = {");
-        });
-
-        /**
-         * `@rebasepro/types` declares no `admin` field at all — the augmentation in
-         * `@rebasepro/cms-types` is what adds it — so emitting the block into a
-         * project that does not have that package writes a type error into every
-         * generated file. It did, until this.
-         */
-        it("emits no admin block where the field is not declared", () => {
-            const meta = makeSimpleTable("t", [
-                mkCol("t", "id", { data_type: "uuid", udt_name: "uuid", is_nullable: "NO" }),
-                // `created_at` and a `text` column are the two that carry a
-                // property-level admin block: readOnly/hideFromCollection and
-                // multiline respectively.
-                mkCol("t", "created_at", { data_type: "timestamp with time zone", udt_name: "timestamptz" }),
-                mkCol("t", "description", { data_type: "text", udt_name: "text" })
-            ]);
-            const gen = (builder: CollectionBuilder) => generateCollectionFile(
-                "t", meta, [], new Set(), new Map([["t", meta]]), new Map(), undefined, { builder }
-            );
-
-            expect(gen("admin-types")).toContain("admin: {");
-            for (const builder of ["common", "annotation"] as const) {
-                expect(gen(builder)).not.toContain("admin: {");
-                // The core options next to them survive: `autoValue` is declared on
-                // `DateProperty` in the core types and describes a write, not a form.
-                expect(gen(builder)).toContain('autoValue: "on_create"');
-            }
-        });
-
-        it("does not duplicate imports for multiple relations to same table", () => {
-            const fks = [mkFk("posts", "author_id", "users"), mkFk("posts", "reviewer_id", "users")];
-            const meta = makeSimpleTable("posts", [
-                mkCol("posts", "id", { data_type: "uuid",
-udt_name: "uuid",
-is_nullable: "NO" }),
-                mkCol("posts", "author_id"),
-                mkCol("posts", "reviewer_id")
-            ], ["id"], fks);
-            const result = generateCollectionFile("posts", meta, fks, new Set(), new Map([["posts", meta]]), new Map());
-            const importMatches = result.match(/import usersCollection/g);
-            expect(importMatches).toHaveLength(1);
-        });
-    });
-
-    describe("export default", () => {
-        it("exports the collection variable as default", () => {
-            const meta = makeSimpleTable("orders", [mkCol("orders", "id", { data_type: "uuid",
-udt_name: "uuid",
-is_nullable: "NO" })]);
-            const result = generateCollectionFile("orders", meta, [], new Set(), new Map([["orders", meta]]), new Map());
-            expect(result).toContain("export default ordersCollection;");
-        });
+        const customization = g.tables[0].customization ?? "";
+        expect(customization).toContain("createdAt: {\n            readOnly: true,\n            hidden: true\n        }");
+        expect(customization).toContain("body: {\n            multiline: true,\n            markdown: true\n        }");
+        expect(customization).toContain("cover: {\n            urlPreview: \"image\"\n        }");
+        expect(moduleOf(g, "articles")).toContain("cover: col.text().validate({ url: true })");
     });
 });

@@ -1,0 +1,49 @@
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { users } from "./users";
+import { changesetComments } from "./changeset_comments";
+import { changesetTags } from "./changeset_tags";
+import { currentNodes } from "./current_nodes";
+import { currentRelations } from "./current_relations";
+import { currentWays } from "./current_ways";
+import { nodes } from "./nodes";
+import { relations } from "./relations";
+import { ways } from "./ways";
+
+// ⚠ Not reproduced exactly by `rebase db push` — read before pushing:
+//   - "created_at" is timestamp without time zone, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
+//   - "closed_at" is timestamp without time zone, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
+export const changesets = defineTable("changesets", {
+    columns: {
+        id: col.bigserial().primaryKey(),
+        userId: col.bigint().notNull(),
+        createdAt: col.custom("timestamp without time zone").notNull(),
+        minLat: col.integer(),
+        maxLat: col.integer(),
+        minLon: col.integer(),
+        maxLon: col.integer(),
+        closedAt: col.custom("timestamp without time zone").notNull(),
+        numChanges: col.integer().notNull().default(0),
+        numCreatedNodes: col.integer().notNull().default(0),
+        numModifiedNodes: col.integer().notNull().default(0),
+        numDeletedNodes: col.integer().notNull().default(0),
+        numCreatedWays: col.integer().notNull().default(0),
+        numModifiedWays: col.integer().notNull().default(0),
+        numDeletedWays: col.integer().notNull().default(0),
+        numCreatedRelations: col.integer().notNull().default(0),
+        numModifiedRelations: col.integer().notNull().default(0),
+        numDeletedRelations: col.integer().notNull().default(0)
+    },
+    relations: {
+        user: rel.belongsTo(() => users, { onDelete: "no action" }),
+        changeset_comments: rel.hasMany(() => changesetComments),
+        changeset_tags: rel.hasMany(() => changesetTags),
+        current_nodes: rel.hasMany(() => currentNodes),
+        current_relations: rel.hasMany(() => currentRelations),
+        current_ways: rel.hasMany(() => currentWays),
+        nodes: rel.hasMany(() => nodes),
+        relations: rel.hasMany(() => relations),
+        ways: rel.hasMany(() => ways),
+        users: rel.manyToMany(() => users, { through: "changesets_subscribers", targetKey: "subscriber_id" })
+    },
+    rls: "admin-only"
+});

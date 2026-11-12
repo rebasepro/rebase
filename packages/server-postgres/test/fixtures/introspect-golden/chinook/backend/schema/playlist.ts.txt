@@ -1,0 +1,14 @@
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { track } from "./track";
+
+// Introspected as a lookup: a 18-row code list: referenced by 1 table(s), references none, 3 or fewer simple columns.
+export const playlist = defineTable("playlist", {
+    columns: {
+        playlistId: col.integer().primaryKey(),
+        name: col.varchar(120)
+    },
+    relations: {
+        track: rel.manyToMany(() => track)
+    },
+    rls: "admin-only"
+});

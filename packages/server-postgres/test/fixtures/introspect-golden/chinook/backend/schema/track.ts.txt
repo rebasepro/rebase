@@ -1,0 +1,28 @@
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { album } from "./album";
+import { genre } from "./genre";
+import { mediaType } from "./media_type";
+import { invoiceLine } from "./invoice_line";
+import { playlist } from "./playlist";
+
+export const track = defineTable("track", {
+    columns: {
+        trackId: col.integer().primaryKey(),
+        name: col.varchar(200).notNull(),
+        albumId: col.integer(),
+        mediaTypeId: col.integer().notNull(),
+        genreId: col.integer(),
+        composer: col.varchar(220),
+        milliseconds: col.integer().notNull(),
+        bytes: col.integer(),
+        unitPrice: col.numeric(10, 2).notNull()
+    },
+    relations: {
+        album: rel.belongsTo(() => album, { onDelete: "no action" }),
+        genre: rel.belongsTo(() => genre, { onDelete: "no action" }),
+        mediaType: rel.belongsTo(() => mediaType, { onDelete: "no action" }),
+        invoice_line: rel.hasMany(() => invoiceLine),
+        playlist: rel.manyToMany(() => playlist)
+    },
+    rls: "admin-only"
+});

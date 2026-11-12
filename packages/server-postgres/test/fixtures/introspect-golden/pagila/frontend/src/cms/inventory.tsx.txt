@@ -1,0 +1,12 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { inventory } from "../../../backend/schema/inventory";
+
+export const inventoryCms = customizeTable<typeof inventory>("inventory", {
+    sort: ["lastUpdate", "desc"],
+    fields: {
+        lastUpdate: {
+            readOnly: true
+        }
+    },
+    fieldOrder: ["inventoryId", "lastUpdate", "film", "store"]
+});

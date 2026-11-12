@@ -1,0 +1,92 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { users } from "../../../backend/schema/users";
+
+// A board over "status" fits this table, but a board needs a text column to keep each card's order in. Add one, then declare kanban: { columnField: "status", orderField: "<that column>" }.
+export const usersCms = customizeTable<typeof users>("users", {
+    icon: "Users",
+    display: {
+        title: "email"
+    },
+    listFields: [
+        "id",
+        "displayName",
+        "homeLocationName",
+        "email",
+        "status",
+        "descriptionFormat"
+    ],
+    fields: {
+        email: {
+            multiline: true
+        },
+        passCrypt: {
+            multiline: true
+        },
+        displayName: {
+            multiline: true
+        },
+        description: {
+            multiline: true
+        },
+        passSalt: {
+            multiline: true
+        },
+        newEmail: {
+            multiline: true
+        },
+        languages: {
+            multiline: true
+        },
+        authUid: {
+            multiline: true
+        },
+        preferredEditor: {
+            multiline: true
+        },
+        authProvider: {
+            multiline: true
+        },
+        homeLocationName: {
+            multiline: true
+        },
+        company: {
+            multiline: true
+        }
+    },
+    fieldOrder: [
+        "id",
+        "displayName",
+        "homeLocationName",
+        "email",
+        "status",
+        "descriptionFormat",
+        "passCrypt",
+        "creationTime",
+        "passSalt",
+        "newEmail",
+        "languages",
+        "termsAgreed",
+        "authUid",
+        "preferredEditor",
+        "authProvider",
+        "touAgreed",
+        "creationAddress",
+        "company",
+        "dataPublic",
+        "emailValid",
+        "considerPd",
+        "termsSeen",
+        "publicHeatmap",
+        "homeLat",
+        "homeLon",
+        "homeZoom",
+        "changesetsCount",
+        "tracesCount",
+        "diaryEntriesCount",
+        "homeTile",
+        "diaryCommentsCount",
+        "noteCommentsCount",
+        "description",
+        "imageUseGravatar"
+    ]
+});

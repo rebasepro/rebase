@@ -1,0 +1,25 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { invoice } from "../../../backend/schema/invoice";
+
+export const invoiceCms = customizeTable<typeof invoice>("invoice", {
+    icon: "ShoppingCart",
+    listFields: [
+        "invoiceId",
+        "invoiceDate",
+        "billingAddress",
+        "billingCity",
+        "billingState",
+        "billingCountry"
+    ],
+    fieldOrder: [
+        "invoiceId",
+        "invoiceDate",
+        "billingAddress",
+        "billingCity",
+        "billingState",
+        "billingCountry",
+        "billingPostalCode",
+        "total",
+        "customer"
+    ]
+});

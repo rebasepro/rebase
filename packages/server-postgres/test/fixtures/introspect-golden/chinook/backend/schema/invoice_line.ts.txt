@@ -1,0 +1,18 @@
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { invoice } from "./invoice";
+import { track } from "./track";
+
+export const invoiceLine = defineTable("invoice_line", {
+    columns: {
+        invoiceLineId: col.integer().primaryKey(),
+        invoiceId: col.integer().notNull(),
+        trackId: col.integer().notNull(),
+        unitPrice: col.numeric(10, 2).notNull(),
+        quantity: col.integer().notNull()
+    },
+    relations: {
+        invoice: rel.belongsTo(() => invoice, { onDelete: "no action" }),
+        track: rel.belongsTo(() => track, { onDelete: "no action" })
+    },
+    rls: "admin-only"
+});

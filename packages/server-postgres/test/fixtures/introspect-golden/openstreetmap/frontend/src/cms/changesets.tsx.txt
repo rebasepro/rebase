@@ -1,0 +1,26 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { changesets } from "../../../backend/schema/changesets";
+
+export const changesetsCms = customizeTable<typeof changesets>("changesets", {
+    listFields: ["id", "closedAt", "minLat", "maxLat", "minLon", "maxLon"],
+    fieldOrder: [
+        "id",
+        "closedAt",
+        "minLat",
+        "maxLat",
+        "minLon",
+        "maxLon",
+        "numChanges",
+        "numCreatedNodes",
+        "numModifiedNodes",
+        "numDeletedNodes",
+        "numCreatedWays",
+        "numModifiedWays",
+        "numDeletedWays",
+        "numCreatedRelations",
+        "numModifiedRelations",
+        "numDeletedRelations",
+        "user",
+        "createdAt"
+    ]
+});

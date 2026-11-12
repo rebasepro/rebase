@@ -1,0 +1,31 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { gpxFiles } from "../../../backend/schema/gpx_files";
+
+// A board over "visibility" fits this table, but a board needs a text column to keep each card's order in. Add one, then declare kanban: { columnField: "visibility", orderField: "<that column>" }.
+export const gpxFilesCms = customizeTable<typeof gpxFiles>("gpx_files", {
+    display: {
+        title: "name"
+    },
+    listFields: ["id", "name", "visibility", "timestamp", "visible", "inserted"],
+    fields: {
+        name: {
+            multiline: true
+        },
+        description: {
+            multiline: true
+        }
+    },
+    fieldOrder: [
+        "id",
+        "name",
+        "visibility",
+        "timestamp",
+        "visible",
+        "inserted",
+        "size",
+        "latitude",
+        "longitude",
+        "user",
+        "description"
+    ]
+});

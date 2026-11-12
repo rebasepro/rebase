@@ -1,164 +1,19 @@
 /**
- * What introspection writes so that the planner builds the column it read.
+ * What introspection reads from a real catalogue — the cases that need one:
+ * the sequence name Postgres gives a long `SERIAL`, a search block read back
+ * from the expression Postgres deparsed, and each column's type and default as
+ * Postgres itself spells them back. Run against PGlite.
  *
  * The end-to-end proof is `e2e/introspect-roundtrip-e2e.test.ts` (introspect,
- * then `db push --dry-run`, against a real Postgres: no changes). These are the
- * per-column answers it is made of, and the two that need a real catalogue —
- * the sequence name Postgres gives a long `SERIAL`, and a search block read
- * back from the expression Postgres deparsed — run against PGlite.
+ * then `db push --dry-run`, against a real Postgres).
  */
 import { PGlite } from "@electric-sql/pglite";
 import type { CollectionConfig } from "@rebasepro/types";
-import type { ForeignKeyRow, TableColumn } from "../src/schema/introspect-db-logic";
-import {
-    arrayStorage,
-    columnStorage,
-    literalDefaultOf,
-    onDeleteOf,
-    primaryKeyStorage,
-    serialSequenceName
-} from "../src/schema/introspect-db-storage";
+import { serialSequenceName } from "../src/schema/introspect-db-storage";
 import { reconstructSearchBlock } from "../src/schema/introspect-db-search";
 import { readSchemaMetadata } from "../src/schema/introspect-db-queries";
+import { describeTables } from "../src/schema/introspect-tables";
 import { ensureCollectionTables } from "../src/schema/ensure-collection-tables";
-
-const col = (column_name: string, data_type: string, extra: Partial<TableColumn> = {}): TableColumn => ({
-    table_name: "things",
-    column_name,
-    data_type,
-    udt_name: data_type,
-    is_nullable: "YES",
-    column_default: null,
-    ...extra
-});
-const plain = { isEnumColumn: false, enumTypeName: "things_x", enumTypeShared: false };
-
-describe("a column's storage keys", () => {
-    it.each([
-        [col("n", "integer"), "number", ['columnType: "integer"']],
-        [col("n", "bigint"), "number", ['columnType: "bigint"']],
-        [col("n", "real"), "number", ['columnType: "real"']],
-        [col("n", "double precision"), "number", ['columnType: "double precision"']],
-        [col("n", "numeric", { numeric_precision: 10, numeric_scale: 2 }), "number", ["precision: 10", "scale: 2"]],
-        [col("n", "numeric"), "number", []],
-        [col("s", "text"), "string", []],
-        [col("s", "character varying", { character_maximum_length: 40 }), "string", ['columnType: "varchar"']],
-        [col("s", "character", { character_maximum_length: 2 }), "string", ['columnType: "char"']],
-        [col("s", "uuid"), "string", ['columnType: "uuid"']],
-        [col("d", "timestamp with time zone"), "date", []],
-        [col("d", "date"), "date", ['columnType: "date"']],
-        [col("d", "time without time zone"), "date", ['columnType: "time"']],
-        [col("m", "jsonb"), "map", []],
-        [col("m", "json"), "map", ['columnType: "json"']]
-    ])("%#: %o as %s → %o", (column, propType, keys) => {
-        const stored = columnStorage(column, propType, plain);
-        expect(stored.keys).toEqual(keys);
-        expect(stored.note).toBeUndefined();
-    });
-
-    it.each([
-        [col("d", "timestamp without time zone"), "date", /timestamptz/],
-        [col("t", "interval"), "string", /interval.*converting the column to text/],
-        [col("i", "inet"), "string", /inet/],
-        [col("s", "character varying"), "string", /no length/],
-        [col("n", "money"), "number", /money/]
-    ])("%#: says what a push would do to %o", (column, propType, note) => {
-        expect(columnStorage(column, propType, plain).note).toMatch(note);
-    });
-
-    it("declares an unbounded varchar as text, never a VARCHAR(255) that narrows it", () => {
-        const stored = columnStorage(col("s", "character varying"), "string", plain);
-        expect(stored.keys).toEqual([]);
-        expect(stored.note).toMatch(/text.*keeps every value/);
-    });
-
-    it("declares a smallint as integer, and says the push widens it", () => {
-        const stored = columnStorage(col("n", "smallint"), "number", plain);
-        expect(stored.keys).toEqual(['columnType: "integer"']);
-        expect(stored.note).toMatch(/widens/);
-    });
-
-    it("keeps an enum whose type is named the way Rebase names it, and says how to rename any other", () => {
-        const enumCol = col("mood", "USER-DEFINED", { udt_name: "mood" });
-        expect(columnStorage({ ...enumCol, udt_name: "things_mood" }, "string",
-            { isEnumColumn: true, enumTypeName: "things_mood", enumTypeShared: false })).toEqual({ keys: [] });
-        expect(columnStorage(enumCol, "string", { isEnumColumn: true, enumTypeName: "things_mood", enumTypeShared: false }).note)
-            .toContain('ALTER TYPE "mood" RENAME TO "things_mood";');
-        expect(columnStorage(enumCol, "string", { isEnumColumn: true, enumTypeName: "things_mood", enumTypeShared: true }).note)
-            .toMatch(/other columns share/);
-    });
-
-    it("stores only the four native array element types natively", () => {
-        expect(arrayStorage(col("a", "ARRAY", { udt_name: "_text" }))).toEqual({ columnType: "text[]", innerType: "string" });
-        expect(arrayStorage(col("a", "ARRAY", { udt_name: "_int4" }))).toEqual({ columnType: "integer[]", innerType: "number" });
-        // Read as integer[] before — a narrowing on the first push.
-        expect(arrayStorage(col("a", "ARRAY", { udt_name: "_int8" })).note).toMatch(/array of int8/);
-        expect(arrayStorage(col("a", "ARRAY", { udt_name: "_varchar" })).columnType).toBeUndefined();
-    });
-});
-
-describe("a primary key's isId", () => {
-    it("is increment for an integer identity, and only for one", () => {
-        expect(primaryKeyStorage(col("id", "integer", { is_identity: "YES" }), "number"))
-            .toEqual({ keys: ['isId: "increment"'] });
-        expect(primaryKeyStorage(col("id", "bigint", { is_identity: "YES" }), "number").note).toMatch(/always INTEGER/);
-    });
-
-    it("declares a serial key as SERIAL, with the sequence Postgres would name", () => {
-        expect(primaryKeyStorage(col("id", "integer", { column_default: "nextval('things_id_seq'::regclass)" }), "number"))
-            .toEqual({ keys: ['isId: "manual"', 'columnType: "serial"'] });
-        expect(primaryKeyStorage(col("id", "bigint", { column_default: "nextval('things_id_seq'::regclass)" }), "number"))
-            .toEqual({ keys: ['isId: "manual"', 'columnType: "bigserial"'] });
-        expect(primaryKeyStorage(col("id", "integer", { column_default: "nextval('custom_seq'::regclass)" }), "number").note)
-            .toMatch(/sequence custom_seq/);
-    });
-
-    it("is uuid only when the database generates it, and manual otherwise", () => {
-        expect(primaryKeyStorage(col("id", "uuid", { column_default: "gen_random_uuid()" }), "string"))
-            .toEqual({ keys: ['isId: "uuid"'] });
-        expect(primaryKeyStorage(col("id", "uuid"), "string"))
-            .toEqual({ keys: ['isId: "manual"', 'columnType: "uuid"'] });
-        expect(primaryKeyStorage(col("code", "text"), "string")).toEqual({ keys: ['isId: "manual"'] });
-        expect(primaryKeyStorage(col("id", "uuid", { column_default: "my_id()" }), "string").keys[0])
-            .toBe('isId: "sql`my_id()`"');
-    });
-});
-
-describe("a column default", () => {
-    it.each([
-        ["'user'::text", "string", '"user"'],
-        ["'it''s'::character varying", "string", "\"it's\""],
-        ["'new'::people_status", "string", '"new"'],
-        ["0", "number", "0"],
-        ["'1.50'::numeric", "number", "1.5"],
-        ["(-3)", "number", "-3"],
-        ["true", "boolean", "true"],
-        ["'{\"a\": 1}'::jsonb", "map", '{"a":1}']
-    ])("%s on a %s is defaultValue %s", (fallback, propType, source) => {
-        expect(literalDefaultOf(col("c", "text", { column_default: fallback }), propType)).toEqual({ source });
-    });
-
-    it("leaves now() to autoValue", () => {
-        expect(literalDefaultOf(col("c", "timestamp with time zone", { column_default: "now()" }), "date")).toBeUndefined();
-    });
-
-    it("says when a default cannot be carried, rather than dropping it unannounced", () => {
-        expect(literalDefaultOf(col("c", "date", { column_default: "CURRENT_DATE" }), "date"))
-            .toEqual({ note: expect.stringMatching(/CURRENT_DATE.*dropping that default/) });
-    });
-});
-
-describe("ON DELETE", () => {
-    const fk = (delete_rule: string): ForeignKeyRow => ({
-        table_name: "orders", column_name: "customer_id", foreign_table_name: "customers", foreign_column_name: "id", delete_rule
-    });
-    it("is written only when it is not what the planner would choose", () => {
-        expect(onDeleteOf(fk("SET NULL"), false)).toBeUndefined();
-        expect(onDeleteOf(fk("RESTRICT"), true)).toBeUndefined();
-        expect(onDeleteOf(fk("CASCADE"), true)).toBe("cascade");
-        expect(onDeleteOf(fk("NO ACTION"), false)).toBe("no action");
-    });
-});
 
 describe("against a real catalogue", () => {
     let db: PGlite;
@@ -203,14 +58,61 @@ describe("against a real catalogue", () => {
         const read = reconstructSearchBlock({ schema: "public", table: "posts", columns, comments, keyByColumn });
         expect(read.note).toBeUndefined();
         expect(read.columns).toEqual(new Set(["search_vector"]));
-        expect(read.block).toContain('language: "english"');
-        expect(read.block).toContain('{ path: "title", weight: "A" }');
-        expect(read.block).toContain('{ path: "body", weight: "C" }');
+        expect(read.search).toEqual({ language: "english", fields: [{ path: "title", weight: "A" }, { path: "body", weight: "C" }] });
 
         // A block that does not reproduce the stamp is not written at all.
         comments.set("search_vector", "rebase:search:v1:0000000000000000");
         const tampered = reconstructSearchBlock({ schema: "public", table: "posts", columns, comments, keyByColumn });
-        expect(tampered.block).toBeUndefined();
+        expect(tampered.search).toBeUndefined();
         expect(tampered.note).toMatch(/does not reproduce the column's stamp/);
+    });
+
+    it("describes each column from the catalogue Postgres itself returns", async () => {
+        await db.exec(`
+            CREATE TYPE mood AS ENUM ('happy', 'sad');
+            CREATE SEQUENCE tickets_seq;
+            CREATE TABLE things (
+                id serial PRIMARY KEY,
+                seq bigint GENERATED BY DEFAULT AS IDENTITY,
+                ticket integer DEFAULT nextval('tickets_seq'),
+                code varchar(12) NOT NULL DEFAULT 'abc',
+                qty integer DEFAULT 1,
+                ratio numeric(6, 3),
+                paid boolean DEFAULT false,
+                meta jsonb DEFAULT '{}'::jsonb,
+                at timestamptz DEFAULT now(),
+                day date,
+                ip inet,
+                span interval,
+                stamp timestamp,
+                tags text[],
+                feelings mood[],
+                feeling mood NOT NULL DEFAULT 'happy',
+                doubled integer GENERATED ALWAYS AS (qty * 2) STORED,
+                gone varchar DEFAULT NULL
+            );
+            ALTER TABLE things ENABLE ROW LEVEL SECURITY;
+        `);
+        const [things] = describeTables(await readSchemaMetadata(db, "public")).tables;
+        const byColumn = Object.fromEntries(things.columns.map(c => [c.column, c]));
+        expect(byColumn.id).toMatchObject({ type: { kind: "serial" }, primaryKey: true });
+        expect(byColumn.id.default).toBeUndefined();
+        expect(byColumn.seq).toMatchObject({ type: { kind: "bigint" }, default: { kind: "identity" } });
+        expect(byColumn.ticket).toMatchObject({ type: { kind: "integer" }, default: { kind: "database" } });
+        expect(byColumn.code).toMatchObject({ type: { kind: "varchar", length: 12 }, nullable: false, default: { kind: "literal", value: "abc" } });
+        expect(byColumn.qty.default).toEqual({ kind: "literal", value: 1 });
+        expect(byColumn.ratio.type).toEqual({ kind: "numeric", precision: 6, scale: 3 });
+        expect(byColumn.paid.default).toEqual({ kind: "literal", value: false });
+        expect(byColumn.meta.default).toEqual({ kind: "literal", value: {} });
+        expect(byColumn.at.default).toEqual({ kind: "sql", expression: "now()" });
+        expect(byColumn.day.type).toEqual({ kind: "date" });
+        expect(byColumn.ip.type).toEqual({ kind: "other", sqlType: "inet" });
+        expect(byColumn.span.type).toEqual({ kind: "other", sqlType: "interval" });
+        expect(byColumn.stamp.type).toEqual({ kind: "other", sqlType: "timestamp without time zone" });
+        expect(byColumn.tags.type).toEqual({ kind: "array", of: { kind: "text" } });
+        expect(byColumn.feelings.type).toEqual({ kind: "array", of: { kind: "enum", values: ["happy", "sad"], name: "mood" } });
+        expect(byColumn.feeling).toMatchObject({ type: { kind: "enum", values: ["happy", "sad"], name: "mood" }, default: { kind: "literal", value: "happy" } });
+        expect(byColumn.doubled).toMatchObject({ generated: { expression: "(qty * 2)" }, readOnly: true });
+        expect(byColumn.gone.default).toBeUndefined();
     });
 });

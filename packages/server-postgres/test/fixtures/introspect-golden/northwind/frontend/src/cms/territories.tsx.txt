@@ -1,0 +1,8 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { territories } from "../../../backend/schema/territories";
+
+export const territoriesCms = customizeTable<typeof territories>("territories", {
+    display: {
+        title: "territoryDescription"
+    }
+});

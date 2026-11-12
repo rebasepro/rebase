@@ -1,0 +1,12 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { store } from "../../../backend/schema/store";
+
+export const storeCms = customizeTable<typeof store>("store", {
+    sort: ["lastUpdate", "desc"],
+    fields: {
+        lastUpdate: {
+            readOnly: true
+        }
+    },
+    fieldOrder: ["storeId", "managerStaffId", "lastUpdate", "address"]
+});

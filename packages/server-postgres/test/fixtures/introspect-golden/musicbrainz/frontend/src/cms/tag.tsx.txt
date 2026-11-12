@@ -1,0 +1,9 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { tag } from "../../../backend/schema/tag";
+
+export const tagCms = customizeTable<typeof tag>("tag", {
+    icon: "Tag",
+    display: {
+        title: "name"
+    }
+});

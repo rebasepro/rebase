@@ -1,0 +1,17 @@
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { activeStorageBlobs } from "./active_storage_blobs";
+
+// Introspected as an owned-child: belongs to active_storage_blobs (its only NOT NULL foreign key) and nothing else references it.
+// ⚠ Not reproduced exactly by `rebase db push` — read before pushing:
+//   - "variation_digest" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
+export const activeStorageVariantRecords = defineTable("active_storage_variant_records", {
+    columns: {
+        id: col.bigserial().primaryKey(),
+        blobId: col.bigint().notNull(),
+        variationDigest: col.text().notNull()
+    },
+    relations: {
+        blob: rel.belongsTo(() => activeStorageBlobs, { onDelete: "no action" })
+    },
+    rls: "admin-only"
+});

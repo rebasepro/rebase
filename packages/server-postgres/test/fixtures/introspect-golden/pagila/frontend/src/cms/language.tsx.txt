@@ -1,0 +1,18 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { language } from "../../../backend/schema/language";
+
+export const languageCms = customizeTable<typeof language>("language", {
+    group: "Reference",
+    display: {
+        title: "name"
+    },
+    sort: ["lastUpdate", "desc"],
+    fields: {
+        name: {
+            multiline: true
+        },
+        lastUpdate: {
+            readOnly: true
+        }
+    }
+});

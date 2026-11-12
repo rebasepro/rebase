@@ -2,7 +2,7 @@ import { describe, expect, it, beforeEach, afterEach, jest } from "@jest/globals
 import { Hono } from "hono";
 import { createServer } from "node:http";
 import path from "node:path";
-import type { BackendBootstrapper, CollectionConfig, DataDriver, InitializedDriver } from "@rebasepro/types";
+import type { BackendBootstrapper, CollectionConfig, DataDriver, InitializedDriver, TableDescriptor } from "@rebasepro/types";
 
 import { initializeRebaseBackend, type RebaseBackendConfig } from "../src/init";
 import type { HonoEnv } from "../src/api/types";
@@ -31,6 +31,17 @@ function collection(slug: string): CollectionConfig {
     };
 }
 
+/** The descriptor an introspecting driver reports beside {@link collection}. */
+function descriptor(slug: string): TableDescriptor {
+    return {
+        name: slug, slug, table: slug, schema: "public", kind: "table",
+        columns: [{ key: "id", column: "id", type: { kind: "uuid" }, nullable: false, primaryKey: true, default: { kind: "random-uuid" } }],
+        primaryKey: ["id"],
+        relations: [],
+        rls: { posture: "rules", rules: [], defaultPolicies: false }
+    };
+}
+
 /** A driver that does nothing; init only needs it to exist and be routable. */
 function stubDriver(): DataDriver {
     return fakeDataDriver({
@@ -55,6 +66,7 @@ function fakeBootstrapper(reports: CollectionConfig[] | undefined): BackendBoots
             return {
                 driver: stubDriver(),
                 collections: reports,
+                ...(reports ? { tables: reports.map(c => descriptor(c.slug)) } : {}),
                 internals: {}
             };
         }

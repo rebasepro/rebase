@@ -1,0 +1,28 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { suppliers } from "../../../backend/schema/suppliers";
+
+export const suppliersCms = customizeTable<typeof suppliers>("suppliers", {
+    display: {
+        title: "companyName"
+    },
+    listFields: ["supplierId", "companyName", "contactName", "contactTitle", "phone", "address"],
+    fields: {
+        homepage: {
+            multiline: true
+        }
+    },
+    fieldOrder: [
+        "supplierId",
+        "companyName",
+        "contactName",
+        "contactTitle",
+        "phone",
+        "address",
+        "city",
+        "region",
+        "postalCode",
+        "country",
+        "fax",
+        "homepage"
+    ]
+});

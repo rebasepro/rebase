@@ -1,0 +1,18 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { reports } from "../../../backend/schema/reports";
+
+export const reportsCms = customizeTable<typeof reports>("reports", {
+    display: {
+        title: "details"
+    },
+    listFields: ["id", "category", "issue", "user", "details", "createdAt"],
+    fields: {
+        details: {
+            multiline: true
+        },
+        category: {
+            multiline: true
+        }
+    },
+    fieldOrder: ["id", "category", "issue", "user", "details", "createdAt", "updatedAt"]
+});

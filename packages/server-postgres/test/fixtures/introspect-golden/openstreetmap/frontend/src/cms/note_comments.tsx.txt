@@ -1,0 +1,15 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { noteComments } from "../../../backend/schema/note_comments";
+
+export const noteCommentsCms = customizeTable<typeof noteComments>("note_comments", {
+    icon: "MessageCircle",
+    hideFromNavigation: true,
+    listFields: ["id", "event", "authorIp", "visible", "note", "author"],
+    fields: {
+        body: {
+            multiline: true,
+            markdown: true
+        }
+    },
+    fieldOrder: ["id", "event", "authorIp", "visible", "note", "author", "body", "createdAt"]
+});

@@ -1,0 +1,34 @@
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { users } from "./users";
+import { issueComments } from "./issue_comments";
+import { reports } from "./reports";
+
+// ⚠ Not reproduced exactly by `rebase db push` — read before pushing:
+//   - "reportable_type" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
+//   - "resolved_at" is timestamp without time zone, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
+//   - "created_at" is timestamp without time zone, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
+//   - "updated_at" is timestamp without time zone, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
+export const issues = defineTable("issues", {
+    columns: {
+        id: col.serial().primaryKey(),
+        reportableType: col.text().notNull(),
+        reportableId: col.integer().notNull(),
+        reportedUserId: col.integer(),
+        status: col.enum(["open", "ignored", "resolved"], { name: "issue_status_enum" }).notNull().default("open"),
+        assignedRole: col.enum(["administrator", "moderator", "importer"], { name: "user_role_enum" }).notNull(),
+        resolvedAt: col.custom("timestamp without time zone"),
+        resolvedBy: col.integer(),
+        updatedBy: col.integer(),
+        reportsCount: col.integer().default(0),
+        createdAt: col.custom("timestamp without time zone").notNull(),
+        updatedAt: col.custom("timestamp without time zone").notNull()
+    },
+    relations: {
+        reportedUser: rel.belongsTo(() => users, { onDelete: "no action" }),
+        resolvedByRelation: rel.belongsTo(() => users, { localKey: "resolved_by", onDelete: "no action" }),
+        updatedByRelation: rel.belongsTo(() => users, { localKey: "updated_by", onDelete: "no action" }),
+        issue_comments: rel.hasMany(() => issueComments),
+        reports: rel.hasMany(() => reports)
+    },
+    rls: "admin-only"
+});

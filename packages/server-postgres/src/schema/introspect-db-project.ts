@@ -1,14 +1,14 @@
 /**
- * What the project being introspected into can actually import.
+ * Where the project being introspected into keeps what introspection writes.
  *
  * The generator is pure — `introspect-db-logic.ts` reads no files — so the one
- * question it cannot answer for itself lives here: which `defineCollection`, if
- * any, will resolve from the directory the collections are written to.
+ * question it cannot answer for itself lives here: does the project have a
+ * frontend that a `customizeTable` file can be written into.
  */
 import fs from "fs";
 import path from "path";
 
-import { ADMIN_TYPES_PACKAGE, COMMON_PACKAGE, type CollectionBuilder } from "./introspect-db-logic";
+import { CMS_PACKAGE } from "./introspect-db-customization";
 
 /** How far up to look before giving up, if no project root announces itself. */
 const MAX_LEVELS = 8;
@@ -25,9 +25,8 @@ function declaredDependencies(manifestPath: string): Set<string> {
         return names;
     }
     if (typeof parsed !== "object" || parsed === null) return names;
-    const manifest = parsed as Record<string, unknown>;
     for (const field of ["dependencies", "devDependencies", "peerDependencies"]) {
-        const block = manifest[field];
+        const block: unknown = Reflect.get(parsed, field);
         if (typeof block === "object" && block !== null) {
             for (const name of Object.keys(block)) names.add(name);
         }
@@ -36,43 +35,41 @@ function declaredDependencies(manifestPath: string): Set<string> {
 }
 
 /**
- * Which `defineCollection` to generate against, for collections written to `outDir`.
- *
- * **The detection is the package manifests above the output directory**, unioned from
- * `outDir` up to and including the project root — the first ancestor holding a
- * `rebase.json`, or `MAX_LEVELS` up if there is none.
- *
- * That is the rule Node itself applies: a file in `config/collections` resolves a bare
- * specifier through `config/node_modules`, then `<project>/node_modules`, and so on up.
- * Reading the manifests along that same path answers the only question that matters —
- * *will this import resolve in the project I am writing into* — from the state on disk
- * at the moment of generation. The alternatives are all proxies for it: `rebase.json`'s
- * `apps` block says a CMS scaffold declared an admin app, and a `frontend/` directory
- * says one was scaffolded, but neither is what the compiler consults, and either can be
- * true of a project whose `config` package does not depend on `@rebasepro/cms-types`.
- *
- * Ambiguity resolves towards the admin panel: a project that declares both packages has
- * a panel, and `@rebasepro/cms-types` is the flavour that keeps the `admin` block.
+ * The project root above a directory: the first ancestor holding a
+ * `rebase.json`, or `undefined` when none does within reach.
  */
-export function detectCollectionBuilder(outDir: string): CollectionBuilder {
-    let dir = path.resolve(outDir);
-    const declared = new Set<string>();
-
+export function findProjectRoot(from: string): string | undefined {
+    let dir = path.resolve(from);
     for (let level = 0; level < MAX_LEVELS; level++) {
-        const manifest = path.join(dir, "package.json");
-        if (fs.existsSync(manifest)) {
-            for (const name of declaredDependencies(manifest)) declared.add(name);
-        }
-        // The project root, and the last level worth reading: anything above it
-        // belongs to whatever the project happens to be checked out inside.
-        if (fs.existsSync(path.join(dir, "rebase.json"))) break;
-
+        if (fs.existsSync(path.join(dir, "rebase.json"))) return dir;
         const parent = path.dirname(dir);
-        if (parent === dir) break;
+        if (parent === dir) return undefined;
         dir = parent;
     }
+    return undefined;
+}
 
-    if (declared.has(ADMIN_TYPES_PACKAGE)) return "admin-types";
-    if (declared.has(COMMON_PACKAGE)) return "common";
-    return "annotation";
+/**
+ * The `frontend/src/cms` directory introspection writes `customizeTable`
+ * files into, or `undefined` when the project has no frontend that can import
+ * `@rebasepro/cms`.
+ *
+ * The project root is the one above the schema directory (`rebase.json`), or —
+ * in a layout without one — the parent of `backend/`. The frontend is
+ * `<root>/frontend`, and it counts only when a manifest on the path a
+ * `frontend/src/cms/<table>.tsx` resolves bare specifiers along (the frontend's
+ * own `package.json`, then the root's) declares `@rebasepro/cms`: that is the
+ * import the file opens with, and a headless project could not resolve it.
+ */
+export function detectCmsDir(schemaDir: string): string | undefined {
+    const resolved = path.resolve(schemaDir);
+    const root = findProjectRoot(resolved) ?? path.dirname(path.dirname(resolved));
+    const frontend = path.join(root, "frontend");
+    if (!fs.existsSync(frontend)) return undefined;
+    for (const manifest of [path.join(frontend, "package.json"), path.join(root, "package.json")]) {
+        if (fs.existsSync(manifest) && declaredDependencies(manifest).has(CMS_PACKAGE)) {
+            return path.join(frontend, "src", "cms");
+        }
+    }
+    return undefined;
 }

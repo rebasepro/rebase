@@ -1,0 +1,6 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { playlist } from "../../../backend/schema/playlist";
+
+export const playlistCms = customizeTable<typeof playlist>("playlist", {
+    group: "Reference"
+});

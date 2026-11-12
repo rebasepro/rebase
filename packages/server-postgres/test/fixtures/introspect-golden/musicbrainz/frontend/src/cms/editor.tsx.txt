@@ -1,0 +1,41 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { editor } from "../../../backend/schema/editor";
+
+export const editorCms = customizeTable<typeof editor>("editor", {
+    display: {
+        title: "name"
+    },
+    listFields: ["id", "name", "email", "website", "password", "ha1"],
+    fields: {
+        bio: {
+            multiline: true
+        },
+        memberSince: {
+            readOnly: true
+        },
+        lastLoginDate: {
+            readOnly: true
+        },
+        lastUpdated: {
+            readOnly: true
+        }
+    },
+    fieldOrder: [
+        "id",
+        "name",
+        "email",
+        "website",
+        "password",
+        "ha1",
+        "deleted",
+        "privs",
+        "gender",
+        "memberSince",
+        "emailConfirmDate",
+        "lastLoginDate",
+        "lastUpdated",
+        "birthDate",
+        "areaRelation",
+        "bio"
+    ]
+});

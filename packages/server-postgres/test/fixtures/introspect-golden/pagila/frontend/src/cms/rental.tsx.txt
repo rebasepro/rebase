@@ -1,0 +1,25 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { rental } from "../../../backend/schema/rental";
+
+export const rentalCms = customizeTable<typeof rental>("rental", {
+    display: {
+        title: "uuid"
+    },
+    sort: ["lastUpdate", "desc"],
+    listFields: ["rentalId", "uuid", "rentalDate", "returnDate", "lastUpdate", "inventory"],
+    fields: {
+        lastUpdate: {
+            readOnly: true
+        }
+    },
+    fieldOrder: [
+        "rentalId",
+        "uuid",
+        "rentalDate",
+        "returnDate",
+        "lastUpdate",
+        "inventory",
+        "customer",
+        "staff"
+    ]
+});

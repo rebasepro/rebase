@@ -1,0 +1,30 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { orders } from "../../../backend/schema/orders";
+
+export const ordersCms = customizeTable<typeof orders>("orders", {
+    icon: "ShoppingCart",
+    listFields: [
+        "orderId",
+        "shipName",
+        "shipAddress",
+        "shipCity",
+        "shipRegion",
+        "shipPostalCode"
+    ],
+    fieldOrder: [
+        "orderId",
+        "shipName",
+        "shipAddress",
+        "shipCity",
+        "shipRegion",
+        "shipPostalCode",
+        "shipCountry",
+        "freight",
+        "orderDate",
+        "requiredDate",
+        "shippedDate",
+        "customer",
+        "employee",
+        "shipViaRelation"
+    ]
+});

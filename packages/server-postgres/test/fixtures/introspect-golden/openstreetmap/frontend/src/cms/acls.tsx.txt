@@ -1,0 +1,22 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { acls } from "../../../backend/schema/acls";
+
+export const aclsCms = customizeTable<typeof acls>("acls", {
+    display: {
+        title: "k"
+    },
+    fields: {
+        k: {
+            multiline: true
+        },
+        v: {
+            multiline: true
+        },
+        domain: {
+            multiline: true
+        },
+        mx: {
+            multiline: true
+        }
+    }
+});

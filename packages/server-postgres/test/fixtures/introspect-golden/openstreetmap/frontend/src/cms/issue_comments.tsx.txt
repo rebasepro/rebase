@@ -1,0 +1,15 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { issueComments } from "../../../backend/schema/issue_comments";
+
+export const issueCommentsCms = customizeTable<typeof issueComments>("issue_comments", {
+    icon: "MessageCircle",
+    display: {
+        title: "body"
+    },
+    fields: {
+        body: {
+            multiline: true,
+            markdown: true
+        }
+    }
+});

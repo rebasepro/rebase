@@ -17,6 +17,7 @@ import {
     type CommentRow,
     type EnumValue,
     type ForeignKeyRow,
+    type IndexRow,
     type PolicyRow,
     type PrimaryKeyRow,
     type SchemaMetadata,
@@ -159,11 +160,18 @@ export interface SchemaSpec {
     enumValues?: EnumValue[];
     rowCounts?: Record<string, number>;
     policies?: PolicyRow[];
+    /** `relrowsecurity` per table; not read (absent) when omitted. */
+    rls?: Record<string, boolean>;
+    indexes?: IndexRow[];
 }
 
 /** Assembles a `SchemaMetadata` plus the table map every entry point wants. */
 export function buildSchema(spec: SchemaSpec): LoadedSchema {
-    const tables: TableRow[] = spec.tables.map((t) => ({ table_name: t.name, is_partitioned: false }));
+    const tables: TableRow[] = spec.tables.map((t) => ({
+        table_name: t.name,
+        is_partitioned: false,
+        ...(spec.rls && t.name in spec.rls ? { rls_enabled: spec.rls[t.name] } : {})
+    }));
     const columns: TableColumn[] = spec.tables.flatMap((t) =>
         t.columns.map((c, index) => ({ ...c, ordinal_position: index + 1 }))
     );
@@ -182,6 +190,7 @@ export function buildSchema(spec: SchemaSpec): LoadedSchema {
         checks: spec.checks ?? [],
         comments: spec.comments ?? [],
         ...(spec.policies && { policies: spec.policies }),
+        ...(spec.indexes && { indexes: spec.indexes }),
         rowCounts: spec.rowCounts ?? {}
     };
 

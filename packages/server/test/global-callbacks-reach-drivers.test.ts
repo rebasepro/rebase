@@ -28,7 +28,7 @@ const leads = (hooks?: TableHooks) => defineTable("leads", {
     ...(hooks ? { hooks } : {})
 });
 /** A Postgres-typed adapter whose driver keeps its own registry, as both real drivers do. */
-function adapter(options: { type?: string; registry?: CollectionRegistry | null; introspected?: PostgresCollectionConfig[] } = {}): DatabaseAdapter {
+function adapter(options: { type?: string; registry?: CollectionRegistry | null; introspected?: PostgresCollectionConfig[]; tables?: TableDescriptor[] } = {}): DatabaseAdapter {
     const registry = options.registry === undefined ? new CollectionRegistry() : options.registry;
     return {
         type: options.type ?? "postgres",
@@ -36,7 +36,7 @@ function adapter(options: { type?: string; registry?: CollectionRegistry | null;
             return {
                 internals: {},
                 driver: fakeDataDriver(),
-                ...(options.introspected ? { collections: options.introspected } : {}),
+                ...(options.introspected ? { collections: options.introspected, tables: options.tables } : {}),
                 ...(registry ? { collectionRegistry: registry } : {})
             };
         },
@@ -107,39 +107,41 @@ describe("global hooks", () => {
             .rejects.toThrow(/returned no collection registry that accepts global callbacks/);
     });
 
-    it("hand an introspected table's descriptor to a hook, now that introspection describes its tables", async () => {
+    it("hand an introspected table's descriptor to a hook — the one the driver read from the catalogue", async () => {
         // What the Postgres driver's runtime introspection hands back for one table.
+        const leadsDescriptor: TableDescriptor = {
+            name: "leads", slug: "leads", table: "leads", schema: "public", kind: "table",
+            columns: [{ key: "id", column: "id", type: { kind: "uuid" }, nullable: false, primaryKey: true, default: { kind: "random-uuid" } }],
+            primaryKey: ["id"],
+            relations: [],
+            rls: { posture: "rules", rules: [{ name: "leads_read", operation: "select", using: "true" }], defaultPolicies: false }
+        };
         const introspectedLeads: PostgresCollectionConfig = {
-            name: "Leads",
+            name: "leads",
             slug: "leads",
             table: "leads",
             schema: "public",
-            properties: { id: { name: "Id", columnName: "id", type: "string", isId: "uuid" } }
+            properties: { id: { type: "string", isId: "uuid", columnType: "uuid" } }
         };
         const registry = new CollectionRegistry();
         const seen: TableDescriptor[] = [];
         const hooks: TableHooks = { afterRead: ({ table, values }) => { seen.push(table); return values; } };
-        await boot(adapter({ registry, introspected: [introspectedLeads] }), { tables: [], hooks });
+        await boot(adapter({ registry, introspected: [introspectedLeads], tables: [leadsDescriptor] }), { tables: [], hooks });
 
         await registry.getGlobalCallbacks()?.afterRead?.(readProps({ id: "1" }));
-        expect(seen.map(table => table.slug)).toEqual(["leads"]);
-        expect(seen[0].rls.posture).toBe("rules");
+        expect(seen).toEqual([leadsDescriptor]);
     });
 
-    it("refuse to boot when an introspected table could not be described — a hook would have no descriptor to receive", async () => {
-        const undescribable: PostgresCollectionConfig = {
-            name: "Leads",
+    it("refuse to boot when a driver serves an introspected table without its descriptor — a hook would have none to receive", async () => {
+        const introspectedLeads: PostgresCollectionConfig = {
+            name: "leads",
             slug: "leads",
             table: "leads",
             schema: "public",
-            properties: {
-                id: { name: "Id", columnName: "id", type: "string", isId: "uuid" },
-                file: { name: "File", columnName: "file", type: "string", storage: { storagePath: () => "leads/" } }
-            }
+            properties: { id: { type: "string", isId: "uuid" } }
         };
-        jest.spyOn(console, "warn").mockImplementation(() => {});
-        await expect(boot(adapter({ introspected: [undescribable] }), { tables: [], hooks: { afterRead: ({ values }) => values } }))
-            .rejects.toThrow(/could not be described.*"leads"/s);
+        await expect(boot(adapter({ introspected: [introspectedLeads] }), { tables: [], hooks: { afterRead: ({ values }) => values } }))
+            .rejects.toThrow(/introspected 1 table\(s\) and described none of them/);
     });
 
     it("still boot a driver with no registry when none are declared", async () => {

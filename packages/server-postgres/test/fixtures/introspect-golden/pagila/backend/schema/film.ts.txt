@@ -1,0 +1,46 @@
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { language } from "./language";
+import { inventory } from "./inventory";
+import { actor } from "./actor";
+import { category } from "./category";
+
+// ⚠ Not reproduced exactly by `rebase db push` — read before pushing:
+//   - "fulltext" is tsvector, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
+//   - "length_hours" is a generated column whose expression was not read; it is declared read-only, and a push would plan it as a plain column.
+export const film = defineTable("film", {
+    columns: {
+        filmId: col.serial().primaryKey(),
+        title: col.text().notNull(),
+        description: col.text(),
+        releaseYear: col.integer(),
+        languageId: col.integer().notNull(),
+        originalLanguageId: col.integer(),
+        rentalDuration: col.smallint().notNull().default(3),
+        rentalRate: col.numeric(4, 2).notNull().default(4.99),
+        length: col.smallint(),
+        replacementCost: col.numeric(5, 2).notNull().default(19.99),
+        rating: col.enum(["G", "PG", "PG-13", "R", "NC-17"], { name: "mpaa_rating" }).default("G"),
+        lastUpdate: col.timestamptz().notNull().onCreateNow(),
+        specialFeatures: col.array(col.text()),
+        fulltext: col.custom("tsvector").notNull(),
+        lengthHours: col.numeric(4, 2).readOnly()
+    },
+    relations: {
+        language: rel.belongsTo(() => language),
+        originalLanguage: rel.belongsTo(() => language, { onDelete: "restrict" }),
+        inventory: rel.hasMany(() => inventory),
+        actor: rel.manyToMany(() => actor, {
+            through: "film_actor",
+            pivot: {
+                lastUpdate: col.timestamptz().notNull().onCreateNow()
+            }
+        }),
+        category: rel.manyToMany(() => category, {
+            through: "film_category",
+            pivot: {
+                lastUpdate: col.timestamptz().notNull().onCreateNow()
+            }
+        })
+    },
+    rls: "admin-only"
+});

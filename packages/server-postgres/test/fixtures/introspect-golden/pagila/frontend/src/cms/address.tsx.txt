@@ -1,0 +1,40 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { address } from "../../../backend/schema/address";
+
+export const addressCms = customizeTable<typeof address>("address", {
+    display: {
+        title: "address"
+    },
+    sort: ["lastUpdate", "desc"],
+    listFields: ["addressId", "phone", "lastUpdate", "city", "address", "address2"],
+    fields: {
+        address: {
+            multiline: true
+        },
+        address2: {
+            multiline: true
+        },
+        district: {
+            multiline: true
+        },
+        postalCode: {
+            multiline: true
+        },
+        phone: {
+            multiline: true
+        },
+        lastUpdate: {
+            readOnly: true
+        }
+    },
+    fieldOrder: [
+        "addressId",
+        "phone",
+        "lastUpdate",
+        "city",
+        "address",
+        "address2",
+        "district",
+        "postalCode"
+    ]
+});

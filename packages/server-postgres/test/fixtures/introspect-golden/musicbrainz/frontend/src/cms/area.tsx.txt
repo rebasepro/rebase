@@ -1,0 +1,34 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { area } from "../../../backend/schema/area";
+
+export const areaCms = customizeTable<typeof area>("area", {
+    display: {
+        title: "comment"
+    },
+    sort: ["lastUpdated", "desc"],
+    listFields: ["id", "name", "gid", "comment", "ended", "editsPending"],
+    fields: {
+        name: {
+            multiline: true
+        },
+        lastUpdated: {
+            readOnly: true
+        }
+    },
+    fieldOrder: [
+        "id",
+        "name",
+        "gid",
+        "comment",
+        "ended",
+        "editsPending",
+        "beginDateYear",
+        "beginDateMonth",
+        "beginDateDay",
+        "endDateYear",
+        "endDateMonth",
+        "endDateDay",
+        "lastUpdated",
+        "typeRelation"
+    ]
+});

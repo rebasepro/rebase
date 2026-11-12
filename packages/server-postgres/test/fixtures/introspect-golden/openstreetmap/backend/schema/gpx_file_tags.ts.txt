@@ -1,0 +1,17 @@
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { gpxFiles } from "./gpx_files";
+
+// Introspected as an owned-child: belongs to gpx_files (its only NOT NULL foreign key) and nothing else references it.
+// ⚠ Not reproduced exactly by `rebase db push` — read before pushing:
+//   - "tag" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
+export const gpxFileTags = defineTable("gpx_file_tags", {
+    columns: {
+        gpxId: col.bigint().notNull(),
+        tag: col.text().notNull(),
+        id: col.bigserial().primaryKey()
+    },
+    relations: {
+        gpx: rel.belongsTo(() => gpxFiles, { onDelete: "no action" })
+    },
+    rls: "admin-only"
+});

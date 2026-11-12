@@ -1,0 +1,36 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { oauthAccessGrants } from "../../../backend/schema/oauth_access_grants";
+
+export const oauthAccessGrantsCms = customizeTable<typeof oauthAccessGrants>("oauth_access_grants", {
+    display: {
+        title: "token"
+    },
+    listFields: ["id", "token", "revokedAt", "scopes", "codeChallenge", "codeChallengeMethod"],
+    fields: {
+        token: {
+            multiline: true
+        },
+        scopes: {
+            multiline: true
+        },
+        codeChallenge: {
+            multiline: true
+        },
+        codeChallengeMethod: {
+            multiline: true
+        }
+    },
+    fieldOrder: [
+        "id",
+        "token",
+        "revokedAt",
+        "scopes",
+        "codeChallenge",
+        "codeChallengeMethod",
+        "expiresIn",
+        "resourceOwner",
+        "application",
+        "redirectUri",
+        "createdAt"
+    ]
+});

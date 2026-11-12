@@ -369,55 +369,47 @@ describe("the reads it is for", () => {
  * Rebase would derive, and nothing where it has it.
  */
 describe("introspecting a database", () => {
+    /** The generated `posts` module, with its notes — what the file says and what the CLI prints. */
     const introspect = async (setup: string): Promise<string> => {
         const { PGlite } = await import("@electric-sql/pglite");
         const { readSchemaMetadata } = await import("../src/schema/introspect-db-queries");
-        const { generateCollectionFile } = await import("../src/schema/introspect-db-logic");
+        const { generateSchemaModules } = await import("../src/schema/introspect-db-logic");
         const db = new PGlite();
         try {
             await db.exec(setup);
-            const metadata = await readSchemaMetadata(db, "public");
-            const fks = metadata.fks.filter(fk => fk.table_name === "posts");
-            const meta = {
-                name: "posts",
-                columns: metadata.columns.filter(c => c.table_name === "posts"),
-                pks: metadata.pks.filter(p => p.table_name === "posts").map(p => p.column_name),
-                fks
-            };
-            const authorsMeta = {
-                name: "authors",
-                columns: metadata.columns.filter(c => c.table_name === "authors"),
-                pks: ["id"],
-                fks: []
-            };
-            return generateCollectionFile("posts", meta, metadata.fks, new Set(), new Map([["posts", meta], ["authors", authorsMeta]]),
-                new Map(), undefined, { metadata });
+            const generation = generateSchemaModules({ metadata: await readSchemaMetadata(db, "public") });
+            const posts = generation.tables.find(t => t.table === "posts");
+            if (!posts) throw new Error("no posts module");
+            return posts.schemaModule;
         } finally {
             await db.close();
         }
     };
     const schema = "CREATE TABLE authors (id serial PRIMARY KEY); " +
         "CREATE TABLE posts (id serial PRIMARY KEY, author_id integer REFERENCES authors(id));";
+    const WITHOUT_INDEX = "author: rel.belongsTo(() => authors, { onDelete: \"no action\", index: false })";
 
     it("writes `index: false`, and why, where the database has no index on the key", async () => {
         const file = await introspect(schema);
-        expect(file).toMatch(/localKey: "author_id",[\s\S]*\/\/ The database has no index on author_id\. Delete this line to have one built\.\s+index: false/);
+        expect(file).toContain(WITHOUT_INDEX);
+        expect(file).toContain("the database has no index on \"author_id\", so its relation says `index: false`; drop that to have one built.");
     });
 
-    // Following "Delete this line to have one built" beside a hand-written
-    // index built a second index doing the first one's job.
+    // Following "drop that to have one built" beside a hand-written index
+    // would build a second index doing the first one's job.
     it("writes it too over a hand-written index, and says that index serves the key", async () => {
         const file = await introspect(`${schema} CREATE INDEX idx_posts_author ON posts (author_id);`);
-        expect(file).toMatch(/\/\/ idx_posts_author already indexes author_id, so Rebase builds none of its own\. Without this line, `rebase db push` would build a second\.\s+index: false/);
-        expect(file).not.toContain("Delete this line");
+        expect(file).toContain(WITHOUT_INDEX);
+        expect(file).toContain("idx_posts_author already indexes \"author_id\", so its relation says `index: false`: without it `rebase db push` would build a second index.");
+        expect(file).not.toContain("drop that to have one built");
     });
 
     it("counts an index the key leads, unique or composite, as serving it", async () => {
         const composite = await introspect(`${schema} ALTER TABLE posts ADD COLUMN created_at timestamptz; ` +
             "CREATE INDEX posts_author_created ON posts (author_id, created_at);");
-        expect(composite).toMatch(/posts_author_created already indexes author_id/);
+        expect(composite).toMatch(/posts_author_created already indexes "author_id"/);
         const unique = await introspect(`${schema} CREATE UNIQUE INDEX posts_one_per_author ON posts (author_id);`);
-        expect(unique).toMatch(/posts_one_per_author already indexes author_id/);
+        expect(unique).toMatch(/posts_one_per_author already indexes "author_id"/);
     });
 
     it("does not count one that cannot serve every lookup on the key", async () => {
@@ -429,7 +421,7 @@ describe("introspecting a database", () => {
             "CREATE INDEX posts_author_hash ON posts USING hash (author_id);"
         ]) {
             const file = await introspect(`${schema} ${index}`);
-            expect(file).toContain("// The database has no index on author_id. Delete this line to have one built.");
+            expect(file).toContain("the database has no index on \"author_id\"");
         }
     });
 
@@ -437,6 +429,6 @@ describe("introspecting a database", () => {
         const name = foreignKeyIndexSpec("public", "posts", "author_id").indexName;
         const file = await introspect(`${schema} CREATE INDEX "${name}" ON posts (author_id);`);
         expect(file).not.toContain("index:");
-        expect(file).toContain('localKey: "author_id"');
+        expect(file).toContain("author: rel.belongsTo(() => authors, { onDelete: \"no action\" })");
     });
 });

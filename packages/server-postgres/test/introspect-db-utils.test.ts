@@ -1,151 +1,9 @@
 import {
-    singularize, toCollectionVarName, getIconForTable,
+    getIconForTable,
     mapPgType, buildEnumMap, buildTablesMap, identifyJoinTables,
-    generateIndexContent, mergeIndexContent, safeHostFromUrl,
+    mergeIndexModule, safeHostFromUrl,
     EnumValue, TableRow, TableColumn, PrimaryKeyRow, ForeignKeyRow
 } from "../src/schema/introspect-db-logic";
-import { humanize } from "../src/schema/introspect-db-naming";
-
-// ═══════════════════════════════════════════════════════════════════════
-// singularize()
-// ═══════════════════════════════════════════════════════════════════════
-describe("singularize", () => {
-    it("strips trailing s from regular plurals", () => {
-        expect(singularize("users")).toBe("user");
-        expect(singularize("products")).toBe("product");
-        expect(singularize("posts")).toBe("post");
-    });
-
-    it("converts -ies to -y", () => {
-        expect(singularize("categories")).toBe("category");
-        expect(singularize("companies")).toBe("company");
-        expect(singularize("stories")).toBe("story");
-    });
-
-    it("converts -ves to -f or -fe depending on the word", () => {
-        expect(singularize("wolves")).toBe("wolf");
-        expect(singularize("leaves")).toBe("leaf");
-        expect(singularize("shelves")).toBe("shelf");
-        expect(singularize("thieves")).toBe("thief");
-        // The -fe half of the rule: one blanket "-ves" -> "-f" branch yields
-        // "knif"/"wif"/"lif" here.
-        expect(singularize("knives")).toBe("knife");
-        expect(singularize("wives")).toBe("wife");
-        expect(singularize("lives")).toBe("life");
-    });
-
-    it("treats an ordinary -ive noun as a plain -s plural", () => {
-        // These only *look* like the f/fe swap. A blanket "-ves" rule turns
-        // them into "archif"/"olif"/"objectif" — names an introspected project
-        // then carries in its generated config forever.
-        expect(singularize("archives")).toBe("archive");
-        expect(singularize("olives")).toBe("olive");
-        expect(singularize("objectives")).toBe("objective");
-        expect(singularize("drives")).toBe("drive");
-    });
-
-    it("converts -ches, -shes, -sses, -xes, -zes", () => {
-        expect(singularize("batches")).toBe("batch");
-        expect(singularize("wishes")).toBe("wish");
-        expect(singularize("classes")).toBe("class");
-        expect(singularize("boxes")).toBe("box");
-        expect(singularize("buzzes")).toBe("buzz");
-    });
-
-    it("converts -ses (not -sses) by removing trailing s", () => {
-        expect(singularize("responses")).toBe("response");
-        expect(singularize("databases")).toBe("database");
-    });
-
-    it("converts -ices to -ex", () => {
-        expect(singularize("indices")).toBe("index");
-        expect(singularize("vertices")).toBe("vertex");
-    });
-
-    it("handles irregular plurals", () => {
-        expect(singularize("people")).toBe("person");
-        expect(singularize("children")).toBe("child");
-        expect(singularize("men")).toBe("man");
-        expect(singularize("women")).toBe("woman");
-        expect(singularize("mice")).toBe("mouse");
-        expect(singularize("geese")).toBe("goose");
-        expect(singularize("teeth")).toBe("tooth");
-        expect(singularize("feet")).toBe("foot");
-        expect(singularize("data")).toBe("datum");
-        expect(singularize("media")).toBe("medium");
-        expect(singularize("criteria")).toBe("criterion");
-        expect(singularize("phenomena")).toBe("phenomenon");
-    });
-
-    it("preserves casing on irregular plurals", () => {
-        expect(singularize("People")).toBe("Person");
-        expect(singularize("Children")).toBe("Child");
-    });
-
-    it("leaves uncountable words unchanged", () => {
-        expect(singularize("status")).toBe("status");
-        expect(singularize("news")).toBe("news");
-        expect(singularize("series")).toBe("series");
-        expect(singularize("species")).toBe("species");
-        expect(singularize("analysis")).toBe("analysis");
-        expect(singularize("diagnosis")).toBe("diagnosis");
-        expect(singularize("crisis")).toBe("crisis");
-        expect(singularize("thesis")).toBe("thesis");
-        expect(singularize("bus")).toBe("bus");
-    });
-
-    it("leaves already-singular words unchanged", () => {
-        expect(singularize("user")).toBe("user");
-        expect(singularize("address")).toBe("address");
-    });
-
-    it("does not strip -ss words", () => {
-        expect(singularize("boss")).toBe("boss");
-        expect(singularize("glass")).toBe("glass");
-    });
-});
-
-// ═══════════════════════════════════════════════════════════════════════
-// humanize()
-// ═══════════════════════════════════════════════════════════════════════
-describe("humanize", () => {
-    it("converts snake_case to Title Case", () => {
-        expect(humanize("created_at")).toBe("Created At");
-        expect(humanize("customer_id")).toBe("Customer Id");
-        expect(humanize("first_name")).toBe("First Name");
-    });
-
-    it("capitalizes single words", () => {
-        expect(humanize("name")).toBe("Name");
-        expect(humanize("id")).toBe("Id");
-    });
-
-    it("handles multiple underscores", () => {
-        expect(humanize("user_profile_image")).toBe("User Profile Image");
-    });
-
-    it("handles already capitalized input", () => {
-        expect(humanize("Name")).toBe("Name");
-    });
-});
-
-// ═══════════════════════════════════════════════════════════════════════
-// toCollectionVarName()
-// ═══════════════════════════════════════════════════════════════════════
-describe("toCollectionVarName", () => {
-    it("converts snake_case to camelCase + Collection", () => {
-        expect(toCollectionVarName("company_token")).toBe("companyTokenCollection");
-        expect(toCollectionVarName("user_profile")).toBe("userProfileCollection");
-    });
-
-    it("handles single-word tables", () => {
-        expect(toCollectionVarName("users")).toBe("usersCollection");
-    });
-
-    it("handles multi-segment names", () => {
-        expect(toCollectionVarName("user_account_settings")).toBe("userAccountSettingsCollection");
-    });
-});
 
 // ═══════════════════════════════════════════════════════════════════════
 // getIconForTable()
@@ -414,43 +272,33 @@ foreign_column_name: "id" }
 });
 
 // ═══════════════════════════════════════════════════════════════════════
-// generateIndexContent()
+// mergeIndexModule()
 // ═══════════════════════════════════════════════════════════════════════
-describe("generateIndexContent", () => {
-    it("generates sorted export lines", () => {
-        const result = generateIndexContent(["zebra", "apple", "mango"]);
-        const lines = result.trim().split("\n");
-        expect(lines[0]).toContain("apple");
-        expect(lines[1]).toContain("mango");
-        expect(lines[2]).toContain("zebra");
+describe("mergeIndexModule", () => {
+    const existing = [
+        "import type { DefaultRls } from \"@rebasepro/server/schema\";",
+        "",
+        "export { users } from \"./users\";",
+        "",
+        "export const defaultRls: DefaultRls = \"admin-only\";",
+        ""
+    ].join("\n");
+
+    it("adds an export line for each table the index does not export yet, after the last one", () => {
+        const merged = mergeIndexModule(existing, [
+            { identifier: "users", importPath: "./users" },
+            { identifier: "blogPosts", importPath: "./blog_posts" }
+        ]);
+        expect(merged).toBe(existing.replace("export { users } from \"./users\";", "export { users } from \"./users\";\nexport { blogPosts } from \"./blog_posts\";"));
+        expect(merged.match(/from "\.\/users"/g)).toHaveLength(1);
     });
 
-    it("generates import statements and collections array", () => {
-        const result = generateIndexContent(["users"]);
-        expect(result).toContain('import usersCollection from "./users";');
-        expect(result).toContain("export const collections = [");
-        expect(result).toContain("    usersCollection,");
-        expect(result).toContain("];");
-    });
-});
-
-// ═══════════════════════════════════════════════════════════════════════
-// mergeIndexContent()
-// ═══════════════════════════════════════════════════════════════════════
-describe("mergeIndexContent", () => {
-    it("adds new exports without duplicating existing ones", () => {
-        const existing = 'import usersCollection from "./users";\n\nexport const collections = [\n    usersCollection,\n];\n';
-        const result = mergeIndexContent(existing, ["users", "posts"]);
-        expect(result.match(/import usersCollection from ".\/users";/g)!.length).toBe(1);
-        expect(result).toContain('import postsCollection from "./posts";');
-        expect(result).toContain("usersCollection,");
-        expect(result).toContain("postsCollection,");
+    it("leaves an index that exports every table as it is", () => {
+        expect(mergeIndexModule(existing, [{ identifier: "users", importPath: "./users" }])).toBe(existing);
     });
 
-    it("returns existing content trimmed + newline when no new files", () => {
-        const existing = 'import aCollection from "./a";\n\nexport const collections = [\n    aCollection,\n];\n';
-        const result = mergeIndexContent(existing, ["a"]);
-        expect(result.trim()).toBe(existing.trim());
+    it("prepends the lines to an index with no export yet", () => {
+        expect(mergeIndexModule("// hand-written\n", [{ identifier: "tags", importPath: "./tags" }])).toBe("export { tags } from \"./tags\";\n\n// hand-written\n");
     });
 });
 

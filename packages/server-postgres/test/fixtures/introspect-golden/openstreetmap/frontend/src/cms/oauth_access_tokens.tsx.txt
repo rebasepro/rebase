@@ -1,0 +1,36 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { oauthAccessTokens } from "../../../backend/schema/oauth_access_tokens";
+
+export const oauthAccessTokensCms = customizeTable<typeof oauthAccessTokens>("oauth_access_tokens", {
+    hideFromNavigation: true,
+    display: {
+        title: "token"
+    },
+    listFields: ["id", "token", "refreshToken", "revokedAt", "scopes", "previousRefreshToken"],
+    fields: {
+        token: {
+            multiline: true
+        },
+        refreshToken: {
+            multiline: true
+        },
+        scopes: {
+            multiline: true
+        },
+        previousRefreshToken: {
+            multiline: true
+        }
+    },
+    fieldOrder: [
+        "id",
+        "token",
+        "refreshToken",
+        "revokedAt",
+        "scopes",
+        "previousRefreshToken",
+        "expiresIn",
+        "resourceOwner",
+        "application",
+        "createdAt"
+    ]
+});

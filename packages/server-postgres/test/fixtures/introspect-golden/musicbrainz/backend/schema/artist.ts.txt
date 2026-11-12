@@ -1,0 +1,37 @@
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { area } from "./area";
+import { artistCreditName } from "./artist_credit_name";
+
+// ⚠ Not reproduced exactly by `rebase db push` — read before pushing:
+//   - "name" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
+//   - "sort_name" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
+export const artist = defineTable("artist", {
+    columns: {
+        id: col.serial().primaryKey(),
+        gid: col.uuid().notNull(),
+        name: col.text().notNull(),
+        sortName: col.text().notNull(),
+        beginDateYear: col.smallint(),
+        beginDateMonth: col.smallint(),
+        beginDateDay: col.smallint(),
+        endDateYear: col.smallint(),
+        endDateMonth: col.smallint(),
+        endDateDay: col.smallint(),
+        type: col.integer(),
+        area: col.integer(),
+        gender: col.integer(),
+        comment: col.varchar().notNull().default(""),
+        editsPending: col.integer().notNull().default(0).validate({ min: 0 }),
+        lastUpdated: col.timestamptz().onCreateNow(),
+        ended: col.boolean().notNull().default(false),
+        beginArea: col.integer(),
+        endArea: col.integer()
+    },
+    relations: {
+        areaRelation: rel.belongsTo(() => area, { localKey: "area", onDelete: "no action" }),
+        beginAreaRelation: rel.belongsTo(() => area, { localKey: "begin_area", onDelete: "no action" }),
+        endAreaRelation: rel.belongsTo(() => area, { localKey: "end_area", onDelete: "no action" }),
+        artist_credit_name: rel.hasMany(() => artistCreditName, { foreignKey: "artist" })
+    },
+    rls: "admin-only"
+});

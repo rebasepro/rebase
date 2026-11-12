@@ -1,0 +1,14 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { areaType } from "../../../backend/schema/area_type";
+
+export const areaTypeCms = customizeTable<typeof areaType>("area_type", {
+    display: {
+        title: "name"
+    },
+    fields: {
+        description: {
+            multiline: true
+        }
+    },
+    fieldOrder: ["id", "name", "gid", "childOrder", "parentRelation", "description"]
+});

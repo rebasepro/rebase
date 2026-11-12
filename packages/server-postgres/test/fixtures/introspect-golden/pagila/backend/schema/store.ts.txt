@@ -1,0 +1,21 @@
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { address } from "./address";
+import { customer } from "./customer";
+import { inventory } from "./inventory";
+import { staff } from "./staff";
+
+export const store = defineTable("store", {
+    columns: {
+        storeId: col.serial().primaryKey(),
+        managerStaffId: col.integer().notNull().unique(),
+        addressId: col.integer().notNull(),
+        lastUpdate: col.timestamptz().notNull().onCreateNow()
+    },
+    relations: {
+        address: rel.belongsTo(() => address),
+        customer: rel.hasMany(() => customer),
+        inventory: rel.hasMany(() => inventory),
+        staff: rel.hasMany(() => staff)
+    },
+    rls: "admin-only"
+});

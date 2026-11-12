@@ -1,0 +1,122 @@
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { changesetComments } from "./changeset_comments";
+import { changesets } from "./changesets";
+import { diaryComments } from "./diary_comments";
+import { diaryEntries } from "./diary_entries";
+import { friends } from "./friends";
+import { gpxFiles } from "./gpx_files";
+import { issueComments } from "./issue_comments";
+import { issues } from "./issues";
+import { messages } from "./messages";
+import { noteComments } from "./note_comments";
+import { notes } from "./notes";
+import { oauthAccessGrants } from "./oauth_access_grants";
+import { oauthAccessTokens } from "./oauth_access_tokens";
+import { oauthApplications } from "./oauth_applications";
+import { redactions } from "./redactions";
+import { reports } from "./reports";
+import { socialLinks } from "./social_links";
+import { userBlocks } from "./user_blocks";
+import { userMutes } from "./user_mutes";
+import { userPreferences } from "./user_preferences";
+import { userRoles } from "./user_roles";
+
+// ⚠ Not reproduced exactly by `rebase db push` — read before pushing:
+//   - "email" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
+//   - "pass_crypt" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
+//   - "creation_time" is timestamp without time zone, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
+//   - "display_name" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
+//   - "pass_salt" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
+//   - "new_email" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
+//   - "languages" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
+//   - "terms_agreed" is timestamp without time zone, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
+//   - "auth_uid" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
+//   - "preferred_editor" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
+//   - "auth_provider" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
+//   - "tou_agreed" is timestamp without time zone, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
+//   - "creation_address" is inet, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
+//   - "home_location_name" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
+//   - "company" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
+export const users = defineTable("users", {
+    columns: {
+        email: col.text().notNull().unique(),
+        id: col.bigserial().primaryKey(),
+        passCrypt: col.text().notNull(),
+        creationTime: col.custom("timestamp without time zone").notNull(),
+        displayName: col.text().notNull().unique().default(""),
+        dataPublic: col.boolean().notNull().default(false),
+        description: col.text().notNull().default(""),
+        homeLat: col.doublePrecision(),
+        homeLon: col.doublePrecision(),
+        homeZoom: col.smallint().default(3),
+        passSalt: col.text(),
+        emailValid: col.boolean().notNull().default(false),
+        newEmail: col.text(),
+        languages: col.text(),
+        status: col.enum(["pending", "active", "confirmed", "suspended", "deleted"], { name: "user_status_enum" }).notNull().default("pending"),
+        termsAgreed: col.custom("timestamp without time zone"),
+        considerPd: col.boolean().notNull().default(false),
+        authUid: col.text(),
+        preferredEditor: col.text(),
+        termsSeen: col.boolean().notNull().default(false),
+        descriptionFormat: col.enum(["html", "markdown", "text"], { name: "format_enum" }).notNull().default("markdown"),
+        changesetsCount: col.integer().notNull().default(0),
+        tracesCount: col.integer().notNull().default(0),
+        diaryEntriesCount: col.integer().notNull().default(0),
+        imageUseGravatar: col.boolean().notNull().default(false),
+        authProvider: col.text(),
+        homeTile: col.bigint(),
+        touAgreed: col.custom("timestamp without time zone"),
+        diaryCommentsCount: col.integer().default(0),
+        noteCommentsCount: col.integer().default(0),
+        creationAddress: col.custom("inet"),
+        homeLocationName: col.text(),
+        company: col.text(),
+        publicHeatmap: col.boolean().notNull().default(true)
+    },
+    relations: {
+        changeset_comments: rel.hasMany(() => changesetComments, { foreignKey: "author_id" }),
+        changesets: rel.hasMany(() => changesets),
+        diary_comments: rel.hasMany(() => diaryComments),
+        diary_entries: rel.hasMany(() => diaryEntries),
+        friends: rel.hasMany(() => friends, { foreignKey: "friend_user_id" }),
+        friends_by_user_id: rel.hasMany(() => friends),
+        gpx_files: rel.hasMany(() => gpxFiles),
+        issue_comments: rel.hasMany(() => issueComments),
+        issues: rel.hasMany(() => issues, { foreignKey: "reported_user_id" }),
+        issues_by_resolved_by: rel.hasMany(() => issues, { foreignKey: "resolved_by" }),
+        issues_by_updated_by: rel.hasMany(() => issues, { foreignKey: "updated_by" }),
+        messages: rel.hasMany(() => messages, { foreignKey: "from_user_id" }),
+        messages_by_to_user_id: rel.hasMany(() => messages, { foreignKey: "to_user_id" }),
+        note_comments: rel.hasMany(() => noteComments, { foreignKey: "author_id" }),
+        notes: rel.hasMany(() => notes),
+        oauth_access_grants: rel.hasMany(() => oauthAccessGrants, { foreignKey: "resource_owner_id" }),
+        oauth_access_tokens: rel.hasMany(() => oauthAccessTokens, { foreignKey: "resource_owner_id" }),
+        oauth_applications: rel.hasMany(() => oauthApplications, { foreignKey: "owner_id" }),
+        redactions: rel.hasMany(() => redactions),
+        reports: rel.hasMany(() => reports),
+        social_links: rel.hasMany(() => socialLinks),
+        user_blocks: rel.hasMany(() => userBlocks, { foreignKey: "creator_id" }),
+        user_blocks_by_revoker_id: rel.hasMany(() => userBlocks, { foreignKey: "revoker_id" }),
+        user_blocks_by_user_id: rel.hasMany(() => userBlocks),
+        user_mutes: rel.hasMany(() => userMutes, { foreignKey: "owner_id" }),
+        user_mutes_by_subject_id: rel.hasMany(() => userMutes, { foreignKey: "subject_id" }),
+        user_preferences: rel.hasMany(() => userPreferences),
+        user_roles: rel.hasMany(() => userRoles, { foreignKey: "granter_id" }),
+        user_roles_by_user_id: rel.hasMany(() => userRoles),
+        changesets_via_changesets_subscribers: rel.manyToMany(() => changesets, {
+            through: "changesets_subscribers",
+            sourceKey: "subscriber_id",
+            targetKey: "changeset_id"
+        }),
+        diary_entries_via_diary_entry_subscriptions: rel.manyToMany(() => diaryEntries, {
+            through: "diary_entry_subscriptions",
+            targetKey: "diary_entry_id"
+        }),
+        notes_via_note_subscriptions: rel.manyToMany(() => notes, {
+            through: "note_subscriptions",
+            targetKey: "note_id"
+        })
+    },
+    rls: "admin-only"
+});

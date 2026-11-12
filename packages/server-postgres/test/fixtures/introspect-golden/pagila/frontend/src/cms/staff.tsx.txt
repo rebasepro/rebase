@@ -1,0 +1,43 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { staff } from "../../../backend/schema/staff";
+
+export const staffCms = customizeTable<typeof staff>("staff", {
+    display: {
+        title: "firstName"
+    },
+    sort: ["lastUpdate", "desc"],
+    listFields: ["staffId", "firstName", "lastName", "username", "email", "active"],
+    fields: {
+        firstName: {
+            multiline: true
+        },
+        lastName: {
+            multiline: true
+        },
+        email: {
+            multiline: true
+        },
+        username: {
+            multiline: true
+        },
+        password: {
+            multiline: true
+        },
+        lastUpdate: {
+            readOnly: true
+        }
+    },
+    fieldOrder: [
+        "staffId",
+        "firstName",
+        "lastName",
+        "username",
+        "email",
+        "active",
+        "lastUpdate",
+        "address",
+        "store",
+        "password",
+        "picture"
+    ]
+});

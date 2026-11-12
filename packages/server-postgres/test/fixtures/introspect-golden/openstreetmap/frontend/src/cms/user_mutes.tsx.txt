@@ -1,0 +1,7 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { userMutes } from "../../../backend/schema/user_mutes";
+
+export const userMutesCms = customizeTable<typeof userMutes>("user_mutes", {
+    icon: "Users",
+    fieldOrder: ["id", "subject", "owner", "createdAt", "updatedAt"]
+});

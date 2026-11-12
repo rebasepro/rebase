@@ -1,0 +1,19 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { category } from "../../../backend/schema/category";
+
+export const categoryCms = customizeTable<typeof category>("category", {
+    icon: "Tag",
+    group: "Reference",
+    display: {
+        title: "name"
+    },
+    sort: ["lastUpdate", "desc"],
+    fields: {
+        name: {
+            multiline: true
+        },
+        lastUpdate: {
+            readOnly: true
+        }
+    }
+});

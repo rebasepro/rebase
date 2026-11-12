@@ -1,0 +1,19 @@
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { film } from "./film";
+import { store } from "./store";
+import { rental } from "./rental";
+
+export const inventory = defineTable("inventory", {
+    columns: {
+        inventoryId: col.serial().primaryKey(),
+        filmId: col.integer().notNull(),
+        storeId: col.integer().notNull(),
+        lastUpdate: col.timestamptz().notNull().onCreateNow()
+    },
+    relations: {
+        film: rel.belongsTo(() => film),
+        store: rel.belongsTo(() => store),
+        rental: rel.hasMany(() => rental)
+    },
+    rls: "admin-only"
+});

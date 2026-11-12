@@ -1,0 +1,29 @@
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { activeStorageAttachments } from "./active_storage_attachments";
+import { activeStorageVariantRecords } from "./active_storage_variant_records";
+
+// ⚠ Not reproduced exactly by `rebase db push` — read before pushing:
+//   - "key" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
+//   - "filename" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
+//   - "content_type" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
+//   - "checksum" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
+//   - "created_at" is timestamp without time zone, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
+//   - "service_name" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
+export const activeStorageBlobs = defineTable("active_storage_blobs", {
+    columns: {
+        id: col.bigserial().primaryKey(),
+        key: col.text().notNull().unique(),
+        filename: col.text().notNull(),
+        contentType: col.text(),
+        metadata: col.text(),
+        byteSize: col.bigint().notNull(),
+        checksum: col.text(),
+        createdAt: col.custom("timestamp without time zone").notNull(),
+        serviceName: col.text().notNull()
+    },
+    relations: {
+        active_storage_attachments: rel.hasMany(() => activeStorageAttachments, { foreignKey: "blob_id" }),
+        active_storage_variant_records: rel.hasMany(() => activeStorageVariantRecords, { foreignKey: "blob_id" })
+    },
+    rls: "admin-only"
+});

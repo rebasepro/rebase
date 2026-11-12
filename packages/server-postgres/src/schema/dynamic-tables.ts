@@ -310,8 +310,9 @@ export function buildDrizzleTablesFromSchema(
  * property on the collection. Tables alone don't satisfy that — without these,
  * `?include=author` silently returns the raw `author_id` and no author.
  *
- * The keys here must match `buildRelations` in introspect-runtime.ts, which is
- * what names the collection's relation properties.
+ * The keys here must match the relation names `introspectTables` gives an
+ * introspected table (`introspect-tables.ts`), which name the collection's
+ * relation properties.
  */
 export function buildDrizzleRelationsFromSchema(
     tablesMap: Map<string, TableMeta>,
@@ -332,7 +333,7 @@ export function buildDrizzleRelationsFromSchema(
         for (const fk of meta.fks) {
             if (!tables[fk.foreign_table_name]) continue;
 
-            // Mirrors buildRelations in introspect-runtime: author_id -> author,
+            // Mirrors introspectTables' relation names: author_id -> author,
             // falling back to the target table when the column name carries no
             // hint. `toWireKey` for the same reason it is there — the two keys
             // must be the same string or the collection advertises a relation key

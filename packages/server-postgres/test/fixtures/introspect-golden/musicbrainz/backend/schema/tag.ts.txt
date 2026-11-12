@@ -1,0 +1,16 @@
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { areaTag } from "./area_tag";
+import { areaTagRaw } from "./area_tag_raw";
+
+export const tag = defineTable("tag", {
+    columns: {
+        id: col.serial().primaryKey(),
+        name: col.varchar().notNull(),
+        refCount: col.integer().notNull().default(0)
+    },
+    relations: {
+        area_tag: rel.hasMany(() => areaTag, { foreignKey: "tag" }),
+        area_tag_raw: rel.hasMany(() => areaTagRaw, { foreignKey: "tag" })
+    },
+    rls: "admin-only"
+});

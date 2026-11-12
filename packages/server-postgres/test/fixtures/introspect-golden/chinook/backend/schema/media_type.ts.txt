@@ -1,0 +1,14 @@
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { track } from "./track";
+
+// Introspected as a lookup: a 5-row code list: referenced by 1 table(s), references none, 3 or fewer simple columns.
+export const mediaType = defineTable("media_type", {
+    columns: {
+        mediaTypeId: col.integer().primaryKey(),
+        name: col.varchar(120)
+    },
+    relations: {
+        track: rel.hasMany(() => track)
+    },
+    rls: "admin-only"
+});

@@ -1,0 +1,20 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { track } from "../../../backend/schema/track";
+
+export const trackCms = customizeTable<typeof track>("track", {
+    display: {
+        title: "name"
+    },
+    listFields: ["trackId", "name", "composer", "milliseconds", "bytes", "unitPrice"],
+    fieldOrder: [
+        "trackId",
+        "name",
+        "composer",
+        "milliseconds",
+        "bytes",
+        "unitPrice",
+        "album",
+        "mediaType",
+        "genre"
+    ]
+});

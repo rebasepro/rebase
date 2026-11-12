@@ -1,0 +1,20 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { actor } from "../../../backend/schema/actor";
+
+export const actorCms = customizeTable<typeof actor>("actor", {
+    display: {
+        title: "firstName"
+    },
+    sort: ["lastUpdate", "desc"],
+    fields: {
+        firstName: {
+            multiline: true
+        },
+        lastName: {
+            multiline: true
+        },
+        lastUpdate: {
+            readOnly: true
+        }
+    }
+});

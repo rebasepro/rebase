@@ -1,0 +1,18 @@
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { users } from "./users";
+
+// Introspected as an owned-child: belongs to users (its only foreign key inside the primary key) and nothing else references it.
+// ⚠ Not reproduced exactly by `rebase db push` — read before pushing:
+//   - "k" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
+//   - "v" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
+export const userPreferences = defineTable("user_preferences", {
+    columns: {
+        userId: col.bigint().primaryKey(),
+        k: col.text().primaryKey(),
+        v: col.text().notNull()
+    },
+    relations: {
+        user: rel.belongsTo(() => users, { onDelete: "no action" })
+    },
+    rls: "admin-only"
+});

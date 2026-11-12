@@ -248,7 +248,8 @@ export interface LowerTablesOptions {
      * A `col.custom()` column (`{ kind: "other" }`) then lowers to a property
      * that passes its value through as the driver returns it (a list for an
      * array type, a string otherwise), and may be a key, instead of being
-     * refused as `custom-sql-type`.
+     * refused as `custom-sql-type`; and a table with no primary key is lowered
+     * rather than refused.
      */
     introspected?: boolean;
 }
@@ -370,7 +371,9 @@ function fillCollection(collection: LoweredCollection, def: AnyDef, ctx: LowerCo
     const columns = Object.entries(config.columns).map(([key, builder]) => ({ key, def: builder.def }));
 
     const primaryKeys = columns.filter(c => c.def.primaryKey).map(c => c.key);
-    if (primaryKeys.length === 0 && isTableDef(def)) {
+    // An introspected table may have no key: it is served as the database
+    // holds it (read, and written by filter), as it always has been.
+    if (primaryKeys.length === 0 && isTableDef(def) && ctx.options.introspected !== true) {
         refuse(where, "declares no primary key. Mark the column (or columns) that identify a row with `.primaryKey()`.");
     }
 

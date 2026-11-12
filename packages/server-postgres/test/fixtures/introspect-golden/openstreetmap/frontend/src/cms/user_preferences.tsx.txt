@@ -1,0 +1,15 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { userPreferences } from "../../../backend/schema/user_preferences";
+
+export const userPreferencesCms = customizeTable<typeof userPreferences>("user_preferences", {
+    icon: "Users",
+    hideFromNavigation: true,
+    display: {
+        title: "v"
+    },
+    fields: {
+        v: {
+            multiline: true
+        }
+    }
+});

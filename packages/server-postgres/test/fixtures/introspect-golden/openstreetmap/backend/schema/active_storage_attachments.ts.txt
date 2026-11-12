@@ -1,0 +1,22 @@
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { activeStorageBlobs } from "./active_storage_blobs";
+
+// Introspected as an owned-child: belongs to active_storage_blobs (its only NOT NULL foreign key) and nothing else references it.
+// ⚠ Not reproduced exactly by `rebase db push` — read before pushing:
+//   - "name" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
+//   - "record_type" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
+//   - "created_at" is timestamp without time zone, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
+export const activeStorageAttachments = defineTable("active_storage_attachments", {
+    columns: {
+        id: col.bigserial().primaryKey(),
+        name: col.text().notNull(),
+        recordType: col.text().notNull(),
+        recordId: col.bigint().notNull(),
+        blobId: col.bigint().notNull(),
+        createdAt: col.custom("timestamp without time zone").notNull()
+    },
+    relations: {
+        blob: rel.belongsTo(() => activeStorageBlobs, { onDelete: "no action" })
+    },
+    rls: "admin-only"
+});

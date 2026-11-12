@@ -1,0 +1,75 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { constraintShapes } from "../../../backend/schema/constraint_shapes";
+
+// A board over "status" fits this table, but a board needs a text column to keep each card's order in. Add one, then declare kanban: { columnField: "status", orderField: "<that column>" }.
+export const constraintShapesCms = customizeTable<typeof constraintShapes>("constraint_shapes", {
+    sort: ["createdAt", "desc"],
+    listFields: ["id", "email", "slug", "code", "status", "tier"],
+    fields: {
+        status: {
+            multiline: true
+        },
+        visibility: {
+            multiline: true
+        },
+        pinnedKind: {
+            multiline: true
+        },
+        apostropheSet: {
+            multiline: true
+        },
+        code: {
+            multiline: true
+        },
+        slug: {
+            multiline: true
+        },
+        fixedLen: {
+            multiline: true
+        },
+        email: {
+            multiline: true
+        },
+        notReserved: {
+            multiline: true
+        },
+        emailUnique: {
+            multiline: true
+        },
+        search: {
+            hidden: true
+        },
+        createdAt: {
+            readOnly: true,
+            hidden: true
+        }
+    },
+    fieldOrder: [
+        "id",
+        "email",
+        "slug",
+        "code",
+        "status",
+        "tier",
+        "search",
+        "price",
+        "discount",
+        "quantity",
+        "rating",
+        "temperature",
+        "exactCount",
+        "percent",
+        "startDay",
+        "endDay",
+        "eitherWay",
+        "computedTotal",
+        "visibility",
+        "pinnedKind",
+        "apostropheSet",
+        "fixedLen",
+        "notReserved",
+        "emailUnique",
+        "payload",
+        "createdAt"
+    ]
+});

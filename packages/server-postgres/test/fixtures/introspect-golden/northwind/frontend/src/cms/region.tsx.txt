@@ -1,0 +1,9 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { region } from "../../../backend/schema/region";
+
+export const regionCms = customizeTable<typeof region>("region", {
+    group: "Reference",
+    display: {
+        title: "regionDescription"
+    }
+});

@@ -1,0 +1,8 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { userRoles } from "../../../backend/schema/user_roles";
+
+// A board over "role" fits this table, but a board needs a text column to keep each card's order in. Add one, then declare kanban: { columnField: "role", orderField: "<that column>" }.
+export const userRolesCms = customizeTable<typeof userRoles>("user_roles", {
+    icon: "Users",
+    fieldOrder: ["id", "role", "user", "granter", "createdAt", "updatedAt"]
+});

@@ -1,0 +1,40 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { activeStorageBlobs } from "../../../backend/schema/active_storage_blobs";
+
+export const activeStorageBlobsCms = customizeTable<typeof activeStorageBlobs>("active_storage_blobs", {
+    display: {
+        title: "key"
+    },
+    listFields: ["id", "filename", "serviceName", "key", "contentType", "checksum"],
+    fields: {
+        key: {
+            multiline: true
+        },
+        filename: {
+            multiline: true
+        },
+        contentType: {
+            multiline: true
+        },
+        metadata: {
+            multiline: true
+        },
+        checksum: {
+            multiline: true
+        },
+        serviceName: {
+            multiline: true
+        }
+    },
+    fieldOrder: [
+        "id",
+        "filename",
+        "serviceName",
+        "key",
+        "contentType",
+        "checksum",
+        "byteSize",
+        "metadata",
+        "createdAt"
+    ]
+});

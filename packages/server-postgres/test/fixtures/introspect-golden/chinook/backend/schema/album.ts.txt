@@ -1,0 +1,16 @@
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { artist } from "./artist";
+import { track } from "./track";
+
+export const album = defineTable("album", {
+    columns: {
+        albumId: col.integer().primaryKey(),
+        title: col.varchar(160).notNull(),
+        artistId: col.integer().notNull()
+    },
+    relations: {
+        artist: rel.belongsTo(() => artist, { onDelete: "no action" }),
+        track: rel.hasMany(() => track)
+    },
+    rls: "admin-only"
+});

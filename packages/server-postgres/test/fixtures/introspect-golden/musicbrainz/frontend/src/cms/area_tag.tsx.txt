@@ -1,0 +1,13 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { areaTag } from "../../../backend/schema/area_tag";
+
+export const areaTagCms = customizeTable<typeof areaTag>("area_tag", {
+    icon: "Tag",
+    hideFromNavigation: true,
+    sort: ["lastUpdated", "desc"],
+    fields: {
+        lastUpdated: {
+            readOnly: true
+        }
+    }
+});

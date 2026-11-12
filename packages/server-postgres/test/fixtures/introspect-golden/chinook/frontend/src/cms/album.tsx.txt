@@ -1,0 +1,8 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { album } from "../../../backend/schema/album";
+
+export const albumCms = customizeTable<typeof album>("album", {
+    display: {
+        title: "title"
+    }
+});

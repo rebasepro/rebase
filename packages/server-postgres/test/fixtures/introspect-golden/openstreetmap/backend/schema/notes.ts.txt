@@ -1,0 +1,30 @@
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { users } from "./users";
+import { noteComments } from "./note_comments";
+
+// ⚠ Not reproduced exactly by `rebase db push` — read before pushing:
+//   - "updated_at" is timestamp without time zone, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
+//   - "created_at" is timestamp without time zone, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
+//   - "closed_at" is timestamp without time zone, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
+//   - "user_ip" is inet, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
+//   - the many-to-many with users through note_subscriptions is declared on users only: declaring it here too would re-key note_subscriptions from (user_id, note_id).
+export const notes = defineTable("notes", {
+    columns: {
+        id: col.bigserial().primaryKey(),
+        latitude: col.integer().notNull(),
+        longitude: col.integer().notNull(),
+        tile: col.bigint().notNull(),
+        updatedAt: col.custom("timestamp without time zone").notNull(),
+        createdAt: col.custom("timestamp without time zone").notNull(),
+        status: col.enum(["open", "closed", "hidden"], { name: "note_status_enum" }).notNull(),
+        closedAt: col.custom("timestamp without time zone"),
+        description: col.text().notNull().default(""),
+        userId: col.bigint(),
+        userIp: col.custom("inet")
+    },
+    relations: {
+        user: rel.belongsTo(() => users, { onDelete: "no action" }),
+        note_comments: rel.hasMany(() => noteComments)
+    },
+    rls: "admin-only"
+});

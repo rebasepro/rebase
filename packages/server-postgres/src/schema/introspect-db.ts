@@ -5,17 +5,16 @@ import pg from "pg";
 import arg from "arg";
 import * as dotenv from "dotenv";
 
+import { printIndexModule, tableIdentifier } from "@rebasepro/common";
+
 import {
     buildTablesMap,
-    buildEnumMap,
-    compositeKeySkipReason,
     describeRlsOffTables,
-    generateCollectionFile,
-    generateIndexContent,
-    mergeIndexContent,
+    generateSchemaModules,
+    mergeIndexModule,
     safeHostFromUrl
 } from "./introspect-db-logic";
-import { detectCollectionBuilder } from "./introspect-db-project";
+import { detectCmsDir } from "./introspect-db-project";
 import { countRowsUpTo, isUsableFileName, quoteRelation, readSchemaMetadata } from "./introspect-db-queries";
 import { classifyTables, lookupCandidates, LOOKUP_MAX_ROWS } from "./introspect-db-structure";
 import { parseCheckConstraints } from "./introspect-db-constraints";
@@ -23,33 +22,33 @@ import { out, outWarn, outError } from "../cli-output";
 import { promptConfirm } from "../cli-prompt";
 import { diagnoseDbError } from "../cli-errors";
 import { pinSearchPath } from "../connection";
+import { DEFAULT_SCHEMA_DIR } from "../cli-schema-dir";
+
+/** A relative import between two files, POSIX-separated, without the extension. */
+function relativeImport(fromDir: string, toFile: string): string {
+    const relative = path.relative(fromDir, toFile).split(path.sep).join("/").replace(/\.tsx?$/, "");
+    return relative.startsWith(".") ? relative : `./${relative}`;
+}
 
 async function main() {
     const args = arg(
         {
-            "--output": String,
-            "--collections": String,
+            "--schema-dir": String,
             "--force": Boolean,
             "--schema": String,
             "--data-inference": Boolean,
             "--no-data-inference": Boolean,
-            "-o": "--output",
-            "-c": "--collections",
             "-f": "--force"
         },
         { permissive: true }
     );
 
-    const cwd = process.cwd();
-    const isBackendDir = path.basename(cwd) === "backend";
-    const defaultOutDir = isBackendDir
-        ? path.resolve(cwd, "..", "config", "collections")
-        : path.resolve(cwd, "config", "collections");
-
-    // Absolute, because it is printed: the driver runs in `backend/`, and the
-    // default `../config/collections` read from the project root named a
-    // directory beside it.
-    const outDir = path.resolve(args["--output"] || args["--collections"] || defaultOutDir);
+    // Absolute, because it is printed. Relative to where the driver runs —
+    // `backend/` — so the default is `backend/schema`, as every other driver
+    // command reads it. The project's `frontend/src/cms`, when it has one, is
+    // found from there (`detectCmsDir`).
+    const outDir = path.resolve(process.cwd(), args["--schema-dir"] || DEFAULT_SCHEMA_DIR);
+    const cmsDir = detectCmsDir(outDir);
     const force = args["--force"] || false;
     const pgSchema = args["--schema"] || "public";
 
@@ -110,9 +109,7 @@ async function main() {
 
     try {
         const metadata = await readSchemaMetadata(client, pgSchema);
-        const enumMap = buildEnumMap(metadata.enumValues);
         const tablesMap = buildTablesMap(metadata.tables, metadata.columns, metadata.pks, metadata.fks);
-        const fks = metadata.fks;
 
         // Only tables that could structurally be a code list are counted, and
         // each count stops at the threshold — see `countRowsUpTo`. Introspection
@@ -130,22 +127,6 @@ async function main() {
 
         const classifications = classifyTables(metadata, tablesMap);
         const checkFacts = parseCheckConstraints(metadata.checks);
-
-        // Which builder the generated files may import — read from the manifests
-        // above `outDir`, because a project without `@rebasepro/cms-types` cannot
-        // resolve that import and has no `admin` block to write into either.
-        const builder = detectCollectionBuilder(outDir);
-        if (builder === "annotation") {
-            outWarn(chalk.yellow(
-                "⚠ Neither @rebasepro/cms-types nor @rebasepro/common is declared above " +
-                `${outDir}.`
-            ));
-            outWarn(chalk.gray(
-                "  Generating plain type annotations, which widen the property keys to `string`: " +
-                "`propertiesOrder` and friends will not be checked. Add @rebasepro/common to the " +
-                "config package to turn that checking on."
-            ));
-        }
         const joinTables = new Set(
             Array.from(classifications.values())
                 .filter((c) => c.role === "junction")
@@ -171,120 +152,93 @@ async function main() {
             // `rebase init --introspect`) — asking would hang forever.
             out(chalk.gray("Skipping data inference (non-interactive run; pass --data-inference to enable)."));
         } else {
-            runDataInference = await promptConfirm(chalk.yellow("? Do you want to run comprehensive data inference on sampled rows to auto-detect types, formats, constraints, and UI configurations? (y/N) "));
+            runDataInference = await promptConfirm(chalk.yellow("? Do you want to sample rows to suggest validation and how the panel edits each column? (y/N) "));
         }
 
-        if (runDataInference) {
-            out(chalk.gray("Sampling database rows for data inference..."));
-        }
-
-        // Generate Collections
-        const generatedFiles: string[] = [];
-        const skippedFiles: string[] = [];
-
-        // A table keyed on more than one column is generated with `isId` on
-        // every key column — one composite key, which the planner builds the
-        // same way — unless that cannot round-trip: a key column no `isId` can
-        // mark, or a link pointing at the table (see `compositeKeySkipReason`).
-        // Those are left out, with the reason. Generating one anyway produced a
-        // file that read the table by an `id` column it does not have, and a
-        // push that planned that column as its new primary key.
-        const compositeKeyed = new Map(
-            Array.from(tablesMap.entries())
-                .filter(([tableName]) => !joinTables.has(tableName))
-                .map(([tableName, meta]) => [tableName, compositeKeySkipReason(meta, fks)] as const)
-                .filter((entry): entry is readonly [string, string] => entry[1] !== undefined)
-        );
-        for (const [tableName, reason] of compositeKeyed) {
+        // ── The name has to be usable as a filename ────────────────
+        //
+        // A table name came out of `pg_class` in a database this tool did
+        // not create — adopting somebody else's database is the whole point
+        // of introspection — and it is about to be joined onto a path.
+        // Postgres will happily hold a table called `../../../etc/cron.d/x`,
+        // and `path.join` resolves it. Skipped rather than sanitised: a file
+        // named something other than its table does not round-trip.
+        const unusable = new Set(Array.from(tablesMap.keys()).filter((t) => !joinTables.has(t) && !isUsableFileName(t)));
+        for (const tableName of unusable) {
             outWarn(chalk.yellow(
-                `⚠ Skipping table ${JSON.stringify(tableName)}: it is keyed on ` +
-                `(${tablesMap.get(tableName)?.pks.join(", ")}), and ${reason}. ` +
-                "`rebase db push` leaves a table that is not a collection alone."
+                `⚠ Skipping table ${JSON.stringify(tableName)}: its name cannot be used as a ` +
+                "filename. Rename the table, or write this table by hand."
             ));
         }
-        const notes: string[] = [];
-
-        const tablesToProcess = Array.from(tablesMap.entries())
-            .filter(([tableName]) => !joinTables.has(tableName) && !compositeKeyed.has(tableName));
 
         // One table at a time: there is one connection, and sampling ten at
-        // once over it is what node-postgres warns about ("Calling
-        // client.query() when the client is already executing a query") —
-        // the queries queued behind each other anyway.
-        for (const [tableName, meta] of tablesToProcess) {
-            // ── The name has to be usable as a filename ────────────────
-            //
-            // `tableName` came out of `pg_class` in a database this tool
-            // did not create — adopting somebody else's database is the
-            // whole point of introspection — and it is about to be joined
-            // onto a path. Postgres will happily hold a table called
-            // `../../../etc/cron.d/x`, and `path.join` resolves it: the
-            // generator would write a TypeScript file wherever that
-            // pointed, as whoever ran the command.
-            //
-            // Skipped rather than sanitised. A file named something other
-            // than its table is a collection that does not round-trip, and
-            // silently renaming it would be a worse surprise than one line
-            // saying which table was left out.
-            if (!isUsableFileName(tableName)) {
-                outWarn(chalk.yellow(
-                    `⚠ Skipping table ${JSON.stringify(tableName)}: its name cannot be used as a ` +
-                    "filename. Rename the table, or write this collection by hand."
-                ));
-                skippedFiles.push(tableName);
-                continue;
-            }
-
-            // ── File overwrite protection ──────────────────────────────
-            const filePath = path.join(outDir, `${tableName}.ts`);
-            if (fs.existsSync(filePath) && !force) {
-                skippedFiles.push(tableName);
-                continue;
-            }
-
-            let sampleData: Record<string, unknown>[] | undefined = undefined;
-            if (runDataInference) {
+        // once over it is what node-postgres warns about.
+        const samples = new Map<string, Record<string, unknown>[]>();
+        if (runDataInference) {
+            out(chalk.gray("Sampling database rows for data inference..."));
+            for (const tableName of tablesMap.keys()) {
+                if (joinTables.has(tableName) || unusable.has(tableName)) continue;
                 try {
-                    // Quoted by `quoteRelation`, which doubles an embedded
-                    // quote. Wrapping a catalogue name in `"` is not
-                    // escaping it — see that function.
+                    // Quoted by `quoteRelation`, which doubles an embedded quote.
                     const { rows } = await client.query(`SELECT * FROM ${quoteRelation(pgSchema, tableName)} LIMIT 100`);
-                    sampleData = rows;
+                    samples.set(tableName, rows);
                 } catch (err) {
                     outError(chalk.yellow(`⚠ Failed to sample data for table ${tableName}: ${err instanceof Error ? err.message : String(err)}`));
                 }
             }
+        }
 
-            const fileContent = generateCollectionFile(
-                tableName,
-                meta,
-                fks,
-                joinTables,
-                tablesMap,
-                enumMap,
-                sampleData,
-                { metadata, classifications, checkFacts, builder, notes, skippedTables: new Set(compositeKeyed.keys()) }
-            );
+        const generation = generateSchemaModules({
+            metadata,
+            classifications,
+            checkFacts,
+            samples,
+            leaveOut: unusable,
+            ...(cmsDir ? { cms: { tableImport: (table: string) => relativeImport(cmsDir, path.join(outDir, `${table}.ts`)) } } : {})
+        });
+        for (const { table, reason } of generation.failed) {
+            outWarn(chalk.yellow(`⚠ Skipping table ${JSON.stringify(table)}: ${reason}`));
+        }
 
-            fs.writeFileSync(filePath, fileContent, "utf-8");
-            generatedFiles.push(tableName);
+        const generatedFiles: { identifier: string; table: string }[] = [];
+        const skippedFiles: string[] = [];
+        const notes: string[] = [];
+        const customizations: string[] = [];
+        for (const generated of generation.tables) {
+            // ── File overwrite protection ──────────────────────────────
+            const filePath = path.join(outDir, `${generated.table}.ts`);
+            if (fs.existsSync(filePath) && !force) {
+                skippedFiles.push(generated.table);
+                continue;
+            }
+            fs.writeFileSync(filePath, generated.schemaModule, "utf-8");
+            generatedFiles.push({ identifier: generated.identifier, table: generated.table });
+            for (const note of generated.notes) notes.push(`${generated.table}: ${note}`);
             out(chalk.green(`  ✓ ${filePath}`));
+
+            if (cmsDir && generated.customization) {
+                const cmsPath = path.join(cmsDir, `${generated.table}.tsx`);
+                if (fs.existsSync(cmsPath) && !force) continue;
+                fs.mkdirSync(cmsDir, { recursive: true });
+                fs.writeFileSync(cmsPath, generated.customization, "utf-8");
+                customizations.push(generated.table);
+                out(chalk.green(`  ✓ ${cmsPath}`));
+            }
         }
 
         // Every column the planner will not reproduce exactly, before anyone
         // pushes. Each line is also at the top of its file.
         if (notes.length > 0) {
             outWarn("");
-            outWarn(chalk.yellow(`⚠ ${notes.length} column(s) will not round-trip exactly — \`rebase db push\` would change them:`));
+            outWarn(chalk.yellow(`⚠ ${notes.length} note(s) on what \`rebase db push\` would not reproduce exactly:`));
             for (const note of [...notes].sort()) outWarn(chalk.gray(`  - ${note}`));
             outWarn(chalk.gray("  Read these before the first push. Run `rebase db push --dry-run` to see the plan."));
         }
 
-        // And the tables whose access the push changes whatever their
-        // collections say: no collection keeps row-level security off.
-        const rlsOff = describeRlsOffTables(metadata.tables
-            .filter((table) => table.rls_enabled === false && generatedFiles.includes(table.table_name))
-            .map((table) => table.table_name));
+        // And the tables whose access the push changes whatever their files
+        // say: no table keeps row-level security off.
+        const written = new Set(generatedFiles.map((file) => file.table));
+        const rlsOff = describeRlsOffTables(generation.rlsOff.filter((table) => written.has(table)));
         if (rlsOff) {
             const [headline, ...rest] = rlsOff.split("\n");
             outWarn("");
@@ -293,28 +247,27 @@ async function main() {
             outWarn(chalk.gray("  `rebase db push --dry-run` lists every policy it would create."));
         }
 
-        // Generate index.ts (sorted alphabetically for deterministic output)
+        // backend/schema/index.ts: its exports are the tables the backend
+        // serves, so every generated one is exported.
         if (generatedFiles.length > 0) {
             const indexPath = path.join(outDir, "index.ts");
-
+            const entries = generatedFiles
+                .map((file) => ({ identifier: file.identifier, importPath: `./${file.table}` }))
+                .sort((a, b) => a.importPath.localeCompare(b.importPath));
             if (fs.existsSync(indexPath) && !force) {
-                // Merge: read existing index, add new exports that don't already exist
-                const existing = fs.readFileSync(indexPath, "utf-8");
-                const merged = mergeIndexContent(existing, generatedFiles);
-                fs.writeFileSync(indexPath, merged, "utf-8");
+                fs.writeFileSync(indexPath, mergeIndexModule(fs.readFileSync(indexPath, "utf-8"), entries), "utf-8");
             } else {
-                // --force replaces collections derived from the database, but the
+                // --force replaces the tables derived from the database, but the
                 // directory can also hold hand-written ones with no table in the
-                // introspected schema (the auth users collection lives in
-                // "rebase"). The backend discovers the whole directory, so an
-                // index listing only introspected tables would silently drop them
-                // from the admin UI while the API still served them.
+                // introspected schema. An index listing only introspected tables
+                // would silently stop serving them.
                 const siblings = fs.readdirSync(outDir)
-                    .filter(f => f.endsWith(".ts") && f !== "index.ts")
-                    .map(f => f.replace(/\.ts$/, ""));
-                const allFiles = [...new Set([...generatedFiles, ...siblings])];
-                const indexContent = generateIndexContent(allFiles);
-                fs.writeFileSync(indexPath, indexContent, "utf-8");
+                    .filter((f) => f.endsWith(".ts") && f !== "index.ts")
+                    .map((f) => f.replace(/\.ts$/, ""))
+                    .filter((name) => !entries.some((entry) => entry.importPath === `./${name}`))
+                    .map((name) => ({ identifier: tableIdentifier(name), importPath: `./${name}` }));
+                const all = [...entries, ...siblings].sort((a, b) => a.importPath.localeCompare(b.importPath));
+                fs.writeFileSync(indexPath, printIndexModule(all), "utf-8");
             }
             out(chalk.green(`  ✓ ${indexPath}`));
         }
@@ -325,9 +278,12 @@ async function main() {
             out(chalk.gray("  Use --force to overwrite existing files."));
             out("");
         }
-        out(chalk.bold.green(`✓ Introspected ${tablesMap.size} tables — generated ${generatedFiles.length} collection(s).`));
+        out(chalk.bold.green(`✓ Introspected ${tablesMap.size} tables — generated ${generatedFiles.length} table(s).`));
         if (generatedFiles.length > 0) {
-            out(chalk.gray(`  Review the generated files in ${outDir} and customize properties as needed.`));
+            out(chalk.gray(`  Review the generated files in ${outDir}.`));
+        }
+        if (customizations.length > 0 && cmsDir) {
+            out(chalk.gray(`  ${customizations.length} panel customization(s) in ${cmsDir}: pass them to <RebaseCMS tableCustomizations={[…]} />.`));
         }
         out("");
 

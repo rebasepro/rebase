@@ -19,7 +19,8 @@ import { eq, getTableColumns } from "drizzle-orm";
 import type { CollectionConfig } from "@rebasepro/types";
 
 import { buildBaasSchema, readCatalogueSchema, type CatalogueSchema } from "../src/schema/catalogue-schema";
-import { buildCollectionsFromSchema, introspectSchema, type Queryable } from "../src/schema/introspect-runtime";
+import { introspectSchema, lowerIntrospectedTables, type Queryable } from "../src/schema/introspect-runtime";
+import { introspectTables } from "../src/schema/introspect-tables";
 import { hiddenColumnsOption } from "../src/schema/search-column";
 import { patchPgNumericToNumber } from "../src/utils/pg-numeric-number-patch";
 import { assertWritableColumns, getPrimaryKeys } from "../src/services/collection-helpers";
@@ -309,7 +310,7 @@ describe("BaaS mode, where the database is the whole specification", () => {
 
     it("serves every column under the same key the derived collection advertises", async () => {
         const schema = await introspectSchema(pg, "public");
-        const derived = buildCollectionsFromSchema(schema, "public");
+        const derived = lowerIntrospectedTables((await introspectTables(pg, "public", { unprotectedTables: "serve" })).tables).collections;
         const { tables } = buildBaasSchema(schema.tablesMap, "public", derived);
 
         const properties = Object.keys(derived[0].properties ?? {});

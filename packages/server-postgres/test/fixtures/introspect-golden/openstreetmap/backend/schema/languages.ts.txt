@@ -1,0 +1,18 @@
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { diaryEntries } from "./diary_entries";
+
+// ⚠ Not reproduced exactly by `rebase db push` — read before pushing:
+//   - "code" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
+//   - "english_name" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
+//   - "native_name" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
+export const languages = defineTable("languages", {
+    columns: {
+        code: col.text().primaryKey(),
+        englishName: col.text().notNull(),
+        nativeName: col.text()
+    },
+    relations: {
+        diary_entries: rel.hasMany(() => diaryEntries, { foreignKey: "language_code" })
+    },
+    rls: "admin-only"
+});

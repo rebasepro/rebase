@@ -1,0 +1,18 @@
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { currentWays } from "./current_ways";
+
+// Introspected as an owned-child: belongs to current_ways (its only foreign key inside the primary key) and nothing else references it.
+// ⚠ Not reproduced exactly by `rebase db push` — read before pushing:
+//   - "k" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
+//   - "v" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
+export const currentWayTags = defineTable("current_way_tags", {
+    columns: {
+        wayId: col.bigint().primaryKey(),
+        k: col.text().primaryKey().default(""),
+        v: col.text().notNull().default("")
+    },
+    relations: {
+        way: rel.belongsTo(() => currentWays, { onDelete: "no action" })
+    },
+    rls: "admin-only"
+});

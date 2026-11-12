@@ -1,0 +1,14 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { nodeTags } from "../../../backend/schema/node_tags";
+
+export const nodeTagsCms = customizeTable<typeof nodeTags>("node_tags", {
+    icon: "Tag",
+    display: {
+        title: "v"
+    },
+    fields: {
+        v: {
+            multiline: true
+        }
+    }
+});

@@ -1,0 +1,26 @@
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { users } from "./users";
+
+// ⚠ Not reproduced exactly by `rebase db push` — read before pushing:
+//   - "title" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
+//   - "sent_on" is timestamp without time zone, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
+export const messages = defineTable("messages", {
+    columns: {
+        id: col.bigserial().primaryKey(),
+        fromUserId: col.bigint().notNull(),
+        title: col.text().notNull(),
+        body: col.text().notNull(),
+        sentOn: col.custom("timestamp without time zone").notNull(),
+        messageRead: col.boolean().notNull().default(false),
+        toUserId: col.bigint().notNull(),
+        toUserVisible: col.boolean().notNull().default(true),
+        fromUserVisible: col.boolean().notNull().default(true),
+        bodyFormat: col.enum(["html", "markdown", "text"], { name: "format_enum" }).notNull().default("markdown"),
+        muted: col.boolean().notNull().default(false)
+    },
+    relations: {
+        fromUser: rel.belongsTo(() => users, { onDelete: "no action" }),
+        toUser: rel.belongsTo(() => users, { onDelete: "no action" })
+    },
+    rls: "admin-only"
+});

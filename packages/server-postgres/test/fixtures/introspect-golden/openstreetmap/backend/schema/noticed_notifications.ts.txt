@@ -1,0 +1,23 @@
+import { defineTable, col } from "@rebasepro/server/schema";
+
+// ⚠ Not reproduced exactly by `rebase db push` — read before pushing:
+//   - "type" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
+//   - "recipient_type" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
+//   - "read_at" is timestamp without time zone, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
+//   - "seen_at" is timestamp without time zone, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
+//   - "created_at" is timestamp without time zone, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
+//   - "updated_at" is timestamp without time zone, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
+export const noticedNotifications = defineTable("noticed_notifications", {
+    columns: {
+        id: col.bigserial().primaryKey(),
+        type: col.text(),
+        eventId: col.bigint().notNull(),
+        recipientType: col.text().notNull(),
+        recipientId: col.bigint().notNull(),
+        readAt: col.custom("timestamp without time zone"),
+        seenAt: col.custom("timestamp without time zone"),
+        createdAt: col.custom("timestamp without time zone").notNull(),
+        updatedAt: col.custom("timestamp without time zone").notNull()
+    },
+    rls: "admin-only"
+});

@@ -39,7 +39,6 @@ import {
     resourceKeyOf,
     DEFAULT_STORAGE_SOURCE_KEY,
     MCP_APP_MODULES,
-    isPostgresCollectionConfig,
     type AdminScope,
     type AuthConfigDocument,
     type CollectionCallbacks,
@@ -61,7 +60,7 @@ import { createRebaseClient } from "@rebasepro/client";
 import { BackendCollectionRegistry } from "../collections/BackendCollectionRegistry";
 import { TableRegistry } from "../schema/table-registry";
 import { globalHooksAsCallbacks, resolveDeclaredTables } from "../schema/declared-tables";
-import { describeIntrospectedTables } from "../schema/introspected-tables";
+import { introspectedDescriptors, type IntrospectedDriverResult } from "../schema/introspected-tables";
 import {
     collectionsStoredBy,
     logUnprovisionedCollections,
@@ -761,6 +760,8 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
 
     /** What each bootstrapper's `initializeDriver` returned, by bootstrapper. */
     const driverResults = new Map<BackendBootstrapper, InitializedDriver>();
+    /** What each introspecting driver found: its collections and their descriptors. */
+    const introspectedResults: IntrospectedDriverResult[] = [];
 
     // ─── Collection schema ───────────────────────────────────────────────
     //
@@ -908,6 +909,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         // into it by whatever the database happens to contain.
         if (introspectCollections && driverResult.collections?.length) {
             activeCollections = [...activeCollections, ...driverResult.collections];
+            introspectedResults.push({ driver: b.id || bootstrapper.type, collections: driverResult.collections, tables: driverResult.tables });
         }
         if (introspectCollections && driverResult.unprotectedTables?.length) {
             unprotectedTables.push(...driverResult.unprotectedTables);
@@ -932,33 +934,17 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     // above; the declared ones were done before the drivers ran, and a property
     // already carrying the flag is skipped here, so this neither re-fixes nor
     // re-warns about them. See exclude-auth-secrets.ts.
-    enforceAuthSecretExclusion(activeCollections);
+    const excludedSecrets = enforceAuthSecretExclusion(activeCollections);
 
     activeCollections.forEach(collection => collectionRegistry.register(collection));
 
-    // What introspection found has no descriptors of its own: lift them, so
-    // `GET /api/schema/tables` serves a database-only project to the
-    // zero-config CMS, the schema version covers it, and a global hook gets
-    // its table's descriptor. After the secret exclusion above, so a users
-    // table found here carries its secrets as private columns.
-    if (introspectCollections && activeCollections.length > 0) {
-        const introspected = describeIntrospectedTables(activeCollections.filter(isPostgresCollectionConfig));
-        tableRegistry.replaceAll(introspected.descriptors);
-        for (const { table, reason } of introspected.skipped) {
-            logger.warn(
-                `Table "${table}" is served, but GET /api/schema/tables does not describe it: ${reason}`
-            );
-        }
-        // A hook receives its table's descriptor; on a table that has none it
-        // would throw on every call. Said now, by name, rather than per request.
-        if (config.hooks && introspected.skipped.length > 0) {
-            throw new Error(
-                "Global table hooks (`hooks`, from backend/hooks.ts) were given, and these introspected tables " +
-                `could not be described, so a hook could not be handed their descriptor: ` +
-                `${introspected.skipped.map(({ table }) => `"${table}"`).join(", ")}. ` +
-                "Declare the tables in backend/schema, or remove the hooks."
-            );
-        }
+    // What introspection found, as the drivers described it from the
+    // catalogue: `GET /api/schema/tables` serves a database-only project to
+    // the zero-config CMS, the schema version covers it, and a global hook
+    // gets its table's descriptor. After the secret exclusion above, so a
+    // users table found here carries its secrets as private columns.
+    if (introspectCollections && introspectedResults.length > 0) {
+        tableRegistry.replaceAll(introspectedDescriptors(introspectedResults, excludedSecrets));
     }
 
     const defaultDriver = driverRegistry.getOrDefault(defaultDriverId);

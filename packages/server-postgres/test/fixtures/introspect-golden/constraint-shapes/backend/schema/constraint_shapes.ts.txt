@@ -1,0 +1,46 @@
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { constraintShapesChild } from "./constraint_shapes_child";
+
+// ⚠ Not reproduced exactly by `rebase db push` — read before pushing:
+//   - "status" accepts only 'draft', 'published', 'archived' (a CHECK the database enforces); a closed set on a text column is not declared yet (`.oneOf()` there waits on `text-one-of`), so the API leaves it to the database.
+//   - "tier" accepts only 'free', 'pro', 'enterprise' (a CHECK the database enforces); a closed set on a text column is not declared yet (`.oneOf()` there waits on `text-one-of`), so the API leaves it to the database.
+//   - "visibility" accepts only 'public', 'private' (a CHECK the database enforces); a closed set on a text column is not declared yet (`.oneOf()` there waits on `text-one-of`), so the API leaves it to the database.
+//   - "pinned_kind" accepts only 'only-one' (a CHECK the database enforces); a closed set on a text column is not declared yet (`.oneOf()` there waits on `text-one-of`), so the API leaves it to the database.
+//   - "apostrophe_set" accepts only 'it's', 'won't' (a CHECK the database enforces); a closed set on a text column is not declared yet (`.oneOf()` there waits on `text-one-of`), so the API leaves it to the database.
+//   - "search" is tsvector, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
+//   - "computed_total" is a generated column whose expression was not read; it is declared read-only, and a push would plan it as a plain column.
+export const constraintShapes = defineTable("constraint_shapes", {
+    description: "Every CHECK shape the parser is expected to handle.",
+    columns: {
+        id: col.integer().primaryKey(),
+        price: col.numeric().notNull().validate({ moreThan: 0 }).describe("Unit price, before tax."),
+        discount: col.real().validate({ min: 0, max: 1 }),
+        quantity: col.integer().validate({ min: 1, max: 1000 }),
+        rating: col.smallint().validate({ min: 1, max: 5 }),
+        temperature: col.integer().validate({ moreThan: -50, lessThan: 60 }),
+        exactCount: col.integer().validate({ min: 42, max: 42 }),
+        percent: col.numeric(5, 2).validate({ min: 0, max: 100 }),
+        status: col.text().notNull().describe("Publication state."),
+        tier: col.varchar(20),
+        visibility: col.text(),
+        pinnedKind: col.text(),
+        apostropheSet: col.text(),
+        code: col.text().validate({ max: 10 }),
+        slug: col.text().validate({ min: 3, max: 64 }),
+        fixedLen: col.text().validate({ min: 8, max: 8 }),
+        startDay: col.integer(),
+        endDay: col.integer(),
+        eitherWay: col.integer(),
+        email: col.text(),
+        payload: col.jsonb(),
+        notReserved: col.text(),
+        emailUnique: col.text().unique(),
+        search: col.custom("tsvector"),
+        computedTotal: col.numeric().readOnly(),
+        createdAt: col.timestamptz().notNull().onCreateNow()
+    },
+    relations: {
+        constraint_shapes_child: rel.hasMany(() => constraintShapesChild, { foreignKey: "parent_id" })
+    },
+    rls: "admin-only"
+});

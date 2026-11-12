@@ -1,0 +1,25 @@
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { city } from "./city";
+import { customer } from "./customer";
+import { staff } from "./staff";
+import { store } from "./store";
+
+export const address = defineTable("address", {
+    columns: {
+        addressId: col.serial().primaryKey(),
+        address: col.text().notNull(),
+        address2: col.text().column("address2"),
+        district: col.text().notNull(),
+        cityId: col.integer().notNull(),
+        postalCode: col.text(),
+        phone: col.text().notNull(),
+        lastUpdate: col.timestamptz().notNull().onCreateNow()
+    },
+    relations: {
+        city: rel.belongsTo(() => city),
+        customer: rel.hasMany(() => customer),
+        staff: rel.hasMany(() => staff),
+        store: rel.hasMany(() => store)
+    },
+    rls: "admin-only"
+});

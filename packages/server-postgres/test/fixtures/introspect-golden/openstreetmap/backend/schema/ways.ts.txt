@@ -1,0 +1,21 @@
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { changesets } from "./changesets";
+import { redactions } from "./redactions";
+
+// ⚠ Not reproduced exactly by `rebase db push` — read before pushing:
+//   - "timestamp" is timestamp without time zone, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
+export const ways = defineTable("ways", {
+    columns: {
+        wayId: col.bigint().primaryKey(),
+        changesetId: col.bigint().notNull(),
+        timestamp: col.custom("timestamp without time zone").notNull(),
+        version: col.bigint().primaryKey(),
+        visible: col.boolean().notNull().default(true),
+        redactionId: col.integer()
+    },
+    relations: {
+        changeset: rel.belongsTo(() => changesets, { onDelete: "no action" }),
+        redaction: rel.belongsTo(() => redactions, { onDelete: "no action" })
+    },
+    rls: "admin-only"
+});

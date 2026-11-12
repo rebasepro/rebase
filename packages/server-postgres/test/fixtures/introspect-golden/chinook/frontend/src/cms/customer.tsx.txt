@@ -1,0 +1,25 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { customer } from "../../../backend/schema/customer";
+
+export const customerCms = customizeTable<typeof customer>("customer", {
+    icon: "Users",
+    display: {
+        title: "firstName"
+    },
+    listFields: ["customerId", "firstName", "lastName", "email", "phone", "state"],
+    fieldOrder: [
+        "customerId",
+        "firstName",
+        "lastName",
+        "email",
+        "phone",
+        "state",
+        "company",
+        "address",
+        "city",
+        "country",
+        "postalCode",
+        "fax",
+        "supportRep"
+    ]
+});

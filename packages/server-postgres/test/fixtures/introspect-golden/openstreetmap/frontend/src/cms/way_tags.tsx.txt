@@ -1,0 +1,15 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { wayTags } from "../../../backend/schema/way_tags";
+
+export const wayTagsCms = customizeTable<typeof wayTags>("way_tags", {
+    icon: "Tag",
+    display: {
+        title: "v"
+    },
+    fields: {
+        v: {
+            multiline: true
+        }
+    },
+    fieldOrder: ["wayId", "k", "version", "v"]
+});

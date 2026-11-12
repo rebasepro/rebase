@@ -1,0 +1,19 @@
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { orders } from "./orders";
+import { products } from "./products";
+
+// Introspected as an owned-child: belongs to orders (the leading column of a primary key made only of foreign keys) and nothing else references it.
+export const orderDetails = defineTable("order_details", {
+    columns: {
+        orderId: col.smallint().primaryKey(),
+        productId: col.smallint().primaryKey(),
+        unitPrice: col.real().notNull(),
+        quantity: col.smallint().notNull(),
+        discount: col.real().notNull()
+    },
+    relations: {
+        order: rel.belongsTo(() => orders, { onDelete: "no action" }),
+        product: rel.belongsTo(() => products, { onDelete: "no action" })
+    },
+    rls: "admin-only"
+});

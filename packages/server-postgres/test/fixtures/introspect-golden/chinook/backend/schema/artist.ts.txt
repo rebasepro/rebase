@@ -1,0 +1,13 @@
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { album } from "./album";
+
+export const artist = defineTable("artist", {
+    columns: {
+        artistId: col.integer().primaryKey(),
+        name: col.varchar(120)
+    },
+    relations: {
+        album: rel.hasMany(() => album)
+    },
+    rls: "admin-only"
+});

@@ -1,0 +1,37 @@
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { areaType } from "./area_type";
+import { areaTag } from "./area_tag";
+import { areaTagRaw } from "./area_tag_raw";
+import { artist } from "./artist";
+import { editor } from "./editor";
+
+// ⚠ Not reproduced exactly by `rebase db push` — read before pushing:
+//   - "name" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
+export const area = defineTable("area", {
+    columns: {
+        id: col.serial().primaryKey(),
+        gid: col.uuid().notNull(),
+        name: col.text().notNull(),
+        type: col.integer(),
+        editsPending: col.integer().notNull().default(0).validate({ min: 0 }),
+        lastUpdated: col.timestamptz().onCreateNow(),
+        beginDateYear: col.smallint(),
+        beginDateMonth: col.smallint(),
+        beginDateDay: col.smallint(),
+        endDateYear: col.smallint(),
+        endDateMonth: col.smallint(),
+        endDateDay: col.smallint(),
+        ended: col.boolean().notNull().default(false),
+        comment: col.varchar().notNull().default("")
+    },
+    relations: {
+        typeRelation: rel.belongsTo(() => areaType, { localKey: "type", onDelete: "no action" }),
+        area_tag: rel.hasMany(() => areaTag, { foreignKey: "area" }),
+        area_tag_raw: rel.hasMany(() => areaTagRaw, { foreignKey: "area" }),
+        artist: rel.hasMany(() => artist, { foreignKey: "area" }),
+        artist_by_begin_area: rel.hasMany(() => artist, { foreignKey: "begin_area" }),
+        artist_by_end_area: rel.hasMany(() => artist, { foreignKey: "end_area" }),
+        editor: rel.hasMany(() => editor, { foreignKey: "area" })
+    },
+    rls: "admin-only"
+});

@@ -1,0 +1,15 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { activeStorageVariantRecords } from "../../../backend/schema/active_storage_variant_records";
+
+export const activeStorageVariantRecordsCms = customizeTable<typeof activeStorageVariantRecords>("active_storage_variant_records", {
+    hideFromNavigation: true,
+    display: {
+        title: "variationDigest"
+    },
+    fields: {
+        variationDigest: {
+            multiline: true
+        }
+    },
+    fieldOrder: ["id", "variationDigest", "blob"]
+});

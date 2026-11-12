@@ -17,6 +17,7 @@ import {
     type TableDescriptor
 } from "@rebasepro/types";
 import { createRebaseClient } from "@rebasepro/client";
+import { lowerTables, tableDefsFromDescriptors } from "@rebasepro/common";
 import type { HonoEnv } from "../src/api/types";
 import type { RebaseAuthConfig, SchemaTablesOptions } from "../src/backend/options";
 import { initializeRebaseBackend } from "../src/init";
@@ -156,12 +157,12 @@ function stubDriver(): DataDriver {
     });
 }
 
-function bootstrapper(introspected?: PostgresCollectionConfig[]): BackendBootstrapper {
+function bootstrapper(introspected?: Introspected): BackendBootstrapper {
     return {
         type: "fake",
         isDefault: true,
         async initializeDriver(): Promise<InitializedDriver> {
-            return { driver: stubDriver(), collections: introspected ?? [], internals: {} };
+            return { driver: stubDriver(), collections: introspected?.collections ?? [], tables: introspected?.tables, internals: {} };
         },
         async initializeAuth() {
             return { userService: {}, authRepository: {} };
@@ -173,7 +174,7 @@ async function boot(options: {
     auth?: RebaseAuthConfig;
     schemaTables?: SchemaTablesOptions;
     tables?: typeof TABLES;
-    introspected?: PostgresCollectionConfig[];
+    introspected?: Introspected;
 } = {}): Promise<Hono<HonoEnv>> {
     const app = new Hono<HonoEnv>();
     await initializeRebaseBackend({
@@ -460,61 +461,83 @@ describe("ETag and 304", () => {
 
 // ── Introspection mode ───────────────────────────────────────────────────────
 
-/** What the Postgres driver's runtime introspection hands back for two tables (see `buildCollectionsFromSchema`). */
-function introspectedCollections(): PostgresCollectionConfig[] {
-    const bySlug = new Map<string, PostgresCollectionConfig>();
-    const customers: PostgresCollectionConfig = {
-        name: "Customers",
-        slug: "customers",
-        table: "customers",
-        schema: "public",
-        properties: {
-            id: { name: "Id", columnName: "id", type: "string", isId: "uuid" },
-            fullName: { name: "Full Name", columnName: "full_name", type: "string", validation: { required: true } }
+/** What an introspecting driver reports: the collections it serves and their descriptors. */
+interface Introspected {
+    collections: PostgresCollectionConfig[];
+    tables: TableDescriptor[];
+}
+
+/**
+ * What the Postgres driver's runtime introspection (`introspectTables`, then
+ * `lowerIntrospectedTables`) hands back for two tables: descriptors read from
+ * the catalogue — the policies as rules — and the collections lowered from them.
+ */
+function introspected(): Introspected {
+    const tables: TableDescriptor[] = [
+        {
+            name: "customers", slug: "customers", table: "customers", schema: "public", kind: "table",
+            columns: [
+                { key: "id", column: "id", type: { kind: "uuid" }, nullable: false, primaryKey: true, default: { kind: "random-uuid" } },
+                { key: "fullName", column: "full_name", type: { kind: "text" }, nullable: false },
+                { key: "ip", column: "ip", type: { kind: "other", sqlType: "inet" }, nullable: true },
+                { key: "passwordHash", column: "password_hash", type: { kind: "text" }, nullable: true }
+            ],
+            primaryKey: ["id"],
+            relations: [],
+            rls: { posture: "rules", rules: [{ name: "customers_self", operation: "select", using: "(id = rebase.uid())" }], defaultPolicies: false }
+        },
+        {
+            name: "orders", slug: "orders", table: "orders", schema: "public", kind: "table",
+            columns: [
+                { key: "id", column: "id", type: { kind: "serial" }, nullable: false, primaryKey: true },
+                { key: "total", column: "total", type: { kind: "numeric", precision: 10, scale: 2 }, nullable: true },
+                { key: "customerId", column: "customer_id", type: { kind: "uuid" }, nullable: false, foreignKeyOf: "customer", derived: true }
+            ],
+            primaryKey: ["id"],
+            relations: [{
+                name: "customer", kind: "belongsTo", target: "customers", cardinality: "one",
+                localKey: "customer_id", localField: "customerId", index: true, constraint: true
+            }],
+            // Row-level security on and no policy: closed.
+            rls: { posture: "rules", rules: [], defaultPolicies: false }
         }
-    };
-    const orders: PostgresCollectionConfig = {
-        name: "Orders",
-        slug: "orders",
-        table: "orders",
-        schema: "public",
-        properties: {
-            id: { name: "Id", columnName: "id", type: "number", isId: "increment" },
-            total: { name: "Total", columnName: "total", type: "number" },
-            customer: {
-                name: "Customer",
-                type: "relation",
-                relation: { kind: "belongsTo", target: () => bySlug.get("customers") ?? customers, localKey: "customer_id" }
-            }
-        }
-    };
-    bySlug.set("customers", customers);
-    bySlug.set("orders", orders);
-    return [customers, orders];
+    ];
+    const collections = lowerTables(tableDefsFromDescriptors(tables, { rls: () => "admin-only" }), { introspected: true });
+    return { collections, tables };
 }
 
 describe("introspection mode (no backend/schema)", () => {
-    it("serves descriptors built from the introspected tables, with the database-owned posture", async () => {
-        const app = await boot({ introspected: introspectedCollections() });
+    it("serves the descriptors the driver read from the catalogue, its policies as the rules", async () => {
+        const app = await boot({ introspected: introspected() });
         const tables = await tablesFor(app, bearer(await person(["admin"])));
         expect(tables.map(table => table.slug)).toEqual(["customers", "orders"]);
-        expect(keys(bySlug(tables, "customers"))).toEqual(["id", "fullName"]);
+        expect(keys(bySlug(tables, "customers"))).toEqual(["id", "fullName", "ip", "passwordHash"]);
+        expect(bySlug(tables, "customers").columns.find(column => column.key === "ip")?.type).toEqual({ kind: "other", sqlType: "inet" });
         expect(relationNames(bySlug(tables, "orders"))).toEqual(["customer"]);
-        // Rebase did not generate these policies and does not read them: the
-        // rules say so, and no policies are listed — for an admin either.
-        expect(bySlug(tables, "orders").rls).toEqual({
+        expect(bySlug(tables, "customers").rls).toEqual({
             posture: "rules",
-            rules: [{ operations: ["all"], redacted: true }],
+            rules: [{ name: "customers_self", operation: "select", using: "(id = rebase.uid())" }],
             defaultPolicies: false
         });
+        // RLS on and no policy is stated as closed, never as open.
+        expect(bySlug(tables, "orders").rls).toEqual({ posture: "rules", rules: [], defaultPolicies: false });
     });
 
-    it("lets global hooks boot now that every introspected table has a descriptor", async () => {
+    it("withholds a policy's SQL from a caller who may not read it", async () => {
+        const app = await boot({ introspected: introspected() });
+        const tables = await tablesFor(app, bearer(await person([])));
+        const rule = bySlug(tables, "customers").rls.rules[0];
+        expect(rule).toMatchObject({ redacted: true });
+        expect(rule).not.toHaveProperty("using");
+    });
+
+    it("lets global hooks boot, every introspected table having its descriptor", async () => {
         const registry = new BackendCollectionRegistry();
+        const fixture = introspected();
         const withRegistry: BackendBootstrapper = {
-            ...bootstrapper(introspectedCollections()),
+            ...bootstrapper(fixture),
             async initializeDriver(): Promise<InitializedDriver> {
-                return { driver: stubDriver(), collections: introspectedCollections(), collectionRegistry: registry, internals: {} };
+                return { driver: stubDriver(), collections: fixture.collections, tables: fixture.tables, collectionRegistry: registry, internals: {} };
             }
         };
         await initializeRebaseBackend({
@@ -528,24 +551,10 @@ describe("introspection mode (no backend/schema)", () => {
         expect(registry.getGlobalCallbacks()?.beforeSave).toBeDefined();
     });
 
-    it("serves the tables it can describe and names the one it cannot, without failing the boot", async () => {
-        const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
-        const [customers, orders] = introspectedCollections();
-        // A function storage path: the table model refuses to describe it.
-        const broken: PostgresCollectionConfig = {
-            name: "Logs",
-            slug: "logs",
-            table: "logs",
-            schema: "public",
-            properties: {
-                id: { name: "Id", columnName: "id", type: "string", isId: "uuid" },
-                file: { name: "File", columnName: "file", type: "string", storage: { storagePath: () => "logs/" } }
-            }
-        };
-        const app = await boot({ introspected: [customers, orders, broken] });
-        const tables = await tablesFor(app, bearer(await person([])));
-        expect(tables.map(table => table.slug)).toEqual(["customers", "orders"]);
-        expect(warn.mock.calls.flat().join("\n")).toMatch(/"logs" is served, but GET \/api\/schema\/tables does not describe it/);
+    it("refuses to boot when a driver serves a table it did not describe", async () => {
+        const fixture = introspected();
+        await expect(boot({ introspected: { collections: fixture.collections, tables: fixture.tables.slice(0, 1) } }))
+            .rejects.toThrow(/Driver "fake" reported tables and descriptors that do not match; served without a descriptor: orders/);
     });
 });
 

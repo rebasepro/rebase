@@ -2786,15 +2786,11 @@ async function schemaCommand(
     } else if (subcommand === "introspect") {
         const argsList = arg(
             {
-                "--output": String,
-                "--collections": String,
+                "--schema-dir": String,
                 "--force": Boolean,
                 "--schema": String,
                 "--data-inference": Boolean,
                 "--no-data-inference": Boolean,
-                "-o": "--output",
-                "--out": "--output",
-                "-c": "--collections",
                 "-f": "--force"
             },
             {
@@ -2809,7 +2805,9 @@ async function schemaCommand(
             process.exit(1);
         }
 
-        const outputPath = argsList["--output"] || argsList["--collections"] || path.join("..", "config", "collections");
+        // Where the tables are written: `backend/schema` (the driver runs in
+        // `backend/`), or the directory `--schema-dir` names.
+        const schemaDir = argsList["--schema-dir"] || DEFAULT_SCHEMA_DIR;
 
         out("");
         out(chalk.bold("  🔍 Rebase Schema Introspector"));
@@ -2818,7 +2816,7 @@ async function schemaCommand(
         const cmdParts = [
             introspect.bin,
             ...introspect.args,
-            `--output=${outputPath}`,
+            `--schema-dir=${schemaDir}`,
             ...(argsList["--force"] ? ["--force"] : []),
             ...(argsList["--schema"] ? [`--schema=${argsList["--schema"]}`] : []),
             // The introspector reads these itself; without one it asks.

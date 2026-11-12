@@ -1,0 +1,17 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { currentRelationMembers } from "../../../backend/schema/current_relation_members";
+
+// A board over "memberType" fits this table, but a board needs a text column to keep each card's order in. Add one, then declare kanban: { columnField: "memberType", orderField: "<that column>" }.
+export const currentRelationMembersCms = customizeTable<typeof currentRelationMembers>("current_relation_members", {
+    icon: "Users",
+    hideFromNavigation: true,
+    display: {
+        title: "memberRole"
+    },
+    fields: {
+        memberRole: {
+            multiline: true
+        }
+    },
+    fieldOrder: ["relationId", "sequenceId", "memberType", "memberRole", "memberId"]
+});

@@ -1,0 +1,29 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { noticedNotifications } from "../../../backend/schema/noticed_notifications";
+
+export const noticedNotificationsCms = customizeTable<typeof noticedNotifications>("noticed_notifications", {
+    icon: "Mail",
+    display: {
+        title: "recipientType"
+    },
+    listFields: ["id", "type", "recipientType", "readAt", "seenAt", "eventId"],
+    fields: {
+        type: {
+            multiline: true
+        },
+        recipientType: {
+            multiline: true
+        }
+    },
+    fieldOrder: [
+        "id",
+        "type",
+        "recipientType",
+        "readAt",
+        "seenAt",
+        "eventId",
+        "recipientId",
+        "createdAt",
+        "updatedAt"
+    ]
+});

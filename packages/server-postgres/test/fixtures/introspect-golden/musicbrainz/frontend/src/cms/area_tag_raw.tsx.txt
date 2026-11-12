@@ -1,0 +1,7 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { areaTagRaw } from "../../../backend/schema/area_tag_raw";
+
+export const areaTagRawCms = customizeTable<typeof areaTagRaw>("area_tag_raw", {
+    icon: "Tag",
+    hideFromNavigation: true
+});

@@ -1,0 +1,29 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { userBlocks } from "../../../backend/schema/user_blocks";
+
+// A board over "reasonFormat" fits this table, but a board needs a text column to keep each card's order in. Add one, then declare kanban: { columnField: "reasonFormat", orderField: "<that column>" }.
+export const userBlocksCms = customizeTable<typeof userBlocks>("user_blocks", {
+    icon: "Users",
+    display: {
+        title: "reason"
+    },
+    listFields: ["id", "reasonFormat", "endsAt", "deactivatesAt", "needsView", "user"],
+    fields: {
+        reason: {
+            multiline: true
+        }
+    },
+    fieldOrder: [
+        "id",
+        "reasonFormat",
+        "endsAt",
+        "deactivatesAt",
+        "needsView",
+        "user",
+        "creator",
+        "revoker",
+        "reason",
+        "createdAt",
+        "updatedAt"
+    ]
+});

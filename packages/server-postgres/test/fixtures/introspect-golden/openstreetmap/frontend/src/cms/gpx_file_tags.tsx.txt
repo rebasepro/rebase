@@ -1,0 +1,16 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { gpxFileTags } from "../../../backend/schema/gpx_file_tags";
+
+export const gpxFileTagsCms = customizeTable<typeof gpxFileTags>("gpx_file_tags", {
+    icon: "Tag",
+    hideFromNavigation: true,
+    display: {
+        title: "tag"
+    },
+    fields: {
+        tag: {
+            multiline: true
+        }
+    },
+    fieldOrder: ["id", "tag", "gpx"]
+});

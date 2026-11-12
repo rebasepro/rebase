@@ -1,0 +1,33 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { messages } from "../../../backend/schema/messages";
+
+// A board over "bodyFormat" fits this table, but a board needs a text column to keep each card's order in. Add one, then declare kanban: { columnField: "bodyFormat", orderField: "<that column>" }.
+export const messagesCms = customizeTable<typeof messages>("messages", {
+    icon: "Mail",
+    display: {
+        title: "title"
+    },
+    listFields: ["id", "title", "bodyFormat", "sentOn", "messageRead", "toUserVisible"],
+    fields: {
+        title: {
+            multiline: true
+        },
+        body: {
+            multiline: true,
+            markdown: true
+        }
+    },
+    fieldOrder: [
+        "id",
+        "title",
+        "bodyFormat",
+        "sentOn",
+        "messageRead",
+        "toUserVisible",
+        "fromUserVisible",
+        "muted",
+        "fromUser",
+        "toUser",
+        "body"
+    ]
+});

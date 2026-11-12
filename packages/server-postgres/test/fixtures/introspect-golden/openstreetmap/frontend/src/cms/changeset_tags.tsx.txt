@@ -1,0 +1,15 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { changesetTags } from "../../../backend/schema/changeset_tags";
+
+export const changesetTagsCms = customizeTable<typeof changesetTags>("changeset_tags", {
+    icon: "Tag",
+    hideFromNavigation: true,
+    display: {
+        title: "v"
+    },
+    fields: {
+        v: {
+            multiline: true
+        }
+    }
+});

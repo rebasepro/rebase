@@ -1,0 +1,15 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { socialLinks } from "../../../backend/schema/social_links";
+
+export const socialLinksCms = customizeTable<typeof socialLinks>("social_links", {
+    hideFromNavigation: true,
+    display: {
+        title: "url"
+    },
+    fields: {
+        url: {
+            multiline: true
+        }
+    },
+    fieldOrder: ["id", "url", "user", "createdAt", "updatedAt"]
+});

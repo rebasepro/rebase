@@ -1,0 +1,27 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { diaryComments } from "../../../backend/schema/diary_comments";
+
+// A board over "bodyFormat" fits this table, but a board needs a text column to keep each card's order in. Add one, then declare kanban: { columnField: "bodyFormat", orderField: "<that column>" }.
+export const diaryCommentsCms = customizeTable<typeof diaryComments>("diary_comments", {
+    icon: "MessageCircle",
+    display: {
+        title: "body"
+    },
+    listFields: ["id", "bodyFormat", "visible", "diaryEntry", "user", "body"],
+    fields: {
+        body: {
+            multiline: true,
+            markdown: true
+        }
+    },
+    fieldOrder: [
+        "id",
+        "bodyFormat",
+        "visible",
+        "diaryEntry",
+        "user",
+        "body",
+        "createdAt",
+        "updatedAt"
+    ]
+});

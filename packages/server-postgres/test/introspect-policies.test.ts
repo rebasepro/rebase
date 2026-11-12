@@ -4,7 +4,7 @@
  * - A table whose policies hand each caller their own rows is the app's data:
  *   not "a 3-row code list" because a young database holds three customers,
  *   and not a child hidden from the navigation.
- * - Each policy becomes a `securityRules` entry the push recreates as it was,
+ * - Each policy becomes a rule of the table's `rls` the push recreates as it was,
  *   so the database's own policies are no longer orphans the next `db push`
  *   warns about, or drops.
  *
@@ -12,7 +12,7 @@
  * `test/e2e/introspect-policies-e2e.test.ts`.
  */
 import { classifyTables } from "../src/schema/introspect-db-structure";
-import { buildEnumMap, describeRlsOffTables, generateCollectionFile } from "../src/schema/introspect-db-logic";
+import { describeRlsOffTables, generateSchemaModules } from "../src/schema/introspect-db-logic";
 import { formatPolicyDrift, type PolicyDrift, type PolicyRef } from "../src/security/policy-drift";
 import { autoStamp, buildSchema, column, foreignKey, rlsPolicy, serialPk } from "./helpers/schema-metadata";
 
@@ -79,32 +79,29 @@ describe("classifying a table by its row-level security", () => {
     });
 });
 
-describe("writing a table's policies into its collection", () => {
-    function generated(policies: ReturnType<typeof rlsPolicy>[], rlsEnabled?: boolean): string {
+describe("writing a table's policies into its `rls`", () => {
+    function generated(policies: ReturnType<typeof rlsPolicy>[], rlsEnabled?: boolean, table = "customers"): string {
         const { metadata, tables } = shop(policies);
-        if (rlsEnabled !== undefined) for (const table of metadata.tables) table.rls_enabled = rlsEnabled;
-        const classifications = classifyTables(metadata, tables);
-        const meta = tables.get("customers");
-        if (!meta) throw new Error("no customers table");
-        return generateCollectionFile("customers", meta, metadata.fks, new Set(), tables, buildEnumMap([]), undefined, {
-            metadata,
-            classifications,
-            builder: "annotation"
-        });
+        if (rlsEnabled !== undefined) for (const row of metadata.tables) row.rls_enabled = rlsEnabled;
+        const generation = generateSchemaModules({ metadata, classifications: classifyTables(metadata, tables) });
+        const found = generation.tables.find(t => t.table === table);
+        if (!found) throw new Error(`no ${table} module`);
+        return found.schemaModule;
     }
 
     it("writes each as a rule with its name, command, mode and both clauses", () => {
         const source = generated([rlsPolicy("customers", "customers_owner", { qual: OWNER, with_check: OWNER })]);
         expect(source).toContain(
-            "    securityRules: [\n" +
+            "    rls: [\n" +
             "        {\n" +
             "            name: \"customers_owner\",\n" +
             "            operation: \"all\",\n" +
             "            mode: \"permissive\",\n" +
             `            using: ${JSON.stringify(OWNER)},\n` +
             `            withCheck: ${JSON.stringify(OWNER)}\n` +
-            "        },\n" +
-            "    ],"
+            "        }\n" +
+            "    ],\n" +
+            "    defaultPolicies: false"
         );
     });
 
@@ -117,7 +114,7 @@ describe("writing a table's policies into its collection", () => {
         expect(source).toContain(`operation: "update"`);
     });
 
-    /** The admin baseline every collection is given, as a database Rebase built holds it. */
+    /** The admin baseline every table is given, as a database Rebase built holds it. */
     const BASELINE = [
         rlsPolicy("customers", "customers_default_admin_read", { cmd: "SELECT", qual: "true" }),
         rlsPolicy("customers", "customers_default_admin_write_insert", { cmd: "INSERT", with_check: "true" }),
@@ -125,62 +122,53 @@ describe("writing a table's policies into its collection", () => {
         rlsPolicy("customers", "customers_default_admin_write_delete", { cmd: "DELETE", qual: "true" })
     ];
 
-    it("leaves out the defaults every collection is given, and writes nothing when they are all there is", () => {
-        expect(generated(BASELINE, true)).not.toContain("securityRules");
-        expect(generated(BASELINE, true)).not.toContain("disableDefaultPolicies");
+    it("is \"admin-only\" when the baseline is all the table holds, and leaves the baseline out of the rules", () => {
+        expect(generated(BASELINE, true)).toContain("rls: \"admin-only\"");
         const source = generated([...BASELINE, rlsPolicy("customers", "customers_owner", { qual: OWNER })], true);
         expect(source).toContain(`name: "customers_owner"`);
         expect(source).not.toContain("customers_default_admin_read");
-        expect(source).not.toContain("disableDefaultPolicies");
+        expect(source).not.toContain("defaultPolicies");
     });
 
     // U2's shop: `orders` had only its owner policy, so an admin read no row of
-    // it. The push after the introspection added the baseline, and the admin
-    // read every row.
+    // it. A push that added the baseline let the admin read every row.
     it("opts a table out of the admin baseline its own policies do not grant", () => {
         const source = generated([rlsPolicy("customers", "customers_owner", { qual: OWNER, with_check: OWNER })], true);
-        expect(source).toMatch(/\/\/ The table's policies are its whole access model[\s\S]*\n {4}disableDefaultPolicies: true,\n[\s\S]*\n {4}securityRules: \[/);
-        expect(source).toContain(`name: "customers_owner"`);
+        expect(source).toMatch(/\n {4}rls: \[[\s\S]*customers_owner[\s\S]*\],\n {4}defaultPolicies: false/);
     });
 
     it("keeps the part of a baseline the table has, as rules, when it lacks the rest", () => {
         const source = generated(BASELINE.slice(0, 2), true);
-        expect(source).toContain("disableDefaultPolicies: true");
+        expect(source).toContain("defaultPolicies: false");
         expect(source).toContain(`name: "customers_default_admin_read"`);
         expect(source).toContain(`name: "customers_default_admin_write_insert"`);
         expect(source).not.toContain("customers_default_admin_write_update");
     });
 
-    it("opts out a table whose RLS is on with no policy at all, which no one but its owner reads", () => {
+    it("writes a rule that grants nothing for RLS on with no policy at all, which no one but its owner reads", () => {
         const source = generated([], true);
-        expect(source).toContain("disableDefaultPolicies: true");
-        expect(source).not.toContain("securityRules");
+        expect(source).toContain(`{ name: "customers_closed", operation: "all", using: "false" }`);
+        expect(source).toContain("defaultPolicies: false");
     });
 
-    it("keeps the baseline for a table with RLS off, and says what the push will do to it", () => {
+    it("keeps the baseline and the table's own policies for a table with RLS off, and says what the push will do to it", () => {
         const source = generated([rlsPolicy("customers", "customers_owner", { qual: OWNER })], false);
-        expect(source).not.toContain("disableDefaultPolicies");
+        expect(source).toContain(`name: "customers_owner"`);
+        expect(source).not.toContain("defaultPolicies");
         expect(source).toMatch(/\/\/ ⚠ Row-level security is off on this table, so every request reaches every row\. `rebase db push`\n\/\/ switches it on/);
+        expect(generated([], false)).toContain("rls: \"admin-only\"");
         expect(describeRlsOffTables(["orders", "customers"])).toMatch(
             /^2 table\(s\) have row-level security off, so every request reaches every row: customers, orders\.\n`rebase db push` switches it on/);
         expect(describeRlsOffTables([])).toBeUndefined();
     });
 
     it("decides by the policies alone when RLS was not read", () => {
-        expect(generated([rlsPolicy("customers", "customers_owner", { qual: OWNER })])).toContain("disableDefaultPolicies: true");
-        expect(generated([])).not.toContain("disableDefaultPolicies");
+        expect(generated([rlsPolicy("customers", "customers_owner", { qual: OWNER })])).toContain("defaultPolicies: false");
+        expect(generated([])).toContain("rls: \"admin-only\"");
     });
 
     it("says an owned-child with the right article", () => {
-        const { metadata, tables } = shop([]);
-        const meta = tables.get("orders");
-        if (!meta) throw new Error("no orders table");
-        const source = generateCollectionFile("orders", meta, metadata.fks, new Set(), tables, buildEnumMap([]), undefined, {
-            metadata,
-            classifications: classifyTables(metadata, tables),
-            builder: "annotation"
-        });
-        expect(source).toContain("// Introspected as an owned-child:");
+        expect(generated([], undefined, "orders")).toContain("// Introspected as an owned-child:");
     });
 });
 

@@ -1,0 +1,7 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { mediaType } from "../../../backend/schema/media_type";
+
+export const mediaTypeCms = customizeTable<typeof mediaType>("media_type", {
+    icon: "Image",
+    group: "Reference"
+});

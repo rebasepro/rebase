@@ -1,0 +1,11 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { constraintShapesChild } from "../../../backend/schema/constraint_shapes_child";
+
+export const constraintShapesChildCms = customizeTable<typeof constraintShapesChild>("constraint_shapes_child", {
+    hideFromNavigation: true,
+    fields: {
+        note: {
+            multiline: true
+        }
+    }
+});

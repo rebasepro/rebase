@@ -1,0 +1,19 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { artistCredit } from "../../../backend/schema/artist_credit";
+
+export const artistCreditCms = customizeTable<typeof artistCredit>("artist_credit", {
+    display: {
+        title: "name"
+    },
+    sort: ["created", "desc"],
+    listFields: ["id", "name", "gid", "artistCount", "refCount", "editsPending"],
+    fields: {
+        name: {
+            multiline: true
+        },
+        created: {
+            readOnly: true
+        }
+    },
+    fieldOrder: ["id", "name", "gid", "artistCount", "refCount", "editsPending", "created"]
+});

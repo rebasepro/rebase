@@ -1,0 +1,10 @@
+import { defineTable, col } from "@rebasepro/server/schema";
+
+// ⚠ Not reproduced exactly by `rebase db push` — read before pushing:
+//   - "version" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
+export const schemaMigrations = defineTable("schema_migrations", {
+    columns: {
+        version: col.text().primaryKey()
+    },
+    rls: "admin-only"
+});

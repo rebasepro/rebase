@@ -1,0 +1,16 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { changesetComments } from "../../../backend/schema/changeset_comments";
+
+export const changesetCommentsCms = customizeTable<typeof changesetComments>("changeset_comments", {
+    icon: "MessageCircle",
+    display: {
+        title: "body"
+    },
+    fields: {
+        body: {
+            multiline: true,
+            markdown: true
+        }
+    },
+    fieldOrder: ["id", "visible", "changeset", "author", "body", "createdAt"]
+});

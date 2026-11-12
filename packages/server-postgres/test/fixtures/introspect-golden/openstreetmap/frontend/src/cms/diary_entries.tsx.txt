@@ -1,0 +1,32 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { diaryEntries } from "../../../backend/schema/diary_entries";
+
+// A board over "bodyFormat" fits this table, but a board needs a text column to keep each card's order in. Add one, then declare kanban: { columnField: "bodyFormat", orderField: "<that column>" }.
+export const diaryEntriesCms = customizeTable<typeof diaryEntries>("diary_entries", {
+    display: {
+        title: "title"
+    },
+    listFields: ["id", "title", "bodyFormat", "visible", "latitude", "longitude"],
+    fields: {
+        title: {
+            multiline: true
+        },
+        body: {
+            multiline: true,
+            markdown: true
+        }
+    },
+    fieldOrder: [
+        "id",
+        "title",
+        "bodyFormat",
+        "visible",
+        "latitude",
+        "longitude",
+        "user",
+        "languageCodeRelation",
+        "body",
+        "createdAt",
+        "updatedAt"
+    ]
+});

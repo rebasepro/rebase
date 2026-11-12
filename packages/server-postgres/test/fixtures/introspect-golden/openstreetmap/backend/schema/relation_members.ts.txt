@@ -1,0 +1,16 @@
+import { defineTable, col } from "@rebasepro/server/schema";
+
+// ⚠ Not reproduced exactly by `rebase db push` — read before pushing:
+//   - the foreign key relation_members_id_fkey spans (relation_id, version); a relation holds one column, so its columns are plain columns.
+//   - "member_role" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
+export const relationMembers = defineTable("relation_members", {
+    columns: {
+        relationId: col.bigint().primaryKey(),
+        memberType: col.enum(["Node", "Way", "Relation"], { name: "nwr_enum" }).notNull(),
+        memberId: col.bigint().notNull(),
+        memberRole: col.text().notNull(),
+        version: col.bigint().primaryKey().default(0),
+        sequenceId: col.integer().primaryKey().default(0)
+    },
+    rls: "admin-only"
+});

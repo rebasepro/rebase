@@ -1,0 +1,28 @@
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { users } from "./users";
+import { gpxFileTags } from "./gpx_file_tags";
+
+// ⚠ Not reproduced exactly by `rebase db push` — read before pushing:
+//   - "name" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
+//   - "timestamp" is timestamp without time zone, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
+//   - "description" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
+export const gpxFiles = defineTable("gpx_files", {
+    columns: {
+        id: col.bigserial().primaryKey(),
+        userId: col.bigint().notNull(),
+        visible: col.boolean().notNull().default(true),
+        name: col.text().notNull().default(""),
+        size: col.bigint(),
+        latitude: col.doublePrecision(),
+        longitude: col.doublePrecision(),
+        timestamp: col.custom("timestamp without time zone").notNull(),
+        description: col.text().notNull().default(""),
+        inserted: col.boolean().notNull(),
+        visibility: col.enum(["private", "public", "trackable", "identifiable"], { name: "gpx_visibility_enum" }).notNull().default("public")
+    },
+    relations: {
+        user: rel.belongsTo(() => users, { onDelete: "no action" }),
+        gpx_file_tags: rel.hasMany(() => gpxFileTags, { foreignKey: "gpx_id" })
+    },
+    rls: "admin-only"
+});

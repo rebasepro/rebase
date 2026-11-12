@@ -33,8 +33,8 @@ import type { TableColumn } from "./introspect-db-logic";
 export interface ReconstructedSearch {
     /** The generated columns that belong to the search block — never emitted as properties. */
     columns: Set<string>;
-    /** The `search: { … }` source, when the stamp confirmed it. */
-    block?: string;
+    /** The table's `search` block, when the stamp confirmed it. */
+    search?: SearchConfig;
     note?: string;
 }
 
@@ -141,12 +141,5 @@ export function reconstructSearchBlock(input: {
         }
     }
 
-    const lines = [
-        ...(search.column ? [`column: ${JSON.stringify(search.column)}`] : []),
-        ...(search.language ? [`language: ${JSON.stringify(search.language)}`] : []),
-        ...(search.unaccent ? ["unaccent: true"] : []),
-        ...(search.fuzzy ? ["fuzzy: true"] : []),
-        `fields: [\n${fields.map(f => `            { path: ${JSON.stringify(f.path)}, weight: ${JSON.stringify(f.weight)} }`).join(",\n")}\n        ]`
-    ];
-    return { columns, block: `\n    search: {\n        ${lines.join(",\n        ")}\n    },` };
+    return { columns, search };
 }

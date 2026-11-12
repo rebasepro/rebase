@@ -1,0 +1,16 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { currentNodes } from "../../../backend/schema/current_nodes";
+
+export const currentNodesCms = customizeTable<typeof currentNodes>("current_nodes", {
+    listFields: ["id", "timestamp", "visible", "latitude", "longitude", "tile"],
+    fieldOrder: [
+        "id",
+        "timestamp",
+        "visible",
+        "latitude",
+        "longitude",
+        "tile",
+        "version",
+        "changeset"
+    ]
+});

@@ -1,0 +1,25 @@
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { categories } from "./categories";
+import { suppliers } from "./suppliers";
+import { orderDetails } from "./order_details";
+
+export const products = defineTable("products", {
+    columns: {
+        productId: col.smallint().primaryKey(),
+        productName: col.varchar(40).notNull(),
+        supplierId: col.smallint(),
+        categoryId: col.smallint(),
+        quantityPerUnit: col.varchar(20),
+        unitPrice: col.real(),
+        unitsInStock: col.smallint(),
+        unitsOnOrder: col.smallint(),
+        reorderLevel: col.smallint(),
+        discontinued: col.integer().notNull()
+    },
+    relations: {
+        category: rel.belongsTo(() => categories, { onDelete: "no action" }),
+        supplier: rel.belongsTo(() => suppliers, { onDelete: "no action" }),
+        order_details: rel.hasMany(() => orderDetails)
+    },
+    rls: "admin-only"
+});

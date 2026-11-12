@@ -1,0 +1,7 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { orderDetails } from "../../../backend/schema/order_details";
+
+export const orderDetailsCms = customizeTable<typeof orderDetails>("order_details", {
+    icon: "ShoppingCart",
+    hideFromNavigation: true
+});

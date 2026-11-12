@@ -1,0 +1,11 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { customerDemographics } from "../../../backend/schema/customer_demographics";
+
+export const customerDemographicsCms = customizeTable<typeof customerDemographics>("customer_demographics", {
+    icon: "Users",
+    fields: {
+        customerDesc: {
+            multiline: true
+        }
+    }
+});

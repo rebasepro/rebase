@@ -1,0 +1,14 @@
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { city } from "./city";
+
+export const country = defineTable("country", {
+    columns: {
+        countryId: col.serial().primaryKey(),
+        country: col.text().notNull(),
+        lastUpdate: col.timestamptz().notNull().onCreateNow()
+    },
+    relations: {
+        city: rel.hasMany(() => city)
+    },
+    rls: "admin-only"
+});

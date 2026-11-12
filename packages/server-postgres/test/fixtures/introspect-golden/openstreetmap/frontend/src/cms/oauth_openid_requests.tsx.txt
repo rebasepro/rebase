@@ -1,0 +1,15 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { oauthOpenidRequests } from "../../../backend/schema/oauth_openid_requests";
+
+export const oauthOpenidRequestsCms = customizeTable<typeof oauthOpenidRequests>("oauth_openid_requests", {
+    hideFromNavigation: true,
+    display: {
+        title: "nonce"
+    },
+    fields: {
+        nonce: {
+            multiline: true
+        }
+    },
+    fieldOrder: ["id", "nonce", "accessGrant"]
+});

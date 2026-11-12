@@ -1,0 +1,26 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { employee } from "../../../backend/schema/employee";
+
+export const employeeCms = customizeTable<typeof employee>("employee", {
+    display: {
+        title: "lastName"
+    },
+    listFields: ["employeeId", "title", "firstName", "lastName", "email", "phone"],
+    fieldOrder: [
+        "employeeId",
+        "title",
+        "firstName",
+        "lastName",
+        "email",
+        "phone",
+        "state",
+        "birthDate",
+        "hireDate",
+        "address",
+        "city",
+        "country",
+        "postalCode",
+        "fax",
+        "reportsToRelation"
+    ]
+});

@@ -1,0 +1,29 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { products } from "../../../backend/schema/products";
+
+export const productsCms = customizeTable<typeof products>("products", {
+    icon: "Package",
+    display: {
+        title: "productName"
+    },
+    listFields: [
+        "productId",
+        "productName",
+        "category",
+        "quantityPerUnit",
+        "unitPrice",
+        "unitsInStock"
+    ],
+    fieldOrder: [
+        "productId",
+        "productName",
+        "category",
+        "quantityPerUnit",
+        "unitPrice",
+        "unitsInStock",
+        "unitsOnOrder",
+        "reorderLevel",
+        "discontinued",
+        "supplier"
+    ]
+});

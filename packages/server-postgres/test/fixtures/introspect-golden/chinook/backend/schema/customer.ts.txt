@@ -1,0 +1,26 @@
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { employee } from "./employee";
+import { invoice } from "./invoice";
+
+export const customer = defineTable("customer", {
+    columns: {
+        customerId: col.integer().primaryKey(),
+        firstName: col.varchar(40).notNull(),
+        lastName: col.varchar(20).notNull(),
+        company: col.varchar(80),
+        address: col.varchar(70),
+        city: col.varchar(40),
+        state: col.varchar(40),
+        country: col.varchar(40),
+        postalCode: col.varchar(10),
+        phone: col.varchar(24),
+        fax: col.varchar(24),
+        email: col.varchar(60).notNull(),
+        supportRepId: col.integer()
+    },
+    relations: {
+        supportRep: rel.belongsTo(() => employee, { onDelete: "no action" }),
+        invoice: rel.hasMany(() => invoice)
+    },
+    rls: "admin-only"
+});

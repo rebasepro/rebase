@@ -103,13 +103,9 @@ export const DRIVER_FLAG_SPECS: Record<string, arg.Spec> = {
         "-w": "--watch"
     },
     "schema introspect": {
-        "--output": String,
-        "-o": "--output",
-        "--out": "--output",
-        // The introspector's output directory, still of collection files: the
-        // introspection slice moves it to backend/schema with the generator.
-        "--collections": String,
-        "-c": "--collections",
+        // Where the introspected tables are written: `backend/schema` unless
+        // this names another directory.
+        "--schema-dir": String,
         "--force": Boolean,
         "-f": "--force",
         "--schema": String,

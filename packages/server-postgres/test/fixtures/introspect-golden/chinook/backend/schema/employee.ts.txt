@@ -1,0 +1,31 @@
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { customer } from "./customer";
+
+// ⚠ Not reproduced exactly by `rebase db push` — read before pushing:
+//   - "birth_date" is timestamp without time zone, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
+//   - "hire_date" is timestamp without time zone, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
+export const employee = defineTable("employee", {
+    columns: {
+        employeeId: col.integer().primaryKey(),
+        lastName: col.varchar(20).notNull(),
+        firstName: col.varchar(20).notNull(),
+        title: col.varchar(30),
+        reportsTo: col.integer(),
+        birthDate: col.custom("timestamp without time zone"),
+        hireDate: col.custom("timestamp without time zone"),
+        address: col.varchar(70),
+        city: col.varchar(40),
+        state: col.varchar(40),
+        country: col.varchar(40),
+        postalCode: col.varchar(10),
+        phone: col.varchar(24),
+        fax: col.varchar(24),
+        email: col.varchar(60)
+    },
+    relations: {
+        reportsToRelation: rel.belongsTo(() => employee, { localKey: "reports_to", onDelete: "no action" }),
+        customer: rel.hasMany(() => customer, { foreignKey: "support_rep_id" }),
+        employee: rel.hasMany(() => employee, { foreignKey: "reports_to" })
+    },
+    rls: "admin-only"
+});

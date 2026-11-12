@@ -1,0 +1,15 @@
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { constraintShapes } from "./constraint_shapes";
+
+// Introspected as an owned-child: belongs to constraint_shapes (its only ON DELETE CASCADE foreign key) and nothing else references it.
+export const constraintShapesChild = defineTable("constraint_shapes_child", {
+    columns: {
+        id: col.integer().primaryKey(),
+        parentId: col.integer().notNull(),
+        note: col.text()
+    },
+    relations: {
+        parent: rel.belongsTo(() => constraintShapes, { onDelete: "cascade" })
+    },
+    rls: "admin-only"
+});

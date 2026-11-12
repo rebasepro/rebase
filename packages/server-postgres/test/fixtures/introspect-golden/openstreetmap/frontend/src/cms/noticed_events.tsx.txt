@@ -1,0 +1,15 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { noticedEvents } from "../../../backend/schema/noticed_events";
+
+export const noticedEventsCms = customizeTable<typeof noticedEvents>("noticed_events", {
+    icon: "Activity",
+    listFields: ["id", "type", "recordType", "recordId", "notificationsCount", "params"],
+    fields: {
+        type: {
+            multiline: true
+        },
+        recordType: {
+            multiline: true
+        }
+    }
+});

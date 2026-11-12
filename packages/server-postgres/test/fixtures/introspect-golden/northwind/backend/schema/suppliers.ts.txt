@@ -1,0 +1,23 @@
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { products } from "./products";
+
+export const suppliers = defineTable("suppliers", {
+    columns: {
+        supplierId: col.smallint().primaryKey(),
+        companyName: col.varchar(40).notNull(),
+        contactName: col.varchar(30),
+        contactTitle: col.varchar(30),
+        address: col.varchar(60),
+        city: col.varchar(15),
+        region: col.varchar(15),
+        postalCode: col.varchar(10),
+        country: col.varchar(15),
+        phone: col.varchar(24),
+        fax: col.varchar(24),
+        homepage: col.text()
+    },
+    relations: {
+        products: rel.hasMany(() => products)
+    },
+    rls: "admin-only"
+});

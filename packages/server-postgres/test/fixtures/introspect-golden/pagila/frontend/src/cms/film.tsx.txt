@@ -1,0 +1,41 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { film } from "../../../backend/schema/film";
+
+export const filmCms = customizeTable<typeof film>("film", {
+    display: {
+        title: "title"
+    },
+    sort: ["lastUpdate", "desc"],
+    listFields: ["filmId", "title", "rating", "releaseYear", "rentalDuration", "rentalRate"],
+    fields: {
+        title: {
+            multiline: true
+        },
+        description: {
+            multiline: true
+        },
+        lastUpdate: {
+            readOnly: true
+        },
+        fulltext: {
+            hidden: true
+        }
+    },
+    fieldOrder: [
+        "filmId",
+        "title",
+        "rating",
+        "fulltext",
+        "releaseYear",
+        "rentalDuration",
+        "rentalRate",
+        "length",
+        "replacementCost",
+        "lengthHours",
+        "lastUpdate",
+        "language",
+        "originalLanguage",
+        "description",
+        "specialFeatures"
+    ]
+});

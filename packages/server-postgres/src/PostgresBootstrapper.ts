@@ -23,7 +23,8 @@ import {
     RealtimeProvider,
     resourceEnvSuffix,
     type RealtimeChannelsConfig,
-    type RealtimeSocketOptions
+    type RealtimeSocketOptions,
+    type TableDescriptor
 } from "@rebasepro/types";
 import { PostgresBackendDriver } from "./PostgresBackendDriver";
 import { RealtimeService, parseMaxSocketsPerUser, parseMaxSubscriptionsPerSocket, parseRealtimeTuning } from "./services/realtimeService";
@@ -41,7 +42,8 @@ import { HistoryService } from "./history/HistoryService";
 import { ensureHistoryIndexes, ensureHistoryTableExists, historyUnavailableReason, readHistoryTableState } from "./history/ensure-history-table";
 import { patchPgArrayNullSafety } from "./utils/pg-array-null-patch";
 import { patchPgNumericToNumber } from "./utils/pg-numeric-number-patch";
-import { buildCollectionsFromSchema, introspectSchema, readRlsStatus } from "./schema/introspect-runtime";
+import { introspectSchema, lowerIntrospectedTables } from "./schema/introspect-runtime";
+import { introspectTables } from "./schema/introspect-tables";
 import { buildBaasSchema, readCatalogueSchema } from "./schema/catalogue-schema";
 import { diffGeneratedSchemaAgainstCatalogue, warnOnGeneratedSchemaDrift } from "./schema/generated-schema-diff";
 import type { TableMeta } from "./schema/introspect-db-logic";
@@ -720,6 +722,9 @@ export async function openPostgresDriver(
     // No collection files and no generated drizzle schema exist, so read
     // the live database and build both from what is actually there.
     let introspectedCollections: CollectionConfig[] | undefined;
+    // Their descriptors, read from the catalogue: what the server serves at
+    // `GET /api/schema/tables` for a project that declares no tables.
+    let introspectedDescriptors: TableDescriptor[] | undefined;
     // The tables skipped for having no authorization model, for the server to
     // name if it then has nothing to serve.
     let skippedUnprotected: { schema: string; table: string }[] | undefined;
@@ -727,7 +732,6 @@ export async function openPostgresDriver(
     let introspectedRelations: Record<string, Relations> | undefined;
     if (introspectCollections && (!collections || collections.length === 0)) {
         const pgSchemaName = pgConfig.introspectionSchema ?? "public";
-        const schema = await introspectSchema(rawClient, pgSchemaName);
 
         // ── Only serve what the database protects ────────────────
         // Requests run as rebase_user, which is granted DML on the
@@ -735,43 +739,41 @@ export async function openPostgresDriver(
         // authorization model at all: serving it hands every row to
         // every authenticated user. baas never runs `db push`, so
         // nothing here would have enabled RLS on the user's behalf.
-        const rlsStatus = await readRlsStatus(rawClient, pgSchemaName);
-        const unprotected = [...schema.tablesMap.keys()].filter(
-            (t) => !schema.joinTables.has(t) && !rlsStatus.get(t)?.rlsEnabled
-        );
-        const policyless = [...schema.tablesMap.keys()].filter(
-            (t) => !schema.joinTables.has(t) && rlsStatus.get(t)?.rlsEnabled && rlsStatus.get(t)?.policyCount === 0
-        );
-        // Outside the filter above because enabling RLS would not serve one:
-        // a join table never becomes a collection, either way.
-        const unprotectedJoinTables = [...schema.joinTables].filter((t) => !rlsStatus.get(t)?.rlsEnabled);
+        // `introspectTables` leaves such a table out (with the SQL that
+        // protects it) unless `unprotectedTables` is "serve".
+        const introspected = await introspectTables(rawClient, pgSchemaName, { unprotectedTables });
+        const policyless = introspected.tables
+            .filter((t) => t.rls.rules.length === 0 && !t.rls.defaultPolicies)
+            .map((t) => t.table);
+        // Outside the skip because enabling RLS would not serve one: a join
+        // table is never served, either way.
+        const unprotectedJoinTables = introspected.junctions.filter((j) => !j.rlsEnabled).map((j) => j.table);
 
-        if (unprotected.length > 0) {
-            if (unprotectedTables === "serve") {
-                logger.warn(
-                    `🔓 [rls] Serving ${unprotected.length} table(s) with row-level security DISABLED: ${unprotected.join(", ")}. ` +
-                    "Every authenticated request can read and write every row of these. " +
-                    "This is baas.unprotectedTables: \"serve\"."
-                );
-            } else {
-                logger.warn(
-                    `🔒 [rls] Not serving ${unprotected.length} table(s) — row-level security is disabled, so they have no ` +
-                    `authorization model: ${unprotected.join(", ")}\n` +
-                    unprotected.map((t) => `      ALTER TABLE "${pgSchemaName}"."${t}" ENABLE ROW LEVEL SECURITY;  -- then add a policy`).join("\n") +
-                    "\n      To serve them without RLS anyway, pass baas: { unprotectedTables: \"serve\" } to the server " +
-                    "entry: an option `rebase eject` gives you, which the managed runtime does not read from config/ or " +
-                    "the environment."
-                );
-                for (const t of unprotected) schema.tablesMap.delete(t);
-                skippedUnprotected = unprotected.map((table) => ({ schema: pgSchemaName, table }));
-            }
+        if (introspected.unprotected.length > 0) {
+            logger.warn(
+                `🔓 [rls] Serving ${introspected.unprotected.length} table(s) with row-level security DISABLED: ${introspected.unprotected.join(", ")}. ` +
+                "Every authenticated request can read and write every row of these. " +
+                "This is baas.unprotectedTables: \"serve\"."
+            );
+        }
+        if (introspected.skipped.length > 0) {
+            const unprotected = introspected.skipped.map((s) => s.table);
+            logger.warn(
+                `🔒 [rls] Not serving ${unprotected.length} table(s) — row-level security is disabled, so they have no ` +
+                `authorization model: ${unprotected.join(", ")}\n` +
+                introspected.skipped.map((s) => s.remediationSql.split("\n").map((line) => `      ${line}`).join("\n")).join("\n") +
+                "\n      To serve them without RLS anyway, pass baas: { unprotectedTables: \"serve\" } to the server " +
+                "entry: an option `rebase eject` gives you, which the managed runtime does not read from backend/ or " +
+                "the environment."
+            );
+            skippedUnprotected = unprotected.map((table) => ({ schema: pgSchemaName, table }));
         }
         if (unprotectedJoinTables.length > 0) {
-            // Dropped so that the skip in `buildCollectionsFromSchema` is not
-            // the only thing keeping these from a caller. The grants stay: a
-            // policy on a served table commonly reads a join table in a
-            // subquery, which runs as the caller, so revoking would turn every
-            // such read into "permission denied".
+            // Left out of the Drizzle schema below, so that serving no
+            // descriptor for it is not the only thing keeping it from a
+            // caller. The grants stay: a policy on a served table commonly
+            // reads a join table in a subquery, which runs as the caller, so
+            // revoking would turn every such read into "permission denied".
             const requestRoles = resolveRlsSettings({
                 ...declaredDatabaseRls(config.dataSourceKey ?? DEFAULT_DATA_SOURCE_KEY),
                 ...pgConfig.rls
@@ -781,7 +783,6 @@ export async function openPostgresDriver(
                 `${unprotectedJoinTables.join(", ")}. The API does not serve a join table, with RLS or without, ` +
                 `but ${requestRoles} keeps its grants on these, so SQL your own code runs as a caller reaches every row.`
             );
-            for (const t of unprotectedJoinTables) schema.tablesMap.delete(t);
         }
         if (policyless.length > 0) {
             // Legal, and silently returns nothing — worth saying out loud,
@@ -791,16 +792,31 @@ export async function openPostgresDriver(
             );
         }
 
-        introspectedCollections = buildCollectionsFromSchema(schema, pgSchemaName);
-        // Tables keyed the way the collections above name their fields,
-        // and relations derived from the foreign keys — the only
-        // evidence a database with no config offers. Without the
-        // relations, drizzle's relational path can't resolve the ones
-        // those collections advertise.
+        // The request-time collections, lowered from the descriptors at the
+        // boundary a declared table crosses at boot.
+        const lowered = lowerIntrospectedTables(introspected.tables);
+        for (const { table, reason } of lowered.dropped) {
+            logger.warn(`[PostgresRegistry] BaaS mode: not serving table "${table}": ${reason}`);
+        }
+        introspectedDescriptors = lowered.tables;
+        introspectedCollections = lowered.collections;
+
+        // The Drizzle tables the query layer reads, from the same catalogue:
+        // the served tables and the protected join tables their relations
+        // go through, keyed the way the collections above name their fields,
+        // with relations derived from the foreign keys.
+        const schema = await introspectSchema(rawClient, pgSchemaName);
+        const keep = new Set([
+            ...lowered.tables.map((t) => t.table),
+            ...introspected.junctions.filter((j) => j.rlsEnabled).map((j) => j.table)
+        ]);
+        for (const table of [...schema.tablesMap.keys()]) {
+            if (!keep.has(table)) schema.tablesMap.delete(table);
+        }
         ({ tables: introspectedTables, relations: introspectedRelations } =
             buildBaasSchema(schema.tablesMap, pgSchemaName, introspectedCollections));
         logger.info(
-            `🔍 [PostgresRegistry] BaaS mode: derived ${introspectedCollections.length} collections from schema "${pgSchemaName}" [${introspectedCollections.map(c => c.slug).join(", ")}]`
+            `🔍 [PostgresRegistry] BaaS mode: derived ${introspectedCollections.length} tables from schema "${pgSchemaName}" [${introspectedCollections.map(c => c.slug).join(", ")}]`
         );
     }
 
@@ -1751,6 +1767,7 @@ foundIn: (tablesByName.get(checkName) ?? []).filter(s => s !== schemaName) });
         // Only set in baas mode — tells the server which collections the
         // database turned out to have.
         collections: introspectedCollections,
+        tables: introspectedDescriptors,
         ...(skippedUnprotected && { unprotectedTables: skippedUnprotected }),
         internals
     };

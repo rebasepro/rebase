@@ -1,0 +1,9 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { shippers } from "../../../backend/schema/shippers";
+
+export const shippersCms = customizeTable<typeof shippers>("shippers", {
+    group: "Reference",
+    display: {
+        title: "companyName"
+    }
+});

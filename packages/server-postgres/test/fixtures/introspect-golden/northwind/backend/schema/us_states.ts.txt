@@ -1,0 +1,11 @@
+import { defineTable, col } from "@rebasepro/server/schema";
+
+export const usStates = defineTable("us_states", {
+    columns: {
+        stateId: col.smallint().primaryKey(),
+        stateName: col.varchar(100),
+        stateAbbr: col.varchar(2),
+        stateRegion: col.varchar(50)
+    },
+    rls: "admin-only"
+});

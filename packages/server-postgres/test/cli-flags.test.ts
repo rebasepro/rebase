@@ -238,11 +238,16 @@ describe("the --out / --output pair", () => {
         expect(problems[0]).toContain("--out");
     });
 
-    it.each(OUTPUT_FLAG_ALIASES)("is accepted by every schema command as %s", flag => {
-        for (const subcommand of ["generate", "introspect", "stale"]) {
+    it.each(OUTPUT_FLAG_ALIASES)("is accepted by every schema command that writes one file, as %s", flag => {
+        for (const subcommand of ["generate", "stale"]) {
             expect(() => assertKnownFlags("schema", subcommand, line("schema", subcommand, flag, "/tmp/x.ts")))
                 .not.toThrow();
         }
+    });
+
+    it.each(OUTPUT_FLAG_ALIASES)("is refused by schema introspect, which writes a directory named by --schema-dir (%s)", flag => {
+        expect(() => assertKnownFlags("schema", "introspect", line("schema", "introspect", flag, "/tmp/x"))).toThrow();
+        expect(() => assertKnownFlags("schema", "introspect", line("schema", "introspect", "--schema-dir", "/tmp/x"))).not.toThrow();
     });
 });
 

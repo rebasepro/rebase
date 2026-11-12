@@ -1,0 +1,17 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { activeStorageAttachments } from "../../../backend/schema/active_storage_attachments";
+
+export const activeStorageAttachmentsCms = customizeTable<typeof activeStorageAttachments>("active_storage_attachments", {
+    hideFromNavigation: true,
+    display: {
+        title: "name"
+    },
+    fields: {
+        name: {
+            multiline: true
+        },
+        recordType: {
+            multiline: true
+        }
+    }
+});

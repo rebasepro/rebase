@@ -1,0 +1,15 @@
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { orders } from "./orders";
+
+// Introspected as a lookup: a 6-row code list: referenced by 1 table(s), references none, 3 or fewer simple columns.
+export const shippers = defineTable("shippers", {
+    columns: {
+        shipperId: col.smallint().primaryKey(),
+        companyName: col.varchar(40).notNull(),
+        phone: col.varchar(24)
+    },
+    relations: {
+        orders: rel.hasMany(() => orders, { foreignKey: "ship_via" })
+    },
+    rls: "admin-only"
+});
