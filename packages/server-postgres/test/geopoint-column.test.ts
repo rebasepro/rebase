@@ -1,9 +1,10 @@
-import { CollectionConfig, PostgresProperty, Property } from "@rebasepro/types";
+import { CollectionConfig, PostgresProperty, col } from "@rebasepro/types";
 import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
 import { generatePostgresDdl } from "../src/schema/generate-postgres-ddl-logic";
 import { planSchema } from "../src/schema/plan/plan-schema";
 import { planColumnFor, planColumnTypeFor } from "./helpers/plan-column";
-import { serializePropertyToServer, parsePropertyFromServer } from "../src/data-transformer";
+import { serializeColumnToServer, parseColumnFromServer } from "../src/data-transformer";
+import { columnOf, runtimeTableOf } from "./helpers/codec-columns";
 import { compileSet, planCollections } from "./helpers/plan-tables";
 
 /**
@@ -44,22 +45,26 @@ name: "Location" }
     });
 
     it("round-trips a { latitude, longitude } value", () => {
-        const prop = places.properties.location as Property;
-        const stored = serializePropertyToServer({ latitude: 41.38,
-longitude: 2.17 }, prop, "location");
+        const location = runtimeTableOf(places).columnsByKey.get("location");
+        if (!location) throw new Error("places compiled without its location column");
+        expect(location.semantic).toBe("geopoint");
+        const stored = serializeColumnToServer({ latitude: 41.38,
+longitude: 2.17 }, location, "location");
         expect(stored).toEqual({ latitude: 41.38,
 longitude: 2.17 });
-        expect(parsePropertyFromServer(stored, prop, places, "location")).toEqual({ latitude: 41.38,
+        expect(parseColumnFromServer(stored, location)).toEqual({ latitude: 41.38,
 longitude: 2.17 });
     });
 
     it("rejects a value that is not a geopoint rather than storing a shrug", () => {
-        const prop = places.properties.location as Property;
-        expect(() => serializePropertyToServer("41.38,2.17", prop, "location"))
+        const location = columnOf(col.geopoint());
+        expect(() => serializeColumnToServer("41.38,2.17", location, "location"))
             .toThrow(/'location' expects a geopoint object/);
-        expect(() => serializePropertyToServer({ lat: 41.38,
-lng: 2.17 }, prop, "location"))
+        expect(() => serializeColumnToServer({ lat: 41.38,
+lng: 2.17 }, location, "location"))
             .toThrow(/numeric `latitude` and `longitude`/);
+        expect(() => serializeColumnToServer([41.38, 2.17], location, "location"))
+            .toThrow(/expects a geopoint object/);
     });
 
     /**

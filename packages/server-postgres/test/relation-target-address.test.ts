@@ -27,7 +27,8 @@ describe("relation ref target — addressed by the whole key", () => {
 isId: true },
             seat_number: { type: "number",
 isId: true },
-            occupant: { type: "string" }
+            occupant: { type: "string" },
+            booking_id: { type: "number" }
         }
     };
 
@@ -38,7 +39,9 @@ isId: true },
         properties: {
             id: { type: "number",
 isId: "increment" },
-            seat: { type: "relation", relation: { kind: "belongsTo", relationName: "seat", target: () => seatsCollection, localKey: "seat_id" } }
+            // A `hasOne`: one column cannot reference a composite key, so the
+            // link to a composite-keyed target is held on the target's side.
+            seat: { type: "relation", relation: { kind: "hasOne", relationName: "seat", target: () => seatsCollection, foreignKeyOnTarget: "booking_id" } }
         }
     };
 

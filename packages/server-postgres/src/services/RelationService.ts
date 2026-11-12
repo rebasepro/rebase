@@ -429,8 +429,8 @@ export class RelationService {
             values = options.rest(targetRow);
         } else {
             values = options?.resolveNested
-                ? await parseDataFromServer(targetRow, targetCollection, this.db, this.registry)
-                : await parseDataFromServer(targetRow, targetCollection, undefined, this.registry);
+                ? await parseDataFromServer(targetRow, this.registry.requireTable(targetCollection.slug), targetCollection, this.db, this.registry)
+                : await parseDataFromServer(targetRow, this.registry.requireTable(targetCollection.slug), targetCollection, undefined, this.registry);
 
             // The target's OWN exclusions, applied to the target's own columns.
             // WebSocket fetches and every realtime frame come through here, so

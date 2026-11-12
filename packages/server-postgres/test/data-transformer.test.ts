@@ -1,133 +1,120 @@
-import { sanitizeAndConvertDates, serializePropertyToServer } from "../src/data-transformer";
-import type { Property } from "@rebasepro/types";
+import { sanitizeAndConvertDates, serializeColumnToServer, serializeRelationValue } from "../src/data-transformer";
+import { col, json } from "@rebasepro/types";
+import { columnOf } from "./helpers/codec-columns";
 
-describe("serializePropertyToServer", () => {
-    // ── Relation property ──
-    describe("relation property", () => {
-        const relationProp: Property = { type: "relation" };
-
-        it("should extract id from a relation object", () => {
-            const value = { id: "abc-123",
+describe("serializeRelationValue", () => {
+    it("should extract id from a relation object", () => {
+        const value = { id: "abc-123",
 path: "authors",
 __type: "relation" };
-            expect(serializePropertyToServer(value, relationProp)).toBe("abc-123");
-        });
-
-        it("should return null for empty string values", () => {
-            expect(serializePropertyToServer("", relationProp)).toBeNull();
-        });
-
-        it("should pass through a plain string ID", () => {
-            expect(serializePropertyToServer("uuid-string", relationProp)).toBe("uuid-string");
-        });
-
-        it("should pass through a numeric ID", () => {
-            expect(serializePropertyToServer(42, relationProp)).toBe(42);
-        });
-
-        it("should return null for null values", () => {
-            expect(serializePropertyToServer(null, relationProp)).toBeNull();
-        });
-
-        it("should return undefined for undefined values", () => {
-            expect(serializePropertyToServer(undefined, relationProp)).toBeUndefined();
-        });
-
-        it("should serialize an array of relation objects to array of IDs", () => {
-            const value = [
-                { id: "id-1",
-path: "authors" },
-                { id: "id-2",
-path: "authors" }
-            ];
-            expect(serializePropertyToServer(value, relationProp)).toEqual(["id-1", "id-2"]);
-        });
-
-        it("should convert empty strings within arrays to null", () => {
-            const value = ["", "some-uuid"];
-            expect(serializePropertyToServer(value, relationProp)).toEqual([null, "some-uuid"]);
-        });
-
-        it("should handle mixed array of objects and strings", () => {
-            const value = [
-                { id: "id-1",
-path: "authors" },
-                "raw-id-2",
-                ""
-            ];
-            expect(serializePropertyToServer(value, relationProp)).toEqual(["id-1", "raw-id-2", null]);
-        });
+        expect(serializeRelationValue(value)).toBe("abc-123");
     });
 
-    // ── String property ──
-    describe("string property", () => {
-        const stringProp: Property = { type: "string" };
+    it("should return null for empty string values", () => {
+        expect(serializeRelationValue("")).toBeNull();
+    });
+
+    it("should pass through a plain string ID", () => {
+        expect(serializeRelationValue("uuid-string")).toBe("uuid-string");
+    });
+
+    it("should pass through a numeric ID", () => {
+        expect(serializeRelationValue(42)).toBe(42);
+    });
+
+    it("should return null for null values", () => {
+        expect(serializeRelationValue(null)).toBeNull();
+    });
+
+    it("should return undefined for undefined values", () => {
+        expect(serializeRelationValue(undefined)).toBeUndefined();
+    });
+
+    it("should serialize an array of relation objects to array of IDs", () => {
+        const value = [
+            { id: "id-1",
+path: "authors" },
+            { id: "id-2",
+path: "authors" }
+        ];
+        expect(serializeRelationValue(value)).toEqual(["id-1", "id-2"]);
+    });
+
+    it("should convert empty strings within arrays to null", () => {
+        expect(serializeRelationValue(["", "some-uuid"])).toEqual([null, "some-uuid"]);
+    });
+
+    it("should handle mixed array of objects, strings and nulls", () => {
+        const value = [
+            { id: "id-1",
+path: "authors" },
+            "raw-id-2",
+            "",
+            null
+        ];
+        expect(serializeRelationValue(value)).toEqual(["id-1", "raw-id-2", null, null]);
+    });
+});
+
+describe("serializeColumnToServer", () => {
+    // ── Text column ──
+    describe("text column", () => {
+        const text = columnOf(col.text());
 
         it("should pass through a regular string", () => {
-            expect(serializePropertyToServer("hello", stringProp)).toBe("hello");
+            expect(serializeColumnToServer("hello", text)).toBe("hello");
         });
 
-        it("should pass through empty string for non-relation types", () => {
-            expect(serializePropertyToServer("", stringProp)).toBe("");
+        it("should pass through empty string", () => {
+            expect(serializeColumnToServer("", text)).toBe("");
         });
 
         it("should pass through null", () => {
-            expect(serializePropertyToServer(null, stringProp)).toBeNull();
+            expect(serializeColumnToServer(null, text)).toBeNull();
         });
     });
 
-    // ── Number property ──
-    describe("number property", () => {
-        const numberProp: Property = { type: "number" };
+    // ── Numeric column ──
+    describe("numeric column", () => {
+        const integer = columnOf(col.integer());
 
         it("should pass through numeric values", () => {
-            expect(serializePropertyToServer(42, numberProp)).toBe(42);
+            expect(serializeColumnToServer(42, integer)).toBe(42);
         });
 
         it("should pass through zero", () => {
-            expect(serializePropertyToServer(0, numberProp)).toBe(0);
+            expect(serializeColumnToServer(0, integer)).toBe(0);
         });
 
         it("should pass through null", () => {
-            expect(serializePropertyToServer(null, numberProp)).toBeNull();
+            expect(serializeColumnToServer(null, integer)).toBeNull();
+        });
+
+        it("should write a number that did not parse as null", () => {
+            expect(serializeColumnToServer("NaN", columnOf(col.numeric()))).toBeNull();
         });
     });
 
-    // ── Map property ──
-    describe("map property", () => {
-        const mapProp: Property = {
-            type: "map",
-            properties: {
-                name: { type: "string" },
-                age: { type: "number" },
-                author: { type: "relation" }
-            }
-        };
+    // ── JSON object column ──
+    // A relation inside a JSON document is not something the table model can
+    // say (the lift refuses it), so the document's fields here are scalars.
+    describe("json object column", () => {
+        const document = columnOf(col.jsonb(json.object({
+            name: json.string(),
+            age: json.number(),
+            seenAt: json.date()
+        })));
 
-        it("should recursively serialize nested properties", () => {
+        it("should recursively serialize nested fields", () => {
             const value = {
                 name: "Alice",
-                age: 30,
-                author: { id: "author-1",
-path: "authors" }
+                age: "NaN",
+                seenAt: "2024-01-01T00:00:00Z"
             };
-            expect(serializePropertyToServer(value, mapProp)).toEqual({
+            expect(serializeColumnToServer(value, document)).toEqual({
                 name: "Alice",
-                age: 30,
-                author: "author-1"
-            });
-        });
-
-        it("should convert empty string relation in map to null", () => {
-            const value = {
-                name: "Test",
-                age: 25,
-                author: ""
-            };
-            expect(serializePropertyToServer(value, mapProp)).toEqual({
-                name: "Test",
-                age: 25,
-                author: null
+                age: null,
+                seenAt: "2024-01-01T00:00:00.000Z"
             });
         });
 
@@ -136,138 +123,128 @@ path: "authors" }
                 name: "Bob",
                 unknownField: "should pass through"
             };
-            const result = serializePropertyToServer(value, mapProp) as Record<string, unknown>;
+            const result = serializeColumnToServer(value, document) as Record<string, unknown>;
             expect(result.name).toBe("Bob");
             expect(result.unknownField).toBe("should pass through");
         });
     });
 
-    // ── Array property ──
-    describe("array property", () => {
-        const arrayOfStringsProp: Property = {
-            type: "array",
-            of: { type: "string" }
-        };
+    // ── Native array column ──
+    describe("array column", () => {
+        const strings = columnOf(col.array(col.text()));
+        const numbers = columnOf(col.array(col.numeric()));
 
-        const arrayOfNumbersProp: Property = {
-            type: "array",
-            of: { type: "number" }
-        };
-
-        const arrayOfRelationsProp: Property = {
-            type: "array",
-            of: { type: "relation" }
-        };
-
-        it("should serialize array elements through their sub-property type", () => {
-            expect(serializePropertyToServer(["a", "b", "c"], arrayOfStringsProp))
-                .toEqual(["a", "b", "c"]);
+        it("should serialize array elements through their element type", () => {
+            expect(serializeColumnToServer(["a", "b", "c"], strings)).toEqual(["a", "b", "c"]);
+            expect(serializeColumnToServer([1, "NaN"], numbers)).toEqual([1, null]);
         });
 
         // Was "should coerce non-array values to empty array". The coercion it
         // asserted threw the caller's value away and answered 201 — a test that
         // pinned a bug in place rather than a behaviour.
-        it("should reject a non-array value for an array property", () => {
-            expect(() => serializePropertyToServer("not-an-array", arrayOfStringsProp, "tags"))
+        it("should reject a non-array value for an array column", () => {
+            expect(() => serializeColumnToServer("not-an-array", strings, "tags"))
                 .toThrow(/'tags' expects an array/);
         });
 
         // --- Null safety ---
         it("should return null for null array value", () => {
-            expect(serializePropertyToServer(null, arrayOfStringsProp)).toBeNull();
+            expect(serializeColumnToServer(null, strings)).toBeNull();
         });
 
         it("should return undefined for undefined array value", () => {
-            expect(serializePropertyToServer(undefined, arrayOfStringsProp)).toBeUndefined();
+            expect(serializeColumnToServer(undefined, strings)).toBeUndefined();
         });
 
         it("should return empty array for empty array value", () => {
-            expect(serializePropertyToServer([], arrayOfStringsProp)).toEqual([]);
+            expect(serializeColumnToServer([], strings)).toEqual([]);
         });
 
-        it("should return null for null value with array-of-numbers property", () => {
-            expect(serializePropertyToServer(null, arrayOfNumbersProp)).toBeNull();
+        it("should return null for null value on an array of numbers", () => {
+            expect(serializeColumnToServer(null, numbers)).toBeNull();
         });
 
         it("should handle array with null elements", () => {
-            const result = serializePropertyToServer([null, "a", null, "b"], arrayOfStringsProp);
-            expect(result).toEqual([null, "a", null, "b"]);
+            expect(serializeColumnToServer([null, "a", null, "b"], strings)).toEqual([null, "a", null, "b"]);
         });
 
-        it("should handle array of relation objects with null entries", () => {
-            const value = [{ id: "1", path: "tags" }, null, { id: "2", path: "tags" }];
-            const result = serializePropertyToServer(value, arrayOfRelationsProp);
-            expect(result).toEqual(["1", null, "2"]);
+        it("should reject a number value for an array column", () => {
+            expect(() => serializeColumnToServer(42, strings)).toThrow(/expects an array/);
         });
 
-        it("should reject a number value for an array property", () => {
-            expect(() => serializePropertyToServer(42, arrayOfStringsProp)).toThrow(/expects an array/);
+        it("should reject a boolean value for an array column", () => {
+            expect(() => serializeColumnToServer(true, strings)).toThrow(/expects an array/);
         });
 
-        it("should reject a boolean value for an array property", () => {
-            expect(() => serializePropertyToServer(true, arrayOfStringsProp)).toThrow(/expects an array/);
-        });
-
-        it("should reject an object value for an array property", () => {
-            expect(() => serializePropertyToServer({ a: 1 }, arrayOfStringsProp)).toThrow(/expects an array/);
+        it("should reject an object value for an array column", () => {
+            expect(() => serializeColumnToServer({ a: 1 }, strings)).toThrow(/expects an array/);
         });
     });
 
-    // ── Boolean property ──
-    describe("boolean property", () => {
-        const boolProp: Property = { type: "boolean" } as Property;
+    // ── Boolean column ──
+    describe("boolean column", () => {
+        const bool = columnOf(col.boolean());
 
         it("should pass through true", () => {
-            expect(serializePropertyToServer(true, boolProp)).toBe(true);
+            expect(serializeColumnToServer(true, bool)).toBe(true);
         });
 
         it("should pass through false", () => {
-            expect(serializePropertyToServer(false, boolProp)).toBe(false);
+            expect(serializeColumnToServer(false, bool)).toBe(false);
         });
     });
 
-    // ── Vector property ──
-    describe("vector property", () => {
-        const vectorProp: Property = { type: "vector",
-dimensions: 3 } as Property;
+    // ── Vector column ──
+    describe("vector column", () => {
+        const vector = columnOf(col.vector(3));
 
-        it("should serialize a Vector instance to a flat array", () => {
+        it("should serialize a Vector envelope to a flat array", () => {
             const vectorVal = { __type: "Vector",
 value: [1.5, -2.0, 3.14] };
-            expect(serializePropertyToServer(vectorVal, vectorProp)).toEqual([1.5, -2.0, 3.14]);
+            expect(serializeColumnToServer(vectorVal, vector)).toEqual([1.5, -2.0, 3.14]);
         });
 
         it("should serialize a raw number array to a flat array", () => {
-            expect(serializePropertyToServer([0.5, 0.6, 0.7], vectorProp)).toEqual([0.5, 0.6, 0.7]);
+            expect(serializeColumnToServer([0.5, 0.6, 0.7], vector)).toEqual([0.5, 0.6, 0.7]);
         });
 
         it("should return null for null values", () => {
-            expect(serializePropertyToServer(null, vectorProp)).toBeNull();
+            expect(serializeColumnToServer(null, vector)).toBeNull();
         });
 
         it("should return undefined for undefined values", () => {
-            expect(serializePropertyToServer(undefined, vectorProp)).toBeUndefined();
+            expect(serializeColumnToServer(undefined, vector)).toBeUndefined();
         });
     });
 
-    // ── Binary property ──
-    describe("binary property", () => {
-        const binaryProp: Property = { type: "binary" } as Property;
+    // ── bytea column ──
+    describe("bytea column", () => {
+        const bytes = columnOf(col.bytea());
 
         it("should serialize a base64 data URL to a Buffer", () => {
             const base64Data = "data:application/octet-stream;base64,aGVsbG8=";
-            const result = serializePropertyToServer(base64Data, binaryProp);
+            const result = serializeColumnToServer(base64Data, bytes);
             expect(Buffer.isBuffer(result)).toBe(true);
-            expect((result as Buffer).toString("utf8")).toBe("hello");
+            expect(Buffer.isBuffer(result) ? result.toString("utf8") : undefined).toBe("hello");
         });
 
         it("should pass through a Buffer as-is", () => {
             const buffer = Buffer.from("world");
-            expect(serializePropertyToServer(buffer, binaryProp)).toBe(buffer);
+            expect(serializeColumnToServer(buffer, bytes)).toBe(buffer);
         });
 
         it("should return null for null values", () => {
-            expect(serializePropertyToServer(null, binaryProp)).toBeNull();
+            expect(serializeColumnToServer(null, bytes)).toBeNull();
+        });
+    });
+
+    // ── A type Rebase does not create ──
+    describe("custom column", () => {
+        it("passes the value through as sent", () => {
+            const inet = columnOf(col.custom("inet"));
+            expect(serializeColumnToServer("10.0.0.1", inet)).toBe("10.0.0.1");
+            expect(serializeColumnToServer("data:application/octet-stream;base64,AQID", inet))
+                .toBe("data:application/octet-stream;base64,AQID");
         });
     });
 });
@@ -296,8 +273,8 @@ describe("sanitizeAndConvertDates", () => {
         expect(Buffer.isBuffer(out.nested[0])).toBe(true);
     });
 
-    it("keeps a data URL decoded by serializePropertyToServer a Buffer", () => {
-        const decoded = serializePropertyToServer("data:application/octet-stream;base64,AQID", { type: "binary" } as Property);
+    it("keeps a data URL decoded by serializeColumnToServer a Buffer", () => {
+        const decoded = serializeColumnToServer("data:application/octet-stream;base64,AQID", columnOf(col.bytea()));
         const out = sanitizeAndConvertDates({ audio: decoded }) as { audio: unknown };
         expect(Buffer.isBuffer(out.audio)).toBe(true);
     });

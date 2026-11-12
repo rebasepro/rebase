@@ -1,11 +1,13 @@
 import {
     serializeDataToServer,
-    parsePropertyFromServer,
+    parseColumnFromServer,
+    parseDataFromServer,
     normalizeDbValues,
     sanitizeAndConvertDates
 } from "../src/data-transformer";
+import { liftedColumnOf, runtimeTableOf } from "./helpers/codec-columns";
 import { pgTable, varchar, type AnyPgColumn } from "drizzle-orm/pg-core";
-import type { PostgresCollectionConfig, Property, Properties, RelationProperty } from "@rebasepro/types";
+import type { PostgresCollectionConfig, Properties } from "@rebasepro/types";
 
 // ─────────────────────────────────────────────────────────────
 // Fixture helpers
@@ -38,7 +40,7 @@ name: "Count" }
         const result = serializeDataToServer(
             { title: "Hello",
 count: 5 },
-            properties
+            runtimeTableOf(makeCollection("items", properties))
         );
         expect(result).toHaveProperty("scalarData");
         expect(result).toHaveProperty("inverseRelationUpdates");
@@ -48,17 +50,17 @@ count: 5 },
     it("does NOT include __inverseRelationUpdates on scalarData (dunder elimination)", () => {
         const result = serializeDataToServer(
             { title: "Test" },
-            properties
+            runtimeTableOf(makeCollection("items", properties))
         );
         // The old pattern embedded __dunder properties on the result object
         expect(result.scalarData).not.toHaveProperty("__inverseRelationUpdates");
         expect(result.scalarData).not.toHaveProperty("__joinPathRelationUpdates");
     });
 
-    it("returns empty arrays when no collection/registry is provided", () => {
+    it("returns empty relation updates for a row of plain columns", () => {
         const result = serializeDataToServer(
             { title: "Test" },
-            properties
+            runtimeTableOf(makeCollection("items", properties))
         );
         expect(result.inverseRelationUpdates).toEqual([]);
         expect(result.joinPathRelationUpdates).toEqual([]);
@@ -68,7 +70,7 @@ count: 5 },
         const result = serializeDataToServer(
             { title: "Hello World",
 count: 42 },
-            properties
+            runtimeTableOf(makeCollection("items", properties))
         );
         expect(result.scalarData.title).toBe("Hello World");
         expect(result.scalarData.count).toBe(42);
@@ -77,7 +79,7 @@ count: 42 },
     it("handles null/undefined entity gracefully", () => {
         // Deliberately invalid: the null guard under test has no typed caller, so the null arrives untyped.
         const noRow: Record<string, unknown> | null = JSON.parse("null");
-        const result = serializeDataToServer(noRow as Record<string, unknown>, properties);
+        const result = serializeDataToServer(noRow as Record<string, unknown>, runtimeTableOf(makeCollection("items", properties)));
         // Object.entries(null) yields nothing → empty object
         expect(result.scalarData).toEqual({});
         expect(result.inverseRelationUpdates).toEqual([]);
@@ -96,9 +98,9 @@ count: 42 },
         const result = serializeDataToServer(
             { title: "Hello",
 subtitle: undefined },
-            { ...properties,
+            runtimeTableOf(makeCollection("items", { ...properties,
 subtitle: { type: "string",
-name: "Subtitle" } }
+name: "Subtitle" } }))
         );
         expect(result.scalarData).toEqual({ title: "Hello" });
         expect("subtitle" in result.scalarData).toBe(false);
@@ -108,7 +110,7 @@ name: "Subtitle" } }
         // The caller who means "clear this column" says so, and is obeyed.
         const result = serializeDataToServer(
             { title: null },
-            properties
+            runtimeTableOf(makeCollection("items", properties))
         );
         expect(result.scalarData).toEqual({ title: null });
     });
@@ -117,7 +119,7 @@ name: "Subtitle" } }
         const result = serializeDataToServer(
             { title: "Hello",
 trigger_populated: undefined },
-            properties
+            runtimeTableOf(makeCollection("items", properties))
         );
         expect("trigger_populated" in result.scalarData).toBe(false);
     });
@@ -126,7 +128,7 @@ trigger_populated: undefined },
 // ─────────────────────────────────────────────────────────────
 // parsePropertyFromServer — relation factory (Issue #1 regression)
 // ─────────────────────────────────────────────────────────────
-describe("parsePropertyFromServer relation factory", () => {
+describe("parseDataFromServer relation refs", () => {
     const targetCollection = makeCollection("authors", {
         name: { type: "string",
 name: "Name" }
@@ -144,18 +146,17 @@ name: "Name" }
             }
         }
     });
+    const table = runtimeTableOf(collection, targetCollection);
 
-    it("produces a relation ref with __type 'relation' from a string FK value", () => {
-        const property = collection.properties.author as Property;
-        const result = parsePropertyFromServer("author-123", property, collection, "author") as Record<string, unknown>;
+    it("produces a relation ref with __type 'relation' from a string key on the relation", async () => {
+        const result = (await parseDataFromServer({ author: "author-123" }, table, collection)).author as Record<string, unknown>;
         expect(result.__type).toBe("relation");
         expect(result.id).toBe("author-123");
         expect(result.path).toBe("authors");
     });
 
-    it("produces a relation ref with __type 'relation' from a numeric FK value", () => {
-        const property = collection.properties.author as Property;
-        const result = parsePropertyFromServer(42, property, collection, "author") as Record<string, unknown>;
+    it("produces a relation ref with __type 'relation' from a numeric key on the relation", async () => {
+        const result = (await parseDataFromServer({ author: 42 }, table, collection)).author as Record<string, unknown>;
         expect(result.__type).toBe("relation");
         expect(result.id).toBe("42");
         expect(result.path).toBe("authors");
@@ -178,8 +179,7 @@ name: "Created" }
     it("coerces string numbers to actual numbers", () => {
         const result = normalizeDbValues(
             { title: "Widget",
-price: "19.99" },
-            collection
+price: "19.99" }, runtimeTableOf(collection)
         );
         expect(result.price).toBe(19.99);
     });
@@ -188,8 +188,7 @@ price: "19.99" },
         const date = new Date("2024-01-15T10:30:00Z");
         const result = normalizeDbValues(
             { title: "Widget",
-created_at: date },
-            collection
+created_at: date }, runtimeTableOf(collection)
         );
         expect(result.created_at).toEqual({
             __type: "date",
@@ -200,8 +199,7 @@ created_at: date },
     it("strips unknown database columns not in properties", () => {
         const result = normalizeDbValues(
             { title: "Widget",
-internal_counter: 999 },
-            collection
+internal_counter: 999 }, runtimeTableOf(collection)
         );
         expect(result).not.toHaveProperty("internal_counter");
         expect(result.title).toBe("Widget");
@@ -210,14 +208,14 @@ internal_counter: 999 },
     it("returns data as-is when properties is empty", () => {
         const empty = makeCollection("empty", {});
         const data = { foo: "bar" };
-        const result = normalizeDbValues(data, empty);
+        const result = normalizeDbValues(data, runtimeTableOf(empty));
         expect(result).toEqual({});
     });
 
     it("handles null data gracefully", () => {
         // Deliberately invalid: the null guard under test has no typed caller, so the null arrives untyped.
         const noRow: Record<string, unknown> | null = JSON.parse("null");
-        const result = normalizeDbValues(noRow as Record<string, unknown>, collection);
+        const result = normalizeDbValues(noRow as Record<string, unknown>, runtimeTableOf(collection));
         expect(result).toBeNull();
     });
 
@@ -239,8 +237,7 @@ name: "Total" }
 
         const result = normalizeDbValues(
             { customer: "some-id",
-total: 42 },
-            collectionWithRelation
+total: 42 }, runtimeTableOf(collectionWithRelation)
         );
         // Relation properties should be skipped
         expect(result).not.toHaveProperty("customer");
@@ -349,8 +346,7 @@ name: "Title" },
         const result = normalizeDbValues(
             { title: "Widget",
 categoryId: "cat-123",
-category: "ignored" },
-            collection
+category: "ignored" }, runtimeTableOf(collection)
         );
 
         // FK column should be preserved as a primitive string
@@ -363,6 +359,10 @@ category: "ignored" },
 
     it("preserves numeric FK columns as numbers", () => {
         const targetCollection = makeCollection("authors", {
+            // A numeric key, so the foreign key the relation plans is an integer column.
+            id: { type: "number",
+name: "Id",
+isId: true },
             name: { type: "string",
 name: "Name" }
         });
@@ -385,8 +385,7 @@ name: "Title" },
 
         const result = normalizeDbValues(
             { title: "Book",
-authorId: 42 },
-            collection
+authorId: 42 }, runtimeTableOf(collection)
         );
         expect(result.authorId).toBe(42);
     });
@@ -415,8 +414,7 @@ name: "Title" },
 
         const result = normalizeDbValues(
             { title: "Book",
-authorId: null },
-            collection
+authorId: null }, runtimeTableOf(collection)
         );
         expect(result.authorId).toBeNull();
     });
@@ -440,7 +438,7 @@ name: "Active" }
             { title: "Test",
 count: 10,
 active: true },
-            properties
+            runtimeTableOf(makeCollection("items", properties))
         );
 
         const dunderKeys = Object.keys(result.scalarData).filter(k => k.startsWith("__"));
@@ -473,7 +471,7 @@ name: "Title" },
 tag: { id: "t1",
 path: "tags",
 __type: "relation" } },
-            properties
+            runtimeTableOf(makeCollection("items", properties))
         );
 
         const dunderKeys = Object.keys(result.scalarData).filter(k => k.startsWith("__"));
@@ -482,9 +480,9 @@ __type: "relation" } },
 });
 
 // ─────────────────────────────────────────────────────────────
-// parsePropertyFromServer — vector parsing
+// parseColumnFromServer — vector parsing
 // ─────────────────────────────────────────────────────────────
-describe("parsePropertyFromServer vector parsing", () => {
+describe("parseColumnFromServer vector parsing", () => {
     const targetCollection = makeCollection("items", {
         embedding: {
             type: "vector",
@@ -494,8 +492,8 @@ describe("parsePropertyFromServer vector parsing", () => {
     });
 
     it("parses string representation '[0.1,-0.2,3.14]' from postgres into wrapped vector", () => {
-        const property = targetCollection.properties.embedding as Property;
-        const result = parsePropertyFromServer("[0.1,-0.2,3.14]", property, targetCollection, "embedding");
+        const property = liftedColumnOf(targetCollection.properties.embedding);
+        const result = parseColumnFromServer("[0.1,-0.2,3.14]", property);
         expect(result).toEqual({
             __type: "Vector",
             value: [0.1, -0.2, 3.14]
@@ -503,8 +501,8 @@ describe("parsePropertyFromServer vector parsing", () => {
     });
 
     it("parses numeric array [0.1,-0.2,3.14] into wrapped vector", () => {
-        const property = targetCollection.properties.embedding as Property;
-        const result = parsePropertyFromServer([0.1, -0.2, 3.14], property, targetCollection, "embedding");
+        const property = liftedColumnOf(targetCollection.properties.embedding);
+        const result = parseColumnFromServer([0.1, -0.2, 3.14], property);
         expect(result).toEqual({
             __type: "Vector",
             value: [0.1, -0.2, 3.14]
@@ -513,9 +511,9 @@ describe("parsePropertyFromServer vector parsing", () => {
 });
 
 // ─────────────────────────────────────────────────────────────
-// parsePropertyFromServer — binary parsing
+// parseColumnFromServer — binary parsing
 // ─────────────────────────────────────────────────────────────
-describe("parsePropertyFromServer binary parsing", () => {
+describe("parseColumnFromServer binary parsing", () => {
     const targetCollection = makeCollection("items", {
         data: {
             type: "binary",
@@ -524,17 +522,17 @@ describe("parsePropertyFromServer binary parsing", () => {
     });
 
     it("parses database Buffer into a base64 data URL string", () => {
-        const property = targetCollection.properties.data as Property;
+        const property = liftedColumnOf(targetCollection.properties.data);
         const buffer = Buffer.from("hello");
-        const result = parsePropertyFromServer(buffer, property, targetCollection, "data");
+        const result = parseColumnFromServer(buffer, property);
         expect(result).toBe("data:application/octet-stream;base64,aGVsbG8=");
     });
 
     it("parses Buffer object (JSON serialization) into a base64 data URL string", () => {
-        const property = targetCollection.properties.data as Property;
+        const property = liftedColumnOf(targetCollection.properties.data);
         const bufferObj = { type: "Buffer",
 data: Array.from(Buffer.from("hello")) };
-        const result = parsePropertyFromServer(bufferObj, property, targetCollection, "data");
+        const result = parseColumnFromServer(bufferObj, property);
         expect(result).toBe("data:application/octet-stream;base64,aGVsbG8=");
     });
 });

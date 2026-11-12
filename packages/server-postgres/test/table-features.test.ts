@@ -27,7 +27,8 @@ import { withPinnedPlannerWorld } from "../src/schema/render-outputs";
 import { assertWritableColumns } from "../src/services/collection-helpers";
 import { readCatalogueSchema } from "../src/schema/catalogue-schema";
 import { collectionIndexStatement } from "../src/schema/collection-index";
-import { parsePropertyFromServer, serializePropertyToServer } from "../src/data-transformer";
+import { parseColumnFromServer, serializeColumnToServer } from "../src/data-transformer";
+import { columnAt, runtimeTableOfDef } from "./helpers/codec-columns";
 import { drizzle } from "drizzle-orm/pglite";
 import {
     TABLE_FEATURES, audits, bugs, memberTags, members, codes, counters, days, grades, handles, initials, keyed, lists, pairs, people, prices, slugs, switches, tallies, tasks, tickets
@@ -349,14 +350,15 @@ describe("table features: `col.array(inner)` of every scalar element type", () =
                 instants: ["2026-01-02T10:00:00.000Z"],
                 times: ["09:30:00"]
             };
+            const runtime = runtimeTableOfDef(lists);
             const values: Record<string, unknown> = {};
             for (const [key, value] of Object.entries(written)) {
-                values[key] = serializePropertyToServer(value, collection.properties[key], key);
+                values[key] = serializeColumnToServer(value, columnAt(runtime, key), key);
             }
             const [row] = await orm.insert(table).values(values).returning();
             const read: Record<string, unknown> = {};
             for (const key of Object.keys(written)) {
-                read[key] = parsePropertyFromServer(row[key], collection.properties[key], collection, key);
+                read[key] = parseColumnFromServer(row[key], columnAt(runtime, key));
             }
             // Each item comes back as a scalar column of its type does.
             const date = (iso: string) => ({ __type: "date", value: iso });

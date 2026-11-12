@@ -1,7 +1,7 @@
 import { eq, and, isNotNull, isNull, sql, SQL } from "drizzle-orm";
 import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 // import { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { CollectionConfig, FilterValues, JUNCTION_PIVOT_KEY, type LogicalCondition, Properties, ResolvedRelation, joinConditions } from "@rebasepro/types";
+import { CollectionConfig, FilterValues, JUNCTION_PIVOT_KEY, type LogicalCondition, ResolvedRelation, joinConditions } from "@rebasepro/types";
 import { createStampKeys, getTableName, resolveCollectionRelations } from "@rebasepro/common";
 import { DrizzleConditionBuilder } from "../utils/drizzle-conditions";
 import {
@@ -551,7 +551,7 @@ export class PersistService {
         let returnedRow: Record<string, unknown> | undefined;
         try {
             // Transform relations to IDs, then sanitize
-            const serializedResult = serializeDataToServer(otherValues as M, collection.properties as Properties, collection, this.registry);
+            const serializedResult = serializeDataToServer(otherValues as M, this.registry.requireTable(collection.slug), collection);
 
             // Extract relation updates from the typed result
             const inverseRelationUpdates = serializedResult.inverseRelationUpdates;
@@ -940,7 +940,7 @@ export class PersistService {
             const { values: plainValues, fieldOps } = splitFieldOps(row.values, this.registry.getTable(collection.slug)?.descriptor);
             if (Object.keys(fieldOps).length > 0) return undefined;
             if (manyRelationKeys.some(key => Object.prototype.hasOwnProperty.call(plainValues, key))) return undefined;
-            const serialized = serializeDataToServer(plainValues, collection.properties as Properties, collection, this.registry);
+            const serialized = serializeDataToServer(plainValues, this.registry.requireTable(collection.slug), collection);
             if (serialized.inverseRelationUpdates.length > 0 || serialized.joinPathRelationUpdates.length > 0) return undefined;
             const data = { ...(sanitizeAndConvertDates(serialized.scalarData) as Record<string, unknown>) };
             assertWritableColumns(data, table, collectionPath);
@@ -1107,7 +1107,7 @@ export class PersistService {
             const { values: plainValues, fieldOps } = splitFieldOps(values, this.registry.getTable(collection.slug)?.descriptor);
             if (Object.keys(fieldOps).length > 0) return undefined;
             if (manyRelationKeys.some(key => Object.prototype.hasOwnProperty.call(plainValues, key))) return undefined;
-            const serialized = serializeDataToServer(plainValues, collection.properties as Properties, collection, this.registry);
+            const serialized = serializeDataToServer(plainValues, this.registry.requireTable(collection.slug), collection);
             if (serialized.inverseRelationUpdates.length > 0 || serialized.joinPathRelationUpdates.length > 0) return undefined;
             const data = { ...(sanitizeAndConvertDates(serialized.scalarData) as Record<string, unknown>) };
             assertWritableColumns(data, table, collectionPath);
@@ -1211,7 +1211,7 @@ export class PersistService {
         const resolvedRelations = resolveCollectionRelations(collection);
         if (Object.keys(resolvedRelations).some(key => resolvedRelations[key]?.cardinality === "many"
             && Object.prototype.hasOwnProperty.call(plainValues, key))) return undefined;
-        const serialized = serializeDataToServer(plainValues, collection.properties as Properties, collection, this.registry);
+        const serialized = serializeDataToServer(plainValues, this.registry.requireTable(collection.slug), collection);
         if (serialized.inverseRelationUpdates.length > 0 || serialized.joinPathRelationUpdates.length > 0) return undefined;
         const data = { ...(sanitizeAndConvertDates(serialized.scalarData) as Record<string, unknown>) };
         assertWritableColumns(data, table, collectionPath);

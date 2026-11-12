@@ -27,7 +27,8 @@ import { diffPlanAgainstCatalogue } from "../src/schema/plan/diff-plan";
 import { readSchemaMetadata } from "../src/schema/introspect-db-queries";
 import { generateSchemaModules } from "../src/schema/introspect-db-logic";
 import { readCatalogueSchema } from "../src/schema/catalogue-schema";
-import { parsePropertyFromServer, serializePropertyToServer } from "../src/data-transformer";
+import { parseColumnFromServer, serializeColumnToServer } from "../src/data-transformer";
+import { columnAt, runtimeTableOfDef } from "./helpers/codec-columns";
 import { customTypesAgree, normalizeFormatType } from "../src/schema/column-type-drift";
 import { evaluateSchemaModules } from "./helpers/introspect-generation";
 
@@ -168,10 +169,11 @@ describe("col.custom(): generated from a database, pushed, booted and served", (
             hops: ["10.0.0.2", "192.168.1.1"]
         };
         const values: Record<string, unknown> = {};
-        for (const [key, value] of Object.entries(written)) values[key] = serializePropertyToServer(value, collection.properties[key], key);
+        const runtime = runtimeTableOfDef(defs[0]);
+        for (const [key, value] of Object.entries(written)) values[key] = serializeColumnToServer(value, columnAt(runtime, key), key);
         const [row] = await orm.insert(catalogue.tables.sessions).values(values).returning();
         const read: Record<string, unknown> = {};
-        for (const key of Object.keys(written)) read[key] = parsePropertyFromServer(row[key], collection.properties[key], collection, key);
+        for (const key of Object.keys(written)) read[key] = parseColumnFromServer(row[key], columnAt(runtime, key));
         expect(read).toEqual(written);
     });
 });

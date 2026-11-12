@@ -20,7 +20,9 @@ import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
 import { RealtimeService } from "../src/services/realtimeService";
-import { serializePropertyToServer } from "../src/data-transformer";
+import { serializeColumnToServer } from "../src/data-transformer";
+import { col } from "@rebasepro/types";
+import { columnOf } from "./helpers/codec-columns";
 
 const peopleTable = pgTable("people", {
     id: varchar("id").primaryKey(),
@@ -92,7 +94,7 @@ describe("text a write is given", () => {
     });
 });
 
-describe("the coercions a property asks for", () => {
+describe("the coercions a column type asks for", () => {
     it("still reads 'NaN' on a number as no value", async () => {
         const row = await saveAndRead({ score: "NaN", price: "nan" });
         expect(row.score).toBeNull();
@@ -105,9 +107,9 @@ describe("the coercions a property asks for", () => {
     });
 
     it("normalizes a date's text, and only a date's", () => {
-        const date = { name: "Seen", type: "date" } as const;
-        const text = { name: "Note", type: "string" } as const;
-        expect(serializePropertyToServer("2024-01-01T00:00:00Z", date)).toBe("2024-01-01T00:00:00.000Z");
-        expect(serializePropertyToServer("2024-01-01T00:00:00Z", text)).toBe("2024-01-01T00:00:00Z");
+        const date = columnOf(col.timestamptz());
+        const text = columnOf(col.text());
+        expect(serializeColumnToServer("2024-01-01T00:00:00Z", date)).toBe("2024-01-01T00:00:00.000Z");
+        expect(serializeColumnToServer("2024-01-01T00:00:00Z", text)).toBe("2024-01-01T00:00:00Z");
     });
 });

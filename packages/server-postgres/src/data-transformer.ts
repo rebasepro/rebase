@@ -1,13 +1,16 @@
 import { eq } from "drizzle-orm";
 import { AnyPgColumn } from "drizzle-orm/pg-core";
-import { CollectionConfig, Properties, Property, ResolvedRelation, RelationProperty, Vector, BinaryProperty, hasForeignKeyOnTarget, type ResolvedBelongsTo, type ResolvedForeignKeyOnTarget, type ResolvedVia } from "@rebasepro/types";
-import { resolveCollectionRelations, findRelation, fieldKeyForColumn, createRelationRef, DEFAULT_ONE_OF_TYPE, DEFAULT_ONE_OF_VALUE } from "@rebasepro/common";
+import { CollectionConfig, Properties, ResolvedRelation, Vector, hasForeignKeyOnTarget, type ResolvedVia } from "@rebasepro/types";
+import { resolveCollectionRelations, findRelation, createRelationRef } from "@rebasepro/common";
 import { isPrototypePollutingKey } from "@rebasepro/utils";
 import { PostgresTableRegistry } from "./model/PostgresTableRegistry";
 import { buildCompositeId, rowIdentityCondition, tableKeys } from "./services/collection-helpers";
 import { applyDynamicJoin, joinStepCondition } from "./services/RelationService";
 import { ApiError, logger } from "@rebasepro/server";
 import type { DrizzleClient } from "./interfaces";
+import type { ColumnDescriptor, ColumnType, JsonShape, RelationDescriptor } from "@rebasepro/types";
+import { columnTypeLabel } from "@rebasepro/types";
+import { valueCodecOf, valueCodecOfType, type ValueCodec } from "@rebasepro/common";
 import type { RuntimeTable } from "./model/runtime-table";
 import { columnKeyOf } from "./services/relation-tables";
 
@@ -118,43 +121,40 @@ function normalizeDateText(value: unknown): unknown {
 }
 
 /**
- * Transform relations for database storage (relation objects to IDs)
+ * A row as it is written: every column's value through its codec
+ * ({@link serializeColumnToServer}), and every relation's value split off —
+ * a `belongsTo` becomes its foreign key, a relation whose foreign key is on
+ * the target (or a `via` chain) is returned for `PersistService` to write.
+ *
+ * Read from the table: which keys are columns, which are relations, and what
+ * each column's Postgres type is. A key the table does not declare is kept as
+ * sent; the catalogue check (`assertWritableColumns`) refuses it later.
+ *
+ * `collection` is read for one thing only: the resolved relation an inverse or
+ * `via` update hands `PersistService`, which still takes the legacy shape.
  */
 export function serializeDataToServer<M extends Record<string, unknown>>(
     row: M,
-    properties: Properties,
-    collection?: CollectionConfig,
-    registry?: PostgresTableRegistry
+    table: RuntimeTable,
+    collection?: CollectionConfig
 ): SerializedEntityData {
-    if (!row || !properties) return { scalarData: row ?? {},
+    if (!row) return { scalarData: {},
 inverseRelationUpdates: [],
 joinPathRelationUpdates: [] };
 
     const result: Record<string, unknown> = {};
-
-    // Get normalized relations if collection is provided
     const resolvedRelations = collection ? resolveCollectionRelations(collection) : {};
 
     // Track inverse relations that need to be handled separately
-    const inverseRelationUpdates: Array<{
-        relationKey: string;
-        relation: ResolvedRelation;
-        newValue: unknown;
-    }> = [];
-    const joinPathRelationUpdates: Array<{
-        relationKey: string;
-        relation: ResolvedVia;
-        newTargetId: string | number | null;
-    }> = [];
+    const inverseRelationUpdates: SerializedEntityData["inverseRelationUpdates"] = [];
+    const joinPathRelationUpdates: SerializedEntityData["joinPathRelationUpdates"] = [];
 
-    // Pre-calculate all local keys used as foreign keys.
-    //
-    // Keyed by the *wire* name: the payload arrives from a client, which knows
-    // the field as `authorId`, never as the `author_id` column behind it.
+    // The keys of every foreign key a `belongsTo` writes: what a client knows
+    // the field as (`authorId`), never the `author_id` column behind it.
     const foreignKeys = new Set<string>();
-    Object.values(resolvedRelations).forEach(relation => {
-        if (relation.kind === "belongsTo") foreignKeys.add(fieldKeyForColumn(collection, relation.localKey));
-    });
+    for (const relation of table.relations.values()) {
+        if (relation.kind === "belongsTo") foreignKeys.add(relation.localField);
+    }
 
     for (const [key, value] of Object.entries(row)) {
         // Same reasoning as `sanitizeAndConvertDates`: these keys come from the
@@ -171,70 +171,56 @@ joinPathRelationUpdates: [] };
         // the caller's object straight through, so it is reachable there.
         if (value === undefined) continue;
 
-        const property = properties[key as keyof M] as Property;
-
         // Coerce empty strings to null for any field that acts as a foreign key
         const effectiveValue = (foreignKeys.has(key) && value === "") ? null : value;
 
-        if (!property) {
-            result[key] = effectiveValue;
+        const relation = table.relations.get(key);
+        if (relation) {
+            if (relation.kind === "belongsTo") {
+                // Owning relation: the relation object becomes the foreign key,
+                // under its key — Drizzle maps it back to the column.
+                const serializedValue = serializeRelationValue(effectiveValue);
+                if (serializedValue !== undefined) result[relation.localField] = serializedValue;
+                continue;
+            }
+            const resolved = findRelation(resolvedRelations, key);
+            if (resolved && hasForeignKeyOnTarget(resolved)) {
+                // Inverse relation: the target table's foreign key is updated.
+                inverseRelationUpdates.push({
+                    relationKey: key,
+                    relation: resolved,
+                    newValue: serializeRelationValue(effectiveValue)
+                });
+                continue;
+            }
+            if (resolved && resolved.kind === "via") {
+                // A join chain is written through its own machinery, one row at
+                // a time for a to-one and as a set for a to-many.
+                const serializedValue = serializeRelationValue(effectiveValue);
+                if (resolved.cardinality === "one") {
+                    // Ordering matters: PersistService applies these BEFORE
+                    // the main UPDATE, so the mapping reads the pre-update
+                    // foreign key rather than a value the same save changed.
+                    joinPathRelationUpdates.push({
+                        relationKey: key,
+                        relation: resolved,
+                        newTargetId: relationTargetId(serializedValue)
+                    });
+                } else {
+                    inverseRelationUpdates.push({
+                        relationKey: key,
+                        relation: resolved,
+                        newValue: serializedValue
+                    });
+                }
+                continue;
+            }
+            result[key] = serializeRelationValue(effectiveValue);
             continue;
         }
 
-
-        // Handle relation properties specially
-        if (property.type === "relation" && collection) {
-            const relation = findRelation(resolvedRelations, key);
-            if (relation) {
-                if (relation.kind === "belongsTo") {
-                    // Owning relation: Map relation object to FK column on current table
-                    const serializedValue = serializePropertyToServer(effectiveValue, property, key);
-                    if (serializedValue !== undefined) {
-                        // The Drizzle key, not the column: Drizzle maps it back
-                        // to `author_id` when it builds the statement.
-                        result[fieldKeyForColumn(collection, relation.localKey)] = serializedValue;
-                    }
-                    // Don't add the original relation property to the result
-                    continue;
-                } else if (hasForeignKeyOnTarget(relation)) {
-                    // Inverse relation: Need to update the target table's FK
-                    const serializedValue = serializePropertyToServer(effectiveValue, property, key);
-                    inverseRelationUpdates.push({
-                        relationKey: key,
-                        relation,
-                        newValue: serializedValue
-                    });
-                    // Don't add the original relation property to the result
-                    continue;
-                } else if (relation.kind === "via") {
-                    // A join chain is written through its own machinery, one
-                    // row at a time for a to-one and as a set for a to-many.
-                    // There used to be two arms here — "owning" and "inverse"
-                    // joinPath — but a join chain has no owning side, so they
-                    // only ever differed by which list they pushed to.
-                    const serializedValue = serializePropertyToServer(effectiveValue, property, key);
-                    if (relation.cardinality === "one") {
-                        // Ordering matters: PersistService applies these BEFORE
-                        // the main UPDATE, so the mapping reads the pre-update
-                        // foreign key rather than a value the same save changed.
-                        joinPathRelationUpdates.push({
-                            relationKey: key,
-                            relation,
-                            newTargetId: serializedValue as string | number | null
-                        });
-                    } else {
-                        inverseRelationUpdates.push({
-                            relationKey: key,
-                            relation,
-                            newValue: serializedValue
-                        });
-                    }
-                    continue;
-                }
-            }
-        }
-
-        result[key] = serializePropertyToServer(effectiveValue, property, key);
+        const column = table.columnsByKey.get(key);
+        result[key] = column ? serializeColumnToServer(effectiveValue, column, key) : effectiveValue;
     }
 
     return {
@@ -242,6 +228,11 @@ joinPathRelationUpdates: [] };
         inverseRelationUpdates,
         joinPathRelationUpdates
     };
+}
+
+/** The id a to-one `via` link is written to: a key, or `null` to unlink. */
+function relationTargetId(value: unknown): string | number | null {
+    return typeof value === "string" || typeof value === "number" ? value : null;
 }
 
 /**
@@ -259,14 +250,6 @@ function describeValue(value: unknown): string {
     return type === "object" ? "an object" : `a ${type}`;
 }
 
-/**
- * Serialize a single property value for database storage.
- *
- * `propertyKey` is only ever used to phrase errors and warnings. Without it the
- * one trace a bad value left was `Expected array value for array property, got
- * string` — no collection, no property, no value, which in the log of a
- * thousand-row import names nothing at all.
- */
 /** `HH:MM[:SS[.fff]]`, the text Postgres reads and writes for a `time` column. */
 const TIME_OF_DAY = /^(\d{2}):(\d{2})(?::(\d{2})(\.\d+)?)?$/;
 
@@ -294,136 +277,195 @@ function dateToTimeOfDay(value: unknown): unknown {
     return date.toISOString().slice(11, 23);
 }
 
-export function serializePropertyToServer(value: unknown, property: Property, propertyKey?: string): unknown {
-    if (value === null || value === undefined) {
-        return value;
+/**
+ * A relation's value as it is written: a relation object (`{ id, … }`) becomes
+ * its id, a list becomes a list of ids, an empty string becomes `null`.
+ */
+export function serializeRelationValue(value: unknown): unknown {
+    if (value === null || value === undefined) return value;
+    if (Array.isArray(value)) return value.map(serializeRelationValue);
+    if (typeof value === "object" && "id" in value) return value.id;
+    if (value === "") return null;
+    return value;
+}
+
+/** How a column is named in a write error: its key, or its type. */
+function writeLabel(type: ColumnType, key: string | undefined): string {
+    return key ? `'${key}'` : `a ${columnTypeLabel(type)} column`;
+}
+
+/** The 400 a value that is not a list gets, on a column or a JSON field that holds one. */
+function notAnArray(label: string, value: unknown): ApiError {
+    // A non-array value used to become `[]` here — the caller's value
+    // destroyed, answered 200/201, and the row reading back as an empty list
+    // on every later fetch. `POST /posts {"tags":"news"}` from a client that
+    // sent a single tag as a scalar, or a CSV import that did not split a
+    // column, was unrecoverable data loss on a `text[]` column. Refusing the
+    // value at the boundary is what a 400 is for.
+    //
+    // The read-side twin (`parseColumnFromServer`) still coerces, and should:
+    // a row already in the database is not this caller's fault.
+    return ApiError.badRequest(
+        `${label} expects an array, but received ${describeValue(value)}.`,
+        "VALIDATION_INVALID_VALUE"
+    );
+}
+
+/**
+ * A point as it is stored: the `{ latitude, longitude }` shape the OpenAPI
+ * schema and the generated TS type both promise, or a 400.
+ */
+function serializeGeopoint(value: unknown, label: string): unknown {
+    if (typeof value !== "object" || value === null || Array.isArray(value)) {
+        throw ApiError.badRequest(
+            `${label} expects a geopoint object with \`latitude\` and \`longitude\`, ` +
+            `but received ${describeValue(value)}.`,
+            "VALIDATION_INVALID_VALUE"
+        );
     }
+    const latitude = "latitude" in value ? value.latitude : undefined;
+    const longitude = "longitude" in value ? value.longitude : undefined;
+    if (typeof latitude !== "number" || typeof longitude !== "number") {
+        throw ApiError.badRequest(
+            `${label} expects a geopoint object with numeric \`latitude\` and \`longitude\`.`,
+            "VALIDATION_INVALID_VALUE"
+        );
+    }
+    return { latitude, longitude };
+}
 
-    const fieldLabel = propertyKey ? `'${propertyKey}'` : `a '${property.type}' field`;
+/** A vector as pgvector takes it: a list of numbers, from a `Vector`, a `{ value }` envelope or a list. */
+function serializeVector(value: unknown): unknown {
+    if (value instanceof Vector) return value.value;
+    if (typeof value === "object" && value !== null && "value" in value && Array.isArray(value.value)) {
+        return value.value.map(Number);
+    }
+    if (Array.isArray(value)) return value.map(Number);
+    return value;
+}
 
-    const propertyType = property.type;
-
-    switch (propertyType) {
+/**
+ * A value of one codec family as it is written, for the families that need no
+ * shape: a column's own value or a native array's item.
+ */
+function serializeScalar(value: unknown, codec: ValueCodec, label: string): unknown {
+    switch (codec) {
+        case "timestamp":
         case "date":
-            return property.columnType === "time" ? dateToTimeOfDay(value) : normalizeDateText(value);
-
+            return normalizeDateText(value);
+        case "time":
+            return dateToTimeOfDay(value);
         case "number":
             // A number that did not parse, as some clients print one. Postgres
             // reads `'NaN'` as a valid `numeric`, and rejects it outright on an
             // integer column, so neither is what was meant.
             return typeof value === "string" && value.trim().toLowerCase() === "nan" ? null : value;
-
-        case "relation":
-            if (Array.isArray(value)) {
-                return value.map(v => serializePropertyToServer(v, property, propertyKey));
-            } else if (typeof value === "object" && value !== null && "id" in value) {
-                return (value as Record<string, unknown>).id;
-            }
-            if (value === "") return null;
-            return value;
-
-        case "array":
-            if (Array.isArray(value)) {
-                if (property.of) {
-                    return value.map(item => serializePropertyToServer(item, property.of as Property, propertyKey));
-                } else if (property.oneOf) {
-                    const typeField = property.oneOf.typeField ?? DEFAULT_ONE_OF_TYPE;
-                    const valueField = property.oneOf.valueField ?? DEFAULT_ONE_OF_VALUE;
-                    return value.map((e) => {
-                        if (e === null) return null;
-                        if (typeof e !== "object") return e;
-                        const rec = e as Record<string, unknown>;
-                        const type = rec[typeField] as string;
-                        const childProperty = property.oneOf?.properties[type];
-                        if (!type || !childProperty) return e;
-                        return {
-                            [typeField]: type,
-                            [valueField]: serializePropertyToServer(rec[valueField], childProperty, propertyKey)
-                        };
-                    });
-                }
-                return value;
-            }
-            // A non-array value used to become `[]` here — the caller's value
-            // destroyed, answered 200/201, and the row reading back as an empty
-            // list on every later fetch. `POST /posts {"tags":"news"}` from a
-            // client that sent a single tag as a scalar, or a CSV import that
-            // did not split a column, was unrecoverable data loss on a `text[]`
-            // column. The stated reason for coercing — "avoid .map() crashes
-            // downstream" — is better served by refusing the value at the
-            // boundary, which is what a 400 does.
-            //
-            // The read-side twin (`parsePropertyFromServer`) still coerces, and
-            // should: a row already in the database is not this caller's fault.
-            throw ApiError.badRequest(
-                `${fieldLabel} expects an array, but received ${describeValue(value)}.`,
-                "VALIDATION_INVALID_VALUE"
-            );
-
-        case "geopoint": {
-            // Stored as `jsonb`, in the `{ latitude, longitude }` shape the
-            // OpenAPI schema and the generated TS type both promise. Nothing
-            // used to handle `geopoint` on either side, which is why the type
-            // was documented, code-generated, admin-editable — and dropped.
-            if (typeof value !== "object" || Array.isArray(value)) {
-                throw ApiError.badRequest(
-                    `${fieldLabel} expects a geopoint object with \`latitude\` and \`longitude\`, ` +
-                    `but received ${describeValue(value)}.`,
-                    "VALIDATION_INVALID_VALUE"
-                );
-            }
-            const point = value as Record<string, unknown>;
-            if (typeof point.latitude !== "number" || typeof point.longitude !== "number") {
-                throw ApiError.badRequest(
-                    `${fieldLabel} expects a geopoint object with numeric \`latitude\` and \`longitude\`.`,
-                    "VALIDATION_INVALID_VALUE"
-                );
-            }
-            return { latitude: point.latitude,
-longitude: point.longitude };
-        }
-
-
-        case "map":
-            if (typeof value === "object" && property.properties) {
-                const result: Record<string, unknown> = {};
-                for (const [subKey, subValue] of Object.entries(value)) {
-                    const subProperty = (property.properties as Properties)[subKey];
-                    if (subProperty) {
-                        result[subKey] = serializePropertyToServer(subValue, subProperty, propertyKey ? `${propertyKey}.${subKey}` : subKey);
-                    } else {
-                        result[subKey] = subValue;
-                    }
-                }
-                return result;
-            }
-            return value;
-        case "vector": {
-            if (value instanceof Vector) {
-                return value.value;
-            }
-            if (value && typeof value === "object" && "value" in value && Array.isArray((value as { value: unknown }).value)) {
-                return (value as { value: unknown[] }).value.map(Number);
-            }
-            if (Array.isArray(value)) {
-                return value.map(Number);
-            }
-            return value;
-        }
-
-        case "binary": {
+        case "geopoint":
+            return serializeGeopoint(value, label);
+        case "vector":
+            return serializeVector(value);
+        case "bytea": {
             const decoded = tryDecodeBase64DataUrl(value);
-            if (decoded) return decoded;
-            if (Buffer.isBuffer(value)) return value;
-            return value;
+            return decoded ?? value;
         }
+        case "text": {
+            const decoded = tryDecodeBase64DataUrl(value);
+            return decoded ?? value;
+        }
+        default:
+            return value;
+    }
+}
 
+/**
+ * One block of a `json.oneOf` (`{ type, value }`) as it is written: its value
+ * through the variant's shape. A block whose type names no variant, or that is
+ * not an object, is kept as sent.
+ */
+function serializeOneOfBlock(block: unknown, shape: Extract<JsonShape, { kind: "oneOf" }>, label: string): unknown {
+    if (block === null || typeof block !== "object" || Array.isArray(block)) return block;
+    const record: Record<string, unknown> = { ...block };
+    const variantName = record[shape.typeField];
+    const variant = typeof variantName === "string" ? shape.variants[variantName] : undefined;
+    if (!variant || typeof variantName !== "string") return block;
+    return {
+        [shape.typeField]: variantName,
+        [shape.valueField]: serializeJsonValue(record[shape.valueField], variant, label)
+    };
+}
+
+/**
+ * A value inside a JSON document as it is written, walked by the document's
+ * shape: a date's text normalised, a number's `"NaN"` nulled, a point checked,
+ * a list checked to be one, an object's declared fields walked. A field the
+ * shape does not declare is kept as sent.
+ */
+function serializeJsonValue(value: unknown, shape: JsonShape, label: string): unknown {
+    if (value === null || value === undefined) return value;
+    switch (shape.kind) {
         case "string":
-        default: {
-            const decoded = tryDecodeBase64DataUrl(value);
-            if (decoded) return decoded;
-            return value;
+            return serializeScalar(value, "text", label);
+        case "number":
+            return serializeScalar(value, "number", label);
+        case "date":
+            return serializeScalar(value, "timestamp", label);
+        case "geopoint":
+            return serializeGeopoint(value, label);
+        case "object": {
+            if (typeof value !== "object") return value;
+            const result: Record<string, unknown> = {};
+            for (const [field, fieldValue] of Object.entries(value)) {
+                const fieldShape = shape.fields[field];
+                result[field] = fieldShape ? serializeJsonValue(fieldValue, fieldShape, `${label}.${field}`) : fieldValue;
+            }
+            return result;
         }
+        case "array": {
+            if (!Array.isArray(value)) throw notAnArray(label, value);
+            const items = shape.of;
+            return items.kind === "oneOf"
+                ? value.map(item => serializeOneOfBlock(item, items, label))
+                : value.map(item => serializeJsonValue(item, items, label));
+        }
+        case "oneOf":
+            return serializeOneOfBlock(value, shape, label);
+        default:
+            return value;
+    }
+}
+
+/**
+ * One column's value as it is written, by the column's Postgres type
+ * (`valueCodecOf`):
+ *
+ * - a temporal value's text in the ISO form Postgres reads; a `time` column's
+ *   value as the UTC time of day;
+ * - a number's `"NaN"` as `null`;
+ * - a geopoint checked to be `{ latitude, longitude }` (400 otherwise);
+ * - a native array checked to be a list (400 otherwise), each item by the
+ *   array's element type;
+ * - a JSON document walked by its shape (`serializeJsonValue`);
+ * - a vector unwrapped to a list of numbers;
+ * - a `data:application/octet-stream;base64,` URL on `bytea` or text decoded
+ *   to bytes.
+ *
+ * `key` is only used to phrase errors. Without it the one trace a bad value
+ * left in the log of a thousand-row import named nothing at all.
+ */
+export function serializeColumnToServer(value: unknown, column: ColumnDescriptor, key?: string): unknown {
+    if (value === null || value === undefined) return value;
+    const label = writeLabel(column.type, key ?? column.key);
+    const codec = valueCodecOf(column);
+    switch (codec) {
+        case "array": {
+            if (!Array.isArray(value)) throw notAnArray(label, value);
+            const element = column.type.kind === "array" ? valueCodecOfType(column.type.of) : "passthrough";
+            return value.map(item => item === null || item === undefined ? item : serializeScalar(item, element, label));
+        }
+        case "json":
+            return column.json ? serializeJsonValue(value, column.json, label) : value;
+        default:
+            return serializeScalar(value, codec, label);
     }
 }
 
@@ -432,6 +474,7 @@ longitude: point.longitude };
  */
 export async function parseDataFromServer<M extends Record<string, unknown>>(
     data: M,
+    table: RuntimeTable,
     collection: CollectionConfig,
     db?: DrizzleClient,
     registry?: PostgresTableRegistry
@@ -443,7 +486,7 @@ export async function parseDataFromServer<M extends Record<string, unknown>>(
     const resolvedRelations = resolveCollectionRelations(collection);
 
     // Shared scalar + relation value normalization
-    const result = normalizeScalarValues(data, properties, collection, resolvedRelations, { skipRelations: false });
+    const result = normalizeScalarValues(data, table, { skipRelations: false });
 
     // The relation properties the row does not carry yet: a ref from the
     // row's own foreign key, or one read from the target (`db`, `registry`).
@@ -635,182 +678,187 @@ function bufferToStringOrBase64(buf: Buffer): string {
     return buf.toString("utf8");
 }
 
-export function parsePropertyFromServer(value: unknown, property: Property, collection: CollectionConfig, propertyKey?: string): unknown {
-    if (value === null || value === undefined) return value;
+/**
+ * A list read back where a list belongs, whatever the database held: a
+ * non-array value from the database is coerced rather than refused, because a
+ * row already stored is not this caller's fault.
+ */
+function readList(value: unknown): unknown[] | undefined {
+    if (Array.isArray(value)) return undefined;
+    logger.warn(`Expected array value from DB for an array column, got ${typeof value}. Coercing to array.`);
+    return typeof value === "string" ? [value] : [];
+}
 
-    switch (property.type) {
-        case "binary": {
-            const buf = tryResolveBuffer(value);
-            if (buf) {
-                return `data:application/octet-stream;base64,${buf.toString("base64")}`;
-            }
-            return value;
-        }
+/** A temporal value as the view model's `{ __type: "date" }` envelope, or `null` when it is not one. */
+function dateEnvelope(value: unknown, timeOfDay: boolean): unknown {
+    let date: Date | undefined;
+    if (timeOfDay && typeof value === "string") {
+        // A time of day, served like a date-only column: on a fixed day, in
+        // UTC. `new Date("09:30:00")` is Invalid, which read every time column
+        // as null.
+        date = timeOfDayToDate(value);
+    } else if (value instanceof Date) {
+        date = value;
+    } else if (typeof value === "string" || typeof value === "number") {
+        const parsedDate = new Date(value);
+        if (!isNaN(parsedDate.getTime())) date = parsedDate;
+    }
+    return date ? { __type: "date", value: date.toISOString() } : null;
+}
 
-        case "string": {
-            if (typeof value === "string") return value;
+/** A vector as the view model's `{ __type: "Vector" }` envelope. */
+function vectorEnvelope(value: unknown): unknown {
+    let nums: number[] = [];
+    if (typeof value === "string") {
+        nums = value.slice(1, -1).split(",").map(Number);
+    } else if (Array.isArray(value)) {
+        nums = value.map(Number);
+    } else if (value instanceof Vector) {
+        nums = value.value;
+    } else if (typeof value === "object" && value !== null && "value" in value && Array.isArray(value.value)) {
+        nums = value.value.map(Number);
+    }
+    return { __type: "Vector", value: nums };
+}
 
-            // Handle Buffer objects (e.g. from PostgreSQL bytea columns)
-            const buf = tryResolveBuffer(value);
-            if (buf) {
-                return bufferToStringOrBase64(buf);
-            }
-
-            if (typeof value === "object" && value !== null) {
-                try {
-                    return JSON.stringify(value);
-                } catch {
-                    return String(value);
-                }
-            }
+/** Text as the view model reads it: bytes as text or a data URL, a document as JSON. */
+function textFromServer(value: unknown): unknown {
+    if (typeof value === "string") return value;
+    const buf = tryResolveBuffer(value);
+    if (buf) return bufferToStringOrBase64(buf);
+    if (typeof value === "object" && value !== null) {
+        try {
+            return JSON.stringify(value);
+        } catch {
             return String(value);
         }
+    }
+    return String(value);
+}
 
-        case "relation":
-            // Transform ID back to relation object with type information
-            if (typeof value === "string" || typeof value === "number") {
-                // Normalization stamps the resolved relation onto the property;
-                // fall back to the collection's map for a property that never
-                // went through the registry.
-                let relationDef: ResolvedRelation | undefined = (property as RelationProperty).resolvedRelation;
-                if (!relationDef && propertyKey) {
-                    relationDef = findRelation(resolveCollectionRelations(collection), propertyKey);
-                }
-
-                if (!relationDef) {
-                    logger.warn(`ResolvedRelation not defined in property for key: ${propertyKey || "unknown"}`);
-                    return value;
-                }
-
-                try {
-                    const targetCollection = relationDef.target();
-                    return createRelationRef(value.toString(), targetCollection.slug);
-                } catch (e) {
-                    logger.warn(`Could not resolve target collection for relation property: ${propertyKey || "unknown"}`, { error: e });
-                    return value;
-                }
-            }
-            return value;
-
-        case "array":
-            if (Array.isArray(value)) {
-                if (property.of) {
-                    return value.map(item => parsePropertyFromServer(item, property.of as Property, collection));
-                } else if (property.oneOf) {
-                    const typeField = property.oneOf.typeField ?? DEFAULT_ONE_OF_TYPE;
-                    const valueField = property.oneOf.valueField ?? DEFAULT_ONE_OF_VALUE;
-                    return value.map((e) => {
-                        if (e === null) return null;
-                        if (typeof e !== "object") return e;
-                        const rec = e as Record<string, unknown>;
-                        const type = rec[typeField] as string;
-                        const childProperty = property.oneOf?.properties[type];
-                        if (!type || !childProperty) return e;
-                        return {
-                            [typeField]: type,
-                            [valueField]: parsePropertyFromServer(rec[valueField], childProperty, collection)
-                        };
-                    });
-                }
-            } else {
-                // Non-array value from DB for an array property — coerce to avoid .map() crashes
-                logger.warn(`Expected array value from DB for array property, got ${typeof value}. Coercing to array.`);
-                return typeof value === "string" ? [value] : [];
-            }
-            return value;
-
-        case "map":
-            if (typeof value === "object" && property.properties) {
-                const result: Record<string, unknown> = {};
-                for (const [subKey, subValue] of Object.entries(value)) {
-                    const subProperty = (property.properties as Properties)[subKey];
-                    if (subProperty) {
-                        result[subKey] = parsePropertyFromServer(subValue, subProperty, collection);
-                    } else {
-                        result[subKey] = subValue;
-                    }
-                }
-                return result;
-            }
-            return value;
-
+/** A value of one codec family as the view model reads it, for the families that need no shape. */
+function parseScalar(value: unknown, codec: ValueCodec): unknown {
+    switch (codec) {
+        case "bytea": {
+            const buf = tryResolveBuffer(value);
+            return buf ? `data:application/octet-stream;base64,${buf.toString("base64")}` : value;
+        }
+        case "text":
+            return textFromServer(value);
         case "number":
             if (typeof value === "string") {
                 const parsed = parseFloat(value);
                 return isNaN(parsed) ? null : parsed;
             }
             return value;
-
-        case "geopoint":
-            // A `jsonb` column, so node-postgres hands back the object already.
-            // Named explicitly rather than left to `default:`, which would run
-            // it past the Buffer probe — and because a type with a write
-            // serializer and no read counterpart is how this one went missing.
+        case "vector":
+            return vectorEnvelope(value);
+        case "timestamp":
+        case "date":
+            return dateEnvelope(value, false);
+        case "time":
+            return dateEnvelope(value, true);
+        default:
+            // A `jsonb` geopoint arrives as the object already; a boolean and
+            // a type Rebase does not create are served as the driver returns them.
             return value;
+    }
+}
 
-        case "vector": {
-            let nums: number[] = [];
-            if (typeof value === "string") {
-                nums = value.slice(1, -1).split(",").map(Number);
-            } else if (Array.isArray(value)) {
-                nums = value.map(Number);
-            } else if (value instanceof Vector) {
-                nums = value.value;
-            } else if (typeof value === "object" && value !== null && "value" in value) {
-                const valObj = value as { value: unknown };
-                if (Array.isArray(valObj.value)) {
-                    nums = valObj.value.map(Number);
-                }
+/** One block of a `json.oneOf` as the view model reads it: its value through the variant's shape. */
+function parseOneOfBlock(block: unknown, shape: Extract<JsonShape, { kind: "oneOf" }>): unknown {
+    if (block === null || typeof block !== "object" || Array.isArray(block)) return block;
+    const record: Record<string, unknown> = { ...block };
+    const variantName = record[shape.typeField];
+    const variant = typeof variantName === "string" ? shape.variants[variantName] : undefined;
+    if (!variant || typeof variantName !== "string") return block;
+    return {
+        [shape.typeField]: variantName,
+        [shape.valueField]: parseJsonValue(record[shape.valueField], variant)
+    };
+}
+
+/**
+ * A value inside a JSON document as the view model reads it, walked by the
+ * document's shape: a date as a `{ __type: "date" }` envelope, a number's text
+ * as a number, a list coerced to one. A field the shape does not declare is
+ * served as stored.
+ */
+function parseJsonValue(value: unknown, shape: JsonShape): unknown {
+    if (value === null || value === undefined) return value;
+    switch (shape.kind) {
+        case "string":
+            return textFromServer(value);
+        case "number":
+            return parseScalar(value, "number");
+        case "date":
+            return dateEnvelope(value, false);
+        case "object": {
+            if (typeof value !== "object") return value;
+            const result: Record<string, unknown> = {};
+            for (const [field, fieldValue] of Object.entries(value)) {
+                const fieldShape = shape.fields[field];
+                result[field] = fieldShape ? parseJsonValue(fieldValue, fieldShape) : fieldValue;
             }
-            return {
-                __type: "Vector",
-                value: nums
-            };
+            return result;
         }
-
-        case "date": {
-            let date: Date | undefined;
-            if (property.columnType === "time" && typeof value === "string") {
-                // A time of day, served like a date-only column: on a fixed
-                // day, in UTC. `new Date("09:30:00")` is Invalid, which read
-                // every time column as null.
-                date = timeOfDayToDate(value);
-            } else if (value instanceof Date) {
-                date = value;
-            } else if (typeof value === "string" || typeof value === "number") {
-                const parsedDate = new Date(value);
-                if (!isNaN(parsedDate.getTime())) {
-                    date = parsedDate;
-                }
-            }
-            if (date) {
-                return {
-                    __type: "date",
-                    value: date.toISOString()
-                };
-            }
-            return null;
+        case "array": {
+            const coerced = readList(value);
+            if (coerced) return coerced;
+            if (!Array.isArray(value)) return value;
+            const items = shape.of;
+            return items.kind === "oneOf"
+                ? value.map(item => parseOneOfBlock(item, items))
+                : value.map(item => parseJsonValue(item, items));
         }
-
-        default: {
-            // Fallback for buffers in case they are mapped to something other than string
-            const buf = tryResolveBuffer(value);
-            if (buf) {
-                return bufferToStringOrBase64(buf);
-            }
+        case "oneOf":
+            return parseOneOfBlock(value, shape);
+        default:
             return value;
-        }
     }
 }
 
 /**
- * Shared internal helper: normalizes scalar column values from a DB row
- * into frontend format. Handles FK-column preservation, type coercion
- * (dates, numbers, NaN), and property filtering.
+ * One column's value as the admin's view model reads it, by the column's
+ * Postgres type (`valueCodecOf`): a temporal value as `{ __type: "date" }`
+ * (a `time` on 1970-01-01, UTC), a vector as `{ __type: "Vector" }`, `bytea`
+ * as a `data:` URL, a number's text as a number, text as text, a native array
+ * item by item, a JSON document walked by its shape. A `col.custom()` or
+ * introspected type is served as the driver returns it.
+ */
+export function parseColumnFromServer(value: unknown, column: ColumnDescriptor): unknown {
+    if (value === null || value === undefined) return value;
+    const codec = valueCodecOf(column);
+    switch (codec) {
+        case "array": {
+            const coerced = readList(value);
+            if (coerced) return coerced;
+            if (!Array.isArray(value)) return value;
+            const element = column.type.kind === "array" ? valueCodecOfType(column.type.of) : "passthrough";
+            return value.map(item => item === null || item === undefined ? item : parseScalar(item, element));
+        }
+        case "json":
+            return column.json ? parseJsonValue(value, column.json) : value;
+        default:
+            return parseScalar(value, codec);
+    }
+}
+
+/** A relation's stored key as the view model's relation ref; any other value as stored. */
+function relationRefFromServer(value: unknown, relation: RelationDescriptor): unknown {
+    if (typeof value === "string" || typeof value === "number") return createRelationRef(String(value), relation.target);
+    return value;
+}
+
+/**
+ * Shared internal helper: normalizes a DB row's values into the view model,
+ * keyed on the table — each column through {@link parseColumnFromServer},
+ * each relation key as a ref, query metadata as computed, anything the table
+ * does not declare dropped.
  *
- * @param skipRelations  When `true`, relation-typed properties are omitted
- *                       from the result (used by `normalizeDbValues` where
- *                       Drizzle's relational API already hydrates them).
+ * @param skipRelations  When `true`, relation keys are omitted from the result
+ *                       (used by `normalizeDbValues` where Drizzle's
+ *                       relational API already hydrates them).
  */
 /**
  * Keys a query computes and attaches to a row, rather than reads from a column.
@@ -823,45 +871,30 @@ const QUERY_METADATA_KEYS = new Set(["_score", "_distance", "_matches"]);
 
 function normalizeScalarValues<M extends Record<string, unknown>>(
     data: M,
-    properties: Properties,
-    collection: CollectionConfig,
-    resolvedRelations: Record<string, ResolvedRelation>,
+    table: RuntimeTable,
     options: { skipRelations: boolean }
 ): Record<string, unknown> {
     const result: Record<string, unknown> = {};
 
-    // Identify FK columns used only for relations and not exposed as properties
-    const internalFKColumns = new Set<string>();
-    Object.values(resolvedRelations).forEach(relation => {
-        if (relation.kind !== "belongsTo") return;
-        // The key a row carries this foreign key under, which is the wire name
-        // — `authorId`, not the `author_id` column.
-        const localField = fieldKeyForColumn(collection, relation.localKey);
-        if (!properties[localField]) internalFKColumns.add(localField);
-    });
-
     for (const [key, value] of Object.entries(data)) {
-        // Keep internal FK columns as primitives
-        if (internalFKColumns.has(key)) {
-            result[key] = value === null ? null : (typeof value === "number" ? value : String(value));
-            continue;
-        }
-
-        // Query-computed metadata, which by definition is not a column and so
-        // has no property to be found. Dropped here until now — which meant
-        // `_distance` was computed for every vector search on this path and
-        // then discarded before the caller ever saw it.
+        // Query-computed metadata, which by definition is not a column. Dropped
+        // here until now — which meant `_distance` was computed for every
+        // vector search on this path and then discarded before the caller
+        // ever saw it.
         if (QUERY_METADATA_KEYS.has(key)) {
             result[key] = value;
             continue;
         }
 
-        const property = properties[key as keyof M] as Property;
-        if (!property) continue; // Skip DB columns not defined in properties
+        const column = table.columnsByKey.get(key);
+        if (column) {
+            result[key] = parseColumnFromServer(value, column);
+            continue;
+        }
 
-        if (options.skipRelations && property.type === "relation") continue;
-
-        result[key] = parsePropertyFromServer(value, property, collection, key);
+        const relation = table.relations.get(key);
+        if (relation && !options.skipRelations) result[key] = relationRefFromServer(value, relation);
+        // Anything else is not a column of the table: skipped.
     }
 
     return result;
@@ -878,11 +911,8 @@ function normalizeScalarValues<M extends Record<string, unknown>>(
  */
 export function normalizeDbValues<M extends Record<string, unknown>>(
     data: M,
-    collection: CollectionConfig
+    table: RuntimeTable
 ): M {
-    const properties = collection.properties;
-    if (!data || !properties) return data;
-
-    const resolvedRelations = resolveCollectionRelations(collection);
-    return normalizeScalarValues(data, properties, collection, resolvedRelations, { skipRelations: true }) as M;
+    if (!data) return data;
+    return normalizeScalarValues(data, table, { skipRelations: true }) as M;
 }

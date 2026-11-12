@@ -340,7 +340,7 @@ function renderTarget(
         // hash that REST correctly withheld rode out on every `.listen()` frame
         // and every WebSocket fetch of anything with a relation to users.
         values: stripUnreadable(
-            normalizeDbValues(targetRow, targetCollection) as Record<string, unknown>,
+            normalizeDbValues(targetRow, registry.requireTable(targetCollection.slug)) as Record<string, unknown>,
             targetCollection
         )
     });
@@ -379,7 +379,7 @@ export function toFlatRow(
     registry: PostgresTableRegistry
 ): Record<string, unknown> {
     const resolvedRelations = resolveCollectionRelations(collection);
-    const normalized = normalizeDbValues(row, collection) as Record<string, unknown>;
+    const normalized = normalizeDbValues(row, registry.requireTable(collection.slug)) as Record<string, unknown>;
 
     // Keyed by relation, reading the drizzle relation name off the raw row: the
     // relation's property key and the name drizzle nested it under are not

@@ -1,9 +1,11 @@
 import { describe, it, expect } from "@jest/globals";
 import {
-    serializePropertyToServer,
-    parsePropertyFromServer,
+    serializeColumnToServer,
+    serializeRelationValue,
+    parseColumnFromServer,
     serializeDataToServer
 } from "../src/data-transformer";
+import { liftedColumnOf, runtimeTableOf } from "./helpers/codec-columns";
 import type { Property, Properties, CollectionConfig, PostgresCollectionConfig, PostgresProperty } from "@rebasepro/types";
 
 // ─────────────────────────────────────────────────────────────
@@ -58,12 +60,6 @@ const arrayOneOfProp: PostgresProperty = {
     }
 };
 
-const arrayOfRelationsProp: PostgresProperty = {
-    type: "array",
-    name: "Authors",
-    of: { type: "relation", name: "Author" }
-};
-
 // A bare array property without `of` or `oneOf`
 const bareArrayProp: PostgresProperty = {
     type: "array",
@@ -71,35 +67,35 @@ const bareArrayProp: PostgresProperty = {
 };
 
 // ─────────────────────────────────────────────────────────────
-// 1. serializePropertyToServer — array null safety
+// 1. serializeColumnToServer — array null safety
 // ─────────────────────────────────────────────────────────────
-describe("serializePropertyToServer — array null safety", () => {
+describe("serializeColumnToServer — array null safety", () => {
 
     // ── Null / undefined early return ──
     it("returns null when value is null with array-of-strings property", () => {
-        expect(serializePropertyToServer(null, arrayOfStringsProp)).toBeNull();
+        expect(serializeColumnToServer(null, liftedColumnOf(arrayOfStringsProp))).toBeNull();
     });
 
     it("returns undefined when value is undefined with array-of-strings property", () => {
-        expect(serializePropertyToServer(undefined, arrayOfStringsProp)).toBeUndefined();
+        expect(serializeColumnToServer(undefined, liftedColumnOf(arrayOfStringsProp))).toBeUndefined();
     });
 
     // ── Empty array ──
     it("returns [] when value is an empty array", () => {
-        expect(serializePropertyToServer([], arrayOfStringsProp)).toEqual([]);
+        expect(serializeColumnToServer([], liftedColumnOf(arrayOfStringsProp))).toEqual([]);
     });
 
     // ── Null with different sub-types ──
     it("returns null when value is null with array-of-numbers property", () => {
-        expect(serializePropertyToServer(null, arrayOfNumbersProp)).toBeNull();
+        expect(serializeColumnToServer(null, liftedColumnOf(arrayOfNumbersProp))).toBeNull();
     });
 
     it("returns null when value is null with array-of-maps property", () => {
-        expect(serializePropertyToServer(null, arrayOfMapsProp)).toBeNull();
+        expect(serializeColumnToServer(null, liftedColumnOf(arrayOfMapsProp))).toBeNull();
     });
 
     it("returns null when value is null with array oneOf property", () => {
-        expect(serializePropertyToServer(null, arrayOneOfProp)).toBeNull();
+        expect(serializeColumnToServer(null, liftedColumnOf(arrayOneOfProp))).toBeNull();
     });
 
     // ── Non-array values (rejected) ──
@@ -111,28 +107,28 @@ describe("serializePropertyToServer — array null safety", () => {
     // the read path (below) still coerces, because a row already in the
     // database is not this caller's fault.
     it("rejects a non-array string for an array property, naming the field", () => {
-        expect(() => serializePropertyToServer("not-an-array", arrayOfStringsProp, "tags"))
+        expect(() => serializeColumnToServer("not-an-array", liftedColumnOf(arrayOfStringsProp), "tags"))
             .toThrow(/'tags' expects an array, but received a string/);
     });
 
     it("rejects a non-array number for an array property", () => {
-        expect(() => serializePropertyToServer(42, arrayOfStringsProp, "tags"))
+        expect(() => serializeColumnToServer(42, liftedColumnOf(arrayOfStringsProp), "tags"))
             .toThrow(/expects an array, but received a number/);
     });
 
     it("rejects a non-array object for a bare array property", () => {
-        expect(() => serializePropertyToServer({ a: 1 }, bareArrayProp, "tags"))
+        expect(() => serializeColumnToServer({ a: 1 }, liftedColumnOf(bareArrayProp), "tags"))
             .toThrow(/expects an array, but received an object/);
     });
 
     it("rejects a boolean for an array property", () => {
-        expect(() => serializePropertyToServer(true, arrayOfStringsProp)).toThrow(/expects an array/);
-        expect(() => serializePropertyToServer(false, arrayOfStringsProp)).toThrow(/expects an array/);
+        expect(() => serializeColumnToServer(true, liftedColumnOf(arrayOfStringsProp))).toThrow(/expects an array/);
+        expect(() => serializeColumnToServer(false, liftedColumnOf(arrayOfStringsProp))).toThrow(/expects an array/);
     });
 
     it("reports the rejection as a 400, not a 500", () => {
         try {
-            serializePropertyToServer("news", arrayOfStringsProp, "tags");
+            serializeColumnToServer("news", liftedColumnOf(arrayOfStringsProp), "tags");
             throw new Error("should have thrown");
         } catch (error) {
             expect((error as { statusCode?: number }).statusCode).toBe(400);
@@ -143,27 +139,27 @@ describe("serializePropertyToServer — array null safety", () => {
     it("does not echo the rejected value back into the message", () => {
         // Errors end up in logs and in error-reporting services, and the value
         // in the wrong field may be the one worth keeping out of both.
-        expect(() => serializePropertyToServer("s3cret-token", arrayOfStringsProp, "tags"))
+        expect(() => serializeColumnToServer("s3cret-token", liftedColumnOf(arrayOfStringsProp), "tags"))
             .toThrow(/^(?!.*s3cret-token).*$/);
     });
 
     // ── Arrays with null / undefined elements ──
     it("handles array with null elements by passing each through sub-serialization", () => {
-        const result = serializePropertyToServer([null, "a", null], arrayOfStringsProp);
+        const result = serializeColumnToServer([null, "a", null], liftedColumnOf(arrayOfStringsProp));
         expect(result).toEqual([null, "a", null]);
     });
 
     it("handles array with undefined elements by passing each through sub-serialization", () => {
-        const result = serializePropertyToServer([undefined, "a"], arrayOfStringsProp);
+        const result = serializeColumnToServer([undefined, "a"], liftedColumnOf(arrayOfStringsProp));
         expect(result).toEqual([undefined, "a"]);
     });
 
     // ── Array of relation objects with null entries ──
     it("serializes array of relation objects with null entries correctly", () => {
         const value = [{ id: "1" }, null, { id: "2" }];
-        const result = serializePropertyToServer(value, arrayOfRelationsProp);
-        // null entries pass through serializePropertyToServer for the sub-property
-        // which returns null for null values
+        // A list of relations is a relation (`hasMany`/`manyToMany`), not a
+        // column: its value is written by the relation codec.
+        const result = serializeRelationValue(value);
         expect(result).toEqual(["1", null, "2"]);
     });
 
@@ -174,7 +170,7 @@ describe("serializePropertyToServer — array null safety", () => {
             null,
             { street: "456 Oak", city: "LA" }
         ];
-        const result = serializePropertyToServer(value, arrayOfMapsProp);
+        const result = serializeColumnToServer(value, liftedColumnOf(arrayOfMapsProp));
         expect(result).toEqual([
             { street: "123 Main", city: "NYC" },
             null,
@@ -184,70 +180,66 @@ describe("serializePropertyToServer — array null safety", () => {
 
     // ── Empty array with oneOf property ──
     it("returns [] when value is an empty array with oneOf property", () => {
-        expect(serializePropertyToServer([], arrayOneOfProp)).toEqual([]);
+        expect(serializeColumnToServer([], liftedColumnOf(arrayOneOfProp))).toEqual([]);
     });
 
     // ── Nested array of arrays (unusual) ──
     it("returns nested array of arrays as-is for bare array property", () => {
         const nested = [["a", "b"], ["c"]];
         // Without `of` or `oneOf`, the array case falls through to `return value`
-        expect(serializePropertyToServer(nested, bareArrayProp)).toEqual([["a", "b"], ["c"]]);
+        expect(serializeColumnToServer(nested, liftedColumnOf(bareArrayProp))).toEqual([["a", "b"], ["c"]]);
     });
 });
 
 // ─────────────────────────────────────────────────────────────
-// 2. parsePropertyFromServer — array null safety
+// 2. parseColumnFromServer — array null safety
 // ─────────────────────────────────────────────────────────────
-describe("parsePropertyFromServer — array null safety", () => {
-    const dummyCollection = makeCollection("items", {
-        tags: arrayOfStringsProp
-    });
-
+describe("parseColumnFromServer — array null safety", () => {
     // ── Null / undefined early return ──
     it("returns null when value is null with array property", () => {
-        expect(parsePropertyFromServer(null, arrayOfStringsProp, dummyCollection)).toBeNull();
+        expect(parseColumnFromServer(null, liftedColumnOf(arrayOfStringsProp))).toBeNull();
     });
 
     it("returns undefined when value is undefined with array property", () => {
-        expect(parsePropertyFromServer(undefined, arrayOfStringsProp, dummyCollection)).toBeUndefined();
+        expect(parseColumnFromServer(undefined, liftedColumnOf(arrayOfStringsProp))).toBeUndefined();
     });
 
     // ── Empty array ──
     it("returns [] when value is an empty array with array-of-strings", () => {
-        expect(parsePropertyFromServer([], arrayOfStringsProp, dummyCollection)).toEqual([]);
+        expect(parseColumnFromServer([], liftedColumnOf(arrayOfStringsProp))).toEqual([]);
     });
 
     // ── Non-array values (coerced to array) ──
     it("coerces a non-array string to single-element array for array property", () => {
-        expect(parsePropertyFromServer("not-an-array", arrayOfStringsProp, dummyCollection)).toEqual(["not-an-array"]);
+        expect(parseColumnFromServer("not-an-array", liftedColumnOf(arrayOfStringsProp))).toEqual(["not-an-array"]);
     });
 
     it("coerces a non-array number to empty array for array property", () => {
-        expect(parsePropertyFromServer(99, arrayOfStringsProp, dummyCollection)).toEqual([]);
+        expect(parseColumnFromServer(99, liftedColumnOf(arrayOfStringsProp))).toEqual([]);
     });
 
     // ── Null with oneOf ──
     it("returns null when value is null with array oneOf property", () => {
-        expect(parsePropertyFromServer(null, arrayOneOfProp, dummyCollection)).toBeNull();
+        expect(parseColumnFromServer(null, liftedColumnOf(arrayOneOfProp))).toBeNull();
     });
 
     // ── Array with null elements ──
     it("handles array with null elements for parsing gracefully", () => {
-        const result = parsePropertyFromServer([null, "a", null], arrayOfStringsProp, dummyCollection);
+        const result = parseColumnFromServer([null, "a", null], liftedColumnOf(arrayOfStringsProp));
         expect(result).toEqual([null, "a", null]);
     });
 
     // ── Falsy non-null values (coerced to array) ──
     it("coerces falsy number 0 to empty array for array property", () => {
-        expect(parsePropertyFromServer(0, arrayOfStringsProp, dummyCollection)).toEqual([]);
+        expect(parseColumnFromServer(0, liftedColumnOf(arrayOfStringsProp))).toEqual([]);
     });
 
     it("coerces false to empty array for array property", () => {
-        expect(parsePropertyFromServer(false, arrayOfStringsProp, dummyCollection)).toEqual([]);
+        expect(parseColumnFromServer(false, liftedColumnOf(arrayOfStringsProp))).toEqual([]);
     });
 
     it("coerces empty string to single-element array for array property", () => {
-        expect(parsePropertyFromServer("", arrayOfStringsProp, dummyCollection)).toEqual([""]);
+        expect(parseColumnFromServer("", liftedColumnOf(arrayOfStringsProp))).toEqual([""]);
     });
 });
 
@@ -287,7 +279,7 @@ describe("serializeDataToServer — entity with null array fields", () => {
     it("serializes entity with tags: null — scalarData.tags should be null", () => {
         const result = serializeDataToServer(
             { tags: null },
-            properties
+            runtimeTableOf(makeCollection("items", properties))
         );
         expect(result.scalarData.tags).toBeNull();
     });
@@ -296,10 +288,10 @@ describe("serializeDataToServer — entity with null array fields", () => {
     it("serializes entity with tags: undefined — tags value should be undefined in scalarData", () => {
         const result = serializeDataToServer(
             { tags: undefined },
-            properties
+            runtimeTableOf(makeCollection("items", properties))
         );
         // Object.entries iterates keys even when value is undefined,
-        // and serializePropertyToServer returns undefined for undefined input
+        // and serializeColumnToServer returns undefined for undefined input
         expect(result.scalarData.tags).toBeUndefined();
     });
 
@@ -307,7 +299,7 @@ describe("serializeDataToServer — entity with null array fields", () => {
     it("serializes entity with tags: [] — scalarData.tags should be []", () => {
         const result = serializeDataToServer(
             { tags: [] },
-            properties
+            runtimeTableOf(makeCollection("items", properties))
         );
         expect(result.scalarData.tags).toEqual([]);
     });
@@ -321,7 +313,7 @@ describe("serializeDataToServer — entity with null array fields", () => {
 
         const result = serializeDataToServer(
             { tags: null, categories: ["cat-a", "cat-b"] },
-            multiProperties
+            runtimeTableOf(makeCollection("items", multiProperties))
         );
         expect(result.scalarData.tags).toBeNull();
         expect(result.scalarData.categories).toEqual(["cat-a", "cat-b"]);
@@ -335,7 +327,7 @@ describe("serializeDataToServer — entity with null array fields", () => {
 
         const result = serializeDataToServer(
             { metadata: { labels: null } },
-            nestedProperties
+            runtimeTableOf(makeCollection("items", nestedProperties))
         );
         // The map serializer recurses into sub-properties; the inner array gets null-checked
         expect(result.scalarData.metadata).toEqual({ labels: null });
@@ -350,7 +342,7 @@ describe("serializeDataToServer — entity with null array fields", () => {
 
         const result = serializeDataToServer(
             { tags: null, categories: null },
-            allArrayProperties
+            runtimeTableOf(makeCollection("items", allArrayProperties))
         );
         expect(result.scalarData.tags).toBeNull();
         expect(result.scalarData.categories).toBeNull();

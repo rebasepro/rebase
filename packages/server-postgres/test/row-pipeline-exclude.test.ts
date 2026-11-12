@@ -170,6 +170,7 @@ describe("excludeFromApi", () => {
                 }
             };
 
+            registry.registerMultiple([authorsCollection]);
             const served = toFlatRow({ id: 1, editors: [author, { ...author, id: 8 }] }, authorsCollection, registry);
 
             for (const ref of served.editors as Array<{ data?: { values?: Record<string, unknown> } }>) {

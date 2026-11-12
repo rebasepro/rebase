@@ -1600,7 +1600,7 @@ target });
         // foreign key into a ref (the registry names its target). Given `db`,
         // it queried each inverse relation itself, with neither the target's
         // scope nor its soft delete.
-        const values = await parseDataFromServer(raw, collection, undefined, this.registry) as Record<string, unknown>;
+        const values = await parseDataFromServer(raw, this.registry.requireTable(collection.slug), collection, undefined, this.registry) as Record<string, unknown>;
         await this.loadRelationRefs(values, buildCompositeId(raw, idInfoArray), collection, collectionPath, raw);
 
         // The primary path strips inside `toFlatRow`; this one parses the row
@@ -1720,7 +1720,7 @@ target });
         // per relation per level, avoiding the N+1 that plagued the old path.
         void idInfo;
         const values = await Promise.all(results.map(async (rawRow: Record<string, unknown>) =>
-            await parseDataFromServer(rawRow as M, collection, undefined, this.registry) as Record<string, unknown>));
+            await parseDataFromServer(rawRow as M, this.registry.requireTable(collection.slug), collection, undefined, this.registry) as Record<string, unknown>));
 
         // Second pass: the relations the caller named, through the same batched
         // loader every other read uses — so a row from here and a row from the
