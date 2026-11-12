@@ -32,6 +32,12 @@
 # trigger of an `on_update` column on a junction's `through.properties`
 # (`players_teams_changed_at_touch`) is written to `triggers.sql` but never
 # planned by the boot. Fixing it turns that line [boot,push]; re-bank then.
+#
+# Moved on purpose (2026-11-12): the `<table>_{insert,update,delete}_<sha7>`
+# policies of the fixture's bare `access: "authenticated"` rule (categories,
+# products, shop.inventory_items). That rule was never a typed rule shape: it
+# compiled to deny-all. From this version it means any signed-in caller, a
+# new shape named in the `rls2:` hash space, so its names moved with it.
 
 column public.accounts.created_at [boot,push]
 column public.accounts.disabled_at [boot,push]
@@ -216,6 +222,9 @@ policy public.categories_products.categories_products_default_admin_write_insert
 policy public.categories_products.categories_products_default_admin_write_update (permissive update) [boot,push]
 policy public.categories_products.categories_products_default_admin_write_update_ar_acc568ae (permissive update) [boot]
 policy public.categories_products.categories_products_default_edge_read (permissive select) [boot,push]
+policy public.categories_products.categories_products_default_edge_write_delete (permissive delete) [boot,push]
+policy public.categories_products.categories_products_default_edge_write_insert (permissive insert) [boot,push]
+policy public.categories_products.categories_products_default_edge_write_update (permissive update) [boot,push]
 policy public.categories.categories_default_admin_read (permissive select) [boot,push]
 policy public.categories.categories_default_admin_read_ar_5f45dbfb (permissive select) [boot]
 policy public.categories.categories_default_admin_write_delete (permissive delete) [boot,push]
@@ -224,10 +233,10 @@ policy public.categories.categories_default_admin_write_insert (permissive inser
 policy public.categories.categories_default_admin_write_insert_ar_640c8dd7 (permissive insert) [boot]
 policy public.categories.categories_default_admin_write_update (permissive update) [boot,push]
 policy public.categories.categories_default_admin_write_update_ar_64730287 (permissive update) [boot]
-policy public.categories.categories_delete_82b8225 (permissive delete) [boot,push]
-policy public.categories.categories_insert_29ea277 (permissive insert) [boot,push]
+policy public.categories.categories_delete_3c23a2b (permissive delete) [boot,push]
+policy public.categories.categories_insert_2faf7c9 (permissive insert) [boot,push]
 policy public.categories.categories_select_841c287 (permissive select) [boot,push]
-policy public.categories.categories_update_b2b72ff (permissive update) [boot,push]
+policy public.categories.categories_update_2799dd8 (permissive update) [boot,push]
 policy public.children.children_default_admin_read (permissive select) [boot,push]
 policy public.children.children_default_admin_read_ar_32beaf2a (permissive select) [boot]
 policy public.children.children_default_admin_write_delete (permissive delete) [boot,push]
@@ -286,6 +295,9 @@ policy public.products_statuses.products_statuses_default_admin_write_insert_ar_
 policy public.products_statuses.products_statuses_default_admin_write_update (permissive update) [boot,push]
 policy public.products_statuses.products_statuses_default_admin_write_update_ar_2e536430 (permissive update) [boot]
 policy public.products_statuses.products_statuses_default_edge_read (permissive select) [boot,push]
+policy public.products_statuses.products_statuses_default_edge_write_delete (permissive delete) [boot,push]
+policy public.products_statuses.products_statuses_default_edge_write_insert (permissive insert) [boot,push]
+policy public.products_statuses.products_statuses_default_edge_write_update (permissive update) [boot,push]
 policy public.products_tags.products_tags_default_admin_read (permissive select) [boot,push]
 policy public.products_tags.products_tags_default_admin_read_ar_cb5b0c2a (permissive select) [boot]
 policy public.products_tags.products_tags_default_admin_write_delete (permissive delete) [boot,push]
@@ -295,6 +307,9 @@ policy public.products_tags.products_tags_default_admin_write_insert_ar_95e99e4a
 policy public.products_tags.products_tags_default_admin_write_update (permissive update) [boot,push]
 policy public.products_tags.products_tags_default_admin_write_update_ar_8d0ecb01 (permissive update) [boot]
 policy public.products_tags.products_tags_default_edge_read (permissive select) [boot,push]
+policy public.products_tags.products_tags_default_edge_write_delete (permissive delete) [boot,push]
+policy public.products_tags.products_tags_default_edge_write_insert (permissive insert) [boot,push]
+policy public.products_tags.products_tags_default_edge_write_update (permissive update) [boot,push]
 policy public.products.products_default_admin_read (permissive select) [boot,push]
 policy public.products.products_default_admin_read_ar_cd6a5cf2 (permissive select) [boot]
 policy public.products.products_default_admin_write_delete (permissive delete) [boot,push]
@@ -303,10 +318,10 @@ policy public.products.products_default_admin_write_insert (permissive insert) [
 policy public.products.products_default_admin_write_insert_ar_7be54415 (permissive insert) [boot]
 policy public.products.products_default_admin_write_update (permissive update) [boot,push]
 policy public.products.products_default_admin_write_update_ar_0abfb972 (permissive update) [boot]
-policy public.products.products_delete_82b8225 (permissive delete) [boot,push]
-policy public.products.products_insert_29ea277 (permissive insert) [boot,push]
+policy public.products.products_delete_3c23a2b (permissive delete) [boot,push]
+policy public.products.products_insert_2faf7c9 (permissive insert) [boot,push]
 policy public.products.products_select_841c287 (permissive select) [boot,push]
-policy public.products.products_update_b2b72ff (permissive update) [boot,push]
+policy public.products.products_update_2799dd8 (permissive update) [boot,push]
 policy public.searched_articles.searched_articles_default_admin_read (permissive select) [boot,push]
 policy public.searched_articles.searched_articles_default_admin_read_ar_b27dd0a6 (permissive select) [boot]
 policy public.searched_articles.searched_articles_default_admin_write_delete (permissive delete) [boot,push]
@@ -396,10 +411,10 @@ policy shop.inventory_items.inventory_items_default_admin_write_insert (permissi
 policy shop.inventory_items.inventory_items_default_admin_write_insert_ar_c954aa41 (permissive insert) [boot]
 policy shop.inventory_items.inventory_items_default_admin_write_update (permissive update) [boot,push]
 policy shop.inventory_items.inventory_items_default_admin_write_update_ar_3e703bba (permissive update) [boot]
-policy shop.inventory_items.inventory_items_delete_82b8225 (permissive delete) [boot,push]
-policy shop.inventory_items.inventory_items_insert_29ea277 (permissive insert) [boot,push]
+policy shop.inventory_items.inventory_items_delete_3c23a2b (permissive delete) [boot,push]
+policy shop.inventory_items.inventory_items_insert_2faf7c9 (permissive insert) [boot,push]
 policy shop.inventory_items.inventory_items_select_841c287 (permissive select) [boot,push]
-policy shop.inventory_items.inventory_items_update_b2b72ff (permissive update) [boot,push]
+policy shop.inventory_items.inventory_items_update_2799dd8 (permissive update) [boot,push]
 schema rebase [push]
 schema shop [push]
 table public.accounts [boot,push]

@@ -29,8 +29,7 @@ export type SecurityOperation = "select" | "insert" | "update" | "delete" | "all
  * - `"public"` — every caller who reaches the database, signed in or not.
  * - `"authenticated"` — a signed-in caller: the `rebase.uid()` is neither the
  *   server context's `NULL` nor an anonymous visitor's sentinel (see
- *   `policy.authenticated()`). Only together with a `condition` / `check`
- *   ({@link ConditionalAccessSecurityRule}, {@link CheckedAccessSecurityRule}).
+ *   `policy.authenticated()`).
  *
  * @group Models
  */
@@ -72,6 +71,7 @@ export type SecurityRuleAccess = "public" | "authenticated";
 export type SecurityRule =
     | OwnerSecurityRule
     | PublicSecurityRule
+    | AuthenticatedSecurityRule
     | ConditionalAccessSecurityRule
     | CheckedAccessSecurityRule
     | StructuredSecurityRule
@@ -232,11 +232,7 @@ export interface OwnerSecurityRule extends SecurityRuleBase {
  * Cannot be combined with `using`, `withCheck`, or `ownerField`. To narrow the
  * rows, add a `condition` — that is a {@link ConditionalAccessSecurityRule}.
  *
- * A bare `access: "authenticated"` is not accepted: older releases
- * compiled it to a policy that denies every row, databases still hold it
- * under that name, and so it keeps that meaning. Write
- * `access: "authenticated"` together with a `condition` / `check`, or
- * `condition: policy.authenticated()`.
+ * For "any signed-in caller", see {@link AuthenticatedSecurityRule}.
  *
  * @example
  * // Public read (every caller sees all rows)
@@ -247,6 +243,35 @@ export interface OwnerSecurityRule extends SecurityRuleBase {
 export interface PublicSecurityRule extends SecurityRuleBase {
     /** Grant unrestricted row access for this operation. */
     access: "public";
+    ownerField?: never;
+    using?: never;
+    withCheck?: never;
+    condition?: never;
+    check?: never;
+}
+
+/**
+ * Security rule that grants any signed-in caller row access, with no row
+ * filter. Generates the signed-in test `policy.authenticated()` compiles to:
+ * `rebase.uid()` is neither the server context's `NULL` nor an anonymous
+ * visitor's sentinel.
+ *
+ * Older releases did not type this shape and compiled it to a policy that
+ * denies every row; it is a new shape with its own policy name (see
+ * `getPolicyNameHash`).
+ *
+ * Cannot be combined with `using`, `withCheck`, or `ownerField`. To narrow the
+ * rows, add a `condition` — that is a {@link ConditionalAccessSecurityRule}.
+ *
+ * @example
+ * // Any signed-in caller reads every row
+ * { operation: "select", access: "authenticated" }
+ *
+ * @group Models
+ */
+export interface AuthenticatedSecurityRule extends SecurityRuleBase {
+    /** Grant row access, with no row filter, to any signed-in caller. */
+    access: "authenticated";
     ownerField?: never;
     using?: never;
     withCheck?: never;

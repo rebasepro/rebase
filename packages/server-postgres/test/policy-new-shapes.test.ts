@@ -250,6 +250,18 @@ describe("the new rls shapes, against Postgres", () => {
         expect(m["reports | alice | delete r2"]).toBe("none");
     });
 
+    it("admits any signed-in caller, and no anonymous one, under bare `access: \"authenticated\"`", async () => {
+        const m = await outcomeMatrix(db);
+        expect(m["members | anonymous | select"]).toBe("");
+        expect(m["members | anonymous | insert mn"]).toBe("refused:42501");
+        for (const caller of ["alice", "bob (editor)"]) {
+            expect({ caller, select: m[`members | ${caller} | select`], insert: m[`members | ${caller} | insert mn`] })
+                .toEqual({ caller, select: "m1,m2", insert: "ok" });
+            // The rule grants select and insert only.
+            expect({ caller, outcome: m[`members | ${caller} | delete m1`] }).toEqual({ caller, outcome: "none" });
+        }
+    });
+
     it("imports its stored policies back into rules that admit exactly what they did", async () => {
         await replacePolicies(db, currentStatements());
         const stored = await outcomeMatrix(db);

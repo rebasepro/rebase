@@ -48,14 +48,9 @@ function baseUsing(rule: SecurityRule, site: Pick<PolicyConditionSite, "table">)
     // is the condition itself — the same object, compiled as it always was.
     if (rule.condition != null) return gated(rule.access, policyConditionToExpression(rule.condition, { ...site, clause: "condition" }));
     if (rule.using != null) return sqlToPolicy(rule.using);
-    // `access` alone: only `"public"` grants. A bare `access: "authenticated"`
-    // is a shape older releases accepted and compiled to no clause (deny); the
-    // types no longer admit it, and it keeps compiling — and being named — as
-    // it did. With a condition or check it is a `ConditionalAccessSecurityRule`.
+    // `access` alone (or with only a `check`): the caller test itself.
     if (rule.access === "public") return policy.true();
-    // `access: "authenticated"` with only a `check`: the USING side is the
-    // caller test alone.
-    if (rule.access === "authenticated" && rule.check != null) return policy.authenticated();
+    if (rule.access === "authenticated") return policy.authenticated();
     if (rule.ownerField) return policy.compare(policy.field(rule.ownerField), "eq", policy.authUid());
     return null;
 }

@@ -21,6 +21,14 @@
       "CREATE POLICY \"reports_default_admin_write_insert\" ON \"public\".\"reports\" AS PERMISSIVE FOR INSERT TO \"rebase_admin\" WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
       "CREATE POLICY \"reports_default_admin_write_update\" ON \"public\".\"reports\" AS PERMISSIVE FOR UPDATE TO \"rebase_admin\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))) WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
       "CREATE POLICY \"reports_default_admin_write_delete\" ON \"public\".\"reports\" AS PERMISSIVE FOR DELETE TO \"rebase_admin\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+    ],
+    "public.members": [
+      "CREATE POLICY \"members_select_83a9c4d_0\" ON \"public\".\"members\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((SELECT rebase.uid()) IS NOT NULL AND (SELECT rebase.uid()) NOT IN ('anonymous', 'anon'));",
+      "CREATE POLICY \"members_insert_83a9c4d_1\" ON \"public\".\"members\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK ((SELECT rebase.uid()) IS NOT NULL AND (SELECT rebase.uid()) NOT IN ('anonymous', 'anon'));",
+      "CREATE POLICY \"members_default_admin_read\" ON \"public\".\"members\" AS PERMISSIVE FOR SELECT TO \"rebase_admin\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "CREATE POLICY \"members_default_admin_write_insert\" ON \"public\".\"members\" AS PERMISSIVE FOR INSERT TO \"rebase_admin\" WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "CREATE POLICY \"members_default_admin_write_update\" ON \"public\".\"members\" AS PERMISSIVE FOR UPDATE TO \"rebase_admin\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))) WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "CREATE POLICY \"members_default_admin_write_delete\" ON \"public\".\"members\" AS PERMISSIVE FOR DELETE TO \"rebase_admin\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
     ]
   }
 }

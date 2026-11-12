@@ -45,9 +45,11 @@ describe("rls: the spec's example", () => {
             { operation: "insert", access: "authenticated", check: { state: "open" } },
             { operation: "select", access: "public", condition: policy.compare(policy.field("rank"), "gt", policy.literal(0)) },
             { operation: "select", condition: { orgId: "acme", deletedAt: null, featured: true, rank: 2 } },
-            { operation: "update", condition: policy.authenticated(), check: { status: "draft" } }
+            { operation: "update", condition: policy.authenticated(), check: { status: "draft" } },
+            { operation: "select", access: "authenticated" },
+            { operations: ["insert", "update"], access: "authenticated", roles: ["member"] }
         ];
-        expect(rules).toHaveLength(5);
+        expect(rules).toHaveLength(7);
     });
 });
 
@@ -62,8 +64,8 @@ describe("rls: what stays illegal", () => {
             { operation: "select", access: "public", withCheck: "true" },
             // @ts-expect-error — `ownerField` and a structured condition cannot be combined
             { operation: "select", ownerField: "userId", condition: { status: "published" } },
-            // @ts-expect-error — a bare `access: "authenticated"` keeps its legacy deny meaning, so it is not admitted
-            { operation: "insert", access: "authenticated" },
+            // @ts-expect-error — `access: "authenticated"` and raw SQL cannot be combined
+            { operation: "select", access: "authenticated", using: "true" },
             // @ts-expect-error — `access` admits "public" and "authenticated" only
             { operation: "select", access: "anyone", condition: { status: "published" } }
         ];

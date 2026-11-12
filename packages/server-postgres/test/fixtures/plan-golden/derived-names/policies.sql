@@ -125,15 +125,15 @@ ALTER TABLE "public"."categories" ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "categories_select_841c287_ar_d7e70093" ON "public"."categories";
 DROP POLICY IF EXISTS "categories_select_841c287" ON "public"."categories";
 CREATE POLICY "categories_select_841c287" ON "public"."categories" AS PERMISSIVE FOR SELECT TO "public" USING (true);
-DROP POLICY IF EXISTS "categories_insert_29ea277_ar_a437676c" ON "public"."categories";
-DROP POLICY IF EXISTS "categories_insert_29ea277" ON "public"."categories";
-CREATE POLICY "categories_insert_29ea277" ON "public"."categories" AS PERMISSIVE FOR INSERT TO "public" WITH CHECK (false);
-DROP POLICY IF EXISTS "categories_update_b2b72ff_ar_906f636f" ON "public"."categories";
-DROP POLICY IF EXISTS "categories_update_b2b72ff" ON "public"."categories";
-CREATE POLICY "categories_update_b2b72ff" ON "public"."categories" AS PERMISSIVE FOR UPDATE TO "public" USING (false) WITH CHECK (false);
-DROP POLICY IF EXISTS "categories_delete_82b8225_ar_0bb9952e" ON "public"."categories";
-DROP POLICY IF EXISTS "categories_delete_82b8225" ON "public"."categories";
-CREATE POLICY "categories_delete_82b8225" ON "public"."categories" AS PERMISSIVE FOR DELETE TO "public" USING (false);
+DROP POLICY IF EXISTS "categories_insert_2faf7c9_ar_91f70e5c" ON "public"."categories";
+DROP POLICY IF EXISTS "categories_insert_2faf7c9" ON "public"."categories";
+CREATE POLICY "categories_insert_2faf7c9" ON "public"."categories" AS PERMISSIVE FOR INSERT TO "public" WITH CHECK ((SELECT rebase.uid()) IS NOT NULL AND (SELECT rebase.uid()) NOT IN ('anonymous', 'anon'));
+DROP POLICY IF EXISTS "categories_update_2799dd8_ar_304aa5b8" ON "public"."categories";
+DROP POLICY IF EXISTS "categories_update_2799dd8" ON "public"."categories";
+CREATE POLICY "categories_update_2799dd8" ON "public"."categories" AS PERMISSIVE FOR UPDATE TO "public" USING ((SELECT rebase.uid()) IS NOT NULL AND (SELECT rebase.uid()) NOT IN ('anonymous', 'anon')) WITH CHECK ((SELECT rebase.uid()) IS NOT NULL AND (SELECT rebase.uid()) NOT IN ('anonymous', 'anon'));
+DROP POLICY IF EXISTS "categories_delete_3c23a2b_ar_d3f6e957" ON "public"."categories";
+DROP POLICY IF EXISTS "categories_delete_3c23a2b" ON "public"."categories";
+CREATE POLICY "categories_delete_3c23a2b" ON "public"."categories" AS PERMISSIVE FOR DELETE TO "public" USING ((SELECT rebase.uid()) IS NOT NULL AND (SELECT rebase.uid()) NOT IN ('anonymous', 'anon'));
 -- Injected by Rebase (not from this collection's securityRules).
 -- Set `disableDefaultPolicies: true` on "categories" to drop these and own its RLS outright.
 DO $rebase_companion$ BEGIN IF EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = 'public' AND p.tablename = 'categories' AND p.policyname = 'categories_default_admin_read_ar_5f45dbfb' AND NOT (p.cmd = 'SELECT' AND p.permissive = 'PERMISSIVE' AND p.roles = ARRAY['rebase_admin_request']::name[] AND COALESCE(p.qual, 'true') = 'true' AND COALESCE(p.with_check, 'true') = 'true')) THEN EXECUTE 'DROP POLICY "categories_default_admin_read_ar_5f45dbfb" ON "public"."categories"'; END IF; END $rebase_companion$;
@@ -194,15 +194,15 @@ ALTER TABLE "shop"."inventory_items" ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "inventory_items_select_841c287_ar_1f05cfa4" ON "shop"."inventory_items";
 DROP POLICY IF EXISTS "inventory_items_select_841c287" ON "shop"."inventory_items";
 CREATE POLICY "inventory_items_select_841c287" ON "shop"."inventory_items" AS PERMISSIVE FOR SELECT TO "public" USING (true);
-DROP POLICY IF EXISTS "inventory_items_insert_29ea277_ar_905a0e54" ON "shop"."inventory_items";
-DROP POLICY IF EXISTS "inventory_items_insert_29ea277" ON "shop"."inventory_items";
-CREATE POLICY "inventory_items_insert_29ea277" ON "shop"."inventory_items" AS PERMISSIVE FOR INSERT TO "public" WITH CHECK (false);
-DROP POLICY IF EXISTS "inventory_items_update_b2b72ff_ar_e001b364" ON "shop"."inventory_items";
-DROP POLICY IF EXISTS "inventory_items_update_b2b72ff" ON "shop"."inventory_items";
-CREATE POLICY "inventory_items_update_b2b72ff" ON "shop"."inventory_items" AS PERMISSIVE FOR UPDATE TO "public" USING (false) WITH CHECK (false);
-DROP POLICY IF EXISTS "inventory_items_delete_82b8225_ar_08f34690" ON "shop"."inventory_items";
-DROP POLICY IF EXISTS "inventory_items_delete_82b8225" ON "shop"."inventory_items";
-CREATE POLICY "inventory_items_delete_82b8225" ON "shop"."inventory_items" AS PERMISSIVE FOR DELETE TO "public" USING (false);
+DROP POLICY IF EXISTS "inventory_items_insert_2faf7c9_ar_7a720a42" ON "shop"."inventory_items";
+DROP POLICY IF EXISTS "inventory_items_insert_2faf7c9" ON "shop"."inventory_items";
+CREATE POLICY "inventory_items_insert_2faf7c9" ON "shop"."inventory_items" AS PERMISSIVE FOR INSERT TO "public" WITH CHECK ((SELECT rebase.uid()) IS NOT NULL AND (SELECT rebase.uid()) NOT IN ('anonymous', 'anon'));
+DROP POLICY IF EXISTS "inventory_items_update_2799dd8_ar_6859b8a4" ON "shop"."inventory_items";
+DROP POLICY IF EXISTS "inventory_items_update_2799dd8" ON "shop"."inventory_items";
+CREATE POLICY "inventory_items_update_2799dd8" ON "shop"."inventory_items" AS PERMISSIVE FOR UPDATE TO "public" USING ((SELECT rebase.uid()) IS NOT NULL AND (SELECT rebase.uid()) NOT IN ('anonymous', 'anon')) WITH CHECK ((SELECT rebase.uid()) IS NOT NULL AND (SELECT rebase.uid()) NOT IN ('anonymous', 'anon'));
+DROP POLICY IF EXISTS "inventory_items_delete_3c23a2b_ar_b1db0cb7" ON "shop"."inventory_items";
+DROP POLICY IF EXISTS "inventory_items_delete_3c23a2b" ON "shop"."inventory_items";
+CREATE POLICY "inventory_items_delete_3c23a2b" ON "shop"."inventory_items" AS PERMISSIVE FOR DELETE TO "public" USING ((SELECT rebase.uid()) IS NOT NULL AND (SELECT rebase.uid()) NOT IN ('anonymous', 'anon'));
 -- Injected by Rebase (not from this collection's securityRules).
 -- Set `disableDefaultPolicies: true` on "inventory_items" to drop these and own its RLS outright.
 DO $rebase_companion$ BEGIN IF EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = 'shop' AND p.tablename = 'inventory_items' AND p.policyname = 'inventory_items_default_admin_read_ar_da19d080' AND NOT (p.cmd = 'SELECT' AND p.permissive = 'PERMISSIVE' AND p.roles = ARRAY['rebase_admin_request']::name[] AND COALESCE(p.qual, 'true') = 'true' AND COALESCE(p.with_check, 'true') = 'true')) THEN EXECUTE 'DROP POLICY "inventory_items_default_admin_read_ar_da19d080" ON "shop"."inventory_items"'; END IF; END $rebase_companion$;
@@ -282,15 +282,15 @@ ALTER TABLE "public"."products" ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "products_select_841c287_ar_09263c88" ON "public"."products";
 DROP POLICY IF EXISTS "products_select_841c287" ON "public"."products";
 CREATE POLICY "products_select_841c287" ON "public"."products" AS PERMISSIVE FOR SELECT TO "public" USING (true);
-DROP POLICY IF EXISTS "products_insert_29ea277_ar_7312c4d0" ON "public"."products";
-DROP POLICY IF EXISTS "products_insert_29ea277" ON "public"."products";
-CREATE POLICY "products_insert_29ea277" ON "public"."products" AS PERMISSIVE FOR INSERT TO "public" WITH CHECK (false);
-DROP POLICY IF EXISTS "products_update_b2b72ff_ar_87593f5b" ON "public"."products";
-DROP POLICY IF EXISTS "products_update_b2b72ff" ON "public"."products";
-CREATE POLICY "products_update_b2b72ff" ON "public"."products" AS PERMISSIVE FOR UPDATE TO "public" USING (false) WITH CHECK (false);
-DROP POLICY IF EXISTS "products_delete_82b8225_ar_72fa959b" ON "public"."products";
-DROP POLICY IF EXISTS "products_delete_82b8225" ON "public"."products";
-CREATE POLICY "products_delete_82b8225" ON "public"."products" AS PERMISSIVE FOR DELETE TO "public" USING (false);
+DROP POLICY IF EXISTS "products_insert_2faf7c9_ar_b0f1f100" ON "public"."products";
+DROP POLICY IF EXISTS "products_insert_2faf7c9" ON "public"."products";
+CREATE POLICY "products_insert_2faf7c9" ON "public"."products" AS PERMISSIVE FOR INSERT TO "public" WITH CHECK ((SELECT rebase.uid()) IS NOT NULL AND (SELECT rebase.uid()) NOT IN ('anonymous', 'anon'));
+DROP POLICY IF EXISTS "products_update_2799dd8_ar_d57012a5" ON "public"."products";
+DROP POLICY IF EXISTS "products_update_2799dd8" ON "public"."products";
+CREATE POLICY "products_update_2799dd8" ON "public"."products" AS PERMISSIVE FOR UPDATE TO "public" USING ((SELECT rebase.uid()) IS NOT NULL AND (SELECT rebase.uid()) NOT IN ('anonymous', 'anon')) WITH CHECK ((SELECT rebase.uid()) IS NOT NULL AND (SELECT rebase.uid()) NOT IN ('anonymous', 'anon'));
+DROP POLICY IF EXISTS "products_delete_3c23a2b_ar_ab733f47" ON "public"."products";
+DROP POLICY IF EXISTS "products_delete_3c23a2b" ON "public"."products";
+CREATE POLICY "products_delete_3c23a2b" ON "public"."products" AS PERMISSIVE FOR DELETE TO "public" USING ((SELECT rebase.uid()) IS NOT NULL AND (SELECT rebase.uid()) NOT IN ('anonymous', 'anon'));
 -- Injected by Rebase (not from this collection's securityRules).
 -- Set `disableDefaultPolicies: true` on "products" to drop these and own its RLS outright.
 DO $rebase_companion$ BEGIN IF EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = 'public' AND p.tablename = 'products' AND p.policyname = 'products_default_admin_read_ar_cd6a5cf2' AND NOT (p.cmd = 'SELECT' AND p.permissive = 'PERMISSIVE' AND p.roles = ARRAY['rebase_admin_request']::name[] AND COALESCE(p.qual, 'true') = 'true' AND COALESCE(p.with_check, 'true') = 'true')) THEN EXECUTE 'DROP POLICY "products_default_admin_read_ar_cd6a5cf2" ON "public"."products"'; END IF; END $rebase_companion$;
@@ -524,6 +524,15 @@ CREATE POLICY "categories_products_default_admin_write_delete" ON "public"."cate
 DROP POLICY IF EXISTS "categories_products_default_edge_read_ar_95affa58" ON "public"."categories_products";
 DROP POLICY IF EXISTS "categories_products_default_edge_read" ON "public"."categories_products";
 CREATE POLICY "categories_products_default_edge_read" ON "public"."categories_products" AS PERMISSIVE FOR SELECT TO "public" USING ((EXISTS (SELECT 1 FROM "public"."products" "_ex0" WHERE "_ex0".id = "public"."categories_products".product_id)) AND (EXISTS (SELECT 1 FROM "public"."categories" "_ex1" WHERE "_ex1".id = "public"."categories_products".category_id)));
+DROP POLICY IF EXISTS "categories_products_default_edge_write_insert_ar_230e82a2" ON "public"."categories_products";
+DROP POLICY IF EXISTS "categories_products_default_edge_write_insert" ON "public"."categories_products";
+CREATE POLICY "categories_products_default_edge_write_insert" ON "public"."categories_products" AS PERMISSIVE FOR INSERT TO "public" WITH CHECK (EXISTS (SELECT 1 FROM "public"."products" "_ex0" WHERE ("_ex0".id = "public"."categories_products".product_id) AND ((SELECT (rebase.uid() IS NOT NULL AND rebase.uid() NOT IN ('anonymous', 'anon'))))));
+DROP POLICY IF EXISTS "categories_products_default_edge_write_update_ar_c09143b1" ON "public"."categories_products";
+DROP POLICY IF EXISTS "categories_products_default_edge_write_update" ON "public"."categories_products";
+CREATE POLICY "categories_products_default_edge_write_update" ON "public"."categories_products" AS PERMISSIVE FOR UPDATE TO "public" USING (EXISTS (SELECT 1 FROM "public"."products" "_ex0" WHERE ("_ex0".id = "public"."categories_products".product_id) AND ((SELECT (rebase.uid() IS NOT NULL AND rebase.uid() NOT IN ('anonymous', 'anon')))))) WITH CHECK (EXISTS (SELECT 1 FROM "public"."products" "_ex0" WHERE ("_ex0".id = "public"."categories_products".product_id) AND ((SELECT (rebase.uid() IS NOT NULL AND rebase.uid() NOT IN ('anonymous', 'anon'))))));
+DROP POLICY IF EXISTS "categories_products_default_edge_write_delete_ar_626a7dda" ON "public"."categories_products";
+DROP POLICY IF EXISTS "categories_products_default_edge_write_delete" ON "public"."categories_products";
+CREATE POLICY "categories_products_default_edge_write_delete" ON "public"."categories_products" AS PERMISSIVE FOR DELETE TO "public" USING (EXISTS (SELECT 1 FROM "public"."products" "_ex0" WHERE ("_ex0".id = "public"."categories_products".product_id) AND ((SELECT (rebase.uid() IS NOT NULL AND rebase.uid() NOT IN ('anonymous', 'anon'))))));
 
 ALTER TABLE "public"."products_tags" ENABLE ROW LEVEL SECURITY;
 
@@ -546,6 +555,15 @@ CREATE POLICY "products_tags_default_admin_write_delete" ON "public"."products_t
 DROP POLICY IF EXISTS "products_tags_default_edge_read_ar_cb37faad" ON "public"."products_tags";
 DROP POLICY IF EXISTS "products_tags_default_edge_read" ON "public"."products_tags";
 CREATE POLICY "products_tags_default_edge_read" ON "public"."products_tags" AS PERMISSIVE FOR SELECT TO "public" USING ((EXISTS (SELECT 1 FROM "public"."products" "_ex0" WHERE "_ex0".id = "public"."products_tags".product_id)) AND (EXISTS (SELECT 1 FROM "public"."tags" "_ex1" WHERE "_ex1".id = "public"."products_tags".tag_id)));
+DROP POLICY IF EXISTS "products_tags_default_edge_write_insert_ar_7aba99a1" ON "public"."products_tags";
+DROP POLICY IF EXISTS "products_tags_default_edge_write_insert" ON "public"."products_tags";
+CREATE POLICY "products_tags_default_edge_write_insert" ON "public"."products_tags" AS PERMISSIVE FOR INSERT TO "public" WITH CHECK (EXISTS (SELECT 1 FROM "public"."products" "_ex0" WHERE ("_ex0".id = "public"."products_tags".product_id) AND ((SELECT (rebase.uid() IS NOT NULL AND rebase.uid() NOT IN ('anonymous', 'anon'))))));
+DROP POLICY IF EXISTS "products_tags_default_edge_write_update_ar_80fbb65c" ON "public"."products_tags";
+DROP POLICY IF EXISTS "products_tags_default_edge_write_update" ON "public"."products_tags";
+CREATE POLICY "products_tags_default_edge_write_update" ON "public"."products_tags" AS PERMISSIVE FOR UPDATE TO "public" USING (EXISTS (SELECT 1 FROM "public"."products" "_ex0" WHERE ("_ex0".id = "public"."products_tags".product_id) AND ((SELECT (rebase.uid() IS NOT NULL AND rebase.uid() NOT IN ('anonymous', 'anon')))))) WITH CHECK (EXISTS (SELECT 1 FROM "public"."products" "_ex0" WHERE ("_ex0".id = "public"."products_tags".product_id) AND ((SELECT (rebase.uid() IS NOT NULL AND rebase.uid() NOT IN ('anonymous', 'anon'))))));
+DROP POLICY IF EXISTS "products_tags_default_edge_write_delete_ar_68e378f4" ON "public"."products_tags";
+DROP POLICY IF EXISTS "products_tags_default_edge_write_delete" ON "public"."products_tags";
+CREATE POLICY "products_tags_default_edge_write_delete" ON "public"."products_tags" AS PERMISSIVE FOR DELETE TO "public" USING (EXISTS (SELECT 1 FROM "public"."products" "_ex0" WHERE ("_ex0".id = "public"."products_tags".product_id) AND ((SELECT (rebase.uid() IS NOT NULL AND rebase.uid() NOT IN ('anonymous', 'anon'))))));
 
 ALTER TABLE "public"."products_statuses" ENABLE ROW LEVEL SECURITY;
 
@@ -568,6 +586,15 @@ CREATE POLICY "products_statuses_default_admin_write_delete" ON "public"."produc
 DROP POLICY IF EXISTS "products_statuses_default_edge_read_ar_47fc71f2" ON "public"."products_statuses";
 DROP POLICY IF EXISTS "products_statuses_default_edge_read" ON "public"."products_statuses";
 CREATE POLICY "products_statuses_default_edge_read" ON "public"."products_statuses" AS PERMISSIVE FOR SELECT TO "public" USING ((EXISTS (SELECT 1 FROM "public"."products" "_ex0" WHERE "_ex0".id = "public"."products_statuses".product_id)) AND (EXISTS (SELECT 1 FROM "public"."statuses" "_ex1" WHERE "_ex1".id = "public"."products_statuses".status_id)));
+DROP POLICY IF EXISTS "products_statuses_default_edge_write_insert_ar_7f7a8ea3" ON "public"."products_statuses";
+DROP POLICY IF EXISTS "products_statuses_default_edge_write_insert" ON "public"."products_statuses";
+CREATE POLICY "products_statuses_default_edge_write_insert" ON "public"."products_statuses" AS PERMISSIVE FOR INSERT TO "public" WITH CHECK (EXISTS (SELECT 1 FROM "public"."products" "_ex0" WHERE ("_ex0".id = "public"."products_statuses".product_id) AND ((SELECT (rebase.uid() IS NOT NULL AND rebase.uid() NOT IN ('anonymous', 'anon'))))));
+DROP POLICY IF EXISTS "products_statuses_default_edge_write_update_ar_b68d928d" ON "public"."products_statuses";
+DROP POLICY IF EXISTS "products_statuses_default_edge_write_update" ON "public"."products_statuses";
+CREATE POLICY "products_statuses_default_edge_write_update" ON "public"."products_statuses" AS PERMISSIVE FOR UPDATE TO "public" USING (EXISTS (SELECT 1 FROM "public"."products" "_ex0" WHERE ("_ex0".id = "public"."products_statuses".product_id) AND ((SELECT (rebase.uid() IS NOT NULL AND rebase.uid() NOT IN ('anonymous', 'anon')))))) WITH CHECK (EXISTS (SELECT 1 FROM "public"."products" "_ex0" WHERE ("_ex0".id = "public"."products_statuses".product_id) AND ((SELECT (rebase.uid() IS NOT NULL AND rebase.uid() NOT IN ('anonymous', 'anon'))))));
+DROP POLICY IF EXISTS "products_statuses_default_edge_write_delete_ar_79240877" ON "public"."products_statuses";
+DROP POLICY IF EXISTS "products_statuses_default_edge_write_delete" ON "public"."products_statuses";
+CREATE POLICY "products_statuses_default_edge_write_delete" ON "public"."products_statuses" AS PERMISSIVE FOR DELETE TO "public" USING (EXISTS (SELECT 1 FROM "public"."products" "_ex0" WHERE ("_ex0".id = "public"."products_statuses".product_id) AND ((SELECT (rebase.uid() IS NOT NULL AND rebase.uid() NOT IN ('anonymous', 'anon'))))));
 
 ALTER TABLE "public"."players_teams" ENABLE ROW LEVEL SECURITY;
 

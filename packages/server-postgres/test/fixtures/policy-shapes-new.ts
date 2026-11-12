@@ -51,6 +51,17 @@ export const NEW_POLICY_SHAPE_COLLECTIONS: CollectionConfig[] = [
             { operation: "update", access: "authenticated", condition: { state: "open" }, check: { state: "open", flagged: false } },
             { operation: "delete", access: "public", condition: { orgId: ORG_A } }
         ]
+    },
+    // Bare `access: "authenticated"`: any signed-in caller, no row filter.
+    {
+        name: "Members", slug: "members", table: "members",
+        properties: {
+            id: { name: "ID", type: "string", isId: true },
+            bio: { name: "Bio", type: "string" }
+        },
+        securityRules: [
+            { operations: ["select", "insert"], access: "authenticated" }
+        ]
     }
 ];
 
@@ -58,6 +69,7 @@ export const NEW_POLICY_SHAPE_DDL = `
     CREATE TYPE posts_status AS ENUM ('draft', 'published');
     CREATE TABLE posts (id text PRIMARY KEY, title text, status posts_status);
     CREATE TABLE reports (id text PRIMARY KEY, state text, flagged boolean, org_id uuid, deleted_at timestamptz);
+    CREATE TABLE members (id text PRIMARY KEY, bio text);
 `;
 
 /** Seeded rows, and rows each caller tries to insert. */
@@ -79,6 +91,10 @@ export const NEW_POLICY_SHAPE_ROWS: Record<string, { rows: Record<string, unknow
             { id: "rn1", state: "open", flagged: false, org_id: ORG_B, deleted_at: null },
             { id: "rn2", state: "open", flagged: true, org_id: ORG_B, deleted_at: null }
         ]
+    },
+    members: {
+        rows: [{ id: "m1", bio: "a" }, { id: "m2", bio: "b" }],
+        inserts: [{ id: "mn", bio: "n" }]
     }
 };
 

@@ -27,8 +27,8 @@ import { toPostgresIdentifier, truncateToBytes } from "./names";
  *   names, so this input must never move. Its `condition` / `check` are
  *   serialised in the key order they were written in, as they always were.
  * - **A rule using a newer form** ({@link isNewShapeRule}: a
- *   `PolicyShorthand` condition / check, or `access` combined with a
- *   condition / check) hashes {@link newShapeHashInput}:
+ *   `PolicyShorthand` condition / check, `access` combined with a
+ *   condition / check, or `access: "authenticated"`) hashes {@link newShapeHashInput}:
  *   `"rls2:"` followed by canonical JSON in which every object's keys are
  *   sorted, so `{ a: 1, b: 2 }` and `{ b: 2, a: 1 }` name the same policy.
  *   A legacy input starts with `{`, so the two spaces cannot meet.
@@ -53,13 +53,13 @@ export function getPolicyNameHash(rule: SecurityRule): string {
 
 /**
  * Whether a rule uses a form newer than the legacy hash input knows: a
- * `PolicyShorthand` condition or check, or `access` together with a condition
- * or check. (A bare `access: "authenticated"` is NOT new: older releases
- * accepted it, compiled it to a deny, and deployed databases hold policies
- * named from the legacy input.) Such a rule hashes
+ * `PolicyShorthand` condition or check, `access` together with a condition or
+ * check, or `access: "authenticated"` (which older releases did not type and
+ * compiled to a deny; it now means any signed-in caller, under a new name). Such a rule hashes
  * {@link newShapeHashInput}; every other rule keeps the legacy input.
  */
 export function isNewShapeRule(rule: SecurityRule): boolean {
+    if (rule.access === "authenticated") return true;
     if (rule.access !== undefined && (rule.condition != null || rule.check != null)) return true;
     return isPolicyShorthand(rule.condition) || isPolicyShorthand(rule.check);
 }

@@ -69,7 +69,6 @@ const anonymous: AuthState<User> = { user: null };
 const row = (values: Record<string, unknown>): Entity => ({ id: "p1", path: "posts", values });
 /** A value from outside the type system — what a JS config or a stored rule can hold. */
 const loose = (json: string): PolicyCondition => JSON.parse(json);
-const looseRule = (json: string): SecurityRule => JSON.parse(json);
 const withRules = (securityRules: SecurityRule[]): CollectionConfig => ({ ...posts, securityRules });
 
 describe("isPolicyShorthand", () => {
@@ -264,8 +263,9 @@ describe("policy names of the new shapes", () => {
         expect(isNewShapeRule({ operation: "select", condition: policy.authenticated() })).toBe(false);
         expect(isNewShapeRule({ operation: "select", access: "public" })).toBe(false);
         expect(isNewShapeRule({ operation: "select", ownerField: "orgId" })).toBe(false);
-        // A shape the types no longer admit but databases still hold: legacy.
-        expect(isNewShapeRule(looseRule("{\"operation\":\"insert\",\"access\":\"authenticated\"}"))).toBe(false);
+        // Bare `access: "authenticated"`: older releases compiled it to a deny
+        // under a legacy name; it is a new shape now, named in the new space.
+        expect(isNewShapeRule({ operation: "insert", access: "authenticated" })).toBe(true);
     });
 
     it("keeps its hash input in a space no legacy input can reach", () => {
@@ -277,8 +277,18 @@ describe("policy names of the new shapes", () => {
     it("leaves every legacy name where it was", () => {
         // Pinned from contracts/derived-names.txt and the golden corpus.
         expect(getPolicyNamesForRule({ operation: "select", access: "public" }, "articles")).toEqual(["articles_select_841c287"]);
-        expect(getPolicyNamesForRule(looseRule("{\"operation\":\"insert\",\"access\":\"authenticated\"}"), "categories"))
-            .toEqual(["categories_insert_29ea277"]);
+        expect(getPolicyNamesForRule({ operation: "select", ownerField: "orgId" }, "posts")).toEqual(
+            getPolicyNamesForRule({ ownerField: "orgId", operation: "select" }, "posts")
+        );
+    });
+
+    it("moves bare `access: \"authenticated\"` off the name it compiled to as a deny", () => {
+        // Was `categories_insert_29ea277` (WITH CHECK (false)); see
+        // contracts/derived-names.txt.
+        expect(getPolicyNamesForRule({ operation: "insert", access: "authenticated" }, "categories"))
+            .toEqual(["categories_insert_2faf7c9"]);
+        expect(newShapeHashInput({ operation: "insert", access: "authenticated" }))
+            .toBe("rls2:{\"a\":\"authenticated\",\"op\":\"insert\"}");
     });
 });
 
@@ -301,6 +311,21 @@ describe("the client-side evaluator on the new shapes", () => {
         expect(checkOperation(collection, editor, draft, "insert")).toBe(true);
         expect(checkOperation(collection, editor, draft, "delete")).toBe(false);
         expect(checkOperation(collection, user("ad", ["admin"]), draft, "delete")).toBe(true);
+    });
+
+    it("compiles and evaluates bare `access: \"authenticated\"`: every signed-in caller", () => {
+        const rule: SecurityRule = { operations: ["select", "insert"], access: "authenticated" };
+        expect(compileRulePolicies(posts, rule).map(p => [p.operation, p.using, p.withCheck])).toEqual([
+            ["select", SIGNED_IN, null],
+            ["insert", null, SIGNED_IN]
+        ]);
+        const rules = withRules([rule]);
+        for (const op of ["select", "insert"] as const) {
+            expect(checkOperation(rules, user("u1"), null, op)).toBe(true);
+            expect(checkOperation(rules, anonymous, null, op)).toBe(false);
+            expect(checkOperation(rules, user("anon"), null, op)).toBe(false);
+        }
+        expect(checkOperation(rules, user("u1"), null, "delete")).toBe(false);
     });
 
     it("tells anonymous from signed-in for `access: \"authenticated\"` + condition", () => {

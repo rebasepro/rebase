@@ -472,6 +472,12 @@ export async function render(): Promise<string> {
         "# trigger of an `on_update` column on a junction's `through.properties`",
         "# (`players_teams_changed_at_touch`) is written to `triggers.sql` but never",
         "# planned by the boot. Fixing it turns that line [boot,push]; re-bank then.",
+        "#",
+        "# Moved on purpose (2026-11-12): the `<table>_{insert,update,delete}_<sha7>`",
+        "# policies of the fixture's bare `access: \"authenticated\"` rule (categories,",
+        "# products, shop.inventory_items). That rule was never a typed rule shape: it",
+        "# compiled to deny-all. From this version it means any signed-in caller, a",
+        "# new shape named in the `rls2:` hash space, so its names moved with it.",
         "",
         ...lines,
         ""

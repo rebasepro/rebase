@@ -63,9 +63,9 @@ export const categories = pgTable("categories", {
     name: text("name")
 }, (table) => ([
     pgPolicy("categories_select_841c287", { as: "permissive", for: "select", to: ["public"], using: sql`true` }),
-    pgPolicy("categories_insert_29ea277", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`false` }),
-    pgPolicy("categories_update_b2b72ff", { as: "permissive", for: "update", to: ["public"], using: sql`false`, withCheck: sql`false` }),
-    pgPolicy("categories_delete_82b8225", { as: "permissive", for: "delete", to: ["public"], using: sql`false` }),
+    pgPolicy("categories_insert_2faf7c9", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(SELECT rebase.uid()) IS NOT NULL AND (SELECT rebase.uid()) NOT IN ('anonymous', 'anon')` }),
+    pgPolicy("categories_update_2799dd8", { as: "permissive", for: "update", to: ["public"], using: sql`(SELECT rebase.uid()) IS NOT NULL AND (SELECT rebase.uid()) NOT IN ('anonymous', 'anon')`, withCheck: sql`(SELECT rebase.uid()) IS NOT NULL AND (SELECT rebase.uid()) NOT IN ('anonymous', 'anon')` }),
+    pgPolicy("categories_delete_3c23a2b", { as: "permissive", for: "delete", to: ["public"], using: sql`(SELECT rebase.uid()) IS NOT NULL AND (SELECT rebase.uid()) NOT IN ('anonymous', 'anon')` }),
     pgPolicy("categories_default_admin_read", { as: "permissive", for: "select", to: ["rebase_admin"], using: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
     pgPolicy("categories_default_admin_write_insert", { as: "permissive", for: "insert", to: ["rebase_admin"], withCheck: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
     pgPolicy("categories_default_admin_write_update", { as: "permissive", for: "update", to: ["rebase_admin"], using: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))`, withCheck: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
@@ -99,9 +99,9 @@ export const inventoryItems = shopSchema.table("inventory_items", {
 }, (table) => ([
     index("inventory_items_sku_ix_808e20a").on(table.sku.asc().nullsLast()),
     pgPolicy("inventory_items_select_841c287", { as: "permissive", for: "select", to: ["public"], using: sql`true` }),
-    pgPolicy("inventory_items_insert_29ea277", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`false` }),
-    pgPolicy("inventory_items_update_b2b72ff", { as: "permissive", for: "update", to: ["public"], using: sql`false`, withCheck: sql`false` }),
-    pgPolicy("inventory_items_delete_82b8225", { as: "permissive", for: "delete", to: ["public"], using: sql`false` }),
+    pgPolicy("inventory_items_insert_2faf7c9", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(SELECT rebase.uid()) IS NOT NULL AND (SELECT rebase.uid()) NOT IN ('anonymous', 'anon')` }),
+    pgPolicy("inventory_items_update_2799dd8", { as: "permissive", for: "update", to: ["public"], using: sql`(SELECT rebase.uid()) IS NOT NULL AND (SELECT rebase.uid()) NOT IN ('anonymous', 'anon')`, withCheck: sql`(SELECT rebase.uid()) IS NOT NULL AND (SELECT rebase.uid()) NOT IN ('anonymous', 'anon')` }),
+    pgPolicy("inventory_items_delete_3c23a2b", { as: "permissive", for: "delete", to: ["public"], using: sql`(SELECT rebase.uid()) IS NOT NULL AND (SELECT rebase.uid()) NOT IN ('anonymous', 'anon')` }),
     pgPolicy("inventory_items_default_admin_read", { as: "permissive", for: "select", to: ["rebase_admin"], using: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
     pgPolicy("inventory_items_default_admin_write_insert", { as: "permissive", for: "insert", to: ["rebase_admin"], withCheck: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
     pgPolicy("inventory_items_default_admin_write_update", { as: "permissive", for: "update", to: ["rebase_admin"], using: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))`, withCheck: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
@@ -159,9 +159,9 @@ export const products = pgTable("products", {
     index("products_keywords_ix_d52f56e").using("gin", table.keywords),
     uniqueIndex("products_primary_category_id_status_ux_b6409b5").on(table.primaryCategoryId.asc().nullsLast(), table.status.asc().nullsLast()),
     pgPolicy("products_select_841c287", { as: "permissive", for: "select", to: ["public"], using: sql`true` }),
-    pgPolicy("products_insert_29ea277", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`false` }),
-    pgPolicy("products_update_b2b72ff", { as: "permissive", for: "update", to: ["public"], using: sql`false`, withCheck: sql`false` }),
-    pgPolicy("products_delete_82b8225", { as: "permissive", for: "delete", to: ["public"], using: sql`false` }),
+    pgPolicy("products_insert_2faf7c9", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`(SELECT rebase.uid()) IS NOT NULL AND (SELECT rebase.uid()) NOT IN ('anonymous', 'anon')` }),
+    pgPolicy("products_update_2799dd8", { as: "permissive", for: "update", to: ["public"], using: sql`(SELECT rebase.uid()) IS NOT NULL AND (SELECT rebase.uid()) NOT IN ('anonymous', 'anon')`, withCheck: sql`(SELECT rebase.uid()) IS NOT NULL AND (SELECT rebase.uid()) NOT IN ('anonymous', 'anon')` }),
+    pgPolicy("products_delete_3c23a2b", { as: "permissive", for: "delete", to: ["public"], using: sql`(SELECT rebase.uid()) IS NOT NULL AND (SELECT rebase.uid()) NOT IN ('anonymous', 'anon')` }),
     pgPolicy("products_default_admin_read", { as: "permissive", for: "select", to: ["rebase_admin"], using: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
     pgPolicy("products_default_admin_write_insert", { as: "permissive", for: "insert", to: ["rebase_admin"], withCheck: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
     pgPolicy("products_default_admin_write_update", { as: "permissive", for: "update", to: ["rebase_admin"], using: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))`, withCheck: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
@@ -179,6 +179,9 @@ export const categoriesProducts = pgTable("categories_products", {
     pgPolicy("categories_products_default_admin_write_update", { as: "permissive", for: "update", to: ["rebase_admin"], using: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))`, withCheck: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
     pgPolicy("categories_products_default_admin_write_delete", { as: "permissive", for: "delete", to: ["rebase_admin"], using: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
     pgPolicy("categories_products_default_edge_read", { as: "permissive", for: "select", to: ["public"], using: sql`(EXISTS (SELECT 1 FROM "public"."products" "_ex0" WHERE "_ex0".id = "public"."categories_products".product_id)) AND (EXISTS (SELECT 1 FROM "public"."categories" "_ex1" WHERE "_ex1".id = "public"."categories_products".category_id))` }),
+    pgPolicy("categories_products_default_edge_write_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`EXISTS (SELECT 1 FROM "public"."products" "_ex0" WHERE ("_ex0".id = "public"."categories_products".product_id) AND ((SELECT (rebase.uid() IS NOT NULL AND rebase.uid() NOT IN ('anonymous', 'anon')))))` }),
+    pgPolicy("categories_products_default_edge_write_update", { as: "permissive", for: "update", to: ["public"], using: sql`EXISTS (SELECT 1 FROM "public"."products" "_ex0" WHERE ("_ex0".id = "public"."categories_products".product_id) AND ((SELECT (rebase.uid() IS NOT NULL AND rebase.uid() NOT IN ('anonymous', 'anon')))))`, withCheck: sql`EXISTS (SELECT 1 FROM "public"."products" "_ex0" WHERE ("_ex0".id = "public"."categories_products".product_id) AND ((SELECT (rebase.uid() IS NOT NULL AND rebase.uid() NOT IN ('anonymous', 'anon')))))` }),
+    pgPolicy("categories_products_default_edge_write_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`EXISTS (SELECT 1 FROM "public"."products" "_ex0" WHERE ("_ex0".id = "public"."categories_products".product_id) AND ((SELECT (rebase.uid() IS NOT NULL AND rebase.uid() NOT IN ('anonymous', 'anon')))))` }),
 ])).enableRLS();
 
 export const productsTags = pgTable("products_tags", {
@@ -192,6 +195,9 @@ export const productsTags = pgTable("products_tags", {
     pgPolicy("products_tags_default_admin_write_update", { as: "permissive", for: "update", to: ["rebase_admin"], using: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))`, withCheck: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
     pgPolicy("products_tags_default_admin_write_delete", { as: "permissive", for: "delete", to: ["rebase_admin"], using: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
     pgPolicy("products_tags_default_edge_read", { as: "permissive", for: "select", to: ["public"], using: sql`(EXISTS (SELECT 1 FROM "public"."products" "_ex0" WHERE "_ex0".id = "public"."products_tags".product_id)) AND (EXISTS (SELECT 1 FROM "public"."tags" "_ex1" WHERE "_ex1".id = "public"."products_tags".tag_id))` }),
+    pgPolicy("products_tags_default_edge_write_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`EXISTS (SELECT 1 FROM "public"."products" "_ex0" WHERE ("_ex0".id = "public"."products_tags".product_id) AND ((SELECT (rebase.uid() IS NOT NULL AND rebase.uid() NOT IN ('anonymous', 'anon')))))` }),
+    pgPolicy("products_tags_default_edge_write_update", { as: "permissive", for: "update", to: ["public"], using: sql`EXISTS (SELECT 1 FROM "public"."products" "_ex0" WHERE ("_ex0".id = "public"."products_tags".product_id) AND ((SELECT (rebase.uid() IS NOT NULL AND rebase.uid() NOT IN ('anonymous', 'anon')))))`, withCheck: sql`EXISTS (SELECT 1 FROM "public"."products" "_ex0" WHERE ("_ex0".id = "public"."products_tags".product_id) AND ((SELECT (rebase.uid() IS NOT NULL AND rebase.uid() NOT IN ('anonymous', 'anon')))))` }),
+    pgPolicy("products_tags_default_edge_write_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`EXISTS (SELECT 1 FROM "public"."products" "_ex0" WHERE ("_ex0".id = "public"."products_tags".product_id) AND ((SELECT (rebase.uid() IS NOT NULL AND rebase.uid() NOT IN ('anonymous', 'anon')))))` }),
 ])).enableRLS();
 
 export const productsStatuses = pgTable("products_statuses", {
@@ -205,6 +211,9 @@ export const productsStatuses = pgTable("products_statuses", {
     pgPolicy("products_statuses_default_admin_write_update", { as: "permissive", for: "update", to: ["rebase_admin"], using: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))`, withCheck: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
     pgPolicy("products_statuses_default_admin_write_delete", { as: "permissive", for: "delete", to: ["rebase_admin"], using: sql`(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))` }),
     pgPolicy("products_statuses_default_edge_read", { as: "permissive", for: "select", to: ["public"], using: sql`(EXISTS (SELECT 1 FROM "public"."products" "_ex0" WHERE "_ex0".id = "public"."products_statuses".product_id)) AND (EXISTS (SELECT 1 FROM "public"."statuses" "_ex1" WHERE "_ex1".id = "public"."products_statuses".status_id))` }),
+    pgPolicy("products_statuses_default_edge_write_insert", { as: "permissive", for: "insert", to: ["public"], withCheck: sql`EXISTS (SELECT 1 FROM "public"."products" "_ex0" WHERE ("_ex0".id = "public"."products_statuses".product_id) AND ((SELECT (rebase.uid() IS NOT NULL AND rebase.uid() NOT IN ('anonymous', 'anon')))))` }),
+    pgPolicy("products_statuses_default_edge_write_update", { as: "permissive", for: "update", to: ["public"], using: sql`EXISTS (SELECT 1 FROM "public"."products" "_ex0" WHERE ("_ex0".id = "public"."products_statuses".product_id) AND ((SELECT (rebase.uid() IS NOT NULL AND rebase.uid() NOT IN ('anonymous', 'anon')))))`, withCheck: sql`EXISTS (SELECT 1 FROM "public"."products" "_ex0" WHERE ("_ex0".id = "public"."products_statuses".product_id) AND ((SELECT (rebase.uid() IS NOT NULL AND rebase.uid() NOT IN ('anonymous', 'anon')))))` }),
+    pgPolicy("products_statuses_default_edge_write_delete", { as: "permissive", for: "delete", to: ["public"], using: sql`EXISTS (SELECT 1 FROM "public"."products" "_ex0" WHERE ("_ex0".id = "public"."products_statuses".product_id) AND ((SELECT (rebase.uid() IS NOT NULL AND rebase.uid() NOT IN ('anonymous', 'anon')))))` }),
 ])).enableRLS();
 
 export const searchedArticles = pgTable("searched_articles", {
