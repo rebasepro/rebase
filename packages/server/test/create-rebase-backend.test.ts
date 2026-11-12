@@ -431,7 +431,7 @@ describe("provision", () => {
 
     it("a part can be left to another process", async () => {
         const rec = recorder();
-        await create({ provision: { collections: false, realtime: false } }, rec);
+        await create({ provision: { tables: false, realtime: false } }, rec);
 
         expect(rec.schemaCalls).toBe(0);
         expect(rec.initConfigs[0]).toMatchObject({ provision: true, realtime: { provision: false } });

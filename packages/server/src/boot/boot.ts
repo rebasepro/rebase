@@ -8,7 +8,6 @@ import { getRequestListener } from "@hono/node-server";
 import {
     DEFAULT_DATA_SOURCE_KEY,
     parseEnvBoolean,
-    type CollectionConfig,
     type DataSourceDefinition,
     type InitializedDriver,
     type StorageSourceDefinition
@@ -426,7 +425,7 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
         // owner. `REBASE_MIGRATE_ON_BOOT=none` turns the collection schema off
         // on top of this, where the DDL runs. `REBASE_PROVISION=false` turns
         // off everything, the framework's own tables included.
-        provision: !env.REBASE_PROVISION ? false : ownsSchema ? true : { collections: false, realtime: false },
+        provision: !env.REBASE_PROVISION ? false : ownsSchema ? true : { tables: false, realtime: false },
         // The schema hooks run before any driver initializes, so they need a
         // stand-in for the result they are declared to take. This path has one
         // — the coordinator opened the connection itself — and passes it
@@ -510,12 +509,8 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
         shutdown: (timeoutMs, shutdownOptions) => createdBackend.shutdown(timeoutMs, { server, ...shutdownOptions })
     };
 
-    // Restrict metric labels to collections that exist, now that they do.
-    metrics?.setKnownCollections(
-        backend.collectionRegistry.getCollections()
-            .map(collection => collection.slug)
-            .filter((slug): slug is string => Boolean(slug))
-    );
+    // Restrict metric labels to tables that exist, now that they do.
+    metrics?.setKnownCollections(backend.getTableDescriptors().map(table => table.slug));
 
     // ── Health ───────────────────────────────────────────────────────────────
     // Not part of the backend's `mount()` because it sits outside `basePath`:

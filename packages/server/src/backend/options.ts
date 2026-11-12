@@ -388,11 +388,11 @@ export interface SchemaTablesOptions {
  */
 export interface ProvisionOptions {
     /**
-     * The collection schema: missing tables, columns and enum types (additive
-     * only, never a drop), the collections' RLS policies, and the stamp that
+     * The declared tables' schema: missing tables, columns and enum types
+     * (additive only, never a drop), their RLS policies, and the stamp that
      * records which schema version was applied.
      */
-    collections?: boolean;
+    tables?: boolean;
     /**
      * Change capture for realtime: the trigger function, the per-table
      * triggers, and any channel-history tables a driver keeps. Whether this
@@ -463,8 +463,8 @@ export interface RebaseBackendOptions {
      *   a missing optional table turns its feature off and is named in the log.
      *   `initializeRebaseBackend` and the runtime image pass it for
      *   `REBASE_PROVISION=false`.
-     * - `{ collections: false, realtime: false }` — the framework's tables and
-     *   the role, but not the collection schema or change capture: a process
+     * - `{ tables: false, realtime: false }` — the framework's tables and
+     *   the role, but not the declared tables' schema or change capture: a process
      *   that is not the schema's owner in a split deployment.
      *
      * Applied while the backend is created rather than in a later step, on

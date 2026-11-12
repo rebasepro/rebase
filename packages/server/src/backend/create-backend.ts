@@ -63,13 +63,13 @@ import { globalHooksAsCallbacks, resolveDeclaredTables } from "../schema/declare
 import { introspectedDescriptors, type IntrospectedDriverResult } from "../schema/introspected-tables";
 import type { DriverCollectionOf } from "../schema/driver-seam";
 import {
-    collectionsStoredBy,
-    logUnprovisionedCollections,
+    logUnprovisionedTables,
+    tablesStoredBy,
     provisionTargetsFor,
     provisioningDisabled,
     type ProvisionTarget,
-    provisionCollectionPolicies,
-    provisionCollectionTables,
+    provisionTablePolicies,
+    provisionTableSchema,
     PROVISIONING_OFF_NOTICE,
     PROVISIONING_OFF_SKIP_REASON,
     verifyProvisioningConnection
@@ -530,7 +530,8 @@ function assertOneSourceEach(config: Pick<RebaseBackendOptions, "functions" | "f
 interface ResolvedProvision {
     /** The database role, and the framework's own tables. */
     database: boolean;
-    collections: boolean;
+    /** The declared tables' schema, policies and stamp (`ProvisionOptions.tables`). */
+    tables: boolean;
     realtime: boolean;
     /**
      * `provision: false`: this backend changes nothing in its database. Kept
@@ -551,11 +552,11 @@ function resolveProvision(provision: boolean | ProvisionOptions | undefined): Re
         );
     }
     if (typeof provision === "boolean") {
-        return { database: provision, collections: provision, realtime: provision, off: !provision };
+        return { database: provision, tables: provision, realtime: provision, off: !provision };
     }
     return {
         database: true,
-        collections: provision.collections ?? true,
+        tables: provision.tables ?? true,
         realtime: provision.realtime ?? true,
         off: false
     };
@@ -704,6 +705,12 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         collectionRegistry.setGlobalCallbacks(globalCallbacks);
     }
     let activeCollections: CollectionConfig[] = [...declaredTables.collections];
+    // The B-R7 seam (see `schema/driver-seam.ts`): table-model code decides
+    // from descriptors and names a table to a driver call by its lowered
+    // collection, which it asks for here and reads nothing from. The registry
+    // once the drivers are open; the lowered list before (boot provisioning).
+    const driverCollection: DriverCollectionOf = slug =>
+        collectionRegistry.getRaw(slug) ?? activeCollections.find(collection => collection.slug === slug);
 
     // Before anything copies them. Every registry re-normalizes what it is
     // handed — `normalizeCollection` rebuilds each property as `{ ...property }`
@@ -726,7 +733,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     // Derived from what actually RESOLVED, not from what was configured: a
     // `schemaDir` pointing at nothing declares nothing, and treating that
     // as "declared" would serve an empty API and never look at the database.
-    const introspectCollections = activeCollections.length === 0;
+    const introspectCollections = declaredTables.tables.length === 0;
     // Only the surprising branch is worth a line every boot. Serving what you
     // declared is what a developer already expects; deriving collections from
     // the database because nothing was declared is the state people debug for
@@ -779,30 +786,23 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     // ever ran for managed tenants. An app shipping its own image called
     // `initializeRebaseBackend` directly, got no tables, and served sign-in
     // while 500ing every data route. See ../boot/provision. Whether it runs at
-    // all is `provision.collections`.
+    // all is `provision.tables`.
     // One target per data source, the default first. Each source gets exactly
-    // the collections routed to it: this used to hand every same-engine
-    // collection to the default, so a table for `database("analytics")` was
+    // the tables whose `database` names it: this used to hand every same-engine
+    // table to the default, so a table for `database("analytics")` was
     // created in the default database and the analytics one stayed empty.
     const provisionTargets = provisionTargetsFor(bootstrappers, config.database, config.provisioningDriverResult);
     const provisionTarget = provisionTargets[0];
     const sourceShapes = provisionTargets.map(t => ({ key: t.key ?? DEFAULT_DRIVER_ID, engine: t.engine }));
-    const declaredShapes = declaredDataSources.map(source => ({
-        key: source.key,
-        engine: source.engine ?? provisionTarget.engine
-    }));
-    const provisionableBy = new Map<ProvisionTarget, CollectionConfig[]>();
-    const storedBySome = new Set<CollectionConfig>();
+    const declaredDescriptors = declaredTables.descriptors;
+    const provisionableBy = new Map<ProvisionTarget, TableDescriptor[]>();
+    const storedBySome = new Set<string>();
     for (const target of provisionTargets) {
-        const mine = collectionsStoredBy(
-            activeCollections,
-            { key: target.key ?? DEFAULT_DRIVER_ID, engine: target.engine },
-            declaredShapes.length > 0 ? declaredShapes : sourceShapes
-        );
+        const mine = tablesStoredBy(declaredDescriptors, target.key ?? DEFAULT_DRIVER_ID);
         provisionableBy.set(target, mine);
-        for (const c of mine) storedBySome.add(c);
+        for (const table of mine) storedBySome.add(table.slug);
     }
-    logUnprovisionedCollections(activeCollections, storedBySome, sourceShapes);
+    logUnprovisionedTables(declaredDescriptors, storedBySome, sourceShapes);
     const provisionable = provisionableBy.get(provisionTarget) ?? [];
 
     // Before that first query: ask the database whether it is there at all. The
@@ -812,22 +812,22 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     // it. See `verifyProvisioningConnection`.
     await verifyProvisioningConnection(provisionTarget);
 
-    let schemaOutcome = await provisionCollectionTables(provisionable, provisionTarget, {
+    let schemaOutcome = await provisionTableSchema(provisionable, driverCollection, provisionTarget, {
         introspecting: introspectCollections,
-        provision: provision.collections,
+        provision: provision.tables,
         skipReason: provisionSkipReason
     });
     for (const target of provisionTargets.slice(1)) {
         const mine = provisionableBy.get(target) ?? [];
         if (mine.length === 0) continue;
-        logger.info(`Provisioning ${mine.length} collection table(s) on data source "${target.key}"`);
+        logger.info(`Provisioning ${mine.length} table(s) on data source "${target.key}"`);
         // The same question for every database that gets tables, not only the
         // first: a second source that is down would otherwise fail inside the
         // DDL with the redacted "Failed query" this probe exists to pre-empt.
         await verifyProvisioningConnection(target);
-        const outcome = await provisionCollectionTables(mine, target, {
+        const outcome = await provisionTableSchema(mine, driverCollection, target, {
             introspecting: introspectCollections,
-            provision: provision.collections,
+            provision: provision.tables,
             skipReason: provisionSkipReason
         });
         if (outcome.status === "applied" && schemaOutcome.status === "applied") {
@@ -966,10 +966,6 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     }
     const defaultBootstrapper = bootstrappers.find(b => b.id === defaultDriverId || b.type === defaultDriverId) || bootstrappers[0];
 
-    // The B-R7 seam (see `schema/driver-seam.ts`): table-model code decides
-    // from descriptors and names a table to a driver call by its lowered
-    // collection, which it asks for here and reads nothing from.
-    const driverCollection: DriverCollectionOf = slug => collectionRegistry.getRaw(slug);
     // The unscoped driver of the database a table lives in (`database` on
     // `defineTable`); `undefined` when that source has no driver here.
     const unscopedDriverServing = (table: TableDescriptor): DataDriver | undefined => {
@@ -996,22 +992,21 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     // at boot rather than as mysterious data going to the wrong database.
     {
         const unresolved = new Map<string, string[]>();
-        for (const collection of activeCollections) {
-            const ds = resolveDataSource(collection, dataSourceRegistry);
-            if (ds.transport !== "server") continue; // direct/custom are client-only
-            if (ds.key === DEFAULT_DRIVER_ID) continue; // always maps to the default
-            if (!driverRegistry.has(ds.key)) {
-                const slugs = unresolved.get(ds.key) ?? [];
-                slugs.push(collection.slug ?? collection.name ?? "?");
-                unresolved.set(ds.key, slugs);
+        for (const table of tableRegistry.list()) {
+            const key = table.database;
+            if (key === undefined || key === DEFAULT_DRIVER_ID) continue; // always maps to the default
+            if (!driverRegistry.has(key)) {
+                const slugs = unresolved.get(key) ?? [];
+                slugs.push(table.slug);
+                unresolved.set(key, slugs);
             }
         }
         for (const [key, slugs] of unresolved) {
             logger.warn(
-                `[DataSource] No driver registered for data source "${key}" ` +
-                `(used by: ${slugs.join(", ")}). These collections will fall back to the ` +
-                `default driver "${defaultDriverId}" — register a bootstrapper with this id, ` +
-                `or mark the data source as a direct/custom transport in \`dataSources\`.`
+                `[DataSource] No driver registered for database "${key}" ` +
+                `(used by: ${slugs.join(", ")}). These tables will fall back to the ` +
+                `default driver "${defaultDriverId}" — declare the database in backend/resources.ts ` +
+                `so a bootstrapper with this id is opened.`
             );
         }
     }
@@ -1140,9 +1135,9 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         }
         return target;
     };
-    const policyOutcome = await provisionCollectionPolicies(provisionable, initializedTarget(provisionTarget), {
+    const policyOutcome = await provisionTablePolicies(provisionable, driverCollection, initializedTarget(provisionTarget), {
         introspecting: introspectCollections,
-        provision: provision.collections,
+        provision: provision.tables,
         skipReason: provisionSkipReason
     });
     for (const source of provisionTargets.slice(1)) {
@@ -1153,12 +1148,12 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         // on the default source only. A second database needs them created on
         // its own, or every CREATE POLICY below fails and the source denies
         // every user read while reporting itself healthy.
-        if (provision.collections && !provisioningDisabled() && target.bootstrapper.ensureRlsRuntime) {
+        if (provision.tables && !provisioningDisabled() && target.bootstrapper.ensureRlsRuntime) {
             await target.bootstrapper.ensureRlsRuntime(target.driverResult);
         }
-        await provisionCollectionPolicies(mine, target, {
+        await provisionTablePolicies(mine, driverCollection, target, {
             introspecting: introspectCollections,
-            provision: provision.collections,
+            provision: provision.tables,
             skipReason: provisionSkipReason
         });
     }

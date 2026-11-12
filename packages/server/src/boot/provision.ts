@@ -1,6 +1,6 @@
-import { createDataSourceRegistry, resolveDataSource } from "@rebasepro/common";
 import { DEFAULT_DATA_SOURCE_KEY } from "@rebasepro/types";
-import type { BackendBootstrapper, CollectionConfig, DataDriver, InitializedDriver } from "@rebasepro/types";
+import type { BackendBootstrapper, CollectionConfig, DataDriver, InitializedDriver, TableDescriptor } from "@rebasepro/types";
+import type { DriverCollectionOf } from "../schema/driver-seam";
 
 import { createIdempotencyStore } from "../api/rest/idempotency";
 import { resolveRateLimitStoreKind } from "../auth/resolve-rate-limit-store";
@@ -10,13 +10,13 @@ import { logger } from "../utils/logger";
 import { schemaRecoveryGuidance } from "./version-skew";
 
 /**
- * Boot-time provisioning of collection tables and their RLS policies.
+ * Boot-time provisioning of the declared tables and their RLS policies.
  *
  * This lives outside both boot paths on purpose. It used to live inside
  * `bootFromBundle`, which meant it ran for managed tenants and for nobody else:
  * an app that ships its own image (`runtimeMode: custom`) boots by calling
  * `initializeRebaseBackend` directly and never passes through the bundle path,
- * so its collection tables were never created. That app came up serving sign-in
+ * so its tables were never created. That app came up serving sign-in
  * — auth bootstraps its own tables — and 500ing every `/api/data/*` route, with
  * a green deploy and no failing check anywhere. It stayed that way for weeks.
  *
@@ -145,7 +145,7 @@ export function provisioningDisabled(env: { REBASE_MIGRATE_ON_BOOT?: string } = 
  *
  * Wider than `REBASE_MIGRATE_ON_BOOT=none`, and deliberately a second
  * variable rather than a new meaning for that one. `none` has only ever turned
- * off the *collection* schema; the framework's own tables stayed current on
+ * off the *declared tables'* schema; the framework's own tables stayed current on
  * every boot, and deployments rely on that — the chart's migration-Job
  * topology runs every api pod with `none`. Widening `none` would stop those
  * pods keeping `rebase.*` current on the next upgrade, silently.
@@ -228,7 +228,7 @@ export async function verifyProvisioningConnection(target: ProvisionTarget): Pro
 }
 
 /**
- * Create any collection tables the database is missing, before serving.
+ * Create any declared tables the database is missing, before serving.
  *
  * Additive only: the driver may create missing tables, columns and enum types,
  * and may never drop or rewrite. Destructive changes stay a deliberate
@@ -249,13 +249,14 @@ export async function verifyProvisioningConnection(target: ProvisionTarget): Pro
  * this exists to prevent, and a crash-looping pod with the DDL error in its logs
  * is a far better signal than a running one that silently cannot serve.
  */
-export async function provisionCollectionTables(
-    collections: CollectionConfig[],
+export async function provisionTableSchema(
+    tables: readonly TableDescriptor[],
+    driverCollection: DriverCollectionOf,
     target: ProvisionTarget,
     options: ProvisionRunOptions = {}
 ): Promise<ProvisionOutcome> {
     const skip = (reason: string, level: "info" | "warn" = "info"): ProvisionOutcome => {
-        logger[level](`Collection schema: skipped — ${reason}`);
+        logger[level](`Table schema: skipped — ${reason}`);
         return { status: "skipped",
 reason };
     };
@@ -271,14 +272,14 @@ reason };
     if (provisioningDisabled(options.env ?? process.env)) {
         return skip("REBASE_MIGRATE_ON_BOOT=none, leaving the database schema untouched.");
     }
-    // A project that declared no collections reads them FROM the database, so
+    // A project that declared no tables reads them FROM the database, so
     // there is nothing to create and creating anything would push a schema into
     // a database it was only meant to read.
     if (options.introspecting) {
-        return skip("this project declares no collections, so they are read from the database rather than from code.");
+        return skip("this project declares no tables, so they are read from the database rather than from code.");
     }
-    if (collections.length === 0) {
-        return skip("no collections resolved for this data source.");
+    if (tables.length === 0) {
+        return skip("no tables are stored by this data source.");
     }
     if (!target.bootstrapper.ensureCollectionSchema) {
         // What is missing is the method on the ADAPTER — the only object boot
@@ -289,16 +290,16 @@ reason };
         // version problem, so naming versions points at the wrong suspect two
         // times in three.
         return skip(
-            `${describeAdapter(target)} does not expose collection-table creation. ` +
+            `${describeAdapter(target)} does not expose table creation. ` +
                 "The driver package may well implement it on a class the adapter does not forward, so check the adapter's shape before blaming its version. " +
-                "Collection tables will NOT be created, so every /api/data route will fail on a missing relation.\n" +
+                "The declared tables will NOT be created, so every /api/data route will fail on a missing relation.\n" +
                 schemaRecoveryGuidance(),
             "warn"
         );
     }
 
     const { applied } = await target.bootstrapper.ensureCollectionSchema(
-        collections,
+        loweredFor(tables, driverCollection),
         target.driverResult as InitializedDriver,
         message => logger.debug(`schema: ${message}`)
     );
@@ -308,15 +309,24 @@ reason };
     if (applied > 0) {
         logger.info(`Applied ${applied} additive schema change(s) before boot.`);
     } else {
-        logger.debug("Collection schema is up to date.");
+        logger.debug("Table schema is up to date.");
     }
     return { status: "applied",
 applied };
 }
 
 /**
- * Apply the collections' RLS policies — the companion to
- * {@link provisionCollectionTables}, which creates the tables this makes
+ * What the driver's provisioning calls (`ensureCollectionSchema`,
+ * `ensureCollectionPolicies`) are handed for these tables: the collections
+ * they were lowered into, through the B-R7 seam (see `DriverCollectionOf`).
+ */
+function loweredFor(tables: readonly TableDescriptor[], driverCollection: DriverCollectionOf): CollectionConfig[] {
+    return tables.flatMap(table => driverCollection(table.slug) ?? []);
+}
+
+/**
+ * Apply the declared tables' RLS policies — the companion to
+ * {@link provisionTableSchema}, which creates the tables this makes
  * servable.
  *
  * Runs after auth is initialized, not alongside table creation: the generated
@@ -327,11 +337,12 @@ applied };
  * The benign gates return quietly here rather than logging the same reason
  * twice: table provisioning already ran on this same boot and explained itself.
  * The one thing this does say out loud is a driver that created tables but
- * cannot apply policies — that is the difference between a served collection and
+ * cannot apply policies — that is the difference between a served table and
  * a 401, and it must not pass in silence.
  */
-export async function provisionCollectionPolicies(
-    collections: CollectionConfig[],
+export async function provisionTablePolicies(
+    tables: readonly TableDescriptor[],
+    driverCollection: DriverCollectionOf,
     target: ProvisionTarget,
     options: ProvisionRunOptions = {}
 ): Promise<ProvisionOutcome> {
@@ -340,23 +351,23 @@ export async function provisionCollectionPolicies(
         // policy is not a missing table: routes answer 200 with zero rows rather
         // than 500, so nothing else in the logs will point here.
         logger.info(options.skipReason
-            ? `Collection RLS policies: not applied — ${options.skipReason}`
-            : "Collection RLS policies: not applied by this process — another process in this deployment owns them.");
+            ? `Table RLS policies: not applied — ${options.skipReason}`
+            : "Table RLS policies: not applied by this process — another process in this deployment owns them.");
         return { status: "skipped", reason: options.skipReason ?? "another process provisions" };
     }
     if (provisioningDisabled(options.env ?? process.env)) {
         return { status: "skipped", reason: "REBASE_MIGRATE_ON_BOOT=none" };
     }
-    if (options.introspecting) return { status: "skipped", reason: "collections are introspected" };
-    if (collections.length === 0) return { status: "skipped", reason: "no collections" };
+    if (options.introspecting) return { status: "skipped", reason: "tables are introspected" };
+    if (tables.length === 0) return { status: "skipped", reason: "no tables" };
 
     if (!target.bootstrapper.ensureCollectionPolicies) {
         // Whether "no RLS" means denied or exposed depends on the driver, so the
         // wording does not promise either.
         const reason = `${describeAdapter(target)} does not apply RLS policies at boot`;
         logger.warn(
-            `Collection policies: skipped — ${reason}. ` +
-                "Collections are not row-secured until policies are applied — depending on the " +
+            `Table policies: skipped — ${reason}. ` +
+                "Tables are not row-secured until policies are applied — depending on the " +
                 "driver's grants that means reads are denied or that they are unfiltered. " +
                 "Do not serve traffic until this is resolved.\n" +
                 schemaRecoveryGuidance()
@@ -366,7 +377,7 @@ reason };
     }
 
     const { applied } = await target.bootstrapper.ensureCollectionPolicies(
-        collections,
+        loweredFor(tables, driverCollection),
         target.driverResult as InitializedDriver,
         message => logger.debug(`policies: ${message}`)
     );
@@ -380,78 +391,47 @@ applied };
 }
 
 /**
- * The collections one data source is the store for.
+ * The tables one data source is the store for: those whose `database` names
+ * it, or the default source's when they name none.
  *
- * A project's collections directory holds *every* collection it declares,
- * whatever source serves it — that is the point of `dataSource` routing. What
- * it is not is a list of tables for the primary to create. This used to
- * filter by *engine*, so a collection routed to a second Postgres database
- * was handed to the default one: its table was created where nothing would
- * ever read it, and the database it was routed to never got one. Every query
- * against `database("analytics")` then failed on a missing relation behind a
- * boot that had reported the schema up to date.
- *
- * So: a collection belongs to the source its `dataSource` names, or to the
- * default when it names none. The engine check stays as a guard — a
- * collection that declares an `engine` other than this source's is never its
- * table, whatever key it names — and a source of a different engine still
- * gets nothing that is not explicitly its own.
- *
- * Takes the shapes it actually reads rather than an `InitializedDataSource`, so
- * the path that has data sources and the path that has only an adapter can share
- * one implementation instead of growing a second one that drifts.
+ * A project's schema holds *every* table it declares, whatever database stores
+ * it — that is the point of `database("analytics")`. What it is not is a list
+ * of tables for the primary to create: handing the default a table routed to a
+ * second Postgres database once created it where nothing would ever read it,
+ * while the database it was routed to never got one, and every query against
+ * it failed on a missing relation behind a boot that had reported the schema
+ * up to date.
  */
-export function collectionsStoredBy(
-    collections: CollectionConfig[],
-    source: { key: string; engine: string },
-    dataSources: Array<{ key: string; engine: string }>
-): CollectionConfig[] {
-    const registry = createDataSourceRegistry(
-        dataSources.map(s => ({ key: s.key, engine: s.engine }))
-    );
-    return collections.filter(collection => {
-        const routedTo = collection.dataSource ?? DEFAULT_DATA_SOURCE_KEY;
-        if (routedTo !== source.key) return false;
-        // The collection's own `engine` is read first, and `resolveDataSource`
-        // is not asked to settle it: that function lets a registered definition
-        // override the collection's engine, which is the right precedence for
-        // *routing* and the wrong one here — a collection declaring
-        // `engine: "firestore"` and no `dataSource` would come back as the
-        // default source's "postgres" and be provisioned as a table.
-        const declared = collection.engine
-            ?? (collection.dataSource ? resolveDataSource(collection, registry).engine : undefined);
-        if (!declared) return true;
-        return declared === source.engine;
-    });
+export function tablesStoredBy(tables: readonly TableDescriptor[], sourceKey: string): TableDescriptor[] {
+    return tables.filter(table => (table.database ?? DEFAULT_DATA_SOURCE_KEY) === sourceKey);
 }
 
 /**
  * Say what no source provisions, so a missing table is never a silent one.
  *
- * Every collection should be stored by exactly one of the sources handed in.
- * One that none claims — routed to a key no source has, or declaring an
- * engine none of them runs — is logged here by name rather than left to fail
- * on its first request.
+ * Every table should be stored by exactly one of the sources handed in. One
+ * that none claims — its `database` names a key no source has — is logged here
+ * by name rather than left to fail on its first request.
  */
-export function logUnprovisionedCollections(
-    all: CollectionConfig[],
-    storedBySome: Set<CollectionConfig>,
+export function logUnprovisionedTables(
+    all: readonly TableDescriptor[],
+    storedBySome: ReadonlySet<string>,
     sources: Array<{ key: string; engine: string }>
 ): void {
-    const orphans = all.filter(c => !storedBySome.has(c));
+    const orphans = all.filter(table => !storedBySome.has(table.slug));
     if (orphans.length === 0) return;
     logger.warn(
-        `${orphans.length} collection(s) are stored by none of the data sources this process opened ` +
-            `(${sources.map(s => `${s.key}: ${s.engine}`).join(", ")}): ` +
-            `${orphans.map(c => `${c.slug}${c.dataSource ? ` → ${c.dataSource}` : ""}`).join(", ")}. ` +
-            "No table is created for them here; a source reached by a provider SDK manages its own."
+        `${orphans.length} table(s) are stored by none of the data sources this process opened ` +
+            `(${sources.map(source => `${source.key}: ${source.engine}`).join(", ")}): ` +
+            `${orphans.map(table => `${table.slug}${table.database ? ` → ${table.database}` : ""}`).join(", ")}. ` +
+            "No table is created for them here: declare the database in backend/resources.ts, or fix the table's `database`."
     );
 }
 
 /**
  * Which bootstrapper provisions, and what to call it in a message.
  *
- * The default source is the one that stores this project's collections, so it
+ * The default source is the one that stores this project's tables, so it
  * is the one asked to create them; `dataSources[0]` is the bundle path's
  * equivalent of the same choice.
  *

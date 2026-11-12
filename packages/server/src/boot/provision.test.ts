@@ -1,10 +1,11 @@
 import { describe, expect, it, beforeEach, afterEach, jest } from "@jest/globals";
-import type { CollectionConfig, InitializedDriver } from "@rebasepro/types";
+import type { InitializedDriver } from "@rebasepro/types";
 import { fakeBootstrapper, fakeDataDriver } from "../../test/helpers/server-b-fakes";
+import { plainTable, servedTablesFor } from "../../test/helpers/tables";
 
 import {
-    provisionCollectionPolicies,
-    provisionCollectionTables,
+    provisionTablePolicies,
+    provisionTableSchema,
     provisionTargetFor,
     resolveProvisionEnv,
     verifyProvisioningConnection,
@@ -31,7 +32,10 @@ let infoSpy: ReturnType<typeof jest.spyOn>;
 let warnSpy: ReturnType<typeof jest.spyOn>;
 let debugSpy: ReturnType<typeof jest.spyOn>;
 
-const collection = (slug: string): CollectionConfig => ({ slug, name: slug, table: slug, properties: {} });
+/** `posts` as the boot hands it to provisioning: its descriptor, and the seam naming it to the driver. */
+const served = servedTablesFor([plainTable("posts")]);
+const posts = served.tables[0].descriptor;
+const lowered = served.driverCollection;
 
 /** A target whose driver can create tables, unless told otherwise. */
 function target(over: Partial<ProvisionTarget> = {}): ProvisionTarget {
@@ -74,9 +78,9 @@ afterEach(() => {
     jest.restoreAllMocks();
 });
 
-describe("provisionCollectionTables — every exit says why", () => {
+describe("provisionTableSchema — every exit says why", () => {
     it("names the opt-out when REBASE_MIGRATE_ON_BOOT=none", async () => {
-        const outcome = await provisionCollectionTables([collection("posts")], target(), {
+        const outcome = await provisionTableSchema([posts], lowered, target(), {
             env: { REBASE_MIGRATE_ON_BOOT: "none" }
         });
 
@@ -86,7 +90,7 @@ describe("provisionCollectionTables — every exit says why", () => {
     });
 
     it("explains an introspecting project rather than skipping in silence", async () => {
-        const outcome = await provisionCollectionTables([], target(), { introspecting: true, env: {} });
+        const outcome = await provisionTableSchema([], lowered, target(), { introspecting: true, env: {} });
 
         expect(logged()).toContain("read from the database");
         expect(outcome.status).toBe("skipped");
@@ -94,16 +98,16 @@ describe("provisionCollectionTables — every exit says why", () => {
         expect(warnSpy).not.toHaveBeenCalled();
     });
 
-    it("explains an empty collection list", async () => {
-        const outcome = await provisionCollectionTables([], target(), { env: {} });
+    it("explains an empty table list", async () => {
+        const outcome = await provisionTableSchema([], lowered, target(), { env: {} });
 
-        expect(logged()).toContain("no collections");
+        expect(logged()).toContain("no tables");
         expect(outcome.status).toBe("skipped");
     });
 
     it("blames the adapter, not the driver package, for the missing method", async () => {
-        const outcome = await provisionCollectionTables(
-            [collection("posts")],
+        const outcome = await provisionTableSchema(
+            [posts], lowered,
             target({ bootstrapper: {} }),
             { env: {} }
         );
@@ -122,12 +126,12 @@ describe("provisionCollectionTables — every exit says why", () => {
     });
 });
 
-describe("provisionCollectionTables — the path that does the work", () => {
+describe("provisionTableSchema — the path that does the work", () => {
     it("applies the driver's changes and reports the count", async () => {
         const ensure = jest.fn(async () => ({ applied: 2 }));
 
-        const outcome = await provisionCollectionTables(
-            [collection("posts")],
+        const outcome = await provisionTableSchema(
+            [posts], lowered,
             target({ bootstrapper: { ensureCollectionSchema: ensure } }),
             { env: {} }
         );
@@ -146,7 +150,7 @@ describe("provisionCollectionTables — the path that does the work", () => {
     // at `debug`, where a diagnosis will find it and a first boot will not be
     // padded by it.
     it("records that the schema is already up to date, below the default level", async () => {
-        await provisionCollectionTables([collection("posts")], target(), { env: {} });
+        await provisionTableSchema([posts], lowered, target(), { env: {} });
 
         expect(logged()).toContain("up to date");
         expect(loggedAtDefaultLevel()).not.toContain("up to date");
@@ -199,8 +203,8 @@ describe("the driver result the schema hooks pass", () => {
             return { applied: 1 };
         });
 
-        await provisionCollectionTables(
-            [collection("posts")],
+        await provisionTableSchema(
+            [posts], lowered,
             target({
                 bootstrapper: { ensureCollectionSchema: ensure },
                 driverResult: { driver: fakeDataDriver(), internals: { db } }
@@ -221,8 +225,8 @@ describe("the driver result the schema hooks pass", () => {
             return { applied: 4 };
         });
 
-        await provisionCollectionPolicies(
-            [collection("posts")],
+        await provisionTablePolicies(
+            [posts], lowered,
             target({
                 bootstrapper: { ensureCollectionPolicies: ensure },
                 driverResult: { driver: fakeDataDriver(), internals: { db } }
@@ -245,8 +249,8 @@ describe("the driver result the schema hooks pass", () => {
             return { applied: 3 };
         });
 
-        const outcome = await provisionCollectionTables(
-            [collection("posts")],
+        const outcome = await provisionTableSchema(
+            [posts], lowered,
             target({
                 bootstrapper: { ensureCollectionSchema: ensure },
                 driverResult: undefined
@@ -328,7 +332,7 @@ describe("provisioning ownership", () => {
     it("runs no schema DDL, and says which process owns it", async () => {
         const t = target();
 
-        const outcome = await provisionCollectionTables([collection("posts")], t, { provision: false });
+        const outcome = await provisionTableSchema([posts], lowered, t, { provision: false });
 
         expect(t.bootstrapper.ensureCollectionSchema).not.toHaveBeenCalled();
         expect(outcome.status).toBe("skipped");
@@ -338,7 +342,7 @@ describe("provisioning ownership", () => {
     it("applies no policies, and says so at the default level", async () => {
         const t = target();
 
-        const outcome = await provisionCollectionPolicies([collection("posts")], t, { provision: false });
+        const outcome = await provisionTablePolicies([posts], lowered, t, { provision: false });
 
         expect(t.bootstrapper.ensureCollectionPolicies).not.toHaveBeenCalled();
         expect(outcome.status).toBe("skipped");
@@ -348,17 +352,17 @@ describe("provisioning ownership", () => {
     it("provisions when the option is absent — the default must not move", async () => {
         const t = target();
 
-        await provisionCollectionTables([collection("posts")], t, { env: {} });
+        await provisionTableSchema([posts], lowered, t, { env: {} });
 
         expect(t.bootstrapper.ensureCollectionSchema).toHaveBeenCalled();
     });
 
     it("names the reason it is given, so a backend that provisions nothing does not blame another process", async () => {
-        await provisionCollectionTables([collection("posts")], target(), {
+        await provisionTableSchema([posts], lowered, target(), {
             provision: false,
             skipReason: "this backend changes nothing in its database"
         });
-        await provisionCollectionPolicies([collection("posts")], target(), {
+        await provisionTablePolicies([posts], lowered, target(), {
             provision: false,
             skipReason: "this backend changes nothing in its database"
         });
@@ -371,7 +375,7 @@ describe("provisioning ownership", () => {
         // The two opt-outs answer different questions and must not be collapsed:
         // an operator reading "another process owns it" on a deployment that has
         // exactly one process would go looking for a process that never existed.
-        await provisionCollectionTables([collection("posts")], target(), {
+        await provisionTableSchema([posts], lowered, target(), {
             provision: true,
             env: { REBASE_MIGRATE_ON_BOOT: "none" }
         });

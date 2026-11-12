@@ -67,7 +67,7 @@ export type RebaseBackendInstance = RebaseBackend;
  *     ...options,
  *     provision: !resolveProvisionEnv(process.env)
  *         ? false
- *         : provisionSchema === false ? { collections: false, realtime: false } : true
+ *         : provisionSchema === false ? { tables: false, realtime: false } : true
  * });
  * setDefaultBackend(backend);
  * backend.mount(app, { basePath });
@@ -108,7 +108,7 @@ export async function initializeRebaseBackend(config: RebaseBackendConfig): Prom
         // changed by something else, and only read here.
         provision: !resolveProvisionEnv(process.env)
             ? false
-            : provisionSchema === false ? { collections: false, realtime: false } : true
+            : provisionSchema === false ? { tables: false, realtime: false } : true
     });
 
     // The process serves this one backend, so the module-level API answers
