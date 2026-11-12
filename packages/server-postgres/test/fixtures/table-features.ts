@@ -79,5 +79,26 @@ export const keyed = defineTable("keyed", {
     rls: "admin-only"
 });
 
+/** `col.array(inner)` of every scalar element type. */
+export const lists = defineTable("lists", {
+    columns: {
+        id: col.uuid().primaryKey().defaultRandom(),
+        ids: col.array(col.uuid()),
+        counts: col.array(col.bigint()),
+        smalls: col.array(col.smallint()),
+        numbers: col.array(col.integer()),
+        amounts: col.array(col.numeric(8, 2)),
+        ratios: col.array(col.doublePrecision()),
+        labels: col.array(col.enum(["red", "green", "blue"])),
+        codes: col.array(col.varchar(5)),
+        words: col.array(col.text()),
+        flags: col.array(col.boolean()),
+        days: col.array(col.date()),
+        instants: col.array(col.timestamptz()),
+        times: col.array(col.time())
+    },
+    rls: "admin-only"
+});
+
 /** Every table, in an order that declares a target before what points at it. */
-export const TABLE_FEATURES = [people, counters, tallies, codes, initials, grades, days, switches, prices, tickets, slugs, pairs, keyed];
+export const TABLE_FEATURES = [people, counters, tallies, codes, initials, grades, days, switches, prices, tickets, slugs, pairs, keyed, lists];

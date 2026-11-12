@@ -124,10 +124,6 @@ export interface PendingTableFeature {
  */
 export const PENDING_TABLE_FEATURES = [
     {
-        id: "array-element-type",
-        description: "`col.array()` of an element other than `col.text()`, `col.integer()`, `col.boolean()` or an unparameterised `col.numeric()`. The planner emits `text[]`, `integer[]`, `boolean[]` and `numeric[]` only."
-    },
-    {
         id: "array-element-modifiers",
         description: "An array element declaring more than `.validate()`, `.oneOf()`, storage or `.transform()` (a default, `.notNull()`, `.unique()`, access…). Those apply to a column, not to the items of one."
     },
@@ -1143,7 +1139,12 @@ function lowerDocumentColumn(def: ColumnDef, kind: "json" | "jsonb", base: BaseF
     return pending(ctx.at, "json-document-shape");
 }
 
-/** The element types a Postgres array column may have, and the `columnType` naming each. */
+/**
+ * The legacy `columnType` of the array columns the legacy shape names. Every
+ * other scalar element (`uuid[]`, `bigint[]`, an enum array, `varchar(n)[]`,
+ * `date[]`, …) is planned from the definition and has no legacy name; its
+ * items are described by `of` for the runtime's codec.
+ */
 const ARRAY_COLUMN_TYPES: Partial<Record<ColumnType["kind"], NonNullable<ArrayProperty["columnType"]>>> = {
     text: "text[]",
     integer: "integer[]",
@@ -1151,19 +1152,31 @@ const ARRAY_COLUMN_TYPES: Partial<Record<ColumnType["kind"], NonNullable<ArrayPr
     numeric: "numeric[]"
 };
 
+/**
+ * Element types an array column does not take: a JSON document or a vector is
+ * a list already (a list of documents is `col.jsonb(json.array(…))`), and a
+ * `bytea` item would need a binary codec per element that nothing implements.
+ */
+const NON_ELEMENT_KINDS: ReadonlySet<ColumnType["kind"]> = new Set(["json", "jsonb", "vector", "bytea", "array", "other"]);
+
 function lowerArrayColumn(def: ColumnDef, of: ColumnType, base: BaseFields, ctx: ColumnContext): ArrayProperty {
     const { at } = ctx;
-    const columnType = ARRAY_COLUMN_TYPES[of.kind];
-    if (columnType === undefined || (of.kind === "numeric" && (of.precision !== undefined || of.scale !== undefined))) {
-        return pending(at, "array-element-type");
-    }
     const element = def.element;
+    if (NON_ELEMENT_KINDS.has(of.kind) || element?.semantic === "geopoint") {
+        return refuse(
+            at,
+            `is \`col.array()\` of ${element?.semantic === "geopoint" ? "geopoints" : `\`${columnTypeLabel(of)}\``}, which is not an ` +
+            "element type of a Postgres array column here. An array column holds scalars — text, uuid, numbers, " +
+            "booleans, dates, enums; a list of documents, points or vectors is `col.jsonb(json.array(…))`."
+        );
+    }
+    const legacyName = of.kind === "numeric" && (of.precision !== undefined || of.scale !== undefined) ? undefined : ARRAY_COLUMN_TYPES[of.kind];
     if (element && (element.notNull || element.unique || element.primaryKey || element.default !== undefined
         || element.generatedAs !== undefined || element.readOnly || element.private || element.access !== undefined
         || element.stamp !== undefined || element.json !== undefined || element.vectorIndex !== undefined)) {
         pending(at, "array-element-modifiers");
     }
-    const property: ArrayProperty = { type: "array", ...base, columnType };
+    const property: ArrayProperty = { type: "array", ...base, ...(legacyName !== undefined ? { columnType: legacyName } : {}) };
     property.of = arrayElementProperty(of, element, def.storage, ctx);
     const validation = arrayValidation(flagsOf(def), def.validate, at);
     if (validation) property.validation = validation;
@@ -1177,8 +1190,10 @@ function arrayElementProperty(of: ColumnType, element: ColumnDef | undefined, st
     const common: { description?: string; callbacks?: PropertyCallbacks } = {};
     if (element?.description !== undefined) common.description = element.description;
     if (element?.transform !== undefined) common.callbacks = lowerTransform(element.transform, ctx.slug, ctx.describe);
-    if (of.kind === "text") {
+    if (of.kind === "text" || of.kind === "varchar" || of.kind === "char" || of.kind === "uuid" || of.kind === "enum") {
         const property: StringProperty = { type: "string", ...common };
+        if (of.kind !== "text" && of.kind !== "enum") property.columnType = of.kind;
+        if (of.kind === "enum") property.enum = enumValues(of.values);
         const elementStorage = element?.storage ?? storage;
         if (elementStorage !== undefined) property.storage = lowerStorage(elementStorage);
         if (element?.oneOf !== undefined) property.enum = enumValues(element.oneOf.map(String));
@@ -1189,6 +1204,14 @@ function arrayElementProperty(of: ColumnType, element: ColumnDef | undefined, st
         return property;
     }
     if (of.kind === "boolean") return { type: "boolean", ...common, ...baseValidation(NO_FLAGS, element?.validate, at) };
+    if (of.kind === "timestamptz" || of.kind === "date" || of.kind === "time") {
+        // Each item read and written as a date column of that type is.
+        const property: DateProperty = { type: "date", ...common };
+        if (of.kind !== "timestamptz") property.columnType = of.kind;
+        const validation = dateValidation(NO_FLAGS, element?.validate, at);
+        if (validation) property.validation = validation;
+        return property;
+    }
     const property: NumberProperty = { type: "number", ...common };
     if (element?.oneOf !== undefined) property.enum = enumValues(element.oneOf);
     const validation = numberValidation(NO_FLAGS, element?.validate, at);

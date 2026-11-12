@@ -163,6 +163,14 @@ describe("lowerTables — columns", () => {
         ["col.array(integer)", col.array(col.integer().validate({ min: 0 })), { type: "array", columnType: "integer[]", of: { type: "number", validation: { min: 0 } } }],
         ["col.array(boolean)", col.array(col.boolean()), { type: "array", columnType: "boolean[]", of: { type: "boolean" } }],
         ["col.array(numeric)", col.array(col.numeric()).default([1]), { type: "array", columnType: "numeric[]", of: { type: "number" }, defaultValue: [1] }],
+        ["col.array(uuid) has no legacy column type; its items say what they are", col.array(col.uuid()), { type: "array", of: { type: "string", columnType: "uuid" } }],
+        ["col.array(enum)", col.array(col.enum(["red", "green"])), { type: "array", of: { type: "string", enum: [{ id: "red", label: "red" }, { id: "green", label: "green" }] } }],
+        ["col.array(varchar(n))", col.array(col.varchar(5).validate({ min: 1 })), { type: "array", of: { type: "string", columnType: "varchar", validation: { min: 1 } } }],
+        ["col.array(bigint)", col.array(col.bigint()), { type: "array", of: { type: "number" } }],
+        ["col.array(numeric(p, s))", col.array(col.numeric(8, 2)), { type: "array", of: { type: "number" } }],
+        ["col.array(date)", col.array(col.date()), { type: "array", of: { type: "date", columnType: "date" } }],
+        ["col.array(timestamptz)", col.array(col.timestamptz()), { type: "array", of: { type: "date" } }],
+        ["col.array(time)", col.array(col.time()), { type: "array", of: { type: "date", columnType: "time" } }],
         ["geopoint", col.geopoint().default({ latitude: 1, longitude: 2 }), { type: "geopoint", defaultValue: { latitude: 1, longitude: 2 } }],
         ["vector", col.vector(3), { type: "vector", dimensions: 3 }],
         ["vector index, `ip` is `inner_product`", col.vector(3, { index: { method: "hnsw", metric: ["cosine", "ip"], m: 8, efConstruction: 32 } }),
@@ -608,7 +616,6 @@ describe("lowerTables — refusals", () => {
 
     /** One definition per pending feature, each refused with that feature's id. */
     const PENDING: Record<PendingTableFeatureId, () => (AnyTableDef | AnyViewDef)[]> = {
-        "array-element-type": () => [defineTable("t", { columns: { id, a: col.array(col.uuid()) }, rls: "admin-only" })],
         "array-element-modifiers": () => [defineTable("t", { columns: { id, a: col.array(col.text().notNull()) }, rls: "admin-only" })],
         "enum-type-name": () => [defineTable("t", { columns: { id, s: col.enum(["a"], { name: "shared_status" }) }, rls: "admin-only" })],
         "text-one-of": () => [defineTable("t", { columns: { id, s: col.text().oneOf(["a", "b"]) }, rls: "admin-only" })],
@@ -662,6 +669,23 @@ describe("lowerTables — refusals", () => {
             expect.stringMatching(/^t\.k: is `\.primaryKey\(\)` on a `vector\(3\)` column/),
             expect.stringMatching(/^t\.k: is `\.primaryKey\(\)` on a `bytea` column/),
             expect.stringMatching(/^t\.k: is `\.primaryKey\(\)` on a `text\[\]` column/)
+        ]);
+    });
+
+    it("refuses an array of something that is no array element: a document, a point, a vector, binary data", () => {
+        const holding = (items: Parameters<typeof lowerColumn>[0]): AnyTableDef =>
+            defineTable("t", { columns: { id, a: items }, rls: "admin-only" });
+        const problems = refusal(() => lowerTables([
+            holding(col.array(col.jsonb())),
+            holding(col.array(col.geopoint())),
+            holding(col.array(col.vector(3))),
+            holding(col.array(col.bytea()))
+        ]));
+        expect(problems).toEqual([
+            expect.stringMatching(/^t\.a: is `col\.array\(\)` of `jsonb`, which is not an element type/),
+            expect.stringMatching(/^t\.a: is `col\.array\(\)` of geopoints/),
+            expect.stringMatching(/^t\.a: is `col\.array\(\)` of `vector\(3\)`/),
+            expect.stringMatching(/^t\.a: is `col\.array\(\)` of `bytea`/)
         ]);
     });
 

@@ -25,8 +25,11 @@ import type { ColumnPlan, SchemaPlan, TablePlan } from "../src/schema/plan/types
 import { ensureCollectionTables, type Queryable } from "../src/schema/ensure-collection-tables";
 import { withPinnedPlannerWorld } from "../src/schema/render-outputs";
 import { assertWritableColumns } from "../src/services/collection-helpers";
+import { readCatalogueSchema } from "../src/schema/catalogue-schema";
+import { parsePropertyFromServer, serializePropertyToServer } from "../src/data-transformer";
+import { drizzle } from "drizzle-orm/pglite";
 import {
-    TABLE_FEATURES, codes, counters, days, grades, initials, keyed, pairs, people, prices, slugs, switches, tallies, tickets
+    TABLE_FEATURES, codes, counters, days, grades, initials, keyed, lists, pairs, people, prices, slugs, switches, tallies, tickets
 } from "./fixtures/table-features";
 
 const PACKAGE_ROOT = path.resolve(__dirname, "..");
@@ -90,9 +93,9 @@ function compileDiagnostics(source: string): string[] {
     }
 }
 
-const queryable = (db: PGlite): Queryable => ({
-    query: async <T = unknown>(statement: string) => {
-        const result = await db.query<T>(statement);
+const queryable = (db: PGlite): Queryable & { query<T = unknown>(statement: string, values?: unknown[]): Promise<{ rows: T[] }> } => ({
+    query: async <T = unknown>(statement: string, values?: unknown[]) => {
+        const result = await db.query<T>(statement, values);
         return { rows: result.rows };
     }
 });
@@ -282,5 +285,88 @@ describe("table features: every scalar key type, and the links into it", () => {
             rls: "admin-only"
         });
         expect(() => planOf([pairs, into])).toThrow(/composite key/);
+    });
+});
+
+describe("table features: `col.array(inner)` of every scalar element type", () => {
+    it("plans an array of the element's own type, an enum array typed by its own enum", () => {
+        const plan = planOf([lists]);
+        const typeOf = (column: string) => columnOf(plan, "lists", column).type;
+        expect(typeOf("ids")).toEqual({ kind: "array", of: { kind: "uuid" } });
+        expect(typeOf("counts")).toEqual({ kind: "array", of: { kind: "bigint" } });
+        expect(typeOf("smalls")).toEqual({ kind: "array", of: { kind: "smallint" } });
+        expect(typeOf("amounts")).toEqual({ kind: "array", of: { kind: "numeric", precision: 8, scale: 2 } });
+        expect(typeOf("labels")).toEqual({
+            kind: "array",
+            of: { kind: "enum", schema: "public", name: "lists_labels", varName: "listsLabels", labels: ["red", "green", "blue"] }
+        });
+        expect(typeOf("codes")).toEqual({ kind: "array", of: { kind: "varchar", length: 5 } });
+        expect(typeOf("days")).toEqual({ kind: "array", of: { kind: "date" } });
+        expect(typeOf("instants")).toEqual({ kind: "array", of: { kind: "timestamptz" } });
+        expect(plan.enums).toEqual([expect.objectContaining({ name: "lists_labels", labels: ["red", "green", "blue"] })]);
+    });
+
+    it("renders `T[]` in the DDL and `.array()` on the element's builder in the Drizzle file", () => {
+        const ddl = ddlOf([lists]);
+        expect(ddl).toContain("CREATE TYPE \"public\".\"lists_labels\" AS ENUM ('red', 'green', 'blue');");
+        expect(ddlLine(ddl, "ids")).toBe("\"ids\" UUID[],");
+        expect(ddlLine(ddl, "counts")).toBe("\"counts\" BIGINT[],");
+        expect(ddlLine(ddl, "amounts")).toBe("\"amounts\" NUMERIC(8, 2)[],");
+        expect(ddlLine(ddl, "labels")).toBe("\"labels\" \"public\".\"lists_labels\"[],");
+        expect(ddlLine(ddl, "codes")).toBe("\"codes\" VARCHAR(5)[],");
+        expect(ddlLine(ddl, "instants")).toBe("\"instants\" TIMESTAMP WITH TIME ZONE[],");
+        const drizzle = drizzleOf([lists]);
+        expect(drizzleLine(drizzle, "ids")).toBe("ids: uuid(\"ids\").array(),");
+        expect(drizzleLine(drizzle, "counts")).toBe("counts: bigint(\"counts\", { mode: \"number\" }).array(),");
+        expect(drizzleLine(drizzle, "labels")).toBe("labels: listsLabels(\"labels\").array(),");
+        expect(drizzleLine(drizzle, "codes")).toBe("codes: varchar(\"codes\", { length: 5 }).array(),");
+        expect(drizzleLine(drizzle, "days")).toBe("days: date(\"days\", { mode: 'string' }).array(),");
+    });
+
+    it("round-trips every element type through the runtime's codec and its catalogue-built table", async () => {
+        const db = new PGlite();
+        try {
+            await db.waitReady;
+            await db.exec(ddlOf([lists]));
+            const [collection] = lowered([lists]);
+            const catalogue = await readCatalogueSchema({ client: queryable(db), collections: [collection], defaultSchema: "public" });
+            const table = catalogue.tables.lists;
+            const orm = drizzle(db, { schema: catalogue.tables });
+
+            const written: Record<string, unknown> = {
+                ids: ["a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"],
+                counts: [1, 9007199254740991],
+                smalls: [3, -4],
+                numbers: [5, 6],
+                amounts: [1.5, 2.25],
+                ratios: [0.5],
+                labels: ["green", "red"],
+                codes: ["ab", "cde"],
+                words: ["it's", "a \"word\""],
+                flags: [true, false],
+                days: ["2026-01-02"],
+                instants: ["2026-01-02T10:00:00.000Z"],
+                times: ["09:30:00"]
+            };
+            const values: Record<string, unknown> = {};
+            for (const [key, value] of Object.entries(written)) {
+                values[key] = serializePropertyToServer(value, collection.properties[key], key);
+            }
+            const [row] = await orm.insert(table).values(values).returning();
+            const read: Record<string, unknown> = {};
+            for (const key of Object.keys(written)) {
+                read[key] = parsePropertyFromServer(row[key], collection.properties[key], collection, key);
+            }
+            // Each item comes back as a scalar column of its type does.
+            const date = (iso: string) => ({ __type: "date", value: iso });
+            expect(read).toEqual({
+                ...written,
+                days: [date("2026-01-02T00:00:00.000Z")],
+                instants: [date("2026-01-02T10:00:00.000Z")],
+                times: [date("1970-01-01T09:30:00.000Z")]
+            });
+        } finally {
+            await db.close();
+        }
     });
 });
