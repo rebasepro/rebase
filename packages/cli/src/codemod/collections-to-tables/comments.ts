@@ -27,6 +27,7 @@ import { memberOf, postDeclarationAssignments, resolveArray, resolveObject, toPo
 import type { CollectionEntry } from "./plan-context";
 import { dedent, reindent } from "./print-js";
 import { COLLECTION_ADMIN_DESTINATIONS } from "./vocabulary";
+import { own } from "./own";
 
 /** Where a comment goes. */
 export interface CommentTarget {
@@ -205,13 +206,13 @@ export function collectComments(ctx: AstContext, entry: CollectionEntry, def: An
             if (!object) return;
             for (const option of object.getProperties()) {
                 const nameNode = "getNameNode" in option ? option.getNameNode() : undefined;
-                const destination = nameNode ? COLLECTION_ADMIN_DESTINATIONS[nameNode.getText()] : undefined;
+                const destination = nameNode ? own(COLLECTION_ADMIN_DESTINATIONS, nameNode.getText()) : undefined;
                 const top = typeof destination === "string" ? destination.split(".")[0] : undefined;
                 putAll(option, top ? { side: "cms", key: top } : { side: "cms" }, option);
             }
             return;
         }
-        const carried = CARRIED_KEYS[key];
+        const carried = own(CARRIED_KEYS, key);
         const target: CommentTarget = carried ? { side: "backend", key: carried }
             : PRESENTATION_KEYS.has(key) ? { side: "cms", key }
                 : { side: "backend" };

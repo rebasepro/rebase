@@ -23,3 +23,9 @@ export function isMissing(error: { code: string }): boolean {
 export const batch = [{ op: "create", collection: "posts", values: {} }];
 
 export type Dictionary = CollectionsDictionary;
+
+/** A method reference, in a type query. */
+export type PostsClient = ReturnType<typeof client.data.collection>;
+
+/** An identifier named like Object.prototype's members is nobody's rename. */
+export const label = String(client).toString();

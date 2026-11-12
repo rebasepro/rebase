@@ -14,7 +14,7 @@
     },
     {
       "path": "frontend/src/client.ts",
-      "edits": 12
+      "edits": 13
     },
     {
       "path": "typed/src/use.ts",
@@ -23,7 +23,7 @@
   ],
   "counts": {
     "table-hooks": 5,
-    "collection-call": 5,
+    "collection-call": 6,
     "boot-options": 1,
     "storage-authorize": 1,
     "generated-types": 4,
@@ -39,6 +39,12 @@
       "line": 8,
       "code": "registry.collection(\"events\")",
       "reason": "left unchanged: receiver not recognised"
+    },
+    {
+      "file": "typed/src/use.ts",
+      "line": 6,
+      "code": "client.data.collection(\"posts\")",
+      "reason": "left unchanged: the receiver's type is not the SDK data surface"
     }
   ],
   "manualSteps": [

@@ -86,14 +86,19 @@ describe("rebase migrate sdk-calls", () => {
         expect(client).toContain(`"UNKNOWN_TABLE"`);
         expect(client).toContain(`{ op: "create", table: "posts"`);
         expect(client).toContain(`client.data.postsTable`);
+        expect(client).toContain(`ReturnType<typeof client.data.table>`);
+        expect(client).toContain(`String(client).toString()`);
         // A receiver the list does not name, recognised by its type.
-        expect(fs.readFileSync(path.join(dir, "typed/src/use.ts"), "utf8")).toContain(`surface.table("posts")`);
+        const typedUse = fs.readFileSync(path.join(dir, "typed/src/use.ts"), "utf8");
+        expect(typedUse).toContain(`surface.table("posts")`);
+        // Spelled like a listed receiver, typed as the project's own interface: the type decides.
+        expect(typedUse).toContain(`client.data.collection("posts")`);
         expect(report.typeAware).toBe(true);
         // Firestore's own collection() and a method of the project's own are left as written.
         const firestore = fs.readFileSync(path.join(dir, "frontend/src/firestore.ts"), "utf8");
         expect(firestore).toContain(`collection(db, "events")`);
         expect(firestore).toContain(`registry.collection("events")`);
-        expect(report.left.map(left => `${left.file}:${left.line}`)).toEqual(["frontend/src/firestore.ts:8"]);
+        expect(report.left.map(left => `${left.file}:${left.line}`)).toEqual(["frontend/src/firestore.ts:8", "typed/src/use.ts:6"]);
         // Hooks: the method renamed, the props adapted, the type renamed.
         const hooks = fs.readFileSync(path.join(dir, "backend/hooks.ts"), "utf8");
         expect(hooks).toContain(`backend.setTableHooks("posts", hooks)`);

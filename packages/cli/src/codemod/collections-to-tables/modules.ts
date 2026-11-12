@@ -17,6 +17,7 @@ import type { SourceFile } from "ts-morph";
 
 import type { AstContext, ImportUse } from "./ast";
 import { toPosix } from "./ast";
+import { own } from "./own";
 
 /** Which side of the split a file lives on. */
 export type Side = "backend" | "frontend";
@@ -162,7 +163,7 @@ export class Relocator {
             if (!LEGACY_TYPE_PACKAGES.has(specifier)) continue;
             const named = declaration.getNamedImports();
             const replaced = named.filter(entry => {
-                const replacement = LEGACY_TYPE_REPLACEMENTS[entry.getName()];
+                const replacement = own(LEGACY_TYPE_REPLACEMENTS, entry.getName());
                 const local = entry.getAliasNode()?.getText() ?? entry.getName();
                 if (!replacement) return false;
                 if (new RegExp(`\\b${local}\\s*<`).test(text)) {
@@ -271,7 +272,7 @@ export function replaceLegacyTypes(uses: readonly ImportUse[], text: string): Le
     const aliases: string[] = [];
     const unreplaceable: string[] = [];
     for (const use of uses) {
-        const replacement = LEGACY_TYPE_PACKAGES.has(use.specifier) ? LEGACY_TYPE_REPLACEMENTS[use.imported] : undefined;
+        const replacement = LEGACY_TYPE_PACKAGES.has(use.specifier) ? own(LEGACY_TYPE_REPLACEMENTS, use.imported) : undefined;
         if (!replacement) {
             kept.push(use);
             continue;

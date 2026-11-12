@@ -15,6 +15,7 @@ import type { ArrowFunction, FunctionExpression, Identifier, Node, ParameterDecl
 
 import type { AstContext, Member } from "./ast";
 import { nodeText } from "./ast";
+import { own } from "./own";
 
 /** The props a callback's parameter is renamed on. */
 export interface PropRenames {
@@ -121,7 +122,7 @@ function rewriteParameter(
     if (typeNode && N.isTypeLiteral(typeNode)) {
         for (const member of typeNode.getMembers()) {
             if (!N.isPropertySignature(member)) continue;
-            const next = renamed[member.getName()];
+            const next = own(renamed, member.getName());
             if (next !== undefined) edits.push({ start: member.getNameNode().getStart(), end: member.getNameNode().getEnd(), text: next });
         }
     }
@@ -136,7 +137,7 @@ function rewriteParameter(
                 continue;
             }
             const key = propertyNameNode ? propertyNameNode.getText() : local.getText();
-            const next = renamed[key];
+            const next = own(renamed, key);
             if (next === undefined) continue;
             if (propertyNameNode) {
                 edits.push({ start: propertyNameNode.getStart(), end: propertyNameNode.getEnd(), text: next });
@@ -182,7 +183,7 @@ function rewriteMemberReads(
         const parent = reference.getParent();
         if (parent && N.isPropertyAccessExpression(parent) && parent.getExpression() === reference) {
             const name = parent.getName();
-            const next = renamed[name];
+            const next = own(renamed, name);
             if (next === undefined) continue;
             const nameNode = parent.getNameNode();
             edits.push({ start: nameNode.getStart(), end: nameNode.getEnd(), text: next });

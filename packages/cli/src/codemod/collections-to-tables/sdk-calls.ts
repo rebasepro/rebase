@@ -50,6 +50,7 @@ import type { CallExpression, Node, ObjectLiteralExpression, Project, SourceFile
 import type { AstContext, Member, TsMorph } from "./ast";
 import { createAstContext, nodeText, resolveObject, toPosix } from "./ast";
 import { carryHook } from "./hooks";
+import { own } from "./own";
 import { reindent } from "./print-js";
 import type { ManualStep, Note } from "./types";
 
@@ -367,9 +368,13 @@ function rewriteFile(
         if (taken(node.getStart(), node.getEnd())) return;
         edits.push({ start: node.getStart(), end: node.getEnd(), text, rule });
     };
+    // The type decides where there is one: a receiver typed as something else
+    // (a structural interface of the project's own that only looks like the
+    // SDK) is left, however it is spelled. Without a type, the list decides.
     const isSdk = (receiver: Node): boolean => {
-        if (isListedReceiver(ctx, receiver)) return true;
-        return typed ? oracle.isSdkData(receiver) === true : false;
+        const byType = typed ? oracle.isSdkData(receiver) : undefined;
+        if (byType !== undefined) return byType;
+        return isListedReceiver(ctx, receiver);
     };
 
     // Imports: generated types (3), SDK type names (5), CollectionCallbacks with setTableHooks (9).
@@ -380,7 +385,7 @@ function rewriteFile(
         const rebase = specifier.startsWith("@rebasepro/");
         for (const named of declaration.getNamedImports()) {
             const imported = named.getName();
-            const next = (generated ? GENERATED_TYPE_RENAMES[imported] : undefined) ?? (rebase ? TYPE_RENAMES[imported] : undefined);
+            const next = (generated ? own(GENERATED_TYPE_RENAMES, imported) : undefined) ?? (rebase ? own(TYPE_RENAMES, imported) : undefined);
             if (!next) continue;
             const alias = named.getAliasNode();
             add(named.getNameNode(), next, generated ? "generated-types" : "type-names");
@@ -406,18 +411,18 @@ function rewriteFile(
         const parent = identifier.getParent();
         if (parent && (N.isImportSpecifier(parent) || (N.isPropertyAccessExpression(parent) && parent.getNameNode() === identifier) ||
             (N.isPropertyAssignment(parent) && parent.getNameNode() === identifier))) continue;
-        add(identifier, next, GENERATED_TYPE_RENAMES[identifier.getText()] ? "generated-types" : identifier.getText() === "CollectionCallbacks" ? "table-hooks" : "type-names");
+        add(identifier, next, own(GENERATED_TYPE_RENAMES, identifier.getText()) ? "generated-types" : identifier.getText() === "CollectionCallbacks" ? "table-hooks" : "type-names");
     }
 
     // String error codes (6).
     for (const literal of [...sf.getDescendantsOfKind(SyntaxKind.StringLiteral), ...sf.getDescendantsOfKind(SyntaxKind.NoSubstitutionTemplateLiteral)]) {
-        const next = ERROR_CODES[literal.getLiteralValue()];
+        const next = own(ERROR_CODES, literal.getLiteralValue());
         if (next) add(literal, literal.getText().replace(literal.getLiteralValue(), next), "error-codes");
     }
 
     // Offline options (7), wherever they are spelled.
     for (const identifier of sf.getDescendantsOfKind(SyntaxKind.Identifier)) {
-        const next = OFFLINE_OPTIONS[identifier.getText()];
+        const next = own(OFFLINE_OPTIONS, identifier.getText());
         if (next) add(identifier, next, "offline-options");
     }
 
@@ -461,6 +466,12 @@ function rewriteFile(
             }
             continue;
         }
+        if (name === "collection" && !isCall && isSdk(receiver)) {
+            // A reference to the method rather than a call: `typeof client.data.collection`,
+            // `const open = context.data.collection`.
+            add(access.getNameNode(), "table", "collection-call");
+            continue;
+        }
         if (/^[a-z]\w*Collection$/.test(name) && !isCall && isSdk(receiver)) {
             add(access.getNameNode(), name === "collectionCollection" ? "collection" : `${name.slice(0, -"Collection".length)}Table`, "typed-accessor");
             continue;
@@ -476,6 +487,15 @@ function rewriteFile(
         const callee = call.getExpression().getText();
         if (callee !== "initializeRebaseBackend" && callee !== "createRebaseBackend") continue;
         bootOptions(ctx, call, relative, report, edits, options);
+    }
+    // `typeof client.data.collection`: the method named in a type query (rule 1).
+    for (const qualified of sf.getDescendantsOfKind(SyntaxKind.QualifiedName)) {
+        if (qualified.getRight().getText() !== "collection") continue;
+        const left = qualified.getLeft();
+        if (!N.isQualifiedName(left) || !DATA_PROPERTIES.has(left.getRight().getText())) continue;
+        const owner = left.getLeft();
+        const ownerName = N.isQualifiedName(owner) ? owner.getRight().getText() : owner.getText();
+        if (RECEIVER_OWNERS.has(ownerName) || (N.isIdentifier(owner) && isFactoryResult(ctx, owner))) add(qualified.getRight(), "table", "collection-call");
     }
     return edits;
 }

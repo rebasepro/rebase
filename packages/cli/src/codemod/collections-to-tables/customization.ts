@@ -37,6 +37,7 @@ import { note, planFile, refuse, relativeToRoot } from "./plan-context";
 import { printValue, RawSource } from "./print-js";
 import type { TableName } from "./backend";
 import { tableImportPath } from "./backend";
+import { own } from "./own";
 
 /** The keys whose string value is a component path (the Vite plugin's `LAZY_COMPONENT_KEYS`). */
 const COMPONENT_KEYS = new Set(["Field", "Preview", "Builder", "Filter", "Component"]);
@@ -269,7 +270,7 @@ export function enumLabelsOf(values: EnumValues): Record<string, unknown> | unde
 function fieldAdmin(plan: PlanContext, builder: Builder, admin: Record<string, unknown>, segments: PathSegment[], target: Record<string, unknown>, label: string): void {
     for (const [key, value] of Object.entries(admin)) {
         if (value === undefined) continue;
-        const destination = PROPERTY_ADMIN_DESTINATIONS[key];
+        const destination = own(PROPERTY_ADMIN_DESTINATIONS, key);
         if (destination === undefined) {
             note(plan, builder.entry, `${label}.admin.${key} is not an admin option (nothing read it); not carried.`);
             continue;
@@ -295,7 +296,7 @@ function collectionAdmin(plan: PlanContext, builder: Builder, admin: Record<stri
     const options = builder.options;
     for (const [key, value] of Object.entries(admin)) {
         if (value === undefined) continue;
-        const destination = COLLECTION_ADMIN_DESTINATIONS[key];
+        const destination = own(COLLECTION_ADMIN_DESTINATIONS, key);
         if (destination === undefined) {
             note(plan, builder.entry, `admin.${key} is not an admin option (nothing read it); not carried.`);
             continue;
@@ -313,7 +314,7 @@ function collectionAdmin(plan: PlanContext, builder: Builder, admin: Record<stri
         if (key === "kanban" && isPlainObject(printed)) {
             const kanban = at(options, ["kanban"]);
             for (const [kanbanKey, kanbanValue] of Object.entries(printed)) {
-                kanban[KANBAN_DESTINATIONS[kanbanKey] ?? kanbanKey] = kanbanValue;
+                kanban[own(KANBAN_DESTINATIONS, kanbanKey) ?? kanbanKey] = kanbanValue;
             }
             continue;
         }
@@ -349,7 +350,7 @@ function relationOverrides(plan: PlanContext, builder: Builder, value: unknown, 
         if (entry === undefined) continue;
         if (key === "admin" && isPlainObject(entry)) {
             for (const [adminKey, adminValue] of Object.entries(entry)) {
-                const destination = COLLECTION_ADMIN_DESTINATIONS[adminKey];
+                const destination = own(COLLECTION_ADMIN_DESTINATIONS, adminKey);
                 if (typeof destination !== "string" || destination.includes(".")) {
                     note(plan, builder.entry, `${label}.admin.${adminKey} has no relation-tab option in \`customizeTable\`; not carried.`);
                     continue;
@@ -434,7 +435,7 @@ function applyFieldNote(plan: PlanContext, builder: Builder, item: LiftNote, fie
         default:
             break;
     }
-    const destination = PROPERTY_FIELD_DESTINATIONS[item.field];
+    const destination = own(PROPERTY_FIELD_DESTINATIONS, item.field);
     if (destination !== undefined && typeof destination !== "string") {
         note(plan, builder.entry, `${label}.${item.field} is not carried: ${destination.dropped}`);
         return;
