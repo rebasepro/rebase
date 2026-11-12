@@ -499,6 +499,7 @@ describe("lowerTables — refusals", () => {
         "json-document-shape": () => [defineTable("t", { columns: { id, j: col.jsonb(json.string()) }, rls: "admin-only" })],
         "json-one-of-placement": () => [defineTable("t", { columns: { id, j: col.jsonb(json.object({ b: json.oneOf({ x: json.string() }) })) }, rls: "admin-only" })],
         "json-unknown-field": () => [defineTable("t", { columns: { id, j: col.jsonb(json.object({ u: json.unknown() })) }, rls: "admin-only" })],
+        "primary-key-type": () => [defineTable("t", { columns: { id: col.jsonb().primaryKey() }, rls: "admin-only" })],
         "array-unique-items": () => [defineTable("t", { columns: { id, a: col.array(col.text()).validate({ uniqueItems: true }) }, rls: "admin-only" })]
     };
 

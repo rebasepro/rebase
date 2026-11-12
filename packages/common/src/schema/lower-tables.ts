@@ -183,6 +183,10 @@ export const PENDING_TABLE_FEATURES = [
         description: "`json.unknown()` as a field of a `json.object()` or a variant of a `json.oneOf()`. Only an array item may be left untyped today."
     },
     {
+        id: "primary-key-type",
+        description: "`.primaryKey()` on a column that is not text, uuid, a number, a boolean or a date/time. The legacy shape marks keys on those properties only."
+    },
+    {
         id: "array-unique-items",
         description: "`.validate({ uniqueItems: true })` on an array. The API does not check it yet."
     }
@@ -683,6 +687,10 @@ function lowerColumn(key: string, def: ColumnDef, ctx: ColumnContext): PostgresP
         if (!def.primaryKey) pending(at, "identity-not-primary-key");
         if (def.type.kind !== "integer") pending(at, "identity-width");
     }
+    if (def.primaryKey && !KEY_KINDS.has(def.type.kind)) pending(at, "primary-key-type");
+    if (def.transform !== undefined && def.json?.transform !== undefined) {
+        refuse(at, "declares a `.transform()` on the column and another on its JSON shape. Keep one: they are the same hook.");
+    }
     const base = baseFields(key, def, ctx);
     const literal = def.default?.kind === "literal" ? def.default.value : undefined;
 
@@ -752,6 +760,13 @@ function lowerColumn(key: string, def: ColumnDef, ctx: ColumnContext): PostgresP
             return refuse(at, `is typed \`${type.sqlType}\`, which only introspection reports. Declare it with a \`col.*\` builder.`);
     }
 }
+
+/** The column types the legacy shape can mark as a key (`isId`). */
+const KEY_KINDS: ReadonlySet<ColumnType["kind"]> = new Set([
+    "text", "varchar", "char", "uuid", "enum",
+    "smallint", "integer", "bigint", "smallserial", "serial", "bigserial", "real", "doublePrecision", "numeric",
+    "boolean", "timestamptz", "date", "time"
+]);
 
 type BaseFields = Partial<Pick<Property, "columnName" | "excludeFromApi" | "access" | "description" | "callbacks" | "databaseDefault">>;
 
