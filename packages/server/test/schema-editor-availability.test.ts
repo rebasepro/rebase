@@ -10,19 +10,21 @@ import type { HonoEnv } from "../src/api/types";
 import { fakeBootstrapper, fakeDataDriver, idleServer } from "./helpers/server-b-fakes";
 import { generateAccessToken } from "../src/auth/jwt";
 import { tablesFrom } from "./helpers/tables";
+import { compileTables } from "@rebasepro/common";
+import { writeSchemaFixture } from "./helpers/schema-source-fixture";
 
 /**
  * Who may reach the schema editor, and what it says when it cannot serve.
  *
- * Two failures met here. The editor rewrites the project's collection *source
- * files*, so it was admin-gated — except the gate was appended to a router that
- * already had its routes registered, and Hono runs matching handlers in
- * registration order, so the guard ran after the handler had already written
- * the file. `POST /api/schema-editor/collection/save` was reachable with no
+ * Two failures met here. The editor rewrites the project's `backend/schema`
+ * source files, so it was admin-gated — except the gate was appended to a
+ * router that already had its routes registered, and Hono runs matching
+ * handlers in registration order, so the guard ran after the handler had
+ * already written the file. The editor's write was reachable with no
  * credentials on every dev server.
  *
  * The second is the mirror image. When the editor is *off* — production, `baas`
- * mode, no `collectionsDir`, no `ts-morph` — the routes simply did not exist,
+ * mode, no `schemaDir`, no `ts-morph` — the routes simply did not exist,
  * and the admin panel had no way to find that out: it decided whether
  * collections were editable from its own bundle's `NODE_ENV`, which belongs to
  * a different process entirely. Every save came back a bare 404. The editor now
@@ -43,7 +45,9 @@ function collection(slug: string): CollectionConfig {
 }
 
 function reportingBootstrapper(reports: CollectionConfig[] | undefined): BackendBootstrapper {
-    return fakeBootstrapper({ collections: reports }, {
+    // A driver that introspects reports what it found, described.
+    const tables = reports ? compileTables(tablesFrom(reports).tables) : undefined;
+    return fakeBootstrapper({ collections: reports, ...(tables ? { tables } : {}) }, {
         // Enough for the built-in auth adapter to be constructed. Nothing here
         // logs in — the JWTs are minted directly.
         async initializeAuth() {
@@ -52,41 +56,21 @@ function reportingBootstrapper(reports: CollectionConfig[] | undefined): Backend
     });
 }
 
-/**
- * A real directory holding one real collection file, so the editor can load.
- *
- * Written the way `rebase init` writes one — `defineCollection`, default export.
- * It used to name a `buildCollection` helper that no package exports, which the
- * editor could not open; the admin's write then "succeeded" only because the
- * writer's fallback recreated the file from the request payload.
- */
+/** A real `backend/schema` directory, so the editor can load. */
+let fixture: ReturnType<typeof writeSchemaFixture>;
 let collectionsDir: string;
 
 beforeEach(() => {
     process.env.NODE_ENV = "development";
-    collectionsDir = fs.mkdtempSync(path.join(os.tmpdir(), "schema-editor-availability-"));
-    fs.writeFileSync(
-        path.join(collectionsDir, "posts.ts"),
-        [
-            "import { defineCollection } from \"@rebasepro/cms-types\";",
-            "",
-            "const postsCollection = defineCollection({",
-            "    name: \"Posts\",",
-            "    slug: \"posts\",",
-            "    properties: {}",
-            "});",
-            "",
-            "export default postsCollection;",
-            ""
-        ].join("\n")
-    );
+    fixture = writeSchemaFixture();
+    collectionsDir = fixture.dir;
 });
 
 const originalNodeEnv = process.env.NODE_ENV;
 
 afterEach(() => {
     process.env.NODE_ENV = originalNodeEnv;
-    fs.rmSync(collectionsDir, { recursive: true, force: true });
+    fixture.cleanup();
     jest.restoreAllMocks();
 });
 
@@ -118,13 +102,13 @@ async function boot(config: Partial<RebaseBackendConfig> = {}): Promise<Hono<Hon
 const bearer = (token: string) => ({ headers: { authorization: `Bearer ${token}` } });
 const adminToken = async () => await generateAccessToken("admin-1", ["admin"]);
 
-const SAVE = "/api/schema-editor/collection/save";
+const SAVE = "/api/schema-editor/apply";
 
-function save(app: Hono<HonoEnv>, init: Record<string, unknown> = {}) {
+function save(app: Hono<HonoEnv>, init: { headers?: Record<string, string> } = {}) {
     return app.request(SAVE, {
         method: "POST",
-        headers: { "content-type": "application/json", ...((init.headers as object) ?? {}) },
-        body: JSON.stringify({ collectionId: "posts", collectionData: { name: "Renamed" } })
+        headers: { "content-type": "application/json", ...(init.headers ?? {}) },
+        body: JSON.stringify({ patches: [{ op: "setOption", table: "posts", option: "description", value: "Renamed" }] })
     });
 }
 
@@ -168,7 +152,7 @@ describe("the schema editor is admin-only", () => {
         const res = await save(app, { headers: { authorization: `Bearer ${await adminToken()}` } });
 
         expect(res.status).toBe(200);
-        expect(fs.readFileSync(path.join(collectionsDir, "posts.ts"), "utf8")).toContain("Renamed");
+        expect(fs.readFileSync(path.join(collectionsDir, "posts.ts"), "utf8")).toContain("description: \"Renamed\"");
     }, BOOTS_A_BACKEND);
 });
 

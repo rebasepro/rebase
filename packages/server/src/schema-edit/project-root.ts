@@ -33,13 +33,13 @@ import { DEFAULT_COMMIT_PATHS, type SchemaCommitPaths } from "@rebasepro/types";
  * behaviour rather than guessing.
  */
 /**
- * Where a scaffolded project keeps its collection source, project-relative.
+ * Where a scaffolded project keeps its schema source, project-relative.
  *
- * A bundle's own collections directory is compiled output, so nothing on the
- * running machine points at this. A deployment committing to a repository states
- * it, and this is the default it states nothing against.
+ * A bundle's tables are compiled output, so nothing on the running machine
+ * points at this. A deployment committing to a repository states it, and this
+ * is the default it states nothing against.
  */
-export const DEFAULT_COLLECTIONS_PATH = "config/collections";
+export const DEFAULT_SCHEMA_PATH = "backend/schema";
 
 export function findProjectRoot(startDir: string, levels = 5): string | undefined {
     let dir = path.resolve(startDir);
@@ -63,10 +63,10 @@ export function findProjectRoot(startDir: string, levels = 5): string | undefine
  * behaviour untouched for every project that already worked.
  */
 export function commitPathsFor(
-    collectionsDir: string,
+    schemaDir: string,
     repositoryRoot: string
 ): Partial<SchemaCommitPaths> | undefined {
-    const projectRoot = findProjectRoot(collectionsDir);
+    const projectRoot = findProjectRoot(schemaDir);
     if (!projectRoot) return undefined;
 
     const prefix = path.relative(path.resolve(repositoryRoot), projectRoot);
@@ -87,15 +87,15 @@ export function commitPathsFor(
  * migration is Atlas's format with an integrity file, minted by an external
  * binary against a throwaway database. A server process has neither.
  *
- * What it *does* write is the collection source, which is exactly what
+ * What it *does* write is the schema source, which is exactly what
  * `rebase db generate` renders its desired state from — so the migration is
  * one command away.
  * The hazard is nobody saying so. A project that deploys by replaying
  * migrations would build its next environment without this change, having been
  * told the change was applied.
  */
-export function usesVersionedMigrations(collectionsDir: string): boolean {
-    const projectRoot = findProjectRoot(collectionsDir);
+export function usesVersionedMigrations(schemaDir: string): boolean {
+    const projectRoot = findProjectRoot(schemaDir);
     if (!projectRoot) return false;
     return MIGRATION_DIRS.some(relative => holdsMigrations(path.join(projectRoot, relative)));
 }

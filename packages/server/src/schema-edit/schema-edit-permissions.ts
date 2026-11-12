@@ -114,13 +114,13 @@ export interface RemoteRepositoryConfig {
     /** Defaults to `main`. */
     branch?: string;
     /**
-     * Where the collection **source** lives in that repository, repo-relative.
-     * Defaults to `config/collections`.
+     * Where the schema **source** (`backend/schema`) lives in that repository,
+     * repo-relative. Defaults to `backend/schema`.
      *
-     * Not derivable from the running bundle, whose collections directory holds
-     * compiled output — a different directory with different files.
+     * Not derivable from the running bundle, whose tables are compiled
+     * output — a different directory with different files.
      */
-    collectionsPath?: string;
+    schemaPath?: string;
     /**
      * A GitHub App installation, or a token.
      *

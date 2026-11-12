@@ -107,13 +107,16 @@ import { deprecatedAlias } from "../api/mount";
 import {
     commitPathsFor,
     usesVersionedMigrations,
-    DEFAULT_COLLECTIONS_PATH
+    DEFAULT_SCHEMA_PATH
 } from "../schema-edit/project-root";
 import { createGitHubRepository } from "../schema-edit/github-repository";
-import { rewriteRemoteCollection } from "../schema-edit/remote-source";
+import { previewRemoteSchema } from "../schema-edit/remote-source";
 import { refuseWhenRepositoryIsAhead } from "../schema-edit/deployed-schema-guard";
-import { editCollectionSource, writeLocalCollectionSource } from "../schema-edit/local-source";
-import type { SchemaSourceEditor } from "../schema-edit/source-editor";
+import type { EditedSchema, TableSourceEdit, TableSourceEditor } from "../api/table-source-editor";
+import type { PreviewedSource } from "../api/live-schema-routes";
+import type { PostgresCollectionConfig } from "@rebasepro/types";
+import { realpathSync } from "node:fs";
+import { replaceableRoutes, type ReplaceableRoutes } from "./replaceable-routes";
 import { createLocalGitRepository, findRepositoryRoot } from "../schema-edit/local-git-repository";
 import { createRlsAudit, type RlsAudit } from "../rls-audit";
 import { startExpiredTokenSweep } from "../auth/expired-token-sweep";
@@ -256,6 +259,12 @@ export interface RebaseRoutes {
     cron(): Hono<HonoEnv>;
     /** The project contract a generated SDK reads, normally at `/api/meta`. */
     meta(): Hono<HonoEnv>;
+    /**
+     * The table descriptors, redacted per caller — `GET /tables` — normally at
+     * `/api/schema`. Part of the meta surface: what the zero-config CMS, the
+     * Studio and MCP views render tables from.
+     */
+    schema(): Hono<HonoEnv>;
 }
 
 /** A route group, by the name `routes` gives it. */
@@ -679,6 +688,8 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     });
     const tableRegistry = new TableRegistry();
     tableRegistry.replaceAll(declaredTables.descriptors);
+    /** The lowered tables whose compiled policies are served; replaced by a live schema apply. */
+    let servedPolicyCollections: PostgresCollectionConfig[] = declaredTables.collections;
     const describeTable = (slug: string): TableDescriptor | undefined => tableRegistry.get(slug);
     if (declaredTables.source === "schemaDir") {
         logger.info("Loaded the declared tables", { count: declaredTables.defs.length, dir: config.schemaDir });
@@ -2022,8 +2033,8 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     const LIVE_SCHEMA_REPOSITORY_HINT = "To edit collections from a deployment, name a repository to commit " +
         "them to: `liveSchema.repository`, or REBASE_LIVE_SCHEMA_REPOSITORY for a built bundle.";
 
-    // The schema editor rewrites collection files, so it needs a collectionsDir
-    // to write to and is off in baas mode (no files) and in production.
+    // The schema editor rewrites backend/schema, so it needs a schemaDir to
+    // write to and is off in baas mode (no files) and in production.
     const schemaEditorEnabled =
         config.schemaEditor ?? (!!config.schemaDir && !introspectCollections && process.env.NODE_ENV !== "production");
 
@@ -2035,7 +2046,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
      * its *own* build mode — `process.env.NODE_ENV` inside the browser bundle.
      * That is a different process from the one that decides whether the routes
      * exist, and the two disagree constantly: a dev frontend against a
-     * deployed API, a `baas`-mode project, a project with no `collectionsDir`,
+     * deployed API, a `baas`-mode project, a project with no `schemaDir`,
      * a server without `ts-morph`. In every one of those the editor offered
      * itself and each save came back as a bare 404. So the server says whether
      * it can write, and says why not, and the client asks instead of guessing.
@@ -2077,19 +2088,27 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
 
     let schemaEditorOff = schemaEditorUnavailable();
     let schemaEditorRoutes: Hono<HonoEnv> | undefined;
-    // The one editor of `collectionsDir` in this process, shared by the
-    // source-only editor's routes and live schema editing's `/apply`.
-    let schemaSourceEditor: SchemaSourceEditor | undefined;
+
+    // The one editor of `schemaDir` in this process, shared by the source-only
+    // editor's routes and live schema editing (which previews every plan
+    // through it, and writes through it where the source-only editor may).
+    // Loaded once, on first use: it brings `ts-morph`, an optional peer
+    // dependency, which a server that never edits its schema never loads.
+    let tableSourceEditor: Promise<TableSourceEditor> | undefined;
+    const loadTableSourceEditor = (dir: string): Promise<TableSourceEditor> =>
+        tableSourceEditor ??= import("../api/schema-editor-routes").then(module => module.createTableSourceEditor(dir));
+    const tsMorphMissing = (err: unknown): boolean =>
+        typeof err === "object" && err !== null && "code" in err && err.code === "ERR_MODULE_NOT_FOUND";
 
     if (!schemaEditorOff && config.schemaDir) {
         // ts-morph is an optional peer dependency, so it can legitimately be
         // absent — run without the schema editor instead of failing startup.
         try {
+            const editor = await loadTableSourceEditor(config.schemaDir);
             const editorModule = await import("../api/schema-editor-routes");
-            schemaSourceEditor = editorModule.createSchemaSourceEditor(config.schemaDir);
-            schemaEditorRoutes = editorModule.createSchemaEditorRoutes(schemaSourceEditor);
+            schemaEditorRoutes = editorModule.createSchemaEditorRoutes(editor);
         } catch (err) {
-            if ((err as { code?: string })?.code === "ERR_MODULE_NOT_FOUND") {
+            if (tsMorphMissing(err)) {
                 schemaEditorOff = {
                     code: "SCHEMA_EDITOR_MISSING_DEPENDENCY",
                     // The install as it works from the project root — a bare
@@ -2099,8 +2118,8 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
                         tsMorphInstallSentence()
                 };
                 // Not said here. A project with no admin panel — a headless one
-                // with collections — never asks for the editor, and was told
-                // on every boot. It is said once somebody does: see
+                // with tables — never asks for the editor, and was told on
+                // every boot. It is said once somebody does: see
                 // `sayEditorNeedsTsMorph`.
                 logger.debug(`Schema Editor disabled: ${schemaEditorOff.message}`);
             } else {
@@ -2108,6 +2127,12 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             }
         }
     }
+
+    /**
+     * Swap the tables this backend serves for the ones an apply left, set by
+     * the data surface once it is built (below). See `serveTables`.
+     */
+    const editedTables: { serve?: (schema: EditedSchema) => void } = {};
 
     /**
      * The missing `ts-morph`, said the first time the editor is asked for —
@@ -2168,12 +2193,12 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         // ── Live schema editing ───────────────────────────────────────────
         // Two write paths. Without a configured repository, writing goes
         // through the source-only editor above, so live editing is on exactly
-        // where that editor is: a `collectionsDir` on disk, `schemaEditor` not
+        // where that editor is: a `schemaDir` on disk, `schemaEditor` not
         // false, and NODE_ENV other than production unless `schemaEditor:
         // true`.
         //
         // With `liveSchema.repository`, the write never touches this machine's
-        // files: the collection files are fetched, rewritten in a scratch
+        // files: the schema files are fetched, rewritten in a scratch
         // directory and committed back. That path does not depend on the
         // source-only editor's gate — a built bundle boots with `schemaEditor:
         // false` under production, and the repository is how one opts in. It
@@ -2181,13 +2206,13 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         //
         // Mounted either way; the routes themselves decide what is possible, so
         // the reason a change is refused arrives as a message rather than as a
-        // missing endpoint. Without a `collectionsDir` the surface still
+        // missing endpoint. Without a `schemaDir` the surface still
         // answers, because it lives under `/api/admin` and an unmounted path
         // there is caught by the admin gate in front of it — which would reply
         // 401 to an operator whose actual problem is an unconfigured
-        // `collectionsDir`. Being told the wrong thing is worse than a 404, and
+        // `schemaDir`. Being told the wrong thing is worse than a 404, and
         // both are worse than being told.
-        // With a configured repository the collection file is fetched,
+        // With a configured repository the schema files are fetched,
         // rewritten and committed back through the Git Data API instead of the
         // local working tree.
         const remoteRepo = config.liveSchema?.repository;
@@ -2196,24 +2221,24 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         // The remote write path's one dependency. Loaded at boot rather than on
         // the first apply, so a server without `ts-morph` says so on `/status`
         // instead of offering the control and failing when it is pressed.
-        let remoteEditor: typeof import("../api/ast-schema-editor") | undefined;
+        let remoteEditor: typeof import("../api/table-source-editor") | undefined;
         let remoteEditingOff: { code: string, message: string } | undefined;
         if (remoteRepo) {
             try {
-                remoteEditor = await import("../api/ast-schema-editor");
+                remoteEditor = await import("../api/table-source-editor");
             } catch (err) {
                 if ((err as { code?: string })?.code !== "ERR_MODULE_NOT_FOUND") throw err;
                 remoteEditingOff = {
                     code: "SCHEMA_EDITOR_MISSING_DEPENDENCY",
                     // Said at boot: a configured repository is somebody asking
                     // for live editing.
-                    message: "Live schema editing rewrites collection source with `ts-morph`, which is " +
+                    message: "Live schema editing rewrites backend/schema with `ts-morph`, which is " +
                         `not installed on this server. ${tsMorphInstallSentence()}`
                 };
                 logger.warn(`Live schema editing disabled: ${remoteEditingOff.message}`);
             }
             logger.info(`Live schema editing commits to ${remoteRepo.owner}/${remoteRepo.repo}` +
-                ` (${remoteRepo.branch ?? "main"}, ${remoteRepo.collectionsPath ?? DEFAULT_COLLECTIONS_PATH}).`);
+                ` (${remoteRepo.branch ?? "main"}, ${remoteRepo.schemaPath ?? DEFAULT_SCHEMA_PATH}).`);
         }
 
         if (!canEditSchema) {
@@ -2223,7 +2248,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
                 error: {
                     code: "SCHEMA_EDITING_NO_COLLECTIONS_DIR",
                     message: "Live schema editing needs `schemaDir` — the directory holding " +
-                        "this project's collection definitions — or `liveSchema.repository`, a " +
+                        "this project's table definitions (backend/schema) — or `liveSchema.repository`, a " +
                         "repository to fetch them from. This server was started with neither, so " +
                         "there is nothing for it to edit."
                 }
@@ -2232,12 +2257,12 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         }
 
         if (canEditSchema) {
-            const collectionsDir = config.schemaDir;
+            const schemaDir = config.schemaDir;
             // Resolved once, at boot. A deployment either has a working tree or
             // it does not, and asking git on every request would spawn a
             // process for every plan the panel asks for.
-            const repositoryRoot = collectionsDir
-                ? await findRepositoryRoot(collectionsDir)
+            const repositoryRoot = schemaDir
+                ? await findRepositoryRoot(schemaDir)
                 : undefined;
             const liveSchemaRouter = new Hono<HonoEnv>();
             // `apply` additionally needs `schema:write` — checked on its route.
@@ -2251,16 +2276,18 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             // this machine can be walked up from to discover it.
             const commitPaths = remoteRepo
                 ? commitPathsFor(
-                    nodePath.join("/", remoteRepo.collectionsPath ?? DEFAULT_COLLECTIONS_PATH),
+                    nodePath.join("/", remoteRepo.schemaPath ?? DEFAULT_SCHEMA_PATH),
                     "/"
                 )
-                : (collectionsDir && repositoryRoot)
-                    ? commitPathsFor(collectionsDir, repositoryRoot)
+                : (schemaDir && repositoryRoot)
+                    ? commitPathsFor(schemaDir, repositoryRoot)
                     : undefined;
             if (commitPaths) {
                 logger.debug("Live schema editing commit paths relocated", { commitPaths });
             }
 
+            /** The local edits previewed for an apply, for the write that follows them. */
+            const localEdits = new WeakMap<PreviewedSource, { editor: TableSourceEditor; edit: TableSourceEdit }>();
             liveSchemaRouter.route("/", createLiveSchemaRoutes({
                 commitPaths,
                 // The reason source editing is off, when it is — carried across
@@ -2293,8 +2320,8 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
                 // committing to a remote repository is a built bundle, which is
                 // provisioned by boot-ensure rather than by replaying
                 // migrations, so the question does not arise there.
-                usesVersionedMigrations: collectionsDir
-                    ? () => usesVersionedMigrations(collectionsDir)
+                usesVersionedMigrations: schemaDir
+                    ? () => usesVersionedMigrations(schemaDir)
                     : undefined,
                 // Off unless the project says otherwise. An automated schema
                 // change is a legitimate thing to want and a poor default:
@@ -2326,89 +2353,102 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
                     if (!repositoryRoot) return undefined;
                     return createLocalGitRepository({ root: repositoryRoot, author });
                 },
-                // Absent, not throwing, when the AST editor is unavailable.
+                previewSource: remoteRepo ? (remoteEditor ? async (patches) => {
+                    // No source on this machine: the schema directory is read
+                    // from the repository into a scratch directory and the
+                    // edit previewed there, the one way it is implemented.
+                    // Bare imports of the schema's modules resolve from this
+                    // runtime's own directory: the scratch copy has no
+                    // node_modules above it.
+                    const { TableSourceEditor } = remoteEditor!;
+                    const { files, result } = await previewRemoteSchema({
+                        repository: createGitHubRepository({
+                            auth: remoteRepo.auth,
+                            owner: remoteRepo.owner,
+                            repo: remoteRepo.repo,
+                            branch: remoteRepo.branch ?? "main"
+                        }),
+                        schemaPath: remoteRepo.schemaPath ?? DEFAULT_SCHEMA_PATH,
+                        preview: async (dir) => {
+                            const edit = await new TableSourceEditor(dir, { resolveBareFrom: process.cwd() }).preview(patches);
+                            return { files: edit.files, result: edit.schema };
+                        }
+                    });
+                    return { files, schema: result };
+                } : undefined) : schemaDir ? async (patches) => {
+                    // This machine's source, through the process's one editor,
+                    // queued behind any edit already running in either router.
+                    let editor: TableSourceEditor;
+                    try {
+                        editor = await loadTableSourceEditor(schemaDir);
+                    } catch (err) {
+                        if (!tsMorphMissing(err)) throw err;
+                        throw new ApiError(501, "SCHEMA_EDITOR_MISSING_DEPENDENCY",
+                            `Reading backend/schema needs \`ts-morph\`, which is not installed on this server. ${tsMorphInstallSentence()}`);
+                    }
+                    const edit = await editor.run(() => editor.preview(patches));
+                    // Against the real path of the schema directory: the
+                    // repository root git reports is one (`/private/var/…`
+                    // where the configured path says `/var/…`).
+                    const realSchemaDir = realpathSync(editor.schemaDir);
+                    const previewed: PreviewedSource = {
+                        files: edit.files.map(file => ({
+                            path: nodePath.relative(
+                                repositoryRoot ?? nodePath.dirname(realSchemaDir),
+                                nodePath.join(realSchemaDir, nodePath.relative(editor.schemaDir, file.path))
+                            ).split(nodePath.sep).join("/"),
+                            contents: file.contents,
+                            ...(file.deleted ? { deleted: true } : {})
+                        })),
+                        schema: edit.schema
+                    };
+                    localEdits.set(previewed, { editor, edit });
+                    return previewed;
+                } : undefined,
+                // Absent, not throwing, when the source may not be written.
                 //
                 // A function that exists and throws made `/status` answer
                 // `enabled: true` — it can only see whether the field is set —
                 // and then `/apply` died with a 500 the moment somebody
                 // confirmed. Leaving it undefined is the same fact stated where
-                // both surfaces can read it: `/status` reports
-                // `SCHEMA_EDITOR_MISSING_DEPENDENCY`, the panel never offers the
-                // control, and a caller that asks anyway gets a refusal that
-                // names the missing dependency.
+                // both surfaces can read it: `/status` reports the reason, the
+                // panel never offers the control, and a caller that asks anyway
+                // gets a refusal that names it.
                 writeSource: remoteRepo
-                    ? (remoteEditor ? async (change) => {
-                        // No source on this machine: fetch the collections
-                        // directory, rewrite it in a scratch directory, hand
-                        // back what changed. The edit is applied the one way it
-                        // is implemented (`editCollectionSource`, or the
-                        // editor's own deletion) — a second implementation of
-                        // keeping a collection file's imports, comments and
-                        // formatting for the remote case would be a second
-                        // thing to get wrong.
-                        const repository = createGitHubRepository({
-                            auth: remoteRepo.auth,
-                            owner: remoteRepo.owner,
-                            repo: remoteRepo.repo,
-                            branch: remoteRepo.branch ?? "main"
-                        });
+                    ? (remoteEditor ? async (previewed) => {
                         // One undeployed change at a time. The commit's
-                        // generated files are rendered from the collections
-                        // this deployment serves, so a change committed and
-                        // not yet running here — by this process, a replica,
-                        // a process before a restart, or a developer — would
-                        // be left out of them. Read from the repository on
-                        // every apply rather than remembered, because memory
-                        // is exactly what a restart or a second replica lacks.
+                        // generated files are rendered from the tables this
+                        // deployment serves, so a change committed and not yet
+                        // running here — by this process, a replica, a process
+                        // before a restart, or a developer — would be left out
+                        // of them. Read from the repository on every apply
+                        // rather than remembered, because memory is exactly
+                        // what a restart or a second replica lacks.
                         const admin = defaultDriver.admin;
                         if (isSchemaEditingAdmin(admin)) {
                             const served = collectionRegistry.getRawCollections();
                             const generated = await admin.planSchemaChange(served, served, { paths: commitPaths });
-                            await refuseWhenRepositoryIsAhead(repository, generated.files);
+                            await refuseWhenRepositoryIsAhead(createGitHubRepository({
+                                auth: remoteRepo.auth,
+                                owner: remoteRepo.owner,
+                                repo: remoteRepo.repo,
+                                branch: remoteRepo.branch ?? "main"
+                            }), generated.files);
                         }
-                        const { AstSchemaEditor } = remoteEditor!;
-                        return rewriteRemoteCollection(
-                            {
-                                repository,
-                                collectionsPath: remoteRepo.collectionsPath ?? DEFAULT_COLLECTIONS_PATH,
-                                edit: async (dir, collectionId, edit: typeof change) => {
-                                    const editor = new AstSchemaEditor(dir);
-                                    if (edit.remove) await editor.deleteCollection(collectionId);
-                                    else await editCollectionSource(editor, collectionId, edit);
-                                }
-                            },
-                            change.collectionId,
-                            change
-                        );
+                        return previewed.files;
                     } : undefined)
-                    : schemaSourceEditor ? async (change) => {
-                        // This machine's source: through the process's editor,
-                        // queued behind any edit already running in either router.
-                        return writeLocalCollectionSource(
-                            schemaSourceEditor,
-                            { collectionsDir: collectionsDir!, repositoryRoot: repositoryRoot! },
-                            change
-                        );
+                    : (schemaDir && repositoryRoot && !schemaEditorOff) ? async (previewed) => {
+                        const local = localEdits.get(previewed);
+                        if (!local) throw new Error("This edit was not previewed by this server.");
+                        // Queued behind any other edit, and refused when a file
+                        // changed on disk since the preview read it.
+                        return local.editor.run(async () => {
+                            local.editor.assertUnchanged(local.edit);
+                            return previewed.files;
+                        });
                     } : undefined,
-                // The same path `writeSource` resolves, derived without writing
-                // anything — the dirty-tree check has to know it before the
-                // edit, or it sees this change's own file and refuses.
-                sourcePathsFor: (change) => {
-                    if (remoteRepo) {
-                        const dir = (remoteRepo.collectionsPath ?? DEFAULT_COLLECTIONS_PATH)
-                            .replace(/\/+$/, "");
-                        return [
-                            `${dir}/${change.collectionId}.ts`,
-                            ...(change.remove ? [`${dir}/index.ts`] : [])
-                        ];
-                    }
-                    if (!collectionsDir || !repositoryRoot) return [];
-                    return [
-                        nodePath.relative(repositoryRoot, nodePath.join(collectionsDir, `${change.collectionId}.ts`)),
-                        // A removal edits the directory's index too.
-                        ...(change.remove ? [nodePath.relative(repositoryRoot, nodePath.join(collectionsDir, "index.ts"))] : [])
-                    ];
-                }
+                // The database has the change: serve it without a restart.
+                onApplied: (schema) => editedTables.serve?.(schema)
             }));
 
             // Admin-only, so it lives under `/api/admin` — see
@@ -2673,6 +2713,8 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
 
     // The data group: the REST routes, or the stub that says there are none.
     let dataSurface: Hono<HonoEnv>;
+    /** The REST routes, replaceable after a live schema apply. See `serveTables`. */
+    let restRoutes: ReplaceableRoutes | undefined;
     if (activeCollections.length > 0) {
         const dataRouter = new Hono<HonoEnv>();
         dataRouter.onError(errorHandler);
@@ -2816,6 +2858,10 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             undefined,
             { provision: provision.database }
         );
+        // Ahead of the routes it may replace: it passes every request on to
+        // them until a live schema apply hands it new ones.
+        restRoutes = replaceableRoutes();
+        dataRouter.use("/*", restRoutes.middleware);
         dataRouter.route("/", restGenerator.generateRoutes());
 
         // As with storage: the registry, the generator and the driver wiring are
@@ -2851,6 +2897,45 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         emptyDataStub.all("/*", (c) => c.json(emptyDataAnswer, 404));
         dataSurface = emptyDataStub;
     }
+
+    /**
+     * Serve the tables a live schema apply left, without a restart.
+     *
+     * The same population boot does, from the same compile: the descriptors
+     * into the table registry (a new revision, which invalidates what
+     * `GET /api/schema/tables` and the contract cache), the lowered tables into
+     * the collection registry and the lists the routes read, with the auth
+     * table's secrets excluded before anything copies them — then the REST
+     * routes regenerated over them. The data driver keeps the tables it was
+     * opened with until the process restarts: refreshing its catalogue is the
+     * driver's to offer.
+     */
+    editedTables.serve = (schema: EditedSchema): void => {
+        const collections: CollectionConfig[] = [...schema.collections];
+        enforceAuthSecretExclusion(collections);
+        tableRegistry.replaceAll(schema.descriptors);
+        servedPolicyCollections = schema.collections;
+        collectionRegistry.reset();
+        collections.forEach(collection => collectionRegistry.register(collection));
+        activeCollections = collections;
+        serverCollections.splice(0, serverCollections.length, ...collections.filter(
+            (collection) => resolveDataSource(collection, dataSourceRegistry).transport === "server"
+        ));
+        if (restRoutes) {
+            restRoutes.replace(new RestApiGenerator(
+                serverCollections,
+                defaultDriver,
+                authAdapter,
+                undefined,
+                undefined,
+                { provision: provision.database }
+            ).generateRoutes());
+        }
+        logger.info("Serving the tables the schema edit left", {
+            tables: schema.descriptors.length,
+            revision: tableRegistry.revision
+        });
+    };
 
     // ── OpenAPI / Swagger ─────────────────────────────────────────────────
     // Follows the data surface: the document describes the collection routes, so
@@ -3753,7 +3838,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         const { createSchemaTablesService, createSchemaTablesRoutes } = await import("../api/schema-tables-routes");
         const schemaTables = createSchemaTablesService({
             tableRegistry,
-            policySource: () => declaredTables.collections,
+            policySource: () => servedPolicyCollections,
             schemaVersion: config.schemaVersion
         });
 
@@ -3799,7 +3884,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         });
         if (!adminSurfacesGated) {
             warnOnMount(
-                "meta",
+                "schema",
                 "GET /schema/tables answers 404 SCHEMA_UNAVAILABLE: no auth is configured (no adapter or no " +
                 "jwtSecret), so there is no caller to describe the tables to."
             );
@@ -3991,6 +4076,15 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         meta: () => {
             requireSurface("meta");
             return group(metaSurface!);
+        },
+        schema: () => {
+            requireSurface("meta");
+            // The JSON error envelope of its own: mounted alone, on an
+            // application without Rebase's root handler, a refusal
+            // (401, 403, 404) must still answer as one.
+            const schemaGroup = group(schemaTablesSurface!);
+            schemaGroup.onError(errorHandler);
+            return schemaGroup;
         }
     };
 
@@ -4011,7 +4105,8 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         functions: servedGroup("functions"),
         admin: servedGroup("admin"),
         cron: servedGroup("cron"),
-        meta: servedGroup("meta")
+        meta: servedGroup("meta"),
+        schema: servedGroup("schema")
     };
 
     /** The base path the application last mounted at — where the SDK's socket dials by default. */
@@ -4037,6 +4132,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             if (surfaces.admin) mounted.add("admin");
             if (surfaces.cron && cronSurface) mounted.add("cron");
             if (surfaces.meta && metaSurface) mounted.add("meta");
+            if (surfaces.meta && schemaTablesSurface) mounted.add("schema");
             sayMountWarnings(mounted);
         }
 
@@ -4156,7 +4252,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         }
 
         if (surfaces.meta && metaSurface) app.route(`${basePath}/meta`, groups.meta());
-        if (surfaces.meta && schemaTablesSurface) app.route(`${basePath}/schema`, group(schemaTablesSurface));
+        if (surfaces.meta && schemaTablesSurface) app.route(`${basePath}/schema`, groups.schema());
 
         if (announce) logger.debug("Rebase backend mounted", { basePath });
     };

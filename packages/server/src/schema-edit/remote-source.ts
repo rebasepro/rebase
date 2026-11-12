@@ -1,39 +1,23 @@
 /**
- * Rewriting a collection whose source is not on this machine.
+ * Editing a schema whose source is not on this machine.
  *
  * A bundle deployment — every Cloud tenant, and any self-host running built
- * output — ships *compiled* collections. The AST editor rewrites the
- * TypeScript, opening it from a directory on disk, so there is nothing for it
- * to open. That single fact is why live schema editing was local-only: not
- * authentication, not the Git Data API, which have worked for a while, but the
- * editor needing a file.
+ * output — ships *compiled* tables. The schema editor rewrites the
+ * TypeScript of `backend/schema`, so the files are brought to it: the whole
+ * schema directory is read from the repository into a scratch directory, the
+ * editor previews the edit there exactly as it does locally (rewriting and
+ * compiling), and what it changed comes back as repository paths for the
+ * commit. The editor is the one implementation of preserving a table file's
+ * imports, comments and formatting; a second one for the remote case would be
+ * a second thing to get wrong.
  *
- * So the files are brought to it. Read the current source from the repository,
- * put it in a scratch directory shaped the way the editor expects, let the
- * editor do exactly what it does locally, and read the result back. The editor
- * is unchanged and untouched — which matters, because it is the part that knows
- * how to preserve a collection file's imports, comments and formatting, and a
- * second implementation of that for the remote case would be a second thing to
- * get wrong.
+ * The whole directory, not only the edited file: the edit is compiled before
+ * it is committed, and compiling reads every module the index exports — a
+ * relation's target, the index itself. A repository that cannot list a
+ * directory cannot be edited this way, and is refused.
  *
- * ## What the scratch directory holds
- *
- * The whole collections directory, when the repository can list it. The editor
- * reads a collection's siblings for two things: a relation picked by slug
- * imports the target's file (with one file present that threw "no file for it
- * in <tmp>"), and a deletion refuses while another file imports the one going
- * and takes it out of `index.ts`. A save is a person pressing a button, so a
- * read per collection file is cheap next to committing a relation that does not
- * resolve.
- *
- * A repository that cannot list gets the one file being edited, as before. That
- * is enough for an edit that touches no other collection; a deletion is refused
- * there, because without the siblings nothing can tell whether the project
- * would still load.
- *
- * What comes back is exactly what the editor changed — edited files, new
- * files, deletions — and the edited collection's file always, so the commit
- * names it even when the edit left it byte-identical.
+ * The scratch directory is removed on every path, the failing one included:
+ * it holds a copy of the customer's schema source.
  */
 import fs from "node:fs/promises";
 import os from "node:os";
@@ -43,34 +27,39 @@ import type { SchemaChangeFile } from "@rebasepro/types";
 import type { SchemaEditRepository } from "./apply-schema-change";
 
 /**
- * At most this many collection files are brought over.
+ * At most this many files are brought over.
  *
- * A collections directory holds tens of files. One holding thousands is not a
- * collections directory — a mis-set `collectionsPath` pointing at the repository
- * root, say — and reading every file in it on each save is the wrong thing to
- * do quietly.
+ * A schema directory holds tens of files. One holding thousands is not a
+ * schema directory — a mis-set `schemaPath` pointing at the repository root,
+ * say — and reading every file in it on each save is the wrong thing to do
+ * quietly.
  */
-export const MAX_REMOTE_COLLECTION_FILES = 500;
+export const MAX_REMOTE_SCHEMA_FILES = 500;
 
-export interface RemoteSourceOptions<Edit = Record<string, unknown>> {
+/** The files a schema module may be. */
+const MODULE = /\.(ts|mts|js|mjs|json)$/;
+
+/** A preview made in a scratch directory: the files it changed, and whatever else the editor answered. */
+export interface ScratchEdit<Result> {
+    /** Every file the edit changed, by its absolute path in the scratch directory. */
+    files: { path: string; contents: string; deleted?: true }[];
+    result: Result;
+}
+
+/**
+ * Options of {@link previewRemoteSchema}.
+ */
+export interface RemoteSchemaOptions<Result> {
     repository: SchemaEditRepository;
     /**
-     * Where the collection *source* lives in the repository, as a repo-relative
-     * posix path — `config/collections`, or `app/config/collections` for a
-     * project in a subdirectory.
-     *
-     * Not derivable from the bundle: its `collectionsDir` points at compiled
-     * output, which is a different directory holding different files.
+     * Where the schema source lives in the repository, as a repo-relative posix
+     * path — `backend/schema`, or `app/backend/schema` for a project in a
+     * subdirectory. Not derivable from the bundle, whose tables are compiled
+     * output.
      */
-    collectionsPath: string;
-    /**
-     * Applies the edit. Injected so this module needs no `ts-morph`.
-     *
-     * `edit` is whatever the caller's editor takes — a whole collection, the
-     * patch of what changed about an existing one, or a removal — passed
-     * through untouched.
-     */
-    edit: (collectionsDir: string, collectionId: string, edit: Edit) => Promise<void>;
+    schemaPath: string;
+    /** Preview the edit over the scratch directory. Injected so this module needs no `ts-morph`. */
+    preview: (dir: string) => Promise<ScratchEdit<Result>>;
 }
 
 /** `repoPath` inside `scratch`, refusing anything that would land outside it. */
@@ -78,115 +67,53 @@ function scratchPathFor(scratch: string, root: string, repoPath: string): string
     const relative = repoPath.slice(root.length + 1);
     const resolved = path.resolve(scratch, ...relative.split("/"));
     if (!repoPath.startsWith(`${root}/`) || !resolved.startsWith(scratch + path.sep)) {
-        throw new Error(`Refusing the repository path "${repoPath}": it resolves outside the collections directory.`);
+        throw new Error(`Refusing the repository path "${repoPath}": it resolves outside the schema directory.`);
     }
     return resolved;
 }
 
-/** Every `.ts` file under `dir`, as posix paths relative to it. */
-async function walk(dir: string, prefix = ""): Promise<string[]> {
-    const found: string[] = [];
-    for (const entry of await fs.readdir(dir, { withFileTypes: true })) {
-        const relative = prefix ? `${prefix}/${entry.name}` : entry.name;
-        if (entry.isDirectory()) found.push(...await walk(path.join(dir, entry.name), relative));
-        else if (entry.isFile() && entry.name.endsWith(".ts")) found.push(relative);
-    }
-    return found;
-}
-
-/** The current source: the whole directory when the repository can list it, else the one file. */
-async function fetchSources(
-    repository: SchemaEditRepository,
-    root: string,
-    target: string
-): Promise<{ sources: Map<string, string>; complete: boolean }> {
-    const read = repository.readFile!.bind(repository);
-    if (!repository.listFiles) {
-        const existing = await read(target);
-        return {
-            sources: new Map(existing === undefined ? [] : [[target, existing]]),
-            complete: false
-        };
-    }
-
-    const listed = (await repository.listFiles(root)).filter(file => file.endsWith(".ts"));
-    if (listed.length > MAX_REMOTE_COLLECTION_FILES) {
-        throw new Error(
-            `${root} holds ${listed.length} TypeScript files, more than the ${MAX_REMOTE_COLLECTION_FILES} ` +
-            "a collections directory is expected to. Check `collectionsPath` " +
-            "(REBASE_LIVE_SCHEMA_COLLECTIONS_PATH) points at the collection source."
-        );
-    }
-    const contents = await Promise.all(listed.map(async file => [file, await read(file)] as const));
-    return {
-        sources: new Map(contents.filter((entry): entry is readonly [string, string] => entry[1] !== undefined)),
-        complete: true
-    };
-}
-
 /**
- * Fetch, rewrite, and return the changed files — without leaving anything behind.
- *
- * The scratch directory is removed on every path, including the failing one. It
- * holds a copy of the customer's collection source, and a temp directory that
- * accumulates those on a long-running server is a slow leak of exactly the
- * thing worth not leaking.
+ * Fetch the schema directory, preview the edit over it, and return what
+ * changed as repository paths — without leaving anything behind.
  */
-export async function rewriteRemoteCollection<Edit>(
-    options: RemoteSourceOptions<Edit>,
-    collectionId: string,
-    change: Edit
-): Promise<SchemaChangeFile[]> {
-    const { repository, edit } = options;
-
-    if (!repository.readFile) {
+export async function previewRemoteSchema<Result>(
+    options: RemoteSchemaOptions<Result>
+): Promise<{ files: SchemaChangeFile[]; result: Result }> {
+    const { repository } = options;
+    if (!repository.readFile || !repository.listFiles) {
         throw new Error(
-            "This repository cannot read a file, so the collection source cannot be rewritten " +
-            "for a deployment that has none on disk."
+            "This repository cannot list a directory and read its files, so the schema source cannot be edited " +
+            "for a deployment that has none on disk: the edit is compiled against the whole schema directory."
+        );
+    }
+    const root = options.schemaPath.replace(/\/+$/, "");
+    const listed = (await repository.listFiles(root)).filter(file => MODULE.test(file));
+    if (listed.length > MAX_REMOTE_SCHEMA_FILES) {
+        throw new Error(
+            `${root} holds ${listed.length} module files, more than the ${MAX_REMOTE_SCHEMA_FILES} a schema directory ` +
+            "is expected to. Check that REBASE_LIVE_SCHEMA_PATH points at the schema source (backend/schema)."
         );
     }
 
-    const root = options.collectionsPath.replace(/\/+$/, "");
-    const target = `${root}/${collectionId}.ts`;
-
-    const scratch = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), "rebase-remote-source-")));
+    const scratch = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), "rebase-remote-schema-")));
     try {
-        const { sources, complete } = await fetchSources(repository, root, target);
-        for (const [repoPath, contents] of sources) {
+        for (const repoPath of listed) {
+            const contents = await repository.readFile(repoPath);
+            if (contents === undefined) continue;
             const local = scratchPathFor(scratch, root, repoPath);
             await fs.mkdir(path.dirname(local), { recursive: true });
             await fs.writeFile(local, contents, "utf8");
         }
-
-        await edit(scratch, collectionId, change);
-
-        const after = new Map<string, string>();
-        for (const relative of await walk(scratch)) {
-            after.set(`${root}/${relative}`, await fs.readFile(path.join(scratch, ...relative.split("/")), "utf8"));
-        }
-
-        const files: SchemaChangeFile[] = [];
-        for (const [repoPath, contents] of after) {
-            if (repoPath === target || sources.get(repoPath) !== contents) {
-                files.push({ path: repoPath, contents });
+        const edit = await options.preview(scratch);
+        const files: SchemaChangeFile[] = edit.files.map(file => {
+            const relative = path.relative(scratch, file.path);
+            if (relative.startsWith("..") || path.isAbsolute(relative)) {
+                throw new Error(`The edit wrote ${file.path}, outside the schema directory.`);
             }
-        }
-        for (const repoPath of sources.keys()) {
-            if (after.has(repoPath)) continue;
-            if (!complete) {
-                throw new Error(
-                    `Deleting "${collectionId}" needs every collection file, to check nothing imports it ` +
-                    "and to take it out of index.ts, and this repository cannot list a directory."
-                );
-            }
-            files.push({ path: repoPath, contents: "", deleted: true });
-        }
-
-        // The edited collection first, then the rest in path order: the commit
-        // and the receipt read the same either way, and a test can say what it
-        // expects.
-        return files.sort((a, b) =>
-            a.path === target ? -1 : b.path === target ? 1 : a.path.localeCompare(b.path));
+            const repoPath = `${root}/${relative.split(path.sep).join("/")}`;
+            return file.deleted ? { path: repoPath, contents: "", deleted: true } : { path: repoPath, contents: file.contents };
+        });
+        return { files: files.sort((a, b) => a.path.localeCompare(b.path)), result: edit.result };
     } finally {
         await fs.rm(scratch, { recursive: true, force: true });
     }

@@ -6,7 +6,7 @@ import type { RebaseBootEnv } from "./env";
 import { normalizePemFromEnv } from "../auth/jwt-keys";
 import { logger } from "../utils/logger";
 import { BundleError } from "./bundle";
-import { DEFAULT_COLLECTIONS_PATH } from "../schema-edit/project-root";
+import { DEFAULT_SCHEMA_PATH } from "../schema-edit/project-root";
 
 /**
  * True when an emailed link would be followable — i.e. when there is an
@@ -252,6 +252,7 @@ export type LiveSchemaEnv = Pick<RebaseBootEnv,
     | "REBASE_LIVE_SCHEMA_GITHUB_APP_ID"
     | "REBASE_LIVE_SCHEMA_GITHUB_APP_INSTALLATION_ID"
     | "REBASE_LIVE_SCHEMA_GITHUB_APP_PRIVATE_KEY"
+    | "REBASE_LIVE_SCHEMA_PATH"
     | "REBASE_LIVE_SCHEMA_COLLECTIONS_PATH"
     | "REBASE_LIVE_SCHEMA_BRANCH">;
 
@@ -265,11 +266,21 @@ export type LiveSchemaEnv = Pick<RebaseBootEnv,
  *
  * A target that is named but cannot be reached — no credential, two
  * credentials, half a GitHub App, a repository that is not `owner/name`, a
- * collections path that leaves the repository — fails the boot. The other
+ * schema path that leaves the repository — fails the boot. So does the
+ * removed `REBASE_LIVE_SCHEMA_COLLECTIONS_PATH`, which named a
+ * `config/collections` directory nothing reads any more. The other
  * outcome is an "Edit collection" button that fails on press, on a deployment
  * whose operator was sure they had configured it.
  */
 export function resolveLiveSchemaOptions(env: LiveSchemaEnv): LiveSchemaConfig | undefined {
+    if (env.REBASE_LIVE_SCHEMA_COLLECTIONS_PATH?.trim()) {
+        throw new BundleError(
+            "REBASE_LIVE_SCHEMA_COLLECTIONS_PATH was removed: the schema editor edits the tables in backend/schema, " +
+            "not a config/collections directory. Set REBASE_LIVE_SCHEMA_PATH to where backend/schema is in the " +
+            "repository (it defaults to backend/schema), and unset REBASE_LIVE_SCHEMA_COLLECTIONS_PATH.",
+            LIVE_SCHEMA_DOCS
+        );
+    }
     const repositoryName = env.REBASE_LIVE_SCHEMA_REPOSITORY?.trim();
     const token = env.REBASE_LIVE_SCHEMA_GITHUB_TOKEN?.trim();
     const app = {
@@ -314,12 +325,12 @@ export function resolveLiveSchemaOptions(env: LiveSchemaEnv): LiveSchemaConfig |
         );
     }
 
-    const collectionsPath = (env.REBASE_LIVE_SCHEMA_COLLECTIONS_PATH?.trim() || DEFAULT_COLLECTIONS_PATH)
+    const schemaPath = (env.REBASE_LIVE_SCHEMA_PATH?.trim() || DEFAULT_SCHEMA_PATH)
         .replace(/^\.\//, "")
         .replace(/\/+$/, "");
-    if (!collectionsPath || collectionsPath.startsWith("/") || collectionsPath.split("/").some(part => part === ".." || part === "")) {
+    if (!schemaPath || schemaPath.startsWith("/") || schemaPath.split("/").some(part => part === ".." || part === "")) {
         throw new BundleError(
-            `REBASE_LIVE_SCHEMA_COLLECTIONS_PATH must be a path inside the repository, like config/collections, not "${env.REBASE_LIVE_SCHEMA_COLLECTIONS_PATH}".`,
+            `REBASE_LIVE_SCHEMA_PATH must be a path inside the repository, like backend/schema, not "${env.REBASE_LIVE_SCHEMA_PATH}".`,
             LIVE_SCHEMA_DOCS
         );
     }
@@ -330,7 +341,7 @@ export function resolveLiveSchemaOptions(env: LiveSchemaEnv): LiveSchemaConfig |
             owner: match[1],
             repo: match[2],
             branch: env.REBASE_LIVE_SCHEMA_BRANCH?.trim() || "main",
-            collectionsPath,
+            schemaPath,
             auth: token
                 ? { kind: "token", token }
                 : {

@@ -381,8 +381,8 @@ export const bootEnvExtension = z.object({
      * Turn on live schema editing for a built bundle, committing to this
      * GitHub repository (`owner/name`).
      *
-     * Off unless set. A bundle ships compiled collections, so the admin's
-     * collection editor has no source to rewrite; with this set, a change is
+     * Off unless set. A bundle ships compiled tables, so the Studio's
+     * schema editor has no source to rewrite; with this set, a change is
      * read from the repository, rewritten, committed back through the Git Data
      * API, and its DDL run on this database. Admin-only, like the rest of
      * `/api/admin`, and applied only by a person (see
@@ -392,7 +392,13 @@ export const bootEnvExtension = z.object({
     REBASE_LIVE_SCHEMA_REPOSITORY: z.string().optional(),
     /** The branch the commit lands on. Defaults to `main`. */
     REBASE_LIVE_SCHEMA_BRANCH: z.string().optional(),
-    /** Where the collection source lives in that repository. Defaults to `config/collections`. */
+    /** Where `backend/schema` lives in that repository. Defaults to `backend/schema`. */
+    REBASE_LIVE_SCHEMA_PATH: z.string().optional(),
+    /**
+     * Removed — read only to refuse the boot with what replaced it
+     * (`REBASE_LIVE_SCHEMA_PATH`): it named a `config/collections` directory,
+     * which nothing reads any more.
+     */
     REBASE_LIVE_SCHEMA_COLLECTIONS_PATH: z.string().optional(),
     /** A token with read and write access to the repository's contents. */
     REBASE_LIVE_SCHEMA_GITHUB_TOKEN: z.string().optional(),

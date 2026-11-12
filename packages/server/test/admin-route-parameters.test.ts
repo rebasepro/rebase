@@ -15,7 +15,7 @@ import { Hono } from "hono";
 import { createCronRoutes } from "../src/cron/cron-routes";
 import { createLogsRoutes, logBuffer } from "../src/api/logs-routes";
 import { createFunctionRoutes } from "../src/functions/function-routes";
-import { createSchemaEditorRoutes, createSchemaSourceEditor } from "../src/api/schema-editor-routes";
+import { createSchemaEditorRoutes, createTableSourceEditor } from "../src/api/schema-editor-routes";
 import { CronScheduler } from "../src/cron/cron-scheduler";
 import type { HonoEnv } from "../src/api/types";
 
@@ -108,7 +108,7 @@ describe("GET /functions", () => {
 });
 
 describe("POST /admin/schema-editor/*", () => {
-    const app = mount(createSchemaEditorRoutes(createSchemaSourceEditor("/tmp/rebase-schema-editor-test")));
+    const app = mount(createSchemaEditorRoutes(createTableSourceEditor("/tmp/rebase-schema-editor-test")));
 
     const post = (path: string, body: string) => app.request(path, {
         method: "POST",
@@ -116,27 +116,33 @@ describe("POST /admin/schema-editor/*", () => {
         body
     });
 
-    it("refuses a body with no collectionId", async () => {
-        const res = await post("/collection/delete", JSON.stringify({}));
+    it("refuses a body with no patches", async () => {
+        const res = await post("/apply", JSON.stringify({}));
         expect(res.status).toBe(400);
         const body = await res.json() as { error: { code: string; message: string } };
         expect(body.error.code).toBe("INVALID_INPUT");
-        expect(body.error.message).toContain("collectionId");
+        expect(body.error.message).toContain("patches");
     });
 
     it("refuses a body that is not JSON", async () => {
-        expect((await post("/collection/delete", "not json")).status).toBe(400);
+        expect((await post("/apply", "not json")).status).toBe(400);
+    });
+
+    it("names every problem of a malformed edit, with where it is", async () => {
+        const res = await post("/apply", JSON.stringify({ patches: [{ op: "createTable", table: { name: "../../etc/passwd", columns: {}, rls: [] } }] }));
+        expect(res.status).toBe(400);
+        const body = await res.json() as { error: { code: string; message: string; details: { problems: { index: number; message: string }[] } } };
+        expect(body.error.code).toBe("INVALID_INPUT");
+        expect(body.error.details.problems.map(problem => problem.message).join(" ")).toMatch(/SQL identifier[\s\S]*at least one column[\s\S]*"admin-only"/);
     });
 
     it("hands the editor's own refusal to the caller", async () => {
-        // These messages are written for the person in the panel — "Only
-        // alphanumeric characters, underscores, and hyphens are allowed". They
-        // were thrown as plain `Error`s, so every one of them arrived as a 500
-        // reading "Internal Server Error".
-        const res = await post("/collection/delete", JSON.stringify({ collectionId: "../../etc/passwd" }));
+        // Written for the person in the panel, and a 400 — not a 500 reading
+        // "Internal Server Error".
+        const res = await post("/apply", JSON.stringify({ patches: [{ op: "removeColumn", table: "posts", key: "title" }] }));
         expect(res.status).toBe(400);
         const body = await res.json() as { error: { code: string; message: string } };
         expect(body.error.code).toBe("SCHEMA_EDIT_REFUSED");
-        expect(body.error.message).toMatch(/Invalid collection ID/i);
+        expect(body.error.message).toMatch(/No table with the slug "posts"/);
     });
 });

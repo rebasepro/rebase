@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import { Hono } from "hono";
-import type { AuthAdapter, AuthUserData, CollectionConfig, SchemaChangePlan, SchemaEditingAdmin, SQLAdmin, UserManagementAdapter } from "@rebasepro/types";
+import type { AuthAdapter, AuthUserData, PostgresCollectionConfig, SchemaChangePlan, SchemaEditingAdmin, SQLAdmin, UserManagementAdapter } from "@rebasepro/types";
 
 import { HonoEnv } from "../src/api/types";
 import { errorHandler } from "../src/api/errors";
@@ -33,7 +33,7 @@ const admin: SchemaEditingAdmin & Pick<SQLAdmin, "executeSql"> = {
     executeSql: async () => []
 };
 
-const tags: CollectionConfig = { slug: "tags", name: "Tags", table: "tags", properties: { name: { type: "string" } } };
+const tags: PostgresCollectionConfig = { slug: "tags", name: "Tags", table: "tags", properties: { name: { type: "string" } } };
 
 function apply(over: Partial<LiveSchemaRoutesConfig>, user: HonoEnv["Variables"]["user"] = TOKEN_USER) {
     const authors: ({ name: string; email: string } | undefined)[] = [];
@@ -54,18 +54,17 @@ function apply(over: Partial<LiveSchemaRoutesConfig>, user: HonoEnv["Variables"]
         getCollections: () => [tags],
         getAdmin: () => admin,
         getRepository: (author) => { authors.push(author); return repository; },
-        writeSource: async () => [{ path: "config/collections/tags.ts", contents: "export default {};" }],
+        previewSource: async () => ({
+            files: [{ path: "backend/schema/tags.ts", contents: "export const tags = defineTable(…);" }],
+            schema: { defs: [], descriptors: [], collections: [tags] }
+        }),
+        writeSource: async (source) => source.files,
         ...over
     }));
     const response = app.fetch(new Request("http://localhost/api/schema/apply", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        // A whole collection for one that exists is turned into the patch of
-        // what differs: one new property.
-        body: JSON.stringify({
-            collectionId: "tags",
-            collection: { slug: "tags", name: "Tags", table: "tags", properties: { name: { type: "string" }, color: { type: "string" } } }
-        })
+        body: JSON.stringify({ patches: [{ op: "addColumn", table: "tags", key: "color", column: { type: { kind: "text" } } }] })
     }));
     return { response, authors };
 }

@@ -222,6 +222,18 @@ describe("one group, mounted alone, at a path of the application's choosing", ()
         expect(widgets.data[0].source).toBe("main");
     });
 
+    it("schema: serves the table descriptors, mounted on its own", async () => {
+        const backend = await create();
+        const app = new Hono<HonoEnv>();
+        app.route("/v2/schema", backend.routes.schema());
+
+        expect((await app.request("/v2/schema/tables")).status).toBe(401);
+        const res = await app.request("/v2/schema/tables", await bearer("u-1", ["admin"]));
+        expect(res.status).toBe(200);
+        expect(res.headers.get("etag")).toBeTruthy();
+        expect((await res.json() as { slug: string }[]).map(table => table.slug)).toContain("widgets");
+    });
+
     it("refuses a group whose surface is off, by name", async () => {
         const backend = await create({ surfaces: { data: false } });
         expect(() => backend.routes.data()).toThrow(/surfaces: \{ data: false \}/);

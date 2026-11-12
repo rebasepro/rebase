@@ -106,7 +106,7 @@
         "packages/cms/src/collection_editor/**",
         "packages/cms/src/collection_editor_ui.ts",
         "packages/server/src/schema-edit/**",
-        "packages/server/src/api/ast-schema-editor.ts",
+        "packages/server/src/api/table-source-editor.ts",
         "packages/server/src/api/live-schema-routes.ts",
         "packages/server/src/api/schema-editor-routes.ts",
         "packages/server/src/api/logs-routes.ts",

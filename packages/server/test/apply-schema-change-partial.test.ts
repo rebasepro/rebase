@@ -100,13 +100,17 @@ describe("a DDL failure after the first statement", () => {
             getCollections: () => [{ slug: "posts", name: "posts", properties: {} }],
             getAdmin: () => admin,
             getRepository: () => repository(),
+            previewSource: async () => ({
+                files: [],
+                schema: { defs: [], descriptors: [], collections: [{ slug: "posts", name: "posts", properties: {} }] }
+            }),
             writeSource: async () => []
         }));
 
         const response = await app.fetch(new Request("http://localhost/api/schema/apply", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ collectionId: "posts", collection: { name: "Posts", properties: {} } })
+            body: JSON.stringify({ patches: [{ op: "setOption", table: "posts", option: "description", value: "Posts" }] })
         }));
         const body = await response.json() as { applied: boolean; appliedStatements?: number; summary: string };
 

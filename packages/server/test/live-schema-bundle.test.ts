@@ -11,16 +11,14 @@ import type { HonoEnv } from "../src/api/types";
 import { fakeDataDriver } from "./helpers/server-a-fakes";
 import { generateAccessToken } from "../src/auth/jwt";
 import { tablesFrom } from "./helpers/tables";
+import { SCHEMA_FILES } from "./helpers/schema-source-fixture";
 
 /**
  * Live schema editing from a built bundle, opted into with a repository.
  *
  * A bundle boots with `schemaEditor: false` and `NODE_ENV=production`, and its
- * `collectionsDir` holds compiled output. Live editing used to need the
- * source-only editor to be on (`writeSource` was built from it), so a bundle
- * answered `SCHEMA_EDITOR_DISABLED` — naming a setting its operator never
- * wrote — even with `liveSchema.repository` configured. With a repository, the
- * write path is its own: fetch the collection files, rewrite them, commit them.
+ * `schemaDir` holds compiled output. With a repository, the write path is its
+ * own: fetch `backend/schema`, preview the edit there, commit what changed.
  *
  * Without one, nothing changes: the same refusal, and the source-only editor
  * stays off either way.
@@ -134,35 +132,9 @@ async function getJson(app: Hono<HonoEnv>, url: string, uid?: string, roles?: st
     return { status: res.status, body: await res.json() as Record<string, unknown> };
 }
 
-const fileOf = (slug: string, extra = "", imports = "") => [
-    "import { defineCollection } from \"@rebasepro/cms-types\";",
-    imports,
-    `const ${slug}Collection = defineCollection({`,
-    `    name: "${slug}",`,
-    `    slug: "${slug}",`,
-    `    table: "${slug}",`,
-    "    properties: {",
-    `        name: { name: "Name", type: "string" }${extra}`,
-    "    }",
-    "});",
-    "",
-    `export default ${slug}Collection;`,
-    ""
-].join("\n");
-
-const REMOTE: Record<string, string> = {
-    "config/collections/posts.ts": fileOf("posts"),
-    "config/collections/authors.ts": fileOf("authors"),
-    "config/collections/tags.ts": fileOf("tags"),
-    "config/collections/index.ts": [
-        "import postsCollection from \"./posts\";",
-        "import authorsCollection from \"./authors\";",
-        "import tagsCollection from \"./tags\";",
-        "",
-        "export const collections = [postsCollection, authorsCollection, tagsCollection];",
-        ""
-    ].join("\n")
-};
+const REMOTE: Record<string, string> = Object.fromEntries(
+    Object.entries(SCHEMA_FILES).map(([name, text]) => [`backend/schema/${name}`, text])
+);
 
 /**
  * GitHub, as far as a schema commit reaches it. A commit whose ref update is
@@ -254,10 +226,10 @@ describe("a bundle with liveSchema.repository", () => {
         const app = await bootBundle({ liveSchema: { repository: REPOSITORY } });
         expect((await getJson(app, "/api/admin/schema-editor/status")).body)
             .toMatchObject({ enabled: false, code: "SCHEMA_EDITOR_DISABLED" });
-        const res = await app.request("/api/admin/schema-editor/collection/save", {
+        const res = await app.request("/api/admin/schema-editor/apply", {
             method: "POST",
             headers: { "content-type": "application/json", ...(await bearer()) },
-            body: JSON.stringify({ collectionId: "posts", collectionData: { name: "x" } })
+            body: JSON.stringify({ patches: [{ op: "setOption", table: "posts", option: "description", value: "x" }] })
         });
         expect(res.status).toBe(501);
     }, BOOTS_A_BACKEND);
@@ -269,73 +241,62 @@ describe("a bundle with liveSchema.repository", () => {
         expect(res.status).toBe(401);
     }, BOOTS_A_BACKEND);
 
-    it("commits a relation to another collection, importing the target's file", async () => {
+    it("commits a relation to another table, importing the target's file", async () => {
         const github = fakeGitHub();
         const app = await bootBundle({ liveSchema: { repository: REPOSITORY } });
 
         const result = await apply(app, {
-            collectionId: "posts",
-            patch: [{
-                op: "set",
-                path: ["properties", "author"],
-                value: { name: "Author", type: "relation", relation: { kind: "belongsTo", target: "authors" } }
-            }]
+            patches: [{ op: "addRelation", table: "posts", name: "tags", relation: { kind: "manyToMany", target: "tags" } }]
         });
 
         expect(result.status).toBe(200);
         const tree = github.committed();
-        expect(Object.keys(tree).sort()).toEqual(["config/collections/posts.ts", "config/schema.generated.ts"]);
-        expect(tree["config/collections/posts.ts"]).toContain("import authorsCollection from \"./authors.js\";");
-        expect(tree["config/collections/posts.ts"]).toContain("target: () => authorsCollection");
+        expect(Object.keys(tree).sort()).toEqual(["backend/schema/posts.ts", "config/schema.generated.ts"]);
+        expect(tree["backend/schema/posts.ts"]).toContain("import { tags } from \"./tags\";");
+        expect(tree["backend/schema/posts.ts"]).toContain("tags: rel.manyToMany(() => tags)");
         // The DDL ran here (boot runs its own SQL through the same admin too).
         expect(executed).toContain('ALTER TABLE "posts" ADD COLUMN IF NOT EXISTS "author_id" UUID;');
         // Never forced: a commit that landed meanwhile fails this one.
         expect(github.calls.find(c => c.method === "PATCH")?.body).toMatchObject({ force: false });
     }, BOOTS_A_BACKEND);
 
-    it("deletes a collection, taking it out of index.ts in the same commit", async () => {
+    it("deletes a table, taking it out of the index in the same commit", async () => {
         const github = fakeGitHub();
         const app = await bootBundle({ liveSchema: { repository: REPOSITORY } });
 
-        const result = await apply(app, { collectionId: "tags", remove: true });
+        const result = await apply(app, { patches: [{ op: "deleteTable", table: "tags" }] });
 
         expect(result.status).toBe(200);
         const tree = github.committed();
-        expect(tree["config/collections/tags.ts"]).toBeNull();
-        expect(tree["config/collections/index.ts"]).toContain("postsCollection, authorsCollection]");
-        expect(tree["config/collections/index.ts"]).not.toMatch(/tags/i);
+        expect(tree["backend/schema/tags.ts"]).toBeNull();
+        expect(tree["backend/schema/index.ts"]).toContain("export { posts } from \"./posts\";");
+        expect(tree["backend/schema/index.ts"]).not.toMatch(/tags/i);
     }, BOOTS_A_BACKEND);
 
-    it("refuses a second change until the first is deployed, committing nothing", async () => {
-        // The generated schema files in a commit are built from the
-        // collections this deployment runs. Until the first commit is
-        // deployed those leave its change out, so a second commit would
-        // put back generated files without it.
+    it("serves the change once applied, so its own next change is planned against it", async () => {
+        // The generated schema files in a commit are built from the tables
+        // this deployment serves. The apply swaps them for the edited ones, so
+        // a second change from the same process carries the first in its
+        // generated file — and a fresh process, which still serves the
+        // deployed tables, refuses (below).
         const github = fakeGitHub();
         const app = await bootBundle({ liveSchema: { repository: REPOSITORY } });
-        const change = {
-            collectionId: "posts",
-            patch: [{ op: "set", path: ["properties", "subtitle"], value: { name: "Subtitle", type: "string" } }]
-        };
 
-        expect((await apply(app, change)).status).toBe(200);
-        const second = await apply(app, change);
+        const first = await apply(app, { patches: [{ op: "addColumn", table: "tags", key: "color", column: { type: { kind: "text" } } }] });
+        expect(first.status).toBe(200);
+        const tables = await getJson(app, "/api/schema/tables");
+        expect(JSON.stringify(tables.body)).toContain("\"color\"");
 
-        expect(second.status).toBe(400);
-        expect(second.body).toMatchObject({ error: { code: "SCHEMA_CHANGE_FAILED" } });
-        expect(String((second.body.error as { message: string }).message))
-            .toMatch(/config\/schema\.generated\.ts.*Deploy it/s);
-        expect(github.calls.filter(c => c.method === "PATCH")).toHaveLength(1);
+        const second = await apply(app, { patches: [{ op: "addColumn", table: "tags", key: "size", column: { type: { kind: "integer" } } }] });
+        expect(second.status).toBe(200);
+        expect(github.calls.filter(c => c.method === "PATCH")).toHaveLength(2);
     }, BOOTS_A_BACKEND);
 
     // The guard used to be a flag this process set when it committed. These
     // are the three ways past it: nothing in a fresh process's memory says a
     // change is waiting, and the repository does.
     describe("a fresh process (a restart, another replica) over a repository holding an undeployed change", () => {
-        const change = {
-            collectionId: "posts",
-            patch: [{ op: "set", path: ["properties", "subtitle"], value: { name: "Subtitle", type: "string" } }]
-        };
+        const change = { patches: [{ op: "addColumn", table: "posts", key: "subtitle", column: { type: { kind: "text" } } }] };
 
         it("refuses a change after a schema change committed here and not deployed yet", async () => {
             // What the first process committed: the generated file for the
@@ -382,10 +343,7 @@ describe("a bundle with liveSchema.repository", () => {
     it("does not count a commit that was refused", async () => {
         const github = fakeGitHub();
         const app = await bootBundle({ liveSchema: { repository: REPOSITORY } });
-        const change = {
-            collectionId: "posts",
-            patch: [{ op: "set", path: ["properties", "subtitle"], value: { name: "Subtitle", type: "string" } }]
-        };
+        const change = { patches: [{ op: "addColumn", table: "posts", key: "subtitle", column: { type: { kind: "text" } } }] };
         const answer = jest.mocked(globalThis.fetch).getMockImplementation();
         if (!answer) throw new Error("fakeGitHub installed no fetch implementation");
         let refuse = true;

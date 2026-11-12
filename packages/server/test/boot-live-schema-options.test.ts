@@ -38,23 +38,30 @@ describe("resolveLiveSchemaOptions", () => {
                 owner: "acme",
                 repo: "shop",
                 branch: "main",
-                collectionsPath: "config/collections",
+                schemaPath: "backend/schema",
                 auth: { kind: "token", token: "github_pat_x" }
             }
         });
     });
 
-    it("takes the branch and the collections path", () => {
+    it("takes the branch and the schema path", () => {
         const options = resolveLiveSchemaOptions(env({
             REBASE_LIVE_SCHEMA_REPOSITORY: "acme/shop",
             REBASE_LIVE_SCHEMA_BRANCH: "schema-edits",
-            REBASE_LIVE_SCHEMA_COLLECTIONS_PATH: "app/config/collections/",
+            REBASE_LIVE_SCHEMA_PATH: "app/backend/schema/",
             REBASE_LIVE_SCHEMA_GITHUB_TOKEN: "github_pat_x"
         }));
         expect(options?.repository).toMatchObject({
             branch: "schema-edits",
-            collectionsPath: "app/config/collections"
+            schemaPath: "app/backend/schema"
         });
+    });
+
+    it("fails the boot on the removed REBASE_LIVE_SCHEMA_COLLECTIONS_PATH, naming what replaced it", () => {
+        for (const repository of [{}, { REBASE_LIVE_SCHEMA_REPOSITORY: "acme/shop", REBASE_LIVE_SCHEMA_GITHUB_TOKEN: "github_pat_x" }]) {
+            expect(() => resolveLiveSchemaOptions(env({ ...repository, REBASE_LIVE_SCHEMA_COLLECTIONS_PATH: "config/collections" })))
+                .toThrow(/REBASE_LIVE_SCHEMA_COLLECTIONS_PATH was removed[\s\S]*REBASE_LIVE_SCHEMA_PATH/);
+        }
     });
 
     it("builds the repository from a GitHub App, normalising the key", () => {
@@ -110,12 +117,12 @@ describe("resolveLiveSchemaOptions", () => {
         }))).toThrow(/both/);
     });
 
-    it("refuses a collections path that leaves the repository", () => {
+    it("refuses a schema path that leaves the repository", () => {
         expect(() => resolveLiveSchemaOptions(env({
             REBASE_LIVE_SCHEMA_REPOSITORY: "acme/shop",
             REBASE_LIVE_SCHEMA_GITHUB_TOKEN: "github_pat_x",
-            REBASE_LIVE_SCHEMA_COLLECTIONS_PATH: "../elsewhere"
-        }))).toThrow(/REBASE_LIVE_SCHEMA_COLLECTIONS_PATH/);
+            REBASE_LIVE_SCHEMA_PATH: "../elsewhere"
+        }))).toThrow(/REBASE_LIVE_SCHEMA_PATH must be a path inside the repository/);
     });
 
     it("warns, and stays off, when a credential is set without a repository", () => {

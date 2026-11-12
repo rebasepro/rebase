@@ -1,18 +1,20 @@
 /**
  * "Edit source only" commits, through the same door as every other change.
  *
- * It used to write the collection through the source-only editor and stop: the
- * file (and, under `rebase dev`, the regenerated schema) were left uncommitted,
- * so the next "Commit and apply" on any collection was refused with 409
- * SCHEMA_EDIT_DIRTY_TREE naming them — and the dialog never said so. Now it is
- * a commit with no DDL, whose message names what the database keeps.
+ * It is a commit with no DDL, whose message names what the database keeps —
+ * so the next "Commit and apply" does not meet its leftovers as somebody
+ * else's work in progress.
  */
+import { afterEach, beforeEach, describe, expect, it } from "@jest/globals";
 import { Hono } from "hono";
-import type { CollectionConfig, DatabaseAdmin, SchemaChange, SchemaChangePlan } from "@rebasepro/types";
+import path from "node:path";
+import type { DatabaseAdmin, PostgresCollectionConfig, SchemaChange, SchemaChangeFile, SchemaChangePlan, TablePatch } from "@rebasepro/types";
 import { HonoEnv } from "../src/api/types";
 import { errorHandler } from "../src/api/errors";
-import { createLiveSchemaRoutes } from "../src/api/live-schema-routes";
+import { createLiveSchemaRoutes, type PreviewedSource } from "../src/api/live-schema-routes";
+import { TableSourceEditor } from "../src/api/table-source-editor";
 import type { SchemaEditRepository } from "../src/schema-edit/apply-schema-change";
+import { writeSchemaFixture } from "./helpers/schema-source-fixture";
 
 const REMOVAL: SchemaChange = {
     kind: "remove-property",
@@ -22,6 +24,11 @@ const REMOVAL: SchemaChange = {
     detail: "\"sku\" was removed, which would drop column \"sku\" and the data in it.",
     sourceOnly: "column \"sku\" stays in the database.",
     kept: "column products.sku kept"
+};
+
+const products: PostgresCollectionConfig = {
+    slug: "products", name: "Products",
+    properties: { title: { type: "string" }, sku: { type: "string" } }
 };
 
 function harness(change = REMOVAL) {
@@ -56,13 +63,15 @@ function harness(change = REMOVAL) {
         await next();
     });
     app.route("/api/schema", createLiveSchemaRoutes({
-        getCollections: (): CollectionConfig[] => [{
-            slug: "products", name: "Products",
-            properties: { title: { type: "string" }, sku: { type: "string" } }
-        }],
+        getCollections: () => [products],
         getAdmin: () => admin,
         getRepository: () => repository,
-        writeSource: async () => { events.push("write-source"); return []; }
+        previewSource: async () => ({
+            files: [{ path: "backend/schema/products.ts", contents: "…" }],
+            schema: { defs: [], descriptors: [], collections: [{ ...products, properties: { title: { type: "string" } } }] }
+        }),
+        writeSource: async (source) => { events.push("write-source"); return source.files; },
+        onApplied: () => { events.push("served"); }
     }));
     const apply = (body: unknown) => app.fetch(new Request("http://localhost/api/schema/apply", {
         method: "POST",
@@ -72,12 +81,12 @@ function harness(change = REMOVAL) {
     return { apply, events, planned };
 }
 
-const patch = [{ op: "remove", path: ["properties", "sku"] }];
+const patches: TablePatch[] = [{ op: "removeColumn", table: "products", key: "sku" }];
 
 describe("Edit source only", () => {
-    it("commits the source and the generated schema, and runs no SQL", async () => {
+    it("commits the source and the generated schema, runs no SQL, and serves nothing new", async () => {
         const { apply, events, planned } = harness();
-        const response = await apply({ collectionId: "products", patch, sourceOnly: true });
+        const response = await apply({ patches, sourceOnly: true });
         const body = await response.json() as { applied: boolean; sourceOnly?: boolean; summary: string };
 
         expect(response.status).toBe(200);
@@ -89,42 +98,45 @@ describe("Edit source only", () => {
         ]);
         expect(body.sourceOnly).toBe(true);
         expect(body.applied).toBe(false);
-        expect(body.summary).toMatch(/source only/i);
         expect(body.summary).toMatch(/column products\.sku kept/);
     });
 
     it("is still refused as an apply", async () => {
         const { apply, events } = harness();
-        const response = await apply({ collectionId: "products", patch });
-        expect(response.status).toBe(400);
+        expect((await apply({ patches })).status).toBe(400);
         expect(events).toEqual([]);
     });
 
     it("is refused for a change that may not be written to the source alone", async () => {
         const { apply, events } = harness({ ...REMOVAL, kind: "change-primary-key", sourceOnly: undefined, kept: undefined });
-        const response = await apply({ collectionId: "products", patch, sourceOnly: true });
+        const response = await apply({ patches, sourceOnly: true });
         expect(response.status).toBe(400);
         expect(await response.text()).toMatch(/source alone/);
         expect(events).toEqual([]);
     });
 });
 
-describe("deleting a collection through the live door", () => {
-    it("plans the set without it and hands the writer a removal", async () => {
+describe("deleting a table through the live door", () => {
+    let fixture: ReturnType<typeof writeSchemaFixture>;
+    beforeEach(() => { fixture = writeSchemaFixture(); });
+    afterEach(() => fixture.cleanup());
+
+    it("plans the schema without it and commits its file as deleted, with the index", async () => {
+        const editor = new TableSourceEditor(fixture.dir);
         const planned: unknown[][] = [];
-        const written: unknown[] = [];
+        const committed: SchemaChangeFile[] = [];
         const admin: DatabaseAdmin = {
             planSchemaChange: async (_b: unknown, after: unknown[], options?: { sourceOnly?: boolean }) => {
                 planned.push(after);
                 const change: SchemaChange = {
-                    kind: "remove-collection", verdict: "needs-migration", collection: "products",
-                    detail: "Collection \"products\" was removed.",
-                    sourceOnly: "Table \"products\" and every row in it stay in the database, and nothing serves them.",
-                    kept: "table products kept"
+                    kind: "remove-collection", verdict: "needs-migration", collection: "tags",
+                    detail: "Table \"tags\" was removed.",
+                    sourceOnly: "Table \"tags\" and every row in it stay in the database, and nothing serves them.",
+                    kept: "table tags kept"
                 };
                 const classified: SchemaChangePlan["classified"] = { changes: [change], verdict: "needs-migration", applicable: false };
                 if (!options?.sourceOnly) throw Object.assign(new Error("x"), { classified });
-                return { files: [{ path: "backend/src/schema.generated.ts", contents: "x" }], statements: [], classified, message: "chore(schema): remove the products collection (source only — table products kept)\n" };
+                return { files: [{ path: "backend/src/schema.generated.ts", contents: "x" }], statements: [], classified, message: "chore(schema): remove the tags table (source only — table tags kept)\n" };
             },
             executeSql: async () => []
         };
@@ -132,23 +144,32 @@ describe("deleting a collection through the live door", () => {
         app.onError(errorHandler);
         app.use("/*", async (c, next) => { c.set("user", { uid: "u_1", roles: ["admin"] }); await next(); });
         app.route("/api/schema", createLiveSchemaRoutes({
-            getCollections: (): CollectionConfig[] => [{ slug: "products", name: "Products", properties: {} }],
+            getCollections: () => [],
             getAdmin: () => admin,
             getRepository: () => ({
-                root: "/tmp/p", currentBranch: async () => "main", dirtyPaths: async () => [],
-                writeFiles: async () => undefined, commit: async () => "abc123def456"
+                root: fixture.root, currentBranch: async () => "main", dirtyPaths: async () => [],
+                writeFiles: async (files) => { committed.push(...files); }, commit: async () => "abc123def456"
             }),
-            writeSource: async (change) => { written.push(change); return []; }
+            previewSource: async (edits): Promise<PreviewedSource> => {
+                const edit = await editor.preview(edits);
+                return {
+                    files: edit.files.map(file => ({ path: path.relative(fixture.root, file.path), contents: file.contents, ...(file.deleted ? { deleted: true } : {}) })),
+                    schema: edit.schema
+                };
+            },
+            writeSource: async (source) => source.files
         }));
         const response = await app.fetch(new Request("http://localhost/api/schema/apply", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ collectionId: "products", remove: true, sourceOnly: true })
+            body: JSON.stringify({ patches: [{ op: "deleteTable", table: "tags" }], sourceOnly: true })
         }));
         const body = await response.json() as { summary: string };
         expect(response.status).toBe(200);
-        expect(planned[0]).toEqual([]);
-        expect(written).toEqual([{ collectionId: "products", remove: true }]);
-        expect(body.summary).toMatch(/table products kept/);
+        expect(planned[0].map(each => (typeof each === "object" && each !== null && "slug" in each ? each.slug : undefined)))
+            .toEqual(["users", "posts", "archived"]);
+        expect(committed.filter(file => file.path.startsWith("backend/schema")).map(file => `${file.path}${file.deleted ? " (deleted)" : ""}`))
+            .toEqual(["backend/schema/index.ts", "backend/schema/tags.ts (deleted)"]);
+        expect(body.summary).toMatch(/table tags kept/);
     });
 });

@@ -103,11 +103,11 @@ const post = (app: Hono<HonoEnv>, body: unknown) =>
     }));
 
 describe("live schema editing, as mounted", () => {
-    it("is reachable when a collectionsDir is configured", async () => {
+    it("is reachable when a schemaDir is configured", async () => {
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-live-schema-"));
         const { app, stop } = await boot(dir);
         try {
-            const res = await post(app, { collectionId: "posts", collection: { name: "Posts" } });
+            const res = await post(app, { patches: [{ op: "setOption", table: "posts", option: "description", value: "Posts" }] });
 
             // 401, not 404: the route exists *and* the admin gate is in front
             // of it. Those are the two things worth pinning here — a route that
@@ -125,7 +125,7 @@ describe("live schema editing, as mounted", () => {
         }
     }, BOOTS_A_BACKEND);
 
-    it("says why, rather than 401ing, when there is no collectionsDir to edit", async () => {
+    it("says why, rather than 401ing, when there is no schemaDir to edit", async () => {
         // The surface lives under `/api/admin`, and the gate in front of that
         // answers 401 to anything unmounted below it. An operator who forgot
         // `collectionsDir` would read that as a credential problem and go and
@@ -133,7 +133,7 @@ describe("live schema editing, as mounted", () => {
         // its own words — the same posture the schema editor beside it takes.
         const { app, stop } = await boot(undefined);
         try {
-            const res = await post(app, { collectionId: "posts", collection: {} });
+            const res = await post(app, { patches: [{ op: "setOption", table: "posts", option: "description", value: "Posts" }] });
             expect(res.status).toBe(401);
 
             // Past the gate, the refusal names the actual obstacle.
@@ -157,7 +157,7 @@ describe("live schema editing, as mounted", () => {
         try {
             const { app, stop } = await boot(dir);
             try {
-                const res = await post(app, { collectionId: "posts", collection: { name: "Posts" } });
+                const res = await post(app, { patches: [{ op: "setOption", table: "posts", option: "description", value: "Posts" }] });
                 // The source-only editor answers 501 SCHEMA_EDITOR_PRODUCTION
                 // here, because it edits files a deploy would overwrite. This
                 // one is gated on having a repository, not on the environment,

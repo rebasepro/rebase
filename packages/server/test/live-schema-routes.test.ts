@@ -1,45 +1,33 @@
 /**
- * The live schema editing routes.
+ * The live schema editing routes, on the table model.
  *
- * Two properties carry most of the weight:
+ * Three properties carry most of the weight:
  *
- * - **`/plan` has no side effects.** It is what a UI calls to show someone what
- *   will happen before they agree to it, and a "preview" that wrote something
- *   would be worse than no preview.
- * - **A refused change writes nothing at all** — not the collection source, not
- *   the generated files, not the DDL. `writeSource` goes to disk through the AST
- *   editor, outside the repository's own checks, so the refusal has to come
- *   first or a rejected edit leaves a rewritten file behind and reports that
- *   nothing happened.
+ * - **`/plan` has no side effects.** The edit is previewed on a copy of the
+ *   source and compiled; nothing is written.
+ * - **A refused change writes nothing at all** — not the table source, not the
+ *   generated files, not the DDL.
+ * - **After an apply, the running server knows** — `onApplied` hands it the
+ *   schema the edit left, and only when the database has the change.
  *
  * The driver is faked. What the planner decides is tested against the real
  * generator in `@rebasepro/server-postgres`; what these routes do with the
  * answer is what is under test here.
  */
+import { afterEach, beforeEach, describe, expect, it } from "@jest/globals";
 import { Hono } from "hono";
-import type { CollectionConfig, DatabaseAdmin, PostgresProperties, SchemaChangePlan } from "@rebasepro/types";
+import path from "node:path";
+import type { DatabaseAdmin, PostgresCollectionConfig, SchemaChangePlan, TablePatch } from "@rebasepro/types";
+import { EMPTY_ACCESS_MODEL } from "@rebasepro/types";
 import { HonoEnv } from "../src/api/types";
 import { errorHandler } from "../src/api/errors";
-import {
-    createLiveSchemaRoutes,
-    proposedCollections,
-    type LiveSchemaRoutesConfig
-} from "../src/api/live-schema-routes";
+import { createLiveSchemaRoutes, type LiveSchemaRoutesConfig, type PreviewedSource } from "../src/api/live-schema-routes";
+import { TableSourceEditError, TableSourceEditor, type EditedSchema } from "../src/api/table-source-editor";
 import type { SchemaEditRepository } from "../src/schema-edit/apply-schema-change";
-import { compileTables } from "@rebasepro/common";
-import { tablesFrom } from "./helpers/tables";
-
-/** A planned collection set compiles as boot compiles tables: what the planner was handed is servable. */
-const compiles = (collections: CollectionConfig[]): void => {
-    const { tables, defaultRls } = tablesFrom(collections);
-    compileTables(tables, defaultRls ? { defaultRls } : {});
-};
-import { resolveCollectionRelations } from "@rebasepro/common";
-import { EMPTY_ACCESS_MODEL } from "@rebasepro/types";
 import { configureAccess } from "../src/auth/access";
+import { writeSchemaFixture } from "./helpers/schema-source-fixture";
 
-const collection = (slug: string, properties: PostgresProperties = {}): CollectionConfig =>
-    ({ slug, name: slug, properties });
+const collection = (slug: string): PostgresCollectionConfig => ({ slug, name: slug, properties: { id: { type: "string", isId: "uuid" } } });
 
 const okPlan = (over: Partial<SchemaChangePlan> = {}): SchemaChangePlan => ({
     files: [{ path: "backend/src/schema.generated.ts", contents: "export const tables = {};" }],
@@ -64,16 +52,11 @@ const blockedPlan = (): SchemaChangePlan => okPlan({
     }
 });
 
-/**
- * Who is asking.
- *
- * In production the admin gate has run before any of this and `user` is always
- * set. A harness that left it undefined would be exercising a request that
- * cannot happen, and would hide the thing worth pinning: these routes refuse a
- * credential the admin gate lets straight through.
- */
 const PERSON = { uid: "u_1", roles: ["admin"], displayName: "Ada", email: "ada@example.com" };
 const API_KEY = { uid: "api-key:7c3f", roles: ["admin", "service"] };
+const SOURCE = "backend/schema/posts.ts";
+
+const edited = (): EditedSchema => ({ defs: [], descriptors: [], collections: [collection("posts")] });
 
 function harness(over: Partial<LiveSchemaRoutesConfig> & {
     plan?: SchemaChangePlan;
@@ -81,6 +64,7 @@ function harness(over: Partial<LiveSchemaRoutesConfig> & {
 } = {}) {
     const events: string[] = [];
     const executed: string[] = [];
+    const applied: EditedSchema[] = [];
 
     const repository: SchemaEditRepository = {
         root: "/tmp/project",
@@ -96,20 +80,24 @@ function harness(over: Partial<LiveSchemaRoutesConfig> & {
     };
 
     const config: LiveSchemaRoutesConfig = {
-        getCollections: () => [collection("posts", { title: { type: "string" } })],
+        getCollections: () => [collection("posts")],
         getAdmin: () => admin,
         getRepository: () => repository,
-        writeSource: async () => {
-            events.push("write-source");
-            return [{ path: "config/collections/posts.ts", contents: "export const posts = {};" }];
+        previewSource: async () => {
+            events.push("preview");
+            return { files: [{ path: SOURCE, contents: "export const posts = defineTable(…);" }], schema: edited() };
         },
+        writeSource: async (source) => {
+            events.push("write-source");
+            return source.files;
+        },
+        onApplied: (schema) => { applied.push(schema); },
         ...over
     };
 
     const app = new Hono<HonoEnv>();
     app.onError(errorHandler);
-    // Stands in for the admin gate. Before `route`, or it never runs — Hono
-    // collects matching handlers in registration order.
+    // Stands in for the admin gate. Before `route`, or it never runs.
     const user = "user" in over ? over.user : PERSON;
     app.use("/*", async (c, next) => {
         if (user) c.set("user", user);
@@ -117,122 +105,121 @@ function harness(over: Partial<LiveSchemaRoutesConfig> & {
     });
     app.route("/api/schema", createLiveSchemaRoutes(config));
 
-    const post = (path: string, body: unknown) => app.fetch(new Request(`http://localhost/api/schema${path}`, {
+    const post = (route: string, body: unknown) => app.fetch(new Request(`http://localhost/api/schema${route}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body)
+        body: typeof body === "string" ? body : JSON.stringify(body)
     }));
+    const get = (route: string) => app.fetch(new Request(`http://localhost/api/schema${route}`));
 
-    return { post, events, executed };
+    return { post, get, events, executed, applied };
 }
 
-const change = { collectionId: "posts", collection: { name: "Posts", properties: {} } };
-
-describe("proposedCollections", () => {
-    it("replaces the collection being edited", () => {
-        const next = proposedCollections(
-            [collection("posts"), collection("tags")],
-            { collectionId: "posts", collection: { name: "Renamed" } }
-        );
-        expect(next).toHaveLength(2);
-        expect(next.find(c => c.slug === "posts")).toMatchObject({ name: "Renamed" });
-        expect(next.find(c => c.slug === "tags")).toBeDefined();
-    });
-
-    it("appends one that does not exist yet", () => {
-        const next = proposedCollections([collection("posts")], { collectionId: "new", collection: {} });
-        expect(next.map(c => c.slug)).toEqual(["posts", "new"]);
-    });
-
-    it("forces the slug to match the id, so the two cannot disagree", () => {
-        const next = proposedCollections([], { collectionId: "posts", collection: { slug: "something-else" } });
-        expect(next[0].slug).toBe("posts");
-    });
-});
+const addSubtitle: TablePatch = { op: "addColumn", table: "posts", key: "subtitle", column: { type: { kind: "text" } } };
+const change = { patches: [addSubtitle] };
 
 describe("POST /plan", () => {
-    it("answers what would happen without touching anything", async () => {
+    it("previews the edit and plans it, writing nothing", async () => {
         const { post, events } = harness();
         const res = await post("/plan", change);
 
         expect(res.status).toBe(200);
-        expect(await res.json()).toMatchObject({
-            applicable: true,
-            verdict: "safe",
-            files: ["backend/src/schema.generated.ts"]
+        expect(await res.json()).toMatchObject({ applicable: true, verdict: "safe" });
+        expect(events).toEqual(["preview", "plan"]);
+    });
+
+    it("plans against what the edit compiles to", async () => {
+        const seen: unknown[][] = [];
+        const { post } = harness({
+            getAdmin: () => ({
+                planSchemaChange: async (before: unknown[], after: unknown[]) => { seen.push(before, after); return okPlan(); }
+            })
         });
-        // Planned, and nothing else.
-        expect(events).toEqual(["plan"]);
+        await post("/plan", change);
+        expect(seen[0]).toEqual([collection("posts")]);
+        expect(seen[1]).toEqual(edited().collections);
     });
 
     it("reports a blocked change rather than refusing to answer", async () => {
         const { post } = harness({ plan: blockedPlan() });
-        const res = await post("/plan", change);
-
-        expect(res.status).toBe(200);
-        const body = await res.json() as { applicable: boolean; changes: unknown[] };
+        const body = await (await post("/plan", change)).json() as { applicable: boolean; changes: unknown[] };
         expect(body.applicable).toBe(false);
         expect(body.changes).toHaveLength(1);
     });
 
     it("answers even when there is nowhere to commit", async () => {
-        // Knowing a change is blocked is useful before knowing where it lands.
         const { post } = harness({ getRepository: () => undefined });
         expect((await post("/plan", change)).status).toBe(200);
     });
 
+    it("names the edits in the commit message of a change with no schema in it", async () => {
+        const { post } = harness({ plan: okPlan({ statements: [], message: "chore(schema): no change\n" }) });
+        const body = await (await post("/plan", {
+            patches: [
+                { op: "setOption", table: "posts", option: "description", value: "Blog posts." },
+                { op: "moveColumn", table: "posts", key: "title" }
+            ]
+        })).json() as { message: string };
+        expect(body.message.split("\n")[0]).toBe("chore(schema): edit posts — set description, move column title");
+    });
+
     /**
-     * Studio's review listed one file — the generated schema — and the commit
-     * also carried the person's own collection file, which the apply writes
-     * and commits first. The review is the consent to the commit, so it lists
-     * exactly what the commit will hold.
+     * The review a person agrees to is the consent to the commit, so it lists
+     * exactly what the commit will hold: the table source, then the generated
+     * files.
      */
     describe("the files it lists", () => {
-        const SOURCE = "config/collections/posts.ts";
-
-        it("are the files the apply commits, the collection source included", async () => {
-            const { post } = harness({ sourcePathsFor: () => [SOURCE] });
-
+        it("are the files the apply commits, the table source included", async () => {
+            const { post } = harness();
             const planned = (await (await post("/plan", change)).json() as { files: string[] }).files;
             const committed = (await (await post("/apply", change)).json() as { committed: { files: string[] } }).committed.files;
-
             expect(planned).toEqual([SOURCE, "backend/src/schema.generated.ts"]);
             expect(planned).toEqual(committed);
         });
 
-        it("leave the source out when source editing is off, as the commit does", async () => {
-            const { post } = harness({ sourcePathsFor: () => [SOURCE], writeSource: undefined });
-
-            const planned = (await (await post("/plan", change)).json() as { files: string[] }).files;
-            const committed = (await (await post("/apply", change)).json() as { committed: { files: string[] } }).committed.files;
-
-            expect(planned).toEqual(["backend/src/schema.generated.ts"]);
-            expect(planned).toEqual(committed);
+        it("leave the source out when the source may not be written", async () => {
+            const { post } = harness({ writeSource: undefined });
+            expect((await (await post("/plan", change)).json() as { files: string[] }).files).toEqual(["backend/src/schema.generated.ts"]);
         });
 
         it("are none for a change the apply refuses", async () => {
-            const { post } = harness({ plan: { ...blockedPlan(), files: [] }, sourcePathsFor: () => [SOURCE] });
-
+            const { post } = harness({ plan: { ...blockedPlan(), files: [] } });
             expect((await (await post("/plan", change)).json() as { files: string[] }).files).toEqual([]);
         });
     });
 });
 
 describe("POST /apply", () => {
-    it("writes the source, commits, then runs the DDL — in that order", async () => {
+    it("previews, plans, writes the source, commits, then runs the DDL — in that order", async () => {
         const { post, events, executed } = harness();
         const res = await post("/apply", change);
 
         expect(res.status).toBe(200);
-        expect(events).toEqual(["plan", "write-source", "write-generated", "commit", "sql"]);
+        expect(events).toEqual(["preview", "plan", "write-source", "write-generated", "commit", "sql"]);
         expect(executed[0]).toContain("ADD COLUMN");
         expect(await res.json()).toMatchObject({ applied: true, committed: { branch: "main" } });
     });
 
+    it("hands the running server the schema the edit left, once the database has it", async () => {
+        const { post, applied } = harness();
+        await post("/apply", change);
+        expect(applied).toEqual([edited()]);
+    });
+
+    it("leaves the running server alone after a source-only commit, or when the DDL fails", async () => {
+        const sourceOnly = harness({ plan: okPlan({ classified: { changes: [], verdict: "safe", applicable: true } }) });
+        await sourceOnly.post("/apply", { ...change, sourceOnly: true });
+        expect(sourceOnly.applied).toEqual([]);
+
+        const failing = harness({
+            getAdmin: () => ({ planSchemaChange: async () => okPlan(), executeSql: async () => { throw new Error("connection refused"); } })
+        });
+        const res = await failing.post("/apply", change);
+        expect(await res.json()).toMatchObject({ applied: false, applyError: expect.stringContaining("connection refused") });
+        expect(failing.applied).toEqual([]);
+    });
+
     it("runs one apply at a time, so two cannot interleave their writes and commits", async () => {
-        // Two applies at once (a double confirm, two tabs) both passed the
-        // dirty-tree check, then wrote and committed in whatever order their
-        // awaits fell: one commit could carry the other's generated schema.
         let releaseFirst: () => void = () => undefined;
         const firstCommitHeld = new Promise<void>(resolve => { releaseFirst = resolve; });
         let commits = 0;
@@ -254,68 +241,34 @@ describe("POST /apply", () => {
         const first = post("/apply", change);
         const second = post("/apply", change);
         await new Promise(resolve => setTimeout(resolve, 20));
-        // The second has not started writing while the first is still committing.
         expect(events.filter(e => e === "write-source")).toHaveLength(1);
 
         releaseFirst();
         expect((await first).status).toBe(200);
         expect((await second).status).toBe(200);
-        expect(events.filter(e => e !== "plan")).toEqual([
+        expect(events.filter(e => e !== "plan" && e !== "preview")).toEqual([
             "write-source", "write-generated", "commit", "sql",
             "write-source", "write-generated", "commit", "sql"
         ]);
     });
 
-    it("commits the rewritten source alongside the generated files", async () => {
-        let staged: string[] = [];
-        const { post } = harness({
-            getRepository: () => ({
-                root: "/tmp/project",
-                currentBranch: async () => "main",
-                dirtyPaths: async () => [],
-                writeFiles: async (files) => { staged = files.map(f => f.path); },
-                commit: async () => "sha"
-            })
-        });
-        await post("/apply", change);
-        expect(staged).toEqual(["config/collections/posts.ts", "backend/src/schema.generated.ts"]);
-    });
-
-    it("writes NOTHING when the change is refused", async () => {
+    it("writes NOTHING when the change is refused, and says what to do instead", async () => {
         const { post, events } = harness({ plan: blockedPlan() });
         const res = await post("/apply", change);
 
         expect(res.status).toBe(400);
-        expect(await res.json()).toMatchObject({ error: { code: "SCHEMA_CHANGE_UNAPPLICABLE" } });
-        // The source must not have been rewritten — that is the whole ordering.
-        expect(events).toEqual(["plan"]);
-    });
-
-    it("puts the remedy in the refusal, not just the problem", async () => {
-        const { post } = harness({ plan: blockedPlan() });
-        const body = await (await post("/apply", change)).json() as { error: { message: string } };
+        const body = await res.json() as { error: { code: string; message: string } };
+        expect(body.error.code).toBe("SCHEMA_CHANGE_UNAPPLICABLE");
         expect(body.error.message).toContain("migration you have read");
+        expect(events).toEqual(["preview", "plan"]);
     });
 
-    it("reports committed-but-not-applied when the DDL fails", async () => {
-        const admin: DatabaseAdmin = {
-            planSchemaChange: async () => okPlan(),
-            executeSql: async () => { throw new Error("connection refused"); }
-        };
-
-        const { post } = harness({ getAdmin: () => admin });
-        const res = await post("/apply", change);
-
-        expect(res.status).toBe(200);
-        expect(await res.json()).toMatchObject({ applied: false, applyError: expect.stringContaining("connection refused") });
-    });
-
-    it("409s on a dirty tree, naming it as a conflict rather than a failure", async () => {
-        const { post } = harness({
+    it("409s on a dirty tree, before writing anything", async () => {
+        const { post, events } = harness({
             getRepository: () => ({
                 root: "/tmp/project",
                 currentBranch: async () => "main",
-                dirtyPaths: async () => ["backend/src/schema.generated.ts"],
+                dirtyPaths: async () => [SOURCE],
                 writeFiles: async () => undefined,
                 commit: async () => "sha"
             })
@@ -323,6 +276,49 @@ describe("POST /apply", () => {
         const res = await post("/apply", change);
         expect(res.status).toBe(409);
         expect(await res.json()).toMatchObject({ error: { code: "SCHEMA_EDIT_DIRTY_TREE" } });
+        expect(events).not.toContain("write-source");
+    });
+
+    it("checks the tree for the paths the preview named, before the write makes them dirty", async () => {
+        const onDisk = new Set<string>();
+        const events: string[] = [];
+        const { post } = harness({
+            getRepository: () => ({
+                root: "/tmp/project",
+                currentBranch: async () => "main",
+                dirtyPaths: async () => { events.push(`dirty-check(${[...onDisk].join(",") || "clean"})`); return [...onDisk]; },
+                writeFiles: async () => undefined,
+                commit: async () => "sha"
+            }),
+            writeSource: async (source) => { events.push("write-source"); onDisk.add(SOURCE); return source.files; }
+        });
+        expect((await post("/apply", change)).status).toBe(200);
+        expect(events).toEqual(["dirty-check(clean)", "write-source"]);
+    });
+
+    it("turns a failure between the check and the commit into a refusal, not a 500", async () => {
+        const { post } = harness({ writeSource: async () => { throw new Error("posts.ts changed since the edit was prepared"); } });
+        const res = await post("/apply", change);
+        expect(res.status).toBe(400);
+        expect(await res.json()).toMatchObject({ error: { code: "SCHEMA_CHANGE_FAILED", message: "posts.ts changed since the edit was prepared" } });
+    });
+});
+
+describe("an edit the schema editor refuses", () => {
+    it.each(["/plan", "/apply"])("is a 400 carrying the problems on %s, and nothing is planned", async (route) => {
+        const { post, events } = harness({
+            previewSource: async () => {
+                throw new TableSourceEditError("SCHEMA_EDIT_DOES_NOT_COMPILE", "The edit was not written: tags has no primary key.", [
+                    { table: "tags", message: "has no primary key." }
+                ]);
+            }
+        });
+        const res = await post(route, change);
+        expect(res.status).toBe(400);
+        expect(await res.json()).toMatchObject({
+            error: { code: "SCHEMA_EDIT_DOES_NOT_COMPILE", details: { problems: [{ table: "tags", message: "has no primary key." }] } }
+        });
+        expect(events).toEqual([]);
     });
 });
 
@@ -330,7 +326,6 @@ describe("refusing where the capability is absent", () => {
     it("says so when the driver cannot plan — a custom driver", async () => {
         const { post } = harness({ getAdmin: () => ({ executeSql: async () => [] }) });
         const res = await post("/plan", change);
-
         expect(res.status).toBe(503);
         expect(await res.json()).toMatchObject({ error: { code: "SCHEMA_EDITING_UNSUPPORTED" } });
     });
@@ -338,132 +333,106 @@ describe("refusing where the capability is absent", () => {
     it("explains the bundle case rather than failing obscurely", async () => {
         const { post } = harness({ getRepository: () => undefined });
         const res = await post("/apply", change);
-
         expect(res.status).toBe(503);
         const body = await res.json() as { error: { code: string; message: string } };
         expect(body.error.code).toBe("SCHEMA_EDITING_NO_REPOSITORY");
         expect(body.error.message).toContain("built bundle");
     });
+
+    it("reports itself unavailable, with the true reason, when the source cannot be written", async () => {
+        const { get, post } = harness({ writeSource: undefined, sourceEditingOff: { code: "SCHEMA_EDITOR_PRODUCTION", message: "off in production" } });
+        expect(await (await get("/status")).json()).toMatchObject({ enabled: false, code: "SCHEMA_EDITOR_PRODUCTION", canPlan: true });
+        const res = await post("/apply", change);
+        expect(res.status).toBe(501);
+        expect(await res.json()).toMatchObject({ error: { code: "SCHEMA_EDITOR_PRODUCTION" } });
+    });
+
+    it("cannot plan without the editor, and says so", async () => {
+        const { get, post } = harness({ previewSource: undefined, writeSource: undefined });
+        expect(await (await get("/status")).json()).toMatchObject({ enabled: false, canPlan: false, code: "SCHEMA_EDITOR_MISSING_DEPENDENCY" });
+        expect((await post("/plan", change)).status).toBe(501);
+    });
 });
 
 describe("input validation", () => {
     it.each([
-        ["no collectionId", { collection: {} }],
-        ["no collection", { collectionId: "posts" }],
-        ["a non-object collection", { collectionId: "posts", collection: "nope" }]
-    ])("rejects %s", async (_label, body) => {
-        const { post } = harness();
-        const res = await post("/apply", body);
-        expect(res.status).toBe(400);
-        expect(await res.json()).toMatchObject({ error: { code: "INVALID_CHANGE" } });
-    });
-
-    /**
-     * Only `collectionId` was checked here, and it is the one name that becomes
-     * a FILENAME. The names that become Postgres IDENTIFIERS — `table`,
-     * `schema`, a property's `columnName` — went through unexamined into DDL
-     * that is quoted and concatenated, on the owner connection: the one
-     * connection in the system that no RLS policy applies to.
-     */
-    it.each([
-        ["a table that closes the statement", {
-            collectionId: "posts",
-            collection: { table: 'x" (id int); DROP TABLE users; --', properties: {} }
-        }],
-        ["a schema that closes the statement", {
-            collectionId: "posts",
-            collection: { schema: 'public"; DROP TABLE users; --', properties: {} }
-        }],
+        ["no patches", {}],
+        ["an empty list", { patches: [] }],
+        ["an unknown operation", { patches: [{ op: "renameTable", table: "posts" }] }],
+        ["a slug rename", { patches: [{ op: "setOption", table: "posts", option: "slug", value: "articles" }] }],
         ["a column name that closes the statement", {
-            collectionId: "posts",
-            collection: { properties: { title: { type: "string", columnName: 'a" ); DROP TABLE users; --' } } }
+            patches: [{ op: "addColumn", table: "posts", key: "title", column: { type: { kind: "text" }, column: "a\" ); DROP TABLE users; --" } }]
         }],
-        ["a table name that is not a string at all", {
-            collectionId: "posts",
-            collection: { table: { toString: "nope" }, properties: {} }
+        ["a table name that closes the statement", {
+            patches: [{ op: "createTable", table: { name: "x\" (id int); DROP TABLE users; --", columns: { id: { type: { kind: "uuid" }, primaryKey: true } }, rls: "admin-only" } }]
+        }],
+        ["a schema that is not a string", {
+            patches: [{ op: "createTable", table: { name: "x", schema: { toString: "nope" }, columns: { id: { type: { kind: "uuid" }, primaryKey: true } }, rls: "admin-only" } }]
+        }],
+        ["a transform, which is code", {
+            patches: [{ op: "changeColumn", table: "posts", key: "title", column: { type: { kind: "text" }, transform: "() => 1" } }]
         }]
-    ])("rejects %s", async (_label, body) => {
+    ])("rejects %s before anything is previewed", async (_label, body) => {
         const { post, events } = harness();
         const res = await post("/apply", body);
         expect(res.status).toBe(400);
         expect(await res.json()).toMatchObject({ error: { code: "INVALID_CHANGE" } });
-        // And nothing happened on the way to the refusal: no plan, no write.
         expect(events).toEqual([]);
     });
 
-    it("still accepts an ordinary table, schema and column name", async () => {
+    it("says why a slug rename is not an edit", async () => {
         const { post } = harness();
-        const res = await post("/plan", {
-            collectionId: "posts",
-            collection: { table: "posts", schema: "public", properties: { title: { type: "string", columnName: "title" } } }
-        });
-        expect(res.status).toBe(200);
+        const body = await (await post("/plan", { patches: [{ op: "setOption", table: "posts", option: "slug", value: "articles" }] })).json() as { error: { message: string } };
+        expect(body.error.message).toMatch(/migration, not an edit/);
+    });
+
+    it.each(["/plan", "/apply"])("answers a body that is not JSON with a 400 on %s", async (route) => {
+        const { post, events } = harness();
+        const res = await post(route, "{ \"patches\": [");
+        expect(res.status).toBe(400);
+        expect(await res.json()).toMatchObject({ error: { code: "INVALID_CHANGE" } });
+        expect(events).toEqual([]);
     });
 });
 
 /**
  * Applying is a second privilege, and the admin gate in front of these routes
  * only answers the first.
- *
- * The failure with consequences is a machine applying: an API key sitting in a
- * CI environment variable that can rewrite the project's source and push a
- * commit to its default branch, under a name that identifies nobody.
  */
 describe("who may apply", () => {
     it("lets a person apply", async () => {
         const { post, events } = harness({ user: PERSON });
-        const res = await post("/apply", change);
-        expect(res.status).toBe(200);
+        expect((await post("/apply", change)).status).toBe(200);
         expect(events).toContain("commit");
     });
 
     it("lets an API key plan", async () => {
-        // Planning has no side effects, and a CI job asking whether a proposed
-        // change is applicable is a good use of this API.
         const { post, events } = harness({ user: API_KEY });
-        const res = await post("/plan", change);
-        expect(res.status).toBe(200);
-        expect(events).toEqual(["plan"]);
+        expect((await post("/plan", change)).status).toBe(200);
+        expect(events).toEqual(["preview", "plan"]);
     });
 
-    it("refuses an API key applying, and writes nothing at all", async () => {
+    it("refuses an API key applying, and previews nothing", async () => {
         const { post, events } = harness({ user: API_KEY });
         const res = await post("/apply", change);
-
         expect(res.status).toBe(403);
-        expect(await res.json()).toMatchObject({
-            error: { code: "SCHEMA_EDIT_REQUIRES_A_PERSON" }
-        });
-        // Refused before the source is rewritten, not after. `writeSource`
-        // writes to disk outside the repository's checks, so a late refusal
-        // leaves a rewritten file behind and reports that nothing happened.
+        expect(await res.json()).toMatchObject({ error: { code: "SCHEMA_EDIT_REQUIRES_A_PERSON" } });
         expect(events).toEqual([]);
     });
 
     it("refuses the service key applying", async () => {
         const { post, events } = harness({ user: { uid: "service", roles: ["admin"] } });
-        const res = await post("/apply", change);
-        expect(res.status).toBe(403);
+        expect((await post("/apply", change)).status).toBe(403);
         expect(events).toEqual([]);
     });
 
     it("lets a machine apply when the project has said so", async () => {
-        const { post, events } = harness({
-            user: API_KEY,
-            policy: { allowMachineApply: true }
-        });
-        const res = await post("/apply", change);
-        expect(res.status).toBe(200);
+        const { post, events } = harness({ user: API_KEY, policy: { allowMachineApply: true } });
+        expect((await post("/apply", change)).status).toBe(200);
         expect(events).toContain("commit");
     });
 
     it("refuses a caller with no identity at all", async () => {
-        // Cannot happen in production — the admin gate runs first. Checked
-        // anyway: a capability function that trusts its caller to have checked
-        // is one refactor away from granting everything.
-        // `/apply` answers 401 before its capability check: its
-        // `schema:write` gate refuses a request with no caller as
-        // unauthenticated, which is what it is.
         const { post } = harness({ user: undefined });
         expect((await post("/plan", change)).status).toBe(403);
         expect((await post("/apply", change)).status).toBe(401);
@@ -484,30 +453,8 @@ describe("who may apply", () => {
     });
 
     it("reports the caller's own capabilities on /status", async () => {
-        // So the panel can grey out the button *and say why*, rather than
-        // letting somebody read a plan, decide, press, and only then be refused.
-        const { post: _post } = harness({ user: API_KEY });
-        const app = new Hono<HonoEnv>();
-        app.onError(errorHandler);
-        app.use("/*", async (c, next) => { c.set("user", API_KEY); await next(); });
-        app.route("/api/schema", createLiveSchemaRoutes({
-            getCollections: () => [collection("posts")],
-            getAdmin: () => ({
-                planSchemaChange: async () => okPlan(),
-                executeSql: async () => []
-            }),
-            getRepository: () => ({
-                root: "/tmp/project",
-                currentBranch: async () => "main",
-                dirtyPaths: async () => [],
-                writeFiles: async () => {},
-                commit: async () => "abc"
-            }),
-            writeSource: async () => []
-        }));
-
-        const res = await app.fetch(new Request("http://localhost/api/schema/status"));
-        expect(await res.json()).toMatchObject({
+        const { get } = harness({ user: API_KEY });
+        expect(await (await get("/status")).json()).toMatchObject({
             enabled: true,
             canPlan: true,
             canApply: false,
@@ -516,432 +463,20 @@ describe("who may apply", () => {
     });
 });
 
-/**
- * The dirty-tree check must not see this change's own edit.
- *
- * `writeSource` goes through the filesystem, not through the repository, so
- * ordering is the whole correctness argument. Written first, the tree is dirty
- * *because of this change* by the time the check runs — and since
- * `git status --porcelain` reports untracked files too, a new collection's
- * source file is always untracked and the change is always refused. The file is
- * left behind either way, so the retry finds a dirty tree as well.
- *
- * That is not a hypothetical: it was the behaviour, and it meant `/apply` could
- * never succeed through its own HTTP surface. Every existing test missed it
- * because they hand `applySchemaChange` a set of files that is already written,
- * which is precisely the shape that cannot reproduce it.
- */
-describe("writing the source without tripping the dirty check", () => {
-    /**
-     * A repository whose `dirtyPaths` answers what a real `git status` would:
-     * nothing at first, and the source file once it has been written.
-     */
-    function withRealisticDirtiness(over: { alreadyDirty?: string[] } = {}) {
-        const events: string[] = [];
-        const onDisk = new Set<string>(over.alreadyDirty ?? []);
-        const SOURCE = "config/collections/posts.ts";
-
-        const repository: SchemaEditRepository = {
-            root: "/tmp/project",
-            currentBranch: async () => "main",
-            dirtyPaths: async () => {
-                events.push(`dirty-check(${[...onDisk].join(",") || "clean"})`);
-                return [...onDisk];
-            },
-            writeFiles: async () => { events.push("write-generated"); },
-            commit: async () => { events.push("commit"); return "abc123def456"; }
-        };
-
-        const admin: DatabaseAdmin = {
-            planSchemaChange: async () => { events.push("plan"); return okPlan(); },
-            executeSql: async () => { events.push("sql"); return []; }
-        };
-
-        const app = new Hono<HonoEnv>();
-        app.onError(errorHandler);
-        app.use("/*", async (c, next) => { c.set("user", PERSON); await next(); });
-        app.route("/api/schema", createLiveSchemaRoutes({
-            getCollections: () => [collection("posts", { title: { type: "string" } })],
-            getAdmin: () => admin,
-            getRepository: () => repository,
-            sourcePathsFor: () => [SOURCE],
-            writeSource: async () => {
-                // What the AST editor does: touch the disk. From here on a real
-                // `git status` reports this path.
-                events.push("write-source");
-                onDisk.add(SOURCE);
-                return [{ path: SOURCE, contents: "export const posts = {};" }];
-            }
-        }));
-
-        return {
-            events,
-            post: (body: unknown) => app.fetch(new Request("http://localhost/api/schema/apply", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(body)
-            }))
-        };
-    }
-
-    it("applies, rather than refusing on the file it just wrote", async () => {
-        const { post, events } = withRealisticDirtiness();
-        const res = await post(change);
-
-        expect(res.status).toBe(200);
-        expect(await res.json()).toMatchObject({ applied: true });
-        // The check runs while the tree is still clean, and only then is the
-        // source written.
-        expect(events.indexOf("dirty-check(clean)")).toBeLessThan(events.indexOf("write-source"));
-        expect(events).toContain("commit");
-    });
-
-    it("commits the source it wrote, not just the generated files", async () => {
-        let committed: string[] = [];
-        const { post } = withRealisticDirtiness();
-        const res = await post(change);
-        committed = ((await res.json()) as { committed: { files: string[] } }).committed.files;
-
-        expect(committed).toContain("config/collections/posts.ts");
-        expect(committed).toContain("backend/src/schema.generated.ts");
-    });
-
-    it("still refuses when somebody else's work is in the way", async () => {
-        // The check has to keep doing its job: a half-finished edit to a file
-        // this commit would sweep up is exactly what it exists to catch.
-        const { post, events } = withRealisticDirtiness({
-            alreadyDirty: ["config/collections/posts.ts"]
-        });
-        const res = await post(change);
-
-        expect(res.status).toBe(409);
-        expect(await res.json()).toMatchObject({ error: { code: "SCHEMA_EDIT_DIRTY_TREE" } });
-        // And nothing was written, so the refusal leaves the tree as it found it.
-        expect(events).not.toContain("write-source");
-        expect(events).not.toContain("commit");
-    });
-});
-
-/**
- * A capability that is absent should say so, not die when it is used.
- *
- * `writeSource` used to be a function that existed and threw when the AST
- * editor was unavailable. `/status` can only see whether the field is *set*, so
- * it answered `enabled: true`, the panel offered the control, and `/apply` came
- * back 500 the moment somebody confirmed — after they had read a plan and
- * agreed to it.
- */
-describe("when the source cannot be rewritten", () => {
-    const withoutWriteSource = () => {
-        const app = new Hono<HonoEnv>();
-        app.onError(errorHandler);
-        app.use("/*", async (c, next) => { c.set("user", PERSON); await next(); });
-        app.route("/api/schema", createLiveSchemaRoutes({
-            getCollections: () => [collection("posts")],
-            getAdmin: () => ({
-                planSchemaChange: async () => okPlan(),
-                executeSql: async () => []
-            }),
-            getRepository: () => ({
-                root: "/tmp/project",
-                currentBranch: async () => "main",
-                dirtyPaths: async () => [],
-                writeFiles: async () => {},
-                commit: async () => "abc123def456"
-            })
-            // writeSource deliberately absent.
-        }));
-        return app;
-    };
-
-    it("reports itself unavailable rather than enabled", async () => {
-        const res = await withoutWriteSource().fetch(
-            new Request("http://localhost/api/schema/status")
-        );
-        expect(await res.json()).toMatchObject({
-            enabled: false,
-            code: "SCHEMA_EDITOR_MISSING_DEPENDENCY",
-            // Planning needs no source rewrite, so it is still on offer.
-            canPlan: true
-        });
-    });
-
-    it("turns a failure between the check and the commit into a refusal, not a 500", async () => {
-        const app = new Hono<HonoEnv>();
-        app.onError(errorHandler);
-        app.use("/*", async (c, next) => { c.set("user", PERSON); await next(); });
-        app.route("/api/schema", createLiveSchemaRoutes({
-            getCollections: () => [collection("posts")],
-            getAdmin: () => ({
-                planSchemaChange: async () => okPlan(),
-                executeSql: async () => []
-            }),
-            getRepository: () => ({
-                root: "/tmp/project",
-                currentBranch: async () => "main",
-                dirtyPaths: async () => [],
-                writeFiles: async () => {},
-                commit: async () => "abc"
-            }),
-            sourcePathsFor: () => ["config/collections/posts.ts"],
-            writeSource: async () => { throw new Error("posts.ts could not be parsed"); }
-        }));
-
-        const res = await app.fetch(new Request("http://localhost/api/schema/apply", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(change)
-        }));
-
-        expect(res.status).toBe(400);
-        expect(await res.json()).toMatchObject({
-            error: { code: "SCHEMA_CHANGE_FAILED", message: "posts.ts could not be parsed" }
-        });
-    });
-});
-
-
-/**
- * The id becomes a filename, so the boundary is where it gets checked.
- *
- * `<collectionsDir>/<id>.ts` is derived in two places: the AST editor, which
- * sanitises before it writes, and the caller, which derives the same path
- * *first* so the dirty check knows what is about to be touched. Only the editor
- * checked. A refusal that arrives one layer in is a refusal the layer above has
- * already acted on.
- */
-describe("the collection id", () => {
-    it.each([
-        ["a parent traversal", "../../../etc/passwd"],
-        ["a nested path", "nested/collection"],
-        ["an absolute path", "/etc/passwd"],
-        ["a null byte", "posts\u0000.ts"],
-        ["a space", "my collection"],
-        ["only whitespace", "   "],
-        ["a dot", "."]
-    ])("refuses %s", async (_label, collectionId) => {
-        const { post, events } = harness();
-        const res = await post("/apply", { collectionId, collection: { name: "X" } });
-
-        expect(res.status).toBe(400);
-        expect(await res.json()).toMatchObject({ error: { code: "INVALID_CHANGE" } });
-        // Refused before anything is planned, let alone written.
-        expect(events).toEqual([]);
-    });
-
-    it("refuses it on /plan too, which also derives the path", async () => {
-        const { post } = harness();
-        const res = await post("/plan", { collectionId: "../escape", collection: {} });
-        expect(res.status).toBe(400);
-    });
-
-    it("accepts the ids a scaffold actually produces", async () => {
-        for (const id of ["posts", "blog_posts", "order-items", "Products2"]) {
-            const { post } = harness();
-            const res = await post("/plan", { collectionId: id, collection: { name: id } });
-            expect(res.status).toBe(200);
-        }
-    });
-});
-
-
-/**
- * A project that replays migrations needs this change recorded as one.
- *
- * Live editing cannot write a migration: that is Atlas's format with an
- * integrity file, minted by an external binary against a throwaway database,
- * and a running server has neither. What it *does* write is the collection,
- * which is exactly what `rebase db generate` renders its migration from — so
- * the migration is one command away, and the only real hazard is
- * nobody saying so. A project that deploys by replaying migrations would build
- * its next environment without this change, having been told it was applied.
- */
 describe("a project that keeps versioned migrations", () => {
-    const withMigrations = (usesMigrations: boolean) => harness({
-        usesVersionedMigrations: () => usesMigrations
+    it("says what still has to be done, on the plan and on the result", async () => {
+        const { post } = harness({ usesVersionedMigrations: () => true });
+        expect(((await (await post("/plan", change)).json()) as { followUp: string[] }).followUp[0]).toContain("rebase db generate");
+        expect(((await (await post("/apply", change)).json()) as { followUp: string[] }).followUp[0]).toContain("rebase db generate");
     });
 
-    it("says what still has to be done, on the plan", async () => {
-        const { post } = withMigrations(true);
-        const body = await (await post("/plan", change)).json() as { followUp: string[] };
-        expect(body.followUp).toHaveLength(1);
-        expect(body.followUp[0]).toContain("rebase db generate");
-    });
-
-    it("says it again on the result, where the person who applied will see it", async () => {
-        const { post } = withMigrations(true);
-        const body = await (await post("/apply", change)).json() as { followUp: string[] };
-        expect(body.followUp[0]).toContain("rebase db generate");
-    });
-
-    it("stays quiet for a project that does not keep them", async () => {
-        const { post } = withMigrations(false);
-        const body = await (await post("/plan", change)).json() as { followUp: string[] };
-        expect(body.followUp).toEqual([]);
-    });
-
-    it("stays quiet when the change needs no DDL at all", async () => {
-        // Nothing ran against the database, so there is nothing to record.
-        const { post } = harness({
-            usesVersionedMigrations: () => true,
-            plan: okPlan({ statements: [] })
-        });
-        const body = await (await post("/plan", change)).json() as { followUp: string[] };
-        expect(body.followUp).toEqual([]);
+    it("stays quiet for a project that does not keep them, or a change with no DDL", async () => {
+        expect(((await (await harness({ usesVersionedMigrations: () => false }).post("/plan", change)).json()) as { followUp: string[] }).followUp).toEqual([]);
+        const noDdl = harness({ usesVersionedMigrations: () => true, plan: okPlan({ statements: [] }) });
+        expect(((await (await noDdl.post("/plan", change)).json()) as { followUp: string[] }).followUp).toEqual([]);
     });
 });
 
-/**
- * A collection with a relation, the way the panel sends it.
- *
- * A relation's `target` is a thunk, and the panel posts the whole collection as
- * JSON — so every relation it did not touch arrives with no target at all, and
- * one picked in the property form names its target by slug. The planner calls
- * `target()` on every relation in the set, so handed the JSON as it arrived it
- * threw on the first one: no change of any kind could be planned for a
- * collection that had a relation, not a new column and not a policy.
- *
- * The planner here does what the real one does first — resolves every relation
- * with the real `resolveCollectionRelations` — and the proposed set is run
- * through the boot validator, because a plan for a set that cannot boot is no
- * plan at all.
- */
-describe("a collection with relations", () => {
-    const authors = collection("authors", { id: { type: "string", isId: true }, name: { type: "string" } });
-    const tags = collection("tags", { id: { type: "string", isId: true }, label: { type: "string" } });
-    const posts: CollectionConfig = {
-        slug: "posts",
-        name: "posts",
-        properties: {
-            id: { type: "string", isId: true },
-            title: { type: "string" },
-            author: {
-                name: "Author",
-                type: "relation",
-                relation: { kind: "belongsTo", target: () => authors, relationName: "author" }
-            }
-        },
-        relations: [{ kind: "manyToMany", target: () => tags, relationName: "tags" }]
-    };
-
-    function resolvingHarness() {
-        const planned: CollectionConfig[][] = [];
-        const admin: DatabaseAdmin = {
-            planSchemaChange: async (_before: CollectionConfig[], after: CollectionConfig[]) => {
-                planned.push(after);
-                for (const each of after) resolveCollectionRelations(each);
-                return okPlan();
-            },
-            executeSql: async () => []
-        };
-        const { post } = harness({
-            getCollections: () => [authors, tags, posts],
-            getAdmin: () => admin
-        });
-        const proposedPosts = () => planned[planned.length - 1].find(c => c.slug === "posts")!;
-        return { post, planned, proposedPosts };
-    }
-
-    const targetsOf = (collection: CollectionConfig) => Object.fromEntries(
-        Object.entries(resolveCollectionRelations(collection)).map(([name, relation]) => [name, relation.target().slug])
-    );
-
-    it("plans a new column on a collection whose relation targets were dropped on the wire", async () => {
-        const { post, planned, proposedPosts } = resolvingHarness();
-        const res = await post("/plan", {
-            collectionId: "posts",
-            collection: { ...posts, properties: { ...posts.properties, subtitle: { type: "string", name: "Subtitle" } } }
-        });
-
-        expect(res.status).toBe(200);
-        expect(targetsOf(proposedPosts())).toEqual({ author: "authors", tags: "tags" });
-        expect(() => compiles(planned[0])).not.toThrow();
-    });
-
-    it("applies it too — /apply plans the same proposed set", async () => {
-        const { post, proposedPosts } = resolvingHarness();
-        const res = await post("/apply", { collectionId: "posts", collection: posts });
-
-        expect(res.status).toBe(200);
-        expect(targetsOf(proposedPosts())).toEqual({ author: "authors", tags: "tags" });
-    });
-
-    it("links a relation picked by slug to the collection it names", async () => {
-        const { post, planned, proposedPosts } = resolvingHarness();
-        const res = await post("/plan", {
-            collectionId: "posts",
-            collection: {
-                ...posts,
-                properties: {
-                    ...posts.properties,
-                    editor: { name: "Editor", type: "relation", relation: { kind: "belongsTo", target: "authors" } }
-                },
-                relations: [
-                    { kind: "manyToMany", relationName: "tags" },
-                    { kind: "hasMany", relationName: "replies", target: "posts", foreignKeyOnTarget: "parent_id" }
-                ]
-            }
-        });
-
-        expect(res.status).toBe(200);
-        expect(targetsOf(proposedPosts())).toEqual({
-            author: "authors",
-            editor: "authors",
-            tags: "tags",
-            // A relation to the collection being edited reaches the proposed
-            // version of it, not the one it is replacing.
-            replies: "posts"
-        });
-        expect(resolveCollectionRelations(proposedPosts()).replies.target()).toBe(proposedPosts());
-        expect(() => compiles(planned[0])).not.toThrow();
-    });
-
-    it("refuses a relation to a collection that does not exist, rather than a 500 from the planner", async () => {
-        const { post, planned } = resolvingHarness();
-        const res = await post("/plan", {
-            collectionId: "posts",
-            collection: {
-                ...posts,
-                properties: { ...posts.properties, editor: { type: "relation", relation: { kind: "belongsTo", target: "ghosts" } } }
-            }
-        });
-
-        expect(res.status).toBe(400);
-        const body = await res.json() as { error: { code: string; message: string } };
-        expect(body.error.code).toBe("INVALID_CHANGE");
-        expect(body.error.message).toContain("ghosts");
-        expect(planned).toEqual([]);
-    });
-
-    it("refuses a new relation with no target at all", async () => {
-        const { post, planned } = resolvingHarness();
-        const res = await post("/plan", {
-            collectionId: "posts",
-            collection: {
-                ...posts,
-                properties: { ...posts.properties, editor: { type: "relation", relation: { kind: "belongsTo" } } }
-            }
-        });
-
-        expect(res.status).toBe(400);
-        const body = await res.json() as { error: { code: string; message: string } };
-        expect(body.error.code).toBe("INVALID_CHANGE");
-        expect(body.error.message).toContain("editor");
-        expect(planned).toEqual([]);
-    });
-});
-
-/**
- * A planner that refuses, the way the contract says it does.
- *
- * `SchemaEditingAdmin.planSchemaChange` *rejects* an unapplicable change,
- * carrying the classification — and the Postgres planner does exactly that,
- * with a `SchemaCommitError`. These routes read `plan.classified.applicable`
- * instead, so every blocked change — a removed property, a table moved from
- * under its rows — reached the error handler unclassified and came back as a
- * 500, and the panel could offer only a retry, never the source-only save a
- * blocked change is meant to lead to.
- */
 describe("a planner that rejects a blocked change", () => {
     class RefusedPlan extends Error {
         constructor(readonly classified: SchemaChangePlan["classified"]) {
@@ -955,10 +490,7 @@ describe("a planner that rejects a blocked change", () => {
 
     it("is planned as blocked, not answered with a 500", async () => {
         const { post } = harness({ getAdmin: () => refusing });
-        const res = await post("/plan", change);
-
-        expect(res.status).toBe(200);
-        expect(await res.json()).toMatchObject({
+        expect(await (await post("/plan", change)).json()).toMatchObject({
             applicable: false,
             verdict: "needs-migration",
             changes: [{ kind: "remove-property", property: "subtitle" }],
@@ -969,48 +501,59 @@ describe("a planner that rejects a blocked change", () => {
     it("is refused on /apply as unapplicable, before anything is written", async () => {
         const { post, events } = harness({ getAdmin: () => refusing });
         const res = await post("/apply", change);
-
         expect(res.status).toBe(400);
-        const body = await res.json() as { error: { code: string; message: string } };
-        expect(body.error.code).toBe("SCHEMA_CHANGE_UNAPPLICABLE");
-        expect(body.error.message).toContain("migration you have read");
-        expect(events).toEqual([]);
+        expect(((await res.json()) as { error: { code: string } }).error.code).toBe("SCHEMA_CHANGE_UNAPPLICABLE");
+        expect(events).toEqual(["preview"]);
     });
 
     it("still fails loudly on anything else the planner throws", async () => {
-        const broken: DatabaseAdmin = {
-            planSchemaChange: async () => { throw new Error("catalogue read failed"); },
-            executeSql: async () => []
-        };
-        const { post } = harness({ getAdmin: () => broken });
+        const { post } = harness({ getAdmin: () => ({ planSchemaChange: async () => { throw new Error("catalogue read failed"); }, executeSql: async () => [] }) });
         expect((await post("/plan", change)).status).toBe(500);
     });
 });
 
 /**
- * A body that is not JSON is the caller's mistake, and `c.req.json()` throws a
- * `SyntaxError` on it — which reached the error handler as an unclassified
- * error and went back as a 500.
+ * The routes over the real editor: the plan's `after` side is the edited
+ * source, compiled and lowered.
  */
-describe("a body that is not JSON", () => {
-    it.each(["/plan", "/apply"])("is a 400 on %s, not a 500", async (path) => {
-        const { events } = harness();
-        const app = new Hono<HonoEnv>();
-        app.onError(errorHandler);
-        app.use("/*", async (c, next) => { c.set("user", PERSON); await next(); });
-        app.route("/api/schema", createLiveSchemaRoutes({
-            getCollections: () => [],
-            getAdmin: () => ({ planSchemaChange: async () => { events.push("plan"); return okPlan(); } }),
-            getRepository: () => undefined
-        }));
-        const res = await app.fetch(new Request(`http://localhost/api/schema${path}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: "{ \"collectionId\": \"posts\", "
-        }));
+describe("over the real schema editor", () => {
+    let fixture: ReturnType<typeof writeSchemaFixture>;
+    let editor: TableSourceEditor;
+    beforeEach(() => {
+        fixture = writeSchemaFixture();
+        editor = new TableSourceEditor(fixture.dir);
+    });
+    afterEach(() => fixture.cleanup());
 
+    const realPreview = async (patches: readonly TablePatch[]): Promise<PreviewedSource> => {
+        const edit = await editor.preview(patches);
+        return {
+            files: edit.files.map(file => ({ path: path.relative(fixture.root, file.path), contents: file.contents })),
+            schema: edit.schema
+        };
+    };
+
+    it("plans the edited table, its new column lowered for the planner", async () => {
+        const planned: unknown[] = [];
+        const { post } = harness({
+            previewSource: realPreview,
+            getAdmin: () => ({ planSchemaChange: async (_before: unknown[], after: unknown[]) => { planned.push(...after); return okPlan(); } })
+        });
+        const res = await post("/plan", change);
+        expect(res.status).toBe(200);
+        expect(((await res.json()) as { files: string[] }).files).toEqual(["backend/schema/posts.ts", "backend/src/schema.generated.ts"]);
+        const posts = planned.find((each): each is PostgresCollectionConfig =>
+            typeof each === "object" && each !== null && "slug" in each && each.slug === "posts");
+        expect(Object.keys(posts?.properties ?? {})).toContain("subtitle");
+    });
+
+    it("refuses an edit whose result does not compile, naming the problem", async () => {
+        const { post, events } = harness({ previewSource: realPreview });
+        const res = await post("/plan", { patches: [{ op: "removeColumn", table: "tags", key: "id" }] });
         expect(res.status).toBe(400);
-        expect(await res.json()).toMatchObject({ error: { code: "INVALID_CHANGE" } });
+        const body = await res.json() as { error: { code: string; details: { problems: { table: string }[] } } };
+        expect(body.error.code).toBe("SCHEMA_EDIT_DOES_NOT_COMPILE");
+        expect(body.error.details.problems.some(problem => problem.table === "tags")).toBe(true);
         expect(events).toEqual([]);
     });
 });

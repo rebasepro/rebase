@@ -1,315 +1,127 @@
 /**
- * Rewriting a collection whose source is not on this machine.
+ * Editing a schema whose source is not on this machine.
  *
- * This is the piece that kept live schema editing local-only. Not
- * authentication and not the Git Data API — both worked — but the AST editor
- * needing a *file to open*, which a bundle deployment does not have.
- *
- * The tests below use a real temp directory and a fake repository, because the
+ * A bundle deployment ships compiled tables, so the schema directory is read
+ * from the repository into a scratch directory, the editor previews the edit
+ * there, and what it changed comes back as repository paths. The tests use a
+ * real temp directory, a fake repository and the real editor, because the
  * thing worth pinning is the handoff: what gets fetched, what the editor is
  * given, what comes back, and what is left behind.
  */
-import { describe, expect, it, jest } from "@jest/globals";
+import { describe, expect, it } from "@jest/globals";
 import fs from "node:fs";
-import fsp from "node:fs/promises";
-import path from "node:path";
+import os from "node:os";
 
-import { rewriteRemoteCollection } from "../src/schema-edit/remote-source";
+import { previewRemoteSchema } from "../src/schema-edit/remote-source";
 import type { SchemaEditRepository } from "../src/schema-edit/apply-schema-change";
-import type { CollectionPatch } from "@rebasepro/types";
+import { TableSourceEditor } from "../src/api/table-source-editor";
+import type { TablePatch } from "@rebasepro/types";
+import { SCHEMA_FILES } from "./helpers/schema-source-fixture";
 
-/** What `init.ts` hands the editor for one collection: a patch, or a removal. */
-interface CollectionSourceChange {
-    patch?: CollectionPatch;
-    remove?: boolean;
-}
-
-/** A repository holding whatever the test says it holds. */
-function repositoryWith(files: Record<string, string>): SchemaEditRepository & {
-    reads: string[];
-} {
+/** A repository holding whatever the test says it holds, that can list a directory as the GitHub one can. */
+function repositoryWith(files: Record<string, string>): SchemaEditRepository & { reads: string[]; listed: string[] } {
     const reads: string[] = [];
+    const listed: string[] = [];
     return {
         reads,
+        listed,
         root: "owner/repo",
         currentBranch: async () => "main",
         dirtyPaths: async () => [],
         writeFiles: async () => {},
         commit: async () => "abc123",
-        readFile: async (p: string) => { reads.push(p); return files[p]; }
+        readFile: async (p: string) => { reads.push(p); return files[p]; },
+        listFiles: async (dir: string) => { listed.push(dir); return Object.keys(files).filter(p => p.startsWith(`${dir}/`)); }
     };
 }
 
-/** Stands in for the AST editor: writes the file the way it would. */
-const writesFile = (contents: string) =>
-    jest.fn(async (dir: string, id: string) => {
-        await fsp.writeFile(path.join(dir, `${id}.ts`), contents, "utf8");
-    });
-
-describe("rewriting a remote collection", () => {
-    it("fetches the existing source and returns what the editor wrote", async () => {
-        const repository = repositoryWith({
-            "config/collections/posts.ts": "export const posts = { name: 'Posts' };\n"
-        });
-        const edit = writesFile("export const posts = { name: 'Posts', extra: 1 };\n");
-
-        const files = await rewriteRemoteCollection(
-            { repository, collectionsPath: "config/collections", edit },
-            "posts",
-            { name: "Posts" }
-        );
-
-        expect(repository.reads).toEqual(["config/collections/posts.ts"]);
-        expect(files).toEqual([{
-            path: "config/collections/posts.ts",
-            contents: "export const posts = { name: 'Posts', extra: 1 };\n"
-        }]);
-    });
-
-    it("gives the editor the file it fetched, not an empty directory", async () => {
-        // The editor rewrites in place and preserves what is around the change.
-        // Handed nothing, it would recreate the file from the payload and drop
-        // every import and comment the collection had.
-        const original = "// keep me\nexport const posts = { name: 'Posts' };\n";
-        const repository = repositoryWith({ "config/collections/posts.ts": original });
-
-        let seen: string | undefined;
-        const edit = jest.fn(async (dir: string, id: string) => {
-            seen = await fsp.readFile(path.join(dir, `${id}.ts`), "utf8");
-            await fsp.writeFile(path.join(dir, `${id}.ts`), original, "utf8");
-        });
-
-        await rewriteRemoteCollection(
-            { repository, collectionsPath: "config/collections", edit },
-            "posts",
-            {}
-        );
-        expect(seen).toBe(original);
-    });
-
-    it("handles a collection that does not exist yet", async () => {
-        // A new collection has no source. That is the same state the editor
-        // sees locally when somebody adds one, so it is not an error.
-        const repository = repositoryWith({});
-        const edit = writesFile("export const fresh = {};\n");
-
-        const files = await rewriteRemoteCollection(
-            { repository, collectionsPath: "config/collections", edit },
-            "fresh",
-            {}
-        );
-        expect(files[0]).toMatchObject({ path: "config/collections/fresh.ts" });
-    });
-
-    it("respects a project in a subdirectory", async () => {
-        const repository = repositoryWith({});
-        await rewriteRemoteCollection(
-            { repository, collectionsPath: "app/config/collections", edit: writesFile("x") },
-            "posts",
-            {}
-        );
-        expect(repository.reads).toEqual(["app/config/collections/posts.ts"]);
-    });
-
-    it("tolerates a trailing slash on the configured path", async () => {
-        const repository = repositoryWith({});
-        await rewriteRemoteCollection(
-            { repository, collectionsPath: "config/collections/", edit: writesFile("x") },
-            "posts",
-            {}
-        );
-        expect(repository.reads).toEqual(["config/collections/posts.ts"]);
-    });
-
-    it("leaves no scratch directory behind, even when the edit throws", async () => {
-        // It holds a copy of the customer's collection source, and a server that
-        // accumulates those is a slow leak of exactly the thing worth not
-        // leaking.
-        const repository = repositoryWith({ "config/collections/posts.ts": "x" });
-        const before = fs.readdirSync(require("node:os").tmpdir())
-            .filter(n => n.startsWith("rebase-remote-source-")).length;
-
-        await expect(rewriteRemoteCollection(
-            {
-                repository,
-                collectionsPath: "config/collections",
-                edit: async () => { throw new Error("ts-morph refused it"); }
-            },
-            "posts",
-            {}
-        )).rejects.toThrow("ts-morph refused it");
-
-        const after = fs.readdirSync(require("node:os").tmpdir())
-            .filter(n => n.startsWith("rebase-remote-source-")).length;
-        expect(after).toBe(before);
-    });
-
-    it("refuses a repository that cannot read, rather than rewriting from nothing", async () => {
-        // Silently treating "cannot read" as "empty file" would have the editor
-        // recreate the collection from the payload and the commit delete
-        // everything else in it.
-        const repository = repositoryWith({});
-        delete (repository as { readFile?: unknown }).readFile;
-
-        await expect(rewriteRemoteCollection(
-            { repository, collectionsPath: "config/collections", edit: writesFile("x") },
-            "posts",
-            {}
-        )).rejects.toThrow(/cannot read a file/);
-    });
+const project = (root = "backend/schema"): Record<string, string> => ({
+    ...Object.fromEntries(Object.entries(SCHEMA_FILES).map(([name, text]) => [`${root}/${name}`, text])),
+    "backend/other.ts": "export const unrelated = 1;\n"
 });
 
-/**
- * The whole collections directory, not one file.
- *
- * The scratch directory used to hold only the collection being edited. The
- * editor reads its siblings for two things — a relation picked by slug imports
- * the target's file, and a deletion refuses while another file imports the
- * one going and edits `index.ts` — so in a bundle deployment adding a
- * relation threw "no file for it in <tmp>" and deleting a collection was
- * refused outright. With a repository that can list a directory, every
- * collection file is brought over, and what comes back is exactly what the
- * editor changed: edited files, new files, and deletions.
- */
-describe("rewriting a remote collection with its siblings", () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { AstSchemaEditor } = require("../src/api/ast-schema-editor") as typeof import("../src/api/ast-schema-editor");
+/** What `create-backend.ts` hands over: the real editor, previewing. */
+const realEditor = (patches: readonly TablePatch[]) => async (dir: string) => {
+    const edit = await new TableSourceEditor(dir).preview(patches);
+    return { files: edit.files, result: edit.schema };
+};
 
-    const collectionFile = (slug: string, extra = "", imports = "") => [
-        "import { defineCollection } from \"@rebasepro/cms-types\";",
-        imports,
-        `const ${slug}Collection = defineCollection({`,
-        `    name: "${slug}",`,
-        `    slug: "${slug}",`,
-        `    table: "${slug}",`,
-        "    properties: {",
-        `        name: { name: "Name", type: "string" }${extra}`,
-        "    }",
-        "});",
-        "",
-        `export default ${slug}Collection;`,
-        ""
-    ].join("\n");
-
-    const INDEX = [
-        "import postsCollection from \"./posts\";",
-        "import authorsCollection from \"./authors\";",
-        "import tagsCollection from \"./tags\";",
-        "",
-        "export const collections = [postsCollection, authorsCollection, tagsCollection];",
-        ""
-    ].join("\n");
-
-    /** A repository that can list a directory, as the GitHub one can. */
-    function listingRepository(files: Record<string, string>) {
-        const repository = repositoryWith(files);
-        const listed: string[] = [];
-        return Object.assign(repository, {
-            listed,
-            listFiles: async (dir: string) => {
-                listed.push(dir);
-                return Object.keys(files).filter(p => p.startsWith(`${dir}/`));
-            }
+describe("previewing an edit of a remote schema", () => {
+    it("fetches the whole schema directory and returns only what the edit changed", async () => {
+        const repository = repositoryWith(project());
+        const { files, result } = await previewRemoteSchema({
+            repository,
+            schemaPath: "backend/schema",
+            preview: realEditor([{ op: "addColumn", table: "tags", key: "color", column: { type: { kind: "text" } } }])
         });
-    }
 
-    const PROJECT = {
-        "config/collections/posts.ts": collectionFile("posts"),
-        "config/collections/authors.ts": collectionFile("authors"),
-        "config/collections/tags.ts": collectionFile("tags"),
-        "config/collections/index.ts": INDEX,
-        "config/other.ts": "export const unrelated = 1;\n"
-    };
-
-    /** What `init.ts` hands over: the real editor, removal included. */
-    const realEditor = async (dir: string, id: string, change: CollectionSourceChange) => {
-        const editor = new AstSchemaEditor(dir);
-        if (change.remove) {
-            await editor.deleteCollection(id);
-            return;
-        }
-        await editor.applyPatch(id, change.patch ?? []);
-    };
-
-    it("links a relation to another collection picked by its slug", async () => {
-        const repository = listingRepository(PROJECT);
-        const files = await rewriteRemoteCollection(
-            { repository, collectionsPath: "config/collections", edit: realEditor },
-            "posts",
-            {
-                patch: [{
-                    op: "set",
-                    path: ["properties", "author"],
-                    value: { name: "Author", type: "relation", relation: { kind: "belongsTo", target: "authors" } }
-                }]
-            }
-        );
-
-        expect(repository.listed).toEqual(["config/collections"]);
-        // Only the edited file: the siblings were read, not rewritten.
-        expect(files.map(f => f.path)).toEqual(["config/collections/posts.ts"]);
-        expect(files[0].contents).toContain("import authorsCollection from \"./authors.js\";");
-        expect(files[0].contents).toContain("target: () => authorsCollection");
+        expect(repository.listed).toEqual(["backend/schema"]);
+        expect(repository.reads.sort()).toEqual(Object.keys(SCHEMA_FILES).map(name => `backend/schema/${name}`).sort());
+        expect(files.map(file => file.path)).toEqual(["backend/schema/tags.ts"]);
+        expect(files[0].contents).toContain("color: col.text()");
+        expect(result.descriptors.find(d => d.slug === "tags")?.columns.map(c => c.key)).toEqual(["id", "label", "color"]);
     });
 
-    it("deletes a collection, taking it out of index.ts in the same change", async () => {
-        const repository = listingRepository(PROJECT);
-        const files = await rewriteRemoteCollection(
-            { repository, collectionsPath: "config/collections", edit: realEditor },
-            "tags",
-            { remove: true }
-        );
-
-        const byPath = Object.fromEntries(files.map(f => [f.path, f]));
-        expect(Object.keys(byPath).sort()).toEqual([
-            "config/collections/index.ts",
-            "config/collections/tags.ts"
-        ]);
-        expect(byPath["config/collections/tags.ts"]).toMatchObject({ contents: "", deleted: true });
-        expect(byPath["config/collections/index.ts"].contents).not.toMatch(/tags/i);
-        expect(byPath["config/collections/index.ts"].contents).toContain("postsCollection, authorsCollection");
-    });
-
-    it("refuses to delete a collection another one imports, naming it", async () => {
-        const repository = listingRepository({
-            ...PROJECT,
-            "config/collections/posts.ts": collectionFile(
-                "posts",
-                ",\n        tags: { name: \"Tags\", type: \"relation\", relation: { kind: \"manyToMany\", target: () => tagsCollection } }",
-                "import tagsCollection from \"./tags.js\";"
-            )
+    it("adds a relation, importing the target's file it fetched", async () => {
+        const { files } = await previewRemoteSchema({
+            repository: repositoryWith(project()),
+            schemaPath: "backend/schema",
+            preview: realEditor([{ op: "addRelation", table: "posts", name: "tags", relation: { kind: "manyToMany", target: "tags" } }])
         });
-        await expect(rewriteRemoteCollection(
-            { repository, collectionsPath: "config/collections", edit: realEditor },
-            "tags",
-            { remove: true }
-        )).rejects.toThrow(/Cannot delete "tags": posts\.ts imports it/);
+        expect(files.map(file => file.path)).toEqual(["backend/schema/posts.ts"]);
+        expect(files[0].contents).toContain("import { tags } from \"./tags\";");
     });
 
-    it("refuses a deletion when it can only see the one file", async () => {
-        // Without the siblings, nothing can tell whether another collection
-        // imports this one, and index.ts cannot be edited: committing the
-        // deletion alone is the change that stops every collection loading.
-        const repository = repositoryWith({ "config/collections/tags.ts": collectionFile("tags") });
-        await expect(rewriteRemoteCollection(
-            { repository, collectionsPath: "config/collections", edit: realEditor },
-            "tags",
-            { remove: true }
-        )).rejects.toThrow(/list/);
+    it("deletes a table, taking it out of the index in the same change", async () => {
+        const { files } = await previewRemoteSchema({
+            repository: repositoryWith(project()),
+            schemaPath: "backend/schema",
+            preview: realEditor([{ op: "deleteTable", table: "tags" }])
+        });
+        const byPath = Object.fromEntries(files.map(file => [file.path, file]));
+        expect(Object.keys(byPath)).toEqual(["backend/schema/index.ts", "backend/schema/tags.ts"]);
+        expect(byPath["backend/schema/tags.ts"]).toMatchObject({ contents: "", deleted: true });
+        expect(byPath["backend/schema/index.ts"].contents).not.toContain("tags");
+    });
+
+    it("respects a project in a subdirectory, and a trailing slash", async () => {
+        const repository = repositoryWith(project("app/backend/schema"));
+        const { files } = await previewRemoteSchema({
+            repository,
+            schemaPath: "app/backend/schema/",
+            preview: realEditor([{ op: "setOption", table: "tags", option: "history", value: true }])
+        });
+        expect(repository.listed).toEqual(["app/backend/schema"]);
+        expect(files.map(file => file.path)).toEqual(["app/backend/schema/tags.ts"]);
+    });
+
+    it("leaves no scratch directory behind, even when the edit is refused", async () => {
+        const count = () => fs.readdirSync(os.tmpdir()).filter(name => name.startsWith("rebase-remote-schema-")).length;
+        const before = count();
+        await expect(previewRemoteSchema({
+            repository: repositoryWith(project()),
+            schemaPath: "backend/schema",
+            preview: realEditor([{ op: "removeColumn", table: "tags", key: "id" }])
+        })).rejects.toThrow(/was not written/);
+        expect(count()).toBe(before);
+    });
+
+    it("refuses a repository that cannot list and read, rather than editing from part of the schema", async () => {
+        const repository = repositoryWith(project());
+        const partial: SchemaEditRepository = { ...repository, listFiles: undefined };
+        await expect(previewRemoteSchema({
+            repository: partial,
+            schemaPath: "backend/schema",
+            preview: realEditor([{ op: "deleteTable", table: "tags" }])
+        })).rejects.toThrow(/cannot list a directory/);
     });
 
     it("never writes a listed path outside the scratch directory", async () => {
-        const repository = repositoryWith({
-            "config/collections/posts.ts": collectionFile("posts"),
-            "config/collections/../../escape.ts": "export const x = 1;\n"
-        });
-        Object.assign(repository, {
-            listFiles: async () => ["config/collections/posts.ts", "config/collections/../../escape.ts"]
-        });
-        await expect(rewriteRemoteCollection(
-            { repository, collectionsPath: "config/collections", edit: writesFile("x") },
-            "posts",
-            {}
-        )).rejects.toThrow(/outside/);
+        const repository = repositoryWith({ "backend/schema/../../escape.ts": "export const x = 1;\n" });
+        await expect(previewRemoteSchema({
+            repository,
+            schemaPath: "backend/schema",
+            preview: async () => ({ files: [], result: undefined })
+        })).rejects.toThrow(/outside/);
     });
 });

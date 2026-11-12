@@ -1,120 +1,86 @@
 import { Hono } from "hono";
-import { z } from "zod";
-import { collectionPatchProblems, isCollectionPatch } from "@rebasepro/types";
-import { AstSchemaEditor } from "./ast-schema-editor";
-import { SchemaSourceEditor } from "../schema-edit/source-editor";
+import path from "node:path";
+import { TablePatchError, parseTablePatches, type TablePatch } from "@rebasepro/types";
+import { TableSourceEditError, TableSourceEditor, type TableSourceEdit } from "./table-source-editor";
 import { ApiError, errorHandler } from "./errors";
 import { HonoEnv } from "./types";
 
 /**
- * Rewriting collection source from the admin panel.
+ * Editing `backend/schema` from the Studio, on this machine, without touching
+ * the database: `/api/admin/schema-editor/*`.
  *
- * Every refusal in `AstSchemaEditor` is written for the person who will read it
- * — "Collection X has no file at …", "Relation Y has no target collection. Pick
- * one before saving." — and every one of them was a plain `Error`, which
- * `errorHandler` treats as an unexpected failure: 500, and a body that says
- * "Internal Server Error". The messages never left the server. They are 400s
- * now, so the panel can show what it was told.
+ * - `GET /tables` — every table the index exports as the editor reads it,
+ *   with what is edited in code (read-only) and why.
+ * - `POST /preview` `{ patches }` — the files the edit would write, compiled;
+ *   nothing is written.
+ * - `POST /apply` `{ patches }` — the same, written to disk.
+ *
+ * Every refusal is a 400 whose message says what to do, with the problems in
+ * `details.problems`: an edit the editor will not make
+ * (`SCHEMA_EDIT_REFUSED`), one whose result does not compile
+ * (`SCHEMA_EDIT_DOES_NOT_COMPILE`), or a list of edits that is not well formed
+ * (`INVALID_INPUT`). Nothing is written on any of them.
+ *
+ * Changing the database is live schema editing's job (`/api/admin/schema`),
+ * which commits the same edits and runs the DDL.
  */
+
+/** The process's one editor of `schemaDir`, shared with live schema editing. */
+export function createTableSourceEditor(schemaDir: string): TableSourceEditor {
+    return new TableSourceEditor(schemaDir);
+}
+
+/** The `{ patches }` of a request, or a 400 naming every problem. */
+async function patchesOf(c: { req: { json: () => Promise<unknown> } }): Promise<TablePatch[]> {
+    const body: unknown = await c.req.json().catch(() => undefined);
+    if (typeof body !== "object" || body === null || !("patches" in body)) {
+        throw ApiError.badRequest("Expected `{ patches: [...] }`: the schema edits to make.", "INVALID_INPUT");
+    }
+    try {
+        return parseTablePatches(body.patches);
+    } catch (error) {
+        if (error instanceof TablePatchError) throw ApiError.badRequest(error.message, "INVALID_INPUT", { problems: error.problems });
+        throw error;
+    }
+}
+
+/** An edit, as the panel reads it: each file by its path in the project, with its new text. */
+function describeEdit(editor: TableSourceEditor, edit: TableSourceEdit) {
+    const root = path.dirname(path.dirname(editor.schemaDir));
+    return {
+        files: edit.files.map(file => ({
+            path: path.relative(root, file.path).split(path.sep).join("/"),
+            ...(file.deleted ? { deleted: true } : { contents: file.contents })
+        })),
+        tables: edit.schema.descriptors.map(descriptor => descriptor.slug)
+    };
+}
+
+/** The editor's refusal, as the 400 that carries its reason and its problems. */
 function refusalsAsBadRequest<T>(run: () => Promise<T>): Promise<T> {
     return run().catch((error: unknown) => {
-        if (error instanceof ApiError) throw error;
-        throw ApiError.badRequest(
-            error instanceof Error ? error.message : String(error),
-            "SCHEMA_EDIT_REFUSED"
-        );
+        if (error instanceof TableSourceEditError) throw ApiError.badRequest(error.message, error.code, { problems: error.problems });
+        throw error;
     });
 }
 
-/** The identifier half of every payload here, checked once. */
-const collectionIdSchema = z.string().min(1, "`collectionId` is required");
-const propertyKeySchema = z.string().min(1, "`propertyKey` is required");
-
-const propertySaveSchema = z.object({
-    collectionId: collectionIdSchema,
-    propertyKey: propertyKeySchema,
-    propertyConfig: z.record(z.string(), z.unknown())
-});
-const propertyDeleteSchema = z.object({
-    collectionId: collectionIdSchema,
-    propertyKey: propertyKeySchema
-});
-const collectionSaveSchema = z.object({
-    collectionId: collectionIdSchema,
-    collectionData: z.record(z.string(), z.unknown()).optional(),
-    /** What changed about an existing collection — see `collection_patch.ts`. */
-    patch: z.array(z.unknown()).optional(),
-    partial: z.boolean().optional()
-}).refine(
-    save => (save.collectionData === undefined) !== (save.patch === undefined),
-    { message: "send `patch` (what changed) or `collectionData` (a new collection), not both" }
-);
-const collectionDeleteSchema = z.object({
-    collectionId: collectionIdSchema
-});
-
-/** Parse a body against a schema, or 400 naming the field. */
-async function body<S extends z.ZodType>(c: { req: { json: () => Promise<unknown> } }, schema: S): Promise<z.infer<S>> {
-    const raw = await c.req.json().catch(() => undefined);
-    const parsed = schema.safeParse(raw);
-    if (!parsed.success) {
-        throw ApiError.badRequest(
-            parsed.error.issues.map(i => `${i.path.join(".") || "body"}: ${i.message}`).join("; "),
-            "INVALID_INPUT"
-        );
-    }
-    return parsed.data;
-}
-
-/**
- * The editor for `collectionsDir`: one per process, shared by these routes
- * and live schema editing's `/apply`. See {@link SchemaSourceEditor}.
- *
- * Here rather than beside the class because building it loads `ts-morph`, an
- * optional peer dependency this module is imported to probe for.
- */
-export function createSchemaSourceEditor(collectionsDir: string): SchemaSourceEditor {
-    return new SchemaSourceEditor(new AstSchemaEditor(collectionsDir));
-}
-
-export function createSchemaEditorRoutes(source: SchemaSourceEditor): Hono<HonoEnv> {
+/** The source-only schema editor's routes, over one editor. */
+export function createSchemaEditorRoutes(editor: TableSourceEditor): Hono<HonoEnv> {
     const router = new Hono<HonoEnv>();
     router.onError(errorHandler);
 
-    router.post("/property/save", async (c) => {
-        const { collectionId, propertyKey, propertyConfig } = await body(c, propertySaveSchema);
-        await refusalsAsBadRequest(() => source.run(editor => editor.saveProperty(collectionId, propertyKey, propertyConfig)));
-        return c.json({ success: true });
+    router.get("/tables", async (c) => c.json({ tables: await editor.describe() }));
+
+    router.post("/preview", async (c) => {
+        const patches = await patchesOf(c);
+        const edit = await refusalsAsBadRequest(() => editor.run(() => editor.preview(patches)));
+        return c.json(describeEdit(editor, edit));
     });
 
-    router.post("/property/delete", async (c) => {
-        const { collectionId, propertyKey } = await body(c, propertyDeleteSchema);
-        await refusalsAsBadRequest(() => source.run(editor => editor.deleteProperty(collectionId, propertyKey)));
-        return c.json({ success: true });
-    });
-
-    /**
-     * `partial: true` means "this payload is what changed", not "this is the
-     * collection". Without it a one-key patch — which is what adding a column
-     * posts — is read as a whole-collection save and deletes everything it does
-     * not mention, `securityRules` included. Absent, it defaults to a full save,
-     * so an older panel keeps the behaviour it was written against.
-     */
-    router.post("/collection/save", async (c) => {
-        const { collectionId, collectionData, patch, partial } = await body(c, collectionSaveSchema);
-        if (patch !== undefined && !isCollectionPatch(patch)) {
-            throw ApiError.badRequest(collectionPatchProblems(patch).join(" "), "INVALID_INPUT");
-        }
-        await refusalsAsBadRequest(() => source.run(editor => patch
-            ? editor.applyPatch(collectionId, patch)
-            : editor.saveCollection(collectionId, collectionData ?? {}, { partial: partial === true })));
-        return c.json({ success: true });
-    });
-
-    router.post("/collection/delete", async (c) => {
-        const { collectionId } = await body(c, collectionDeleteSchema);
-        await refusalsAsBadRequest(() => source.run(editor => editor.deleteCollection(collectionId)));
-        return c.json({ success: true });
+    router.post("/apply", async (c) => {
+        const patches = await patchesOf(c);
+        const edit = await refusalsAsBadRequest(() => editor.apply(patches));
+        return c.json({ success: true, ...describeEdit(editor, edit) });
     });
 
     return router;

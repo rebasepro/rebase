@@ -30,21 +30,19 @@
  */
 import { Hono, type Context } from "hono";
 import {
-    applyCollectionPatch,
-    collectionPatchProblems,
-    diffCollections,
-    isCollectionPatch,
+    TablePatchError,
     isSchemaEditingAdmin,
     isSQLAdmin,
-    nestCollectionPatchPaths,
+    parseTablePatches,
     type AuthAdapter,
     type ClassifiedSchemaChanges,
-    type CollectionPatch,
     type CollectionConfig,
     type DatabaseAdmin,
+    type SchemaChangeFile,
     type SchemaChangePlan,
     type SchemaCommitPaths,
-    type SchemaEditingAdmin
+    type SchemaEditingAdmin,
+    type TablePatch
 } from "@rebasepro/types";
 import { HonoEnv } from "./types";
 import { ApiError, errorHandler } from "./errors";
@@ -64,6 +62,18 @@ import {
     type SchemaEditPolicy
 } from "../schema-edit/schema-edit-permissions";
 import { requireScope } from "../auth/access";
+import type { EditedSchema, TableSourceEditError } from "./table-source-editor";
+
+/**
+ * A schema edit applied to a copy of `backend/schema` and compiled: the files
+ * it changes, by repository path, and what the schema compiles to with it.
+ */
+export interface PreviewedSource {
+    /** Every file the edit changes, as repository-relative paths. */
+    files: SchemaChangeFile[];
+    /** The schema the edit leaves: the `after` side of the plan, and what the server is refreshed with. */
+    schema: EditedSchema;
+}
 
 export interface LiveSchemaRoutesConfig {
     /**
@@ -81,16 +91,32 @@ export interface LiveSchemaRoutesConfig {
      */
     getRepository: (author?: { name: string; email: string }) => SchemaEditRepository | undefined;
     /**
-     * Rewrite the collection source for a proposed change, returning the files
-     * that changed. Supplied by the caller because it is the AST editor's job,
-     * and that needs `ts-morph`, which is an optional dependency.
+     * Apply the edits to a copy of `backend/schema` and compile the result,
+     * writing nothing — the `after` side of every plan. Supplied by the caller
+     * because it is the schema editor's job, and that needs `ts-morph`, an
+     * optional dependency. Refuses (a `TableSourceEditError`) an edit it cannot
+     * make or whose result does not compile.
      */
-    writeSource?: (change: ProposedChange) => Promise<{ path: string; contents: string }[]>;
+    previewSource?: (patches: readonly TablePatch[]) => Promise<PreviewedSource>;
+    /**
+     * Hand back a previewed edit's files for the commit, once it is safe to:
+     * refuses when a file changed since the preview read it. Absent where the
+     * source may be read but not written — then `/apply` is refused with
+     * {@link sourceEditingOff}.
+     */
+    writeSource?: (edit: PreviewedSource) => Promise<SchemaChangeFile[]>;
+    /**
+     * Called after an apply that ran against the database, with the schema it
+     * left: the running server swaps its tables for these, so the change is
+     * served without a restart. Not called for a source-only commit — the
+     * database does not have the change.
+     */
+    onApplied?: (schema: EditedSchema) => void | Promise<void>;
     /**
      * Why {@link writeSource} is absent, when the caller knows.
      *
      * `writeSource` being undefined has several causes — the editor turned off,
-     * `baas` mode, no `collectionsDir`, `NODE_ENV=production`, `ts-morph` not
+     * `baas` mode, no `schemaDir`, `NODE_ENV=production`, `ts-morph` not
      * installed — and this route could see only that the field was unset, so it
      * reported the last of them for all of them. The admin panel calls this
      * *and* `/api/schema-editor/status` on every page load and got two
@@ -104,13 +130,6 @@ export interface LiveSchemaRoutesConfig {
      * database and goes wherever the project's own changes go — still works.
      */
     databaseChangesOff?: { code: string; message: string };
-    /**
-     * Which paths {@link writeSource} will touch, without touching them.
-     *
-     * The dirty-tree check needs them *before* the write, or it reads the
-     * change's own edit as somebody else's work in progress and refuses.
-     */
-    sourcePathsFor?: (change: ProposedChange) => string[];
     /**
      * Where this project's generated artifacts belong, relative to the
      * repository.
@@ -172,33 +191,6 @@ export async function readAccountIdentity(
 }
 
 /**
- * What the panel posts about one collection.
- *
- * For a collection that exists, a `patch`: what the person changed, as the
- * difference between the JSON the editor loaded and the JSON it is saving (see
- * `collection_patch.ts` in `@rebasepro/types`). The whole collection travelled
- * here once, and the write rewrote every key it carried and deleted whatever
- * JSON had dropped — handlers, shared properties, imported enums, comments.
- *
- * For a collection that does not exist yet, the whole `collection`. A caller
- * that sends a whole collection for one that exists has it turned into the
- * patch of what differs (see {@link asPatch}).
- */
-export interface ProposedChange {
-    collectionId: string;
-    /** The whole collection — only for one that does not exist yet. */
-    collection?: Record<string, unknown>;
-    /** What changed about an existing collection. */
-    patch?: CollectionPatch;
-    /**
-     * Delete the collection's source: its file, and its entry in `index.ts`.
-     * Planned like any change — the table and its rows stay, and say so — and
-     * committed source-only.
-     */
-    remove?: true;
-}
-
-/**
  * The git identity for the caller.
  *
  * `undefined` when the request carries no user — a service key, say — which
@@ -247,150 +239,19 @@ const nonEmptyString = (value: unknown): string | undefined =>
     typeof value === "string" && value.trim() !== "" ? value : undefined;
 
 /**
- * What a collection id may contain.
- *
- * The same alphabet the AST editor sanitises to, stated at the boundary
- * instead. The id becomes a *filename* — `<collectionsDir>/<id>.ts` — in two
- * places, and only one of them checked it: the editor refuses a traversal when
- * it writes, but the caller derives the same path first, to hand the dirty
- * check the paths it is about to touch. A refusal that arrives one layer in is
- * a refusal that the layer above already acted on.
+ * The edits a request carries: `{ patches: TablePatch[] }`, checked — or a 400
+ * naming every problem, each with its index in the list.
  */
-const SAFE_COLLECTION_ID = /^[A-Za-z0-9_-]+$/;
-
-/**
- * What may become a Postgres identifier.
- *
- * Narrower than {@link SAFE_COLLECTION_ID}: a hyphen is fine in a filename and
- * has to be quoted in SQL, and the builders downstream interpolate rather than
- * escape. Deliberately the same alphabet
- * `server-postgres/src/schema/ensure-collection-tables.ts` enforces, so a name
- * this accepts is one that module will also accept — the two disagreeing would
- * mean a change that validates here and throws from inside a planner.
- */
-const SAFE_SQL_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_$]*$/;
-
-const parseProposed = (body: unknown): ProposedChange => {
-    const candidate = body as Partial<ProposedChange> | undefined;
-    if (!candidate?.collectionId || typeof candidate.collectionId !== "string") {
-        throw ApiError.badRequest("`collectionId` is required.", "INVALID_CHANGE");
-    }
-    if (!SAFE_COLLECTION_ID.test(candidate.collectionId)) {
-        throw ApiError.badRequest(
-            `"${candidate.collectionId}" is not a usable collection id. It becomes a filename, so ` +
-            "it may contain only letters, numbers, underscores and hyphens.",
-            "INVALID_CHANGE"
-        );
-    }
-    if (candidate.remove === true) {
-        if (candidate.collection !== undefined || candidate.patch !== undefined) {
-            throw ApiError.badRequest("A removal carries no `collection` or `patch`.", "INVALID_CHANGE");
+function parsePatches(body: unknown): TablePatch[] {
+    if (!isRecord(body)) throw ApiError.badRequest("Expected a JSON object: `{ patches: [...] }`.", "INVALID_CHANGE");
+    try {
+        return parseTablePatches(body.patches);
+    } catch (error) {
+        if (error instanceof TablePatchError) {
+            throw ApiError.badRequest(error.message, "INVALID_CHANGE", { problems: error.problems });
         }
-        return { collectionId: candidate.collectionId, remove: true };
+        throw error;
     }
-    if (candidate.patch !== undefined) {
-        if (candidate.collection !== undefined) {
-            throw ApiError.badRequest("Send `patch` or `collection`, not both.", "INVALID_CHANGE");
-        }
-        const patch: unknown = candidate.patch;
-        if (!isCollectionPatch(patch)) {
-            throw ApiError.badRequest(collectionPatchProblems(patch).join(" "), "INVALID_CHANGE");
-        }
-        return { collectionId: candidate.collectionId, patch: nestCollectionPatchPaths(patch) };
-    }
-    if (!candidate.collection || typeof candidate.collection !== "object") {
-        throw ApiError.badRequest("`collection` or `patch` is required.", "INVALID_CHANGE");
-    }
-    assertSafeIdentifiers(candidate.collection);
-    return { collectionId: candidate.collectionId, collection: candidate.collection };
-};
-
-/**
- * Refuse the names inside a collection that reach SQL as identifiers.
- *
- * Run on the posted collection, and on the proposed one a patch produces — a
- * patch can carry a `columnName` as easily as a whole collection can.
- */
-function assertSafeIdentifiers(candidate: object): void {
-
-    // The names inside the collection reach SQL as identifiers, and only the id
-    // above was checked. `table`, `schema` and every property's `columnName` are
-    // interpolated into CREATE TABLE and ALTER TABLE — quoted, which is not the
-    // same as escaped — and those statements run on the owner connection, the
-    // one connection exempt from every RLS policy. The DDL builders refuse an
-    // unsafe identifier now too, but a 500 from the middle of a planner is not
-    // an answer a caller can act on, and the boundary is where a bad request
-    // belongs.
-    const collection = candidate as {
-        table?: unknown;
-        schema?: unknown;
-        properties?: Record<string, { columnName?: unknown } | undefined>;
-    };
-    const named: Array<[string, unknown]> = [
-        ["table", collection.table],
-        ["schema", collection.schema],
-        ...Object.entries(collection.properties ?? {}).map(
-            ([property, spec]) => [`properties.${property}.columnName`, spec?.columnName] as [string, unknown]
-        )
-    ];
-    for (const [field, value] of named) {
-        if (value === undefined || value === null) continue;
-        if (typeof value !== "string" || !SAFE_SQL_IDENTIFIER.test(value)) {
-            // `typeof value` rather than the value itself: a body can carry an
-            // object whose `toString` is not callable, and formatting it would
-            // turn a 400 into a 500 from inside the validator.
-            const shown = typeof value === "string" ? `"${value}"` : `a ${typeof value}`;
-            throw ApiError.badRequest(
-                `${shown} is not a usable value for \`${field}\`. It becomes a Postgres ` +
-                "identifier, so it may contain only letters, numbers, underscores and dollar signs, " +
-                "and may not start with a digit.",
-                "INVALID_CHANGE"
-            );
-        }
-    }
-}
-
-/** True for a function, or anything holding one at any depth. */
-function holdsCode(value: unknown, seen = new Set<unknown>()): boolean {
-    if (typeof value === "function") return true;
-    if (typeof value !== "object" || value === null || seen.has(value)) return false;
-    seen.add(value);
-    return Object.values(value).some(child => holdsCode(child, seen));
-}
-
-function valueAt(root: unknown, keys: string[]): unknown {
-    let node = root;
-    for (const key of keys) {
-        if (!isRecord(node)) return undefined;
-        node = node[key];
-    }
-    return node;
-}
-
-/**
- * The change as a patch against the collection as it is.
- *
- * A whole collection posted for one that exists is the difference from the
- * current one: a caller that sends JSON cannot then delete what JSON could not
- * carry. A key it left out is removed only when its value is pure data — a
- * key holding code (`callbacks`, a handler, a component) is not something a
- * JSON caller could have meant to drop.
- */
-export function asPatch(existing: CollectionConfig, change: ProposedChange): CollectionPatch {
-    if (change.patch) return change.patch;
-    return diffCollections(existing, change.collection ?? {})
-        .filter(op => op.op !== "remove" || !holdsCode(valueAt(existing, op.path)));
-}
-
-/**
- * What the source writer is handed: the whole collection for a new one, the
- * patch for an existing one.
- */
-function sourceChangeFor(current: CollectionConfig[], change: ProposedChange): ProposedChange {
-    if (change.remove) return change;
-    const existing = current.find(collection => collection.slug === change.collectionId);
-    if (!existing) return change;
-    return { collectionId: change.collectionId, patch: asPatch(existing, change) };
 }
 
 /**
@@ -411,196 +272,14 @@ async function readBody(c: Context<HonoEnv>): Promise<unknown> {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
     typeof value === "object" && value !== null && !Array.isArray(value);
 
-/**
- * A relation as it arrived, given back with a callable `target`.
- *
- * `relation` is the posted one; `current` is the same relation in the
- * collection as it is now, when there is one.
- */
-type RelationRepair = (
-    relation: Record<string, unknown>,
-    current: Record<string, unknown> | undefined,
-    path: string
-) => Record<string, unknown>;
-
-/**
- * {@link RelationRepair} applied to every relation in a property tree, paired
- * by key with the same property in the collection as it is now.
- *
- * Nested, because the registry resolves a relation inside a `map`, an array's
- * `of` or a block's `oneOf` as well as a top-level one, and throws on the same
- * missing target there.
- */
-function repairPropertyRelations(
-    properties: unknown,
-    current: unknown,
-    path: string,
-    repair: RelationRepair
-): unknown {
-    if (!isRecord(properties)) return properties;
-    const was = isRecord(current) ? current : {};
-    return Object.fromEntries(Object.entries(properties).map(([key, property]) =>
-        [key, repairPropertyRelation(property, was[key], `${path}.${key}`, repair)]
-    ));
+/** Whether an error is the schema editor's refusal (from this copy of the module or another). */
+function isEditRefusal(error: unknown): error is TableSourceEditError {
+    return error instanceof Error && error.name === "TableSourceEditError" && "code" in error && "problems" in error;
 }
 
-function repairPropertyRelation(
-    property: unknown,
-    current: unknown,
-    path: string,
-    repair: RelationRepair
-): unknown {
-    if (!isRecord(property)) return property;
-    const was = isRecord(current) ? current : {};
-    const next: Record<string, unknown> = { ...property };
-
-    if (property.type === "relation" && isRecord(property.relation)) {
-        next.relation = repair(property.relation, isRecord(was.relation) ? was.relation : undefined, path);
-    }
-    if (isRecord(property.properties)) {
-        next.properties = repairPropertyRelations(property.properties, was.properties, path, repair);
-    }
-    if (Array.isArray(property.of)) {
-        const wasOf = Array.isArray(was.of) ? was.of : [];
-        next.of = property.of.map((item, index) =>
-            repairPropertyRelation(item, wasOf[index], `${path}.of[${index}]`, repair));
-    } else if (isRecord(property.of)) {
-        next.of = repairPropertyRelation(property.of, was.of, `${path}.of`, repair);
-    }
-    if (isRecord(property.oneOf) && isRecord(property.oneOf.properties)) {
-        const wasOneOf = isRecord(was.oneOf) ? was.oneOf : {};
-        next.oneOf = {
-            ...property.oneOf,
-            properties: repairPropertyRelations(property.oneOf.properties, wasOneOf.properties, `${path}.oneOf`, repair)
-        };
-    }
-    return next;
-}
-
-/**
- * {@link RelationRepair} applied to the collection's own `relations` array.
- *
- * Paired with the current entries the way the AST editor pairs them when it
- * writes the file (`writeRelations`): by `relationName`, and positionally for
- * an unnamed entry only while the array's length is unchanged — after that a
- * position no longer means the same relation. The plan and the file have to
- * agree about which relation is which, or the plan describes a change the
- * write does not make.
- */
-function repairCollectionRelations(relations: unknown, current: unknown, repair: RelationRepair): unknown {
-    if (!Array.isArray(relations)) return relations;
-    const was = Array.isArray(current) ? current : [];
-    const byName = new Map<string, Record<string, unknown>>();
-    const anonymousByIndex: (Record<string, unknown> | undefined)[] = [];
-    was.forEach((relation, index) => {
-        if (!isRecord(relation)) return;
-        if (typeof relation.relationName === "string") byName.set(relation.relationName, relation);
-        else anonymousByIndex[index] = relation;
-    });
-
-    return relations.map((relation, index) => {
-        if (!isRecord(relation)) return relation;
-        const name = typeof relation.relationName === "string" ? relation.relationName : undefined;
-        const counterpart = (name !== undefined ? byName.get(name) : undefined)
-            ?? (relations.length === was.length ? anonymousByIndex[index] : undefined);
-        return repair(relation, counterpart, `relations.${name ?? index}`);
-    });
-}
-
-/**
- * The proposed collection set: everything as it is, with one collection
- * replaced or added.
- *
- * The replacement arrives as JSON, and a relation's `target` is a thunk —
- * `JSON.stringify` drops it, so every relation the panel did not touch comes
- * back with no target, and one picked in the property form names its target by
- * slug. The planner calls `target()` on every relation in the set, so as it
- * arrived it threw on the first one, and no change of any kind could be planned
- * for a collection that had a relation.
- *
- * So each target is made callable again, the way the AST editor makes it
- * source again when it writes the file: a slug becomes a lookup in the
- * proposed set — so a link to the collection being edited reaches its new
- * version — and a missing target is the one the same relation has now. A
- * target that is neither is refused here, as the caller's mistake, rather than
- * thrown from inside the planner as a 500.
- */
-export function proposedCollections(
-    current: CollectionConfig[],
-    change: ProposedChange
-): CollectionConfig[] {
-    let proposed: CollectionConfig[] = [];
-    const slugs = new Set([...current.map(collection => collection.slug), change.collectionId]);
-    const lookup = (slug: string) => (): CollectionConfig => {
-        const found = proposed.find(collection => collection.slug === slug);
-        if (!found) throw new Error(`No collection "${slug}" in the proposed set.`);
-        return found;
-    };
-
-    const repair: RelationRepair = (relation, was, path) => {
-        const target = relation.target;
-        if (typeof target === "function") return relation;
-
-        const named = typeof target === "string" ? target.trim() : "";
-        if (named && slugs.has(named)) return { ...relation, target: lookup(named) };
-        // `() => authorsCollection` is the thunk's own source, which the AST
-        // editor accepts and writes back as it is. An identifier is not
-        // something this can look up, so only the relation's current target
-        // can stand in for it.
-        if (named && !/^\(\s*\)\s*=>/.test(named)) {
-            throw ApiError.badRequest(
-                `The relation at \`${path}\` on "${change.collectionId}" targets "${named}", which is not a ` +
-                "collection. Pick an existing collection as its target.",
-                "INVALID_CHANGE"
-            );
-        }
-        if (typeof was?.target === "function") return { ...relation, target: was.target };
-        throw ApiError.badRequest(
-            `The relation at \`${path}\` on "${change.collectionId}" has no target collection. ` +
-            "Pick one before saving.",
-            "INVALID_CHANGE"
-        );
-    };
-
-    const existing = current.find(collection => collection.slug === change.collectionId);
-    if (change.remove) {
-        if (!existing) {
-            throw ApiError.badRequest(`There is no collection "${change.collectionId}" to remove.`, "INVALID_CHANGE");
-        }
-        return current.filter(collection => collection.slug !== change.collectionId);
-    }
-    if (change.patch && !existing) {
-        throw ApiError.badRequest(
-            `There is no collection "${change.collectionId}" to change. A new collection is sent whole, as \`collection\`.`,
-            "INVALID_CHANGE"
-        );
-    }
-    // An existing collection is the one there is with the change applied, so
-    // everything the change did not touch — a relation's thunk, a handler, a
-    // shared property — is exactly what it was.
-    const repaired: Record<string, unknown> = existing
-        ? applyCollectionPatch({ ...existing } as Record<string, unknown>, asPatch(existing, change))
-        : { ...change.collection };
-    if ("properties" in repaired) {
-        repaired.properties = repairPropertyRelations(repaired.properties, existing?.properties, "properties", repair);
-    }
-    if ("relations" in repaired) {
-        repaired.relations = repairCollectionRelations(
-            repaired.relations,
-            existing && "relations" in existing ? existing.relations : undefined,
-            repair
-        );
-    }
-
-    if (change.patch) assertSafeIdentifiers(repaired);
-    const next = { ...repaired, slug: change.collectionId } as CollectionConfig;
-    const replaced = current.map(each =>
-        each.slug === change.collectionId ? next : each
-    );
-    proposed = replaced.some(each => each.slug === change.collectionId)
-        ? replaced
-        : [...replaced, next];
-    return proposed;
+/** An edit the schema editor refused, as the 400 that says why. */
+function refusedEdit(error: TableSourceEditError): ApiError {
+    return ApiError.badRequest(error.message, error.code, { problems: error.problems });
 }
 
 const isClassification = (value: unknown): value is ClassifiedSchemaChanges =>
@@ -639,17 +318,37 @@ async function planOrRefusal(
  * The commit message, naming what changed when the schema did not.
  *
  * The planner describes schema changes, and for an edit that has none — a
- * renamed collection, a new icon, a reordered list — it said
- * `chore(schema): no change` over a commit that changed the collection file.
- * The patch knows what changed, so the subject says it.
+ * description, a reordered column — it said `chore(schema): no change` over a
+ * commit that changed a table file. The edits know what changed, so the
+ * subject says it.
  */
-function messageFor(change: ProposedChange, plan: SchemaChangePlan): string {
+function messageFor(patches: readonly TablePatch[], plan: SchemaChangePlan): string {
     if (plan.classified.changes.length > 0) return plan.message;
-    const paths = (change.patch ?? []).map(op => op.path.join("."));
-    const shown = paths.length > 5 ? [...paths.slice(0, 5), `and ${paths.length - 5} more`] : paths;
-    return paths.length > 0
-        ? `chore(schema): edit ${change.collectionId} — ${shown.join(", ")}\n`
-        : `chore(schema): edit ${change.collectionId}\n`;
+    const described = patches.map(describePatch);
+    const tables = [...new Set(patches.map(patch => (patch.op === "createTable" ? patch.table.name : patch.table)))];
+    const shown = described.length > 5 ? [...described.slice(0, 5), `and ${described.length - 5} more`] : described;
+    return `chore(schema): edit ${tables.join(", ")} — ${shown.join(", ")}\n`;
+}
+
+/** One edit in a few words, for a commit subject: `add column subtitle`. */
+function describePatch(patch: TablePatch): string {
+    switch (patch.op) {
+        case "createTable": return `create ${patch.table.name}`;
+        case "deleteTable": return `delete ${patch.table}`;
+        case "addColumn": return `add column ${patch.key}`;
+        case "changeColumn": return `change column ${patch.key}`;
+        case "renameColumn": return `rename column ${patch.key} to ${patch.to}`;
+        case "removeColumn": return `remove column ${patch.key}`;
+        case "moveColumn": return `move column ${patch.key}`;
+        case "addRelation": return `add relation ${patch.name}`;
+        case "changeRelation": return `change relation ${patch.name}`;
+        case "removeRelation": return `remove relation ${patch.name}`;
+        case "setRls": return "set rls";
+        case "addRule": return "add a rule";
+        case "replaceRule": return `change rule ${patch.index}`;
+        case "removeRule": return `remove rule ${patch.index}`;
+        case "setOption": return `${patch.value === null ? "remove" : "set"} ${patch.option}`;
+    }
 }
 
 /**
@@ -678,7 +377,7 @@ async function planSourceOnly(
     const unoffered = plan.classified.changes.filter(change => change.verdict !== "safe" && !change.sourceOnly);
     if (unoffered.length > 0 || plan.files.length === 0) {
         throw ApiError.badRequest(
-            "This change cannot be written to the collection source alone:\n" +
+            "This change cannot be written to the table source alone:\n" +
             unoffered.map(c => `  • ${c.detail}${c.remedy ? `\n    ${c.remedy}` : ""}`).join("\n"),
             "SCHEMA_CHANGE_UNAPPLICABLE",
             { changes: plan.classified.changes }
@@ -697,11 +396,11 @@ async function planSourceOnly(
  * collection file. Nothing for a change the apply refuses, which commits
  * nothing; no source when there is no `writeSource`, which writes none.
  */
-function filesCommittedBy(config: LiveSchemaRoutesConfig, change: ProposedChange, plan: SchemaChangePlan): string[] {
+function filesCommittedBy(config: LiveSchemaRoutesConfig, source: PreviewedSource, plan: SchemaChangePlan): string[] {
     const generated = plan.files.map(file => file.path);
     if (!plan.classified.applicable) return generated;
-    const source = config.writeSource ? config.sourcePathsFor?.(change) ?? [] : [];
-    return [...new Set([...source, ...generated])];
+    const written = config.writeSource ? source.files.map(file => file.path) : [];
+    return [...new Set([...written, ...generated])];
 }
 
 /**
@@ -775,7 +474,9 @@ export function createLiveSchemaRoutes(config: LiveSchemaRoutesConfig): Hono<Hon
             const off = config.sourceEditingOff;
             return c.json({
                 enabled: false,
-                canPlan: true,
+                // Planning reads the source and writes nothing, so it is
+                // possible wherever the source can be read.
+                canPlan: Boolean(config.previewSource),
                 code: off?.code ?? "SCHEMA_EDITOR_MISSING_DEPENDENCY",
                 reason: off?.message
                     ?? "Rewriting collection source needs `ts-morph`, which is not installed " +
@@ -788,7 +489,7 @@ export function createLiveSchemaRoutes(config: LiveSchemaRoutesConfig): Hono<Hon
                 // `plan` needs no repository, and saying so is the difference
                 // between a panel that greys out the preview and one that can
                 // still show somebody exactly what their change would do.
-                canPlan: true,
+                canPlan: Boolean(config.previewSource),
                 code: "SCHEMA_EDITING_NO_REPOSITORY",
                 reason: "There is no repository to commit to. Live schema editing writes the " +
                     "change to your project's source before applying it, so it needs the project " +
@@ -860,12 +561,33 @@ export function createLiveSchemaRoutes(config: LiveSchemaRoutesConfig): Hono<Hon
     };
 
     /**
+     * The edit applied to a copy of the source and compiled, or the refusal
+     * that says why it cannot be — what every plan's `after` side is.
+     */
+    const preview = async (patches: readonly TablePatch[]): Promise<PreviewedSource> => {
+        if (!config.previewSource) {
+            const off = config.sourceEditingOff;
+            throw new ApiError(
+                501,
+                off?.code ?? "SCHEMA_EDITOR_MISSING_DEPENDENCY",
+                off?.message ?? `Reading backend/schema needs \`ts-morph\`, which is not installed on this server. ${tsMorphInstallSentence()}`
+            );
+        }
+        try {
+            return await config.previewSource(patches);
+        } catch (error) {
+            if (isEditRefusal(error)) throw refusedEdit(error);
+            throw error;
+        }
+    };
+
+    /**
      * What would happen. No side effects, and deliberately reachable even when
      * there is no repository — knowing a change is blocked is useful before
      * knowing where it would be committed.
      */
     router.post("/plan", async (c) => {
-        const change = parseProposed(await readBody(c));
+        const patches = parsePatches(await readBody(c));
         const admin = requirePlanner();
 
         // Checked even though planning has no side effects, and even though the
@@ -883,17 +605,15 @@ export function createLiveSchemaRoutes(config: LiveSchemaRoutesConfig): Hono<Hon
             );
         }
 
-        const before = config.getCollections();
-        const after = proposedCollections(before, change);
-
-        const plan = await planOrRefusal(admin, before, after, config.commitPaths);
+        const source = await preview(patches);
+        const plan = await planOrRefusal(admin, config.getCollections(), source.schema.collections, config.commitPaths);
         return c.json({
             applicable: plan.classified.applicable,
             verdict: plan.classified.verdict,
             changes: plan.classified.changes,
             statements: plan.statements,
-            files: filesCommittedBy(config, change, plan),
-            message: messageFor(sourceChangeFor(before, change), plan),
+            files: filesCommittedBy(config, source, plan),
+            message: messageFor(patches, plan),
             // A change can be applicable and still leave something the config
             // asks for unenforced. That is not a refusal, so it does not belong
             // in `changes` — but it is the one thing on this response somebody
@@ -907,11 +627,9 @@ export function createLiveSchemaRoutes(config: LiveSchemaRoutesConfig): Hono<Hon
     // applying alters the database and the project's source.
     router.post("/apply", requireScope("schema:write"), async (c) => {
         const body = await readBody(c);
-        const change = parseProposed(body);
-        // "Edit source only": commit the collection and the generated schema
-        // for a change the database cannot take, and run nothing. It used to
-        // be a write through the source-only editor that was never committed,
-        // which every later apply then met as somebody else's work — 409.
+        const patches = parsePatches(body);
+        // "Edit source only": commit the table source and the generated schema
+        // for a change the database cannot take, and run nothing.
         const sourceOnly = isRecord(body) && body.sourceOnly === true;
         if (config.databaseChangesOff && !sourceOnly) {
             throw ApiError.conflict(config.databaseChangesOff.message, config.databaseChangesOff.code);
@@ -929,30 +647,35 @@ export function createLiveSchemaRoutes(config: LiveSchemaRoutesConfig): Hono<Hon
                 capabilities.code ?? "FORBIDDEN"
             );
         }
+        const writeSource = config.writeSource;
+        if (!writeSource) {
+            const off = config.sourceEditingOff;
+            throw new ApiError(
+                501,
+                off?.code ?? "SCHEMA_EDITOR_MISSING_DEPENDENCY",
+                off?.message ?? `Rewriting backend/schema needs \`ts-morph\`, which is not installed on this server. ${tsMorphInstallSentence()}`
+            );
+        }
 
-        // Attributed to whoever pressed the button. A schema change with an
-        // author and a diff in the project's history is the thing neither
-        // competitor gives you; an anonymous one is just a commit. A machine
-        // that has been allowed to apply is named as a machine, so that reading
-        // `git log` a month from now still distinguishes the two.
+        // Attributed to whoever pressed the button. A machine that has been
+        // allowed to apply is named as a machine, so that reading `git log` a
+        // month from now still distinguishes the two.
         const author = principal.kind === "machine"
             ? machineCommitAuthor(principal)
             : await commitAuthor(c.get("user"), config.resolveAuthorIdentity);
         const repository = requireRepository(author);
 
-        // One apply at a time, from the plan to the last statement: two at
+        // One apply at a time, from the preview to the last statement: two at
         // once (a double confirm, two tabs) both passed the dirty-tree check,
-        // then wrote and committed in whatever order their awaits fell, and
-        // one commit could carry the other's generated schema.
+        // then wrote and committed in whatever order their awaits fell.
         return oneApplyAtATime(async () => {
+            // The edit is made on a copy and compiled first, and planned
+            // against what it compiles to, before anything is written: a change
+            // that turns out to be unapplicable is refused having touched
+            // nothing.
+            const source = await preview(patches);
             const before = config.getCollections();
-            const after = proposedCollections(before, change);
-
-            // Planned before the source is touched. `writeSource` writes to disk
-            // through the AST editor, outside the repository's dirty-tree check, so
-            // a change that turns out to be unapplicable must be refused *first* —
-            // otherwise a rejected edit still leaves a rewritten collection file
-            // behind, and the refusal reads as "nothing happened" when something did.
+            const after = source.schema.collections;
             const plan = sourceOnly
                 ? await planSourceOnly(admin, before, after, config.commitPaths)
                 : await planOrRefusal(admin, before, after, config.commitPaths);
@@ -966,22 +689,19 @@ export function createLiveSchemaRoutes(config: LiveSchemaRoutesConfig): Hono<Hon
                 );
             }
 
+            let result: Awaited<ReturnType<typeof applySchemaChange>>;
             try {
-                const result = await applySchemaChange({
+                result = await applySchemaChange({
                     plan: sourceOnly
                         ? { ...plan, statements: [] }
-                        : { ...plan, message: messageFor(sourceChangeFor(before, change), plan) },
+                        : { ...plan, message: messageFor(patches, plan) },
                     sourceOnly,
                     repository,
-                    // Handed down rather than called here. Writing the source first
-                    // and passing the files over is what made every change fail:
-                    // the AST editor writes through the filesystem, so by the time
-                    // the dirty-tree check ran, the tree was dirty *because of this
-                    // change*, and it refused on the evidence of its own edit.
-                    sourcePaths: config.sourcePathsFor?.(change) ?? [],
-                    writeSource: config.writeSource
-                        ? () => config.writeSource!(sourceChangeFor(before, change))
-                        : undefined,
+                    // The paths the edit changes, known from the preview, so the
+                    // dirty-tree check sees them before anything is written and
+                    // does not mistake this change's own edit for someone else's.
+                    sourcePaths: source.files.map(file => file.path),
+                    writeSource: () => writeSource(source),
                     apply: async (statements) => {
                         const sql = config.getAdmin();
                         if (!isSQLAdmin(sql)) {
@@ -1001,17 +721,6 @@ export function createLiveSchemaRoutes(config: LiveSchemaRoutesConfig): Hono<Hon
                         }
                     }
                 });
-
-                logger.info(`[schema-edit] ${result.summary}`);
-                // Carried onto the result as well as the plan: whoever reads the
-                // outcome may not be whoever read the preview, and "applied" with a
-                // constraint quietly missing is exactly the state this feature
-                // exists to stop being invisible.
-                return c.json({
-                    ...result,
-                    withheldConstraints: plan.withheldConstraints ?? [],
-                    followUp: followUpFor(config, plan.statements)
-                });
             } catch (err) {
                 if (err instanceof UnapplicableChangeError) {
                     throw ApiError.badRequest(err.message, "SCHEMA_CHANGE_UNAPPLICABLE", {
@@ -1021,20 +730,31 @@ export function createLiveSchemaRoutes(config: LiveSchemaRoutesConfig): Hono<Hon
                 if (err instanceof DirtyWorkingTreeError) {
                     throw ApiError.conflict(err.message, "SCHEMA_EDIT_DIRTY_TREE");
                 }
+                if (isEditRefusal(err)) throw refusedEdit(err);
                 // Anything else that goes wrong between the check and the commit —
-                // the AST editor refusing a file it cannot parse, git refusing the
-                // commit, a path outside the repository — is a refusal of *this
-                // change*, not a broken server. A 500 tells the person nothing and
-                // reads as an outage; the message is the useful part and it is
-                // already on the error.
-                //
-                // Deliberately below the two specific cases above, so neither is
-                // flattened into this one.
+                // a file changed since the preview, git refusing the commit, a
+                // path outside the repository — is a refusal of *this change*,
+                // not a broken server. Deliberately below the specific cases
+                // above, so neither is flattened into this one.
                 throw ApiError.badRequest(
                     err instanceof Error ? err.message : String(err),
                     "SCHEMA_CHANGE_FAILED"
                 );
             }
+
+            logger.info(`[schema-edit] ${result.summary}`);
+            // The database has the change: serve it now, rather than after the
+            // next restart. A source-only commit, or an apply whose statements
+            // failed, leaves the database behind the source — the tables served
+            // stay those the database holds.
+            if (!sourceOnly && result.applied) await config.onApplied?.(source.schema);
+            // Carried onto the result as well as the plan: whoever reads the
+            // outcome may not be whoever read the preview.
+            return c.json({
+                ...result,
+                withheldConstraints: plan.withheldConstraints ?? [],
+                followUp: followUpFor(config, plan.statements)
+            });
         });
     });
 
