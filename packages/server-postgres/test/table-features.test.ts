@@ -15,7 +15,7 @@ import { afterEach, beforeEach, describe, expect, it } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
 import { pgTable, text, uuid } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
-import { lowerTables, type LoweredCollection } from "@rebasepro/common";
+import { findRelation, lowerTables, resolveCollectionRelations, type LoweredCollection } from "@rebasepro/common";
 import { col, defineTable, rel, type AnyTableDef } from "@rebasepro/types";
 
 import { planSchema } from "../src/schema/plan/plan-schema";
@@ -30,7 +30,7 @@ import { collectionIndexStatement } from "../src/schema/collection-index";
 import { parsePropertyFromServer, serializePropertyToServer } from "../src/data-transformer";
 import { drizzle } from "drizzle-orm/pglite";
 import {
-    TABLE_FEATURES, bugs, codes, counters, days, grades, handles, initials, keyed, lists, pairs, people, prices, slugs, switches, tallies, tasks, tickets
+    TABLE_FEATURES, audits, bugs, codes, counters, days, grades, handles, initials, keyed, lists, pairs, people, prices, slugs, switches, tallies, tasks, tickets
 } from "./fixtures/table-features";
 
 const PACKAGE_ROOT = path.resolve(__dirname, "..");
@@ -447,6 +447,50 @@ describe("table features: an index without a `reason`", () => {
             await db.exec(ddlOf([handles]));
             const { rows } = await db.query<{ indexname: string }>("SELECT indexname FROM pg_indexes WHERE tablename = 'handles'");
             expect(rows.map(row => row.indexname)).toContain(index.indexName);
+        } finally {
+            await db.close();
+        }
+    });
+});
+
+describe("table features: `rel.belongsTo(…, { constraint: false })`", () => {
+    it("plans each key column with no FOREIGN KEY, bound or derived, typed by the target's key", () => {
+        const plan = planOf([people, audits]);
+        expect(columnOf(plan, "audits", "actor_id")).toMatchObject({ type: { kind: "uuid" }, nullable: true });
+        expect(columnOf(plan, "audits", "subject_id")).toMatchObject({ type: { kind: "uuid" }, nullable: false, source: { kind: "relation" } });
+        expect(columnOf(plan, "audits", "archived_id")).toMatchObject({ type: { kind: "uuid" }, nullable: true });
+        expect(tableOf(plan, "audits").columns.filter(column => column.foreignKey)).toEqual([]);
+        expect(ddlOf([people, audits])).not.toContain("FOREIGN KEY");
+    });
+
+    it("still indexes each one, unless `index: false`", () => {
+        const plan = planOf([people, audits]);
+        expect(tableOf(plan, "audits").indexes.map(index => index.keys.map(key => key.column))).toEqual([["actor_id"], ["subject_id"]]);
+        const ddl = ddlOf([people, audits]);
+        for (const index of tableOf(plan, "audits").indexes) expect(ddl).toContain(collectionIndexStatement(index));
+        expect(drizzleOf([people, audits])).toContain(`index("${tableOf(plan, "audits").indexes[0].indexName}")`);
+    });
+
+    it("is still a Drizzle relation, and a relation the runtime includes through", () => {
+        const plan = planOf([people, audits]);
+        expect(plan.relations.filter(relation => relation.tableVar === "audits").map(relation => [relation.key, relation.kind])).toEqual([
+            ["actor", "one"], ["subject", "one"], ["archived", "one"]
+        ]);
+        expect(drizzleLine(drizzleOf([people, audits]), "actorId")).toBe("actorId: uuid(\"actor_id\"),");
+        const [, collection] = lowered([people, audits]);
+        const relations = resolveCollectionRelations(collection);
+        expect(findRelation(relations, "actor")).toMatchObject({ kind: "belongsTo", localKey: "actor_id" });
+        expect(findRelation(relations, "subject")).toMatchObject({ kind: "belongsTo", localKey: "subject_id" });
+    });
+
+    it("lets Postgres hold a key that points at nothing", async () => {
+        const db = new PGlite();
+        try {
+            await db.waitReady;
+            await db.exec(ddlOf([people, audits]));
+            await db.query("INSERT INTO audits (subject_id) VALUES (gen_random_uuid())");
+            const { rows } = await db.query<{ n: number }>("SELECT count(*)::int AS n FROM audits");
+            expect(rows).toEqual([{ n: 1 }]);
         } finally {
             await db.close();
         }

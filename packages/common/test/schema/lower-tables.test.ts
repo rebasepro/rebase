@@ -302,15 +302,27 @@ describe("lowerTables — relations", () => {
         expect(lowered.relations?.[0]).toEqual({ kind: "belongsTo", relationName: "author", target: expect.any(Function) });
     });
 
-    it("lowers an unconstrained key to a relation no property addresses, over the column it binds", () => {
+    it("lowers an unconstrained key over the column it binds: the column stays, the relation property beside it", () => {
         const posts = defineTable("posts", {
             columns: { id, authorId: col.uuid() },
             relations: { author: rel.belongsTo(() => users, { constraint: false, index: false }) },
             rls: "admin-only"
         });
         const lowered = only([posts, users]);
-        expect(lowered.properties).toEqual({ id: { type: "string", isId: "uuid" }, authorId: { type: "string", columnType: "uuid" } });
+        expect(lowered.properties).toEqual({ id: { type: "string", isId: "uuid" }, authorId: { type: "string", columnType: "uuid" }, author: { type: "relation" } });
         expect(lowered.relations).toEqual([{ kind: "belongsTo", relationName: "author", target: expect.any(Function), index: false }]);
+    });
+
+    it("lowers an unconstrained key with no column to bind as a derived one, its field rules on its property", () => {
+        const posts = defineTable("posts", {
+            columns: { id },
+            relations: { author: rel.belongsTo(() => users, { constraint: false, notNull: true, access: { read: ["admin"] } }) },
+            rls: "admin-only"
+        });
+        const [lowered] = lowerWithDefinitions([posts, users]);
+        expect(lowered.properties.author).toMatchObject({ type: "relation", validation: { required: true }, access: { read: ["admin"] } });
+        // The planner reads `constraint: false` off the relation's definition.
+        expect(lowered.properties.author.tableRelation).toMatchObject({ kind: "belongsTo", constraint: false });
     });
 
     it("lowers the other kinds under the legacy names", () => {
@@ -390,15 +402,13 @@ describe("lowerTables — relations", () => {
         expect(properties.path).toEqual({ type: "relation", excludeFromApi: true });
     });
 
-    it("refuses field rules a relation has no property to carry, and private beside access", () => {
+    it("carries an unconstrained relation's field rules on its property, and refuses private beside access", () => {
         const unconstrained = defineTable("posts", {
             columns: { id, authorId: col.uuid() },
             relations: { author: rel.belongsTo(() => users, { constraint: false, index: false, access: { read: ["admin"] } }) },
             rls: "admin-only"
         });
-        expect(refusal(() => lowerTables([unconstrained, users]))).toEqual([
-            expect.stringContaining("posts.author: is `rel.belongsTo(…, { constraint: false })` over the column \"authorId\" and declares `access`")
-        ]);
+        expect(only([unconstrained, users]).properties.author).toEqual({ type: "relation", access: { read: ["admin"] } });
         const both = defineTable("both", {
             columns: { id },
             relations: { many: rel.hasMany(() => users, { private: true, access: { read: ["admin"] } }) },
@@ -631,7 +641,6 @@ describe("lowerTables — refusals", () => {
         "array-element-modifiers": () => [defineTable("t", { columns: { id, a: col.array(col.text().notNull()) }, rls: "admin-only" })],
         "text-one-of": () => [defineTable("t", { columns: { id, s: col.text().oneOf(["a", "b"]) }, rls: "admin-only" })],
         "has-many-order-by": () => [defineTable("t", { columns: { id }, relations: { posts: rel.hasMany(() => users, { orderBy: ["id", "asc"] }) }, rls: "admin-only" }), users],
-        "belongs-to-unconstrained-derived": () => [defineTable("t", { columns: { id }, relations: { user: rel.belongsTo(() => users, { constraint: false, index: false }) }, rls: "admin-only" }), users],
         "belongs-to-unconstrained-index": () => [defineTable("t", { columns: { id, userId: col.uuid() }, relations: { user: rel.belongsTo(() => users, { constraint: false }) }, rls: "admin-only" }), users],
         "json-document-shape": () => [defineTable("t", { columns: { id, j: col.jsonb(json.string()) }, rls: "admin-only" })],
         "json-one-of-placement": () => [defineTable("t", { columns: { id, j: col.jsonb(json.object({ b: json.oneOf({ x: json.string() }) })) }, rls: "admin-only" })],

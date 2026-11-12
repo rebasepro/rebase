@@ -134,7 +134,24 @@ export const handles = defineTable("handles", {
     rls: "admin-only"
 });
 
+/**
+ * `rel.belongsTo(…, { constraint: false })`: a key column with no `FOREIGN KEY`
+ * — bound or derived, indexed unless `index: false`, still a relation.
+ */
+export const audits = defineTable("audits", {
+    columns: {
+        id: col.uuid().primaryKey().defaultRandom(),
+        actorId: col.uuid()
+    },
+    relations: {
+        actor: rel.belongsTo(() => people, { localKey: "actor_id", constraint: false }),
+        subject: rel.belongsTo(() => people, { constraint: false, notNull: true }),
+        archived: rel.belongsTo(() => people, { constraint: false, index: false })
+    },
+    rls: "admin-only"
+});
+
 /** Every table, in an order that declares a target before what points at it. */
 export const TABLE_FEATURES = [
-    people, counters, tallies, codes, initials, grades, days, switches, prices, tickets, slugs, pairs, keyed, lists, tasks, bugs, handles
+    people, counters, tallies, codes, initials, grades, days, switches, prices, tickets, slugs, pairs, keyed, lists, tasks, bugs, handles, audits
 ];

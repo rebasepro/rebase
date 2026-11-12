@@ -31,9 +31,10 @@
  *   relation property before or after them in relation order (the legacy shape
  *   lists relation properties together), or after the declared columns; the
  *   other kinds come last;
- * - `rel.belongsTo({ constraint: false })` over a bound column is a relation
- *   with no relation property: the legacy planner creates no constraint and no
- *   index for it, and keeps the column the property declares;
+ * - `rel.belongsTo({ constraint: false })` keeps its column — bound (the
+ *   column stays a property, the relation property beside it) or derived —
+ *   and the planner, reading the relation's definition, plans no `FOREIGN KEY`
+ *   for it while still indexing it unless `index: false`;
  * - an `id` column that is exactly the planner's implicit key
  *   (`id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text`, declared first) is
  *   left out, and the planner adds it back as it always has.
@@ -134,14 +135,6 @@ export const PENDING_TABLE_FEATURES = [
     {
         id: "has-many-order-by",
         description: "`rel.hasMany(target, { orderBy })`. Related rows come back in the caller's order only."
-    },
-    {
-        id: "belongs-to-unconstrained-derived",
-        description: "`rel.belongsTo(target, { constraint: false })` without a column in `columns` to bind to. Declare the column; an unconstrained key is a column of its own."
-    },
-    {
-        id: "belongs-to-unconstrained-index",
-        description: "`rel.belongsTo(target, { constraint: false })` without `index: false`. A foreign-key index is planned only with its constraint; declare the index in `indexes` instead."
     },
     {
         id: "json-document-shape",
@@ -376,10 +369,6 @@ function fillCollection(collection: LoweredCollection, def: AnyDef, ctx: LowerCo
         }
         const localKey = relation.localKey ?? generateForeignKeyName(key);
         const bound = columns.find(c => sqlNameOf(c.key, c.def) === localKey);
-        if (relation.constraint === false) {
-            if (!bound) pending({ table: def.name, key }, "belongs-to-unconstrained-derived");
-            if (relation.index !== false) pending({ table: def.name, key }, "belongs-to-unconstrained-index");
-        }
         if (!bound) continue;
         const previous = boundBy.get(bound.key);
         if (previous) {
@@ -440,22 +429,11 @@ function fillCollection(collection: LoweredCollection, def: AnyDef, ctx: LowerCo
             };
         } else {
             const bound = columns.find(column => column.key === entry.boundColumn);
-            if (bound && entry.keepsColumn && relation.constraint !== false) property = relationProperty(bound.def, false);
+            if (bound && entry.keepsColumn) property = relationProperty(bound.def, false);
         }
-        if (!property) {
-            // An absorbed column's relation property is placed above, with its
-            // field rules. `constraint: false` over a bound column plans no
-            // relation property at all, so nothing would carry them.
-            if (relation.constraint === false && (relation.access !== undefined || relation.private === true)) {
-                refuse(
-                    { table: def.name, key: entry.key },
-                    `is \`rel.belongsTo(…, { constraint: false })\` over the column "${entry.boundColumn}" and declares ` +
-                    `\`${relation.private === true ? "private" : "access"}\`. Without a constraint the link is that column ` +
-                    `alone: put the rule on the column (\`.${relation.private === true ? "private()" : "access({ … })"}\`).`
-                );
-            }
-            return;
-        }
+        // An absorbed column's relation property is placed above, with its
+        // field rules.
+        if (!property) return;
         Object.assign(property, relationFieldAccess(relation, { table: def.name, key: entry.key }));
         const item = { key: entry.key, property: fromRelation(property, relation), relation: index };
         const after = ordered.findLastIndex(other => other.relation !== undefined && other.relation < index);
