@@ -289,3 +289,50 @@ export const ${name} = defineAuthTable("${name}", {
         expect((await definitionError()).problems[0].message).toContain("defineAuthTable");
     });
 });
+
+describe("loadBackendSchema — a caller-supplied importModule", () => {
+    // A CLI is not running under a TypeScript loader and passes jiti; here a
+    // recording importer stands in, delegating to the native import().
+    const recording = (calls: string[], failOn?: string) => async (file: string): Promise<Record<string, unknown>> => {
+        calls.push(path.relative(dir, file));
+        if (failOn !== undefined && file.endsWith(failOn)) throw new Error("the importer could not load it");
+        return { ...(await import(file)) };
+    };
+
+    it("imports the index and every sibling through it, and reads the definitions off what it returns", async () => {
+        write("index.ts", `export { posts } from "./posts";\nexport { tags } from "./tags";`);
+        write("posts.ts", table("posts"));
+        write("tags.ts", table("tags"));
+        const calls: string[] = [];
+
+        const loaded = await loadBackendSchema(dir, { projectRoot: false, importModule: recording(calls) });
+
+        expect(calls).toEqual(["index.ts", "posts.ts", "tags.ts"]);
+        expect(loaded.defs.map(def => def.name).sort()).toEqual(["posts", "tags"]);
+    });
+
+    it("still refuses a sibling definition the index does not export", async () => {
+        write("index.ts", `export { posts } from "./posts";`);
+        write("posts.ts", table("posts"));
+        write("drafts.ts", table("drafts"));
+
+        await expect(loadBackendSchema(dir, { projectRoot: false, importModule: recording([]) })).rejects.toThrow(/drafts/);
+    });
+
+    it("turns the importer's failure into a SchemaLoadError naming the file", async () => {
+        write("index.ts", `export { posts } from "./posts";`);
+        write("posts.ts", table("posts"));
+        write("broken.ts", `export const x = 1;`);
+
+        let caught: unknown;
+        try {
+            await loadBackendSchema(dir, { projectRoot: false, importModule: recording([], "broken.ts") });
+        } catch (error) {
+            caught = error;
+        }
+        if (!isSchemaLoadError(caught)) throw new Error(`expected a SchemaLoadError, got ${String(caught)}`);
+        const error = caught;
+        expect(error.file).toBe(path.join(path.resolve(dir), "broken.ts"));
+        expect(error.message).toContain("the importer could not load it");
+    });
+});

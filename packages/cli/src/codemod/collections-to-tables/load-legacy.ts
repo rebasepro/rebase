@@ -19,8 +19,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import { createRequire } from "node:module";
-import { pathToFileURL } from "node:url";
+import type { SchemaModuleImporter } from "@rebasepro/server";
 import { isPostgresCollectionConfig, resolveResourceRefs, type CollectionConfig, type SecurityRule } from "@rebasepro/types";
 
 /** A legacy collection, with the file it came from. */
@@ -46,36 +45,8 @@ export interface LegacyProject {
     configIndexExports: string[];
 }
 
-/** A module importer: what jiti gives, or a stand-in in tests. */
-export type ModuleImporter = (file: string) => Promise<Record<string, unknown>>;
-
-/**
- * An importer for a project's modules, through jiti. `aliases` maps
- * specifiers to files (tests and in-repo corpora point `@rebasepro/*` at
- * source); a user's project resolves through its own `node_modules`.
- */
-export async function createImporter(root: string, aliases: Record<string, string> = {}): Promise<ModuleImporter> {
-    // jiti keeps what it evaluated in Node's shared module cache. One importer
-    // evaluates a module once (so collections that import each other are the
-    // same objects); a new importer must see the files as they are now — the
-    // codemod reads the tree, writes it, and reads it back in one process.
-    const cache = createRequire(import.meta.url).cache;
-    const prefix = path.resolve(root) + path.sep;
-    for (const key of Object.keys(cache)) if (key.startsWith(prefix)) delete cache[key];
-    const { createJiti } = await import("jiti");
-    const jiti = createJiti(pathToFileURL(path.join(root, "__rebase_migrate__.ts")).href, {
-        alias: aliases,
-        interopDefault: true,
-        moduleCache: true,
-        fsCache: false,
-        jsx: true
-    });
-    return async (file: string) => {
-        const loaded: unknown = await jiti.import(file);
-        if (typeof loaded !== "object" || loaded === null) return { default: loaded };
-        return Object.fromEntries(Object.entries(loaded));
-    };
-}
+/** A module importer: the CLI's jiti importer (`createSchemaModuleImporter`), or a stand-in in tests. */
+export type ModuleImporter = SchemaModuleImporter;
 
 /** The loader's file filter (`isCollectionFile` in `@rebasepro/server`). */
 export function isLegacyCollectionFile(file: string): boolean {

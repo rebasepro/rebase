@@ -26,7 +26,8 @@ import { nameTables, planBackend } from "./backend";
 import { planCustomizations, printCmsIndex } from "./customization";
 import { planFirestoreCollection } from "./firestore";
 import { Journal } from "./journal";
-import { createImporter, LegacyLoadError, loadLegacyProject } from "./load-legacy";
+import { createSchemaModuleImporter } from "../../utils/import-schema-module";
+import { LegacyLoadError, loadLegacyProject } from "./load-legacy";
 import { Relocator } from "./modules";
 import type { CollectionEntry, PlanContext } from "./plan-context";
 import { note, planFile, relativeToRoot } from "./plan-context";
@@ -88,7 +89,7 @@ export async function migrateCollectionsToTables(options: MigrateOptions): Promi
         }
     }
 
-    const importModule = await createImporter(root, options.moduleAliases);
+    const importModule = await createSchemaModuleImporter(root, options.moduleAliases);
     let legacy;
     try {
         legacy = await loadLegacyProject(configDir, importModule);
@@ -371,7 +372,7 @@ export async function migrateCollectionsToTables(options: MigrateOptions): Promi
     const journal = new Journal();
     for (const file of pending) journal.write(path.join(root, file.path), file.content);
     // A fresh importer: the one that read config/ cached modules by path.
-    const verification = await verifyMigration(legacyPostgres, schemaDir, await createImporter(root, options.moduleAliases));
+    const verification = await verifyMigration(legacyPostgres, schemaDir, await createSchemaModuleImporter(root, options.moduleAliases));
     report.verification = verification;
     if (!verification.identical) {
         journal.rollback();

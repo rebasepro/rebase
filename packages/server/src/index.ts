@@ -81,6 +81,7 @@ export {
     isSchemaLoadError,
     type LoadedSchema,
     type LoadBackendSchemaOptions,
+    type SchemaModuleImporter,
     type CompiledSchema
 } from "./schema/load-schema";
 

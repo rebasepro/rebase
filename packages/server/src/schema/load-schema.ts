@@ -64,7 +64,28 @@ export interface LoadBackendSchemaOptions {
      * manifest's format version already vouches for.
      */
     projectRoot?: string | false;
+    /**
+     * How a module of the directory is imported: the index and every sibling
+     * module go through it. Defaults to a plain `import()`.
+     *
+     * The default is right wherever a loader already handles TypeScript — the
+     * server under tsx, the stock runtime reading a compiled bundle, a test
+     * runner. A CLI process is not running under a TypeScript loader, and a
+     * schema module's relative imports are extensionless (`./users`), which
+     * Node's own type stripping cannot resolve; such a caller passes an
+     * importer that can (the CLI passes jiti). Whatever it returns must be the
+     * module's namespace: the definitions are read off its exports.
+     */
+    importModule?: SchemaModuleImporter;
 }
+
+/**
+ * A module importer for {@link LoadBackendSchemaOptions.importModule}: takes an
+ * absolute file path, returns the module's exports.
+ *
+ * @group Schema
+ */
+export type SchemaModuleImporter = (file: string) => Promise<Record<string, unknown>>;
 
 /**
  * The schema directory could not be read: a module failed to import, the
@@ -101,13 +122,13 @@ export function isSchemaLoadError(error: unknown): error is SchemaLoadError {
     return typeof error === "object" && error !== null && "code" in error && error.code === "SCHEMA_LOAD_FAILED";
 }
 
-async function importModule(file: string): Promise<Record<string, unknown>> {
+async function nativeImport(file: string): Promise<Record<string, unknown>> {
     // A plain import(), so the tsx loader (or the runtime's own resolution of a
     // compiled bundle) resolves `.ts` and workspace specifiers.
     return await import(pathToFileURL(file).href);
 }
 
-async function importOrThrow(file: string, role: string): Promise<Record<string, unknown>> {
+async function importOrThrow(importModule: SchemaModuleImporter, file: string, role: string): Promise<Record<string, unknown>> {
     try {
         return await importModule(file);
     } catch (error) {
@@ -195,6 +216,7 @@ function isDefaultRls(value: unknown): value is DefaultRls {
  */
 export async function loadBackendSchema(dir: string, options: LoadBackendSchemaOptions = {}): Promise<LoadedSchema> {
     const resolved = path.resolve(dir);
+    const importModule = options.importModule ?? nativeImport;
 
     if (resolved.split(path.sep).join("/").endsWith("/config/collections")) {
         throw legacyLayoutError(`${resolved} is a config/collections directory`, resolved);
@@ -223,7 +245,7 @@ export async function loadBackendSchema(dir: string, options: LoadBackendSchemaO
     const defs: (AnyTableDef | AnyViewDef)[] = [];
     let defaultRls: DefaultRls | undefined;
     if (indexFile) {
-        const mod = await importOrThrow(indexFile, "the schema index");
+        const mod = await importOrThrow(importModule, indexFile, "the schema index");
         for (const [name, value] of Object.entries(mod)) {
             if (isTableDef(value) || isViewDef(value)) {
                 if (!defs.includes(value)) defs.push(value);
@@ -254,7 +276,7 @@ export async function loadBackendSchema(dir: string, options: LoadBackendSchemaO
     const exportedNames = new Set(defs.map(def => `${def.brand}:${def.name}`));
     const problems: SchemaDefinitionProblem[] = [];
     for (const file of siblingModules(resolved)) {
-        const mod = await importOrThrow(file, "a schema module");
+        const mod = await importOrThrow(importModule, file, "a schema module");
         const relative = path.relative(resolved, file);
         for (const [name, value] of Object.entries(mod)) {
             if (isLegacyCollection(value)) {

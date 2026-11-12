@@ -3,40 +3,18 @@
  * migrated tables render the same SQL.
  *
  * "Before" is the collections exactly as the legacy loader serves them.
- * "After" is `backend/schema` read back through the new pipeline — its index
- * imported, every definition compiled and lowered by `compileSchemaDefs`
- * (the one lowering boot, the runtime and the CLI share). Both go through
+ * "After" is `backend/schema` read back through the new pipeline —
+ * `loadBackendSchema` (index authority, sibling check, compile) with the CLI's
+ * jiti importer, then lowered by `compileLoadedSchema`, the one lowering boot,
+ * the runtime and the CLI share. Both go through
  * `renderSchemaOutputs`, the renderer the plan-golden corpus is recorded
  * with: DDL under every option, policies, search, vector, triggers, views,
  * the Drizzle schema and the boot plans. A single byte of difference fails.
  */
-import fs from "node:fs";
-import path from "node:path";
-import { isTableDef, isViewDef, type AnyTableDef, type AnyViewDef, type CollectionConfig, type DefaultRls } from "@rebasepro/types";
+import type { CollectionConfig } from "@rebasepro/types";
 
 import type { ModuleImporter } from "./load-legacy";
 import type { VerificationResult } from "./types";
-
-function isDefaultRls(value: unknown): value is DefaultRls {
-    return value === "admin-only" || (Array.isArray(value) && value.length > 0 && value.every(rule => typeof rule === "object" && rule !== null));
-}
-
-/** The tables `<schemaDir>/index.ts` exports, and its `defaultRls`. */
-export async function readMigratedSchema(schemaDir: string, importModule: ModuleImporter): Promise<{ defs: (AnyTableDef | AnyViewDef)[]; defaultRls?: DefaultRls }> {
-    const indexFile = ["index.ts", "index.mts", "index.js"].map(name => path.join(schemaDir, name)).find(file => fs.existsSync(file));
-    if (!indexFile) throw new Error(`${schemaDir} has no index module.`);
-    const mod = await importModule(indexFile);
-    const defs: (AnyTableDef | AnyViewDef)[] = [];
-    let defaultRls: DefaultRls | undefined;
-    for (const [name, value] of Object.entries(mod)) {
-        if (isTableDef(value) || isViewDef(value)) {
-            if (!defs.includes(value)) defs.push(value);
-        } else if (name === "defaultRls" && isDefaultRls(value)) {
-            defaultRls = value;
-        }
-    }
-    return { defs, ...(defaultRls !== undefined ? { defaultRls } : {}) };
-}
 
 /** The lines around the first and last difference of two texts, as a unified-style excerpt. */
 export function describeDifference(before: string, after: string, context = 3, limit = 80): string {
@@ -72,11 +50,15 @@ export async function verifyMigration(
     importModule: ModuleImporter
 ): Promise<VerificationResult> {
     const { renderSchemaOutputs } = await import("@rebasepro/server-postgres");
-    const { compileSchemaDefs } = await import("@rebasepro/server");
+    const { compileLoadedSchema, loadBackendSchema } = await import("@rebasepro/server");
     let after: Record<string, string>;
     try {
-        const { defs, defaultRls } = await readMigratedSchema(schemaDir, importModule);
-        const { collections } = compileSchemaDefs(defs, defaultRls);
+        // Exactly as the server reads it: the index is authoritative, a sibling
+        // definition it does not export is refused, every definition compiles.
+        // `projectRoot: false` — config/ is still there until the user deletes it.
+        const loaded = await loadBackendSchema(schemaDir, { projectRoot: false, importModule });
+        if (!loaded.indexFile) throw new Error(`${schemaDir} has no index module.`);
+        const { collections } = compileLoadedSchema(loaded);
         after = renderSchemaOutputs(collections);
     } catch (error) {
         return { identical: false, compared: 0, differences: [], error: `The migrated schema could not be read back: ${error instanceof Error ? error.message : String(error)}` };

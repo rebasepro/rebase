@@ -48,7 +48,7 @@ const PROPERTY_ADMIN_RENAMES: Readonly<Record<string, string>> = {
 const COMPONENT_KEYS = new Set(["Field", "Preview", "Builder", "Filter", "Component"]);
 
 /** Property-level presentation fields that keep their name on a field customization. */
-const SAME_NAME_FIELD_KEYS = new Set(["userSelect", "mode", "timezone", "propertyConfig", "conditions", "dynamicProps", "metadata", "description"]);
+const SAME_NAME_FIELD_KEYS = new Set(["mode", "timezone", "propertyConfig", "conditions", "dynamicProps", "metadata", "description"]);
 
 const KNOWN_COLLECTION_ADMIN = new Set<string>(ADMIN_COLLECTION_KEYS);
 const KNOWN_PROPERTY_ADMIN = new Set<string>(ADMIN_PROPERTY_KEYS);
