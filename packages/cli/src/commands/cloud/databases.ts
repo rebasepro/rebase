@@ -120,7 +120,7 @@ maxPositionals: 0 });
     const projectId = await requireProject(rawArgs, client);
     const projectRef = displayProjectRef(rawArgs);
     try {
-        const dbs = cloudRows<DatabaseRow>((await client.data.collection("databases").find({
+        const dbs = cloudRows<DatabaseRow>((await client.data.table("databases").find({
             where: { project: ["==", projectId] },
             limit: 50
         })).data);
@@ -171,7 +171,7 @@ async function firstAttachedDatabase(
     client: CloudClient,
     projectId: string
 ): Promise<DatabaseRow | undefined> {
-    const rows = cloudRows<DatabaseRow>((await client.data.collection("databases").find({
+    const rows = cloudRows<DatabaseRow>((await client.data.table("databases").find({
         where: { project: ["==", projectId] },
         limit: 1
     })).data);
@@ -190,7 +190,7 @@ export async function attachDatabaseRow(
     client: CloudClient,
     input: { projectId: string; type: string; connectionString?: string }
 ): Promise<DatabaseRow> {
-    return requireCloudRow<DatabaseRow>(await client.data.collection("databases").create({
+    return requireCloudRow<DatabaseRow>(await client.data.table("databases").create({
         project: input.projectId,
         type: input.type,
         connectionString: input.type === "byodb" ? input.connectionString : undefined,

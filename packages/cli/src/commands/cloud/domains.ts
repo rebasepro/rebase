@@ -346,7 +346,7 @@ async function addDomain(rawArgs: string[]): Promise<void> {
         const set = await loadDomains(client, projectId);
         if (set.model === "column") {
             // No `domains` function: the column is the project's one domain.
-            await client.data.collection("projects").update(projectId, { customDomain: domain });
+            await client.data.table("projects").update(projectId, { customDomain: domain });
             added = columnEntry(await fetchColumnSetup(client, projectId))[0];
         } else {
             const legacy = set.domains.find(d => d.id === null);
@@ -483,7 +483,7 @@ async function removeDomain(rawArgs: string[]): Promise<void> {
     try {
         let removed = true;
         if (target.id === null) {
-            await client.data.collection("projects").update(projectId, { customDomain: "" });
+            await client.data.table("projects").update(projectId, { customDomain: "" });
         } else {
             const res = await client.functions.invoke<{ removed?: boolean }>(
                 "domains",

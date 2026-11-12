@@ -8,7 +8,7 @@
  *      never a deploy the server would 409.
  *   4. Destructive commands refuse to run non-interactively without `--yes`.
  *
- * The command handlers call `client.functions.invoke` / `client.data.collection`,
+ * The command handlers call `client.functions.invoke` / `client.data.table`,
  * so a fake client stands in for the SDK and we capture stdout.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";

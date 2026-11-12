@@ -311,7 +311,7 @@ export async function previewCost(client: CloudClient, url: string, projectId: s
     };
     let project: Record<string, unknown> | undefined;
     try {
-        project = (await client.data.collection("projects").findById(projectId)) as Record<string, unknown> | undefined;
+        project = (await client.data.table("projects").findById(projectId)) as Record<string, unknown> | undefined;
     } catch {
         return cost;
     }

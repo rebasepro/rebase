@@ -197,7 +197,7 @@ export async function loginCommand(rawArgs: string[]): Promise<void> {
 
         // Convenience: if the account belongs to exactly one org, make it active.
         try {
-            const orgs = await client.data.collection("organizations").find({ limit: 2 });
+            const orgs = await client.data.table("organizations").find({ limit: 2 });
             if (orgs.data.length === 1 && !getContextOrg(url)) {
                 setContextOrg(url, String(orgs.data[0].id));
             }

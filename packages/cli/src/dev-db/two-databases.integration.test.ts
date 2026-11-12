@@ -149,8 +149,8 @@ describe("two declared databases", () => {
 
         // And the routed data plane writes and reads there.
         const data = server.rebase.dataAsAdmin;
-        await data.collection("events").create({ title: "boot" });
-        const found = await data.collection("events").find({});
+        await data.table("events").create({ title: "boot" });
+        const found = await data.table("events").find({});
         expect(found.data.map(r => r.title)).toEqual(["boot"]);
         const { rows: stored } = await connect(env.DATABASE_URL__ANALYTICS!).query<{ title: string }>("select title from events");
         expect(stored.map(r => r.title)).toEqual(["boot"]);

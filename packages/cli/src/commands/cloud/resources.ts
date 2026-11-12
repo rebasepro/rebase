@@ -273,7 +273,7 @@ maxPositionals: 0 });
     const { client, url } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
     try {
-        const project = (await client.data.collection("projects").findById(projectId)) as
+        const project = (await client.data.table("projects").findById(projectId)) as
             | {
                 id: string | number; name?: string; subdomain?: string; host?: string; status?: string;
                 gitBranch?: string; runtimeMode?: string | null; runtimeVersion?: string | null;
@@ -656,7 +656,7 @@ maxPositionals: 0 });
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
     try {
-        const stores = (await client.data.collection("storages").find({
+        const stores = (await client.data.table("storages").find({
             where: { project: ["==", projectId] },
             limit: 50
         })).data as Array<{
@@ -885,7 +885,7 @@ async function storageAttachCommand(rawArgs: string[]): Promise<void> {
     const sourceKey = (parsed["--source"] ?? "").trim() || DEFAULT_STORAGE_SOURCE_KEY;
 
     try {
-        const existing = (await client.data.collection("storages").find({
+        const existing = (await client.data.table("storages").find({
             where: { project: ["==", projectId] },
             limit: 50
         })).data.find((r) => {
@@ -917,9 +917,9 @@ async function storageAttachCommand(rawArgs: string[]): Promise<void> {
 
         const replaced = Boolean(existing?.id);
         if (existing?.id) {
-            await client.data.collection("storages").update(String(existing.id), row);
+            await client.data.table("storages").update(String(existing.id), row);
         } else {
-            await client.data.collection("storages").create(row);
+            await client.data.table("storages").create(row);
         }
 
         success(`Storage attached to ${displayProjectRef(rawArgs)}.`);
@@ -1201,7 +1201,7 @@ async function clustersAddCommand(rawArgs: string[]): Promise<void> {
     const { kubeconfigPath: _path, ...columns } = args;
     let created: { id: string | number };
     try {
-        created = await client.data.collection<Record<string, unknown> & { id: string | number }>("clusters").create({
+        created = await client.data.table<Record<string, unknown> & { id: string | number }>("clusters").create({
             ...columns,
             authType: "kubeconfig",
             kubeConfigData
@@ -1332,7 +1332,7 @@ async function clustersRegistryCommand(rawArgs: string[]): Promise<void> {
 
     const { client } = await requireClient(rawArgs);
     try {
-        await client.data.collection("clusters").update(args.id, columns);
+        await client.data.table("clusters").update(args.id, columns);
     } catch (error: unknown) {
         reportError(error, "Could not record the cluster's registry");
         return;
@@ -1364,7 +1364,7 @@ command: "cloud clusters",
 maxPositionals: 0 });
     const { client } = await requireClient(rawArgs);
     try {
-        const clusters = (await client.data.collection("clusters").find({ limit: 100 })).data as Array<{
+        const clusters = (await client.data.table("clusters").find({ limit: 100 })).data as Array<{
             id: string | number;
             name?: string;
             provider?: string;
@@ -1508,7 +1508,7 @@ projectId }
     // default: show the active org's billing account.
     if (!org) fail("No active organization.", "Run `rebase cloud use` first.", "no_org");
     try {
-        const billingId = billingAccountIdOf(await client.data.collection("organizations").findById(org));
+        const billingId = billingAccountIdOf(await client.data.table("organizations").findById(org));
         if (!billingId) {
             // Not an error — an org simply may not have been billed yet.
             emit(
@@ -1524,7 +1524,7 @@ paymentMethod: null }
             );
             return;
         }
-        const acct = (await client.data.collection("billing-accounts").findById(billingId)) as
+        const acct = (await client.data.table("billing-accounts").findById(billingId)) as
             | { id: string | number; billingEmail?: string; status?: string; stripeCustomerId?: string }
             | undefined;
 
@@ -1556,7 +1556,7 @@ permissive: true });
             const ref = parsed["--project"] || readLink()?.projectId;
             const projectId = ref ? await lookupProjectId(ref, client) : undefined;
             if (projectId) {
-                const proj = (await client.data.collection("projects").findById(projectId)) as
+                const proj = (await client.data.table("projects").findById(projectId)) as
                     | Record<string, unknown>
                     | undefined;
                 const hasCluster = proj?.cluster_id != null || proj?.cluster != null;
@@ -1746,7 +1746,7 @@ export async function computeCommand(action: string | undefined, rawArgs: string
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
 
-    const project = (await client.data.collection("projects").findById(projectId)) as
+    const project = (await client.data.table("projects").findById(projectId)) as
         | Record<string, unknown>
         | undefined;
     if (!project) fail(`Project ${displayProjectRef(rawArgs)} not found.`, undefined, "not_found");
@@ -1846,7 +1846,7 @@ export async function computeCommand(action: string | undefined, rawArgs: string
     const patch = built.patch;
 
     try {
-        await client.data.collection("projects").update(projectId, patch);
+        await client.data.table("projects").update(projectId, patch);
     } catch (error: unknown) {
         // The control plane's refusals are written to be read by whoever chose
         // the number — a ratio named, a field named — so they are surfaced

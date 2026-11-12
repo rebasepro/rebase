@@ -65,7 +65,7 @@ const mockClient = {
         getUser: vi.fn().mockResolvedValue({ uid: "admin-id", email: "admin@rebase.pro", roles: ["admin"] })
     },
     data: {
-        collection: vi.fn(() => ({
+        table: vi.fn(() => ({
             find: vi.fn().mockResolvedValue([{ id: "doc-1",
 title: "Test Doc" }]),
             findById: vi.fn().mockResolvedValue({ id: "doc-1",
@@ -893,7 +893,7 @@ describe("destructive-tool gate via the call handler", () => {
         expect(result.isError).toBe(true);
         expect(result.content[0].text).toContain("Refusing to run \"delete_document\"");
         expect(result.content[0].text).toContain("https://api.example.com");
-        expect(mockClient.data.collection).not.toHaveBeenCalled();
+        expect(mockClient.data.table).not.toHaveBeenCalled();
     });
 
     it("still allows delete_document against the local default project", async () => {
@@ -903,7 +903,7 @@ describe("destructive-tool gate via the call handler", () => {
         });
 
         expect(result.isError).toBeUndefined();
-        expect(mockClient.data.collection).toHaveBeenCalledWith("posts");
+        expect(mockClient.data.table).toHaveBeenCalledWith("posts");
     });
 });
 
@@ -1354,7 +1354,7 @@ describe("the gate covers escalation and destruction, not just deletes", () => {
         expect(mockClient.admin.createUser).not.toHaveBeenCalled();
         expect(mockClient.functions.invoke).not.toHaveBeenCalled();
         expect(mockClient.cron.toggleJob).not.toHaveBeenCalled();
-        expect(mockClient.data.collection).not.toHaveBeenCalled();
+        expect(mockClient.data.table).not.toHaveBeenCalled();
     });
 
     it("still lets reads through against the same remote backend", async () => {
@@ -1396,7 +1396,7 @@ describe("binary columns in data reads", () => {
 
     it("forwards `fields` to the query and omits binary values by default", async () => {
         const find = vi.fn().mockResolvedValue({ data: [{ id: "v1", wav }] });
-        mockClient.data.collection.mockReturnValueOnce({ ...mockClient.data.collection(), find });
+        mockClient.data.table.mockReturnValueOnce({ ...mockClient.data.table(), find });
         const result = await handler()({
             method: "tools/call",
             params: { name: "list_documents", arguments: { collection: "voice_cache", limit: 1, fields: ["id", "text"] } }
@@ -1409,7 +1409,7 @@ describe("binary columns in data reads", () => {
 
     it("returns the contents when asked", async () => {
         const find = vi.fn().mockResolvedValue({ data: [{ id: "v1", wav }] });
-        mockClient.data.collection.mockReturnValueOnce({ ...mockClient.data.collection(), find });
+        mockClient.data.table.mockReturnValueOnce({ ...mockClient.data.table(), find });
         const result = await handler()({
             method: "tools/call",
             params: { name: "list_documents", arguments: { collection: "voice_cache", includeBinary: true } }

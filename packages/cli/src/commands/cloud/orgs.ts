@@ -72,7 +72,7 @@ command: "cloud orgs",
 maxPositionals: 0 });
     const { client, url } = await requireClient(rawArgs);
     try {
-        const orgs = cloudRows<OrgRow>((await client.data.collection("organizations").find({ limit: 100 })).data);
+        const orgs = cloudRows<OrgRow>((await client.data.table("organizations").find({ limit: 100 })).data);
         const active = getContextOrg(url);
 
         emit(
@@ -145,7 +145,7 @@ message: "Organization name:" });
     const slug = (args["--slug"] || slugify(name)).trim();
 
     try {
-        const created = requireCloudRow<OrgRow>(await client.data.collection("organizations").create({
+        const created = requireCloudRow<OrgRow>(await client.data.table("organizations").create({
             name,
             slug,
             createdAt: new Date().toISOString()
@@ -198,7 +198,7 @@ function orgFor(flag: string | undefined, url: string): string {
 }
 
 async function loadMembers(client: CloudClient, org: string): Promise<MemberRow[]> {
-    const rows = cloudRows<{ id: string | number; userId?: string; role?: string }>((await client.data.collection("organization-members").find({
+    const rows = cloudRows<{ id: string | number; userId?: string; role?: string }>((await client.data.table("organization-members").find({
         where: { organization: ["==", org] },
         limit: 200
     })).data);
@@ -208,7 +208,7 @@ async function loadMembers(client: CloudClient, org: string): Promise<MemberRow[
         // The users read policy shows the people you share an organization
         // with, which is exactly this list. An unreadable row leaves the id.
         try {
-            const users = cloudRows<{ id: string | number; email?: string }>((await client.data.collection("users").find({
+            const users = cloudRows<{ id: string | number; email?: string }>((await client.data.table("users").find({
                 where: { id: ["in", ids] },
                 limit: 200
             })).data);
@@ -383,7 +383,7 @@ async function removeMember(rawArgs: string[], orgFlag: string | undefined, ref:
     const who = target.email ?? target.userId ?? ref;
     await confirmDestructive({ yes, prompt: `Remove ${who} (${target.role ?? "member"}) from org ${org}? They lose access to its projects.` });
     try {
-        await client.data.collection("organization-members").delete(target.id);
+        await client.data.table("organization-members").delete(target.id);
     } catch (e) {
         // The server's words: the last owner, or an admin removing an owner.
         reportError(e, `Failed to remove ${who}`);
@@ -408,7 +408,7 @@ async function changeRole(rawArgs: string[], orgFlag: string | undefined, ref: s
         return;
     }
     try {
-        await client.data.collection("organization-members").update(target.id, { role });
+        await client.data.table("organization-members").update(target.id, { role });
     } catch (e) {
         // The server's words: only an owner grants or removes owner; never the last owner.
         reportError(e, `Failed to change ${who}'s role`);

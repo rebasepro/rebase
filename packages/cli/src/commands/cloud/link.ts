@@ -144,7 +144,7 @@ export async function linkCommand(rawArgs: string[]): Promise<void> {
 
         if (args["--project"]) {
             const projectId = await resolveProjectRef(args["--project"], client);
-            project = (await client.data.collection("projects").findById(projectId)) as ProjectRow | undefined;
+            project = (await client.data.table("projects").findById(projectId)) as ProjectRow | undefined;
             if (!project) {
                 fail(`Project ${args["--project"]} not found.`, undefined, "project_not_found");
             }
@@ -153,7 +153,7 @@ export async function linkCommand(rawArgs: string[]): Promise<void> {
             // run by an agent parked on a select prompt forever.
             requireInteractive("a project to link", "--project <slug>");
             const org = getContextOrg(url);
-            const projects = cloudRows<ProjectRow>((await client.data.collection("projects").find({
+            const projects = cloudRows<ProjectRow>((await client.data.table("projects").find({
                 where: org ? { organization: ["==", org] } : undefined,
                 limit: 100
             })).data);
@@ -270,7 +270,7 @@ export async function selectOrgCommand(rawArgs: string[]): Promise<void> {
     const { client, url } = await requireClient(rawArgs);
 
     try {
-        const orgs = (await client.data.collection("organizations").find({ limit: 100 })).data as Array<{
+        const orgs = (await client.data.table("organizations").find({ limit: 100 })).data as Array<{
             id: string | number;
             name?: string;
             slug?: string;

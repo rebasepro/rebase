@@ -249,7 +249,7 @@ projectStatus }
 }
 
 async function fetchDeployments(client: CloudClient, projectId: string, limit = 100): Promise<DeploymentRow[]> {
-    const res = await client.data.collection("deployments").find({
+    const res = await client.data.table("deployments").find({
         where: { project: ["==", projectId] },
         orderBy: ["createdAt", "desc"],
         limit
@@ -380,7 +380,7 @@ async function deploymentOfProject(
 ): Promise<DeploymentRow | undefined> {
     let row: Record<string, unknown> | undefined;
     try {
-        row = (await client.data.collection("deployments").findById(deploymentId)) as Record<string, unknown> | undefined;
+        row = (await client.data.table("deployments").findById(deploymentId)) as Record<string, unknown> | undefined;
     } catch {
         return undefined;
     }

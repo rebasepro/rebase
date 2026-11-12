@@ -67,7 +67,7 @@ const created = vi.hoisted(() => [] as Array<{ baseUrl: string; token?: string }
 vi.mock("@rebasepro/client", () => ({
     createRebaseClient: (opts: { baseUrl: string; token?: string }) => {
         created.push({ baseUrl: opts.baseUrl, token: opts.token });
-        return { data: { collection: () => ({ find: async () => ({ data: [] }) }) } };
+        return { data: { table: () => ({ find: async () => ({ data: [] }) }) } };
     }
 }));
 

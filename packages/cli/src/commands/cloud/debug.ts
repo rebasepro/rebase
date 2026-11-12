@@ -831,7 +831,7 @@ permissive: true });
     }
 
     const [project, baseDomain] = await Promise.all([
-        client.data.collection("projects").findById(projectId) as Promise<
+        client.data.table("projects").findById(projectId) as Promise<
             { subdomain?: string; host?: string; customDomain?: string } | undefined
         >,
         fetchTenantBaseDomain(client, url)

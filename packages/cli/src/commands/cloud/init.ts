@@ -4,7 +4,7 @@
  *
  * The command an agent runs when it has built an app and needs somewhere to
  * put it. The control plane provisions an ordinary project on Rebase Cloud in
- * an organization nobody owns yet, this command pushes the local collections to
+ * an organization nobody owns yet, this command pushes the local tables to
  * it with a normal managed deploy, and what comes back is the live URL and a
  * claim link. The person the agent works for opens the link, signs in, and the
  * project is theirs; nobody claims it within 72 hours and it is deleted.
@@ -372,7 +372,7 @@ export interface DeployOutcome {
  * `REBASE_TOKEN` outranks the stored grant (see `requireClient`), and a shell
  * or an MCP server that has one holds it for the person's other projects — it
  * has no scope on the project just provisioned, so the deploy was refused and
- * the project never got its collections. The project is deployed with its own
+ * the project never got its tables. The project is deployed with its own
  * token.
  */
 export function bundleDeployEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
@@ -382,7 +382,7 @@ export function bundleDeployEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
 }
 
 /**
- * Push the local collections: `rebase cloud deploy --bundle`, as a child.
+ * Push the local tables: `rebase cloud deploy --bundle`, as a child.
  *
  * A child rather than a call, so this command still prints exactly one
  * result — a JSON caller gets the deploy's outcome folded into it — and still
@@ -481,7 +481,7 @@ export async function cloudInitCommand(rawArgs: string[], deps: InitDeps = DEFAU
         if (!projectRoot) {
             warn("No rebase.json here, so there is nothing to deploy yet.", "Run `rebase cloud deploy` from the project once it has one.");
         } else {
-            note("Pushing the local collections (rebase cloud deploy --bundle)…");
+            note("Pushing the local tables (rebase cloud deploy --bundle)…");
             noteBlank();
             deployed = await deps.deploy(root, isJsonMode());
             if (!deployed.ok) {

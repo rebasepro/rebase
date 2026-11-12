@@ -71,7 +71,7 @@ maxPositionals: 0 });
     const org = args["--all-orgs"] ? undefined : getContextOrg(url);
     try {
         const [projects, baseDomain] = await Promise.all([
-            client.data.collection("projects").find({
+            client.data.table("projects").find({
                 where: org ? { organization: ["==", org] } : undefined,
                 orderBy: ["name", "asc"],
                 limit: 100
@@ -368,7 +368,7 @@ message: "Subdomain:" });
         if (!user) {
             fail("Session is no longer valid.", "Run `rebase cloud login` again.", "session_invalid");
         }
-        const created = requireCloudRow<ProjectRow>(await client.data.collection("projects").create({
+        const created = requireCloudRow<ProjectRow>(await client.data.table("projects").create({
             name,
             subdomain,
             gitRepoUrl,
@@ -575,7 +575,7 @@ export async function projectInfo(rawArgs: string[], projectRef: string): Promis
     const { client, url } = await requireClient(rawArgs);
     try {
         const projectId = await resolveProjectRef(projectRef, client);
-        const p = (await client.data.collection("projects").findById(projectId)) as ProjectRow | undefined;
+        const p = (await client.data.table("projects").findById(projectId)) as ProjectRow | undefined;
         if (!p) fail(`Project ${projectRef} not found.`, undefined, "project_not_found");
 
         const [db, lastDeploy, baseDomain, capacity] = await Promise.all([
@@ -663,7 +663,7 @@ export async function deleteProject(rawArgs: string[], projectRef: string): Prom
     const { client } = await requireClient(rawArgs);
     const projectId = await resolveProjectRef(projectRef, client);
 
-    const p = (await client.data.collection("projects").findById(projectId).catch(() => undefined)) as
+    const p = (await client.data.table("projects").findById(projectId).catch(() => undefined)) as
         | ProjectRow
         | undefined;
     if (!p) fail(`Project ${projectRef} not found.`, undefined, "project_not_found");
@@ -680,7 +680,7 @@ export async function deleteProject(rawArgs: string[], projectRef: string): Prom
     });
 
     try {
-        await client.data.collection("projects").delete(projectId);
+        await client.data.table("projects").delete(projectId);
         success(`Deleted project ${chalk.bold(p.name ?? projectId)}`);
         emit(() => {}, {
             success: true,
@@ -700,7 +700,7 @@ export async function firstRow(
     collection: string,
     projectId: string
 ): Promise<Record<string, unknown> | undefined> {
-    const res = await client.data.collection(collection).find({
+    const res = await client.data.table(collection).find({
         where: { project: ["==", projectId] },
         limit: 1
     });
@@ -711,7 +711,7 @@ export async function latestDeployment(
     client: CloudClient,
     projectId: string
 ): Promise<{ id: string | number; status?: string; createdAt?: string; logs?: string } | undefined> {
-    const res = await client.data.collection("deployments").find({
+    const res = await client.data.table("deployments").find({
         where: { project: ["==", projectId] },
         orderBy: ["createdAt", "desc"],
         limit: 1

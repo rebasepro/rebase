@@ -1111,7 +1111,7 @@ permissive: true });
  */
 export async function lookupProjectId(ref: string, client: CloudClient): Promise<string | undefined> {
     if (UUID_RE.test(ref)) return ref;
-    const res = await client.data.collection("projects").find({
+    const res = await client.data.table("projects").find({
         where: { subdomain: ["==", ref] },
         limit: 1
     });
@@ -1925,7 +1925,7 @@ export interface CloudRow {
 /**
  * Read the control plane's rows as a subcommand's row shape.
  *
- * `client.data.collection(...)` is typed against the *generated* schema of the
+ * `client.data.table(...)` is typed against the *generated* schema of the
  * project the SDK is pointed at, and the control-plane collections this CLI
  * reads are not in one — so every row arrives as an open
  * `Record<string, unknown>`. A declared `interface` gets no implicit index

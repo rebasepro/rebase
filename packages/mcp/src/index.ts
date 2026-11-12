@@ -687,7 +687,7 @@ type RebaseClient = {
         signInWithEmailAndPassword: (email: string, password: string) => Promise<{ user: { uid: string }; tokens: { accessToken: string } }>;
     };
     data: {
-        collection: (slug: string) => {
+        table: (slug: string) => {
             find: (opts: Record<string, unknown>) => Promise<unknown>;
             findById: (id: string) => Promise<unknown>;
             create: (data: unknown) => Promise<unknown>;
@@ -2904,7 +2904,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             if (argsObj.fields !== undefined && !fields) {
                 return { ...textResult("`fields` is a list of column names."), isError: true };
             }
-            const result = await client.data.collection(slug).find({
+            const result = await client.data.table(slug).find({
                 limit,
                 offset,
                 orderBy,
@@ -2920,7 +2920,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         case "get_document": {
             const argsObj = args as { collection: string; id: string; includeBinary?: boolean };
             const { collection: slug, id } = argsObj;
-            const entity = await client.data.collection(slug).findById(id);
+            const entity = await client.data.table(slug).findById(id);
             if (!entity) return textResult(`Document ${id} not found in ${slug}`);
             return untrustedJsonResult(
                 `collection "${slug}"`,
@@ -2931,21 +2931,21 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         case "create_document": {
             const argsObj = args as { collection: string; data: Record<string, unknown> };
             const { collection: slug, data } = argsObj;
-            const entity = await client.data.collection(slug).create(data);
+            const entity = await client.data.table(slug).create(data);
             return untrustedJsonResult(`collection "${slug}"`, entity);
         }
 
         case "update_document": {
             const argsObj = args as { collection: string; id: string; data: Record<string, unknown> };
             const { collection: slug, id, data } = argsObj;
-            const entity = await client.data.collection(slug).update(id, data);
+            const entity = await client.data.table(slug).update(id, data);
             return untrustedJsonResult(`collection "${slug}"`, entity);
         }
 
         case "delete_document": {
             const argsObj = args as { collection: string; id: string };
             const { collection: slug, id } = argsObj;
-            await client.data.collection(slug).delete(id);
+            await client.data.table(slug).delete(id);
             return textResult(`Deleted document ${id} from ${slug}`);
         }
 

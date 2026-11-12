@@ -327,7 +327,7 @@ describe("the stored token afterwards", () => {
         const { client, url } = await requireClient(line("status"));
         expect(url).toBe(CP);
         respond = () => json(200, { data: [] });
-        await client.data.collection("projects").find({ limit: 1 });
+        await client.data.table("projects").find({ limit: 1 });
         expect(sent.at(-1)?.authorization).toBe(`Bearer ${PROVISIONED.apiKey}`);
     });
 
@@ -539,7 +539,7 @@ describe("with REBASE_TOKEN in the environment", () => {
         said = [];
         const { client } = await requireClient(line("status"));
         respond = () => json(200, { data: [] });
-        await client.data.collection("projects").find({ limit: 1 });
+        await client.data.table("projects").find({ limit: 1 });
         expect(sent.at(-1)?.authorization).toBe("Bearer rk_live_other_projects");
         expect(said.join("\n")).toContain(`REBASE_TOKEN is set, so it is used instead of the token`);
     });
@@ -559,10 +559,10 @@ describe("with REBASE_TOKEN in the environment", () => {
         sent = [];
 
         const first = await requireClient(line("status"));
-        await first.client.data.collection("projects").find({ limit: 1 });
+        await first.client.data.table("projects").find({ limit: 1 });
         expect(sent.at(-1)?.authorization).toBe(`Bearer ${PROVISIONED.apiKey}`);
         const second = await requireClient(line("logs"));
-        await second.client.data.collection("projects").find({ limit: 1 });
+        await second.client.data.table("projects").find({ limit: 1 });
         expect(sent.at(-1)?.authorization).toBe(`Bearer ${PROVISIONED.apiKey}`);
 
         // One scopes call for the process, asked with REBASE_TOKEN.
@@ -580,7 +580,7 @@ describe("with REBASE_TOKEN in the environment", () => {
         tokenHolds(["data:read:projects", `project:deploy:${PROVISIONED.projectId}`]);
         said = [];
         const { client } = await requireClient(line("status"));
-        await client.data.collection("projects").find({ limit: 1 });
+        await client.data.table("projects").find({ limit: 1 });
         expect(sent.at(-1)?.authorization).toBe("Bearer rk_live_also_this_one");
         expect(said.join("\n")).toContain("REBASE_TOKEN is set, so it is used instead of the token");
     });
@@ -590,7 +590,7 @@ describe("with REBASE_TOKEN in the environment", () => {
         process.env.REBASE_TOKEN = "rk_live_every_project";
         tokenHolds(["project:read"]);
         const { client } = await requireClient(line("status"));
-        await client.data.collection("projects").find({ limit: 1 });
+        await client.data.table("projects").find({ limit: 1 });
         expect(sent.at(-1)?.authorization).toBe("Bearer rk_live_every_project");
     });
 
@@ -600,7 +600,7 @@ describe("with REBASE_TOKEN in the environment", () => {
         tokenHolds(["project:deploy:proj_someone_else"]);
         sent = [];
         const { client } = await requireClient(line("logs", "--project", "someone-elses-shop"));
-        await client.data.collection("projects").find({ limit: 1 });
+        await client.data.table("projects").find({ limit: 1 });
         expect(sent.at(-1)?.authorization).toBe("Bearer rk_live_other_projects");
         expect(sent.some(request => request.path === "/api/auth/scopes")).toBe(false);
     });
@@ -612,7 +612,7 @@ describe("with REBASE_TOKEN in the environment", () => {
             ? json(502, { error: { code: "upstream_error", message: "Bad gateway" } })
             : json(200, { data: [] });
         const { client } = await requireClient(line("status"));
-        await client.data.collection("projects").find({ limit: 1 });
+        await client.data.table("projects").find({ limit: 1 });
         expect(sent.at(-1)?.authorization).toBe("Bearer rk_live_other_projects");
     });
 

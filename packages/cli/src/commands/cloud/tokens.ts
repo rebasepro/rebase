@@ -117,7 +117,7 @@ export function parseCapabilities(values: readonly string[] | undefined): Reques
 /** The organization a project belongs to, or undefined when its row does not say. */
 async function projectOrganization(client: CloudClient, projectId: string): Promise<string | undefined> {
     try {
-        const row = (await client.data.collection("projects").findById(projectId)) as Record<string, unknown> | undefined;
+        const row = (await client.data.table("projects").findById(projectId)) as Record<string, unknown> | undefined;
         const raw = row?.organization ?? row?.organizationId ?? row?.organization_id;
         if (raw && typeof raw === "object" && "id" in raw) return String((raw as { id: unknown }).id);
         return raw == null || raw === "" ? undefined : String(raw);

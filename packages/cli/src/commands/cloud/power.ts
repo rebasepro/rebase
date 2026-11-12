@@ -11,7 +11,7 @@ import { requireClient, requireProject, displayProjectRef, parseCloudArgs, emit,
 type PowerAction = "start" | "stop" | "restart";
 
 async function setStatus(client: CloudClient, projectId: string, status: "active" | "stopped"): Promise<void> {
-    await client.data.collection("projects").update(projectId, { status });
+    await client.data.table("projects").update(projectId, { status });
 }
 
 export async function powerCommand(action: PowerAction, rawArgs: string[]): Promise<void> {

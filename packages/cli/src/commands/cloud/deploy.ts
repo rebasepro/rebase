@@ -378,7 +378,7 @@ app: target.app as RebaseBackendAppConfig };
         // Same derivation `rebase build` does, and fatal for the same reason: a
         // bundle whose manifest is missing a bucket the code declares deploys
         // into a tenant with nothing provisioned for it. After `backend` on
-        // purpose — the config directory it reads comes from that app.
+        // purpose — the schema directory it reads comes from that app.
         const { graph: resourceGraph, issues: resourceIssues } = await deriveResourceGraph(
             deriveOptionsFor(projectRoot, backend.app)
         );
@@ -1303,10 +1303,10 @@ async function readDeployContext(
 ): Promise<{ project?: DeployProjectRow; recent: DeploySourceRow[]; readable: boolean }> {
     try {
         const [project, recent] = await Promise.all([
-            client.data.collection("projects").findById(projectId),
+            client.data.table("projects").findById(projectId),
             // The page the control plane chooses an archive from — see
             // `snapshotDeployment`.
-            client.data.collection("deployments").find({
+            client.data.table("deployments").find({
                 where: { project: ["==", projectId] },
                 orderBy: ["createdAt", "desc"],
                 limit: 25
@@ -1374,7 +1374,7 @@ export async function readBillingState(client: CloudClient, projectId: string): 
 hasPaymentMethod: null,
 simulated: false };
     try {
-        const project = (await client.data.collection("projects").findById(projectId)) as
+        const project = (await client.data.table("projects").findById(projectId)) as
             | Record<string, unknown>
             | undefined;
         const orgRaw = project?.organization ?? project?.organizationId ?? project?.organization_id;
@@ -1395,9 +1395,9 @@ path: `payment-method/${encodeURIComponent(org)}` }
         // plan to read — which is not "internal", so it does not exempt anything.
         let plan: string | null = null;
         try {
-            const billingId = billingAccountIdOf(await client.data.collection("organizations").findById(org));
+            const billingId = billingAccountIdOf(await client.data.table("organizations").findById(org));
             if (billingId != null) {
-                const acct = (await client.data.collection("billing-accounts").findById(billingId)) as
+                const acct = (await client.data.table("billing-accounts").findById(billingId)) as
                     | { plan?: string }
                     | undefined;
                 plan = typeof acct?.plan === "string" ? acct.plan : null;
@@ -1973,7 +1973,7 @@ function resolveTriggerFailure(e: unknown, fallback = "Failed to trigger deploym
  */
 export async function platformRebuildsOff(client: CloudClient, projectId: string): Promise<boolean> {
     try {
-        const row: unknown = await client.data.collection("projects").findById(projectId);
+        const row: unknown = await client.data.table("projects").findById(projectId);
         return typeof row === "object" && row !== null && "platformRebuilds" in row && row.platformRebuilds === false;
     } catch {
         return false;
@@ -2038,7 +2038,7 @@ export async function deployedUrl(
     if (!opts.projectId || !opts.url) return undefined;
     try {
         const [project, baseDomain] = await Promise.all([
-            client.data.collection("projects").findById(opts.projectId),
+            client.data.table("projects").findById(opts.projectId),
             fetchTenantBaseDomain(client, opts.url)
         ]);
         if (!project) return undefined;
@@ -2163,7 +2163,7 @@ async function streamBuildLogs(
     for (;;) {
         let dep: Deployment | undefined;
         try {
-            dep = (await client.data.collection(opts.collection ?? "deployments").findById(deploymentId)) as Deployment | undefined;
+            dep = (await client.data.table(opts.collection ?? "deployments").findById(deploymentId)) as Deployment | undefined;
             unreadableSince = undefined;
         } catch (e) {
             // A read that failed says nothing about the build. A control plane
@@ -2517,7 +2517,7 @@ async function previewBuildLogs(
     }
     const deploymentId = preview.deploymentId;
     try {
-        const dep = (await client.data.collection(PREVIEW_DEPLOYMENTS_COLLECTION).findById(deploymentId)) as Deployment | undefined;
+        const dep = (await client.data.table(PREVIEW_DEPLOYMENTS_COLLECTION).findById(deploymentId)) as Deployment | undefined;
         if (!dep) fail(`Preview "${preview.name}"'s deployment ${deploymentId} is gone.`, undefined, "not_found");
         const heading = (): void => {
             console.log("");
