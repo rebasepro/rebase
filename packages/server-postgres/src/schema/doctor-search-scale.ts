@@ -1,11 +1,11 @@
 /**
- * `rebase doctor`: collections searched by a full scan of a large table.
+ * `rebase doctor`: tables searched by a full scan of a large table.
  *
  * Without a `search` block, a search — the admin's search box, `?searchString=`,
  * `.search()` — is `ILIKE '%term%'` over every text column. A leading `%`
  * defeats a B-tree, so each one reads the whole table: on 100k posts a search
  * took 326 ms, half for the page and half for its count. Nothing reports it;
- * the box just gets slower as the table grows. This names the collections
+ * the box just gets slower as the table grows. This names the tables
  * where that has started to matter, and points at the block that fixes it.
  *
  * A hint, not a failure: it never changes doctor's exit code, and the database
@@ -15,59 +15,55 @@
  * `main()` on import.
  */
 import chalk from "chalk";
-import { getTableName, relationalCollections } from "@rebasepro/common";
-import { isPostgresCollectionConfig, type CollectionConfig } from "@rebasepro/types";
+import { isIlikeSearchable } from "@rebasepro/common";
+import type { TableDescriptor } from "@rebasepro/types";
 import { loadTables } from "./load-tables";
-import { lowerCompiledTables } from "./lowered-tables";
-import { buildSearchColumnSpec } from "./search-column";
+import { buildTableSearchColumnSpec } from "./search-column";
 
 /** Above this many rows an unindexed search is worth a word. */
 export const UNINDEXED_SEARCH_ROWS = 10_000;
 
-/** A collection whose search would be `ILIKE` over these fields. */
-export interface IlikeSearchedCollection {
+/** A table whose search would be `ILIKE` over these columns. */
+export interface IlikeSearchedTable {
     slug: string;
     schema: string;
     table: string;
-    /** The string properties the search reads. */
+    /** The keys of the text columns the search reads. */
     fields: string[];
 }
 
 /**
- * The collections a search reaches without an index: no `search` block (or
- * one that does not build), and at least one property the default search
- * reads — a `string`, not an enum, not a uuid key (the rule in
- * `DrizzleConditionBuilder.buildSearchConditions`).
+ * The tables a search reaches without an index: no `search` block (or one
+ * that does not build), and at least one column the default search reads —
+ * text, without `.oneOf()` ({@link isIlikeSearchable}, the rule the search
+ * conditions use).
  */
-export function ilikeSearchedCollections(collections: CollectionConfig[]): IlikeSearchedCollection[] {
-    const found: IlikeSearchedCollection[] = [];
-    for (const collection of relationalCollections(collections)) {
-        if (!isPostgresCollectionConfig(collection)) continue;
+export function ilikeSearchedTables(tables: readonly TableDescriptor[]): IlikeSearchedTable[] {
+    const found: IlikeSearchedTable[] = [];
+    for (const table of tables) {
+        if (table.kind === "view") continue;
         let indexed: boolean;
         try {
-            indexed = buildSearchColumnSpec(collection) !== undefined;
+            indexed = buildTableSearchColumnSpec(table) !== undefined;
         } catch {
             // A block that does not build is reported by the boot; the search
             // falls back to ILIKE meanwhile, so it counts as none here.
             indexed = false;
         }
         if (indexed) continue;
-        const fields = Object.entries(collection.properties ?? {})
-            .filter(([, property]) => property.type === "string" && !property.enum && property.isId !== "uuid")
-            .map(([key]) => key);
-        const table = getTableName(collection);
-        if (fields.length === 0 || !table) continue;
-        found.push({ slug: collection.slug, schema: collection.schema ?? "public", table, fields });
+        const fields = table.columns.filter(column => isIlikeSearchable(column)).map(column => column.key);
+        if (fields.length === 0) continue;
+        found.push({ slug: table.slug, schema: table.schema, table: table.table, fields });
     }
     return found;
 }
 
 /** Those of `candidates` whose table holds more than `threshold` rows, by estimate. */
 export function unindexedSearchFindings(
-    candidates: IlikeSearchedCollection[],
+    candidates: IlikeSearchedTable[],
     rowEstimates: ReadonlyMap<string, number>,
     threshold: number = UNINDEXED_SEARCH_ROWS
-): (IlikeSearchedCollection & { rows: number })[] {
+): (IlikeSearchedTable & { rows: number })[] {
     return candidates
         .map(candidate => ({ ...candidate, rows: rowEstimates.get(`${candidate.schema}.${candidate.table}`) ?? 0 }))
         .filter(candidate => candidate.rows > threshold);
@@ -95,8 +91,8 @@ export async function estimateRowCounts(
     return new Map(rows.map(row => [`${row.schema}.${row.table}`, Number(row.rows)]));
 }
 
-/** The report, one warning per collection. */
-export function formatUnindexedSearches(findings: (IlikeSearchedCollection & { rows: number })[]): string[] {
+/** The report, one warning per table. */
+export function formatUnindexedSearches(findings: (IlikeSearchedTable & { rows: number })[]): string[] {
     if (findings.length === 0) return [];
     const lines = ["", chalk.yellow(`  ⚠ ${findings.length} table(s) searched by reading the whole table:`)];
     for (const finding of findings) {
@@ -122,8 +118,7 @@ export async function runSearchScaleCheck(schemaDir: string, databaseUrl?: strin
     const { Client } = await import("pg");
     const client = new Client({ connectionString: databaseUrl });
     try {
-        // B-PLAN-2 step 6: the searched columns from the descriptors.
-        const candidates = ilikeSearchedCollections(lowerCompiledTables(await loadTables(schemaDir)));
+        const candidates = ilikeSearchedTables((await loadTables(schemaDir)).map(table => table.descriptor));
         if (candidates.length === 0) return;
         await client.connect();
         const estimates = await estimateRowCounts(

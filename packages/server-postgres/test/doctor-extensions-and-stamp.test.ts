@@ -5,7 +5,7 @@ import { missingExtensionIssues, schemaStampIssues } from "../src/schema/doctor"
 /**
  * Two things `rebase doctor` could not see, both of which stop a first run.
  *
- * A `{ type: "vector" }` property plans a column of a type that does not exist
+ * A `col.vector()` column plans a column of a type that does not exist
  * until pgvector is installed — and installing it is a deployment decision
  * Rebase deliberately does not make, so the absence is often correct
  * configuration and a wrong image. Without this check the first symptom is
@@ -40,7 +40,7 @@ const descriptorsOf = (collections: CollectionConfig[]): TableDescriptor[] =>
 
 describe("missing extensions", () => {
     it("reports pgvector when a collection needs it and the database has not got it", () => {
-        const [issue] = missingExtensionIssues(withVector, new Set(["plpgsql"]));
+        const [issue] = missingExtensionIssues(descriptorsOf(withVector), new Set(["plpgsql"]));
         expect(issue.severity).toBe("error");
         expect(issue.message).toContain("pgvector");
         // Both halves of the fix: the declaration Rebase needs, and the image
@@ -50,11 +50,11 @@ describe("missing extensions", () => {
     });
 
     it("says nothing when the extension is installed", () => {
-        expect(missingExtensionIssues(withVector, new Set(["vector"]))).toEqual([]);
+        expect(missingExtensionIssues(descriptorsOf(withVector), new Set(["vector"]))).toEqual([]);
     });
 
     it("says nothing when no collection asks for it", () => {
-        expect(missingExtensionIssues(withoutVector, new Set())).toEqual([]);
+        expect(missingExtensionIssues(descriptorsOf(withoutVector), new Set())).toEqual([]);
     });
 });
 

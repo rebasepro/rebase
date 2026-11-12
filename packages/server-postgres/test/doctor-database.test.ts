@@ -2,7 +2,8 @@
  * `rebase doctor --database`: which tables it treats as Rebase's, and how it
  * prints what the preflight found.
  */
-import type { CollectionConfig } from "@rebasepro/types";
+import type { CollectionConfig, TableDescriptor } from "@rebasepro/types";
+import { collectionsToTableDefs, compileTables } from "@rebasepro/common";
 import { managedTablesOf, preflightSchemasOf, preflightStatus, renderPreflightFindings } from "../src/schema/doctor-database";
 import type { PreflightFinding } from "../src/security/database-preflight";
 
@@ -35,23 +36,26 @@ const posts: CollectionConfig = {
     }
 };
 
+/** The fixtures as the doctor reads them: compiled descriptors, in the order given. */
+const described = (collections: CollectionConfig[]): TableDescriptor[] => compileTables(collectionsToTableDefs(collections).tables);
+
 describe("managedTablesOf", () => {
-    it("lists each collection's table in its schema, and the junctions", () => {
-        expect(managedTablesOf([posts, tags])).toEqual([
+    it("lists each table in its schema, and the junctions", () => {
+        expect(managedTablesOf(described([posts, tags]))).toEqual([
             { schema: "content", table: "posts" },
             { schema: "public", table: "tags" },
             { schema: "public", table: "posts_tags" }
         ]);
     });
 
-    it("is empty for a project with no collections", () => {
+    it("is empty for a project with no tables", () => {
         expect(managedTablesOf([])).toEqual([]);
     });
 });
 
 describe("preflightSchemasOf", () => {
-    it("is public, rebase and every schema a collection names", () => {
-        expect(preflightSchemasOf([posts, tags])).toEqual(["public", "rebase", "content"]);
+    it("is public, rebase and every schema a table names", () => {
+        expect(preflightSchemasOf(described([posts, tags]))).toEqual(["public", "rebase", "content"]);
         expect(preflightSchemasOf([])).toEqual(["public", "rebase"]);
     });
 });

@@ -180,7 +180,7 @@ describe("doctor and boot agree about schema drift", () => {
             { kind: "type", table: "authors", collection: "authors", column: "name", property: "name", generated: "text", live: "integer" },
             { kind: "nullability", table: "authors", collection: "authors", column: "name", property: "name", generated: "NOT NULL", live: "nullable" },
             { kind: "type", table: "authors", collection: "authors", column: "bio", property: "bio", generated: "text", live: "integer" }
-        ], already, [authorsAfter]);
+        ], already, compileSet([authorsAfter]).map(table => table.descriptor));
         expect(issues.map(i => `${i.category} ${i.column}`)).toEqual(["nullability_mismatch name", "type_mismatch bio"]);
     });
 

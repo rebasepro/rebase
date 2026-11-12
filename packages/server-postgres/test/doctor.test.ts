@@ -1,6 +1,6 @@
-import { CollectionConfig, PostgresCollectionConfig, StringProperty, NumberProperty, DateProperty, ArrayProperty, Property } from "@rebasepro/types";
+import { CollectionConfig, PostgresCollectionConfig } from "@rebasepro/types";
 import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
-import { checkCollectionsVsSchema, checkCollectionsVsSdk, getExpectedColumnType, renderReport, runDoctor } from "../src/schema/doctor";
+import { checkCollectionsVsSchema, checkCollectionsVsSdk, expectedDataType, renderReport, runDoctor } from "../src/schema/doctor";
 import { generateTypedefs } from "@rebasepro/codegen";
 import { collectionsToTableDefs, compileTables } from "@rebasepro/common";
 import { loadTableSchema } from "../src/schema/load-tables";
@@ -111,95 +111,13 @@ describe("Rebase Schema Doctor", () => {
     });
 
     describe("column type mapping", () => {
-        // We test getExpectedColumnType indirectly through import
-        // These are integration-style tests against the mapping logic
-
-        it("should map string types correctly", () => {
-            expect(getExpectedColumnType({ type: "string" })).toBe("text");
-            expect(getExpectedColumnType({ type: "string",
-columnType: "text" } as StringProperty)).toBe("text");
-            expect(getExpectedColumnType({ type: "string",
-columnType: "char" } as StringProperty)).toBe("character");
-            expect(getExpectedColumnType({ type: "string",
-columnType: "uuid" } as StringProperty)).toBe("uuid");
-        });
-
-        // The generator compiles markdown/multiline strings to `text`. When this
-        // expectation said "text", every scaffolded project reported
-        // phantom drift on its markdown columns the first time doctor ran.
-        it("should expect text for markdown/multiline strings", () => {
-            // `admin` is the CMS's augmentation, outside this program: a string carrying it as an extra key, as a config does.
-            const withUi = (admin: Record<string, boolean>) => ({ type: "string" as const, admin });
-            expect(getExpectedColumnType(withUi({ markdown: true }))).toBe("text");
-            expect(getExpectedColumnType(withUi({ multiline: true }))).toBe("text");
-            // A plain string with unrelated ui config stays varchar.
-            expect(getExpectedColumnType(withUi({ hideFromCollection: true }))).toBe("text");
-        });
-
-        it("should map number types correctly", () => {
-            expect(getExpectedColumnType({ type: "number" })).toBe("numeric");
-            expect(getExpectedColumnType({ type: "number",
-validation: { integer: true } } as NumberProperty)).toBe("integer");
-            expect(getExpectedColumnType({ type: "number",
-columnType: "real" } as NumberProperty)).toBe("real");
-            expect(getExpectedColumnType({ type: "number",
-columnType: "double precision" } as NumberProperty)).toBe("double precision");
-            expect(getExpectedColumnType({ type: "number",
-columnType: "bigint" } as NumberProperty)).toBe("bigint");
-            // Serial types are integers with a sequence default; the catalog
-            // reports the underlying width.
-            expect(getExpectedColumnType({ type: "number",
-columnType: "serial" } as NumberProperty)).toBe("integer");
-            expect(getExpectedColumnType({ type: "number",
-columnType: "bigserial" } as NumberProperty)).toBe("bigint");
-            const smallserial: string = "smallserial";
-            // Outside `NumberProperty["columnType"]`, which lists no smallserial; the mapping still knows it.
-            expect(getExpectedColumnType({ type: "number", columnType: smallserial } as NumberProperty)).toBe("smallint");
-            // Any other columnType passes through, matching the generator, rather
-            // than falling back to numeric and reporting drift.
-            const outsideTheUnion: string = "smallint";
-            // Deliberately outside `NumberProperty["columnType"]`: the pass-through for any other column type is what is under test.
-            expect(getExpectedColumnType({ type: "number", columnType: outsideTheUnion } as NumberProperty)).toBe("smallint");
-        });
-
-        it("should map boolean type correctly", () => {
-            expect(getExpectedColumnType({ type: "boolean" })).toBe("boolean");
-        });
-
-        it("should map date types correctly", () => {
-            expect(getExpectedColumnType({ type: "date" })).toBe("timestamp with time zone");
-            expect(getExpectedColumnType({ type: "date",
-columnType: "date" } as DateProperty)).toBe("date");
-            expect(getExpectedColumnType({ type: "date",
-columnType: "time" } as DateProperty)).toBe("time without time zone");
-        });
-
-        it("should map json types correctly", () => {
-            expect(getExpectedColumnType({ type: "map" })).toBe("jsonb");
-            expect(getExpectedColumnType({ type: "array" })).toBe("jsonb");
-            expect(getExpectedColumnType({ type: "array",
-columnType: "json" } as ArrayProperty)).toBe("json");
-
-            // Native array element type mappings
-            expect(getExpectedColumnType({ type: "array",
-of: { type: "string" } } as ArrayProperty)).toBe("ARRAY");
-            expect(getExpectedColumnType({ type: "array",
-of: { type: "number",
-validation: { integer: true } } } as ArrayProperty)).toBe("ARRAY");
-            expect(getExpectedColumnType({ type: "array",
-of: { type: "boolean" } } as ArrayProperty)).toBe("ARRAY");
-        });
-
-        it("should map enum string to USER-DEFINED", () => {
-            expect(getExpectedColumnType({
-                type: "string",
-                enum: { active: "Active",
-inactive: "Inactive" }
-            } as StringProperty)).toBe("USER-DEFINED");
-        });
-
-        it("should return null for relation type", () => {
-            expect(getExpectedColumnType({ type: "relation" } as Property)).toBe(null);
+        // Every column type, row by row, is in doctor-extended.test.ts.
+        it("reads the planner's type, spelled the way the catalogue spells it", () => {
+            expect(expectedDataType({ kind: "text" })).toBe("text");
+            expect(expectedDataType({ kind: "varchar", length: 255 })).toBe("character varying");
+            expect(expectedDataType({ kind: "serial" })).toBe("integer");
+            expect(expectedDataType({ kind: "array", of: { kind: "text" } })).toBe("ARRAY");
+            expect(expectedDataType({ kind: "enum", values: ["active", "inactive"] })).toBe("USER-DEFINED");
         });
     });
 

@@ -1,63 +1,66 @@
 /**
- * `rebase doctor` names the collections whose search reads the whole table.
+ * `rebase doctor` names the tables whose search reads the whole table.
  *
  * With no `search` block a search is `ILIKE '%term%'` over every text column,
  * which no index can serve: 326 ms per search on 100k rows, and growing with
  * the table. Doctor now says so above 10,000 rows, and points at the block.
  */
 import { PGlite } from "@electric-sql/pglite";
-import { CollectionConfig } from "@rebasepro/types";
+import { col, defineTable, type TableDescriptor } from "@rebasepro/types";
+import { compileTables } from "@rebasepro/common";
 import {
     estimateRowCounts,
     formatUnindexedSearches,
-    ilikeSearchedCollections,
+    ilikeSearchedTables,
     unindexedSearchFindings,
     UNINDEXED_SEARCH_ROWS
 } from "../src/schema/doctor-search-scale";
 
-const posts: CollectionConfig = {
-    name: "Posts", slug: "posts", table: "posts",
-    properties: {
-        id: { name: "ID", type: "string", isId: "uuid" },
-        title: { name: "Title", type: "string" },
-        body: { name: "Body", type: "string", columnType: "text" },
-        status: { name: "Status", type: "string", enum: [{ id: "draft", label: "draft" }, { id: "published", label: "published" }] },
-        views: { name: "Views", type: "number" }
-    }
-};
+const posts = defineTable("posts", {
+    columns: {
+        id: col.uuid().primaryKey(),
+        title: col.text(),
+        body: col.text(),
+        status: col.enum(["draft", "published"]),
+        views: col.numeric()
+    },
+    rls: "admin-only"
+});
 
-const people: CollectionConfig = {
-    name: "People", slug: "people", table: "people",
+const people = defineTable("people", {
+    columns: {
+        id: col.uuid().primaryKey(),
+        name: col.text()
+    },
     search: { fields: [{ path: "name", weight: "A" }] },
-    properties: {
-        id: { name: "ID", type: "string", isId: "uuid" },
-        name: { name: "Name", type: "string" }
-    }
-};
+    rls: "admin-only"
+});
 
-const counters: CollectionConfig = {
-    name: "Counters", slug: "counters", table: "counters",
-    properties: {
-        id: { name: "ID", type: "string", isId: "uuid" },
-        kind: { name: "Kind", type: "string", enum: [{ id: "a", label: "a" }, { id: "b", label: "b" }] },
-        value: { name: "Value", type: "number" }
-    }
-};
+const counters = defineTable("counters", {
+    columns: {
+        id: col.uuid().primaryKey(),
+        kind: col.text().oneOf(["a", "b"]),
+        value: col.numeric()
+    },
+    rls: "admin-only"
+});
 
-describe("ilikeSearchedCollections", () => {
-    it("names a collection searched by ILIKE, with the fields it reads", () => {
-        expect(ilikeSearchedCollections([posts])).toEqual([
+const described = (...defs: Parameters<typeof compileTables>[0][number][]): TableDescriptor[] => compileTables(defs);
+
+describe("ilikeSearchedTables", () => {
+    it("names a table searched by ILIKE, with the columns it reads", () => {
+        expect(ilikeSearchedTables(described(posts))).toEqual([
             { slug: "posts", schema: "public", table: "posts", fields: ["title", "body"] }
         ]);
     });
 
-    it("leaves out a collection with a search block, and one with nothing ILIKE reads", () => {
-        expect(ilikeSearchedCollections([people, counters])).toEqual([]);
+    it("leaves out a table with a search block, and one with nothing ILIKE reads", () => {
+        expect(ilikeSearchedTables(described(people, counters))).toEqual([]);
     });
 });
 
 describe("unindexedSearchFindings", () => {
-    const candidates = ilikeSearchedCollections([posts]);
+    const candidates = ilikeSearchedTables(described(posts));
 
     it("warns above the threshold", () => {
         const findings = unindexedSearchFindings(candidates, new Map([["public.posts", 120_000]]));

@@ -12,35 +12,22 @@ import * as fs from "fs";
 import path from "path";
 import { pathToFileURL } from "url";
 import chalk from "chalk";
-import { CollectionConfig, DEFAULT_DATA_SOURCE_KEY, LEGACY_SCHEMA_VERSION_PREFIX, type CompiledTable, type TableDescriptor, isPostgresCollectionConfig, Property, NumberProperty, StringProperty, DateProperty, ArrayProperty, MapProperty, RelationProperty, type ResolvedManyToMany, type ResolvedBelongsTo, isManyToMany } from "@rebasepro/types";
+import { DEFAULT_DATA_SOURCE_KEY, LEGACY_SCHEMA_VERSION_PREFIX, type ColumnDescriptor, type ColumnType, type CompiledTable, type TableDescriptor } from "@rebasepro/types";
 import { generateSchema } from "./generate-drizzle-schema-logic";
 import { compareGeneratedDeclarations, describeDeclarationDifferences } from "./generated-schema-staleness";
 import { describeSchemaDifference, readGeneratedSchemaDrift, type SchemaDifference } from "./generated-schema-diff";
-import { planSchema } from "./plan/plan-schema";
-import { columnPgType } from "./legacy-column-type";
+import { pgTypeOf, planSchema } from "./plan/plan-schema";
 import { renderPgType } from "./plan/render-ddl";
 import type { PgType, SchemaPlan, TablePlan } from "./plan/types";
 import { generateTypedefs } from "@rebasepro/codegen";
-import { getTableName, resolveCollectionRelations, findRelation, relationalCollections, resolveJunctionSpecs } from "@rebasepro/common";
-import { toPostgresIdentifier, toSnakeCase } from "@rebasepro/utils";
+import { relationsOfKind, resolveTableJunctions, sortTablesBySlug } from "@rebasepro/common";
+import { toPostgresIdentifier } from "@rebasepro/utils";
 import { defaultDatabaseSchemaVersion, loadTableSchema } from "./load-tables";
 import { lowerCompiledTables } from "./lowered-tables";
 import { describeMismatch } from "@rebasepro/server";
 // The report is CLI output, not application logging — see cli-output.ts.
 import { out, outError } from "../cli-output";
 import { deepestErrorMessage, diagnoseDbError, parseHostInfo } from "../cli-errors";
-
-/**
- * Resolve the SQL column name for a property.
- * Uses the explicit `columnName` when set (e.g. from introspection),
- * falling back to `toSnakeCase(propName)` for manually-authored collections.
- */
-const resolveColumnName = (propName: string, prop?: Property | null): string => {
-    if (prop && "columnName" in prop && typeof prop.columnName === "string") {
-        return prop.columnName;
-    }
-    return toSnakeCase(propName);
-};
 
 // ── Types ────────────────────────────────────────────────────────────────
 
@@ -166,38 +153,57 @@ const informationSchemaName = (type: PgType): string | null =>
     type.kind === "custom" ? null : INFORMATION_SCHEMA_NAMES[type.kind];
 
 /**
- * The `data_type` the database should report for a property's column, or `null`
- * when there is nothing to compare.
- *
- * `null` covers the two honest cases: a `relation`, whose column is derived from
- * the relation rather than from the property, and a configuration the planner
- * refuses outright — which is a problem the doctor's other phases report with a
- * message, not a type mismatch to invent one for.
+ * The planned Postgres type of a column of `table`, through the planner's own
+ * `pgTypeOf` — or `undefined` for a type the planner refuses (an array of
+ * documents, an enum with no labels), which is a problem the doctor's other
+ * phases report with a message, not a type mismatch to invent one for.
  */
-export function getExpectedColumnType(prop: Property): string | null {
-    // The FK column a relation owns is planned from the relation, and its type
-    // is the *target's* key — which a bare property cannot resolve.
-    if (prop.type === "relation") return null;
-
-    // A one-property collection, because the planner asks the questions a
-    // column needs in context: is this the primary key, what is the enum type
-    // called, what does the link point at. A `reference` whose target is not
-    // here resolves to `text`, exactly as it does in a real bundle.
-    // `prop` may be a `reference`, which no Postgres property type admits but
-    // the planner answers (`text`), so the one-property collection is asserted.
-    const collection = {
-        slug: "__doctor__",
-        table: "__doctor__",
-        properties: { __column__: prop }
-    } as unknown as CollectionConfig;
-
+function plannedColumnType(table: Pick<TableDescriptor, "schema" | "table" | "slug">, column: Pick<ColumnDescriptor, "key" | "column" | "type">): PgType | undefined {
     try {
-        const type = columnPgType("__column__", prop, collection, () => undefined);
-        return informationSchemaName(type);
+        return pgTypeOf(column.type, {
+            schema: table.schema,
+            table: table.table,
+            owner: table.slug,
+            propName: column.key,
+            column: column.column
+        });
     } catch {
-        return null;
+        return undefined;
     }
 }
+
+/**
+ * The `data_type` the database should report for a column of this type, or
+ * `null` when there is nothing to compare: a `col.custom()` type (the boot diff
+ * compares it by `format_type`), or a type the planner refuses outright.
+ */
+export function expectedDataType(type: ColumnType): string | null {
+    // The site only names an enum's type, and `data_type` never says the name.
+    const planned = plannedColumnType({ schema: "public", table: "__doctor__", slug: "__doctor__" }, { key: "column", column: "column", type });
+    return planned ? informationSchemaName(planned) : null;
+}
+
+/**
+ * `information_schema.columns.udt_name` of a native array of this element
+ * type — the array's `data_type` is `ARRAY` whatever it holds, so the element
+ * is told apart here. `undefined` for an element this does not name.
+ */
+const ARRAY_UDT_NAMES: Partial<Record<PgType["kind"], string>> = {
+    text: "_text",
+    varchar: "_varchar",
+    char: "_bpchar",
+    uuid: "_uuid",
+    smallint: "_int2",
+    integer: "_int4",
+    bigint: "_int8",
+    real: "_float4",
+    doublePrecision: "_float8",
+    numeric: "_numeric",
+    boolean: "_bool",
+    timestamptz: "_timestamptz",
+    date: "_date",
+    time: "_time"
+};
 
 // ── Phase 1: Collections ↔ Generated Schema ─────────────────────────────
 
@@ -206,8 +212,6 @@ export async function checkCollectionsVsSchema(
     schemaFilePath: string
 ): Promise<DoctorPhase> {
     const issues: DoctorIssue[] = [];
-    // B-PLAN-2 step 6: which tables Postgres stores, from the descriptors.
-    const collections = lowerCompiledTables(tables);
 
     // Check if schema file exists
     if (!fs.existsSync(schemaFilePath)) {
@@ -221,11 +225,8 @@ export async function checkCollectionsVsSchema(
 issues };
     }
 
-    // Re-generate schema in-memory and compare with file on disk. Only the
-    // collections the generator itself will emit — a Firestore collection has
-    // no table in the generated file and must not be reported as missing one.
-    const postgresCollections = relationalCollections(collections);
-    if (postgresCollections.length === 0) {
+    // Re-generate schema in-memory and compare with file on disk.
+    if (tables.length === 0) {
         return { passed: true,
 issues };
     }
@@ -355,9 +356,9 @@ interface DbEnumValue {
 }
 
 /**
- * Extensions the collections need, that the database does not have installed.
+ * Extensions the tables need, that the database does not have installed.
  *
- * Only `vector` today, and only because a `{ type: "vector" }` property plans a
+ * Only `vector` today, and only because a `col.vector()` column plans a
  * column of a type that will not exist. Rebase installs it only where a project
  * has said it may (`database({ extensions: ["vector"] })`), so the absence is
  * often correct configuration and a wrong deployment — which is exactly why the
@@ -366,12 +367,10 @@ interface DbEnumValue {
  * Exported for its test.
  */
 export function missingExtensionIssues(
-    collections: CollectionConfig[],
+    tables: readonly TableDescriptor[],
     installed: ReadonlySet<string>
 ): DoctorIssue[] {
-    const usesVector = collections.some(collection =>
-        Object.values(collection.properties ?? {})
-            .some(property => (property as { type?: string } | null)?.type === "vector"));
+    const usesVector = tables.some(table => table.columns.some(column => column.type.kind === "vector"));
 
     if (!usesVector || installed.has("vector")) return [];
 
@@ -558,9 +557,8 @@ export function junctionKeyIssues(
 }
 
 /** A table as the other issues name it: bare in `public`, `schema.table` elsewhere. */
-function displayTableOf(difference: SchemaDifference, collections: CollectionConfig[]): string {
-    const collection = difference.collection ? collections.find(c => c.slug === difference.collection) : undefined;
-    const schema = collection && isPostgresCollectionConfig(collection) ? collection.schema : undefined;
+function displayTableOf(difference: SchemaDifference, tables: readonly TableDescriptor[]): string {
+    const schema = difference.collection ? tables.find(t => t.slug === difference.collection)?.schema : undefined;
     return schema && schema !== "public" ? `${schema}.${difference.table}` : difference.table;
 }
 
@@ -609,7 +607,7 @@ function generatedDriftFix(difference: SchemaDifference): string {
 export function generatedSchemaDriftIssues(
     differences: SchemaDifference[],
     already: DoctorIssue[],
-    collections: CollectionConfig[]
+    tables: readonly TableDescriptor[]
 ): DoctorIssue[] {
     const bare = (table: string | undefined) => table?.split(".").pop();
     const covered = (difference: SchemaDifference) => already.some(issue =>
@@ -620,7 +618,7 @@ export function generatedSchemaDriftIssues(
     return differences.filter(difference => !covered(difference)).map(difference => ({
         severity: "warning",
         category: COVERING_CATEGORY[difference.kind],
-        table: displayTableOf(difference, collections),
+        table: displayTableOf(difference, tables),
         ...(difference.column ? { column: difference.column } : {}),
         ...(difference.generated ? { expected: difference.generated } : {}),
         ...(difference.live ? { actual: difference.live } : {}),
@@ -630,12 +628,12 @@ export function generatedSchemaDriftIssues(
 }
 
 /**
- * The collections whose tables the default database holds — the filter boot
- * applies before it reads the catalogue, for the same reason: a collection
- * routed to `database("analytics")` has no table here.
+ * The tables the default database holds — the filter boot applies before it
+ * reads the catalogue, for the same reason: a table routed to
+ * `database("analytics")` has no table here.
  */
-function defaultSourceCollections(collections: CollectionConfig[]): CollectionConfig[] {
-    return collections.filter(c => !c.dataSource || c.dataSource === DEFAULT_DATA_SOURCE_KEY);
+function defaultDatabaseTables(tables: readonly CompiledTable[]): CompiledTable[] {
+    return tables.filter(t => !t.descriptor.database || t.descriptor.database === DEFAULT_DATA_SOURCE_KEY);
 }
 
 export async function checkCollectionsVsDatabase(
@@ -656,23 +654,16 @@ export async function checkCollectionsVsDatabase(
     } = {}
 ): Promise<DoctorPhase> {
     const issues: DoctorIssue[] = [];
-    // B-PLAN-2 step 6: the comparisons read the descriptors.
-    const collections = lowerCompiledTables(tables);
+    const descriptors = tables.map(table => table.descriptor);
+    const bySlug = new Map(descriptors.map(descriptor => [descriptor.slug, descriptor]));
 
     // Dynamic import to avoid loading pg when not needed
     const pgModule = await import("pg");
     const { Pool } = pgModule.default ?? pgModule;
     const pool = new Pool({ connectionString: databaseUrl });
 
-    // Determine all schemas defined by the collections, plus public and rebase
-    const schemas = Array.from(new Set([
-        "public",
-        "rebase",
-        ...relationalCollections(collections)
-            .filter(isPostgresCollectionConfig)
-            .map(c => c.schema)
-            .filter((s): s is string => !!s)
-    ]));
+    // Every schema a table is declared in, plus public and rebase
+    const schemas = Array.from(new Set(["public", "rebase", ...descriptors.map(d => d.schema)]));
 
     try {
         // Fetch all tables in the defined schemas
@@ -706,7 +697,7 @@ export async function checkCollectionsVsDatabase(
         // allowed to install it — so this reports, it does not install.
         const extensionsResult = await pool.query<{ extname: string }>("SELECT extname FROM pg_extension");
         const installedExtensions = new Set(extensionsResult.rows.map(r => r.extname));
-        issues.push(...missingExtensionIssues(collections, installedExtensions));
+        issues.push(...missingExtensionIssues(descriptors, installedExtensions));
 
         // A database provisioned from a different set of collections than the
         // ones on disk.
@@ -808,15 +799,15 @@ export async function checkCollectionsVsDatabase(
             fksByTable.get(key)!.push(row);
         }
 
-        // ── Compare each collection against the database ─────────────────
+        // ── Compare each table against the database ──────────────────────
 
-        const postgresCollections = relationalCollections(collections);
-        const junctionSpecs = resolveJunctionSpecs(postgresCollections);
+        // Where boot and `db push` create each junction table.
+        const junctions = resolveTableJunctions(sortTablesBySlug(tables).map(t => t.descriptor).filter(d => d.kind !== "view"));
 
         // What push and boot build, read once. The key and the junction checks
         // compare against it rather than against a fifth reading of the
-        // properties. A configuration the planner refuses has no plan; the
-        // other phases name that problem, and these checks stand down.
+        // columns. A configuration the planner refuses has no plan; the other
+        // phases name that problem, and these checks stand down.
         let plan: SchemaPlan | undefined;
         try {
             plan = planSchema(tables);
@@ -826,14 +817,14 @@ export async function checkCollectionsVsDatabase(
         const tablePlans = new Map<string, TablePlan>((plan?.tables ?? []).map(t => [t.qualified, t]));
         const checkedJunctions = new Set<string>();
 
-        for (const collection of postgresCollections) {
-            const tableName = getTableName(collection);
-            const schemaName = (collection as { schema?: string }).schema || "public";
+        for (const descriptor of descriptors) {
+            const tableName = descriptor.table;
+            const schemaName = descriptor.schema;
             const fullTableName = schemaName === "public" ? tableName : `${schemaName}.${tableName}`;
 
             // A view is Rebase's to create from its query; there are no
-            // columns of its own to check against the properties.
-            if (isPostgresCollectionConfig(collection) && collection.view) {
+            // columns of its own to check against the definition.
+            if (descriptor.kind === "view") {
                 if (!existingViews.has(fullTableName)) {
                     issues.push({
                         severity: "error",
@@ -869,56 +860,48 @@ export async function checkCollectionsVsDatabase(
                 issues.push(...primaryKeyIssues(tablePlan, pksByTable.get(fullTableName) ?? [], fullTableName));
             }
 
-            // Check properties → columns
-            for (const [propName, prop] of Object.entries(collection.properties ?? {})) {
-                if (prop.type === "relation") {
-                    // ResolvedRelation columns are derived from localKey
-                    const resolvedRelations = resolveCollectionRelations(collection);
-                    const relation = findRelation(resolvedRelations, (prop as RelationProperty).relation?.relationName ?? propName);
-                    if (relation?.kind === "belongsTo") {
-                        const fkColName = relation.localKey;
-                        if (!dbColumnMap.has(fkColName)) {
-                            issues.push({
-                                severity: "error",
-                                category: "missing_column",
-                                table: fullTableName,
-                                column: fkColName,
-                                message: `Foreign key column "${fkColName}" for relation "${propName}" is missing from table "${fullTableName}".`,
-                                fix: "Run `rebase db push` or `rebase db generate && rebase db migrate`"
-                            });
-                        }
-
-                        // Check FK constraint exists
-                        const tableFks = fksByTable.get(fullTableName) ?? [];
-                        let targetTableName = "unknown";
-                        let targetSchemaName = "public";
-                        try {
-                            const targetColl = relation.target();
-                            targetTableName = getTableName(targetColl);
-                            targetSchemaName = (targetColl as { schema?: string }).schema || "public";
-                        } catch { /* ignore */ }
-
-                        const hasFk = tableFks.some((fk) =>
-                            fk.column_name === fkColName &&
-                            fk.foreign_table_name === targetTableName &&
-                            fk.foreign_table_schema === targetSchemaName
-                        );
-
-                        if (dbColumnMap.has(fkColName) && !hasFk) {
-                            issues.push({
-                                severity: "warning",
-                                category: "missing_foreign_key",
-                                table: fullTableName,
-                                column: fkColName,
-                                message: `Column "${fkColName}" exists but has no FOREIGN KEY constraint referencing "${targetSchemaName === "public" ? targetTableName : `${targetSchemaName}.${targetTableName}`}".`,
-                                fix: "Run `rebase db push` or add the constraint manually"
-                            });
-                        }
-                    }
+            // A `belongsTo`: its foreign-key column, and the constraint on it.
+            for (const relation of relationsOfKind(descriptor, "belongsTo")) {
+                const fkColName = relation.localKey;
+                if (!dbColumnMap.has(fkColName)) {
+                    issues.push({
+                        severity: "error",
+                        category: "missing_column",
+                        table: fullTableName,
+                        column: fkColName,
+                        message: `Foreign key column "${fkColName}" for relation "${relation.name}" is missing from table "${fullTableName}".`,
+                        fix: "Run `rebase db push` or `rebase db generate && rebase db migrate`"
+                    });
                     continue;
                 }
+                // A link written without a constraint (`constraint: false`) has none to find.
+                if (!relation.constraint) continue;
 
-                const colName = resolveColumnName(propName, prop);
+                const target = bySlug.get(relation.target);
+                const targetTableName = target?.table ?? "unknown";
+                const targetSchemaName = target?.schema ?? "public";
+                const hasFk = (fksByTable.get(fullTableName) ?? []).some((fk) =>
+                    fk.column_name === fkColName &&
+                    fk.foreign_table_name === targetTableName &&
+                    fk.foreign_table_schema === targetSchemaName
+                );
+                if (!hasFk) {
+                    issues.push({
+                        severity: "warning",
+                        category: "missing_foreign_key",
+                        table: fullTableName,
+                        column: fkColName,
+                        message: `Column "${fkColName}" exists but has no FOREIGN KEY constraint referencing "${targetSchemaName === "public" ? targetTableName : `${targetSchemaName}.${targetTableName}`}".`,
+                        fix: "Run `rebase db push` or add the constraint manually"
+                    });
+                }
+            }
+
+            // Columns. A foreign-key column is typed by the key it points at,
+            // and checked with its relation above.
+            for (const column of descriptor.columns) {
+                if (column.foreignKeyOf !== undefined) continue;
+                const colName = column.column;
 
                 const dbCol = dbColumnMap.get(colName);
                 if (!dbCol) {
@@ -927,138 +910,112 @@ export async function checkCollectionsVsDatabase(
                         category: "missing_column",
                         table: fullTableName,
                         column: colName,
-                        message: `Column "${colName}" is defined in table "${collection.slug}" (backend/schema) but missing from table "${fullTableName}".`,
+                        message: `Column "${colName}" is defined in table "${descriptor.slug}" (backend/schema) but missing from table "${fullTableName}".`,
                         fix: "Run `rebase db push` or `rebase db generate && rebase db migrate`"
                     });
                     continue;
                 }
 
+                const planned = plannedColumnType(descriptor, column);
+                if (!planned) continue;
+
                 // Type check
-                const expectedType = getExpectedColumnType(prop);
+                const expectedType = informationSchemaName(planned);
                 if (expectedType) {
                     const actualType = dbCol.data_type;
                     let isMismatch = actualType !== expectedType;
-                    if (prop.type === "vector" && dbCol.udt_name !== "vector") {
-                        isMismatch = true;
-                    }
-                    if (prop.type === "array") {
-                        const ap = prop as ArrayProperty;
-                        let expectedColType = ap.columnType;
-                        if (!expectedColType && ap.of && !Array.isArray(ap.of)) {
-                            const ofProp = ap.of as Property;
-                            if (ofProp.type === "string") expectedColType = "text[]";
-                            else if (ofProp.type === "number") expectedColType = ofProp.validation?.integer ? "integer[]" : "numeric[]";
-                            else if (ofProp.type === "boolean") expectedColType = "boolean[]";
-                        }
-                        if (expectedColType && expectedColType.endsWith("[]")) {
-                            if (actualType !== "ARRAY") {
-                                isMismatch = true;
-                            } else {
-                                const expectedUdt = expectedColType === "text[]" ? "_text" :
-                                                    expectedColType === "integer[]" ? "_int4" :
-                                                    expectedColType === "boolean[]" ? "_bool" :
-                                                    expectedColType === "numeric[]" ? "_numeric" : "";
-                                if (expectedUdt && dbCol.udt_name !== expectedUdt) {
-                                    isMismatch = true;
-                                }
-                            }
-                        }
+                    if (planned.kind === "vector" && dbCol.udt_name !== "vector") isMismatch = true;
+                    if (planned.kind === "array" && actualType === "ARRAY") {
+                        const expectedUdt = ARRAY_UDT_NAMES[planned.of.kind];
+                        if (expectedUdt && dbCol.udt_name !== expectedUdt) isMismatch = true;
                     }
                     if (isMismatch) {
-                        const planned = tablePlan?.columns.find(c => c.column === colName)?.type;
+                        const expectedLabel = planned.kind === "vector" ? "vector" : expectedType;
+                        const actualLabel = dbCol.udt_name === "vector" ? "vector" : actualType;
                         issues.push({
                             severity: "warning",
                             category: "type_mismatch",
                             table: fullTableName,
                             column: colName,
-                            expected: prop.type === "vector" ? "vector" : expectedType,
-                            actual: dbCol.udt_name === "vector" ? "vector" : actualType,
-                            message: `Column "${colName}" in table "${fullTableName}": expected type "${prop.type === "vector" ? "vector" : expectedType}" but found "${dbCol.udt_name === "vector" ? "vector" : actualType}".`,
-                            fix: typeMismatchFix(schemaName, tableName, colName, actualType, planned)
+                            expected: expectedLabel,
+                            actual: actualLabel,
+                            message: `Column "${colName}" in table "${fullTableName}": expected type "${expectedLabel}" but found "${actualLabel}".`,
+                            fix: typeMismatchFix(schemaName, tableName, colName, actualType,
+                                tablePlan?.columns.find(c => c.column === colName)?.type ?? planned)
                         });
                     }
                 }
 
                 // Enum value check
-                if (prop.type === "string" && (prop as StringProperty).enum) {
-                    const enumValues = (prop as StringProperty).enum;
-                    if (enumValues) {
-                        // The planner's name: `<table>_<column>`, cut to the 63
-                        // bytes Postgres keeps, in the collection's schema.
-                        const enumName = toPostgresIdentifier(`${tableName}_${colName}`);
-                        const dbEnumValues = enumsByName.get(`${schemaName}.${enumName}`);
-                        if (!dbEnumValues) {
+                if (planned.kind === "enum") {
+                    // The planner's name, cut to the 63 bytes Postgres keeps,
+                    // in the schema the planner put it in.
+                    const enumName = toPostgresIdentifier(planned.name);
+                    const enumSchema = planned.schema;
+                    const dbEnumValues = enumsByName.get(`${enumSchema}.${enumName}`);
+                    if (!dbEnumValues) {
+                        issues.push({
+                            severity: "warning",
+                            category: "missing_enum",
+                            table: fullTableName,
+                            column: colName,
+                            expected: enumName,
+                            message: `Enum type "${enumSchema}"."${enumName}" is defined in backend/schema but not found in the database.`,
+                            fix: "Run `rebase db push` or `rebase db generate && rebase db migrate`"
+                        });
+                    } else {
+                        const expectedValues = planned.labels;
+                        const missing = expectedValues.filter((v) => !dbEnumValues.includes(v));
+                        const extra = dbEnumValues.filter((v) => !expectedValues.includes(v));
+
+                        if (missing.length > 0 || extra.length > 0) {
+                            const parts: string[] = [];
+                            if (missing.length > 0) parts.push(`missing: ${missing.join(", ")}`);
+                            if (extra.length > 0) parts.push(`extra in DB: ${extra.join(", ")}`);
                             issues.push({
                                 severity: "warning",
-                                category: "missing_enum",
+                                category: "enum_value_mismatch",
                                 table: fullTableName,
                                 column: colName,
-                                expected: enumName,
-                                message: `Enum type "${schemaName}"."${enumName}" is defined in backend/schema but not found in the database.`,
-                                fix: "Run `rebase db push` or `rebase db generate && rebase db migrate`"
+                                expected: expectedValues.join(", "),
+                                actual: dbEnumValues.join(", "),
+                                message: `Enum values for "${colName}" in table "${fullTableName}" are out of sync (${parts.join("; ")}).`,
+                                fix: extra.length > 0 && missing.length === 0
+                                    // A push cannot remove a label (no ALTER TYPE … DROP VALUE), so it was never the remedy for these.
+                                    ? `PostgreSQL cannot drop an enum label, so \`rebase db push\` leaves ${extra.join(", ")} in place. Harmless unless something still writes it; to retire it, UPDATE its rows to another value, then rewrite the type in a migration (\`rebase db generate\`: CREATE TYPE …, ALTER TABLE … TYPE … USING, DROP TYPE) and \`rebase db migrate\``
+                                    : "Run `rebase db push` to add the missing labels" + (extra.length > 0 ? `; it cannot remove ${extra.join(", ")} (PostgreSQL has no ALTER TYPE … DROP VALUE) — retire those with a migration that rewrites the type` : "")
                             });
-                        } else {
-                            // Compare enum values
-                            const expectedValues = Array.isArray(enumValues)
-                                ? enumValues.map((v) => (typeof v === "string" ? v : String(v.id)))
-                                : Object.keys(enumValues);
-
-                            const missing = expectedValues.filter((v) => !dbEnumValues.includes(v));
-                            const extra = dbEnumValues.filter((v) => !expectedValues.includes(v));
-
-                            if (missing.length > 0 || extra.length > 0) {
-                                const parts: string[] = [];
-                                if (missing.length > 0) parts.push(`missing: ${missing.join(", ")}`);
-                                if (extra.length > 0) parts.push(`extra in DB: ${extra.join(", ")}`);
-                                issues.push({
-                                    severity: "warning",
-                                    category: "enum_value_mismatch",
-                                    table: fullTableName,
-                                    column: colName,
-                                    expected: expectedValues.join(", "),
-                                    actual: dbEnumValues.join(", "),
-                                    message: `Enum values for "${colName}" in table "${fullTableName}" are out of sync (${parts.join("; ")}).`,
-                                    fix: extra.length > 0 && missing.length === 0
-                                        // A push cannot remove a label (no ALTER TYPE … DROP VALUE), so it was never the remedy for these.
-                                        ? `PostgreSQL cannot drop an enum label, so \`rebase db push\` leaves ${extra.join(", ")} in place. Harmless unless something still writes it; to retire it, UPDATE its rows to another value, then rewrite the type in a migration (\`rebase db generate\`: CREATE TYPE …, ALTER TABLE … TYPE … USING, DROP TYPE) and \`rebase db migrate\``
-                                        : "Run `rebase db push` to add the missing labels" + (extra.length > 0 ? `; it cannot remove ${extra.join(", ")} (PostgreSQL has no ALTER TYPE … DROP VALUE) — retire those with a migration that rewrites the type` : "")
-                                });
-                            }
                         }
                     }
                 }
             }
 
-            // Also check junction tables for many-to-many relations — where
-            // `resolveJunctionSpecs` says they are, which is where boot and
-            // `db push` create them: `public`, whatever schema the declaring
-            // collection is in, under the name with any schema prefix removed.
-            const resolvedRelations = resolveCollectionRelations(collection);
-            for (const relation of Object.values(resolvedRelations)) {
-                if (isManyToMany(relation)) {
-                    const junctionTable = relation.through.table.split(".").pop() ?? relation.through.table;
-                    const junctionSchema = junctionSpecs.get(junctionTable)?.schema ?? "public";
-                    const fullJunctionTable = junctionSchema === "public" ? junctionTable : `${junctionSchema}.${junctionTable}`;
-                    if (!existingTables.has(fullJunctionTable)) {
-                        issues.push({
-                            severity: "error",
-                            category: "missing_table",
-                            table: fullJunctionTable,
-                            message: `Junction table "${fullJunctionTable}" for many-to-many relation "${relation.relationName}" is missing.`,
-                            fix: "Run `rebase db push` or `rebase db generate && rebase db migrate`"
-                        });
-                    } else if (!checkedJunctions.has(fullJunctionTable)) {
-                        // Both sides declare the same junction; it is checked once.
-                        checkedJunctions.add(fullJunctionTable);
-                        const junctionPlan = tablePlans.get(`${junctionSchema}.${junctionTable}`);
-                        if (junctionPlan) {
-                            issues.push(...junctionKeyIssues(
-                                junctionPlan,
-                                columnsByTable.get(fullJunctionTable) ?? [],
-                                pksByTable.get(fullJunctionTable) ?? [],
-                                fullJunctionTable
-                            ));
-                        }
+            // Junction tables for many-to-many relations — where boot and
+            // `db push` create them (`resolveTableJunctions`), under the name
+            // with any schema prefix removed.
+            for (const relation of relationsOfKind(descriptor, "manyToMany")) {
+                const junctionTable = relation.through.table.split(".").pop() ?? relation.through.table;
+                const junctionSchema = junctions.get(junctionTable)?.schema ?? "public";
+                const fullJunctionTable = junctionSchema === "public" ? junctionTable : `${junctionSchema}.${junctionTable}`;
+                if (!existingTables.has(fullJunctionTable)) {
+                    issues.push({
+                        severity: "error",
+                        category: "missing_table",
+                        table: fullJunctionTable,
+                        message: `Junction table "${fullJunctionTable}" for many-to-many relation "${relation.name}" is missing.`,
+                        fix: "Run `rebase db push` or `rebase db generate && rebase db migrate`"
+                    });
+                } else if (!checkedJunctions.has(fullJunctionTable)) {
+                    // Both sides declare the same junction; it is checked once.
+                    checkedJunctions.add(fullJunctionTable);
+                    const junctionPlan = tablePlans.get(`${junctionSchema}.${junctionTable}`);
+                    if (junctionPlan) {
+                        issues.push(...junctionKeyIssues(
+                            junctionPlan,
+                            columnsByTable.get(fullJunctionTable) ?? [],
+                            pksByTable.get(fullJunctionTable) ?? [],
+                            fullJunctionTable
+                        ));
                     }
                 }
             }
@@ -1075,10 +1032,11 @@ export async function checkCollectionsVsDatabase(
             const differences = await readGeneratedSchemaDrift({
                 client: pool,
                 generated: options.generated,
-                collections: defaultSourceCollections(collections),
+                // TRANSITIONAL until generated-schema-diff reads tables (B-PLAN-5 step 2).
+                collections: lowerCompiledTables(defaultDatabaseTables(tables)),
                 defaultSchema: "public"
             });
-            issues.push(...generatedSchemaDriftIssues(differences, issues, collections));
+            issues.push(...generatedSchemaDriftIssues(differences, issues, descriptors));
         }
     } finally {
         await pool.end();
@@ -1303,12 +1261,12 @@ export async function runDoctor(options: {
     // the policy generator about which tables exist would compare the wrong
     // thing. A schema that does not compile is fatal here as everywhere.
     const loaded = await loadTableSchema(options.schemaDir);
-    const { collections, descriptors, tables } = loaded;
-    if (collections.length === 0) {
+    const { descriptors, tables } = loaded;
+    if (tables.length === 0) {
         outError(chalk.red(`  ✗ No tables found in ${options.schemaDir} (its index.ts exports none).`));
         process.exit(1);
     }
-    out(chalk.gray(`  Found ${collections.length} table(s)`));
+    out(chalk.gray(`  Found ${tables.length} table(s)`));
     out();
 
     // Phase 1: Collections ↔ Generated Schema

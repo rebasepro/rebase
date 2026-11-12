@@ -7,41 +7,29 @@
  * `main()` on import; the rendering and the table list are tested here.
  */
 import chalk from "chalk";
-import type { CollectionConfig } from "@rebasepro/types";
-import { isPostgresCollectionConfig } from "@rebasepro/types";
-import { getTableName, relationalCollections, resolveJunctionSpecs } from "@rebasepro/common";
+import type { TableDescriptor } from "@rebasepro/types";
+import { resolveTableJunctions } from "@rebasepro/common";
 import type { PreflightFinding } from "../security/database-preflight";
 import type { ManagedTable, RawSqlRunner } from "../security/rls-enforcement";
 import type { RlsSettings } from "../security/rls-settings";
 import type { PolicyCheckStatus } from "./doctor-policy-checks";
 
 /**
- * The tables Rebase serves, as the server would list them: every relational
- * collection's table in its schema (`public` by default), and every junction
+ * The tables Rebase serves, as the server would list them: every declared
+ * table in its schema (`public` by default), and every junction
  * table a many-to-many declares.
  */
-export function managedTablesOf(collections: CollectionConfig[]): ManagedTable[] {
-    const relational = relationalCollections(collections);
+export function managedTablesOf(descriptors: readonly TableDescriptor[]): ManagedTable[] {
     const tables = new Map<string, ManagedTable>();
     const add = (schema: string, table: string) => tables.set(`${schema}.${table}`, { schema, table });
-    for (const collection of relational) {
-        const schema = isPostgresCollectionConfig(collection) && collection.schema ? collection.schema : "public";
-        add(schema, getTableName(collection));
-    }
-    for (const spec of resolveJunctionSpecs(relational).values()) add(spec.schema, spec.table);
+    for (const descriptor of descriptors) add(descriptor.schema, descriptor.table);
+    for (const junction of resolveTableJunctions(descriptors.filter(d => d.kind !== "view")).values()) add(junction.schema, junction.table);
     return [...tables.values()];
 }
 
-/** The schemas Rebase writes to: `public`, `rebase`, and every schema a collection names. */
-export function preflightSchemasOf(collections: CollectionConfig[]): string[] {
-    return Array.from(new Set([
-        "public",
-        "rebase",
-        ...relationalCollections(collections)
-            .filter(isPostgresCollectionConfig)
-            .map((c) => c.schema)
-            .filter((s): s is string => !!s)
-    ]));
+/** The schemas Rebase writes to: `public`, `rebase`, and every schema a table names. */
+export function preflightSchemasOf(descriptors: readonly TableDescriptor[]): string[] {
+    return Array.from(new Set(["public", "rebase", ...descriptors.map((d) => d.schema)]));
 }
 
 const LEVEL_ORDER: PreflightFinding["level"][] = ["fail", "warn", "ok"];
@@ -94,7 +82,7 @@ export function preflightStatus(findings: readonly PreflightFinding[]): PolicyCh
 
 /**
  * Every table in `schemas` but `rebase`: what a project with no declared
- * collections serves, since its API is introspected from the database.
+ * tables serves, since its API is introspected from the database.
  */
 async function everyTableIn(run: RawSqlRunner, schemas: readonly string[]): Promise<ManagedTable[]> {
     const names = schemas.filter((s) => s !== "rebase").map((s) => `'${s.replace(/'/g, "''")}'`);
@@ -120,7 +108,6 @@ export async function runDatabasePreflight(schemaDir: string, databaseUrl?: stri
     }
 
     const { loadTables } = await import("./load-tables");
-    const { lowerCompiledTables } = await import("./lowered-tables");
     const { preflightDatabase } = await import("../security/database-preflight");
     const { readRecordedRequestRoles } = await import("../security/rls-enforcement");
     const { cliRlsSettings } = await import("../security/rls-settings");
@@ -130,15 +117,15 @@ export async function runDatabasePreflight(schemaDir: string, databaseUrl?: stri
     try {
         const run: RawSqlRunner = async (text) => (await pool.query(text)).rows as Record<string, unknown>[];
         // B-PLAN-2 step 6: the table list from the descriptors.
-        const collections = lowerCompiledTables(await loadTables(schemaDir));
+        const descriptors = (await loadTables(schemaDir)).map((table) => table.descriptor);
         // Only the schemas that exist: the SQL a finding carries grants on each
         // one, and a GRANT on a missing schema fails the whole script. A boot
         // grants on the ones it creates itself.
         const existing = new Set((await run("SELECT nspname FROM pg_namespace")).map((row) => String(row.nspname)));
-        const schemas = preflightSchemasOf(collections).filter((schema) => existing.has(schema));
+        const schemas = preflightSchemasOf(descriptors).filter((schema) => existing.has(schema));
         const settings = cliRlsSettings(await readRecordedRequestRoles(run));
 
-        let managedTables = managedTablesOf(collections);
+        let managedTables = managedTablesOf(descriptors);
         console.log("");
         if (managedTables.length === 0) {
             managedTables = await everyTableIn(run, schemas);
