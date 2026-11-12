@@ -29,7 +29,7 @@ This package has no React dependency — it's pure TypeScript and can be used in
 
 | Export | Description |
 |---|---|
-| `buildRebaseData(driver)` | Wraps a `DataDriver` in a `Proxy`-based `RebaseData` object. Property access like `data.products` returns a `CollectionAccessor` for that collection slug (camelCase → snake_case). |
+| `buildRebaseData(driver)` | Wraps a `DataDriver` in a `Proxy`-based `RebaseData` object. Property access like `data.products` returns a `TableAccessor` for that collection slug (camelCase → snake_case). |
 | `QueryBuilder<M>` | Fluent query builder with `.where()`, `.orderBy()`, `.limit()`, `.offset()`, `.search()`, `.include()`, `.find()`, and `.listen()` |
 | `or(...conditions)` | Create an OR logical condition |
 | `and(...conditions)` | Create an AND logical condition |
@@ -102,7 +102,7 @@ const { data: filtered } = await data.products
 
 ## Related Packages
 
-- [`@rebasepro/types`](../types) — `DataDriver`, `RebaseData`, `CollectionAccessor`, `Entity`, `FindResponse`, etc.
+- [`@rebasepro/types`](../types) — `DataDriver`, `RebaseData`, `TableAccessor`, `Entity`, `FindResponse`, etc.
 - [`@rebasepro/utils`](../utils) — Low-level utilities (`toSnakeCase`, etc.)
 - [`@rebasepro/app`](../app) — Runtime layer that consumes `@rebasepro/common`
 - [`@rebasepro/client`](../client) — HTTP client that re-exports and extends the `QueryBuilder`

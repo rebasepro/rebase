@@ -1,5 +1,5 @@
 import { buildRebaseData, buildSdkData, wrapAsSdkData, wrapAsEntityData } from "../src/data/buildRebaseData";
-import { CollectionAccessor, DataDriver, RebaseData, RebaseSdkData, SDKCollectionClient } from "@rebasepro/types";
+import { TableAccessor, DataDriver, RebaseData, RebaseSdkData, SDKTableClient } from "@rebasepro/types";
 
 /**
  * Both data namespaces expose collections through a dynamic index signature
@@ -7,12 +7,12 @@ import { CollectionAccessor, DataDriver, RebaseData, RebaseSdkData, SDKCollectio
  * cannot narrow a bare `data.products`. A project generates a `Database` type
  * and gets the narrowing for free; a test does it here.
  */
-function sdk(data: RebaseSdkData, slug: string): SDKCollectionClient {
-    return data[slug] as SDKCollectionClient;
+function sdk(data: RebaseSdkData, slug: string): SDKTableClient {
+    return data[slug] as SDKTableClient;
 }
 
-function entity(data: RebaseData, slug: string): CollectionAccessor {
-    return data[slug] as CollectionAccessor;
+function entity(data: RebaseData, slug: string): TableAccessor {
+    return data[slug] as TableAccessor;
 }
 
 /**

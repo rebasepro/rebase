@@ -1,4 +1,4 @@
-import type { DataDriver, SDKCollectionClient } from "@rebasepro/types";
+import type { DataDriver, SDKTableClient } from "@rebasepro/types";
 import { buildSdkData } from "../../src/data/buildRebaseData";
 
 const notUsed = async (): Promise<never> => {
@@ -24,6 +24,6 @@ export function inertDriver(overrides: Partial<DataDriver> = {}): DataDriver {
  * A real flat client over {@link inertDriver}, with the methods a test
  * exercises put in place of the ones it inherits.
  */
-export function sdkClient(overrides: Partial<SDKCollectionClient>): SDKCollectionClient {
-    return { ...buildSdkData(inertDriver()).collection("items"), ...overrides };
+export function sdkClient(overrides: Partial<SDKTableClient>): SDKTableClient {
+    return { ...buildSdkData(inertDriver()).table("items"), ...overrides };
 }

@@ -1,5 +1,5 @@
 import {
-    CollectionAccessor,
+    TableAccessor,
     FilterCondition,
     FindParams,
     FindResponse,
@@ -89,13 +89,13 @@ export class QueryBuilder<M extends Record<string, unknown> = Record<string, unk
     // behind them, cast once at each handoff.
     private params: FindParams = { where: {} };
 
-    /** Only `find` and `listen` are read; any {@link CollectionAccessor} is one. */
-    constructor(private collection: Pick<CollectionAccessor<M>, "find" | "listen">) {}
+    /** Only `find` and `listen` are read; any {@link TableAccessor} is one. */
+    constructor(private collection: Pick<TableAccessor<M>, "find" | "listen">) {}
 
     /**
      * Add a filter condition to your query.
      * @example
-     * client.collection('users').where('age', '>=', 18).find()
+     * client.data.table('users').where('age', '>=', 18).find()
      */
     where<K extends keyof M & string, Op extends WhereFilterOp>(column: K, operator: Op, value: WhereValueFor<Op, M[K]>): this;
     where(logicalCondition: LogicalCondition): this;
@@ -146,9 +146,9 @@ export class QueryBuilder<M extends Record<string, unknown> = Record<string, unk
      * keys apply in the order they were added.
      *
      * @example
-     * client.collection('users').orderBy('createdAt', 'desc').find()
+     * client.data.table('users').orderBy('createdAt', 'desc').find()
      * @example
-     * client.collection('users').orderBy('roles').orderBy('createdAt', 'desc').find()
+     * client.data.table('users').orderBy('roles').orderBy('createdAt', 'desc').find()
      */
     orderBy(column: (keyof M & string) | ComputedSortField, direction: "asc" | "desc" = "asc"): this {
         const existing = normalizeOrderBy(this.params.orderBy) ?? [];

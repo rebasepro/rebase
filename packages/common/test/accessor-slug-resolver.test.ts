@@ -1,7 +1,7 @@
 import { buildRebaseData, buildSdkData } from "../src/data/buildRebaseData";
 import { buildRoutedRebaseData } from "../src/data/buildRoutedRebaseData";
-import { createAccessorSlugResolver, toCollectionAccessor } from "../src/data/collection-accessor";
-import { DataDriver, RebaseSdkData, SDKCollectionClient } from "@rebasepro/types";
+import { createAccessorSlugResolver, toTableAccessor } from "../src/data/table-accessor";
+import { DataDriver, RebaseSdkData, SDKTableClient } from "@rebasepro/types";
 
 /**
  * A server-side data proxy resolves a property through the collections'
@@ -13,8 +13,8 @@ import { DataDriver, RebaseSdkData, SDKCollectionClient } from "@rebasepro/types
  * slug's snake_case: with `table: "notes"` the typed accessor reached nothing.
  */
 
-function sdk(data: RebaseSdkData, property: string): SDKCollectionClient {
-    return data[property] as SDKCollectionClient;
+function sdk(data: RebaseSdkData, property: string): SDKTableClient {
+    return data[property] as SDKTableClient;
 }
 
 function pathRecordingDriver() {
@@ -33,19 +33,19 @@ function pathRecordingDriver() {
 }
 
 describe("createAccessorSlugResolver", () => {
-    const collections = [{ slug: "my-notes" }, { slug: "company_members" }, { slug: "posts" }, { slug: "collection" }];
+    const collections = [{ slug: "my-notes" }, { slug: "company_members" }, { slug: "posts" }, { slug: "table" }];
 
-    it("answers a collection's generated accessor with its slug", () => {
+    it("answers a table's generated accessor with its slug", () => {
         const resolve = createAccessorSlugResolver(() => collections);
         expect(resolve("myNotes")).toBe("my-notes");
         expect(resolve("companyMembers")).toBe("company_members");
         expect(resolve("posts")).toBe("posts");
-        expect(resolve("collectionCollection")).toBe("collection");
+        expect(resolve("tableTable")).toBe("table");
     });
 
     it("uses the accessor names codegen prints", () => {
         const resolve = createAccessorSlugResolver(() => collections);
-        for (const { slug } of collections) expect(resolve(toCollectionAccessor(slug))).toBe(slug);
+        for (const { slug } of collections) expect(resolve(toTableAccessor(slug))).toBe(slug);
     });
 
     it("falls back to snake_case for a name no collection answers to", () => {

@@ -94,7 +94,7 @@ describe("createCallContext", () => {
 
         expect(() => context.client.functions).not.toThrow();
         expect(() => context.data.posts).not.toThrow();
-        expect(() => context.data.collection("posts")).not.toThrow();
+        expect(() => context.data.table("posts")).not.toThrow();
         expect(() => context.storageSource.putObject).not.toThrow();
     });
 
@@ -104,7 +104,7 @@ describe("createCallContext", () => {
         await expect(context.data.posts.find()).rejects.toThrow(
             "context.data was not provided to createCallContext"
         );
-        await expect(context.data.collection("posts").create({ title: "x" })).rejects.toThrow(
+        await expect(context.data.table("posts").create({ title: "x" })).rejects.toThrow(
             "buildSdkData(driver)"
         );
         await expect(stampAuthor.beforeSave!({

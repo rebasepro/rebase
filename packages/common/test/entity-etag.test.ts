@@ -8,16 +8,16 @@
  * and `update(id, data, { ifMatch })` hands it to the SDK.
  */
 import { describe, expect, it, jest } from "@jest/globals";
-import type { Entity, SDKCollectionClient } from "@rebasepro/types";
+import type { Entity, SDKTableClient } from "@rebasepro/types";
 import { wrapAsEntityData } from "../src/data/buildRebaseData";
 import { withETag } from "../src/data/row-etag";
 import { sdkClient } from "./helpers/inert-driver";
 
 type Row = Record<string, unknown>;
 
-function sdkWith(methods: Partial<SDKCollectionClient>) {
+function sdkWith(methods: Partial<SDKTableClient>) {
     const client = sdkClient(methods);
-    return { collection: () => client };
+    return { table: () => client };
 }
 
 describe("an entity carries the version of the row it was built from", () => {
@@ -33,7 +33,7 @@ describe("an entity carries the version of the row it was built from", () => {
                 return () => undefined;
             }
         }));
-        const posts = data.collection("posts");
+        const posts = data.table("posts");
 
         const read = await posts.findById("1");
         expect(read?.etag).toBe("\"v1\"");
@@ -53,7 +53,7 @@ describe("an entity carries the version of the row it was built from", () => {
     it("a row with no version builds an entity with no `etag` key, and updates without options", async () => {
         const update = jest.fn(async (_id: string | number, data: Row) => ({ id: "1", ...data }));
         const data = wrapAsEntityData(sdkWith({ findById: async () => ({ id: "1", title: "a" }), update }));
-        const posts = data.collection("posts");
+        const posts = data.table("posts");
 
         expect(await posts.findById("1")).toEqual({ id: "1", path: "posts", values: { id: "1", title: "a" } });
         await posts.update("1", { title: "c" });

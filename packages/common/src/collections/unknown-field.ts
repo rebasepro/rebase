@@ -54,7 +54,7 @@ const validList = (validFields: string[]): string =>
 /** A filter key that resolves to nothing on `collectionPath`. */
 export function unknownFilterField(field: string, collectionPath: string, validFields: string[]): UnknownFieldAnswer {
     return {
-        message: `Unknown filter field '${field}' on collection '${collectionPath}'${validList(validFields)}`,
+        message: `Unknown filter field '${field}' on table '${collectionPath}'${validList(validFields)}`,
         code: "UNKNOWN_FILTER_FIELD",
         details: { field, collection: collectionPath, ...(validFields.length > 0 && { validFields }) }
     };
@@ -68,7 +68,7 @@ export function unknownRelationTargetField(
 ): UnknownFieldAnswer {
     return {
         message: `Unknown field '${path.fieldKey}' on '${target.slug}', the target of relation ` +
-            `'${path.relationKey}' on collection '${collectionPath}'${validList(target.validFields)}`,
+            `'${path.relationKey}' on table '${collectionPath}'${validList(target.validFields)}`,
         code: "UNKNOWN_FILTER_FIELD",
         details: {
             field: path.field,
@@ -82,7 +82,7 @@ export function unknownRelationTargetField(
 
 /** An `orderBy` key that resolves to nothing. `collectionName` is absent when the read carries no collection. */
 export function unknownOrderByField(orderBy: string, collectionName: string | undefined, validFields: string[]): UnknownFieldAnswer {
-    const onCollection = collectionName ? ` on collection '${collectionName}'` : "";
+    const onCollection = collectionName ? ` on table '${collectionName}'` : "";
     return {
         message: `Unknown orderBy field '${orderBy}'${onCollection}${validList(validFields)}`,
         code: "UNKNOWN_ORDER_BY_FIELD",
@@ -97,7 +97,7 @@ export function unknownOrderByField(orderBy: string, collectionName: string | un
 /** A `fields` entry that names nothing. */
 export function unknownProjectionField(name: string, collectionName: string, validFields: string[]): UnknownFieldAnswer {
     return {
-        message: `Unknown field '${name}' in \`fields\` on collection '${collectionName}'. Valid fields: ${validFields.join(", ")}`,
+        message: `Unknown field '${name}' in \`fields\` on table '${collectionName}'. Valid fields: ${validFields.join(", ")}`,
         code: "UNKNOWN_FIELD",
         details: { field: name, collection: collectionName }
     };
@@ -109,7 +109,7 @@ export function unknownProjectionField(name: string, collectionName: string, val
  */
 export function unknownIncludeRelation(key: string, collectionName: string, validRelations: string[]): UnknownFieldAnswer {
     return {
-        message: `Unknown relation '${key}' on collection '${collectionName}'`
+        message: `Unknown relation '${key}' on table '${collectionName}'`
             + (validRelations.length > 0
                 ? `. Its relations are: ${validRelations.join(", ")}`
                 : ". It declares no relations."),

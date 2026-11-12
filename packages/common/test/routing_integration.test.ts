@@ -67,7 +67,7 @@ type: "string" } }
 
     it("routes a direct-source collection to its driver", async () => {
         const { routed, pg, fs } = buildRouted();
-        await routed.collection("events").find();
+        await routed.table("events").find();
         expect(fs.fetchCollection).toHaveBeenCalledTimes(1);
         expect((fs.fetchCollection as jest.Mock).mock.calls[0][0]).toMatchObject({ path: "events" });
         expect(pg.fetchCollection).not.toHaveBeenCalled();
@@ -75,14 +75,14 @@ type: "string" } }
 
     it("routes a default-source collection to the default driver", async () => {
         const { routed, pg, fs } = buildRouted();
-        await routed.collection("products").find();
+        await routed.table("products").find();
         expect(pg.fetchCollection).toHaveBeenCalledTimes(1);
         expect(fs.fetchCollection).not.toHaveBeenCalled();
     });
 
     it("routes by the accessed path (entity sub-path inherits the source)", async () => {
         const { routed, fs } = buildRouted();
-        await routed.collection("events/evt1").findById("evt1");
+        await routed.table("events/evt1").findById("evt1");
         expect(fs.fetchOne).toHaveBeenCalledTimes(1);
         expect((fs.fetchOne as jest.Mock).mock.calls[0][0]).toMatchObject({ path: "events/evt1", id: "evt1" });
     });
@@ -91,14 +91,14 @@ type: "string" } }
         // A Firestore (events) form referencing products must read products
         // from Postgres — routing follows the target path, not the ancestor.
         const { routed, pg, fs } = buildRouted();
-        await routed.collection("products").findById("p1");
+        await routed.table("products").findById("p1");
         expect(pg.fetchOne).toHaveBeenCalledTimes(1);
         expect(fs.fetchOne).not.toHaveBeenCalled();
     });
 
     it("routes writes on a direct-source collection to its driver", async () => {
         const { routed, pg, fs } = buildRouted();
-        await routed.collection("events").create({ title: "launch" });
+        await routed.table("events").create({ title: "launch" });
         expect(fs.save).toHaveBeenCalledTimes(1);
         expect((fs.save as jest.Mock).mock.calls[0][0]).toMatchObject({ path: "events", status: "new" });
         expect(pg.save).not.toHaveBeenCalled();
@@ -173,7 +173,7 @@ describe("references across data sources (hybrid Postgres + Firestore)", () => {
 
     it("stores a Firestore document's reference to a Postgres row as the row's id", async () => {
         const { routed, fs } = buildHybrid();
-        await routed.collection("fs_events").create({ type: "signup", customerId: postgresCustomer });
+        await routed.table("fs_events").create({ type: "signup", customerId: postgresCustomer });
         expect((fs.save as jest.Mock).mock.calls[0][0]).toMatchObject({
             path: "events",
             values: { type: "signup", customerId: "42" }
@@ -183,13 +183,13 @@ describe("references across data sources (hybrid Postgres + Firestore)", () => {
     it("keeps a reference within Firestore for the driver to store as a document reference", async () => {
         const { routed, fs } = buildHybrid();
         const sameSource = new EntityReference({ id: "c1", path: "customers" });
-        await routed.collection("fs_events").update("e1", { mirror: sameSource });
+        await routed.table("fs_events").update("e1", { mirror: sameSource });
         expect((fs.save as jest.Mock).mock.calls[0][0].values.mirror).toBe(sameSource);
     });
 
     it("reads the stored id back as a reference routed to Postgres, not to the Firestore collection stored at its path", async () => {
         const { routed, registry } = buildHybrid({ firestore: [{ id: "e1", type: "signup", customerId: "42" }] });
-        const { data } = await routed.collection("fs_events").find();
+        const { data } = await routed.table("fs_events").find();
         const reference = data[0].values.customerId;
         expect(reference).toEqual(postgresCustomer);
         // What the preview does with it: the collection it is looked up in.
@@ -204,20 +204,20 @@ describe("references across data sources (hybrid Postgres + Firestore)", () => {
         // as a reference into Firestore.
         const dangling = new EntityReference({ id: "42", path: "customers", driver: "firestore" });
         const { routed } = buildHybrid({ firestore: [{ id: "e1", customerId: dangling }] });
-        const { data } = await routed.collection("fs_events").find();
+        const { data } = await routed.table("fs_events").find();
         expect(data[0].values.customerId).toEqual(postgresCustomer);
     });
 
     it("leaves references within Firestore as they were read", async () => {
         const mirror = new EntityReference({ id: "c1", path: "customers", driver: "firestore" });
         const { routed } = buildHybrid({ firestore: [{ id: "e1", mirror }] });
-        const { data } = await routed.collection("fs_events").find();
+        const { data } = await routed.table("fs_events").find();
         expect(data[0].values.mirror).toBe(mirror);
     });
 
     it("reads a Postgres column of Firestore ids as references routed to Firestore, and stores them back as ids", async () => {
         const { routed, pg, registry } = buildHybrid({ postgres: [{ id: "1", name: "Ada", eventIds: ["e1", "e2"] }] });
-        const { data } = await routed.collection("customers").find();
+        const { data } = await routed.table("customers").find();
         const references = data[0].values.eventIds;
         expect(references).toEqual([
             new EntityReference({ id: "e1", path: "events", driver: "firestore" }),
@@ -225,7 +225,7 @@ describe("references across data sources (hybrid Postgres + Firestore)", () => {
         ]);
         expect(registry.resolveCollectionPath("events", "firestore")).toBe("fs_events");
 
-        await routed.collection("customers").update("1", { eventIds: references });
+        await routed.table("customers").update("1", { eventIds: references });
         expect((pg.save as jest.Mock).mock.calls[0][0].values).toEqual({ eventIds: ["e1", "e2"] });
     });
 });

@@ -12,7 +12,7 @@ import { normalizeOrderBy } from "./sort-dialect";
  * The pagination engine behind `iterate()` / `findAll()`.
  *
  * It lives here, above both transports, on purpose: the HTTP client and the
- * in-process accessor implement the same `SDKCollectionClient` contract, and a
+ * in-process accessor implement the same `SDKTableClient` contract, and a
  * helper written twice is a helper that drifts. Both call into this file, so
  * "the SDK paginates like *this*" has exactly one definition.
  *
@@ -136,7 +136,7 @@ function normalizeMaxRows(raw: number | undefined): number {
  * Walk every row a query matches, yielding one row at a time and fetching the
  * next page only when the consumer asks for it.
  *
- * See {@link SDKCollectionClient.iterate} for the caller-facing contract,
+ * See {@link SDKTableClient.iterate} for the caller-facing contract,
  * including the offset-drift caveat and the `cursor` alternative.
  *
  * @param find   the transport's single-page read
@@ -146,7 +146,7 @@ function normalizeMaxRows(raw: number | undefined): number {
 export async function* paginateFind<M extends Record<string, unknown> = Record<string, unknown>>(
     find: PageFinder<M>,
     params?: IterateParams<M>,
-    label = "collection"
+    label = "table"
 ): AsyncGenerator<M, void, undefined> {
     const {
         pageSize,
@@ -307,12 +307,12 @@ export async function* paginateFind<M extends Record<string, unknown> = Record<s
 /**
  * {@link paginateFind}, collected into an array under a ceiling.
  *
- * See {@link SDKCollectionClient.findAll}.
+ * See {@link SDKTableClient.findAll}.
  */
 export async function collectAllPages<M extends Record<string, unknown> = Record<string, unknown>>(
     find: PageFinder<M>,
     params?: FindAllParams<M>,
-    label = "collection"
+    label = "table"
 ): Promise<M[]> {
     const { maxRows, ...rest } = (params ?? {}) as FindAllParams<M> & Record<string, unknown>;
     const cap = normalizeMaxRows(maxRows as number | undefined);

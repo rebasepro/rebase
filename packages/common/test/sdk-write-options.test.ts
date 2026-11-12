@@ -1,11 +1,11 @@
 import { buildSdkData } from "../src/data/buildRebaseData";
-import { DataDriver, RebaseClientError, RebaseSdkData, SDKCollectionClient, WriteOptions } from "@rebasepro/types";
+import { DataDriver, RebaseClientError, RebaseSdkData, SDKTableClient, WriteOptions } from "@rebasepro/types";
 
 /**
  * Every `WriteOptions` field, through the in-process accessor — `context.data`
  * in a callback, `rebase.data` in a function or a cron.
  *
- * It implements the same `SDKCollectionClient` as the HTTP client, whose
+ * It implements the same `SDKTableClient` as the HTTP client, whose
  * `ifMatch` says "Honoured on `update` and `delete`" — and every write here
  * took no options at all. So `rebase.data.posts.update(id, data, { ifMatch:
  * staleEtag })` overwrote the row and resolved: the precondition the caller
@@ -17,8 +17,8 @@ import { DataDriver, RebaseClientError, RebaseSdkData, SDKCollectionClient, Writ
  * they are refused, by name.
  */
 
-function sdk(data: RebaseSdkData, slug: string): SDKCollectionClient {
-    return data[slug] as SDKCollectionClient;
+function sdk(data: RebaseSdkData, slug: string): SDKTableClient {
+    return data[slug] as SDKTableClient;
 }
 
 function recordingDriver() {
@@ -45,7 +45,7 @@ function recordingDriver() {
 }
 
 /** Every write, called with the given options. */
-const writes: [string, (posts: SDKCollectionClient, options: WriteOptions) => Promise<unknown>][] = [
+const writes: [string, (posts: SDKTableClient, options: WriteOptions) => Promise<unknown>][] = [
     ["create", (posts, options) => posts.create({ title: "t" }, undefined, options)],
     ["upsert", (posts, options) => posts.upsert({ id: "p1", title: "t" }, options)],
     ["createMany", (posts, options) => posts.createMany([{ title: "t" }], options)],

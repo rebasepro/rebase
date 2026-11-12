@@ -1,5 +1,5 @@
 import { buildRebaseData, buildSdkData, wrapAsEntityData } from "../src/data/buildRebaseData";
-import { CollectionAccessor, DataDriver, Entity, RebaseClientError, RebaseData, RebaseSdkData } from "@rebasepro/types";
+import { TableAccessor, DataDriver, Entity, RebaseClientError, RebaseData, RebaseSdkData } from "@rebasepro/types";
 import { sdkClient } from "./helpers/inert-driver";
 
 /**
@@ -8,8 +8,8 @@ import { sdkClient } from "./helpers/inert-driver";
  * cannot narrow a bare `data.products` on its own. A project generates a
  * `Database` type and gets the narrowing for free; a test does it here.
  */
-function at(data: RebaseData, slug: string): CollectionAccessor {
-    return data[slug] as CollectionAccessor;
+function at(data: RebaseData, slug: string): TableAccessor {
+    return data[slug] as TableAccessor;
 }
 
 // ── Mock driver ─────────────────────────────────────────────
@@ -30,7 +30,7 @@ function createMockDriver(overrides: Partial<DataDriver> = {}): DataDriver {
 }
 
 describe("buildRebaseData", () => {
-    it("creates a proxy that returns CollectionAccessor for any slug", () => {
+    it("creates a proxy that returns TableAccessor for any slug", () => {
         const driver = createMockDriver();
         const data = buildRebaseData(driver);
 
@@ -56,7 +56,7 @@ describe("buildRebaseData", () => {
         const driver = createMockDriver();
         const data = buildRebaseData(driver);
 
-        const accessor = data.collection("products");
+        const accessor = data.table("products");
         expect(accessor).toBe(data.products);
     });
 
@@ -79,7 +79,7 @@ describe("buildRebaseData", () => {
         const data = buildRebaseData(driver);
 
         const companyMembers = at(data, "companyMembers");
-        const manualCollection = data.collection("company_members");
+        const manualCollection = data.table("company_members");
 
         expect(companyMembers).toBe(manualCollection);
 
@@ -93,7 +93,7 @@ describe("buildRebaseData", () => {
     });
 
     // ── find ────────────────────────────────────────────────
-    describe("CollectionAccessor.find", () => {
+    describe("TableAccessor.find", () => {
         it("delegates to driver.fetchCollection", async () => {
             // The driver returns flat rows; the accessor wraps them into Entities
             const mockRows = [
@@ -213,7 +213,7 @@ price: "gte.100" } as never
     });
 
     // ── the count beside a page ─────────────────────────────
-    describe("CollectionAccessor.find and its count", () => {
+    describe("TableAccessor.find and its count", () => {
         const rows = (n: number) => Array.from({ length: n }, (_, i) => ({ id: String(i + 1) }));
 
         it("does not count with `count: \"none\"`, and takes `hasMore` from one row past the page", async () => {
@@ -247,7 +247,7 @@ price: "gte.100" } as never
     });
 
     // ── findById ────────────────────────────────────────────
-    describe("CollectionAccessor.findById", () => {
+    describe("TableAccessor.findById", () => {
         it("delegates to driver.fetchOne", async () => {
             // The driver returns a flat row; the accessor wraps it into a Entity
             const row = { id: "abc",
@@ -268,7 +268,7 @@ id: "abc" });
     });
 
     // ── create ──────────────────────────────────────────────
-    describe("CollectionAccessor.create", () => {
+    describe("TableAccessor.create", () => {
         it("delegates to driver.save with status new", async () => {
             const driver = createMockDriver();
             const data = buildRebaseData(driver);
@@ -302,7 +302,7 @@ price: 299 },
     });
 
     // ── update ──────────────────────────────────────────────
-    describe("CollectionAccessor.update", () => {
+    describe("TableAccessor.update", () => {
         it("delegates to driver.save with status existing", async () => {
             const driver = createMockDriver();
             const data = buildRebaseData(driver);
@@ -321,7 +321,7 @@ price: 299 },
     });
 
     // ── delete ──────────────────────────────────────────────
-    describe("CollectionAccessor.delete", () => {
+    describe("TableAccessor.delete", () => {
         it("delegates to driver.delete", async () => {
             const driver = createMockDriver();
             const data = buildRebaseData(driver);
@@ -338,7 +338,7 @@ path: "products" })
     });
 
     // ── count ───────────────────────────────────────────────
-    describe("CollectionAccessor.count", () => {
+    describe("TableAccessor.count", () => {
         it("delegates to driver.count when available", async () => {
             const driver = createMockDriver();
             const data = buildRebaseData(driver);
@@ -381,7 +381,7 @@ path: "products" })
 
         it("hands every driver call the stored path", async () => {
             const driver = createListeningDriver();
-            const accessor = buildRebaseData(driver, { resolveDataPath }).collection("fs_diagnosis");
+            const accessor = buildRebaseData(driver, { resolveDataPath }).table("fs_diagnosis");
 
             await accessor.find();
             await accessor.findById("abc");
@@ -413,7 +413,7 @@ path: "products" })
 
         it("translates a subcollection path as a whole", async () => {
             const driver = createListeningDriver();
-            await buildRebaseData(driver, { resolveDataPath }).collection("fs_diagnosis/abc/locales").find();
+            await buildRebaseData(driver, { resolveDataPath }).table("fs_diagnosis/abc/locales").find();
 
             expect(driver.fetchCollection).toHaveBeenCalledWith(expect.objectContaining({ path: "diagnosis/abc/locales" }));
         });
@@ -423,7 +423,7 @@ path: "products" })
             // deletes it by `entity.path`; the stored path would name the
             // Postgres collection called `diagnosis` instead.
             const driver = createListeningDriver();
-            const accessor = buildRebaseData(driver, { resolveDataPath }).collection("fs_diagnosis");
+            const accessor = buildRebaseData(driver, { resolveDataPath }).table("fs_diagnosis");
 
             const { data } = await accessor.find();
             expect(data[0].path).toBe("fs_diagnosis");
@@ -433,7 +433,7 @@ path: "products" })
         it("asks on every call, so a resolver registered after the accessor was built still applies", async () => {
             const driver = createListeningDriver();
             const options: { resolveDataPath?: (path: string) => string | undefined } = {};
-            const accessor = buildRebaseData(driver, options).collection("fs_diagnosis");
+            const accessor = buildRebaseData(driver, options).table("fs_diagnosis");
 
             await accessor.find();
             options.resolveDataPath = resolveDataPath;
@@ -445,14 +445,14 @@ path: "products" })
 
         it("hands over the slug where there is nothing to translate", async () => {
             const driver = createListeningDriver();
-            await buildRebaseData(driver, { resolveDataPath }).collection("exercises").find();
+            await buildRebaseData(driver, { resolveDataPath }).table("exercises").find();
 
             expect(driver.fetchCollection).toHaveBeenCalledWith(expect.objectContaining({ path: "exercises" }));
         });
     });
 
     // ── Fluent Query Builder ────────────────────────────────
-    describe("CollectionAccessor Fluent Queries", () => {
+    describe("TableAccessor Fluent Queries", () => {
         it("supports fluent query building and translates to find calls", async () => {
             const driver = createMockDriver();
             const data = buildRebaseData(driver);
@@ -484,7 +484,7 @@ path: "products" })
 /**
  * The admin's `useData()` is `wrapAsEntityData(client.data)`, so this is the
  * accessor the CMS actually holds. `createMany` is declared on
- * `CollectionAccessor` and was implemented on the driver-backed accessor only —
+ * `TableAccessor` and was implemented on the driver-backed accessor only —
  * which is why the admin's own import wrote one HTTP request per row, could not
  * be atomic, and never asked for the upsert its preview screen promised.
  */
@@ -500,12 +500,12 @@ describe("wrapAsEntityData", () => {
             }
         });
         return { calls,
-            sdkData: { collection: () => client } };
+            sdkData: { table: () => client } };
     }
 
     it("exposes createMany and forwards the rows and the upsert flag", async () => {
         const { calls, sdkData } = sdkDataWithBulk();
-        const accessor = wrapAsEntityData(sdkData).collection("products");
+        const accessor = wrapAsEntityData(sdkData).table("products");
 
         expect(accessor.createMany).toBeDefined();
         const written = await accessor.createMany!(
@@ -536,7 +536,7 @@ describe("buildSdkData bulk arguments", () => {
         const posts = buildSdkData(createMockDriver({
             saveMany: jest.fn(),
             deleteMany: jest.fn()
-        } as Partial<DataDriver>)).collection("posts");
+        } as Partial<DataDriver>)).table("posts");
         const call = posts[method] as (arg: unknown) => Promise<unknown>;
         await expect(call.call(posts, "nope")).rejects.toBeInstanceOf(RebaseClientError);
         await expect(call.call(posts, "nope")).rejects.toMatchObject({ code: "INVALID_BULK_BODY" });

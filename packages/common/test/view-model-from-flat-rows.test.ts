@@ -1,5 +1,5 @@
 import { EntityRelation } from "@rebasepro/types";
-import type { CollectionAccessor, CollectionConfig, DataDriver, RebaseData } from "@rebasepro/types";
+import type { TableAccessor, CollectionConfig, DataDriver, RebaseData } from "@rebasepro/types";
 import { buildRebaseData } from "../src/data/buildRebaseData";
 
 /**
@@ -58,7 +58,7 @@ describe("the admin's view model, from a flat row", () => {
 
     const read = async (row: Record<string, unknown>) => {
         const data: RebaseData = buildRebaseData(driverServing(row), { resolveCollection });
-        const accessor = data.collection("orders") as CollectionAccessor;
+        const accessor = data.table("orders") as TableAccessor;
         const res = await accessor.find();
         return res.data[0].values as Record<string, unknown>;
     };
@@ -132,7 +132,7 @@ describe("the admin's view model, from a flat row", () => {
         // derives the flat SDK from this same layer and must keep the wire's
         // own types.
         const data: RebaseData = buildRebaseData(driverServing({ id: "o1", order_date: "2026-08-24T00:37:57.512Z" }));
-        const res = await (data.collection("orders") as CollectionAccessor).find();
+        const res = await (data.table("orders") as TableAccessor).find();
 
         expect((res.data[0].values as Record<string, unknown>).order_date).toBe("2026-08-24T00:37:57.512Z");
     });

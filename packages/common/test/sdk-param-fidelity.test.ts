@@ -1,6 +1,6 @@
 import { buildSdkData } from "../src/data/buildRebaseData";
 import { or, cond } from "../src/data/query_builder";
-import { DEFAULT_LIST_LIMIT, DataDriver, RebaseSdkData, SDKCollectionClient } from "@rebasepro/types";
+import { DEFAULT_LIST_LIMIT, DataDriver, RebaseSdkData, SDKTableClient } from "@rebasepro/types";
 
 /**
  * The other half of the symmetry contract.
@@ -16,8 +16,8 @@ import { DEFAULT_LIST_LIMIT, DataDriver, RebaseSdkData, SDKCollectionClient } fr
  * error, it widens the result set.
  */
 
-function sdk(data: RebaseSdkData, slug: string): SDKCollectionClient {
-    return data[slug] as SDKCollectionClient;
+function sdk(data: RebaseSdkData, slug: string): SDKTableClient {
+    return data[slug] as SDKTableClient;
 }
 
 /** A driver that records the props it was handed. */

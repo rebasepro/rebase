@@ -1,5 +1,5 @@
 import { toDriverAggregate, toDriverAggregateGroup } from "@rebasepro/types";
-import { CollectionAccessor, type CollectionConfig, DataDriver, DEFAULT_VECTOR_LIST_LIMIT, Entity, EntityValues, FindAllParams, FindParams, FindResponse, FindResult, IterateParams, LogicalCondition, OrderByTuple, PageWalkOptions, RebaseApiError, RebaseData, RebaseSdkData, RelationAggregateSort, SDKCollectionClient, SDKQueryBuilderInterface, sortKeyToString, type AggregateMeta, type AggregateParams, type AggregateResult, type AggregateGroup, type RefreshOptions, type ComputedSortField, type FieldPath, type ByIdReadOptions, type IncludeSpec, type NonColumnFieldPath, type NullsPlacement, type SearchMatch, type UpdateValues, type UpsertOptions, type WriteOptions, type FilteredWriteParams, type WhereFor, type BatchOperation, type BatchResult, type RestoreOptions, type TrashClient, RebaseClientError, WhereFilterOp, WhereValueFor, isUnsupported, unsupportedMethod } from "@rebasepro/types";
+import { TableAccessor, type CollectionConfig, DataDriver, DEFAULT_VECTOR_LIST_LIMIT, Entity, EntityValues, FindAllParams, FindParams, FindResponse, FindResult, IterateParams, LogicalCondition, OrderByTuple, PageWalkOptions, RebaseApiError, RebaseData, RebaseSdkData, RelationAggregateSort, SDKTableClient, SDKQueryBuilderInterface, sortKeyToString, type AggregateMeta, type AggregateParams, type AggregateResult, type AggregateGroup, type RefreshOptions, type ComputedSortField, type FieldPath, type ByIdReadOptions, type IncludeSpec, type NonColumnFieldPath, type NullsPlacement, type SearchMatch, type UpdateValues, type UpsertOptions, type WriteOptions, type FilteredWriteParams, type WhereFor, type BatchOperation, type BatchResult, type RestoreOptions, type TrashClient, RebaseClientError, WhereFilterOp, WhereValueFor, isUnsupported, unsupportedMethod } from "@rebasepro/types";
 import { toSnakeCase, toWireKey } from "@rebasepro/utils";
 import { cursorToStartAfter, decodeCursor, reconcileCursorOrder } from "./cursor";
 import { mergeIncludeSpecs } from "./include-spec";
@@ -364,7 +364,7 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
     storedPath: () => string = () => slug,
     /** Values on their way to the driver — see `createStoredValuesConverter`. */
     toStored: <V extends Record<string, unknown>>(values: V) => V = (values) => values
-): CollectionAccessor<M> {
+): TableAccessor<M> {
     /**
      * One page of the collection, and its count. `withDeleted: "only"` reads
      * the trash (see `trash` below) through the same pipeline, so a trashed
@@ -548,7 +548,7 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
         });
     }
 
-    const accessor: CollectionAccessor<M> = {
+    const accessor: TableAccessor<M> = {
         find(params?: FindParams<M>): Promise<FindResponse<M>> {
             return findRows(params);
         },
@@ -807,7 +807,7 @@ ids });
  * Build a `RebaseData` object from a `DataDriver` using JavaScript Proxy.
  *
  * This is the key bridge: any property access like `data.products` returns
- * a `CollectionAccessor` backed by the underlying DataDriver, without
+ * a `TableAccessor` backed by the underlying DataDriver, without
  * needing per-collection code generation.
  *
  * @example
@@ -933,12 +933,12 @@ function isPlainRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export function buildRebaseData(driver: DataDriver, options?: EntityDataOptions): RebaseData {
-    const cache = new Map<string, CollectionAccessor>();
+    const cache = new Map<string, TableAccessor>();
     const primaryKeysFor = createPrimaryKeyResolver(options);
     const viewModelFor = createViewModelConverter(options);
     const storedValuesFor = createStoredValuesConverter(options);
 
-    function getAccessor(slug: string): CollectionAccessor {
+    function getAccessor(slug: string): TableAccessor {
         let accessor = cache.get(slug);
         if (!accessor) {
             accessor = createDriverAccessor(
@@ -955,18 +955,18 @@ export function buildRebaseData(driver: DataDriver, options?: EntityDataOptions)
     }
 
     const target = {
-        collection: getAccessor
+        table: getAccessor
     } as RebaseData;
 
     return new Proxy(target, {
         get(_target, prop: string | symbol) {
-            if (prop === "collection") return getAccessor;
+            if (prop === "table") return getAccessor;
             // Ignore Symbol properties (e.g. Symbol.toPrimitive, Symbol.iterator)
             if (typeof prop === "symbol") return undefined;
             // Ignore internal JS properties
             if (prop === "then" || prop === "toJSON" || prop === "$$typeof") return undefined;
 
-            // A collection's own accessor name, else camelCase → snake_case.
+            // A table's own accessor name, else camelCase → snake_case.
             return getAccessor(options?.resolveAccessor?.(prop) ?? toSnakeCase(prop));
         }
     });
@@ -993,7 +993,7 @@ function entityToRow<M extends Record<string, unknown>>(entity: Entity<M>): M {
 class SdkQueryBuilder<M extends Record<string, unknown> = Record<string, unknown>> implements SDKQueryBuilderInterface<M> {
     private params: FindParams = { where: {} };
 
-    constructor(private client: SDKCollectionClient<M>) {}
+    constructor(private client: SDKTableClient<M>) {}
 
     where<K extends keyof M & string, Op extends WhereFilterOp>(column: K, operator: Op, value: WhereValueFor<Op, M[K]>): this;
     /** A relation path (`author.name`) or a JSON path (`metadata->>tier`). */
@@ -1082,7 +1082,7 @@ class SdkQueryBuilder<M extends Record<string, unknown> = Record<string, unknown
         return this.client.find(this.params as FindParams<M>);
     }
 
-    /** Aggregate the matching rows. See {@link SDKCollectionClient.aggregate}. */
+    /** Aggregate the matching rows. See {@link SDKTableClient.aggregate}. */
     async aggregate(
         params: Omit<AggregateParams<M>, "where" | "logical" | "searchString">
     ): Promise<AggregateResult> {
@@ -1138,7 +1138,7 @@ class SdkQueryBuilder<M extends Record<string, unknown> = Record<string, unknown
  * Refuse a write option this door cannot honour, by name, before anything is
  * written.
  *
- * The in-process accessor implements the same `SDKCollectionClient` as the HTTP
+ * The in-process accessor implements the same `SDKTableClient` as the HTTP
  * client, whose `ifMatch` is "Honoured on `update` and `delete`" — and its
  * writes took no options at all, so `rebase.data.posts.update(id, data, {
  * ifMatch: staleEtag })` overwrote the row and resolved. A precondition the
@@ -1162,21 +1162,21 @@ function refuseUnhonouredWriteOptions(method: string, slug: string, options?: Wr
 }
 
 /**
- * Wrap a Entity-shaped {@link CollectionAccessor} into a flat
- * {@link SDKCollectionClient}. Every returned record is unwrapped to a flat row
+ * Wrap a Entity-shaped {@link TableAccessor} into a flat
+ * {@link SDKTableClient}. Every returned record is unwrapped to a flat row
  * so the backend SDK is byte-for-byte the same shape as the frontend client.
  */
-function toSdkCollectionClient<M extends Record<string, unknown>>(
-    snap: CollectionAccessor<M>,
-    slug = "collection"
-): SDKCollectionClient<M> {
-    const client: SDKCollectionClient<M> = {
+function toSdkTableClient<M extends Record<string, unknown>>(
+    snap: TableAccessor<M>,
+    slug = "table"
+): SDKTableClient<M> {
+    const client: SDKTableClient<M> = {
         async find(params?: FindParams<M>): Promise<FindResult<M>> {
             const res = await snap.find(params);
             return { data: res.data.map(entityToRow), meta: res.meta };
         },
         // Pagination is shared with the HTTP client rather than reimplemented:
-        // both transports satisfy the same `SDKCollectionClient`, so a walk that
+        // both transports satisfy the same `SDKTableClient`, so a walk that
         // behaved differently in-process than over the wire would be a bug the
         // type system could not see.
         iterate(params?: IterateParams<M>) {
@@ -1233,7 +1233,7 @@ function toSdkCollectionClient<M extends Record<string, unknown>>(
          * One row through the bulk path, because the bulk path is where the
          * conflict target lives.
          *
-         * `CollectionAccessor` has no single-row upsert and adding one would
+         * `TableAccessor` has no single-row upsert and adding one would
          * mean a second way to say the same thing to the same driver method —
          * `saveMany` already takes `upsert` and `onConflict`, and a batch of
          * one is exactly an upsert of one.
@@ -1319,7 +1319,7 @@ data: u.data as Partial<EntityValues<M>> }))
             }
             await snap.deleteMany(ids);
         },
-        // The three are non-optional on `SDKCollectionClient`: where the
+        // The three are non-optional on `SDKTableClient`: where the
         // underlying accessor cannot serve one, a stub says so when called
         // rather than being absent. `isUnsupported()` is how an adapter asks
         // the capability question — see `toEntityAccessor` below, which has to.
@@ -1374,15 +1374,15 @@ data: u.data as Partial<EntityValues<M>> }))
 }
 
 /**
- * {@link SDKCollectionClient.trash} over an accessor's
- * {@link CollectionAccessor.trash}: the same API the browser client has. A
+ * {@link SDKTableClient.trash} over an accessor's
+ * {@link TableAccessor.trash}: the same API the browser client has. A
  * restore is the client's own `update`/`updateMany` setting the soft-delete
  * field to `null`, so it keeps their refusals and their answer.
  */
 function toSdkTrashClient<M extends Record<string, unknown>>(
-    snap: CollectionAccessor<M>,
+    snap: TableAccessor<M>,
     slug: string,
-    client: () => SDKCollectionClient<M>
+    client: () => SDKTableClient<M>
 ): TrashClient<M> {
     const trash = snap.trash;
     if (!trash) {
@@ -1442,12 +1442,12 @@ function writeOptionsOf<M extends Record<string, unknown>>(options?: RestoreOpti
 }
 
 /**
- * Wrap a flat {@link SDKCollectionClient} into a Entity-shaped
- * {@link CollectionAccessor}. Every returned row is re-wrapped into the
+ * Wrap a flat {@link SDKTableClient} into a Entity-shaped
+ * {@link TableAccessor}. Every returned row is re-wrapped into the
  * `{ id, path, values }` view-model the admin panel renders.
  */
 function toEntityAccessor<M extends Record<string, unknown>>(
-    sdk: SDKCollectionClient<M>,
+    sdk: SDKTableClient<M>,
     slug: string,
     getPks: () => PrimaryKeyInfo[] = () => [],
     toViewModel?: (values: Record<string, unknown>) => Record<string, unknown>,
@@ -1459,8 +1459,8 @@ function toEntityAccessor<M extends Record<string, unknown>>(
     viewModelSource: () => unknown = () => undefined,
     /** Values on their way to the client — see `createStoredValuesConverter`. */
     toStored: <V extends Record<string, unknown>>(values: V) => V = (values) => values
-): CollectionAccessor<M> {
-    const accessor: CollectionAccessor<M> = {
+): TableAccessor<M> {
+    const accessor: TableAccessor<M> = {
         async find(params?: FindParams<M>): Promise<FindResponse<M>> {
             const res = await sdk.find(params);
             return { data: rowsToEntities<M>(res.data, slug, getPks(), toViewModel), meta: res.meta };
@@ -1472,7 +1472,7 @@ function toEntityAccessor<M extends Record<string, unknown>>(
         async create(data: Partial<EntityValues<M>>, id?: string | number): Promise<Entity<M>> {
             return rowToEntity<M>(await sdk.create(toStored(data) as Partial<M>, id), slug, getPks(), toViewModel);
         },
-        // Declared on `CollectionAccessor` and, until now, never implemented on
+        // Declared on `TableAccessor` and, until now, never implemented on
         // this side of the boundary — so the admin's own import wrote one HTTP
         // request per row and could neither be atomic nor upsert. It forwards to
         // the same `/bulk` route the SDK client uses.
@@ -1496,7 +1496,7 @@ function toEntityAccessor<M extends Record<string, unknown>>(
         delete(id: string | number): Promise<void> {
             return sdk.delete(id);
         },
-        // `CollectionAccessor` keeps these optional, and the optionality is
+        // `TableAccessor` keeps these optional, and the optionality is
         // load-bearing: the admin panel picks between subscribing and a
         // one-shot `find()` on exactly this property, and a UI that subscribes
         // into a throw is worse than one that polls. The client's method is
@@ -1596,32 +1596,32 @@ function toEntityAccessor<M extends Record<string, unknown>>(
  *
  * Taking a whole `RebaseSdkData` meant taking `RebaseSdkData<unknown>`, whose
  * dynamic branch is an index signature — and no `RebaseSdkData<DB>` satisfies
- * it, because its own `collection` method is not a `SDKCollectionClient`. So a
+ * it, because its own `collection` method is not a `SDKTableClient`. So a
  * caller holding a *typed* client could not pass it to a function that reads
  * one method off it, and that method is identical on every instantiation.
  * It is asked for untyped, as it is read: every `RebaseSdkData` has one.
  */
-export function wrapAsEntityData(sdkData: { collection(slug: string): SDKCollectionClient }, options?: EntityDataOptions): RebaseData {
-    const cache = new Map<string, CollectionAccessor>();
+export function wrapAsEntityData(sdkData: { table(slug: string): SDKTableClient }, options?: EntityDataOptions): RebaseData {
+    const cache = new Map<string, TableAccessor>();
     const primaryKeysFor = createPrimaryKeyResolver(options);
     const viewModelFor = createViewModelConverter(options);
     const storedValuesFor = createStoredValuesConverter(options);
 
-    function getAccessor(slug: string): CollectionAccessor {
+    function getAccessor(slug: string): TableAccessor {
         let accessor = cache.get(slug);
         if (!accessor) {
-            accessor = toEntityAccessor(sdkData.collection(slug), slug, () => primaryKeysFor(slug), viewModelFor(slug),
+            accessor = toEntityAccessor(sdkData.table(slug), slug, () => primaryKeysFor(slug), viewModelFor(slug),
                 () => options?.resolveCollection?.(slug), storedValuesFor(slug));
             cache.set(slug, accessor);
         }
         return accessor;
     }
 
-    const target = { collection: getAccessor } as RebaseData;
+    const target = { table: getAccessor } as RebaseData;
 
     return new Proxy(target, {
         get(_target, prop: string | symbol) {
-            if (prop === "collection") return getAccessor;
+            if (prop === "table") return getAccessor;
             if (typeof prop === "symbol") return undefined;
             if (prop === "then" || prop === "toJSON" || prop === "$$typeof") return undefined;
             return getAccessor(toSnakeCase(prop));
@@ -1646,18 +1646,18 @@ export function wrapAsEntityData(sdkData: { collection(slug: string): SDKCollect
  */
 export function wrapAsSdkData<DB = unknown>(
     /** Only the by-slug accessor is read; every {@link RebaseData} has one. */
-    entityData: { collection(slug: string): CollectionAccessor },
+    entityData: { table(slug: string): TableAccessor },
     options?: Pick<EntityDataOptions, "resolveAccessor"> & {
         /** What `data.batch()` runs: the driver's `batchWrite`. Absent, it refuses with `BATCH_UNSUPPORTED`. */
         batchWrite?: DataDriver["batchWrite"];
     }
 ): RebaseSdkData<NoInfer<DB>> {
-    const cache = new Map<string, SDKCollectionClient>();
+    const cache = new Map<string, SDKTableClient>();
 
-    function getAccessor(slug: string): SDKCollectionClient {
+    function getAccessor(slug: string): SDKTableClient {
         let accessor = cache.get(slug);
         if (!accessor) {
-            accessor = toSdkCollectionClient(entityData.collection(slug), slug);
+            accessor = toSdkTableClient(entityData.table(slug), slug);
             cache.set(slug, accessor);
         }
         return accessor;
@@ -1678,7 +1678,7 @@ export function wrapAsSdkData<DB = unknown>(
         const data = await options.batchWrite({
             operations: operations.map(operation => ({
                 op: operation.op,
-                path: slugOf(operation.collection),
+                path: slugOf(operation.table),
                 ...("id" in operation ? { id: operation.id } : {}),
                 ...("values" in operation ? { values: operation.values as Record<string, unknown> } : {}),
                 ...(operation.op === "upsert" && operation.onConflict ? { onConflict: operation.onConflict } : {}),
@@ -1688,11 +1688,11 @@ export function wrapAsSdkData<DB = unknown>(
         return { data, meta: { operations: operations.length } };
     };
 
-    const target = { collection: getAccessor, batch } as RebaseSdkData<DB>;
+    const target = { table: getAccessor, batch } as RebaseSdkData<DB>;
 
     return new Proxy(target, {
         get(_target, prop: string | symbol) {
-            if (prop === "collection") return getAccessor;
+            if (prop === "table") return getAccessor;
             if (prop === "batch") return batch;
             if (typeof prop === "symbol") return undefined;
             if (prop === "then" || prop === "toJSON" || prop === "$$typeof") return undefined;

@@ -9,7 +9,7 @@ import {
     IterateParams,
     OrderByTuple,
     RebaseSdkData,
-    SDKCollectionClient
+    SDKTableClient
 } from "@rebasepro/types";
 
 /**
@@ -32,8 +32,8 @@ interface Row extends Record<string, unknown> {
  * cannot narrow a bare `data.jobs` on its own. A project generates a `Database`
  * type and gets the narrowing for free; a test does it here.
  */
-function jobsOf(data: RebaseSdkData): SDKCollectionClient<Row> {
-    return data.jobs as SDKCollectionClient<Row>;
+function jobsOf(data: RebaseSdkData): SDKTableClient<Row> {
+    return data.jobs as SDKTableClient<Row>;
 }
 
 function rows(from: number, count: number): Row[] {

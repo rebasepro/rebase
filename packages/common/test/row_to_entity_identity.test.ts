@@ -54,7 +54,7 @@ describe("rowToEntity — the address is derived, not carried", () => {
 
     it("derives the address from a numeric key while the row keeps its real type", async () => {
         const data = dataWith(slug => collections[slug]);
-        const { data: entities } = await data.collection("products").find();
+        const { data: entities } = await data.table("products").find();
 
         expect(entities[0].id).toBe("42");
         // The row is untouched: still a number, still just columns.
@@ -65,7 +65,7 @@ name: "Camera" });
 
     it("addresses a row whose key is not called `id`", async () => {
         const data = dataWith(slug => collections[slug]);
-        const { data: entities } = await data.collection("sku_items").find();
+        const { data: entities } = await data.table("sku_items").find();
 
         expect(entities[0].id).toBe("ABC-1");
         expect(entities[0].values).toEqual({ sku: "ABC-1",
@@ -74,7 +74,7 @@ label: "Widget" });
 
     it("joins a composite key into one addressable token", async () => {
         const data = dataWith(slug => collections[slug]);
-        const { data: entities } = await data.collection("memberships").find();
+        const { data: entities } = await data.table("memberships").find();
 
         expect(entities[0].id).toBe("1:::2");
         expect(entities[0].values).toEqual({ tenant_id: 1,
@@ -86,7 +86,7 @@ role: "admin" });
         // Drivers other than postgres still serve rows carrying an id; without
         // this the admin would lose addressing for every one of them.
         const data = dataWith(() => undefined);
-        const { data: entities } = await data.collection("legacy").find();
+        const { data: entities } = await data.table("legacy").find();
 
         expect(entities[0].id).toBe("L1");
     });
@@ -95,8 +95,8 @@ role: "admin" });
         const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
         try {
             const data = dataWith(slug => collections[slug]);
-            await data.collection("unkeyed").find();
-            await data.collection("unkeyed").find();
+            await data.table("unkeyed").find();
+            await data.table("unkeyed").find();
 
             expect(warn).toHaveBeenCalledTimes(1);
             expect(String(warn.mock.calls[0][0])).toContain("declares no primary key");
@@ -114,12 +114,12 @@ role: "admin" });
             resolveCollection: slug => registry[slug]
         });
 
-        const before = await data.collection("products").find();
+        const before = await data.table("products").find();
         expect(before.data[0].id).toBe(42); // no keys yet: falls back to row.id
 
         registry = collections;
 
-        const after = await data.collection("products").find();
+        const after = await data.table("products").find();
         expect(after.data[0].id).toBe("42"); // derived once the registry arrives
     });
 });

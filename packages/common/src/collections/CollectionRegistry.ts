@@ -420,7 +420,7 @@ export class CollectionRegistry {
      * addresses it by.
      *
      * The admin addresses a collection by its slug — in routes, in
-     * `data.collection(...)`, in the `path` of every entity it lists — because
+     * `data.table(...)`, in the `path` of every entity it lists — because
      * the slug is what is unique. A Firestore collection may declare
      * a `path` of its own ({@link getCollectionDataPath}), and its driver has to
      * be handed that one, under every record and subcollection too:

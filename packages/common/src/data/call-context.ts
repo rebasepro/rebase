@@ -87,7 +87,7 @@ function refuse(field: ContextField, used: string): () => never {
 
 /**
  * A driver every operation of which refuses. Wrapped by `buildSdkData`, it is
- * a complete data plane — `data.posts`, `data.collection("posts")`, any slug —
+ * a complete data plane — `data.posts`, `data.table("posts")`, any slug —
  * whose every read and write reaches one of these and throws, so the stand-in
  * needs no Proxy and no assertion of its own.
  */

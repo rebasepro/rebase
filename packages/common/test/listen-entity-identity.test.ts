@@ -24,7 +24,7 @@ function liveSdk() {
             };
         }
     });
-    const sdk = { collection: () => client };
+    const sdk = { table: () => client };
     return { sdk, push: (rows: Row[]) => deliver!(rows) };
 }
 
@@ -40,7 +40,7 @@ describe("a live list through the admin boundary", () => {
         const { sdk, push } = liveSdk();
         const data = wrapAsEntityData(sdk, { resolveCollection: () => products });
         const frames: Entity[][] = [];
-        const stop = data.collection("products").listen!({}, (result) => frames.push(result.data));
+        const stop = data.table("products").listen!({}, (result) => frames.push(result.data));
 
         const a = { id: "a", name: "A" };
         const b = { id: "b", name: "B" };
@@ -59,7 +59,7 @@ describe("a live list through the admin boundary", () => {
         let collection: CollectionConfig | undefined;
         const data = wrapAsEntityData(sdk, { resolveCollection: () => collection });
         const frames: Entity[][] = [];
-        data.collection("products").listen!({}, (result) => frames.push(result.data));
+        data.table("products").listen!({}, (result) => frames.push(result.data));
 
         const a = { id: "a", name: "A" };
         push([a]);

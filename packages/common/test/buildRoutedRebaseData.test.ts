@@ -1,6 +1,6 @@
 import { buildRebaseData } from "../src/data/buildRebaseData";
 import { buildRoutedRebaseData } from "../src/data/buildRoutedRebaseData";
-import { CollectionAccessor, DataDriver } from "@rebasepro/types";
+import { TableAccessor, DataDriver } from "@rebasepro/types";
 
 // ── Mock driver ─────────────────────────────────────────────
 function createMockDriver(key: string): DataDriver {
@@ -40,8 +40,8 @@ describe("buildRoutedRebaseData", () => {
             resolveKey: (path) => (path === "analytics" ? "firestore" : undefined)
         });
 
-        await routed.collection("analytics").find();
-        await routed.collection("products").find();
+        await routed.table("analytics").find();
+        await routed.table("products").find();
 
         expect(fsDriver.fetchCollection).toHaveBeenCalledTimes(1);
         expect((fsDriver.fetchCollection as jest.Mock).mock.calls[0][0]).toMatchObject({ path: "analytics" });
@@ -59,8 +59,8 @@ describe("buildRoutedRebaseData", () => {
             resolveKey: (path) => (path === "orders" ? "postgres" : "(default)")
         });
 
-        await routed.collection("orders").find();
-        await routed.collection("anything").find();
+        await routed.table("orders").find();
+        await routed.table("anything").find();
 
         expect(pgDriver.fetchCollection).toHaveBeenCalledTimes(2);
         expect(fsDriver.fetchCollection).not.toHaveBeenCalled();
@@ -84,8 +84,8 @@ describe("buildRoutedRebaseData", () => {
             resolveKey: (path) => driverByPath[path]
         });
 
-        await routed.collection("fs_docs").find();
-        await routed.collection("pg_authors").findById("a1");
+        await routed.table("fs_docs").find();
+        await routed.table("pg_authors").findById("a1");
 
         expect(fsDriver.fetchCollection).toHaveBeenCalledTimes(1);
         expect(pgDriver.fetchOne).toHaveBeenCalledTimes(1);
@@ -106,7 +106,7 @@ describe("buildRoutedRebaseData", () => {
         });
 
         // The camelCase property is the path under test; its accessor type is one arm of the index signature.
-        await (routed.blogPosts as CollectionAccessor).find();
+        await (routed.blogPosts as TableAccessor).find();
 
         expect(seenSlugs).toContain("blog_posts");
         expect(fsDriver.fetchCollection).toHaveBeenCalledTimes(1);
@@ -122,10 +122,10 @@ describe("buildRoutedRebaseData", () => {
             resolveKey: (path) => (path === "events" ? "firestore" : undefined)
         });
 
-        await routed.collection("events").create({ name: "a" });
-        await routed.collection("events").update("e1", { name: "b" });
-        await routed.collection("events").delete("e1");
-        await routed.collection("events").find();
+        await routed.table("events").create({ name: "a" });
+        await routed.table("events").update("e1", { name: "b" });
+        await routed.table("events").delete("e1");
+        await routed.table("events").find();
 
         // All writes/reads went to Firestore, none to the default.
         expect(fsDriver.save).toHaveBeenCalledTimes(2); // create + update

@@ -1,6 +1,6 @@
 import { buildSdkData } from "../src/data/buildRebaseData";
 import { resolveFindWindow } from "../src/data/paginate";
-import { DataDriver, FetchCollectionProps, RebaseSdkData, SDKCollectionClient } from "@rebasepro/types";
+import { DataDriver, FetchCollectionProps, RebaseSdkData, SDKTableClient } from "@rebasepro/types";
 
 /**
  * `page` and `offset` name one window twice. `page` used to win silently, so a
@@ -14,8 +14,8 @@ interface Row extends Record<string, unknown> {
     id: number;
 }
 
-function jobsOf(data: RebaseSdkData): SDKCollectionClient<Row> {
-    return data.jobs as SDKCollectionClient<Row>;
+function jobsOf(data: RebaseSdkData): SDKTableClient<Row> {
+    return data.jobs as SDKTableClient<Row>;
 }
 
 function driver(calls: FetchCollectionProps[]): DataDriver {

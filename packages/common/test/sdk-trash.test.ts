@@ -1,5 +1,5 @@
 import { buildRebaseData, buildSdkData, wrapAsEntityData, wrapAsSdkData } from "../src/data/buildRebaseData";
-import { DataDriver, RebaseSdkData, SDKCollectionClient, isUnsupported } from "@rebasepro/types";
+import { DataDriver, RebaseSdkData, SDKTableClient, isUnsupported } from "@rebasepro/types";
 import { inertDriver } from "./helpers/inert-driver";
 
 /**
@@ -12,8 +12,8 @@ import { inertDriver } from "./helpers/inert-driver";
  * purging trashed rows meant raw SQL.
  */
 
-function sdk(data: RebaseSdkData, slug: string): SDKCollectionClient {
-    return data[slug] as SDKCollectionClient;
+function sdk(data: RebaseSdkData, slug: string): SDKTableClient {
+    return data[slug] as SDKTableClient;
 }
 
 function recordingDriver(options?: { rest?: boolean }) {
@@ -167,7 +167,7 @@ describe("context.data.<slug>.trash", () => {
 
     it("is a stub that throws where the data source has no trash", async () => {
         const bare = {
-            collection: () => ({ ...buildRebaseData(inertDriver()).collection("posts"), trash: undefined })
+            table: () => ({ ...buildRebaseData(inertDriver()).table("posts"), trash: undefined })
         };
         const posts = sdk(wrapAsSdkData(bare), "posts");
 

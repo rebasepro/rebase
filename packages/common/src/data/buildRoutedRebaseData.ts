@@ -4,17 +4,17 @@ import { toSnakeCase } from "@rebasepro/utils";
 /**
  * The data-layer shapes that can be routed: the Entity-shaped admin
  * {@link RebaseData}, the flat SDK {@link RebaseSdkData}, or just the flat
- * SDK's `.collection(slug)` accessor, which is all the router needs.
+ * SDK's `.table(slug)` accessor, which is all the router needs.
  */
-export type RoutableData = RebaseData | RebaseSdkData | Pick<RebaseSdkData, "collection">;
+export type RoutableData = RebaseData | RebaseSdkData | Pick<RebaseSdkData, "table">;
 
 /**
  * Parameters for {@link buildRoutedRebaseData}.
  */
 export interface RoutedRebaseDataParams<T extends RoutableData = RebaseData> {
     /**
-     * The default data source. Handles every collection that does not
-     * resolve to an entry in `sources` (i.e. server-transport collections,
+     * The default data source. Handles every table that does not
+     * resolve to an entry in `sources` (i.e. server-transport tables,
      * which ride the Rebase client).
      */
     defaultData: T;
@@ -27,7 +27,7 @@ export interface RoutedRebaseDataParams<T extends RoutableData = RebaseData> {
     sources: Record<string, T>;
 
     /**
-     * Resolve the data-source key for a given collection slug or path.
+     * Resolve the data-source key for a given table slug or path.
      * Typically backed by the collection registry + `resolveDataSource`
      * (`resolveDataSource(registry.getCollection(path), defs).key`).
      *
@@ -44,11 +44,11 @@ export interface RoutedRebaseDataParams<T extends RoutableData = RebaseData> {
 }
 
 /**
- * Build a {@link RebaseData} that routes each collection to the right
+ * Build a {@link RebaseData} that routes each table to the right
  * backend based on its resolved data source.
  *
- * `.collection(path)` (and dynamic `data.products`-style access) resolves the
- * collection's data-source key via `resolveKey` and delegates to the matching
+ * `.table(path)` (and dynamic `data.products`-style access) resolves the
+ * table's data-source key via `resolveKey` and delegates to the matching
  * entry in `sources`, falling back to `defaultData` when there is no match.
  * Because routing keys off the *path being accessed*, a reference widget
  * inside a Firestore form that points at a Postgres collection is still
@@ -87,22 +87,22 @@ export function buildRoutedRebaseData<T extends RoutableData = RebaseData>({
     }
 
     function getAccessor(slugOrPath: string) {
-        return (resolve(slugOrPath) as RoutableData).collection(slugOrPath);
+        return (resolve(slugOrPath) as RoutableData).table(slugOrPath);
     }
 
     const target = {
-        collection: getAccessor
+        table: getAccessor
     } as T;
 
     return new Proxy(target as object, {
         get(_target, prop: string | symbol) {
-            if (prop === "collection") return getAccessor;
+            if (prop === "table") return getAccessor;
             // Ignore Symbol properties (e.g. Symbol.toPrimitive, Symbol.iterator)
             if (typeof prop === "symbol") return undefined;
             // Ignore internal JS properties
             if (prop === "then" || prop === "toJSON" || prop === "$$typeof") return undefined;
 
-            // A collection's own accessor name, else camelCase → snake_case,
+            // A table's own accessor name, else camelCase → snake_case,
             // mirroring buildRebaseData so dynamic access routes consistently.
             return getAccessor(resolveAccessor?.(prop) ?? toSnakeCase(prop));
         }
