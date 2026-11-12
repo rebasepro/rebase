@@ -38,7 +38,7 @@ import {
     useAppCheck,
     useFirebaseAuthController,
     useFirebaseStorageSource,
-    useFirestoreDriver,
+    useFirestoreDataSource,
     useInitialiseFirebase,
     useBuildUserManagement,
     useFirebaseAccessGate
@@ -143,12 +143,16 @@ export function RebaseFirebaseApp({
      */
     const userConfigPersistence = useBuildLocalConfigurationPersistence();
 
-    const firestoreDelegate = useFirestoreDriver({
+    // Firestore is this app's default data source: collections that name no
+    // `dataSource` are served by it.
+    const firestoreSource = useFirestoreDataSource({
+        key: DEFAULT_DATA_SOURCE_KEY,
         firebaseApp,
-        textSearchControllerBuilder: textSearchControllerBuilder,
-        firestoreIndexesBuilder: firestoreIndexesBuilder,
+        textSearchControllerBuilder,
+        firestoreIndexesBuilder,
         localTextSearchEnabled
-    })
+    });
+    const firestoreDelegate = firestoreSource.driver;
 
     /**
      * Controller used for saving and fetching files in storage
@@ -222,12 +226,7 @@ export function RebaseFirebaseApp({
                                     modeController={modeController}
                                     userConfigPersistence={userConfigPersistence}
                         dateTimeFormat={dateTimeFormat}
-                        dataSources={[{
-                            key: DEFAULT_DATA_SOURCE_KEY,
-                            engine: "firestore",
-                            transport: "direct",
-                            driver: firestoreDelegate
-                        }]}
+                        dataSources={[firestoreSource]}
                         storageSource={storageSource}
                         entityLinkBuilder={({ id, path }) => `https://console.firebase.google.com/project/${firebaseApp.options.projectId}/firestore/data/${path}/${id}`}
                         locale={locale}

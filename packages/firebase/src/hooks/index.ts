@@ -3,6 +3,7 @@ export * from "./useFirebaseStorageSource";
 export * from "./useInitialiseFirebase";
 export * from "./useAppCheck";
 export * from "./useFirestoreDriver";
+export * from "./useFirestoreDataSource";
 export * from "./useFirebaseRealTimeDBDelegate";
 export * from "./useRecaptcha";
 export * from "./useBuildUserManagement";

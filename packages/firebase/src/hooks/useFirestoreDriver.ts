@@ -64,6 +64,24 @@ export interface FirestoreDataDriverProps {
      * for multiple fields in the CMS.
      */
     firestoreIndexesBuilder?: FirestoreIndexesBuilder;
+
+    /**
+     * The key of the `<Rebase dataSources>` entry this driver serves — what a
+     * collection's `dataSource` names. With it the driver tells a reference to
+     * a record of its own Firestore database (written as a
+     * `DocumentReference`) from one to a record of another data source
+     * (written as the record's id, see {@link rebaseToFirestoreModel}), and
+     * stamps it on every reference it reads back. `useFirestoreDataSource`
+     * passes its `key`.
+     */
+    dataSourceKey?: string;
+
+    /**
+     * The Firestore database read and written when a call does not name one
+     * (a collection's `databaseId` does). Defaults to the app's default
+     * database.
+     */
+    databaseId?: string;
 }
 
 export type FirestoreIndexesBuilder = (params: {
@@ -196,7 +214,7 @@ export function listenToSearchResults({
  * Null-testing operators map to `==` / `!=` against null. Firestore has no
  * LIKE/ILIKE, so those fail loudly rather than return wrong results.
  */
-function firestoreCondition(key: string, op: WhereFilterOp, value: unknown, firestore: Firestore): QueryFieldFilterConstraint {
+function firestoreCondition(key: string, op: WhereFilterOp, value: unknown, firestore: Firestore, options?: FirestoreModelOptions): QueryFieldFilterConstraint {
     if (op === "is-null") return whereClause(key, "==", null);
     if (op === "is-not-null") return whereClause(key, "!=", null);
     if (op === "like" || op === "ilike" || op === "not-like" || op === "not-ilike") {
@@ -211,7 +229,7 @@ function firestoreCondition(key: string, op: WhereFilterOp, value: unknown, fire
             "(array-contains) or any of a list (array-contains-any)."
         );
     }
-    return whereClause(key, op, rebaseToFirestoreModel(value, firestore));
+    return whereClause(key, op, rebaseToFirestoreModel(value, firestore, options));
 }
 
 /**
@@ -225,7 +243,8 @@ function firestoreCondition(key: string, op: WhereFilterOp, value: unknown, fire
  */
 export function firestoreLogicalCondition(
     logical: LogicalCondition | undefined,
-    firestore: Firestore
+    firestore: Firestore,
+    options?: FirestoreModelOptions
 ): QueryFilterConstraint | undefined {
     if (!logical || !Array.isArray(logical.conditions)) return undefined;
     if (logical.type === "not") {
@@ -235,11 +254,11 @@ export function firestoreLogicalCondition(
     for (const entry of logical.conditions) {
         if (!entry) continue;
         if ("conditions" in entry) {
-            const nested = firestoreLogicalCondition(entry, firestore);
+            const nested = firestoreLogicalCondition(entry, firestore, options);
             if (nested) parts.push(nested);
             continue;
         }
-        parts.push(firestoreCondition(entry.column, entry.operator, entry.value, firestore));
+        parts.push(firestoreCondition(entry.column, entry.operator, entry.value, firestore, options));
     }
     if (parts.length === 0) return undefined;
     return logical.type === "or" ? orClause(...parts) : andClause(...parts);
@@ -255,8 +274,19 @@ export function useFirestoreDriver({
     firebaseApp,
     textSearchControllerBuilder,
     firestoreIndexesBuilder,
-    localTextSearchEnabled
+    localTextSearchEnabled,
+    dataSourceKey,
+    databaseId: defaultDatabaseId
 }: FirestoreDataDriverProps): FirestoreDataDriver {
+
+    /** The Firestore of `databaseId`, else of the driver's default database. */
+    const firestoreOf = useCallback((app: FirebaseApp, databaseId?: string): Firestore => {
+        const resolved = databaseId ?? defaultDatabaseId;
+        return resolved ? getFirestore(app, resolved) : getFirestore(app);
+    }, [defaultDatabaseId]);
+
+    /** How this driver converts values: see {@link FirestoreModelOptions}. */
+    const modelOptions = useMemo<FirestoreModelOptions>(() => ({ dataSourceKey }), [dataSourceKey]);
 
     const searchControllerRef = useRef<FirestoreTextSearchController>(undefined);
 
@@ -283,7 +313,7 @@ export function useFirestoreDriver({
 
         if (!firebaseApp) throw Error("useFirestoreDriver Firebase not initialised");
 
-        const firestore = databaseId ? getFirestore(firebaseApp, databaseId) : getFirestore(firebaseApp);
+        const firestore = firestoreOf(firebaseApp, databaseId);
         const collectionReference: Query = collectionClause(firestore, path);
 
         // Every tuple of every field, through one leaf translation — a field
@@ -292,10 +322,10 @@ export function useFirestoreDriver({
         const filters: QueryFieldFilterConstraint[] = [];
         for (const [key, filterParameter] of Object.entries(filter ?? {})) {
             for (const [op, value] of toFilterTuples(filterParameter)) {
-                filters.push(firestoreCondition(key, op, value, firestore));
+                filters.push(firestoreCondition(key, op, value, firestore, modelOptions));
             }
         }
-        const group = firestoreLogicalCondition(logical, firestore);
+        const group = firestoreLogicalCondition(logical, firestore, modelOptions);
 
         const queryParams: QueryNonFilterConstraint[] = [];
 
@@ -321,7 +351,7 @@ export function useFirestoreDriver({
             return query(collectionReference, andClause(...filters, group), ...queryParams);
         }
         return query(collectionReference, ...filters, ...queryParams);
-    }, [firebaseApp]);
+    }, [firebaseApp, firestoreOf, modelOptions]);
 
     const getAndBuildEntity = useCallback((path: string,
         id: string | number,
@@ -329,16 +359,16 @@ export function useFirestoreDriver({
     ): Promise<Record<string, unknown> | undefined> => {
         if (!firebaseApp) throw Error("useFirestoreDriver Firebase not initialised");
 
-        const firestore = databaseId ? getFirestore(firebaseApp, databaseId) : getFirestore(firebaseApp);
+        const firestore = firestoreOf(firebaseApp, databaseId);
 
         return getDoc(doc(firestore, path, String(id)))
             .then((docEntity) => {
                 if (!docEntity.exists()) {
                     return undefined;
                 }
-                return createRowFromDocument(docEntity);
+                return createRowFromDocument(docEntity, modelOptions);
             });
-    }, [firebaseApp]);
+    }, [firebaseApp, firestoreOf, modelOptions]);
 
     const listenOne = useCallback(<M extends Record<string, any>>(
         {
@@ -350,20 +380,19 @@ export function useFirestoreDriver({
         }: ListenOneProps<M>): () => void => {
         if (!firebaseApp) throw Error("useFirestoreDriver Firebase not initialised");
 
-        const databaseId = collection?.databaseId;
-        const firestore = databaseId ? getFirestore(firebaseApp, databaseId) : getFirestore(firebaseApp);
+        const firestore = firestoreOf(firebaseApp, collection?.databaseId);
         const resolvedPath = path;
 
         return onSnapshot(
             doc(firestore, resolvedPath, String(id)),
             {
                 next: (docEntity) => {
-                    onUpdate(docEntity.exists() ? createRowFromDocument(docEntity) : null);
+                    onUpdate(docEntity.exists() ? createRowFromDocument(docEntity, modelOptions) : null);
                 },
                 error: onError
             }
         );
-    }, [firebaseApp]);
+    }, [firebaseApp, firestoreOf, modelOptions]);
 
     /** The ids the text search controller finds for `searchString` under `path`. */
     const searchIds = useCallback((
@@ -508,8 +537,8 @@ export function useFirestoreDriver({
         const query = buildQuery(resolvedPath, filter, orderBy, order, startAfter as unknown[] | undefined, fetchLimit, databaseId, logical);
 
         const entity = await getDocs(query);
-        return entity.docs.slice(skip).map((doc) => createRowFromDocument(doc));
-    }, [buildQuery, searchIds, getAndBuildEntity]);
+        return entity.docs.slice(skip).map((doc) => createRowFromDocument(doc, modelOptions));
+    }, [buildQuery, searchIds, getAndBuildEntity, modelOptions]);
 
     /**
      * Listen to a entities in a given path
@@ -588,13 +617,13 @@ export function useFirestoreDriver({
         return onSnapshot(query,
             {
                 next: (entity) => {
-                    onUpdate(entity.docs.slice(skip).map((doc) => createRowFromDocument(doc)));
+                    onUpdate(entity.docs.slice(skip).map((doc) => createRowFromDocument(doc, modelOptions)));
                 },
                 error: onError
             }
         );
 
-    }, [buildQuery, firebaseApp, performTextSearch]);
+    }, [buildQuery, firebaseApp, performTextSearch, modelOptions]);
 
     /**
      * Retrieve a entity given a path and a collection
@@ -641,7 +670,9 @@ export function useFirestoreDriver({
             values: valuesProp,
             collection
         })
-        const values = rebaseToFirestoreModel(valuesProp, getFirestore(firebaseApp));
+        const databaseId = collection?.databaseId;
+        const firestore = firestoreOf(firebaseApp, databaseId);
+        const values = rebaseToFirestoreModel(valuesProp, firestore, modelOptions);
 
         console.debug("2", {
             path,
@@ -649,8 +680,6 @@ export function useFirestoreDriver({
             values: valuesProp,
             collection
         })
-        const databaseId = collection?.databaseId;
-        const firestore = databaseId ? getFirestore(firebaseApp, databaseId) : getFirestore(firebaseApp);
         const resolvedPath = path;
 
         const collectionReference: CollectionReference = collectionClause(firestore, path);
@@ -670,7 +699,7 @@ export function useFirestoreDriver({
         return setDoc(documentReference, values as Record<string, unknown>, { merge: true })
             .then(() => {
                 return {
-                    ...(firestoreToRebaseModel(values) as Record<string, unknown>),
+                    ...(firestoreToRebaseModel(values, modelOptions) as Record<string, unknown>),
                     id: documentReference.id
                 };
             })
@@ -679,7 +708,7 @@ export function useFirestoreDriver({
                 throw error;
 
             });
-    }, [firebaseApp]);
+    }, [firebaseApp, firestoreOf, modelOptions]);
 
     /**
      * Delete a entity
@@ -695,11 +724,10 @@ export function useFirestoreDriver({
     ): Promise<void> => {
         if (!firebaseApp) throw Error("useFirestoreDriver Firebase not initialised");
 
-        const databaseId = collection?.databaseId;
-        const firestore = databaseId ? getFirestore(firebaseApp, databaseId) : getFirestore(firebaseApp);
+        const firestore = firestoreOf(firebaseApp, collection?.databaseId);
 
         return deleteDoc(doc(firestore, row.path, String(row.id)));
-    }, [firebaseApp]);
+    }, [firebaseApp, firestoreOf]);
 
     /**
      * Check if the given property is unique in the given collection
@@ -721,17 +749,16 @@ export function useFirestoreDriver({
 
         if (!firebaseApp) throw Error("useFirestoreDriver Firebase not initialised");
 
-        const databaseId = collection?.databaseId;
-        const firestore = databaseId ? getFirestore(firebaseApp, databaseId) : getFirestore(firebaseApp);
+        const firestore = firestoreOf(firebaseApp, collection?.databaseId);
 
         if (value === undefined || value === null) {
             return Promise.resolve(true);
         }
-        const q = query(collectionClause(firestore, path), whereClause(name, "==", rebaseToFirestoreModel(value, firestore)));
+        const q = query(collectionClause(firestore, path), whereClause(name, "==", rebaseToFirestoreModel(value, firestore, modelOptions)));
         const entity = await getDocs(q);
         return entity.docs.filter(doc => doc.id !== id).length === 0;
 
-    }, [firebaseApp]);
+    }, [firebaseApp, firestoreOf, modelOptions]);
 
     const count = useCallback(async ({
         path,
@@ -836,10 +863,48 @@ export function useFirestoreDriver({
 
 }
 
+/**
+ * How the model converters treat references, for one data source.
+ *
+ * @group Firestore
+ */
+export interface FirestoreModelOptions {
+    /**
+     * The key of the data source the converted values belong to — the
+     * `<Rebase dataSources>` entry the driver serves.
+     *
+     * With it, a reference whose `driver` names *another* data source (a
+     * Postgres table's record, picked in a Firestore form) is written as the
+     * referenced id, and every `DocumentReference` read back carries this key
+     * as its `driver`. Without it, every reference is written as a
+     * `DocumentReference`, as before the data source was known.
+     */
+    dataSourceKey?: string;
+}
+
+/**
+ * The engine name a reference's `driver` may carry instead of a data-source
+ * key — `new EntityReference({ …, driver: "firestore" })` — and which always
+ * means a Firestore document.
+ */
+const FIRESTORE_ENGINE = "firestore";
+
+/**
+ * Does `reference` point into another data source than the one `options`
+ * describes? Only when both are known and differ: a reference that names no
+ * `driver` is one of the driver's own documents, as it always was.
+ */
+function isForeignReference(reference: EntityReference, options: FirestoreModelOptions | undefined): boolean {
+    const own = options?.dataSourceKey;
+    const target = reference.driver;
+    return own !== undefined && target !== undefined && target !== own && target !== FIRESTORE_ENGINE;
+}
+
 const createRowFromDocument = (
-    docSnap: DocumentSnapshot
+    docSnap: DocumentSnapshot,
+    options?: FirestoreModelOptions
 ): Record<string, unknown> => {
-    const values = firestoreToRebaseModel(docSnap.data()) as Record<string, unknown>;
+    const values = firestoreToRebaseModel(docSnap.data(), options) as Record<string, unknown>;
     return {
         ...values,
         // Spread the canonical document id last so it wins over a literal `id` field
@@ -853,11 +918,20 @@ const createRowFromDocument = (
  * Rebase uses Javascript dates internally instead of Firestore timestamps.
  * This makes it easier to interact with the rest of the libraries and
  * bindings.
- * Also, Firestore references are replaced with {@link EntityReference}
+ *
+ * Firestore references are replaced with {@link EntityReference}s carrying
+ * the stored path, the Firestore database, and — when `options` names the
+ * driver's data source — that key as their `driver`.
+ *
+ * A reference to a record of another data source is stored as the record's
+ * id (see {@link rebaseToFirestoreModel}) and comes back as that id: the
+ * document holds no more than that. The admin turns it back into a reference
+ * from the field's `target`, which it knows and this function does not.
  * @param data
+ * @param options
  * @group Firestore
  */
-export function firestoreToRebaseModel(data: unknown): unknown {
+export function firestoreToRebaseModel(data: unknown, options?: FirestoreModelOptions): unknown {
     if (data === null || data === undefined) return null;
     if (typeof data === "object" && data !== null && "isEqual" in data && typeof (data as FieldValue).isEqual === "function" && deleteField().isEqual(data as FieldValue)) {
         return undefined;
@@ -889,15 +963,20 @@ value: (data as { toArray: () => number[] }).toArray() };
             && typeof internalId.database === "string" ? internalId.database : undefined;
         return new EntityReference({ id: data.id,
             path: getCMSPathFromFirestorePath(data.path),
-            databaseId });
+            databaseId,
+            ...(options?.dataSourceKey !== undefined ? { driver: options.dataSourceKey } : {}) });
+    }
+    if (data instanceof EntityReference) {
+        // Already converted: a save hands its own written values back through here.
+        return data;
     }
     if (Array.isArray(data)) {
-        return data.map(firestoreToRebaseModel).filter(v => v !== undefined);
+        return data.map(item => firestoreToRebaseModel(item, options)).filter(v => v !== undefined);
     }
     if (typeof data === "object") {
         const result: Record<string, unknown> = {};
         for (const key of Object.keys(data)) {
-            const childValue = firestoreToRebaseModel((data as Record<string, unknown>)[key]);
+            const childValue = firestoreToRebaseModel((data as Record<string, unknown>)[key], options);
             if (childValue !== undefined)
                 result[key] = childValue;
         }
@@ -916,8 +995,32 @@ function getCMSPathFromFirestorePath(fsPath: string): string {
     return fsPath.substring(0, to);
 }
 
-
-export function rebaseToFirestoreModel(data: unknown, firestore: Firestore, inArray = false): unknown {
+/**
+ * Convert values as the admin holds them into what Firestore stores: a
+ * `Date` as a `Timestamp`, a `GeoPoint` as Firestore's, a vector as a
+ * `VectorValue`, `undefined` as a field deletion.
+ *
+ * References are stored by where they point:
+ *
+ * - to a document of this Firestore — a reference with no `driver`, or one
+ *   naming this data source — as a `DocumentReference`, exactly as before;
+ * - to a record of **another** data source (its `driver` names a different
+ *   key than `options.dataSourceKey`) as the record's id, a plain string. A
+ *   `DocumentReference` there would point at a document that does not exist,
+ *   and a query for the record would never match it.
+ *
+ * @param data the values
+ * @param firestore the Firestore the references point into
+ * @param options which data source the values belong to; `inArray` is
+ * internal (an element of an array cannot hold a field deletion)
+ * @group Firestore
+ */
+export function rebaseToFirestoreModel(
+    data: unknown,
+    firestore: Firestore,
+    options?: FirestoreModelOptions & { inArray?: boolean }
+): unknown {
+    const inArray = options?.inArray ?? false;
     if (data === undefined) {
         // `deleteField()` removes a field of the document or of one of its
         // maps. Firestore refuses it anywhere inside an array — the element is
@@ -926,9 +1029,17 @@ export function rebaseToFirestoreModel(data: unknown, firestore: Firestore, inAr
     } else if (data === null) {
         return null;
     } else if (Array.isArray(data)) {
-        return (data as unknown[]).filter(v => v !== undefined).map(v => rebaseToFirestoreModel(v, firestore, true));
-    } else if (typeof data === "object" && data !== null && "isEntityReference" in data && typeof (data as Record<string, unknown>).isEntityReference === "function" && (data as { isEntityReference: () => boolean }).isEntityReference()) {
-        const entityRef = data as EntityReference;
+        return (data as unknown[]).filter(v => v !== undefined).map(v => rebaseToFirestoreModel(v, firestore, { ...options, inArray: true }));
+    } else if (data instanceof EntityReference || (typeof data === "object" && "isEntityReference" in data && typeof data.isEntityReference === "function" && data.isEntityReference() === true && "path" in data && "id" in data)) {
+        const entityRef = data instanceof EntityReference
+            ? data
+            : new EntityReference({
+                id: String(Reflect.get(data, "id")),
+                path: String(Reflect.get(data, "path")),
+                driver: stringOrUndefined(Reflect.get(data, "driver")),
+                databaseId: stringOrUndefined(Reflect.get(data, "databaseId"))
+            });
+        if (isForeignReference(entityRef, options)) return entityRef.id;
         const targetFirestore = entityRef.databaseId ? getFirestore(firestore.app, entityRef.databaseId) : firestore;
         return doc(targetFirestore, entityRef.path, entityRef.id);
     } else if (data && typeof data === "object" && "__type" in data && (data as Record<string, unknown>).__type === "relation" && "path" in data && "id" in data) {
@@ -943,7 +1054,7 @@ export function rebaseToFirestoreModel(data: unknown, firestore: Firestore, inAr
     } else if (data && typeof data === "object") {
         return Object.entries(data)
             .map(([key, v]) => {
-                const firestoreModel = rebaseToFirestoreModel(v, firestore, inArray);
+                const firestoreModel = rebaseToFirestoreModel(v, firestore, options);
                 if (firestoreModel !== undefined)
                     return ({ [key]: firestoreModel });
                 else
@@ -954,6 +1065,11 @@ export function rebaseToFirestoreModel(data: unknown, firestore: Firestore, inAr
     }
     return data;
 }
+
+function stringOrUndefined(value: unknown): string | undefined {
+    return typeof value === "string" ? value : undefined;
+}
+
 
 function currentTime(): unknown {
     return serverTimestamp();
