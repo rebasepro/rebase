@@ -3,6 +3,7 @@ import path from "node:path";
 import { TablePatchError, parseTablePatches, type TablePatch } from "@rebasepro/types";
 import { TableSourceEditError, TableSourceEditor, type TableSourceEdit } from "./table-source-editor";
 import { ApiError, errorHandler } from "./errors";
+import { createFrontendSourceEditor, createFrontendSourceRoutes } from "./frontend-source-routes";
 import { HonoEnv } from "./types";
 
 /**
@@ -23,6 +24,11 @@ import { HonoEnv } from "./types";
  *
  * Changing the database is live schema editing's job (`/api/admin/schema`),
  * which commits the same edits and runs the DDL.
+ *
+ * `/frontend/*` edits the project's frontend source the same way — the
+ * object argument of one call in `frontend/src`, which the admin panel uses
+ * for its Firestore collections — under the same gate
+ * (see `frontend-source-routes.ts`).
  */
 
 /** The process's one editor of `schemaDir`, shared with live schema editing. */
@@ -82,6 +88,8 @@ export function createSchemaEditorRoutes(editor: TableSourceEditor): Hono<HonoEn
         const edit = await refusalsAsBadRequest(() => editor.apply(patches));
         return c.json({ success: true, ...describeEdit(editor, edit) });
     });
+
+    router.route("/frontend", createFrontendSourceRoutes(createFrontendSourceEditor(editor.schemaDir)));
 
     return router;
 }

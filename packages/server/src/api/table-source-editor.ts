@@ -468,7 +468,7 @@ class Workspace {
     }
 }
 
-function unwrapExpression(node: Node | undefined): Node | undefined {
+export function unwrapExpression(node: Node | undefined): Node | undefined {
     let current = node;
     while (current && (Node.isParenthesizedExpression(current) || Node.isAsExpression(current) ||
         Node.isSatisfiesExpression(current) || Node.isNonNullExpression(current) || Node.isTypeAssertion(current))) {
@@ -477,13 +477,13 @@ function unwrapExpression(node: Node | undefined): Node | undefined {
     return current;
 }
 
-function literalString(node: Node | undefined): string | undefined {
+export function literalString(node: Node | undefined): string | undefined {
     if (node && (Node.isStringLiteral(node) || Node.isNoSubstitutionTemplateLiteral(node))) return node.getLiteralValue();
     return undefined;
 }
 
 /** The key a member of an object literal is written under, when it is written literally. */
-function memberName(member: Node): string | undefined {
+export function memberName(member: Node): string | undefined {
     if (Node.isPropertyAssignment(member) || Node.isShorthandPropertyAssignment(member) || Node.isMethodDeclaration(member)) {
         const nameNode = member.getNameNode();
         if (Node.isIdentifier(nameNode)) return nameNode.getText();
@@ -494,7 +494,7 @@ function memberName(member: Node): string | undefined {
 }
 
 /** Why an object literal's members cannot be read one by one, when they cannot. */
-function opaqueMembers(object: ObjectLiteralExpression, what: string): string | undefined {
+export function opaqueMembers(object: ObjectLiteralExpression, what: string): string | undefined {
     for (const member of object.getProperties()) {
         if (Node.isSpreadAssignment(member)) return `${what} spreads \`${member.getExpression().getText()}\`, so any key may come from code.`;
         if (memberName(member) === undefined) return `${what} has a key computed at run time (\`${member.getText().split(":")[0].trim()}\`).`;
@@ -503,12 +503,12 @@ function opaqueMembers(object: ObjectLiteralExpression, what: string): string | 
 }
 
 /** A member of an object literal: its assignment, or why it cannot be written. */
-type Member =
+export type Member =
     | { kind: "absent" }
     | { kind: "written"; node: Node; value: Node; index: number }
     | { kind: "code"; reason: string };
 
-function member(object: ObjectLiteralExpression, key: string, what: string): Member {
+export function member(object: ObjectLiteralExpression, key: string, what: string): Member {
     const members = object.getProperties();
     const opaque = opaqueMembers(object, what);
     for (const [index, each] of members.entries()) {
@@ -678,8 +678,8 @@ function compileRefusal(error: unknown, scratch: string, dir: string): TableSour
     );
 }
 
-const IDENTIFIER = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
-const printKey = (key: string): string => (IDENTIFIER.test(key) ? key : JSON.stringify(key));
+export const IDENTIFIER = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
+export const printKey = (key: string): string => (IDENTIFIER.test(key) ? key : JSON.stringify(key));
 
 /** The builder import of a file: the import declaration naming `defineTable` & co. */
 function builderImport(source: SourceFile): { declaration: ImportDeclaration; local: Map<string, string> } | undefined {
@@ -867,7 +867,7 @@ function removeMember(workspace: Workspace, file: string, object: ObjectLiteralE
 }
 
 /** Whether a node is plain data — what an option's value may be overwritten from. */
-function isData(node: Node): boolean {
+export function isData(node: Node): boolean {
     const value = unwrapExpression(node);
     if (!value) return false;
     if (Node.isStringLiteral(value) || Node.isNumericLiteral(value) || Node.isNoSubstitutionTemplateLiteral(value) ||
