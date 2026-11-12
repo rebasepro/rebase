@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
-import type { CollectionConfig } from "@rebasepro/types";
-import { compileRulePolicies } from "@rebasepro/common";
+import { col, defineTable } from "@rebasepro/types";
+import { compileRulePolicies, compileTables, lowerTables } from "@rebasepro/common";
 import {
     assertReviewConfig,
     diffStagedChange,
@@ -8,42 +8,26 @@ import {
     isReviewer,
     mayPropose,
     ReviewConfigError,
-    reviewSecurityRules,
+    reviewRls,
     type ReviewConfig,
     type StateFieldReview
 } from "../src/config";
 
-const posts: CollectionConfig = {
-    slug: "posts",
-    name: "Posts",
-    table: "posts",
-    properties: {
-        id: { name: "ID",
-type: "string",
-isId: "uuid" },
-        title: { name: "Title",
-type: "string" },
-        views: { name: "Views",
-type: "number" },
-        status: {
-            name: "Status",
-            type: "string",
-            enum: [{ id: "draft",
-label: "Draft" }, { id: "published",
-label: "Published" }, { id: "rejected",
-label: "Rejected" }]
-        }
-    }
+const POSTS_COLUMNS = {
+    id: col.uuid().primaryKey().defaultRandom(),
+    title: col.text(),
+    views: col.integer(),
+    status: col.enum(["draft", "published", "rejected"])
 };
-const orders: CollectionConfig = {
-    slug: "orders",
-    name: "Orders",
-    properties: { id: { name: "ID",
-type: "number",
-isId: "increment" },
-total: { name: "Total",
-type: "number" } }
-};
+const postsDef = defineTable("posts", { columns: POSTS_COLUMNS, rls: "admin-only" });
+const ordersDef = defineTable("orders", {
+    columns: {
+        id: col.serial().primaryKey(),
+        total: col.integer()
+    },
+    rls: "admin-only"
+});
+const [posts, orders] = compileTables([postsDef, ordersDef]);
 
 const stateField: StateFieldReview = {
     mode: "state-field",
@@ -70,25 +54,35 @@ reviewerRoles: ["ops"] }
         })).toEqual([]);
     });
 
-    it("accepts a plain string field, with no enum to check against", () => {
-        const plain: CollectionConfig = { ...posts,
-properties: { ...posts.properties,
-status: { name: "Status",
-type: "string" } } };
+    it("accepts a plain text column, with no value set to check against", () => {
+        const [plain] = compileTables([defineTable("posts", {
+            columns: { id: col.uuid().primaryKey().defaultRandom(), status: col.text() },
+            rls: "admin-only"
+        })]);
         expect(findReviewConfigProblems({ collections: { posts: { ...stateField,
 pendingValue: "anything" } } }, [plain])).toEqual([]);
     });
 
-    it("names a collection that does not exist", () => {
+    it("checks the values against a `.oneOf([...])` text column too", () => {
+        const [closed] = compileTables([defineTable("posts", {
+            columns: { id: col.uuid().primaryKey().defaultRandom(), status: col.text().oneOf(["draft", "published"]) },
+            rls: "admin-only"
+        })]);
+        expect(findReviewConfigProblems({ collections: { posts: { ...stateField, rejectedValue: undefined } } }, [closed])).toEqual([]);
+        expect(findReviewConfigProblems({ collections: { posts: stateField } }, [closed]).map(problem => problem.path))
+            .toEqual(["collections.posts.rejectedValue"]);
+    });
+
+    it("names a table that does not exist", () => {
         expect(problems({ collections: { comments: { mode: "staged-table" } } })).toEqual(["collections.comments"]);
     });
 
-    it("refuses a field the collection lacks, and one that is not a string", () => {
+    it("refuses a column the table lacks, and one that does not hold text", () => {
         expect(problems({ collections: { posts: { ...stateField,
 field: "state" } } })).toEqual(["collections.posts.field"]);
         const [problem] = findReviewConfigProblems({ collections: { posts: { ...stateField,
 field: "views" } } }, [posts]);
-        expect(problem.message).toContain("number");
+        expect(problem.message).toContain("integer");
     });
 
     it("refuses each value outside the enum, listing the values there are", () => {
@@ -145,9 +139,14 @@ reviewerRoles: ["ops"] };
     });
 });
 
-describe("reviewSecurityRules", () => {
-    const compile = (review: StateFieldReview) =>
-        reviewSecurityRules("posts", review).flatMap(rule => compileRulePolicies(posts, rule));
+describe("reviewRls", () => {
+    /** The policies the rules compile to on the table they are spread into, as the backend lowers it. */
+    const compile = (review: StateFieldReview) => {
+        const table = defineTable("posts", { columns: POSTS_COLUMNS, rls: reviewRls("posts", review) });
+        const [descriptor] = compileTables([table]);
+        const [lowered] = lowerTables([table], { describe: () => descriptor });
+        return descriptor.rls.rules.flatMap(rule => compileRulePolicies(lowered, rule));
+    };
 
     it("compiles to one restrictive policy per write, named after the slug, the same every time", () => {
         const policies = compile(stateField);
@@ -184,7 +183,7 @@ reviewerRoles: undefined });
     });
 
     it("writes a dashed slug as an identifier", () => {
-        expect(reviewSecurityRules("blog-posts", stateField)[0].name).toBe("blog_posts_review_pending_only");
+        expect(reviewRls("blog-posts", stateField)[0].name).toBe("blog_posts_review_pending_only");
     });
 });
 

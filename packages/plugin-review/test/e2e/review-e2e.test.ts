@@ -5,7 +5,7 @@
  *   update; the live row does not move, and the key cannot write it directly.
  * - An operator approves; the row changes, and a batch approval applies all of
  *   its changes in one transaction or none of them.
- * - On a state-field collection, an agent role setting `status = 'published'`
+ * - On a state-field table, an agent role setting `status = 'published'`
  *   itself is refused by Postgres row-level security.
  *
  * Everything goes through what the server mounts: the boot, the built-in auth,
@@ -18,7 +18,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import pg from "pg";
 import { Hono } from "hono";
 import { createServer } from "node:http";
-import type { CollectionConfig } from "@rebasepro/types";
+import { col, defineTable } from "@rebasepro/types";
 
 import { startPgContainer, stopPgContainer, type PgContainer } from "../../../server-postgres/test/e2e/pg-setup.js";
 import { createPostgresAdapter } from "../../../server-postgres/src/PostgresAdapter.js";
@@ -27,7 +27,7 @@ import { initializeRebaseBackend, _resetRebaseMock } from "../../../server/src/i
 import { generateAccessToken } from "../../../server/src/auth/jwt.js";
 import type { HonoEnv } from "../../../server/src/api/types.js";
 import type { AuthRepository } from "../../../server/src/auth/interfaces.js";
-import { reviewFunction, reviewSecurityRules, type ReviewConfig, type StagedChange, type StateFieldReview } from "../../src/server/index.js";
+import { reviewFunction, reviewRls, type ReviewConfig, type StagedChange, type StateFieldReview } from "../../src/server/index.js";
 
 const JWT_SECRET = "review-plugin-e2e-secret-that-is-long-enough-0123456789";
 
@@ -49,51 +49,27 @@ reviewerRoles: ["ops"] },
     }
 };
 
-const ordersCollection: CollectionConfig = {
-    name: "Orders",
-    slug: "orders",
-    table: "orders",
+const orders = defineTable("orders", {
+    columns: {
+        id: col.uuid().primaryKey().defaultRandom(),
+        customer: col.text(),
+        total: col.numeric()
+    },
     // Agents read orders; nothing lets them write one.
-    securityRules: [{ name: "orders_agents_read",
-operations: ["select"],
-roles: ["agent"] }],
-    properties: {
-        id: { name: "ID",
-type: "string",
-isId: "uuid" },
-        customer: { name: "Customer",
-type: "string" },
-        total: { name: "Total",
-type: "number" }
-    }
-};
+    rls: [{ name: "orders_agents_read", operations: ["select"], roles: ["agent"] }]
+});
 
-const postsCollection: CollectionConfig = {
-    name: "Posts",
-    slug: "posts",
-    table: "posts",
-    securityRules: [
-        { name: "posts_agents_write",
-operations: ["select", "insert", "update"],
-roles: ["agent"] },
-        ...reviewSecurityRules("posts", postsReview)
-    ],
-    properties: {
-        id: { name: "ID",
-type: "string",
-isId: "uuid" },
-        title: { name: "Title",
-type: "string" },
-        status: {
-            name: "Status",
-            type: "string",
-            enum: [{ id: "draft",
-label: "Draft" }, { id: "published",
-label: "Published" }, { id: "rejected",
-label: "Rejected" }]
-        }
-    }
-};
+const posts = defineTable("posts", {
+    columns: {
+        id: col.uuid().primaryKey().defaultRandom(),
+        title: col.text(),
+        status: col.enum(["draft", "published", "rejected"])
+    },
+    rls: [
+        { name: "posts_agents_write", operations: ["select", "insert", "update"], roles: ["agent"] },
+        ...reviewRls("posts", postsReview)
+    ]
+});
 
 const ORDER = {
     one: "11111111-1111-4111-8111-111111111111",
@@ -178,7 +154,7 @@ roles } });
         backend = await initializeRebaseBackend({
             app,
             server,
-            collections: [ordersCollection, postsCollection],
+            tables: [orders, posts],
             database: createPostgresAdapter({ connection: connection.db,
 connectionString: container.connectionString }),
             auth: { jwtSecret: JWT_SECRET },
@@ -342,7 +318,7 @@ review_note: "Not a duplicate" });
 total: 200 });
     });
 
-    it("refuses a proposal to a collection the configuration does not stage, and to a row the agent cannot see", async () => {
+    it("refuses a proposal to a table the configuration does not stage, and to a row the agent cannot see", async () => {
         const notStaged = await call("/api/functions/review/changes", key.stage, {
             method: "POST",
             body: { collection: "posts",

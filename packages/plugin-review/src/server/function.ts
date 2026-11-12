@@ -11,7 +11,7 @@
 
 import { Hono } from "hono";
 import type { Context } from "hono";
-import { getCollectionDataPath, scopeGrants, type BatchWriteOperation, type CollectionConfig, type DataDriver } from "@rebasepro/types";
+import { scopeGrants, type BatchWriteOperation, type DataDriver, type TableDescriptor } from "@rebasepro/types";
 import { ApiError, getApiKey, getScopes, getUser, rebase, requireDriver, type HonoEnv } from "@rebasepro/server/functions";
 import { isReviewer, mayPropose, scopeForOperation } from "../config/access";
 import { findReviewConfigProblems } from "../config/validate";
@@ -94,7 +94,7 @@ function pageNumber(value: string | undefined, fallback: number, max: number): n
  * ```ts
  * // functions/review.ts
  * import { reviewFunction } from "@rebasepro/plugin-review/server";
- * import { review } from "../config/review";
+ * import { review } from "../review";
  *
  * export default reviewFunction(review);
  * ```
@@ -102,7 +102,7 @@ function pageNumber(value: string | undefined, fallback: number, max: number): n
  * Routes, under `/api/functions/review`:
  *
  * - `POST /changes` — propose a change (`StageChangeRequest`). Nothing in the
- *   collection moves.
+ *   table moves.
  * - `GET /changes?collection=&status=&limit=&offset=` — the changes the caller
  *   reviews, and the caller's own proposals.
  * - `GET /changes/count?collection=&status=` — how many of those there are.
@@ -119,20 +119,20 @@ export function reviewFunction(config: ReviewConfig, options: ReviewFunctionOpti
     const store: StagedChangeStore = createStagedChangeStore(sql);
     let configChecked = false;
 
-    /** The collection a slug names on the backend serving the request, when it can say. */
-    const collectionOf = (c: ReviewContext, slug: string): CollectionConfig | undefined =>
-        c.get("services")?.collections().find(collection => collection.slug === slug);
+    /** The descriptor of the table a slug names on the backend serving the request, when it can say. */
+    const tableOf = (c: ReviewContext, slug: string): TableDescriptor | undefined =>
+        c.get("services")?.tables().find(table => table.slug === slug);
 
-    /** The caller, or a 401; and the configuration checked once against the backend's collections. */
+    /** The caller, or a 401; and the configuration checked once against the backend's tables. */
     const prepare = async (c: ReviewContext) => {
         const user = getUser(c);
         if (!user) throw new ApiError(401, "UNAUTHORIZED", "Authentication required");
         const services = c.get("services");
         if (!configChecked && services) {
-            const problems = findReviewConfigProblems(config, services.collections());
+            const problems = findReviewConfigProblems(config, services.tables());
             if (problems.length > 0) {
                 throw new ApiError(500, "REVIEW_CONFIG_INVALID",
-                    "The review plugin's configuration does not match this backend's collections: " +
+                    "The review plugin's configuration does not match this backend's tables: " +
                     problems.map(problem => `${problem.path}: ${problem.message}`).join("; "),
                     { problems });
             }
@@ -148,13 +148,13 @@ scopes: getScopes(c) };
         const review = typeof slug === "string" ? reviews.get(slug) : undefined;
         if (typeof slug !== "string" || !review) {
             throw new ApiError(404, "NOT_REVIEWED",
-                `"${String(slug)}" has no staged-table review. Reviewed collections: ${[...reviews.keys()].join(", ") || "none"}.`);
+                `"${String(slug)}" has no staged-table review. Reviewed tables: ${[...reviews.keys()].join(", ") || "none"}.`);
         }
         return { slug,
 review };
     };
 
-    /** A change as this caller may see it: no snapshot for a key that cannot read the collection. */
+    /** A change as this caller may see it: no snapshot for a key that cannot read the table. */
     const visible = (scopes: string[] | undefined, change: StagedChange): StagedChange =>
         grants(scopes, "data:read", change.collection_slug) ? change : { ...change,
 before_data: null };
@@ -181,16 +181,14 @@ before_data: null };
     };
 
     /** Apply approved changes in one transaction, under the reviewer's own driver. */
-    const apply = async (c: ReviewContext, driver: DataDriver, changes: StagedChange[]) => {
+    const apply = async (driver: DataDriver, changes: StagedChange[]) => {
         if (!driver.batchWrite) {
             throw new ApiError(501, "BATCH_UNSUPPORTED", "This backend's data driver cannot apply changes as one transaction.");
         }
+        // A table's data path is its slug; the driver resolves the table from it.
         const operations = changes.map((change): BatchWriteOperation => {
-            const collection = collectionOf(c, change.collection_slug);
-            const path = collection ? getCollectionDataPath(collection) : change.collection_slug;
             const values = change.proposed_data ?? undefined;
-            const base = { path,
-...(collection ? { collection } : {}) };
+            const base = { path: change.collection_slug };
             if (change.operation === "insert") {
                 return { ...base,
 op: "create",
@@ -233,7 +231,7 @@ values };
         }
         if (action === "approve") {
             try {
-                await apply(c, driver, changes);
+                await apply(driver, changes);
             } catch (error) {
                 await store.reopen(claimed.map(change => change.id));
                 throw error;
@@ -270,10 +268,13 @@ values };
                 throw new ApiError(400, "INVALID_STAGED_CHANGE", `A proposed ${op} carries the values it writes: \`data\`, an object.`);
             }
             data = Object.fromEntries(Object.entries(body.data));
-            const collection = collectionOf(c, slug);
-            const unknown = collection ? Object.keys(data).filter(key => !(key in collection.properties)) : [];
+            const table = tableOf(c, slug);
+            // A write names a column by its key, or a relation by its name (a
+            // belongsTo takes the target's id), as REST takes it.
+            const known = table ? new Set([...table.columns.map(column => column.key), ...table.relations.map(relation => relation.name)]) : undefined;
+            const unknown = known ? Object.keys(data).filter(key => !known.has(key)) : [];
             if (unknown.length > 0) {
-                throw new ApiError(400, "UNKNOWN_FIELD", `"${slug}" has no field ${unknown.map(key => `"${key}"`).join(", ")}.`, { fields: unknown });
+                throw new ApiError(400, "UNKNOWN_FIELD", `"${slug}" has no column ${unknown.map(key => `"${key}"`).join(", ")}.`, { fields: unknown });
             }
         }
 
@@ -281,12 +282,7 @@ values };
         // security, so nobody proposes a change to a row they cannot see.
         let before: Record<string, unknown> | null = null;
         if (op !== "insert" && recordId) {
-            const collection = collectionOf(c, slug);
-            const row = await requireDriver(c).fetchOne({
-                path: collection ? getCollectionDataPath(collection) : slug,
-                id: recordId,
-                ...(collection ? { collection } : {})
-            });
+            const row = await requireDriver(c).fetchOne({ path: slug, id: recordId });
             if (!row) throw new ApiError(404, "NOT_FOUND", `No row "${recordId}" in "${slug}".`);
             before = row;
         }

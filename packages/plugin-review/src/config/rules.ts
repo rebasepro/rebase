@@ -5,27 +5,32 @@ import type { StateFieldReview } from "./types";
  * The restrictive policy that holds a state-field review.
  *
  * Restrictive policies are ANDed with every other policy on the table, so this
- * narrows what the collection's own `securityRules` grant and never widens it:
+ * narrows what the table's own `rls` grants and never widens it:
  * a caller held to review may insert a row only with `field = pendingValue`,
  * and may update a row only while it holds `pendingValue` and keeps it. The
  * trusted server context, the `admin` role and every reviewer role pass
  * untouched; with `agentRoles` set, so does every caller holding none of them.
  *
- * Spread it into the collection's rules:
+ * Spread it into the table's `rls`:
  *
  * @example
  * ```ts
- * import { reviewSecurityRules } from "@rebasepro/plugin-review/config";
+ * // backend/schema/posts.ts
+ * import { col, defineTable } from "@rebasepro/server/schema";
+ * import { reviewRls } from "@rebasepro/plugin-review/config";
  * import { review } from "../review";
  *
- * defineCollection({
- *     slug: "posts",
- *     securityRules: [
+ * export const posts = defineTable("posts", {
+ *     columns: {
+ *         id: col.uuid().primaryKey().defaultRandom(),
+ *         status: col.enum(["draft", "published", "rejected"]).notNull().default("draft"),
+ *         …
+ *     },
+ *     rls: [
  *         { operations: ["select", "insert", "update"], roles: ["agent", "editor"] },
- *         ...reviewSecurityRules("posts", review.collections.posts)
- *     ],
- *     properties: { status: { type: "string", enum: { draft: "Draft", published: "Published" } }, … }
- * })
+ *         ...reviewRls("posts", review.collections.posts)
+ *     ]
+ * });
  * ```
  *
  * The policy's name is derived from the slug, `<slug>_review_pending_only`
@@ -33,7 +38,7 @@ import type { StateFieldReview } from "./types";
  *
  * @group Review
  */
-export function reviewSecurityRules(slug: string, review: StateFieldReview): SecurityRule[] {
+export function reviewRls(slug: string, review: StateFieldReview): SecurityRule[] {
     const exempt: PolicyExpression[] = [
         policy.serverContext(),
         policy.rolesOverlap(["admin", ...(review.reviewerRoles ?? [])])

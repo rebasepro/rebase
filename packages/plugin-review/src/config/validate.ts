@@ -1,4 +1,4 @@
-import type { CollectionConfig, EnumValues } from "@rebasepro/types";
+import { isTextColumnType, type ColumnDescriptor, type TableDescriptor } from "@rebasepro/types";
 import { STAGED_CHANGE_OPERATIONS, type CollectionReview, type ReviewConfig } from "./types";
 
 /** One thing wrong with a review configuration. @group Review */
@@ -20,10 +20,15 @@ export class ReviewConfigError extends Error {
     }
 }
 
-/** The ids an `enum` declares, as strings. */
-function enumIds(values: EnumValues): string[] {
-    if (Array.isArray(values)) return values.map(entry => String(entry.id));
-    return Object.keys(values);
+/** The closed value set a column holds — its Postgres enum's labels, or its `.oneOf([...])` — as strings. */
+function closedValues(column: ColumnDescriptor): string[] | undefined {
+    if (column.type.kind === "enum") return [...column.type.values];
+    return column.oneOf?.map(String);
+}
+
+/** Whether a column holds text a review state can be compared with: a text kind, or a Postgres enum. */
+function holdsText(column: ColumnDescriptor): boolean {
+    return isTextColumnType(column.type) || column.type.kind === "enum";
 }
 
 function checkRoleList(value: unknown, path: string, problems: ReviewConfigProblem[]): void {
@@ -35,7 +40,7 @@ message: "a role list is an array of role names, e.g. [\"agent\"]." });
 }
 
 /**
- * Check one collection's review against the collection itself.
+ * Check one table's review against the table's descriptor.
  *
  * A state-field review compiles to a policy comparing the field to
  * `pendingValue`, so the field has to exist and hold text, and every value the
@@ -43,16 +48,16 @@ message: "a role list is an array of role names, e.g. [\"agent\"]." });
  * outside it is a comparison Postgres refuses when the policy is created, and
  * a value no reviewer could ever set is the same mistake one step later.
  */
-function checkCollectionReview(
+function checkTableReview(
     slug: string,
     review: CollectionReview,
-    collection: CollectionConfig | undefined,
+    table: TableDescriptor | undefined,
     problems: ReviewConfigProblem[]
 ): void {
     const at = `collections.${slug}`;
-    if (collection === undefined) {
+    if (table === undefined) {
         problems.push({ path: at,
-message: `no collection has the slug "${slug}".` });
+message: `no table has the slug "${slug}". Declare it with defineTable in backend/schema, or name one there is.` });
     }
     checkRoleList(review.agentRoles, `${at}.agentRoles`, problems);
     checkRoleList(review.reviewerRoles, `${at}.reviewerRoles`, problems);
@@ -87,28 +92,28 @@ message: "the same as pendingValue, so approving a row would change nothing." })
 
     if (typeof review.field !== "string" || review.field === "") {
         problems.push({ path: `${at}.field`,
-message: "names the property holding the review state, e.g. \"status\"." });
+message: "names the column holding the review state, e.g. \"status\"." });
         return;
     }
-    if (!collection) return;
-    const property = collection.properties[review.field];
-    if (!property) {
+    if (!table) return;
+    const column = table.columns.find(candidate => candidate.key === review.field);
+    if (!column) {
         problems.push({ path: `${at}.field`,
-message: `"${slug}" has no property "${review.field}". Declare it as a string, or name one it has.` });
+message: `"${slug}" has no column "${review.field}". Declare it as a text column (col.text()), or name one it has.` });
         return;
     }
-    if (property.type !== "string") {
+    if (!holdsText(column)) {
         problems.push({ path: `${at}.field`,
-message: `"${review.field}" is a ${property.type}; a review state is compared with text, so it has to be a string.` });
+message: `"${review.field}" is a ${column.type.kind} column; a review state is compared with text, so it has to hold text (col.text(), col.varchar() or col.enum()).` });
         return;
     }
-    if (!property.enum) return;
-    const allowed = enumIds(property.enum);
+    const allowed = closedValues(column);
+    if (!allowed) return;
     for (const [key, value] of values) {
         if (typeof value === "string" && value !== "" && !allowed.includes(value)) {
             problems.push({
                 path: `${at}.${key}`,
-                message: `"${value}" is not one of ${review.field}'s enum values (${allowed.map(id => `"${id}"`).join(", ")}), ` +
+                message: `"${value}" is not one of ${review.field}'s values (${allowed.map(id => `"${id}"`).join(", ")}), ` +
                     "so no row could ever be in that state."
             });
         }
@@ -116,19 +121,20 @@ message: `"${review.field}" is a ${property.type}; a review state is compared wi
 }
 
 /**
- * Every problem in a review configuration, checked against the collections it
- * names. Empty when the configuration is sound.
+ * Every problem in a review configuration, checked against the descriptors
+ * of the tables it names (`services.tables()` on the backend, or
+ * `compileTables(...)`). Empty when the configuration is sound.
  *
  * @group Review
  */
-export function findReviewConfigProblems(config: ReviewConfig, collections: readonly CollectionConfig[]): ReviewConfigProblem[] {
+export function findReviewConfigProblems(config: ReviewConfig, tables: readonly TableDescriptor[]): ReviewConfigProblem[] {
     const problems: ReviewConfigProblem[] = [];
     if (config.functionName !== undefined && !/^[a-z0-9][a-z0-9-]*$/.test(config.functionName)) {
         problems.push({ path: "functionName",
 message: "a function name is lower-case letters, digits and dashes." });
     }
     for (const [slug, review] of Object.entries(config.collections ?? {})) {
-        checkCollectionReview(slug, review, collections.find(collection => collection.slug === slug), problems);
+        checkTableReview(slug, review, tables.find(table => table.slug === slug), problems);
     }
     return problems;
 }
@@ -139,8 +145,8 @@ message: "a function name is lower-case letters, digits and dashes." });
  *
  * @group Review
  */
-export function assertReviewConfig(config: ReviewConfig, collections: readonly CollectionConfig[]): ReviewConfig {
-    const problems = findReviewConfigProblems(config, collections);
+export function assertReviewConfig(config: ReviewConfig, tables: readonly TableDescriptor[]): ReviewConfig {
+    const problems = findReviewConfigProblems(config, tables);
     if (problems.length > 0) throw new ReviewConfigError(problems);
     return config;
 }

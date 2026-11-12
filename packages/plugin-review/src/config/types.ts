@@ -1,18 +1,18 @@
 /**
  * The review plugin's configuration and wire types.
  *
- * Headless: this module imports nothing but types, so a collection file the
- * backend loads, the server function and the admin panel can all read one
+ * Headless: this module imports nothing but types, so a `backend/schema` table
+ * file the backend loads, the server function and the admin panel can all read one
  * review declaration.
  *
  * @module
  */
 
 /**
- * Review declared through a property on the row itself.
+ * Review declared through a column on the row itself.
  *
  * Callers held to review may only write rows whose `field` holds
- * `pendingValue`; {@link reviewSecurityRules} turns this into a restrictive
+ * `pendingValue`; {@link reviewRls} turns this into a restrictive
  * Postgres policy, so neither the API nor raw SQL under the user role can skip
  * it. A reviewer approves by setting the field to `approvedValue`.
  *
@@ -24,12 +24,12 @@
  * @group Review
  */
 export interface StateFieldReview {
-    /** Discriminant: review state lives in a property of the row. */
+    /** Discriminant: review state lives in a column of the row. */
     mode: "state-field";
     /**
-     * The property holding the review state. It must be declared on the
-     * collection and be a `string`; when it declares `enum` values, every
-     * value below must be one of them.
+     * The column holding the review state, by its key. It must be declared
+     * on the table and hold text; when it has a closed value set (an enum,
+     * or `.oneOf([...])`), every value below must be one of them.
      */
     field: string;
     /**
@@ -101,7 +101,11 @@ export type CollectionReview = StateFieldReview | StagedTableReview;
  * @group Review
  */
 export interface ReviewConfig {
-    /** Keyed by collection slug. */
+    /**
+     * Keyed by table slug — the slug a `defineTable` in `backend/schema`
+     * serves, which is also the slug of the collection the admin panel
+     * derives from it.
+     */
     collections: Record<string, CollectionReview>;
     /**
      * The name the server function is registered under, and so the path it

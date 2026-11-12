@@ -9,7 +9,7 @@
  * ```ts
  * // functions/review.ts
  * import { reviewFunction } from "@rebasepro/plugin-review/server";
- * import { review } from "../config/review";
+ * import { review } from "../review";
  *
  * export default reviewFunction(review);
  * ```
