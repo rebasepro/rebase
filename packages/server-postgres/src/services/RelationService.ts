@@ -830,9 +830,8 @@ export class RelationService {
         if (options.searchString) {
             const searchConditions = DrizzleConditionBuilder.buildSearchConditions(
                 options.searchString,
-                targetCollection.properties,
                 targetTable,
-                targetCollection
+                this.registry.requireTable(targetCollection.slug).descriptor
             );
 
             if (searchConditions.length === 0) {

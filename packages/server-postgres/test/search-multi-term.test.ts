@@ -16,6 +16,7 @@
 import { CollectionConfig } from "@rebasepro/types";
 import { pgTable, PgDialect, text, uuid } from "drizzle-orm/pg-core";
 import { DrizzleConditionBuilder } from "../src/utils/drizzle-conditions";
+import { tablesFromCollections } from "./helpers/tables";
 
 const customers = pgTable("customers", {
     id: uuid("id").primaryKey(),
@@ -36,10 +37,11 @@ const collection: CollectionConfig = {
     },
     idField: "id"
 };
+const [described] = tablesFromCollections([collection]).descriptors;
 
 const compile = (searchString: string) => {
     const conditions = DrizzleConditionBuilder.buildSearchConditions(
-        searchString, collection.properties, customers, collection
+        searchString, customers, described
     );
     expect(conditions).toHaveLength(1);
     const { sql, params } = new PgDialect().sqlToQuery(conditions[0]);
@@ -90,7 +92,7 @@ describe("the ILIKE fallback across several fields", () => {
             properties: { id: { type: "string", isId: "uuid" } }
         };
         expect(DrizzleConditionBuilder.buildSearchConditions(
-            "sebastian melendez", idOnly.properties, customers, idOnly
+            "sebastian melendez", customers, tablesFromCollections([idOnly]).descriptors[0]
         )).toEqual([]);
     });
 });

@@ -25,6 +25,7 @@ import { CollectionConfig } from "@rebasepro/types";
 import { pgTable, PgDialect, uuid, varchar, text } from "drizzle-orm/pg-core";
 import { DrizzleConditionBuilder } from "../src/utils/drizzle-conditions";
 import type { PgTable } from "drizzle-orm/pg-core";
+import { tablesFromCollections } from "./helpers/tables";
 
 const users = pgTable("users", {
     id: uuid("id").primaryKey(),
@@ -50,6 +51,7 @@ const collection: CollectionConfig = {
         bio: { type: "string" }
     }
 };
+const [described] = tablesFromCollections([collection]).descriptors;
 
 /**
  * The columns the search was built against, by SQL identifier.
@@ -59,7 +61,7 @@ const collection: CollectionConfig = {
  */
 const searchedColumns = (table: PgTable): string[] => {
     const conditions = DrizzleConditionBuilder.buildSearchConditions(
-        "francesco", collection.properties, table, collection
+        "francesco", table, described
     );
     if (conditions.length === 0) return [];
     expect(conditions).toHaveLength(1);

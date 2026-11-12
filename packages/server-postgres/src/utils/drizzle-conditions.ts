@@ -5,11 +5,12 @@ import {
     CollectionConfig, FilterValues, WhereFilterOp, JoinStep, joinConditions, LogicalCondition, FilterCondition,
     ResolvedRelation, ResolvedBelongsTo, ResolvedHasOne, ResolvedHasMany,
     ResolvedForeignKeyOnTarget, ResolvedManyToMany, hasForeignKeyOnTarget, isManyToMany,
-    encodeRelationAggregateSort, parseCaseFoldedFieldPath, type Property, type RelationAggregateFn, type RelationAggregateSort
+    encodeRelationAggregateSort, parseCaseFoldedFieldPath, type RelationAggregateFn, type RelationAggregateSort
 } from "@rebasepro/types";
 import {
     apiHiddenFieldNames,
-    canReadField,
+    canReadColumn,
+    isIlikeSearchable,
     queryableFieldNames,
     unknownFilterField,
     unknownVectorProperty,
@@ -33,7 +34,8 @@ const PG_TRGM_WORD_SIMILARITY_DEFAULT = 0.6;
  * half always outranks one found only by substring.
  */
 const HYBRID_SUBSTRING_SCORE = 0.001;
-import { buildSearchColumnSpec, SEARCH_UNACCENT_FN, type SearchColumnSpec } from "../schema/search-column";
+import { buildTableSearchColumnSpec, SEARCH_UNACCENT_FN, type SearchColumnSpec } from "../schema/search-column";
+import type { TableDescriptor } from "@rebasepro/types";
 import { PostgresTableRegistry } from "../model/PostgresTableRegistry";
 import { ConditionBuilderStatic } from "../interfaces";
 import { ApiError, logger } from "@rebasepro/server";
@@ -2429,8 +2431,10 @@ whereConditions };
      * - **Declared** — one `@@ websearch_to_tsquery` against the generated
      *   `tsvector` column. Stems, drops stopwords, AND-es the terms, reaches
      *   inside JSONB and arrays, and uses the GIN index.
-     * - **Not declared** — `ILIKE '%term%'` per term, OR-ed across top-level
-     *   string properties and AND-ed across the terms, with each term escaped
+     * - **Not declared** — `ILIKE '%term%'` per term, OR-ed across the
+     *   table's text columns the caller may read (see `isIlikeSearchable`:
+     *   `text`/`varchar`/`char`, never an enum, a uuid or a text `.oneOf()`)
+     *   and AND-ed across the terms, with each term escaped
      *   (see {@link escapeLikePattern}) so it is matched as the literal text
      *   the user typed.
      *
@@ -2444,44 +2448,37 @@ whereConditions };
      * Returns at most one condition. Every caller ORs what it gets back, which
      * is right across columns and wrong across terms, so the AND is built here.
      *
-     * `collection` is optional so that the callers which genuinely have no
-     * collection in hand — nested paths, derived views — keep working; without
-     * one there is no `search` block to read and the ILIKE path is correct.
+     * `described` is the searched table's descriptor: its `search` block and
+     * its columns' types and access rules are read from it, `table` is the
+     * catalogue table the columns are found on (by column key).
      */
     static buildSearchConditions(
         searchString: string,
-        properties: Record<string, unknown>,
         table: PgTable<any>,
-        collection?: CollectionConfig
+        described: TableDescriptor
     ): SQL[] {
         const searchConditions: SQL[] = [];
 
-        const ftsCondition = collection
-            ? DrizzleConditionBuilder.buildFullTextCondition(searchString, table, collection)
-            : undefined;
+        const ftsCondition = DrizzleConditionBuilder.buildFullTextCondition(searchString, table, described);
         if (ftsCondition) return [ftsCondition];
 
-        let declaredStringProperties = 0;
+        let declaredTextColumns = 0;
         const viewer = currentFieldViewer();
         const searchableColumns: AnyPgColumn[] = [];
 
-        for (const [key, prop] of Object.entries(properties)) {
-            const p = prop as Record<string, unknown>;
-            // A field this caller cannot read is not one they may search. The
+        for (const column of described.columns) {
+            // A column this caller cannot read is not one they may search. The
             // strip keeps the value out of the response; without this the same
             // value is still recoverable a substring at a time by watching which
             // searches return the row, which is the disclosure the read rule
-            // exists to prevent. `excludeFromApi` expands to the same rule, so a
-            // password hash stops being ILIKE-matchable here too.
-            if (!canReadField(prop as Property, viewer)) continue;
-            // Only include string properties that don't have enum defined
-            // PostgreSQL enum and uuid columns don't support ILIKE, so we skip them
-            if (p.type === "string" && !p.enum && p.isId !== "uuid") {
-                declaredStringProperties++;
-                const fieldColumn = table[key as keyof typeof table] as AnyPgColumn;
-                if (fieldColumn && supportsILike(fieldColumn)) {
-                    searchableColumns.push(fieldColumn);
-                }
+            // exists to prevent. `.private()` is the rule no caller satisfies,
+            // so a password hash is never ILIKE-matchable.
+            if (!canReadColumn(column, viewer)) continue;
+            if (!isIlikeSearchable(column)) continue;
+            declaredTextColumns++;
+            const fieldColumn = table[column.key as keyof typeof table] as AnyPgColumn | undefined;
+            if (fieldColumn && supportsILike(fieldColumn)) {
+                searchableColumns.push(fieldColumn);
             }
         }
 
@@ -2490,10 +2487,10 @@ whereConditions };
         // which reads as "no such row" rather than as the breakage it is. Say so
         // once per query: this is how the `instanceof` version of
         // {@link supportsILike} failed silently in the field for months.
-        if (declaredStringProperties > 0 && searchableColumns.length === 0) {
+        if (declaredTextColumns > 0 && searchableColumns.length === 0) {
             logger.warn(
-                `[search] "${collection?.slug ?? "collection"}" declares ${declaredStringProperties} string ` +
-                "property(ies) but none compiled to a searchable column, so this search can only return nothing. " +
+                `[search] table "${described.slug}" declares ${declaredTextColumns} text ` +
+                "column(s) but none is a searchable column of the catalogue table, so this search can only return nothing. " +
                 "Check that the generated schema's column types are text/varchar/char."
             );
         }
@@ -2541,11 +2538,11 @@ whereConditions };
     static buildFullTextCondition(
         searchString: string,
         table: PgTable<any>,
-        collection: CollectionConfig
+        described: TableDescriptor
     ): SQL | undefined {
         let spec: SearchColumnSpec | undefined;
         try {
-            spec = buildSearchColumnSpec(collection);
+            spec = buildTableSearchColumnSpec(described);
         } catch {
             // Reported at boot. Falling back to ILIKE here keeps reads serving.
             return undefined;
@@ -2726,11 +2723,11 @@ whereConditions };
     static buildSearchMatchesExpression(
         searchString: string,
         table: PgTable<any>,
-        collection: CollectionConfig
+        described: TableDescriptor
     ): SQL | undefined {
         let spec: SearchColumnSpec | undefined;
         try {
-            spec = buildSearchColumnSpec(collection);
+            spec = buildTableSearchColumnSpec(described);
         } catch {
             return undefined;
         }
@@ -2789,11 +2786,11 @@ whereConditions };
     static buildSearchRankExpression(
         searchString: string,
         table: PgTable<any>,
-        collection: CollectionConfig
+        described: TableDescriptor
     ): SQL | undefined {
         let spec: SearchColumnSpec | undefined;
         try {
-            spec = buildSearchColumnSpec(collection);
+            spec = buildTableSearchColumnSpec(described);
         } catch {
             return undefined;
         }

@@ -16,12 +16,15 @@ import { CollectionConfig } from "@rebasepro/types";
 import { pgTable, PgDialect, serial, text, integer } from "drizzle-orm/pg-core";
 import { DrizzleConditionBuilder } from "../src/utils/drizzle-conditions";
 import { withFieldViewer } from "../src/services/field-viewer";
+import { tablesFromCollections } from "./helpers/tables";
 
 const staff = pgTable("staff", {
     id: serial("id").primaryKey(),
     name: text("name"),
     notes: text("notes"),
-    password_hash: text("password_hash"),
+    // Keyed as the table declares the column, so the search would reach it
+    // if the private rule did not stop it.
+    passwordHash: text("password_hash"),
     age: integer("age")
 });
 
@@ -38,6 +41,7 @@ const collection: CollectionConfig = {
     },
     idField: "id"
 };
+const [described] = tablesFromCollections([collection]).descriptors;
 
 /**
  * How many columns the compiled search actually looks at.
@@ -48,7 +52,7 @@ const collection: CollectionConfig = {
  */
 const searchedColumnCount = (roles?: string[]): number => {
     const build = () =>
-        DrizzleConditionBuilder.buildSearchConditions("ada", collection.properties, staff, collection);
+        DrizzleConditionBuilder.buildSearchConditions("ada", staff, described);
     const conditions = roles ? withFieldViewer({ roles }, build) : build();
     if (conditions.length === 0) return 0;
     const { sql } = new PgDialect().sqlToQuery(conditions[0]);
@@ -69,9 +73,9 @@ describe("the fallback ILIKE search", () => {
         expect(searchedColumnCount(["admin"])).toBe(2);
     });
 
-    it("never searches an `excludeFromApi` column, whoever is asking", () => {
+    it("never searches a private column, whoever is asking", () => {
         // Two is `name` + `notes`. A third would be `password_hash`, and the
-        // whole point of the flag is that no caller reaches it.
+        // whole point of `.private()` is that no caller reaches it.
         expect(searchedColumnCount(["admin"])).toBe(2);
         expect(searchedColumnCount(["hr"])).toBe(2);
     });

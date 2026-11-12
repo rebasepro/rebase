@@ -409,7 +409,7 @@ export class FetchService {
         searchString?: string
     ): AnyPgColumn | SQL | undefined {
         if (orderBy === FetchService.SCORE_FIELD && collection && searchString) {
-            const rank = DrizzleConditionBuilder.buildSearchRankExpression(searchString, table, collection);
+            const rank = DrizzleConditionBuilder.buildSearchRankExpression(searchString, table, this.registry.requireTable(collection.slug).descriptor);
             if (rank) return rank;
         }
         return this.resolveOrderByField(table, orderBy, collection);
@@ -1898,7 +1898,7 @@ target });
 
         if (options.searchString) {
             const searchConditions = DrizzleConditionBuilder.buildSearchConditions(
-                options.searchString, collection.properties, table, collection
+                options.searchString, table, this.registry.requireTable(collection.slug).descriptor
             );
             if (searchConditions.length === 0) return 0;
             allConditions.push(DrizzleConditionBuilder.combineConditionsWithOr(searchConditions)!);
@@ -2124,7 +2124,7 @@ target });
         withSoftDelete(conditions, this.registry.requireTable(collection.slug), table, options.withDeleted);
         if (options.searchString) {
             const searchConditions = DrizzleConditionBuilder.buildSearchConditions(
-                options.searchString, collection.properties, table, collection
+                options.searchString, table, this.registry.requireTable(collection.slug).descriptor
             );
             // No searchable field means no row matches — the same impossible
             // WHERE the listing uses, rather than an unfiltered aggregate.
@@ -2649,12 +2649,12 @@ relatedTo: hop }, include
         // request carried a search string, so a caller can order by it, show
         // it, or blend it with a score of their own.
         const rankSelect = options.searchString
-            ? DrizzleConditionBuilder.buildSearchRankExpression(options.searchString, table, collection)
+            ? DrizzleConditionBuilder.buildSearchRankExpression(options.searchString, table, this.registry.requireTable(collection.slug).descriptor)
             : undefined;
 
         // Only when asked: a `ts_headline` per declared field per row.
         const matchesSelect = options.searchString && options.searchExplain
-            ? DrizzleConditionBuilder.buildSearchMatchesExpression(options.searchString, table, collection)
+            ? DrizzleConditionBuilder.buildSearchMatchesExpression(options.searchString, table, this.registry.requireTable(collection.slug).descriptor)
             : undefined;
 
         // `SELECT DISTINCT`, over exactly the projection above.
@@ -2701,7 +2701,7 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
 
         if (options.searchString) {
             const searchConditions = DrizzleConditionBuilder.buildSearchConditions(
-                options.searchString, collection.properties, table, collection
+                options.searchString, table, this.registry.requireTable(collection.slug).descriptor
             );
             if (searchConditions.length === 0) return [];
             allConditions.push(DrizzleConditionBuilder.combineConditionsWithOr(searchConditions)!);

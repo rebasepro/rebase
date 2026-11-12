@@ -24,6 +24,7 @@ import { pgTable, PgDialect, serial, text } from "drizzle-orm/pg-core";
 import { DrizzleConditionBuilder, escapeLikePattern } from "../src/utils/drizzle-conditions";
 import { UserService } from "../src/auth/services";
 import { recordingDb } from "./helpers/spg-c-db";
+import { tablesFromCollections } from "./helpers/tables";
 
 const docs = pgTable("docs", {
     id: serial("id").primaryKey(),
@@ -39,11 +40,12 @@ const collection: CollectionConfig = {
         title: { type: "string" }
     }
 };
+const [described] = tablesFromCollections([collection]).descriptors;
 
 /** The bound patterns the ILIKE condition would send, one per search term. */
 const patternsFor = (searchString: string): string[] => {
     const conditions = DrizzleConditionBuilder.buildSearchConditions(
-        searchString, collection.properties, docs, collection
+        searchString, docs, described
     );
     expect(conditions).toHaveLength(1);
     const { params } = new PgDialect().sqlToQuery(conditions[0]);
