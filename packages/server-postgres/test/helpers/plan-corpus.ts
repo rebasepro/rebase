@@ -9,20 +9,32 @@
  * new model and asserts the same goldens — which is why the sets are data and
  * the renderer is exported rather than living inside the test.
  *
- * Nothing here re-implements a loader. Directories are read by
- * `loadCollectionsFromDirectory` (the one the CLI, the runtime and the doctor
- * share, which applies a directory's `defaultSecurityRules`), the generated
- * real-schema collections are written by `generateCollectionFile` and read back
- * by the same loader, and the docs sample is evaluated by the docs gate's own
- * evaluator in a child process.
+ * The corpus is legacy collection sets on purpose: the goldens were recorded
+ * from them on `main`, and the table path is proven against the same goldens
+ * by lifting each set (`plan-equivalence.test.ts`). The runtime no longer reads
+ * `config/collections` (it reads `backend/schema`), so a collection directory
+ * is read here by {@link readCollectionDirectory} — the deleted runtime
+ * loader's semantics, kept for these frozen inputs only: every non-index module
+ * in directory order, its default export, and the index's
+ * `defaultSecurityRules` applied to each collection with no rules of its own.
+ * The generated real-schema collections are written by
+ * `generateCollectionFile` and read back the same way, and the docs sample is
+ * evaluated by the docs gate's own evaluator in a child process.
  */
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { resetDeclaredResources, type CollectionConfig } from "@rebasepro/types";
-import { loadCollectionsFromDirectory } from "@rebasepro/server";
+import { pathToFileURL } from "node:url";
+
+import {
+    isPostgresCollectionConfig,
+    resetDeclaredResources,
+    resolveResourceRefs,
+    type CollectionConfig,
+    type SecurityRule
+} from "@rebasepro/types";
 
 import { generateSchema } from "../../src/schema/generate-drizzle-schema-logic";
 import {
@@ -369,7 +381,48 @@ async function loadCliTemplate(preset: (typeof CLI_TEMPLATE_PRESETS)[number]): P
         }
     }
     fs.rmSync(presets, { recursive: true, force: true });
-    return loadCollectionsFromDirectory(collections);
+    return readCollectionDirectory(collections);
+}
+
+/** A module of a collection directory: not the index, a test, a declaration file or a dotfile. */
+const isCollectionModule = (file: string): boolean =>
+    (file.endsWith(".ts") || file.endsWith(".js")) && !file.startsWith(".") && !file.includes(".test.") &&
+    !file.endsWith(".d.ts") && file !== "index.ts" && file !== "index.js";
+
+const isSecurityRuleList = (value: unknown): value is SecurityRule[] => Array.isArray(value);
+
+/**
+ * A legacy `config/collections` directory, read the way the runtime read one
+ * when these goldens were recorded: each module's default export in directory
+ * order, references resolved, and the index's `defaultSecurityRules` applied
+ * to every collection that declares no rules. Throws on a module that does not
+ * import or exports no collection — a set silently missing a collection would
+ * record a golden for a different schema.
+ */
+async function readCollectionDirectory(dir: string): Promise<CollectionConfig[]> {
+    const collections: CollectionConfig[] = [];
+    for (const file of fs.readdirSync(dir).filter(isCollectionModule)) {
+        const mod: Record<string, unknown> = await import(pathToFileURL(path.join(dir, file)).href);
+        const collection: unknown = mod.default;
+        if (typeof collection !== "object" || collection === null || !("properties" in collection)) {
+            throw new Error(`${path.join(dir, file)} default-exports no collection`);
+        }
+        // A plain object authored as a collection: what the runtime loader accepted.
+        collections.push(resolveResourceRefs(collection as CollectionConfig));
+    }
+    const index = ["index.ts", "index.js"].map(name => path.join(dir, name)).find(candidate => fs.existsSync(candidate));
+    if (index) {
+        const mod: Record<string, unknown> = await import(pathToFileURL(index).href);
+        const defaults = mod.defaultSecurityRules;
+        if (isSecurityRuleList(defaults) && defaults.length > 0) {
+            for (const collection of collections) {
+                if (isPostgresCollectionConfig(collection) && !collection.securityRules?.length) {
+                    collection.securityRules = defaults;
+                }
+            }
+        }
+    }
+    return collections;
 }
 
 /** Every database captured under `test/fixtures/real-schemas`. */
@@ -415,7 +468,7 @@ async function loadGeneratedRealSchema(name: RealSchemaName): Promise<Collection
         generated.push(table);
     }
     fs.writeFileSync(path.join(outDir, "index.ts"), generateIndexContent(generated), "utf-8");
-    return loadCollectionsFromDirectory(outDir);
+    return readCollectionDirectory(outDir);
 }
 
 /**
@@ -493,7 +546,7 @@ export async function loadPlanCorpus(): Promise<PlanCorpus> {
         { id: "policy-shapes", collections: POLICY_SHAPE_COLLECTIONS, options: {} },
         {
             id: "app",
-            collections: await loadCollectionsFromDirectory(path.join(REPO_ROOT, "app", "config", "collections")),
+            collections: await readCollectionDirectory(path.join(REPO_ROOT, "app", "config", "collections")),
             options: {}
         }
     ];
@@ -510,7 +563,7 @@ export async function loadPlanCorpus(): Promise<PlanCorpus> {
     if (fs.existsSync(saasCollections)) {
         sets.push({
             id: "saas",
-            collections: await loadCollectionsFromDirectory(saasCollections),
+            collections: await readCollectionDirectory(saasCollections),
             options: {},
             goldenRoot: SAAS_PLAN_GOLDEN_DIR
         });

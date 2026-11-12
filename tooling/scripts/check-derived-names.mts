@@ -100,7 +100,26 @@ const tableOf = (line: string): string => {
 const moved: { from: string; to: string }[] = [];
 const unmatchedRemovals = [...removed];
 const unmatchedAdditions = [...added];
+
+// The same identifier on both sides with a different tag is not a rename: its
+// name is unchanged, only which producer emits it moved. Paired first, so the
+// rename pairing below never reads `X [push]` → `X [boot,push]` as `X` moved
+// to `X`. A producer gained (push-only → both) closes a boot/push gap and is
+// safe; a producer lost is the divergence reported below.
+const producersOf = (line: string): string[] => /\[([a-z,]+)\]$/.exec(line)?.[1].split(",") ?? [];
+const producerGained: { line: string; was: string }[] = [];
 for (const removal of [...unmatchedRemovals]) {
+    const same = unmatchedAdditions.find(addition => identifierOf(addition) === identifierOf(removal));
+    if (!same) continue;
+    if (!producersOf(removal).every(producer => producersOf(same).includes(producer))) continue;
+    producerGained.push({ line: same, was: removal });
+    unmatchedRemovals.splice(unmatchedRemovals.indexOf(removal), 1);
+    unmatchedAdditions.splice(unmatchedAdditions.indexOf(same), 1);
+}
+
+for (const removal of [...unmatchedRemovals]) {
+    // A retagged identifier that LOST a producer is a divergence, never a move.
+    if (unmatchedAdditions.some(addition => identifierOf(addition) === identifierOf(removal))) continue;
     // Only pair a removal with an addition on the same table and of the same
     // kind. Anything looser invents renames out of coincidence.
     const match = unmatchedAdditions.find(addition => tableOf(addition) === tableOf(removal));
@@ -158,6 +177,11 @@ const plainAdditions = unmatchedAdditions.filter(line => !divergent.includes(lin
 if (plainAdditions.length > 0) {
     console.error("\x1b[33m  ADDED — safe.\x1b[0m");
     console.error(bullet(plainAdditions));
+}
+
+if (producerGained.length > 0) {
+    console.error("\x1b[33m  PRODUCER ADDED — safe: the same name, now emitted by both.\x1b[0m");
+    console.error(bullet(producerGained.map(g => `${g.line}  (was ${/\[[a-z,]+\]$/.exec(g.was)?.[0] ?? "?"})`)));
 }
 
 console.error(

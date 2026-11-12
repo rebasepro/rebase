@@ -339,8 +339,23 @@ async function assertResolvesToSource(): Promise<void> {
     }
 }
 
-export async function render(): Promise<string> {
-    await assertResolvesToSource();
+/** What the two producers name for one fixture: the surface, and the legacy names boot recognises. */
+interface Rendered {
+    surface: Surface;
+    legacy: string[];
+}
+
+/** One shape of the fixture, as the planner reads it. */
+type FixtureInput = typeof FIXTURE;
+
+/**
+ * Run both producers over `fixture` and collect every name they emit.
+ *
+ * Called twice by {@link render}: once with the legacy collection fixture, once
+ * with the same fixture lifted into `defineTable` definitions and lowered back
+ * — the path every project takes now that tables live in `backend/schema`.
+ */
+async function renderFixture(fixture: FixtureInput): Promise<Rendered> {
 
     const {
         generatePostgresDdl,
@@ -365,15 +380,15 @@ export async function render(): Promise<string> {
     // which this file's own header calls a defect — and would miss
     // `CREATE EXTENSION vector` entirely, since that is the one statement
     // `schema.sql` must never carry.
-    const pushDdl: string = await generatePostgresDdl(FIXTURE, {
+    const pushDdl: string = await generatePostgresDdl(fixture, {
         includePolicies: true,
         includeSearch: false,
         includeVector: false
     });
     const pushFiles = [
         pushDdl,
-        generatePostgresSearchDdl(FIXTURE) as string,
-        generatePostgresVectorDdl(FIXTURE, { extensions: FIXTURE_DATABASE_EXTENSIONS }) as string
+        generatePostgresSearchDdl(fixture) as string,
+        generatePostgresVectorDdl(fixture, { extensions: FIXTURE_DATABASE_EXTENSIONS }) as string
     ];
     for (const file of pushFiles) {
         for (const statement of statementsOf(file)) readStatement(surface, "push", statement);
@@ -381,22 +396,22 @@ export async function render(): Promise<string> {
     // `triggers.sql` and `views.sql`, the other two files `db push` writes and
     // Atlas is not shown. Read after the first three so that adding them, when
     // the fixture first carried a trigger and a view, moved no existing line.
-    for (const statement of statementsOf(generatePostgresTriggersDdl(FIXTURE) as string)) {
+    for (const statement of statementsOf(generatePostgresTriggersDdl(fixture) as string)) {
         readStatement(surface, "push", statement);
     }
-    for (const statement of viewStatementsOf(generatePostgresViewsDdl(FIXTURE) as string)) {
+    for (const statement of viewStatementsOf(generatePostgresViewsDdl(fixture) as string)) {
         readStatement(surface, "push", statement);
     }
 
     // Boot, against a database with nothing in it — the managed first-deploy
     // case, and the only starting state where boot emits its full surface.
     const emptyDb = { tables: new Map(), enums: new Set(), constraints: new Set() };
-    for (const action of planCollectionSchemaEnsure(FIXTURE, emptyDb, {
+    for (const action of planCollectionSchemaEnsure(fixture, emptyDb, {
         databaseExtensions: FIXTURE_DATABASE_EXTENSIONS
     }).actions) {
         readStatement(surface, "boot", action.sql);
     }
-    for (const plan of planCollectionPolicies(FIXTURE)) {
+    for (const plan of planCollectionPolicies(fixture)) {
         for (const statement of plan.policyStatements) readStatement(surface, "boot", statement);
     }
     // The boot's admin-request companions — `TO rebase_admin_request USING
@@ -404,12 +419,12 @@ export async function render(): Promise<string> {
     // only once it has made that role, and which no file `db push` writes
     // carries. Planned again with both roles available; the policies they sit
     // beside come out identical, so only the companions are new lines.
-    for (const plan of planCollectionPolicies(FIXTURE, { adminRoleAvailable: true, adminRequestRoleAvailable: true })) {
+    for (const plan of planCollectionPolicies(fixture, { adminRoleAvailable: true, adminRequestRoleAvailable: true })) {
         for (const statement of plan.policyStatements) readStatement(surface, "boot", statement);
     }
     // Views are applied at boot from the same plan, by the same renderer
     // `views.sql` is written with (`ensureCollectionTables`).
-    const bootPlan = planSchema(FIXTURE, { databaseExtensions: FIXTURE_DATABASE_EXTENSIONS });
+    const bootPlan = planSchema(fixture, { databaseExtensions: FIXTURE_DATABASE_EXTENSIONS });
     for (const statement of viewStatementsOf(renderViewsDdl(bootPlan) as string)) {
         readStatement(surface, "boot", statement);
     }
@@ -419,12 +434,12 @@ export async function render(): Promise<string> {
     // bit as frozen as the current ones: drop one and an aged database silently
     // gets a second, empty column beside its populated one.
     const legacy: string[] = [];
-    for (const plan of planRelationalColumns(FIXTURE)) {
+    for (const plan of planRelationalColumns(fixture)) {
         if (plan.legacyColumn) {
             legacy.push(`legacy-column ${plan.schema}.${plan.table}.${plan.column} <- ${plan.legacyColumn}`);
         }
     }
-    for (const plan of planJunctionTables(FIXTURE)) {
+    for (const plan of planJunctionTables(fixture)) {
         for (const column of plan.columns) {
             if (column.legacyName) {
                 legacy.push(`legacy-column ${plan.schema}.${plan.table}.${column.name} <- ${column.legacyName}`);
@@ -432,10 +447,49 @@ export async function render(): Promise<string> {
         }
     }
 
-    const lines = [...surface.entries()]
-        .map(([key, producers]) => `${key} [${[...producers].sort().join(",")}]`)
-        .concat(legacy.sort())
-        .sort((a, b) => a.localeCompare(b, "en"));
+    return { surface, legacy };
+}
+
+/** A surface as baseline lines: `<kind> <id> [<producers>]`, legacy names appended, sorted. */
+const linesOf = ({ surface, legacy }: Rendered): string[] => [...surface.entries()]
+    .map(([key, producers]) => `${key} [${[...producers].sort().join(",")}]`)
+    .concat([...legacy].sort())
+    .sort((a, b) => a.localeCompare(b, "en"));
+
+/**
+ * The fixture as tables: lifted with `collectionsToTableDefs` (the codemod's
+ * own conversion) and lowered with `lowerTables`, exactly as `loadTables`
+ * lowers a project's `backend/schema`. Lifted at run time rather than
+ * hand-copied, so the twin can never drift from the fixture it shadows.
+ */
+async function tableShapedFixture(): Promise<FixtureInput> {
+    const { collectionsToTableDefs, lowerTables } = await import("@rebasepro/common");
+    const lifted = collectionsToTableDefs(FIXTURE);
+    return lowerTables(lifted.tables, lifted.defaultRls !== undefined ? { defaultRls: lifted.defaultRls } : {});
+}
+
+export async function render(): Promise<string> {
+    await assertResolvesToSource();
+
+    const lines = linesOf(await renderFixture(FIXTURE));
+
+    // The contract has to outlive the collection shape. Every project's tables
+    // now reach the planner through `defineTable` and the lowering, so the
+    // table-shaped twin must name exactly what the collection fixture names —
+    // same identifiers, same producers. When the legacy shape is deleted, the
+    // twin is what renders the baseline, and this check is what says it may.
+    const twin = linesOf(await renderFixture(await tableShapedFixture()));
+    const onlyCollections = lines.filter(line => !twin.includes(line));
+    const onlyTables = twin.filter(line => !lines.includes(line));
+    if (onlyCollections.length > 0 || onlyTables.length > 0) {
+        throw new Error(
+            "The table-shaped fixture (FIXTURE lifted into defineTable and lowered) does not emit the\n" +
+            "surface the collection fixture does. Every derived name must survive the move to tables.\n" +
+            onlyCollections.map(line => `  only from collections: ${line}`).join("\n") +
+            (onlyCollections.length > 0 && onlyTables.length > 0 ? "\n" : "") +
+            onlyTables.map(line => `  only from tables:      ${line}`).join("\n")
+        );
+    }
 
     return [
         "# Derived database identifiers — FROZEN.",
@@ -468,10 +522,14 @@ export async function render(): Promise<string> {
         "# (`<policy>_ar_<sha8>`) are boot-only. The boot plans them only once it has",
         "# made `rebase_admin_request`, and no file `db push` writes may carry one.",
         "#",
-        "# One known defect, banked as emitted so it cannot move unseen: the touch",
-        "# trigger of an `on_update` column on a junction's `through.properties`",
-        "# (`players_teams_changed_at_touch`) is written to `triggers.sql` but never",
-        "# planned by the boot. Fixing it turns that line [boot,push]; re-bank then.",
+        "# Fixed (2026-11-12): the touch trigger of an `on_update` column on a",
+        "# junction's `through.properties` (`players_teams_changed_at_touch`) was",
+        "# written to `triggers.sql` and never planned by the boot. The boot plans it",
+        "# now: an ADDED boot producer on an unchanged name.",
+        "#",
+        "# Every line is rendered twice — from the collection fixture and from the",
+        "# same fixture lifted into `defineTable` and lowered (what `backend/schema`",
+        "# goes through) — and the gate refuses to render when the two differ.",
         "#",
         "# Moved on purpose (2026-11-12): the `<table>_{insert,update,delete}_<sha7>`",
         "# policies of the fixture's bare `access: \"authenticated\"` rule (categories,",

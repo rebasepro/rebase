@@ -744,6 +744,16 @@
       "kind": "create-trigger",
       "target": "public.touched_rows.touched_rows_updated_at_touch",
       "sql": "CREATE TRIGGER \"touched_rows_updated_at_touch\" BEFORE UPDATE ON \"public\".\"touched_rows\" FOR EACH ROW EXECUTE FUNCTION rebase.set_updated_at('updated_at');"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "public.players_teams.players_teams_changed_at_touch",
+      "sql": "DROP TRIGGER IF EXISTS \"players_teams_changed_at_touch\" ON \"public\".\"players_teams\";"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "public.players_teams.players_teams_changed_at_touch",
+      "sql": "CREATE TRIGGER \"players_teams_changed_at_touch\" BEFORE UPDATE ON \"public\".\"players_teams\" FOR EACH ROW EXECUTE FUNCTION rebase.set_updated_at('changed_at');"
     }
   ],
   "statements": [
@@ -895,7 +905,9 @@
     "DROP TRIGGER IF EXISTS \"tenant_documents_keep_tenant\" ON \"public\".\"tenant_documents\";",
     "CREATE TRIGGER \"tenant_documents_keep_tenant\" BEFORE UPDATE ON \"public\".\"tenant_documents\" FOR EACH ROW EXECUTE FUNCTION rebase.keep_tenant('org_id', 'admin');",
     "DROP TRIGGER IF EXISTS \"touched_rows_updated_at_touch\" ON \"public\".\"touched_rows\";",
-    "CREATE TRIGGER \"touched_rows_updated_at_touch\" BEFORE UPDATE ON \"public\".\"touched_rows\" FOR EACH ROW EXECUTE FUNCTION rebase.set_updated_at('updated_at');"
+    "CREATE TRIGGER \"touched_rows_updated_at_touch\" BEFORE UPDATE ON \"public\".\"touched_rows\" FOR EACH ROW EXECUTE FUNCTION rebase.set_updated_at('updated_at');",
+    "DROP TRIGGER IF EXISTS \"players_teams_changed_at_touch\" ON \"public\".\"players_teams\";",
+    "CREATE TRIGGER \"players_teams_changed_at_touch\" BEFORE UPDATE ON \"public\".\"players_teams\" FOR EACH ROW EXECUTE FUNCTION rebase.set_updated_at('changed_at');"
   ],
   "legacyForeignKeys": [],
   "searchDrift": [],

@@ -28,10 +28,14 @@
 # (`<policy>_ar_<sha8>`) are boot-only. The boot plans them only once it has
 # made `rebase_admin_request`, and no file `db push` writes may carry one.
 #
-# One known defect, banked as emitted so it cannot move unseen: the touch
-# trigger of an `on_update` column on a junction's `through.properties`
-# (`players_teams_changed_at_touch`) is written to `triggers.sql` but never
-# planned by the boot. Fixing it turns that line [boot,push]; re-bank then.
+# Fixed (2026-11-12): the touch trigger of an `on_update` column on a
+# junction's `through.properties` (`players_teams_changed_at_touch`) was
+# written to `triggers.sql` and never planned by the boot. The boot plans it
+# now: an ADDED boot producer on an unchanged name.
+#
+# Every line is rendered twice — from the collection fixture and from the
+# same fixture lifted into `defineTable` and lowered (what `backend/schema`
+# goes through) — and the gate refuses to render when the two differ.
 #
 # Moved on purpose (2026-11-12): the `<table>_{insert,update,delete}_<sha7>`
 # policies of the fixture's bare `access: "authenticated"` rule (categories,
@@ -448,7 +452,7 @@ table-constraint public.players_teams PRIMARY KEY ("team_id", "player_id") [boot
 table-constraint public.products_statuses PRIMARY KEY ("product_id", "status_id") [boot,push]
 table-constraint public.products_tags PRIMARY KEY ("product_id", "tag_id") [boot,push]
 table-constraint public.translations PRIMARY KEY ("locale", "key") [boot,push]
-trigger public.players_teams.players_teams_changed_at_touch [push]
+trigger public.players_teams.players_teams_changed_at_touch [boot,push]
 trigger public.tenant_documents.tenant_documents_keep_tenant [boot,push]
 trigger public.touched_rows.touched_rows_updated_at_touch [boot,push]
 view public.product_rollups [boot,push]

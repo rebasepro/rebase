@@ -1108,8 +1108,10 @@ export function diffPlanAgainstCatalogue(
 
     // 6. `autoValue: "on_update"` triggers. After the column, and idempotent by
     //    DROP-then-CREATE rather than `CREATE OR REPLACE TRIGGER`, which exists
-    //    only on Postgres 14+.
-    for (const table of collectionTables) {
+    //    only on Postgres 14+. Junctions too: a `through.properties` payload
+    //    column stamped on update has its touch trigger in `triggers.sql`, and
+    //    boot must describe the same database.
+    for (const table of [...collectionTables, ...junctionTables]) {
         for (const trigger of table.triggers) {
             // Named after its table and column, so a trigger already in the
             // catalogue is this one — re-issuing it every boot would work and

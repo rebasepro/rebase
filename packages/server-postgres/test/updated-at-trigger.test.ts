@@ -120,3 +120,83 @@ describe("`autoValue: \"on_update\"` is a database trigger", () => {
         expect(again.actions.filter(a => a.kind === "create-trigger")).toEqual([]);
     });
 });
+
+/**
+ * A junction's payload column stamped on update (`through.properties` with
+ * `autoValue: "on_update"`). `triggers.sql` always carried its touch trigger;
+ * the boot planned triggers for collection tables only, so a database the
+ * managed runtime provisioned had the column and no trigger — a raw UPDATE of
+ * the link left `changed_at` claiming it had never changed, and `db push` and
+ * boot described two different databases. Banked in the derived-names
+ * contract as push-only until this was fixed.
+ */
+describe("a junction payload's `on_update` column", () => {
+    const players: CollectionConfig = {
+        slug: "players",
+        table: "players",
+        name: "Players",
+        properties: { id: { type: "number", isId: "increment" }, handle: { type: "string" } }
+    };
+    const teams: CollectionConfig = {
+        slug: "teams",
+        table: "teams",
+        name: "Teams",
+        properties: {
+            id: { type: "string", isId: "uuid" },
+            name: { type: "string" },
+            players: {
+                type: "relation",
+                relation: {
+                    kind: "manyToMany",
+                    target: () => players,
+                    relationName: "players",
+                    through: { properties: { changedAt: { type: "date", autoValue: "on_update" } } }
+                }
+            }
+        }
+    };
+    const collections = [players, teams];
+    const emptyDb = { tables: new Map(), enums: new Set<string>(), constraints: new Set<string>() };
+
+    const triggerNames = (statements: string[]): string[] => statements
+        .map(statement => /CREATE TRIGGER "([^"]+)" .*? ON "([^"]+)"\."([^"]+)"/s.exec(statement))
+        .filter((match): match is RegExpExecArray => match !== null)
+        .map(match => `${match[2]}.${match[3]}.${match[1]}`)
+        .sort();
+
+    it("gets the same touch trigger from the boot as from `triggers.sql`", () => {
+        const push = triggerNames(generatePostgresTriggersDdl(collections).split(";"));
+        const boot = triggerNames(planCollectionSchemaEnsure(collections, emptyDb).actions
+            .filter(action => action.kind === "create-trigger")
+            .map(action => action.sql));
+
+        expect(push).toEqual(["public.players_teams.players_teams_changed_at_touch"]);
+        expect(boot).toEqual(push);
+    });
+
+    it("moves on a raw UPDATE of the link once the boot has provisioned it", async () => {
+        const db = new PGlite();
+        await db.waitReady;
+        try {
+            const result = await ensureCollectionTables(queryable(db), collections);
+            expect(result.failures).toEqual([]);
+
+            await db.exec(`INSERT INTO "public"."players" ("handle") VALUES ('ada');`);
+            await db.exec(`INSERT INTO "public"."teams" ("name") VALUES ('reds');`);
+            await db.exec(
+                `INSERT INTO "public"."players_teams" ("team_id", "player_id", "changed_at") ` +
+                `SELECT t."id", p."id", '2000-01-01T00:00:00Z' FROM "public"."teams" t, "public"."players" p;`
+            );
+            await db.exec(`UPDATE "public"."players_teams" SET "changed_at" = "changed_at";`);
+
+            const rows = await db.query<{ changed_at: string }>(`SELECT "changed_at" FROM "public"."players_teams";`);
+            expect(new Date(rows.rows[0].changed_at).getUTCFullYear()).toBeGreaterThan(2000);
+
+            // And, like every other trigger, planned once.
+            const again = planCollectionSchemaEnsure(collections, await readExistingSchema(queryable(db), ["public"]));
+            expect(again.actions.filter(action => action.kind === "create-trigger")).toEqual([]);
+        } finally {
+            await db.close();
+        }
+    });
+});

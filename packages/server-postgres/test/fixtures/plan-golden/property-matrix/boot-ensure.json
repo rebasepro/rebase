@@ -1624,6 +1624,16 @@
       "kind": "create-trigger",
       "target": "public.membership_tenanted.membership_tenanted_keep_tenant",
       "sql": "CREATE TRIGGER \"membership_tenanted_keep_tenant\" BEFORE UPDATE ON \"public\".\"membership_tenanted\" FOR EACH ROW EXECUTE FUNCTION rebase.keep_tenant('org_id', 'admin');"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "public.org_members.org_members_touched_at_touch",
+      "sql": "DROP TRIGGER IF EXISTS \"org_members_touched_at_touch\" ON \"public\".\"org_members\";"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "public.org_members.org_members_touched_at_touch",
+      "sql": "CREATE TRIGGER \"org_members_touched_at_touch\" BEFORE UPDATE ON \"public\".\"org_members\" FOR EACH ROW EXECUTE FUNCTION rebase.set_updated_at('touched_at');"
     }
   ],
   "statements": [
@@ -1951,7 +1961,9 @@
     "DROP TRIGGER IF EXISTS \"claim_tenanted_keep_tenant\" ON \"public\".\"claim_tenanted\";",
     "CREATE TRIGGER \"claim_tenanted_keep_tenant\" BEFORE UPDATE ON \"public\".\"claim_tenanted\" FOR EACH ROW EXECUTE FUNCTION rebase.keep_tenant('org_id', 'admin');",
     "DROP TRIGGER IF EXISTS \"membership_tenanted_keep_tenant\" ON \"public\".\"membership_tenanted\";",
-    "CREATE TRIGGER \"membership_tenanted_keep_tenant\" BEFORE UPDATE ON \"public\".\"membership_tenanted\" FOR EACH ROW EXECUTE FUNCTION rebase.keep_tenant('org_id', 'admin');"
+    "CREATE TRIGGER \"membership_tenanted_keep_tenant\" BEFORE UPDATE ON \"public\".\"membership_tenanted\" FOR EACH ROW EXECUTE FUNCTION rebase.keep_tenant('org_id', 'admin');",
+    "DROP TRIGGER IF EXISTS \"org_members_touched_at_touch\" ON \"public\".\"org_members\";",
+    "CREATE TRIGGER \"org_members_touched_at_touch\" BEFORE UPDATE ON \"public\".\"org_members\" FOR EACH ROW EXECUTE FUNCTION rebase.set_updated_at('touched_at');"
   ],
   "legacyForeignKeys": [],
   "searchDrift": [],
