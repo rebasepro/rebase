@@ -1,0 +1,410 @@
+---
+slug: docs/upgrading/0-30-to-0-31
+title: Upgrading 0.30 to 0.31
+sidebar_label: 0.30 → 0.31
+description: "The breaking changes 0.31 carries for an app on 0.30 — tables in backend/schema replace config/collections, the panel renders what the server serves, the SDK says data.table(slug) — with the codemod that moves a project, and every manual step after it."
+---
+
+# Upgrading 0.30 → 0.31
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+0.31 makes the backend Postgres-first. The tables you declare with
+`defineTable` in `backend/schema/` are the only thing the backend knows about
+your data; what the admin panel shows on top of them lives in the frontend.
+Almost every entry below is one consequence of that split, and almost all of it
+is done for you by one command.
+
+### The checklist, per project
+
+1. **Run the codemod** on a clean git tree:
+   `rebase migrate collections-to-tables`. It writes `backend/schema/`,
+   `frontend/src/cms/`, the `backend/` modules and the project files, rewrites
+   your SDK calls, and proves the generated SQL byte-identical — or puts every
+   file back. See [section 108](#108-tables-in-backendschema-replace-configcollections--run-the-codemod-first).
+2. **Do the manual steps it prints**, in order. Each names its file, and most
+   carry the snippet to write.
+3. **`rebase generate-sdk`** — the generated module's names changed
+   ([section 115](#115-the-sdk-addresses-a-table-datatableslug)).
+4. **`rebase db push --dry-run`** against your development database. It must
+   plan no change: the codemod's SQL check guarantees it, and this confirms it on
+   the real database.
+5. **`git rm -r config`** — the line the codemod printed — once the diff is
+   reviewed.
+6. **Rebuild and deploy.** A bundle built before 0.31 does not boot on a 0.31
+   runtime ([section 112](#112-bundle-format-3-format-2-bundles-are-refused)).
+   The first boot restamps the database's schema version once
+   ([section 113](#113-the-schema-version-is-computed-from-tables-v2)).
+
+Run `rebase migrate collections-to-tables --check` in CI until `config/` is
+gone: it verifies the migrated tables still render the same SQL as the
+collections they came from.
+
+### The words
+
+| Before | Now | Where "collection" stays |
+|---|---|---|
+| a collection in `config/collections/` | a **table** in `backend/schema/` (`defineTable`) | — |
+| `properties` | `columns` (`col.*`) and `relations` (`rel.*`) | — |
+| `securityRules`, `defaultSecurityRules` | `rls` (required), `defaultRls` | — |
+| `callbacks`, `Property.callbacks` | `hooks`, a column's `.transform()` | — |
+| the `admin` block | `customizeTable` in `frontend/src/cms/` | — |
+| `data.collection(slug)` | `data.table(slug)` | — |
+| what the admin panel draws | a **collection**: a table as the panel shows it, or a Firestore collection | the CMS: `CollectionPanel`, the Collection Editor, `externalCollections` |
+
+---
+
+## 108. Tables in `backend/schema` replace `config/collections` — run the codemod first
+
+**Who this hits:** every project with a `config/collections/` directory.
+
+**What changed:** the backend reads only `backend/schema/index.ts` and the
+`defineTable`, `defineAuthTable` and `defineView` results it exports.
+`defineCollection` files are not read by anything: the runtime, every CLI
+command and `rebase.json` validation refuse a project that still has
+`config/collections`, naming the command below. `rls` is required on every
+table — a list of rules, `"admin-only"`, or `"inherit"` for the `defaultRls`
+the index exports — and `disableDefaultPolicies` is `defaultPolicies: false`.
+
+**What to do:**
+
+```bash
+rebase migrate collections-to-tables            # or --dry-run first
+```
+
+It writes one table per collection, every physical column explicit at its
+original position (so a `belongsTo`'s key column is written out), the index
+with `defaultRls` from `defaultSecurityRules`, a `customizeTable` for each
+collection whose presentation was not the default, and
+`defineFirestoreCollection` files for Firestore collections. A collection's
+callbacks become its table's `hooks` and its columns' `.transform()`s; the
+global `callbacks` `config/index.ts` exported are a manual step (section 109).
+Then it reads the
+result back through the new pipeline: DDL, policies, search, vector, triggers,
+views and the Drizzle schema must be byte-identical to what the collections
+generated, or every file is put back and the run exits 1 with the diff.
+
+What it cannot carry exactly is refused with its file and line, and nothing is
+written: a collection built by calling a function, a spread or accessor it
+cannot read through, an engine other than Postgres or Firestore, an output file
+that exists with other content (move it aside, or `--force`). A dirty git tree
+or a project outside git is refused too, so the migration is one reviewable
+diff. `--json` prints the whole report for a script or an agent. See
+[`rebase migrate`](/docs/cli/#rebase-migrate) and [Tables](/docs/schema/).
+
+## 109. There is no config package
+
+**Who this hits:** every project — `config/` was a workspace of its own.
+
+**What changed:** what lived beside the collections moves into `backend/`:
+
+| Before | Now |
+|---|---|
+| `config/resources.ts` | `backend/resources.ts` |
+| `config/storage.ts`, `storageAuthorize` from `config/index.ts` | `backend/storage.ts` |
+| `callbacks` exported from `config/index.ts` | `hooks` exported from `backend/hooks.ts` (`TableHooks`: `table` for `collection`, `values` for `row`) |
+| `config/generated/register.ts` | `backend/generated/register.ts` |
+| `rebase.json` `config`, `usersCollection` | `tables` (default `backend/schema`); the auth table is the one declared with `defineAuthTable` |
+
+The runtime reads `storageAuthorize` and `hooks` and nothing else from those
+modules; any other export is reported at boot. The frontend imports
+`backend/**` as types only — `pnpm check:frontend-backend-imports` refuses a
+value import, which would ship server code to the browser.
+
+**What to do:** the codemod moves `resources.ts`, `storage.ts` and the
+registration, and rewrites `rebase.json`, `package.json`,
+`pnpm-workspace.yaml` and `backend/tsconfig.json`. The global `callbacks`
+are a manual step it prints: move them to `backend/hooks.ts` by hand, and add
+`hooks.ts` to the `include` of `backend/tsconfig.json` so `tsc` checks it. A
+`config/` file it does not recognise is listed too.
+
+## 110. Boot options and hooks name tables
+
+**Who this hits:** a backend you boot yourself (`initializeRebaseBackend`,
+`createRebaseBackend`), and code that attaches hooks after boot.
+
+**What changed:**
+
+| Before | Now |
+|---|---|
+| `collections`, `collectionsDir` | `tables`, `defaultRls`, `schemaDir` |
+| `callbacks` | `hooks` |
+| `auth.collection` | gone: the `defineAuthTable` in `tables` |
+| `backend.setCollectionCallbacks(slug, cb)` | `backend.setTableHooks(slug, hooks)` |
+| hook props `collection`, `row` | `table` (the descriptor), `values` |
+| `composeCallbacks` | `composeTableHooks` from `@rebasepro/common` |
+
+```diff ts
+-await initializeRebaseBackend({ app, server, collectionsDir: "./config/collections", callbacks });
++await initializeRebaseBackend({ app, server, schemaDir: path.resolve(__dirname, "../schema"), hooks });
+```
+
+**What to do:** `rebase migrate sdk-calls` rewrites `setCollectionCallbacks`
+and adapts the hook props, and lists each backend options object to update by
+hand. See [Backend overview](/docs/backend/) and [Global hooks](/docs/backend/hooks/).
+
+## 111. The admin panel renders the tables the server serves
+
+**Who this hits:** every frontend that mounts `<RebaseCMS>`.
+
+**What changed:** `<RebaseCMS collections>` is gone. The panel shows every
+table the backend serves at `GET /api/schema/tables`, with no file per table,
+then `externalCollections` (Firestore). `tableCustomizations` takes the
+`customizeTable` objects from `frontend/src/cms/`. The Vite collections plugin
+and `virtual:rebase-collections` are removed. `CollectionsProvider` takes the
+same three inputs (`tableCustomizations`, `externalCollections`, `tables`).
+
+```diff tsx
+-import { collections } from "virtual:rebase-collections";
+-<RebaseCMS collections={collections}/>
++import { postsCms } from "./cms/posts";
++<RebaseCMS tableCustomizations={[postsCms]}/>
+```
+
+**What to do:** the codemod writes `frontend/src/cms/index.ts`, which exports
+`tableCustomizations` (and `externalCollections`), and mounts it in a scaffold's
+`App.tsx` itself; an `App.tsx` it does not recognise, the plugin in
+`vite.config.ts` and the virtual module declaration are manual steps it
+prints.
+See [Customizing a table](/docs/frontend/customize-table/).
+
+## 112. Bundle format 3; format-2 bundles are refused
+
+**Who this hits:** every deployment of a built bundle — self-hosted with the
+runtime image, or on Rebase Cloud.
+
+**What changed:** a bundle's schema is `entry.tables`, beside
+`entry.resources`, `entry.storage` and `entry.hooks`; `bundleFormat` is 3 and
+the runtime contract 2. A format-1 or format-2 bundle carries
+`config/collections`, which a 0.31 runtime has nothing to read with, so it
+refuses to boot with the codemod in the message rather than introspecting the
+database and serving a different API.
+
+**What to do:** migrate the source, then `rebase build` and deploy. On Rebase
+Cloud, deploying the migrated repository rebuilds it. See
+[Runtime and bundles](/docs/architecture/runtime-and-bundles/).
+
+## 113. The schema version is computed from tables (`v2:`)
+
+**Who this hits:** every database a runtime before 0.31 provisioned, and every
+generated SDK.
+
+**What changed:** the schema version hashes the compiled table descriptors and
+starts with `v2:`. A database stamped `v1:` reports the model change once —
+the boot log and `rebase doctor` say so and how to restamp — and every
+generated SDK is reported stale once.
+
+**What to do:** provision once with the new runtime: boot the process that owns
+the schema, or run `rebase db push`. With `REBASE_REQUIRE_SCHEMA_MATCH=true`,
+restamp before rolling the other processes. Regenerate the SDK.
+
+## 114. Error codes name tables
+
+**Who this hits:** code that branches on an error `code`.
+
+**What changed:**
+
+| Before | Now |
+|---|---|
+| `NO_COLLECTIONS` (404) | `NO_TABLES` |
+| `COLLECTION_READ_ONLY` (405) | `TABLE_READ_ONLY` |
+| `UNKNOWN_COLLECTION` (SDK) | `UNKNOWN_TABLE` |
+| `INVALID_COLLECTION_PATH` (SDK) | `INVALID_TABLE_PATH` |
+
+**What to do:** `rebase migrate sdk-calls` rewrites the string literals. See
+[Errors](/docs/backend/errors/).
+
+## 115. The SDK addresses a table: `data.table(slug)`
+
+**Who this hits:** every client, function, cron, hook and script that names a
+table by slug, or passes the generated dictionary.
+
+**What changed:**
+
+| Before | Now |
+|---|---|
+| `data.collection(slug)` | `data.table(slug)` |
+| `createRebaseClient({ collections: collectionsDictionary })` | `createRebaseClient({ tables: tablesDictionary })` |
+| generated `CollectionName`, `CollectionsDictionary` | `TableName`, `TablesDictionary` |
+| batch `{ op, collection }` (SDK and `POST /api/data/_batch`) | `{ op, table }` |
+| `CollectionClient`, `SDKCollectionClient`, `CollectionAccessor`, `CollectionTrashAccessor` | `TableClient`, `SDKTableClient`, `TableAccessor`, `TableTrashAccessor` |
+| offline `maxCachedRowsPerCollection`, `maxCachedQueriesPerCollection` | `…PerTable` |
+| reserved accessor `<name>Collection`; `collectionCollection` | `<name>Table`; the `collection` table is `collection` |
+
+```diff ts
+-const { data } = await client.data.collection("posts").find();
++const { data } = await client.data.table("posts").find();
+```
+
+Typed accessors (`client.data.posts`) are unchanged.
+
+**What to do:** the codemod runs `rebase migrate sdk-calls` over your code —
+run it alone on a project already migrated — then `rebase generate-sdk`. A
+`.collection(` call whose receiver is not the SDK is left as written and
+listed. See [Typed SDK](/docs/sdk/).
+
+## 116. CLI flags: `--schema-dir`, not `--collections`
+
+**Who this hits:** scripts and CI steps that call the CLI with a schema path.
+
+**What changed:** `--collections` / `-c` are refused on every command that
+reads the schema, with the codemod in the message (`generate-sdk` ignores a
+stray `--collections-dir`); `--schema-dir`
+names a schema directory other than `backend/schema`. `rebase schema
+introspect` writes `defineTable` files to `backend/schema/` — `--output` is
+gone. `REBASE_STRICT_COLLECTION_CONFIG` is no longer read: a schema that does
+not compile always refuses the boot.
+
+**What to do:** replace the flags. See [CLI](/docs/cli/) and
+[Schema generation](/docs/cli/schema/).
+
+## 117. The schema editor edits `backend/schema` with `TablePatch`
+
+**Who this hits:** code that calls the schema-editor or live-schema routes, and
+deployments that set the live-editing variables.
+
+**What changed:** `/api/admin/schema-editor/collection/save`,
+`collection/delete`, `property/save` and `property/delete` are gone. The editor
+serves `GET /tables`, `POST /preview` and `POST /apply`, and live schema
+editing's `/plan` and `/apply` take `{ patches: TablePatch[] }` instead of a
+collection or a patch of one. `REBASE_LIVE_SCHEMA_COLLECTIONS_PATH` is
+refused at boot: it is `REBASE_LIVE_SCHEMA_PATH` (default `backend/schema`),
+and `liveSchema.repository.collectionsPath` is `schemaPath`. Presentation is
+never a schema edit: it is saved as UI preferences (`/api/admin/ui-config`).
+
+**What to do:** rename the variable; rewrite a caller of the routes to send
+`TablePatch` edits. See [Live schema editing](/docs/backend/live-schema-editing/).
+
+## 118. A component slot is a component
+
+**Who this hits:** customizations that named a React component by a string
+path or a lazy `() => import(…)` thunk.
+
+**What changed:** a field's `Field` / `Preview` / `Filter`, collection
+`Actions`, `entityViews[].Builder`, `collectionViews[].Builder`,
+`formView.Builder` and component overrides take the component itself.
+`ComponentRef`, `ComponentLike`, `LazyComponentRef` and
+`isLazyComponentRef` (`@rebasepro/types`), `asComponentRef` and
+`asReactComponent` (`@rebasepro/cms-types`) and `resolveComponentRef` /
+`useResolvedComponent` (`@rebasepro/app`) are removed. `customizeTable`
+refuses a string or a thunk with the "imported by value" message.
+
+**What to do:** import the component in the `frontend/src/cms/` file and pass
+it. See [Custom fields](/docs/frontend/custom-fields/).
+
+## 119. Panel preferences are UI preferences
+
+**Who this hits:** code that implements `UserConfigurationPersistence`.
+
+**What changed:** how a user resized or reordered a table is a
+`UiTablePreferences` delta: `getTablePreferences` / `saveTablePreferences`
+replace `getCollectionConfig` / `onCollectionModified`, and
+the partial collection-config type it took is removed. The browser store keeps them under
+`table_preferences::<slug>`, and ignores what an older panel stored, so each
+user's column widths and view modes reset once. `userSelect` on a field is
+gone: a `.userId()` column is the user picker.
+
+**What to do:** port a custom persistence to the two methods.
+
+## 120. MongoDB is retired
+
+**Who this hits:** a project on `@rebasepro/server-mongo`, or one declaring
+`database(…, { engine: "mongodb" })`.
+
+**What changed:** the package is gone, and so are the Mongo collection
+types and the rest of the Mongo model. Postgres is the only server engine: a
+server-transport source on another engine refuses the boot, naming it.
+
+**What to do:** move the data to Postgres. There is no migration path inside
+Rebase.
+
+## 121. Firestore collections live in the frontend
+
+**Who this hits:** a hybrid project with `engine: "firestore"` collections.
+
+**What changed:** a Firestore collection is a CMS source the browser reads
+directly: `defineFirestoreCollection` from `@rebasepro/firebase`, in
+`frontend/src/cms/`, passed to `<RebaseCMS externalCollections>`. A reference
+between Firestore and a Postgres table is stored as the target's id, and a
+Firestore reference whose `path` is also a Postgres slug now targets the
+Postgres table.
+
+**What to do:** the codemod writes the `defineFirestoreCollection` files. Point
+a reference at a Firestore collection by that collection's slug. See
+[Firebase](/docs/frontend/firebase/).
+
+## 122. MCP tools are named for tables
+
+**Who this hits:** prompts, scripts and allow-lists that name MCP tools.
+
+**What changed:** remote `/mcp`: `list_collections`, `describe_collection`,
+`query_collection`, `show_collection`, `count_documents`,
+`aggregate_documents`, `get_document`, `create_document`, `update_document`,
+`delete_document` → `list_tables`, `describe_table`, `query_table`,
+`show_table`, `count_rows`, `aggregate_rows`, `get_row`, `create_row`,
+`update_row`, `delete_row`; the `collection` argument is `table`, and
+`show_app` / `save_app` take `tables`. The local server: `list_documents` →
+`query_table`, `get_document` → `get_row`, `create_document` → `create_row`,
+`update_document` → `update_row`, `delete_document` → `delete_row`;
+`rebase_schema_plan` takes `patches`; resources are `rebase://tables/{name}`.
+
+**What to do:** rename. See [MCP tool reference](/docs/ai/mcp-tool-reference/)
+and [Remote MCP](/docs/ai/remote-mcp/).
+
+## 123. The rule vocabulary says `table`
+
+**Who this hits:** rules that use `policy.existsIn` or a membership tenant,
+and bare `access: "authenticated"` rules.
+
+**What changed:** `policy.existsIn({ collection, where })` is
+`existsIn({ table, where })`, and `tenant.from.membership.collection` is
+`membership.table`; policy names do not move. A bare
+`{ access: "authenticated" }`, which used to compile to deny-all, now admits
+any signed-in caller, so its policies' names change and the junctions of such
+a table gain their edge-write policies.
+
+**What to do:** rename the keys. Read the next `rebase db push --dry-run` for
+an `access: "authenticated"` rule: it now grants what it says.
+
+## 124. Studio reads the tables from the server
+
+**Who this hits:** Studio pointed at a backend older than 0.31, and Studio JS
+console scripts.
+
+**What changed:** every schema-aware tool reads `GET /api/schema/tables`;
+against a runtime without it they show an upgrade notice. The RLS editor's
+declared side is what the server compiled. A JS console script receives
+`context.tables` (it was `context.collections`).
+
+**What to do:** upgrade the runtime with the panel. See [Studio](/docs/studio/).
+
+## 125. `rls-check --format agent` says `rls`
+
+**Who this hits:** a tool that reads `rls-check --format agent`.
+
+**What changed:** `remediation.rebase.securityRules` is `remediation.rebase.rls`,
+the excerpt is a `defineTable(…, { rls })`, and the document's format version
+is 2. `--json` is unchanged. See [rls-check](/docs/rls-check/).
+
+**What to do:** read the new key.
+
+## 126. `@rebasepro/plugin-review`: `reviewRls`
+
+**Who this hits:** a project using the review plugin.
+
+**What changed:** `reviewSecurityRules(slug, review)` is
+`reviewRls(slug, review)`, spread into the table's `rls`;
+`findReviewConfigProblems` and `assertReviewConfig` take table descriptors.
+
+**What to do:** rename the call and pass `services.tables()` or
+`compileTables(…)`.
+
+## 127. `@rebasepro/codegen` reads descriptors
+
+**Who this hits:** code that calls the generator directly.
+
+**What changed:** `generateTypedefs(tables)` and `generateSDK(tables, options)`
+take `TableDescriptor[]` — what `compileTables` returns and
+`GET /api/schema/tables` serves — instead of collections.
+
+**What to do:** compile your definitions first, or use `rebase generate-sdk`.

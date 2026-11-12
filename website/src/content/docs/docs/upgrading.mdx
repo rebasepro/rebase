@@ -6,11 +6,12 @@ description: What breaks when you move an existing app to the current release, a
 
 # Upgrading an existing app
 
-Twelve hops, newest first. Start at the one above the version you are on and work
+Thirteen hops, newest first. Start at the one above the version you are on and work
 downwards — or, if you are coming from 0.12, start at the bottom and work up.
 
 | You are on | Read | What it does to you |
 |---|---|---|
+| **0.30** | [0.30 → 0.31](/docs/upgrading/0-30-to-0-31/) | Tables in `backend/schema` (`defineTable`) replace `config/collections`, and there is no config package: run `rebase migrate collections-to-tables`, which moves the project and proves the generated SQL unchanged. The admin panel renders the tables the server serves, customized from `frontend/src/cms`; the SDK says `data.table(slug)` and `tables: tablesDictionary`; bundles are format 3, so rebuild before deploying; MongoDB is retired. |
 | **0.29** | [0.29 → 0.30](/docs/upgrading/0-29-to-0-30/) | A backend booted with `initializeRebaseBackend` keeps the refresh token in a cookie unless it sets `cookieAuth: false`, so a caller that reads it from the body without `x-rebase-auth-flow: json` gets `""`. |
 | **0.27 – 0.28** | [0.27 → 0.29](/docs/upgrading/0-27-to-0-29/) | Everything the admin hands your code is the server's row with its id beside it: the browser's `context.data` and `browserCallbacks` hand ISO strings and foreign keys where they handed `Date`s and relation objects, which no compiler catches; the `Entity` data hooks go internal; and callbacks, panels, the side panel and the selection take `row` and `id` for `entity` and `entityId`. 0.28 declares no breaking change, so this is one hop from 0.27. |
 | **0.26** | [0.26 → 0.27](/docs/upgrading/0-26-to-0-27/) | A cron schedule that restricts both day fields runs on either one, so it runs more often, and a schedule with a malformed number is refused, so that job stops running. A key whose `isId` strategy its type cannot honour stops the boot. On Rebase Cloud, a deploy or preview fails when a function or cron file does not load. |
@@ -73,6 +74,14 @@ Then, whichever hop you made:
 [ ] grep crons for ctx.client and for `userId` as an identity key
 [ ] rename --legacy to --workspace wherever build/start is scripted
 [ ] if you implement EmailService yourself, `send` must return a result
+
+--- 0.30 → 0.31 ---
+[ ] rebase migrate collections-to-tables on a clean tree; read the manual steps
+[ ] move config/index.ts `callbacks` to backend/hooks.ts by hand, if you had them
+[ ] rebase generate-sdk; rebase db push --dry-run plans no change
+[ ] git rm -r config (the line the codemod printed)
+[ ] rename the MCP tools in prompts and allow-lists (list_tables, query_table, …)
+[ ] rebuild the bundle and deploy — a format-2 bundle is refused
 ```
 
 `rebase doctor --policies` is the one to wire into CI: it exits non-zero on a

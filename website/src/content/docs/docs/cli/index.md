@@ -242,7 +242,7 @@ rebase migrate sdk-calls [dir]               # data.collection("x") → data.tab
 `backend/schema/` (every column explicit, at its original position), its
 `index.ts` with `defaultRls`, a `customizeTable` in `frontend/src/cms/` for a
 collection whose presentation was not the default, `defineFirestoreCollection`
-files, and `backend/{resources,storage,hooks}.ts` and
+files, and `backend/resources.ts`, `backend/storage.ts` and
 `backend/generated/register.ts` from `config/`. Then it runs `sdk-calls` over
 your code. Every run reads the result back through the new pipeline: the
 generated SQL — DDL, policies, search, vector, triggers, views, the Drizzle
@@ -252,7 +252,7 @@ it leaves to you is printed as numbered manual steps. `config/` is never
 deleted — the run prints the `git rm` line. Flags: `--dry-run`, `--check`
 (verify a project already migrated), `--json`, `--force` (a dirty git tree, or
 output files that differ), `--skip-sdk-calls`. The [upgrade
-guide](/docs/upgrading/0-30-to-0-31/#step-1-run-the-codemod) has the details.
+guide](/docs/upgrading/0-30-to-0-31/#108-tables-in-backendschema-replace-configcollections--run-the-codemod-first) has the details.
 
 `sdk-calls` rewrites `.collection(` to `.table(` on the SDK data surface and
 the other SDK renames, and lists every call it left as written. Flags:
