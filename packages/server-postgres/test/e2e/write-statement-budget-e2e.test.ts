@@ -42,7 +42,7 @@ import type { RealtimeService } from "../../src/services/realtimeService.js";
 import { ensureHistoryIndexes } from "../../src/history/ensure-history-table.js";
 import { MetricsRegistry } from "../../../server/src/metrics/index.js";
 import { recordPoolWaits } from "../../../server/src/metrics/pool-wait.js";
-import { tablesFrom } from "../helpers/tables.js";
+import { tablesFrom, tablesFromCollections } from "../helpers/tables.js";
 
 // ── statement capture ──────────────────────────────────────────────────────
 //
@@ -368,7 +368,7 @@ describe("a write's statements (E2E)", () => {
         if (historyService) {
             app.route("/api/data", createHistoryRoutes({ historyService, registry: backend.collectionRegistry, driver }));
         }
-        app.route("/api/data", new RestApiGenerator(collections, driver).generateRoutes());
+        app.route("/api/data", new RestApiGenerator(tablesFromCollections(collections), driver).generateRoutes());
 
         await admin.query("INSERT INTO public.authors (name) VALUES ('Ada')");
         await admin.query("INSERT INTO public.tags (name) SELECT 'tag ' || g FROM generate_series(1, 20) g");

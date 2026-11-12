@@ -35,7 +35,7 @@ import { errorHandler } from "../../../server/src/api/errors.js";
 import type { HonoEnv } from "../../../server/src/api/types.js";
 import { createRuntimeHttpServer } from "../../../server/src/boot/http-server.js";
 import { testUser } from "./test-user.js";
-import { tablesFrom } from "../helpers/tables.js";
+import { tablesFrom, tablesFromCollections } from "../helpers/tables.js";
 
 const DIMS = 1536;
 
@@ -105,7 +105,7 @@ describe("vector search over HTTP (E2E)", () => {
             c.set("driver", await driver.withAuth(USER));
             await next();
         });
-        app.route("/api/data", new RestApiGenerator([docs], driver).generateRoutes());
+        app.route("/api/data", new RestApiGenerator(tablesFromCollections([docs]), driver).generateRoutes());
 
         plainServer = createServer(getRequestListener(app.fetch));
         runtimeServer = createRuntimeHttpServer(getRequestListener(app.fetch));

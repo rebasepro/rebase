@@ -23,6 +23,7 @@ import type { AddressInfo } from "node:net";
 import { WebSocket as NodeWebSocket } from "ws";
 import type { CollectionConfig } from "@rebasepro/types";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
+import { tablesFromCollections } from "../helpers/tables.js";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
 import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry.js";
 import { FixtureTableRegistry } from "../helpers/tables";
@@ -164,7 +165,7 @@ describe("ETags on live row frames and PATCH (E2E)", () => {
             c.set("driver", await driver.withAuth(USER));
             await next();
         });
-        app.route("/api/data", new RestApiGenerator([peopleCollection, notesCollection, docsCollection], driver).generateRoutes());
+        app.route("/api/data", new RestApiGenerator(tablesFromCollections([peopleCollection, notesCollection, docsCollection]), driver).generateRoutes());
 
         server = createServer();
         createPostgresWebSocket(server, realtime, driver, { requireAuth: true });

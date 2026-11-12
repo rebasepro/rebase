@@ -38,7 +38,7 @@ import { RestApiGenerator } from "../../../server/src/api/rest/api-generator.js"
 import { errorHandler } from "../../../server/src/api/errors.js";
 import type { HonoEnv } from "../../../server/src/api/types.js";
 import { testUser } from "./test-user.js";
-import { tablesFrom } from "../helpers/tables.js";
+import { tablesFrom, tablesFromCollections } from "../helpers/tables.js";
 
 // ── statement capture ───────────────────────────────────────────────────────
 
@@ -325,7 +325,7 @@ describe("REST read cost: statements and rows per request (E2E)", () => {
             c.set("driver", await driver.withAuth(USER));
             await next();
         });
-        app.route("/api/data", new RestApiGenerator(ALL, driver).generateRoutes());
+        app.route("/api/data", new RestApiGenerator(tablesFromCollections(ALL), driver).generateRoutes());
     }, 240_000);
 
     afterAll(async () => {

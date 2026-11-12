@@ -23,7 +23,7 @@ import { col, defineTable, rel } from "@rebasepro/types";
 import { compileTables, lowerTables } from "@rebasepro/common";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
-import { FixtureTableRegistry } from "../helpers/tables.js";
+import { FixtureTableRegistry, tablesFromCollections } from "../helpers/tables.js";
 import { RealtimeService } from "../../src/services/realtimeService.js";
 import { RestApiGenerator } from "../../../server/src/api/rest/api-generator.js";
 import { errorHandler } from "../../../server/src/api/errors.js";
@@ -197,7 +197,7 @@ describe("remote MCP tools on the real driver (E2E)", () => {
             c.set("driver", await driver.withAuth(USER));
             await next();
         });
-        app.route("/api/data", new RestApiGenerator(COLLECTIONS, driver).generateRoutes());
+        app.route("/api/data", new RestApiGenerator(tablesFromCollections(COLLECTIONS), driver).generateRoutes());
     }, 120_000);
 
     afterAll(async () => {

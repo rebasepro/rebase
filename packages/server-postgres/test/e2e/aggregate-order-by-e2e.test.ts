@@ -19,6 +19,7 @@ import { Hono } from "hono";
 import type { AggregateParams, AggregateRow, CollectionConfig, DataDriver, SDKTableClient } from "@rebasepro/types";
 import { buildSdkData } from "@rebasepro/common";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
+import { tablesFromCollections } from "../helpers/tables.js";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
 import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry.js";
 import { FixtureTableRegistry } from "../helpers/tables";
@@ -104,7 +105,7 @@ describe("aggregate orderBy, over HTTP and in process (E2E)", () => {
             c.set("driver", await driver.withAuth(ADMIN));
             await next();
         });
-        app.route("/api/data", new RestApiGenerator([orders], driver).generateRoutes());
+        app.route("/api/data", new RestApiGenerator(tablesFromCollections([orders]), driver).generateRoutes());
     }, 120_000);
 
     afterAll(async () => {
