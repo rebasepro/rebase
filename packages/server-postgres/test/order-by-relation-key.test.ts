@@ -64,7 +64,7 @@ describe("orderBy on an owning relation resolves through localKey", () => {
         ]
     };
 
-    const service = new FetchService(recordingDb().db, new FixtureTableRegistry());
+    const service = new FetchService(recordingDb().db, new FixtureTableRegistry([postsCollection]));
     const resolve = (orderBy: string, collection?: CollectionConfig): PgColumn | undefined => {
         const column = callPrivate(service, "resolveOrderByField", postsTable, orderBy, collection);
         return column instanceof PgColumn ? column : undefined;
