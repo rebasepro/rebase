@@ -82,7 +82,7 @@ ${cleanHtml(tr("hero.subtitle"))}
 Rebase is a backend, with an admin panel on top of it:
 
 - **Rebase Backend** — REST, a typed SDK, realtime, auth, storage, functions, cron and backups over your own Postgres, with or without the admin panel.
-- **Rebase CMS** — the team's side of the admin panel: tables, forms, media and roles, generated from the same collection definitions.
+- **Rebase CMS** — the team's side of the admin panel: tables, forms, media and roles, generated from the same table definitions and customized in your frontend.
 - **Rebase Studio** — the developers' side of the admin panel: SQL editor, schema visualizer, RLS editor, logs and an API explorer. Studio is the developer workspace. It registers inside the same panel as CMS.
 
 Authorization is Postgres row-level security in every mode, and no panel changes the API.
@@ -175,7 +175,7 @@ ${cleanHtml(tr("about.story.p3"))}
   if (page === "backend") {
     return `# Rebase — Backend & APIs
 
-Define your collections in TypeScript and get a complete API server.
+Define your tables in TypeScript and get a complete API server.
 
 ## Features
 - **Hono & Drizzle Engine**: Built on lightweight Hono server and Drizzle ORM.
@@ -189,18 +189,18 @@ Define your collections in TypeScript and get a complete API server.
   if (page === "admin") {
     return `# Rebase CMS
 
-The admin panel that sits on top of a Rebase backend — optional, and a client of the same API.
+The admin panel that ships with a Rebase backend — a client of the same API, under the same policies.
 
 ## How it relates to the backend
-- **Opt-in**: the \`admin\` block on a collection only type-checks once \`@rebasepro/cms-types\` is added to the project.
-- **Non-invasive**: the server loads your collection files and never reads inside \`admin\`; the REST, auth and realtime APIs are identical with or without a panel.
+- **Derived from the tables**: the panel reads the tables the server serves at \`GET /api/schema/tables\` and builds a default view and form for each one.
+- **Customized in your frontend**: \`customizeTable\` files in \`frontend/src/cms\` change labels, views, layouts and components; the server never reads them, so the REST, auth and realtime APIs are identical with or without a panel.
 - **Same data path**: the panel reads and writes through the same APIs you build on, under the same Postgres row-level security.
 
 ## Features
 - **Every view**: data grid, cards, list and Kanban over the same rows, with inline editing.
 - **Rich content editing**: block editor, Markdown fields and structured content written straight to Postgres.
 - **Media & storage**: uploads and previews backed by your own storage bucket.
-- **History & audit**: per-collection version history with side-by-side comparison and revert.
+- **History & audit**: per-table version history with side-by-side comparison and revert.
 - **Import & export**: CSV, JSON and Excel with automatic field mapping.
 - **Users & roles**: account management against the same roles your RLS policies read.
 - **Extensible in React**: custom fields, previews, entity views and actions referenced from the \`admin\` block.
@@ -214,7 +214,7 @@ Let AI agents read, write, and act on your Postgres data autonomously.
 
 ## Capabilities
 - **Model Context Protocol (MCP) Server**: Exposes your Postgres data plus schema, user, storage, cron and function tools — 40 of them — to AI assistants like Cursor and Claude.
-- **Scoped API Keys**: Per-collection, per-operation permissions for agents, enforced by Postgres row-level security on every query.
+- **Scoped API Keys**: Per-table, per-operation permissions for agents, enforced by Postgres row-level security on every query.
 - **${inline(tr("whatsnew.claude.title"))}**: ${cleanHtml(tr("whatsnew.claude.desc"))}
 `;
   }
@@ -238,7 +238,7 @@ A visual developer workspace to manage database content, edit schemas, and inspe
 A typed client library to interact with your Rebase backend from client-side or server-side TypeScript.
 
 ## Features
-- **Type Safety**: Automatic TypeScript types generated directly from your collection schemas.
+- **Type Safety**: Automatic TypeScript types generated directly from your tables.
 - **CRUD Operations**: Securely fetch and update documents with IDE autocomplete.
 - **Realtime Subscriptions**: Subscribe to table updates or broadcast channels over WebSockets.
 - **Auth & Storage**: Built-in methods to handle login, sign-up, JWT auth, and resumable file uploads.
@@ -252,8 +252,8 @@ A powerful terminal CLI to scaffold, introspect, migrate, and deploy Rebase proj
 
 ## Core Commands
 - \`init\`: Initialize a new Rebase project in the current directory.
-- \`pull\`: Introspect an existing PostgreSQL database schema and generate TypeScript collections.
-- \`db:push\`: Push schema changes to your database.
+- \`schema introspect\`: Read an existing PostgreSQL database and write \`defineTable\` files to \`backend/schema\`.
+- \`db push\`: Push schema changes to your database.
 - \`dev\`: Spin up the admin panel, API, and WebSocket server locally.
 `;
   }
@@ -265,7 +265,7 @@ Bulletproof, version-controlled access control for your PostgreSQL database.
 
 ## Security Architecture
 - **Row-Level Security (RLS)**: Define RLS policies directly in your TypeScript schema — no raw SQL required.
-- **Role-Based Access Control (RBAC)**: Fine-grained permissions per collection, per field, and per user role.
+- **Role-Based Access Control (RBAC)**: Fine-grained permissions per table, per field, and per user role.
 - **JWT Authentication**: Secure JSON Web Token plumbing out of the box.
 - **SSO & OAuth**: OIDC single sign-on including Microsoft Entra ID, plus Google, GitHub, Apple, LinkedIn and more.
 `;
@@ -299,7 +299,7 @@ Ship your product faster with schema-driven development. Eliminate backend boile
   if (page === "developers") {
     return `# Rebase — Developers Overview
 
-Rebase is the open-source backend for Postgres, with an admin panel for your team. You write TypeScript collections; the schema, REST API, typed SDK and admin panel come out of them.
+Rebase is the open-source backend for Postgres, with an admin panel for your team. You declare Postgres tables in TypeScript; the schema, REST API, typed SDK and admin panel come out of them.
 
 ## Key Principles
 - **Schema-as-Code**: Your TypeScript definitions are the single source of truth.

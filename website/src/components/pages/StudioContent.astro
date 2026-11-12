@@ -13,23 +13,20 @@ import "../../styles/editor.css";
 
 
 
-const collectionEditorHtml = `<span class="text-primary-light">import type</span> { PostgresCollectionConfig } <span class="text-primary-light">from</span> <span class="text-green-400">"@rebasepro/types"</span>;
+const collectionEditorHtml = `<span class="text-primary-light">import</span> { defineTable, col } <span class="text-primary-light">from</span> <span class="text-green-400">"@rebasepro/server/schema"</span>;
 
-<span class="text-primary-light">export const</span> <span class="text-white">orders</span>: PostgresCollectionConfig = {
-  <span class="text-blue-300">name</span>: <span class="text-green-400">"Orders"</span>,
-  <span class="text-blue-300">slug</span>: <span class="text-green-400">"orders"</span>,
-  <span class="text-blue-300">table</span>: <span class="text-green-400">"orders"</span>,
-  <span class="text-blue-300">properties</span>: {
-    <span class="text-blue-300">customer</span>: { <span class="text-blue-300">type</span>: <span class="text-green-400">"string"</span>, <span class="text-blue-300">name</span>: <span class="text-green-400">"Customer"</span> },
-    <span class="text-blue-300">total</span>:    { <span class="text-blue-300">type</span>: <span class="text-green-400">"number"</span>, <span class="text-blue-300">name</span>: <span class="text-green-400">"Total"</span> },
-    <span class="text-blue-300">status</span>:   { <span class="text-blue-300">type</span>: <span class="text-green-400">"string"</span>,
-      <span class="text-blue-300">enum</span>: { <span class="text-blue-300">pending</span>: <span class="text-green-400">"Pending"</span>,
-              <span class="text-blue-300">shipped</span>: <span class="text-green-400">"Shipped"</span>,
-              <span class="text-blue-300">delivered</span>: <span class="text-green-400">"Delivered"</span> } },
+<span class="text-primary-light">export const</span> <span class="text-white">orders</span> = <span class="text-blue-300">defineTable</span>(<span class="text-green-400">"orders"</span>, {
+  <span class="text-blue-300">columns</span>: {
+    <span class="text-blue-300">id</span>:       col.<span class="text-blue-300">uuid</span>().<span class="text-blue-300">primaryKey</span>().<span class="text-blue-300">defaultRandom</span>(),
+    <span class="text-blue-300">customer</span>: col.<span class="text-blue-300">text</span>().<span class="text-blue-300">notNull</span>(),
+    <span class="text-blue-300">total</span>:    col.<span class="text-blue-300">numeric</span>(<span class="text-amber-500">10</span>, <span class="text-amber-500">2</span>),
+    <span class="text-blue-300">status</span>:   col.<span class="text-blue-300">enum</span>([<span class="text-green-400">"pending"</span>, <span class="text-green-400">"shipped"</span>,
+                       <span class="text-green-400">"delivered"</span>]),
   },
-  <span class="text-blue-300">securityRules</span>: [<span class="text-surface-500">/* ... */</span>],
-  <span class="text-blue-300">callbacks</span>: { <span class="text-blue-300">onSave</span>: <span class="text-surface-500">/* ... */</span> }
-};`;
+  <span class="text-blue-300">rls</span>: [<span class="text-surface-500">/* ... */</span>],
+  <span class="text-blue-300">hooks</span>: { <span class="text-blue-300">afterSave</span>: <span class="text-surface-500">/* ... */</span> },
+  <span class="text-blue-300">history</span>: <span class="text-primary-light">true</span>,
+});`;
 import ClosingCta from "../ClosingCta.astro";
 import { DEMO_URL } from "../../utils/links";
 import HeroBackdrop from "../HeroBackdrop.astro";
@@ -101,7 +98,7 @@ import HeroBackdrop from "../HeroBackdrop.astro";
             </div>
             <div class="flex">
               <div class="py-3 px-2 text-right text-[11px] font-mono text-surface-600 leading-[1.55rem] select-none border-r border-surface-800/40 bg-surface-950">
-                <div>1</div><div>2</div><div>3</div><div>4</div><div>5</div><div>6</div><div>7</div><div>8</div><div>9</div><div>10</div><div>11</div><div>12</div><div>13</div><div>14</div><div>15</div>
+                <div>1</div><div>2</div><div>3</div><div>4</div><div>5</div><div>6</div><div>7</div><div>8</div><div>9</div><div>10</div><div>11</div><div>12</div><div>13</div><div>14</div>
               </div>
               <pre class="py-3 px-4 text-[11px] font-mono leading-[1.55rem] text-surface-300 overflow-x-auto flex-1 bg-surface-950" set:html={collectionEditorHtml}></pre>
             </div>
@@ -212,7 +209,7 @@ import HeroBackdrop from "../HeroBackdrop.astro";
               <div class="flex flex-col gap-1 flex-1 font-mono text-[7px]">
                 <div class="text-blue-300">const sdk = rebase();</div>
                 <div class="text-surface-300">const users = await sdk</div>
-                <div class="text-surface-300">  .collection("users")</div>
+                <div class="text-surface-300">  .table("users")</div>
                 <div class="text-surface-300">  .find(&#123; role: "admin" &#125;);</div>
                 <div class="text-emerald-400 mt-0.5">// → 3 results</div>
               </div>

@@ -34,16 +34,15 @@ const CAPABILITIES: Capability[] = [
         title: "A surface an agent can hold",
         desc: "No controllers, no serializers, no migrations to hand-write, and nothing for a model to invent between the schema and the route. The whole contract fits in one context window, and the compiler checks whatever it writes back.",
         pills: ["no controllers to review", "fits in one context window", "compiler-checked"],
-        screen: "config/collections/orders.ts",
+        screen: "backend/schema/orders.ts",
         guardrailLabel: "Compiler + Schema Gate",
-        guardrailDetail: "1 collection file → 0 custom controllers to hallucinate · TypeScript + SQL migration verified before apply",
+        guardrailDetail: "1 table file → 0 custom controllers to hallucinate · TypeScript + SQL migration verified before apply",
         body: (
             <>
-                {line(0, <span className="text-blue-400">export const</span>, <span className="text-surface-200"> orders</span>, <span className="text-surface-300">: </span>, <span className="text-cyan-300">PostgresCollectionConfig</span>, <span className="text-surface-300"> = {"{"}</span>)}
-                {line(1, <span className="text-surface-300">table: </span>, <span className="text-emerald-300">"orders"</span>, <span className="text-surface-300">,</span>)}
-                {line(1, <span className="text-surface-300">properties: {"{"} total, status, customer {"}"},</span>)}
-                {line(1, <span className="text-surface-300">securityRules: [{"{"} operation: </span>, <span className="text-emerald-300">"select"</span>, <span className="text-surface-300">, … {"}"}],</span>)}
-                {line(0, <span className="text-surface-300">{"}"};</span>)}
+                {line(0, <span className="text-blue-400">export const</span>, <span className="text-surface-200"> orders</span>, <span className="text-surface-300"> = </span>, <span className="text-cyan-300">defineTable</span>, <span className="text-surface-300">(</span>, <span className="text-emerald-300">"orders"</span>, <span className="text-surface-300">, {"{"}</span>)}
+                {line(1, <span className="text-surface-300">columns: {"{"} total, status, customer {"}"},</span>)}
+                {line(1, <span className="text-surface-300">rls: [{"{"} operation: </span>, <span className="text-emerald-300">"select"</span>, <span className="text-surface-300">, … {"}"}],</span>)}
+                {line(0, <span className="text-surface-300">{"}"});</span>)}
                 <div className="mt-3 border-t border-hairline pt-3">
                     {line(0, <span className="text-surface-500">→ REST · typed SDK · RLS policies · admin views</span>)}
                 </div>
@@ -55,17 +54,17 @@ const CAPABILITIES: Capability[] = [
         label: "Human review gates",
         Icon: ShieldCheck,
         title: "Agents draft. Humans approve.",
-        desc: "Encode review boundaries directly in the collection and its Postgres policies. An agent holding a scoped key can draft rows or stage updates, while only an operator in the panel can move a record to approved or sent.",
+        desc: "Encode review boundaries directly in the table and its Postgres policies. An agent holding a scoped key can draft rows or stage updates, while only an operator in the panel can move a record to approved or sent.",
         pills: ["schema-enforced states", "approval queues in Rebase CMS", "RLS write guards"],
-        screen: "config/collections/outreach.ts",
+        screen: "backend/schema/outreach.ts",
         guardrailLabel: "Postgres WITH CHECK Gate",
         guardrailDetail: "Agent INSERT with status='approved' → rejected by Postgres RLS · Operator approval required in Rebase CMS",
         body: (
             <>
-                {line(0, <span className="text-surface-300">status: {"{"} type: </span>, <span className="text-emerald-300">"string"</span>, <span className="text-surface-300">, enumValues: [</span>, <span className="text-emerald-300">"draft"</span>, <span className="text-surface-300">, </span>, <span className="text-emerald-300">"approved"</span>, <span className="text-surface-300">] {"}"},</span>)}
-                {line(0, <span className="text-surface-300">securityRules: [</span>)}
-                {line(1, <span className="text-surface-300">{"{"} role: </span>, <span className="text-amber-300">"agent"</span>, <span className="text-surface-300">, operation: </span>, <span className="text-emerald-300">"insert"</span>, <span className="text-surface-300">, check: </span>, <span className="text-cyan-300">status = 'draft'</span>, <span className="text-surface-300"> {"}"},</span>)}
-                {line(1, <span className="text-surface-300">{"{"} role: </span>, <span className="text-primary">"operator"</span>, <span className="text-surface-300">, operation: </span>, <span className="text-emerald-300">"update"</span>, <span className="text-surface-300"> {"}"}</span>)}
+                {line(0, <span className="text-surface-300">status: col.enum([</span>, <span className="text-emerald-300">"draft"</span>, <span className="text-surface-300">, </span>, <span className="text-emerald-300">"approved"</span>, <span className="text-surface-300">]),</span>)}
+                {line(0, <span className="text-surface-300">rls: [</span>)}
+                {line(1, <span className="text-surface-300">{"{"} roles: [</span>, <span className="text-amber-300">"agent"</span>, <span className="text-surface-300">], operation: </span>, <span className="text-emerald-300">"insert"</span>, <span className="text-surface-300">, check: {"{"} status: </span>, <span className="text-cyan-300">"draft"</span>, <span className="text-surface-300"> {"}"} {"}"},</span>)}
+                {line(1, <span className="text-surface-300">{"{"} roles: [</span>, <span className="text-primary">"operator"</span>, <span className="text-surface-300">], operation: </span>, <span className="text-emerald-300">"update"</span>, <span className="text-surface-300"> {"}"}</span>)}
                 {line(0, <span className="text-surface-300">]</span>)}
                 <div className="mt-3 border-t border-hairline pt-3">
                     {line(0, <span className="text-emerald-400">✔ </span>, <span className="text-surface-400">agent drafts in Postgres · operator approves in the panel</span>)}
@@ -78,7 +77,7 @@ const CAPABILITIES: Capability[] = [
         label: "Service API keys",
         Icon: KeyRound,
         title: "Scoped service API keys",
-        desc: "Issue a key with per-collection, per-operation permissions. Rate limited, expiring, revocable — and still subject to row-level security underneath.",
+        desc: "Issue a key with per-table, per-operation permissions. Rate limited, expiring, revocable — and still subject to row-level security underneath.",
         pills: ["SHA-256 hashed", "per-key rate limits", "soft revocation"],
         screen: "api-keys",
         guardrailLabel: "No Bypass-RLS Master Key",
@@ -115,7 +114,7 @@ const CAPABILITIES: Capability[] = [
         pills: ["AGENTS.md", "CLAUDE.md", "rls-check", "rebase init"],
         screen: "my-app/",
         guardrailLabel: "Zero-Prompt Onboarding",
-        guardrailDetail: "AGENTS.md & CLAUDE.md pre-loaded with collection conventions, relation rules, and @rebasepro/rls-check verification",
+        guardrailDetail: "AGENTS.md & CLAUDE.md pre-loaded with table conventions, relation rules, and @rebasepro/rls-check verification",
         body: (
             <>
                 {line(0, <span className="text-primary">~ </span>, <span className="text-surface-200">pnpm dlx @rebasepro/cli init my-app</span>)}
@@ -123,8 +122,8 @@ const CAPABILITIES: Capability[] = [
                     {line(0, <span className="text-surface-400">my-app/</span>)}
                     {line(1, <span className="text-emerald-300">AGENTS.md</span>, <span className="text-surface-600"> — layout, commands, conventions</span>)}
                     {line(1, <span className="text-emerald-300">CLAUDE.md</span>, <span className="text-surface-600"> — same, for Claude Code</span>)}
-                    {line(1, <span className="text-surface-400">config/collections/</span>)}
-                    {line(1, <span className="text-surface-400">backend/  frontend/</span>)}
+                    {line(1, <span className="text-surface-400">backend/schema/</span>)}
+                    {line(1, <span className="text-surface-400">frontend/src/cms/</span>)}
                 </div>
             </>
         )
@@ -134,19 +133,19 @@ const CAPABILITIES: Capability[] = [
         label: "Agent skills",
         Icon: BookOpen,
         title: "Official agent skills",
-        desc: "Twenty maintained skills — collections, access rules, auth, realtime, storage, the SDK — written into your agent's own rules directory. It reads how Rebase works instead of guessing.",
+        desc: "Twenty-four maintained skills — tables, access rules, auth, realtime, storage, the SDK — written into your agent's own rules directory. It reads how Rebase works instead of guessing.",
         pills: ["Claude Code", "Cursor", "Windsurf", "Gemini CLI"],
         screen: "~/my-app",
-        guardrailLabel: "20 Versioned Skills",
-        guardrailDetail: "Installed into .claude/skills/ and .cursor/rules/ so coding agents author valid defineCollection() & RLS rules on the first try",
+        guardrailLabel: "24 Versioned Skills",
+        guardrailDetail: "Installed into .claude/skills/ and .cursor/rules/ so coding agents author valid defineTable() & RLS rules on the first try",
         body: (
             <>
                 {line(0, <span className="text-primary">~ </span>, <span className="text-surface-200">rebase skills</span>)}
                 {line(0, <span className="text-surface-500">detected .claude/ — installing to .claude/skills/</span>)}
                 <div className="mt-2 space-y-1">
-                    {line(0, <span className="text-emerald-400">✔ </span>, <span className="text-surface-400">rebase-collections, rebase-security, rebase-auth</span>)}
+                    {line(0, <span className="text-emerald-400">✔ </span>, <span className="text-surface-400">rebase-tables, rebase-security, rebase-auth</span>)}
                     {line(0, <span className="text-emerald-400">✔ </span>, <span className="text-surface-400">rebase-realtime, rebase-sdk, rebase-storage …</span>)}
-                    {line(0, <span className="text-surface-300">20 skills installed</span>)}
+                    {line(0, <span className="text-surface-300">24 skills installed</span>)}
                 </div>
             </>
         )
@@ -164,9 +163,9 @@ const CAPABILITIES: Capability[] = [
         body: (
             <>
                 {line(0, <span className="text-surface-500">→ initialize</span>)}
-                {line(0, <span className="text-emerald-400">← 40 tools registered</span>)}
+                {line(0, <span className="text-emerald-400">← 53 tools registered</span>)}
                 <div className="mt-2.5 space-y-1">
-                    {line(1, <span className="text-primary">list_documents</span>, <span className="text-surface-500"> — read any collection under RLS</span>)}
+                    {line(1, <span className="text-primary">query_table</span>, <span className="text-surface-500"> — read any table under RLS</span>)}
                     {line(1, <span className="text-primary">rebase_schema_introspect</span>, <span className="text-surface-500"> — tables, relations, enums</span>)}
                     {line(1, <span className="text-primary">rebase_db_migrate</span>, <span className="text-surface-500"> — apply pending migrations</span>)}
                 </div>

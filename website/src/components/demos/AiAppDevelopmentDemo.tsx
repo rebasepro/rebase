@@ -74,8 +74,8 @@ export default function AiAppDevelopmentDemo() {
               <span className="ml-auto text-[10px] text-surface-500 font-mono">Option 1</span>
             </div>
             <p className="text-surface-400 text-xs leading-relaxed">
-              Inject custom collections and backend listeners directly into your codebase. 
-              The AI callbacks execute on database events within your local project files.
+              Inject tables and table hooks directly into your codebase.
+              The AI hooks run on every write, from your local project files.
             </p>
           </div>
 
@@ -145,7 +145,7 @@ export default function AiAppDevelopmentDemo() {
                     }`}
                   >
                     <Code className="w-3.5 h-3.5 text-sky-400" />
-                    collections/feedbacks.ts
+                    schema/feedbacks.ts
                   </button>
                   <button
                     onClick={() => setRecipeTab("sql")}
@@ -162,9 +162,9 @@ export default function AiAppDevelopmentDemo() {
                 <div className="flex-1 p-5 font-mono text-[11px] sm:text-xs text-slate-300 overflow-hidden leading-relaxed select-text bg-[#0d0d0f]">
                   {recipeTab === "schema" ? (
                     <div className="space-y-1">
-                      <div><span className="text-slate-500">{"// collections/feedbacks.ts"}</span></div>
+                      <div><span className="text-slate-500">{"// backend/schema/feedbacks.ts"}</span></div>
                       <div>
-                        <span className="text-sky-400">import type</span> {"{"} PostgresCollectionConfig {"}"} <span className="text-sky-400">from</span> <span className="text-emerald-400">"@rebasepro/types"</span>;
+                        <span className="text-sky-400">import</span> {"{"} defineTable, col {"}"} <span className="text-sky-400">from</span> <span className="text-emerald-400">"@rebasepro/server/schema"</span>;
                       </div>
                       <div>
                         <span className="text-sky-400">import</span> OpenAI <span className="text-sky-400">from</span> <span className="text-emerald-400">"openai"</span>;
@@ -175,16 +175,16 @@ export default function AiAppDevelopmentDemo() {
                       </div>
                       <div className="h-2"></div>
                       <div>
-                        <span className="text-sky-400">export const</span> feedbacks: <span className="text-blue-400">PostgresCollectionConfig</span> = {"{"}
+                        <span className="text-sky-400">export const</span> feedbacks = <span className="text-blue-400">defineTable</span>(<span className="text-emerald-400">"feedbacks"</span>, {"{"}
                       </div>
                       <div className="pl-4">
-                        slug: <span className="text-emerald-400">"feedbacks"</span>, table: <span className="text-emerald-400">"feedbacks"</span>,
+                        columns: {"{"} content, aiSentiment, aiTags {"},"}
                       </div>
                       <div className="pl-4">
-                        properties: {"{"} content, aiSentiment, aiTags {"},"}
+                        rls: <span className="text-emerald-400">"admin-only"</span>,
                       </div>
                       <div className="pl-4">
-                        callbacks: {"{"}
+                        hooks: {"{"}
                       </div>
                       <div className="pl-8">
                         <span className="text-slate-500">{"// Runs on every write — enrich the row before it hits Postgres"}</span>
@@ -204,7 +204,7 @@ export default function AiAppDevelopmentDemo() {
                       <div className="pl-4">
                         {"}"}
                       </div>
-                      <div>{"};"}</div>
+                      <div>{"});"}</div>
                     </div>
                   ) : (
                     <div className="space-y-1">

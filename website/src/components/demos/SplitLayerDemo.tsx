@@ -3,9 +3,9 @@ import React, { useState } from "react";
 /**
  * The BaaS / admin-panel split, made touchable.
  *
- * Toggle the admin layer on and off: the project grows one dependency and one
- * nested block, the admin panel appears — and the API response on the right
- * never moves. That last part is the whole argument.
+ * Toggle the admin layer on and off: the project grows a frontend and one
+ * customization file, the admin panel appears — and the API response on the
+ * right never moves. That last part is the whole argument.
  */
 
 type Mode = "backend" | "full";
@@ -17,8 +17,8 @@ const BACKEND_DEPS = [
 ];
 
 const ADMIN_DEPS = [
-    "@rebasepro/cms",
-    "@rebasepro/cms-types"
+    "@rebasepro/app",
+    "@rebasepro/cms"
 ];
 
 export function SplitLayerDemo() {
@@ -52,8 +52,8 @@ export function SplitLayerDemo() {
                 </div>
                 <p className="text-xs text-surface-500">
                     {full
-                        ? "One dependency and one nested block added. The API below is untouched."
-                        : "A headless project: no admin block, no panel — just the API."}
+                        ? "A frontend and one customization file added. The API below is untouched."
+                        : "A headless project: no frontend, no panel — just the API."}
                 </p>
             </div>
 
@@ -66,9 +66,10 @@ export function SplitLayerDemo() {
                     </p>
 
                     <div className="font-mono text-[11px] leading-relaxed text-surface-400 mb-4">
-                        <div>config/</div>
-                        <div className="pl-3">collections/users.ts</div>
-                        {full && <div className="pl-3 text-emerald-400">admin.d.ts</div>}
+                        <div>backend/</div>
+                        <div className="pl-3">schema/users.ts</div>
+                        {full && <div className="text-emerald-400">frontend/</div>}
+                        {full && <div className="pl-3 text-emerald-400">src/cms/users.tsx</div>}
                     </div>
 
                     <p className="text-[10px] font-semibold uppercase tracking-wider text-surface-500 mb-2">
@@ -85,45 +86,43 @@ export function SplitLayerDemo() {
 
                     <p className="mt-4 text-[11px] leading-relaxed text-surface-500">
                         {full
-                            ? "The reference in admin.d.ts is what makes an `admin` block legal anywhere in the project."
-                            : "Without admin.d.ts, an `admin` key on a collection is a type error."}
+                            ? "The panel reads the tables the server serves; the customization only changes how it shows them."
+                            : "A table has no presentation keys, so nothing about a panel can live in the backend."}
                     </p>
                 </div>
 
                 {/* 2 — the collection file */}
                 <div className="p-4 sm:p-5">
                     <p className="text-[10px] font-semibold uppercase tracking-wider text-surface-500 mb-3">
-                        config/collections/users.ts
+                        backend/schema/users.ts
                     </p>
 
-                    <pre className="font-mono text-[11px] leading-relaxed text-surface-300 overflow-x-auto"><code>{`export const users = {
-  name: "Users",
-  table: "users",
-  properties: {
-    email: { type: "string" },
-    displayName: { type: "string" },
+                    <pre className="font-mono text-[11px] leading-relaxed text-surface-300 overflow-x-auto"><code>{`export const users = defineAuthTable("users", {
+  columns: {
+    id: col.uuid().primaryKey().defaultRandom(),
+    email: col.text().notNull().unique(),
+    displayName: col.text(),
   },
-  securityRules: [
-    { operation: "select",
-      using: "id = rebase.uid()::uuid" },
-  ],`}</code></pre>
+  // everyone reads their own row; admins list all
+  rls: [{ operation: "select", roles: ["admin"] }],
+});`}</code></pre>
 
                     <div className={`transition-all duration-300 ${full ? "opacity-100 mt-1" : "opacity-30"}`}>
                         <pre className={`font-mono text-[11px] leading-relaxed overflow-x-auto rounded-r-lg border-l-2 pl-3 py-1 transition-colors duration-300 ${
                             full
                                 ? "border-emerald-400/60 bg-emerald-400/[0.04] text-surface-300"
                                 : "border-hairline-strong text-surface-600 line-through decoration-surface-600/60"
-                        }`}><code>{`  admin: {
-    icon: "Users",
-    group: "Settings",
-    listProperties: ["displayName", "email"],
-  },`}</code></pre>
+                        }`}><code>{`// frontend/src/cms/users.tsx
+customizeTable<typeof users>("users", {
+  icon: "Users",
+  group: "Settings",
+  listFields: ["displayName", "email"],
+});`}</code></pre>
                     </div>
 
-                    <pre className="font-mono text-[11px] leading-relaxed text-surface-300">{`};`}</pre>
 
                     <p className="mt-4 text-[11px] leading-relaxed text-surface-500">
-                        The server loads this file either way — and never reads inside <code className="font-mono">admin</code>.
+                        The server loads the table either way — and never sees the customization.
                     </p>
                 </div>
 

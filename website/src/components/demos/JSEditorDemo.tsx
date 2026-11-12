@@ -25,7 +25,7 @@ const DEFAULT_CODE = `// Available: client (RebaseClient), context
 // Press Cmd+Enter (Ctrl+Enter) to run
 
 const result = await client.data
-  .collection("posts")
+  .table("posts")
   .find({ limit: 10 });
 
 console.log("Found", result.data.length, "posts");
@@ -84,7 +84,7 @@ const SNIPPETS = [
     { name: "List all users",
 code: "const users = await client.admin.listUsers();\nreturn users;" },
     { name: "Count posts",
-code: "const result = await client.data.collection(\"posts\").find();\nconsole.log(\"Total:\", result.data.length);\nreturn { count: result.data.length };" },
+code: "const result = await client.data.table(\"posts\").find();\nconsole.log(\"Total:\", result.data.length);\nreturn { count: result.data.length };" },
     { name: "Get current session",
 code: "const session = client.auth.getSession();\nreturn session;" }
 ];
@@ -111,7 +111,7 @@ function highlightJS(code: string): React.ReactNode[] {
                 tokens.push(<span key={`${lineIdx}-${i}`} className="text-green-400">{part}</span>);
             } else if (/^\d+/.test(part)) {
                 tokens.push(<span key={`${lineIdx}-${i}`} className="text-amber-400">{part}</span>);
-            } else if (/^(console|client|context|result|data|admin|auth|collection|find|findById|create|update|delete|listUsers|getSession)$/.test(part)) {
+            } else if (/^(console|client|context|result|data|admin|auth|table|find|findById|create|update|delete|listUsers|getSession)$/.test(part)) {
                 tokens.push(<span key={`${lineIdx}-${i}`} className="text-cyan-300">{part}</span>);
             } else {
                 tokens.push(<span key={`${lineIdx}-${i}`}>{part}</span>);
@@ -183,11 +183,11 @@ code: "// New script\n" }]);
                 <div className="flex-1 overflow-y-auto p-1.5">
                     {sidebarTab === "collections" && (
                         <div className="space-y-0.5">
-                            <div className="px-1.5 py-1 text-[10px] font-semibold text-surface-500 tracking-wider">COLLECTIONS</div>
+                            <div className="px-1.5 py-1 text-[10px] font-semibold text-surface-500 tracking-wider">TABLES</div>
                             {["posts", "users", "comments", "products", "orders"].map(col => (
                                 <button
                                     key={col}
-                                    onClick={() => handleCodeChange(`const result = await client.data\n  .collection("${col}")\n  .find({ limit: 10 });\n\nreturn result;`)}
+                                    onClick={() => handleCodeChange(`const result = await client.data\n  .table("${col}")\n  .find({ limit: 10 });\n\nreturn result;`)}
                                     className="flex items-center gap-1.5 px-2 py-1.5 rounded text-xs text-surface-400 hover:bg-surface-hover w-full text-left transition-colors"
                                 >
                                     <div className="w-4 h-4 rounded bg-indigo-500/20 flex items-center justify-center shrink-0">

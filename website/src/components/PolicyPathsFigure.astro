@@ -8,7 +8,7 @@
  * dashboard do not. A rule in application code protects the door, not the
  * room (manifesto, belief 1).
  *
- * State two — the rule as Postgres holds it: the `securityRules` block, the
+ * State two — the rule as Postgres holds it: the table's `rls` rules, the
  * policy it compiles to, and the same five paths each reading "policy
  * applies". Press the toggle, or scroll it into view.
  *
@@ -47,13 +47,12 @@ const TODAY: { path: string; code: string; ok: boolean; verdict: string }[] = [
     { path: "the hosted dashboard", code: `${k("select")} * ${k("from")} orders  ${dim("-- as the owner")}`, ok: false, verdict: "no policy" },
 ];
 
-const RULE = `securityRules: [
-  { operation: ${s('"select"')}, using: ${s('"owner_id = rebase.uid()"')} },
-  { operation: ${s('"update"')}, using: ${s('"owner_id = rebase.uid()"')} },
+const RULE = `rls: [
+  { operations: [${s('"select"')}, ${s('"update"')}], ownerField: ${s('"owner_id"')} },
 ]
 ${dim("-- compiled into Postgres; enforced on every statement, for every caller")}
 ${k("CREATE POLICY")} orders_select ${k("ON")} orders ${k("FOR SELECT")} ${k("USING")} (owner_id = rebase.uid());
-${dim("-- a table with no policy is not served at all")}`;
+${dim("-- a table without rls does not compile")}`;
 
 const AFTER: { path: string; role: string }[] = [
     { path: "routes/orders.ts", role: "rebase_user" },
@@ -67,7 +66,7 @@ const AFTER: { path: string; role: string }[] = [
 <div class="frame paths" data-paths data-state="today">
     <div class="frame-head">
         <span class="only-today truncate">{t("recognition.badge")}</span>
-        <span class="only-rule truncate">collections/orders.ts · {t("recognition.oneNote")}</span>
+        <span class="only-rule truncate">schema/orders.ts · {t("recognition.oneNote")}</span>
         <div class="ml-auto inline-flex overflow-hidden rounded-md border border-white/15 bg-black/30" role="group">
             <button type="button" data-paths-set="today" aria-pressed="true"
                     class="cursor-pointer px-3 py-1 font-sans text-2xs font-medium text-surface-400 transition-colors aria-pressed:bg-rose-500/20 aria-pressed:text-rose-200 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">

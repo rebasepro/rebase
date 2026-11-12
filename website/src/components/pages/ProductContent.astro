@@ -14,11 +14,11 @@ const translatePath = useTranslatedPath(lang);
 // The one thing this page exists to show: two layers, what is in each, and
 // which page goes deeper. Backend first — see website/SITE-STORY.md.
 const backendParts = ["rest", "sdk", "realtime", "auth", "storage", "functions", "rls", "openapi"].map(
-    (k, i) => ({ k, meta: ["/api/data/:collection", "@rebasepro/client", "listen()", "/api/auth/*", "/api/storage/*", "functions/", "securityRules", "/api/docs"][i] })
+    (k, i) => ({ k, meta: ["/api/data/:table", "@rebasepro/client", "listen()", "/api/auth/*", "/api/storage/*", "functions/", "rls", "/api/docs"][i] })
 );
 
 const adminParts = ["views", "forms", "react", "roles", "studio"].map(
-    (k, i) => ({ k, meta: ["enabledViews", "properties", "admin.Field", "RBAC", "/studio"][i] })
+    (k, i) => ({ k, meta: ["enabledViews", "customizeTable", "fields.*.Field", "RBAC", "/studio"][i] })
 );
 
 // What you stop maintaining. Concrete, not aspirational.

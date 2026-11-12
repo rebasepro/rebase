@@ -11,7 +11,7 @@ import React, { useState } from "react";
  * also make.
  *
  * Tool names are the real ones the hosted MCP server exposes. The scopes are
- * the real vocabulary from @rebasepro/types: `data:<operation>:<collection>`.
+ * the real vocabulary from @rebasepro/types: `data:<operation>:<table>`.
  * The second toggle is the key's RLS roles — `admin` reads every row — which
  * is a separate setting from its scopes on purpose.
  */
@@ -52,24 +52,24 @@ interface Call {
 
 const CALLS: Call[] = [
     {
-        tool: "query_collection",
-        args: `{ "collection": "products", "limit": 20 }`,
+        tool: "query_table",
+        args: `{ "table": "products", "limit": 20 }`,
         needs: { collection: "products", op: "read" },
         rlsAllows: true,
         ok: `20 rows · id, title, price, stock`,
         rlsNote: `products has a select policy naming "service"`
     },
     {
-        tool: "update_document",
-        args: `{ "collection": "orders", "id": "8f21", "data": { "status": "refunded" } }`,
+        tool: "update_row",
+        args: `{ "table": "orders", "id": "8f21", "data": { "status": "refunded" } }`,
         needs: { collection: "orders", op: "write" },
         rlsAllows: true,
         ok: `1 row updated · orders/8f21`,
         rlsNote: `orders grants update to "service"`
     },
     {
-        tool: "delete_document",
-        args: `{ "collection": "orders", "id": "8f21" }`,
+        tool: "delete_row",
+        args: `{ "table": "orders", "id": "8f21" }`,
         needs: { collection: "orders", op: "delete" },
         rlsAllows: false,
         ok: `1 row deleted · orders/8f21`,
@@ -77,8 +77,8 @@ const CALLS: Call[] = [
         blocked: `403  WRITE_DENIED · orders/8f21 is still there`
     },
     {
-        tool: "get_document",
-        args: `{ "collection": "customers", "id": "c7" }`,
+        tool: "get_row",
+        args: `{ "table": "customers", "id": "c7" }`,
         needs: { collection: "customers", op: "read" },
         rlsAllows: false,
         ok: `1 row · customers/c7 · name, email, plan`,

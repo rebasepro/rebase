@@ -206,7 +206,7 @@ export function SdkMiniDemo() {
 
             <div className="h-5 bg-[#007acc] flex items-center px-2 gap-3 text-[9px] text-white/90 shrink-0">
                 <span>TypeScript 5.8 · @rebasepro/client</span>
-                <span className="hidden sm:inline text-white/75">schema synced from collections/posts.ts</span>
+                <span className="hidden sm:inline text-white/75">schema synced from backend/schema/posts.ts</span>
                 <span className="ml-auto">UTF-8</span>
                 <span>Ln {caretRow + 1}, Col {caretCol + 1}</span>
             </div>

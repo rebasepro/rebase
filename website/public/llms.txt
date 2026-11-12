@@ -4,15 +4,15 @@
 > row-level security, realtime subscriptions, storage, cron jobs, and an MCP server for AI agents —
 > all generated from your schema, with a full admin panel and SQL editor included on top.
 > Connect an existing PostgreSQL database or start fresh; Rebase uses Drizzle ORM under the hood and
-> keeps your TypeScript collection definitions as the single source of truth.
-> Scoped API keys with per-collection permissions plus Postgres-enforced RLS make it safe for
+> keeps your TypeScript table definitions (defineTable, in backend/schema) as the single source of truth.
+> Scoped API keys with per-table permissions plus Postgres-enforced RLS make it safe for
 > autonomous agents to read and write production data.
 
 ## Product
 
 - [Rebase](https://rebase.pro/): What Rebase is: a Postgres backend with an admin panel generated from the same schema.
 - [Backend](https://rebase.pro/backend): The backend on its own — REST API, auth, RLS, realtime, storage, functions, cron.
-- [Admin panel (Studio)](https://rebase.pro/studio): The admin UI your non-technical teammates use, generated from the collections.
+- [Admin panel (Studio)](https://rebase.pro/studio): The admin UI your non-technical teammates use, generated from the tables.
 - [Pricing](https://rebase.pro/pricing): Open source and self-hosted, plus Rebase Cloud (private beta), priced per resource rather than per seat.
 - [Security](https://rebase.pro/security): Row-level security compiled from code to real Postgres policies, and how it is enforced.
 - [rls-check (free tool)](https://rebase.pro/rls-check): A free, read-only Row-Level Security audit for ANY Postgres database — Supabase, Neon, RDS, anything. 15 checks, one command, no account, no Rebase required.

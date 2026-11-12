@@ -31,9 +31,9 @@ const t = useTranslations(lang);
 // same way on both pages.
 const DbIcon = Database, RestIcon = Globe, SdkIcon = Code, ViewIcon = TableProperties, FormIcon = LayoutDashboard;
 // Plate 03's call: a real @rebasepro/mcp tool with its real arguments, filtering
-// on the sample collection's own field. Highlighted like the samples above.
-const TOOL_CALL_HTML = `<span class="text-white">list_documents</span>({
-  <span class="text-blue-300">collection</span>: <span class="text-green-400">"products"</span>,
+// on the sample table's own field. Highlighted like the samples above.
+const TOOL_CALL_HTML = `<span class="text-white">query_table</span>({
+  <span class="text-blue-300">table</span>: <span class="text-green-400">"products"</span>,
   <span class="text-blue-300">where</span>: { <span class="text-blue-300">in_stock</span>: <span class="text-green-400">"eq.true"</span> },
   <span class="text-blue-300">orderBy</span>: <span class="text-green-400">"price:desc"</span>,
   <span class="text-blue-300">limit</span>: <span class="text-primary-light">3</span>

@@ -17,33 +17,31 @@ import { useTranslatedPath } from '../../i18n/ui';
 const translatePath = useTranslatedPath(lang);
 
 // Whitespace matters inside <pre>, so the samples live in frontmatter.
-const optInCode = `<span class="text-surface-500"># one dependency more than a headless project</span>
-<span class="text-primary-light">~</span> pnpm add @rebasepro/cms-types
-
-<span class="text-surface-500">// config/cms.d.ts — one line, once per project</span>
-<span class="text-surface-500">/// &lt;reference types="@rebasepro/cms-types" /&gt;</span>`;
-
-const adminBlockCode = `<span class="text-primary-light">export const</span> <span class="text-white">orders</span>: PostgresCollectionConfig = {
-  <span class="text-surface-500">// … the backend half: table, properties, securityRules</span>
-
-  <span class="text-blue-300">admin</span>: {
-    <span class="text-blue-300">icon</span>: <span class="text-green-400">"ShoppingCart"</span>,
-    <span class="text-blue-300">group</span>: <span class="text-green-400">"E-Commerce"</span>,
-    <span class="text-blue-300">defaultViewMode</span>: <span class="text-green-400">"table"</span>,
-    <span class="text-blue-300">enabledViews</span>: [<span class="text-green-400">"table"</span>, <span class="text-green-400">"kanban"</span>],
-    <span class="text-blue-300">listProperties</span>: [<span class="text-green-400">"reference"</span>, <span class="text-green-400">"status"</span>, <span class="text-green-400">"total"</span>],
-    <span class="text-blue-300">sort</span>: [<span class="text-green-400">"created_at"</span>, <span class="text-green-400">"desc"</span>],
+const tableCode = `<span class="text-primary-light">export const</span> <span class="text-white">orders</span> = <span class="text-blue-300">defineTable</span>(<span class="text-green-400">"orders"</span>, {
+  <span class="text-blue-300">columns</span>: {
+    <span class="text-blue-300">reference</span>: col.<span class="text-blue-300">text</span>().<span class="text-blue-300">notNull</span>(),
+    <span class="text-blue-300">status</span>:    col.<span class="text-blue-300">enum</span>([<span class="text-green-400">"paid"</span>, <span class="text-green-400">"refunded"</span>]),
+    <span class="text-blue-300">total</span>:     col.<span class="text-blue-300">numeric</span>(<span class="text-amber-500">10</span>, <span class="text-amber-500">2</span>),
+    <span class="text-surface-500">// …</span>
   },
-};`;
+  <span class="text-blue-300">rls</span>: <span class="text-green-400">"admin-only"</span>,
+});`;
 
-const customComponentCode = `<span class="text-blue-300">status</span>: {
-  <span class="text-blue-300">name</span>: <span class="text-green-400">"Status"</span>,
-  <span class="text-blue-300">type</span>: <span class="text-green-400">"string"</span>,
-  <span class="text-blue-300">enum</span>: { <span class="text-blue-300">paid</span>: <span class="text-green-400">"Paid"</span>, <span class="text-blue-300">refunded</span>: <span class="text-green-400">"Refunded"</span> },
-  <span class="text-blue-300">admin</span>: {
-    <span class="text-surface-500">// your own React component, resolved at build time</span>
-    <span class="text-blue-300">Field</span>: <span class="text-green-400">"./components/StatusPicker"</span>,
-    <span class="text-blue-300">Preview</span>: <span class="text-green-400">"./components/StatusChip"</span>,
+const customizationCode = `<span class="text-primary-light">export const</span> <span class="text-white">ordersCms</span> = <span class="text-blue-300">customizeTable</span>&lt;<span class="text-primary-light">typeof</span> <span class="text-white">orders</span>&gt;(<span class="text-green-400">"orders"</span>, {
+  <span class="text-blue-300">icon</span>: <span class="text-green-400">"ShoppingCart"</span>,
+  <span class="text-blue-300">group</span>: <span class="text-green-400">"E-Commerce"</span>,
+  <span class="text-blue-300">defaultViewMode</span>: <span class="text-green-400">"table"</span>,
+  <span class="text-blue-300">enabledViews</span>: [<span class="text-green-400">"table"</span>, <span class="text-green-400">"cards"</span>],
+  <span class="text-blue-300">listFields</span>: [<span class="text-green-400">"reference"</span>, <span class="text-green-400">"status"</span>, <span class="text-green-400">"total"</span>],
+  <span class="text-blue-300">sort</span>: [<span class="text-green-400">"created_at"</span>, <span class="text-green-400">"desc"</span>],
+});`;
+
+const customComponentCode = `<span class="text-blue-300">fields</span>: {
+  <span class="text-blue-300">status</span>: {
+    <span class="text-blue-300">enumLabels</span>: { <span class="text-blue-300">paid</span>: <span class="text-green-400">"Paid"</span>, <span class="text-blue-300">refunded</span>: <span class="text-green-400">"Refunded"</span> },
+    <span class="text-surface-500">// your own React components, imported like any other</span>
+    <span class="text-blue-300">Field</span>: <span class="text-white">StatusPicker</span>,
+    <span class="text-blue-300">Preview</span>: <span class="text-white">StatusChip</span>,
   },
 },`;
 
@@ -69,14 +67,14 @@ import ChapterRule from "../ChapterRule.astro";
         <HeroBackdrop />
 
         <div class="mx-auto relative z-10 max-w-6xl px-6 lg:px-8">
-            <div class="hero-badge mb-6"><span class="dot text-cyan-300" aria-hidden="true"></span><span>Optional layer · React 19 · Bring your own components</span></div>
+            <div class="hero-badge mb-6"><span class="dot text-cyan-300" aria-hidden="true"></span><span>Ships with the backend · React 19 · Bring your own components</span></div>
             <h1 class="mb-6 text-display-2 text-white">
                 Rebase CMS.<br/>{t("cmspage.hero.tagline")}
             </h1>
             <p class="mb-10 text-lg leading-8 text-surface-300 lg:text-xl">
-                A complete admin panel, generated from the collections your backend already uses. It is a layer
-                on top — a client of the same API your own code calls, under the same policies. Add it when a
-                human needs to touch the data, skip it when nobody does, and remove it without your API noticing.
+                A complete admin panel, generated from the tables your backend already serves. It is a layer
+                on top — a client of the same API your own code calls, under the same policies. Your team works
+                in it from the first <code class="font-mono text-surface-200">rebase dev</code>, and you customize it in your own frontend.
             </p>
             <div class="flex flex-wrap items-center justify-start gap-x-6 gap-y-3">
                 <a href={DEMO_URL} target="_blank" rel="noopener noreferrer"
@@ -123,7 +121,7 @@ import ChapterRule from "../ChapterRule.astro";
                     {t("cmspage.work.title")}
                 </h2>
                 <p class="mt-lead text-lg leading-8 text-surface-400">
-                    Everything below is generated from the same collection definitions your API is served from.
+                    Everything below is generated from the same table definitions your API is served from.
                     Nobody drew these screens.
                 </p>
             </div>
@@ -481,9 +479,9 @@ import ChapterRule from "../ChapterRule.astro";
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
                 <div class="frame overflow-hidden">
                     <div class="px-4 py-3 border-b border-surface-800/80 bg-surface-900/50">
-                        <span class="font-mono text-xs text-surface-400">opting in</span>
+                        <span class="font-mono text-xs text-surface-400">backend/schema/orders.ts</span>
                     </div>
-                    <pre class="p-5 overflow-x-auto text-2xs sm:text-xs leading-relaxed font-mono text-surface-300"><code set:html={optInCode}></code></pre>
+                    <pre class="p-5 overflow-x-auto text-2xs sm:text-xs leading-relaxed font-mono text-surface-300"><code set:html={tableCode}></code></pre>
                     <p class="px-5 pb-5 text-sm text-surface-400" set:html={t("cmspage.06")}></p>
                 </div>
 
@@ -491,7 +489,7 @@ import ChapterRule from "../ChapterRule.astro";
                     <div class="px-4 py-3 border-b border-surface-800/80 bg-surface-900/50">
                         <span class="font-mono text-xs text-surface-400">{t("cmspage.07")}</span>
                     </div>
-                    <pre class="p-5 overflow-x-auto text-2xs sm:text-xs leading-relaxed font-mono text-surface-300"><code set:html={adminBlockCode}></code></pre>
+                    <pre class="p-5 overflow-x-auto text-2xs sm:text-xs leading-relaxed font-mono text-surface-300"><code set:html={customizationCode}></code></pre>
                     <p class="px-5 pb-5 text-sm text-surface-400">{t("cmspage.08")}</p>
                 </div>
             </div>

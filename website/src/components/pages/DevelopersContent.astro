@@ -15,17 +15,17 @@ const loop = [
     {
         cmd: "rebase init",
         title: "Scaffold, or adopt what exists",
-        desc: "Creates the three packages and wires them together. Already have a database? rebase schema introspect writes collections from your tables instead.",
+        desc: "Creates the backend and the admin panel and wires them together. Already have a database? rebase schema introspect writes the table files from it instead.",
     },
     {
         cmd: "rebase db push",
         title: "Move the schema",
-        desc: "Diffs your collections against the database and applies the change. db generate + db migrate when you want the SQL in version control.",
+        desc: "Diffs your tables against the database and applies the change. db generate + db migrate when you want the SQL in version control.",
     },
     {
         cmd: "rebase generate-sdk",
         title: "Regenerate the types",
-        desc: "Writes a typed client from your collections — or from a running backend with --from <url>, in a repo that has no schema of its own.",
+        desc: "Writes a typed client from your tables — or from a running backend with --from <url>, in a repo that has no schema of its own.",
     },
     {
         cmd: "rebase dev",
@@ -34,37 +34,35 @@ const loop = [
     },
 ];
 
-const projectTree = `<span class="text-white">my-app/</span>
-├── <span class="text-primary-light">config/collections/</span>   <span class="text-surface-500"># the source of truth</span>
-│   ├── index.ts
-│   └── orders.ts           <span class="text-surface-500"># properties · relations · securityRules · admin</span>
+const projectTree = `my-app/
+├── backend/              # the backend: API, auth, RLS, realtime
+│   ├── schema/             # the source of truth
+│   │   ├── index.ts
+│   │   └── orders.ts         # defineTable: columns · relations · rls · hooks
+│   ├── resources.ts        # databases, buckets, topics
+│   ├── functions/          # your own routes, auto-mounted
+│   └── src/schema.generated.ts  # Drizzle, generated
 │
-├── <span class="text-primary-light">backend/</span>              <span class="text-surface-500"># Hono server</span>
-│   ├── src/index.ts        <span class="text-surface-500"># initializeRebaseBackend(…)</span>
-│   ├── src/schema.generated.ts  <span class="text-surface-500"># Drizzle, generated</span>
-│   └── functions/          <span class="text-surface-500"># your own routes, auto-mounted</span>
+├── frontend/             # the admin panel, reading the tables the backend serves
+│   └── src/cms/            # customizeTable: labels, views, your components
 │
-├── <span class="text-primary-light">frontend/</span>             <span class="text-surface-500"># the admin panel — delete it and nothing breaks</span>
-│   └── src/App.tsx
-│
-└── .env                    <span class="text-surface-500"># DATABASE_URL, JWT_SECRET, …</span>`;
+└── .env                    # DATABASE_URL, JWT_SECRET, …`;
 
-const callbackCode = `<span class="text-primary-light">export const</span> <span class="text-white">orders</span> = {
-  slug: <span class="text-green-400">"orders"</span>,
+const callbackCode = `<span class="text-primary-light">export const</span> <span class="text-white">orders</span> = <span class="text-amber-400">defineTable</span>(<span class="text-green-400">"orders"</span>, {
+  columns: { <span class="text-surface-500">/* … */</span> },
+  rls: <span class="text-green-400">"admin-only"</span>,
 
-  <span class="text-blue-300">callbacks</span>: {
-    <span class="text-amber-400">onPreSave</span>: <span class="text-primary-light">async</span> ({ values, context }) =&gt; {
+  <span class="text-blue-300">hooks</span>: {
+    <span class="text-amber-400">beforeSave</span>: <span class="text-primary-light">async</span> ({ values }) =&gt; {
       values.total = <span class="text-amber-400">recalculate</span>(values.items);
       <span class="text-primary-light">return</span> values;
     },
-    <span class="text-amber-400">onSaveSuccess</span>: <span class="text-primary-light">async</span> ({ entity, context }) =&gt; {
-      <span class="text-primary-light">await</span> context.rebase.<span class="text-amber-400">sql</span>(
-        <span class="text-green-400">"INSERT INTO ledger (order_id) VALUES ($1)"</span>,
-        { params: [entity.id] },
-      );
+    <span class="text-amber-400">afterSave</span>: <span class="text-primary-light">async</span> ({ id, context }) =&gt; {
+      <span class="text-surface-500">// same transaction: commits with the order, or not at all</span>
+      <span class="text-primary-light">await</span> context.data.ledger.<span class="text-amber-400">create</span>({ orderId: id });
     },
   },
-};`;
+});`;
 
 const functionCode = `<span class="text-surface-500">// backend/functions/checkout.ts</span>
 <span class="text-blue-400">import</span> { Hono } <span class="text-blue-400">from</span> <span class="text-green-400">"hono"</span>;
@@ -80,10 +78,10 @@ app.<span class="text-amber-400">post</span>(<span class="text-green-400">"/"</s
 <span class="text-blue-400">export default</span> app;
 <span class="text-surface-500">// → POST /api/functions/checkout</span>`;
 
-const resourcesCode = `<span class="text-surface-500">// config/resources.ts</span>
+const resourcesCode = `<span class="text-surface-500">// backend/resources.ts</span>
 <span class="text-blue-400">import</span> { database, bucket, topic } <span class="text-blue-400">from</span> <span class="text-green-400">"@rebasepro/types"</span>;
 
-<span class="text-blue-400">export const</span> analytics = <span class="text-amber-400">database</span>(<span class="text-green-400">"analytics"</span>, { engine: <span class="text-green-400">"mongodb"</span> });
+<span class="text-blue-400">export const</span> analytics = <span class="text-amber-400">database</span>(<span class="text-green-400">"analytics"</span>, { engine: <span class="text-green-400">"postgres"</span> });
 <span class="text-blue-400">export const</span> media     = <span class="text-amber-400">bucket</span>(<span class="text-green-400">"media"</span>, { engine: <span class="text-green-400">"s3"</span>, transport: <span class="text-green-400">"direct"</span> });
 <span class="text-blue-400">export const</span> signups   = <span class="text-amber-400">topic</span>&lt;{ userId: <span class="text-blue-300">string</span> }&gt;(<span class="text-green-400">"signups"</span>);
 

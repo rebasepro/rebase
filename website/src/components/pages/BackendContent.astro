@@ -10,16 +10,17 @@ const translatePath = useTranslatedPath(lang);
 // Whitespace matters inside <pre>, so every sample lives in frontmatter.
 
 const sdkCode = `<span class="text-surface-500">// generated once by \`rebase generate-sdk\`</span>
-<span class="text-primary-light">import type</span> { Database } <span class="text-primary-light">from</span> <span class="text-green-400">"./generated/sdk/database.types"</span>;
+<span class="text-primary-light">import</span> { tablesDictionary, <span class="text-primary-light">type</span> Database } <span class="text-primary-light">from</span> <span class="text-green-400">"./generated/sdk/database.types"</span>;
 
 <span class="text-primary-light">const</span> client = <span class="text-amber-400">createRebaseClient</span>&lt;Database&gt;({
   <span class="text-blue-300">baseUrl</span>: <span class="text-green-400">"https://api.example.com"</span>,
+  <span class="text-blue-300">tables</span>: tablesDictionary,
 });
 
-<span class="text-surface-500">// collection names, field names and return types all autocomplete</span>
+<span class="text-surface-500">// table names, column names and return types all autocomplete</span>
 <span class="text-primary-light">const</span> { data } = <span class="text-primary-light">await</span> client.data.orders
   .<span class="text-amber-400">find</span>({
-    <span class="text-blue-300">filter</span>: { status: [<span class="text-green-400">"eq"</span>, <span class="text-green-400">"paid"</span>] },
+    <span class="text-blue-300">where</span>: { status: [<span class="text-green-400">"=="</span>, <span class="text-green-400">"paid"</span>] },
     <span class="text-blue-300">include</span>: [<span class="text-green-400">"customer"</span>],
     <span class="text-blue-300">limit</span>: <span class="text-orange-300">50</span>,
   });`;
@@ -33,41 +34,38 @@ const restCode = `<span class="text-amber-400">GET</span>  /api/data/orders?stat
 <span class="text-amber-400">DEL</span>  /api/data/orders/42`;
 
 const honoCode = `<span class="text-blue-400">import</span> { initializeRebaseBackend } <span class="text-blue-400">from</span> <span class="text-emerald-400">"@rebasepro/server"</span>;
-<span class="text-blue-400">import</span> { createPostgresBootstrapper } <span class="text-blue-400">from</span> <span class="text-emerald-400">"@rebasepro/server-postgres"</span>;
+<span class="text-blue-400">import</span> { createPostgresAdapter } <span class="text-blue-400">from</span> <span class="text-emerald-400">"@rebasepro/server-postgres"</span>;
 
 <span class="text-blue-400">const</span> backend = <span class="text-blue-400">await</span> <span class="text-amber-400">initializeRebaseBackend</span>({
   server,
   app,
-  bootstrappers: [
-    <span class="text-amber-400">createPostgresBootstrapper</span>({
-      connection: db,
-      schema: { tables, enums, relations },
-    })
-  ],
+  schemaDir: path.<span class="text-amber-400">resolve</span>(__dirname, <span class="text-emerald-400">"../schema"</span>),
+  database: <span class="text-amber-400">createPostgresAdapter</span>({
+    connection: db,
+    schema: { tables, enums, relations },
+  }),
   auth: { jwtSecret: process.env.<span class="text-amber-400">JWT_SECRET</span> },
   storage: { type: <span class="text-emerald-400">"local"</span>, basePath: <span class="text-emerald-400">"./uploads"</span> },
 });
 <span class="text-surface-500">// it's a Hono app — mount it, wrap it, add your own middleware</span>`;
 
-const drizzleCode = `<span class="text-surface-500">// one collection, one relation</span>
-<span class="text-blue-400">const</span> posts = {
-  slug: <span class="text-emerald-400">"posts"</span>,
-  properties: { title: { type: <span class="text-emerald-400">"string"</span> } },
-  relations: [{
-    relationName: <span class="text-emerald-400">"author"</span>,
-    target: () =&gt; users,
-    cardinality: <span class="text-emerald-400">"one-to-one"</span>
-  }]
-};
+const drizzleCode = `<span class="text-surface-500">// one table, one relation</span>
+<span class="text-blue-400">export const</span> posts = <span class="text-amber-400">defineTable</span>(<span class="text-emerald-400">"posts"</span>, {
+  columns: {
+    id: col.<span class="text-amber-400">uuid</span>().<span class="text-amber-400">primaryKey</span>().<span class="text-amber-400">defaultRandom</span>(),
+    title: col.<span class="text-amber-400">text</span>().<span class="text-amber-400">notNull</span>(),
+  },
+  relations: { author: rel.<span class="text-amber-400">belongsTo</span>(() =&gt; users) },
+  rls: <span class="text-emerald-400">"inherit"</span>,
+});
 
 <span class="text-surface-500">// GET /api/data/posts?include=author</span>
 <span class="text-surface-500">// → one query via db.query.findMany, not 1 + N</span>`;
 
-const rulesCode = `<span class="text-primary-light">export const</span> <span class="text-white">orders</span> = {
-  slug: <span class="text-green-400">"orders"</span>,
-  table: <span class="text-green-400">"orders"</span>,
+const rulesCode = `<span class="text-primary-light">export const</span> <span class="text-white">orders</span> = <span class="text-amber-400">defineTable</span>(<span class="text-green-400">"orders"</span>, {
+  columns: { <span class="text-surface-500">/* … customer_id, total, status */</span> },
 
-  <span class="text-blue-300">securityRules</span>: [
+  <span class="text-blue-300">rls</span>: [
     <span class="text-surface-500">// customers see their own orders…</span>
     { operation: <span class="text-green-400">"select"</span>, ownerField: <span class="text-green-400">"customer_id"</span> },
 
@@ -75,7 +73,7 @@ const rulesCode = `<span class="text-primary-light">export const</span> <span cl
     { operations: [<span class="text-green-400">"select"</span>, <span class="text-green-400">"update"</span>],
       roles: [<span class="text-green-400">"support"</span>] },
   ],
-};`;
+});`;
 
 const policyCode = `<span class="text-surface-500">-- rebase schema generate → db push</span>
 <span class="text-primary-light">ALTER TABLE</span> orders <span class="text-primary-light">ENABLE ROW LEVEL SECURITY</span>;
@@ -94,13 +92,14 @@ const policyCode = `<span class="text-surface-500">-- rebase schema generate →
 
 // The routes the server actually mounts. Nothing aspirational in this list.
 const routes = [
-    { path: "/api/data/:collection", note: "CRUD, filters, sorting, pagination, relation includes, nested subcollections" },
+    { path: "/api/data/:table", note: "CRUD, filters, sorting, pagination, relation includes, nested relation paths" },
+    { path: "/api/schema/tables", note: "the tables, columns, relations and policies, redacted per caller — what the admin panel reads" },
     { path: "/api/auth/*", note: "sign-up, login, refresh, password reset, OAuth, MFA, roles" },
     { path: "/api/storage/*", note: "upload, download, signed access — local, S3-compatible or GCS" },
     { path: "/api/functions/:name", note: "your own Hono routes, auto-mounted from functions/" },
     { path: "/api/cron/*", note: "scheduled jobs with run history and manual triggers" },
     { path: "/api/docs · /api/swagger", note: "OpenAPI 3.0 spec, plus an explorer in dev" },
-    { path: "/api/meta", note: "the runtime contract: collections, properties, capabilities" },
+    { path: "/api/meta", note: "the runtime contract: schema version, runtime, tables" },
     { path: "/health", note: "readiness for your orchestrator — asserts the auth schema, not just TCP" },
     { path: "WebSocket", note: "row subscriptions, broadcast channels and presence on the same server" },
 ];
@@ -108,11 +107,11 @@ const routes = [
 const alsoShipped = [
     { title: "Topics and jobs", desc: "Publish an event, subscribe by name. One durable row per subscriber, each retrying on its own schedule — and a publish inside a transaction that rolls back never happened." },
     { title: "Webhooks", desc: "HMAC-signed outbound calls on insert, update and delete, with retries." },
-    { title: "Entity history", desc: "An audit trail per collection: who changed what, when, and a revert." },
+    { title: "Entity history", desc: "An audit trail per table: who changed what, when, and a revert." },
     { title: "Database branching", desc: "Isolated copies of the whole database for a feature or a test run — schema, rows and policies — with one command to switch your project onto one and back." },
     { title: "Email", desc: "SMTP for verification, password reset and your own transactional templates." },
     { title: "Backups", desc: "Role-complete dumps and restores, driven from the CLI or the admin API." },
-    { title: "Multiple sources", desc: "Route different collections to different databases from one server." },
+    { title: "Multiple sources", desc: "Route different tables to different databases from one server." },
 ];
 import ClosingCta from "../ClosingCta.astro";
 import HeroBackdrop from "../HeroBackdrop.astro";

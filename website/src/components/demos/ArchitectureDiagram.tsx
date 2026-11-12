@@ -96,7 +96,7 @@ export function ArchitectureDiagram() {
                             <span className="text-sm font-semibold text-white">Database Layer</span>
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2.5">
+                        <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2.5">
                             {/* PostgreSQL */}
                             <div className="rounded-lg border border-[#336791]/20 bg-[#0f0f11] p-3 flex items-center gap-3 hover:border-[#336791]/35 transition-colors">
                                 <div className="h-10 w-10 rounded-lg bg-[#336791]/10 border border-[#336791]/20 flex items-center justify-center shrink-0">
@@ -107,21 +107,11 @@ export function ArchitectureDiagram() {
                                     <div className="text-[11px] text-surface-500 leading-snug">Drizzle ORM · Pooling · Read replicas</div>
                                 </div>
                             </div>
-                            {/* MongoDB */}
-                            <div className="rounded-lg border border-[#4DB33D]/15 bg-[#0f0f11] p-3 flex items-center gap-3 hover:border-[#4DB33D]/30 transition-colors">
-                                <div className="h-10 w-10 rounded-lg bg-[#4DB33D]/8 border border-[#4DB33D]/15 flex items-center justify-center shrink-0">
-                                    <img src="/img/mongodb-logo.svg" width="24" height="24" alt="MongoDB" className="h-6 w-auto" />
-                                </div>
-                                <div>
-                                    <div className="text-xs font-semibold text-white">MongoDB</div>
-                                    <div className="text-[11px] text-surface-500 leading-snug">v7 document driver</div>
-                                </div>
-                            </div>
                             {/* DB capabilities */}
                             <div className="flex flex-wrap gap-1.5 items-center content-center">
                                 <Tag tip="CREATE DATABASE … TEMPLATE for isolated feature branches">Branching</Tag>
                                 <Tag tip="Drizzle-based push (dev) and generate (prod)">Migrations</Tag>
-                                <Tag tip="Reverse-engineer existing DB → Rebase collections">Introspection</Tag>
+                                <Tag tip="Reverse-engineer an existing database → defineTable files">Introspection</Tag>
                             </div>
                         </div>
                     </div>
@@ -149,7 +139,7 @@ export function ArchitectureDiagram() {
                                     <div className="flex flex-wrap gap-1.5">
                                         <Tag tip="Google, GitHub, Apple, Microsoft, Facebook, Twitter, Discord, LinkedIn, GitLab, Bitbucket, Slack, Spotify" color="amber">12 OAuth Providers</Tag>
                                         <Tag tip="TOTP multi-factor authentication with recovery codes" color="amber">MFA</Tag>
-                                        <Tag tip="Per-collection CRUD scoping with expiration" color="amber">API Keys</Tag>
+                                        <Tag tip="Per-table CRUD scoping with expiration" color="amber">API Keys</Tag>
                                     </div>
                                     <div className="flex flex-wrap gap-1.5">
                                         <Mono tip="SET LOCAL ROLE + user/role context injection, fail-closed design">Row-Level Security</Mono>
@@ -264,7 +254,7 @@ export function ArchitectureDiagram() {
                             <div className="rounded-lg border border-blue-500/10 bg-[#0f0f11] p-3">
                                 <Label color="text-blue-500/50">Generator</Label>
                                 <div className="space-y-1.5">
-                                    <Mono tip="Generates Row, Insert, Update TS interfaces per collection">database.types.ts</Mono>
+                                    <Mono tip="Generates Row, Insert, Update TS interfaces per table">database.types.ts</Mono>
                                     <div className="text-[10px] text-surface-600 leading-snug">Enums · Relations · Nested maps</div>
                                 </div>
                             </div>

@@ -48,8 +48,8 @@ information the reader does not already have, cut it.
 | One definition fans out to every surface | 01 only | "one TypeScript file per collection", "everything generated" |
 | The rules are in the database, on every path | 02 only | "the same policies", "one set of rules" |
 | Working APIs, and a panel a non-developer can use | 03 only | "your app gets the API, your team gets the panel" |
-| A backend small enough for a model to hold | 04 only | "a handful of collection files" |
-| It holds up in serious places | 05 only | "the same collection file underneath" |
+| A backend small enough for a model to hold | 04 only | "a handful of table files" |
+| It holds up in serious places | 05 only | "the same table file underneath" |
 | It is yours — MIT, your Postgres, leaving is a redeploy | close only | — |
 
 **Order matters.** The backend leads. The admin panel comes second and it comes with it — never framed as optional, an add-on, or something you opt into (Francesco, repeatedly).
@@ -170,8 +170,10 @@ routes", which is what happens when only the middle product is described.
   competitor's category on /compare, never Rebase.
 - **back office** names only the thing a customer would otherwise build ("the
   back office stops being a project"), never what Rebase generates.
-- **access rules** in prose, for what a collection declares; `securityRules`
-  is the key. **typed SDK**, in the nav and page titles too — not "Client SDK".
+- **access rules** in prose, for what a table declares; `rls` is the key.
+  **table** is what the backend is made of (`defineTable` in `backend/schema`);
+  "collection" is the admin panel's word for a table it shows, never the thing
+  you write. **typed SDK**, in the nav and page titles too — not "Client SDK".
 - Studio's place is one sentence, used verbatim wherever it is described:
   *Studio is the developer workspace. It registers inside the same panel as
   CMS.* Before 2026-09-02 four pages described it four ways — a child of CMS,
