@@ -188,6 +188,12 @@ function validateOptions(options: unknown, where: string, allowFields: boolean):
         if (typeof action.name !== "string") throw new Error(`${at} needs a \`name\`.`);
         if (typeof action.onClick !== "function") throw new Error(`${at} needs an \`onClick\` function.`);
     });
+    const resetPassword = options.resetPasswordAction;
+    if (resetPassword !== undefined && resetPassword !== false) {
+        if (!isRecord(resetPassword)) throw new Error(`${where}.resetPasswordAction must be \`false\` (no reset-password action) or an action that replaces it.`);
+        if (typeof resetPassword.name !== "string") throw new Error(`${where}.resetPasswordAction needs a \`name\`.`);
+        if (typeof resetPassword.onClick !== "function") throw new Error(`${where}.resetPasswordAction needs an \`onClick\` function.`);
+    }
     validateEntries(options.entityViews, `${where}.entityViews`, (view, at) => assertComponent(view.Builder, `${at}.Builder`));
     validateEntries(options.customViews, `${where}.customViews`, (view, at) => {
         if (view.Builder === undefined) throw new Error(`${at} needs a \`Builder\` component.`);

@@ -424,6 +424,19 @@ function applyFieldNote(plan: PlanContext, builder: Builder, item: LiftNote, fie
         case "propertiesOrder":
             target[String(PROPERTY_FIELD_DESTINATIONS.propertiesOrder)] = item.value;
             return;
+        case "defaultValue": {
+            // A relation's pre-fill: `new EntityRelation(…)` objects, which are
+            // printed from their source (a class instance has no literal), its
+            // imports carried.
+            const located = locate(plan, builder.entry, [...literal, "defaultValue"]);
+            if (!located.member) {
+                note(plan, builder.entry, `${label}.defaultValue is not carried: its source could not be found (${located.reason ?? "unknown"}). Write it as \`fields.${key}.defaultValue\` in the customization.`);
+                return;
+            }
+            builder.codeNodes.push(located.member.node);
+            target.defaultValue = new RawSource(memberFunctionText(plan.ast, located.member));
+            return;
+        }
         case "storage.processFile":
         case "storage.postProcess":
         case "storage.previewUrl":
@@ -454,6 +467,28 @@ function applyFieldNote(plan: PlanContext, builder: Builder, item: LiftNote, fie
     note(plan, builder.entry, `${label}.${item.field}: ${item.reason} \`customizeTable\` has no option for it; not carried.`);
 }
 
+/**
+ * `auth.actions` of an auth collection: `resetPassword: false` takes the
+ * panel's reset-password action away, an action replaces it — both
+ * `customizeTable`'s `resetPasswordAction` now. `true` is the default.
+ */
+function authActions(plan: PlanContext, builder: Builder, value: unknown): void {
+    if (!isPlainObject(value)) {
+        note(plan, builder.entry, "auth.actions is not an object of actions; not carried.");
+        return;
+    }
+    for (const [key, entry] of Object.entries(value)) {
+        if (key !== "resetPassword") {
+            note(plan, builder.entry, `auth.actions.${key} is not an auth action (nothing read it); not carried.`);
+            continue;
+        }
+        if (entry === undefined || entry === true) continue;
+        builder.options.resetPasswordAction = entry === false
+            ? false
+            : printable(plan, builder, entry, ["auth", "actions", "resetPassword"], "auth.actions.resetPassword");
+    }
+}
+
 /** Apply one collection-level note. */
 function applyCollectionNote(plan: PlanContext, builder: Builder, item: LiftNote): void {
     const options = builder.options;
@@ -472,6 +507,9 @@ function applyCollectionNote(plan: PlanContext, builder: Builder, item: LiftNote
             if (isPlainObject(item.value)) collectionAdmin(plan, builder, item.value);
             return;
         case "ownerId":
+            return;
+        case "auth.actions":
+            authActions(plan, builder, item.value);
             return;
         case "childCollections":
             plan.manualSteps.push({

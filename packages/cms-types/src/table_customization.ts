@@ -651,6 +651,13 @@ export interface RelationFieldOptions<
 > {
     /** The target's fields shown in the chip that stands for a related row. At most three fit. */
     previewFields?: TargetKey[];
+    /**
+     * The related row(s) a new record's form starts with — a pre-fill of the
+     * picker, written only when the form is saved:
+     * `new EntityRelation(id, "<target slug>")`, or a list of them for a
+     * many-relation. A column's own default is `.default()` on the column.
+     */
+    defaultValue?: EntityRelation | EntityRelation[];
     /** How a related row is picked. */
     widget?: "select" | "dialog";
     /** Offer only rows that pass this filter. */
@@ -1027,6 +1034,14 @@ export interface TableCustomizationOptions<T extends CustomizableTable | undefin
     entityActions?: (string | TableEntityAction<TableRow<T>, USER>)[];
     /** Built-in actions this table does not offer. */
     disableDefaultActions?: ("edit" | "copy" | "delete")[];
+    /**
+     * The auth table's reset-password action (a table defined with
+     * `defineAuthTable`). The panel offers a built-in one where the auth
+     * adapter can reset a password; `false` takes it away, and an action
+     * replaces it (it is offered whatever the adapter supports: its backend
+     * is yours). Ignored, with a warning, on any other table.
+     */
+    resetPasswordAction?: false | TableEntityAction<TableRow<T>, USER>;
     /** Extra tabs on a record, by value or by the key of one registered on `<RebaseCMS entityViews>`. */
     entityViews?: (string | TableEntityView)[];
     /** Components rendered in the collection's toolbar. */
@@ -1127,6 +1142,7 @@ export const TABLE_CUSTOMIZATION_KEYS = [
     "openEntityMode",
     "pagination",
     "previewFields",
+    "resetPasswordAction",
     "selectionController",
     "selectionEnabled",
     "sideDialogWidth",
@@ -1151,6 +1167,7 @@ export const FIELD_CUSTOMIZATION_KEYS = [
     "columnWidth",
     "conditions",
     "customProps",
+    "defaultValue",
     "description",
     "disabled",
     "dynamicProps",

@@ -269,7 +269,7 @@ const FIELD_KEYS_BY_TYPE: Readonly<Record<Property["type"], readonly string[]>> 
     date: ["clearable", "mode", "timezone"],
     geopoint: [],
     reference: ["previewFields", "fixedFilter", "includeId", "includeEntityLink"],
-    relation: ["previewFields", "widget", "fixedFilter", "includeId", "includeEntityLink", "renderInForm", "overrides"],
+    relation: ["previewFields", "widget", "fixedFilter", "includeId", "includeEntityLink", "renderInForm", "overrides", "defaultValue"],
     array: ["expanded", "minimalistView", "sortable", "canAddElements", "of", "oneOf", "enumLabels", "enumOrder", "storage"],
     map: ["expanded", "minimalistView", "spreadChildren", "previewFields", "keyValue", "fields", "fieldOrder"],
     vector: ["clearable"],
@@ -547,6 +547,8 @@ function applyTyped(property: Property, field: AnyFieldCustomization, where: str
             set(admin, "includeEntityLink", field.includeEntityLink);
             set(admin, "renderInForm", field.renderInForm);
             const out = { ...property, admin };
+            // The form's pre-fill: what `getDefaultValuesFor` starts a new record with.
+            if (field.defaultValue !== undefined) out.defaultValue = field.defaultValue;
             if (field.overrides !== undefined && property.relation) {
                 out.relation = { ...property.relation, overrides: overridesOf(field.overrides, `${where}.overrides`) };
             }
@@ -613,6 +615,17 @@ export function applyTableCustomization(collection: TableCollection, customizati
     set(out, "singularName", customization.singularName);
     set(out, "description", customization.description);
     if (customization.metadata !== undefined) out.metadata = { ...collection.metadata, ...customization.metadata };
+    if (customization.resetPasswordAction !== undefined) {
+        // What the panel injects on the auth table (`injectAuthCollectionConfig`)
+        // reads `auth.actions.resetPassword`: `false` leaves it out, an action
+        // stands in for the built-in one.
+        const auth = collection.auth;
+        if (!auth) {
+            warnOnce(`${where}.resetPasswordAction`, `${where}.resetPasswordAction applies to the auth table (defineAuthTable) only; "${collection.slug}" is not one. Skipped.`);
+        } else {
+            out.auth = { ...(typeof auth === "object" ? auth : { enabled: true }), actions: { resetPassword: customization.resetPasswordAction } };
+        }
+    }
     if (collection.relations && overrides.size > 0) {
         out.relations = collection.relations.map((relation): Relation => {
             const override = relation.relationName ? overrides.get(relation.relationName) : undefined;

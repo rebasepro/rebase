@@ -584,7 +584,7 @@ class CollectionLift {
         if (!entry) return;
         const resolved = entry.resolved;
         if (property.defaultValue !== undefined) {
-            this.note(key, "defaultValue", "ui", property.defaultValue, "A relation's default is a panel pre-fill; no column default is planned for it.");
+            this.note(key, "defaultValue", "ui", property.defaultValue, "A relation's default is a panel pre-fill: `customizeTable`'s `defaultValue` on the relation field. No column default is planned for it.");
         }
         if (property.description !== undefined) this.note(key, "description", "ui", property.description, "The relation field's description.");
         if (property.columnName !== undefined) {
@@ -1426,7 +1426,7 @@ class CollectionLift {
         if (auth.personalKeys !== undefined) out.personalKeys = auth.personalKeys;
         if (auth.onCreateUser !== undefined) out.onCreateUser = auth.onCreateUser;
         if (auth.onResetPassword !== undefined) out.onResetPassword = auth.onResetPassword;
-        if (auth.actions !== undefined) this.note(undefined, "auth.actions", "ui", auth.actions, "The panel's user actions.");
+        if (auth.actions !== undefined) this.note(undefined, "auth.actions", "ui", auth.actions, "The panel's reset-password action: `customizeTable`'s `resetPasswordAction` on the auth table (`false` takes it away, an action replaces it).");
         return out;
     }
 

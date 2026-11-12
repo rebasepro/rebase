@@ -180,6 +180,49 @@ describe("what the blog fixture says about routing", () => {
     }, 120_000);
 });
 
+describe("presentation that moved to a customizeTable option", () => {
+    /** The blog fixture, with its users collection's `auth` replaced. */
+    async function usersCustomization(auth: string): Promise<string | undefined> {
+        const dir = materialize("blog");
+        const file = path.join(dir, "config", "collections", "users.ts");
+        fs.writeFileSync(file, fs.readFileSync(file, "utf8").replace("auth: { enabled: true },", auth));
+        const report = await run(dir, { dryRun: true });
+        expect(report.refusals).toEqual([]);
+        expect(report.notes.filter(entry => entry.message.includes("auth.actions"))).toEqual([]);
+        return report.files.find(entry => entry.path === "frontend/src/cms/users.tsx")?.content;
+    }
+
+    it("carries `auth.actions.resetPassword: false` as `resetPasswordAction: false`", async () => {
+        const content = await usersCustomization("auth: { enabled: true, actions: { resetPassword: false } },");
+        expect(content).toContain("resetPasswordAction: false");
+    }, 120_000);
+
+    it("carries a replacement reset-password action, its code with it", async () => {
+        const content = await usersCustomization(
+            "auth: { enabled: true, actions: { resetPassword: { key: \"reset_password\", name: \"Send reset link\", onClick: async () => { console.log(\"reset\"); } } } },");
+        expect(content).toContain("resetPasswordAction: {");
+        expect(content).toContain("name: \"Send reset link\"");
+        expect(content).toContain("console.log(\"reset\")");
+    }, 120_000);
+});
+
+describe("a relation field's form default", () => {
+    it("carries a relation's `defaultValue` as `fields.<relation>.defaultValue`, printed from its source", async () => {
+        const dir = materialize("blog");
+        const file = path.join(dir, "config", "collections", "posts.ts");
+        const source = fs.readFileSync(file, "utf8")
+            .replace("import { defineCollection } from \"@rebasepro/cms-types\";", "import { defineCollection } from \"@rebasepro/cms-types\";\nimport { EntityRelation } from \"@rebasepro/types\";")
+            .replace("            name: \"Author\",\n            type: \"relation\",", "            name: \"Author\",\n            type: \"relation\",\n            defaultValue: new EntityRelation(\"a1\", \"authors\"),");
+        fs.writeFileSync(file, source);
+        const report = await run(dir, { dryRun: true });
+        expect(report.refusals).toEqual([]);
+        expect(report.notes.filter(entry => entry.message.includes("defaultValue"))).toEqual([]);
+        const content = report.files.find(entry => entry.path === "frontend/src/cms/posts.tsx")?.content;
+        expect(content).toContain("defaultValue: new EntityRelation(\"a1\", \"authors\")");
+        expect(content).toContain("import { EntityRelation } from \"@rebasepro/types\";");
+    }, 120_000);
+});
+
 describe("modes", () => {
     it("is idempotent: a second run finds every file already written and the SQL still identical", async () => {
         const dir = materialize("blog");

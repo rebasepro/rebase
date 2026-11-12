@@ -1,7 +1,7 @@
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
-import { col, defineTable, json, rel, type ArrayProperty, type MapProperty, type Property } from "@rebasepro/types";
-import { compileTables } from "@rebasepro/common";
+import { EntityRelation, col, defineTable, json, rel, type ArrayProperty, type MapProperty, type Property } from "@rebasepro/types";
+import { compileTables, getDefaultValuesFor } from "@rebasepro/common";
 import type { AdminPostgresCollection, FieldProps } from "@rebasepro/cms-types";
 import { applyTableCustomization, applyTableCustomizations, customizeTable, updateRecord } from "@rebasepro/cms";
 // The projector (slice C1) is not on the package entry yet; read it from its module.
@@ -461,6 +461,32 @@ describe("end to end: defineTable → descriptor → projection → customizatio
         },
         relations: { author: rel.belongsTo(() => users) },
         rls: [{ operation: "select", access: "public" }, { operations: ["insert", "update", "delete"], roles: ["editor"] }]
+    });
+
+    it("pre-fills a relation's picker with the field's `defaultValue`, and a new record's form starts with it", () => {
+        const projected = collectionsFromTables(compileTables([users, posts]));
+        const ada = new EntityRelation("u1", "users");
+        const [, customized] = applyTableCustomizations(projected, [customizeTable<typeof posts>("posts", { fields: { author: { defaultValue: ada } } })]);
+        const author = property(customized, "author");
+        expect(author.type === "relation" && author.defaultValue).toBe(ada);
+        expect(getDefaultValuesFor(customized.properties).author).toBe(ada);
+        // Without one, the picker starts empty.
+        expect(getDefaultValuesFor(projected[1].properties).author).toBeNull();
+    });
+
+    it("projects a JSON array's `uniqueBy` as `uniqueInArray` on the named fields of its items, which the form checks", () => {
+        const orders = defineTable("orders", {
+            columns: {
+                id: col.uuid().primaryKey().defaultRandom(),
+                lines: col.jsonb(json.array(json.object({ sku: json.string(), qty: json.number() })).validate({ uniqueBy: ["sku"] }))
+            },
+            rls: "admin-only"
+        });
+        const [projected] = collectionsFromTables(compileTables([orders]));
+        const lines = property(projected, "lines");
+        const item = lines.type === "array" && !Array.isArray(lines.of) ? lines.of : undefined;
+        expect(item?.type === "map" && item.properties?.sku?.validation?.uniqueInArray).toBe(true);
+        expect(item?.type === "map" && item.properties?.qty?.validation?.uniqueInArray).toBeUndefined();
     });
 
     it("projects the spec's posts and folds the spec's customization in", () => {

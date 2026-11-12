@@ -108,6 +108,7 @@ export const COLLECTION_FIELD_DESTINATIONS: Readonly<Record<string, Destination>
     name: "name",
     singularName: "singularName",
     icon: "icon",
+    "auth.actions.resetPassword": "resetPasswordAction",
     admin: { dropped: "not a destination itself: each of its keys is routed by COLLECTION_ADMIN_DESTINATIONS." },
     childCollections: { dropped: "customizeTable has no child collections: a table's hasMany / manyToMany relations are its record tabs (reported as a manual step)." },
     ownerId: { dropped: "stamped by the collection editor; nothing on the request path or in the panel reads it." }
@@ -132,7 +133,7 @@ export const PROPERTY_FIELD_DESTINATIONS: Readonly<Record<string, Destination>> 
     "storage.fileName": "storage",
     admin: { dropped: "not a destination itself: each of its keys is routed by PROPERTY_ADMIN_DESTINATIONS." },
     userSelect: { dropped: "carried by the lift as `.userId()` on the column; the CMS reads it from the descriptor." },
-    defaultValue: { dropped: "a relation's default is a panel pre-fill, which customizeTable has no option for." },
+    defaultValue: "defaultValue",
     validation: { dropped: "a relation's `requiredMessage` / `uniqueInArray` are panel messages customizeTable has no option for." },
     "oneOf.propertiesOrder": { dropped: "the order the panel offers block types in; customizeTable has no option for it." },
     isId: { dropped: "`\"manual\"` and `true` are the same key to the server; the difference had no other reader." },

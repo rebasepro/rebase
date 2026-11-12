@@ -3,6 +3,10 @@ import { resolveCollections } from "../../src/hooks/navigation/useNavigationReso
 import type { AfterSaveProps, EntityStatus } from "@rebasepro/types";
 import { resolveAdminCollection, type AdminCollection, type AuthCapabilities, type AuthController } from "@rebasepro/cms-types";
 import { fakeAuthController, fakeDialogsController, fakeRebaseContext, fakeSdkData, fakeUser } from "../helpers/fakes";
+import { col, defineAuthTable } from "@rebasepro/types";
+import { compileTables } from "@rebasepro/common";
+import { composeCollections } from "../../src/hooks/navigation/compose_collections";
+import { customizeTable } from "../../src/tables/customize_table";
 
 const admin = fakeUser("admin-1", { roles: ["admin"] });
 
@@ -206,5 +210,45 @@ describe("creation-result dialog injection", () => {
             { context: fakeRebaseContext({ dialogsController: dialogs }) }));
 
         expect(open).toHaveBeenCalledWith(expect.objectContaining({ key: "user_creation_result" }));
+    });
+});
+
+/**
+ * `auth.actions.resetPassword` of a collection, now `customizeTable`'s
+ * `resetPasswordAction` on the auth table: what the codemod writes for a
+ * project that had either form.
+ */
+describe("customizeTable(\"users\", { resetPasswordAction }) on a defineAuthTable table", () => {
+    const users = defineAuthTable("users", {
+        columns: { id: col.uuid().primaryKey().defaultRandom(), email: col.text().notNull() },
+        rls: "admin-only"
+    });
+    const authController = fakeAuthController({ user: admin, capabilities: { adminPasswordReset: true } });
+
+    async function actionsOf(customization?: ReturnType<typeof customizeTable>) {
+        const [collection] = composeCollections({
+            tables: compileTables([users]),
+            tableCustomizations: customization ? [customization] : [],
+            externalCollections: []
+        });
+        const resolved = await resolveCollections([collection], authController, fakeSdkData(), undefined);
+        return resolved[0]?.entityActions ?? [];
+    }
+
+    it("offers the built-in reset by default", async () => {
+        expect((await actionsOf()).map(a => typeof a === "string" ? a : a.key)).toContain("reset_password");
+    });
+
+    it("a migrated `resetPassword: false` still has no reset button", async () => {
+        const keys = (await actionsOf(customizeTable("users", { resetPasswordAction: false }))).map(a => typeof a === "string" ? a : a.key);
+        expect(keys).not.toContain("reset_password");
+    });
+
+    it("a custom replacement is carried in place of the built-in one", async () => {
+        const onClick = jest.fn(async () => undefined);
+        const actions = await actionsOf(customizeTable("users", { resetPasswordAction: { key: "reset_password", name: "Send reset link", onClick } }));
+        const resets = actions.filter(a => typeof a !== "string" && a.key === "reset_password");
+        expect(resets).toHaveLength(1);
+        expect(typeof resets[0] !== "string" && resets[0].name).toBe("Send reset link");
     });
 });
