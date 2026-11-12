@@ -99,6 +99,7 @@ sense for; calling one elsewhere is a type error.
 | `.onUpdateNow()` | `timestamptz`, `date`, `time` | `DEFAULT now()` and a `BEFORE UPDATE` trigger | the server stamps the time on create and on every update |
 | `.onCreateUser()` | text columns, `col.uuid()` | none | the server writes the caller's id on create |
 | `.onUpdateUser()` | text columns, `col.uuid()` | none | the server writes the caller's id on every write |
+| `.userId()` | text columns, `col.uuid()` | none | the column holds a user's id; the panel offers a user picker; see [User columns](#user-columns) |
 | `.multiple()` | `col.storage()` | `TEXT[]` | the column holds several file paths |
 
 ## Null, required and defaults
@@ -161,6 +162,43 @@ Stamp columns stay nullable unless you write `.notNull()`.
 `.onCreateUser()` is how a column that a row-level security rule compares with
 the caller (`ownerField`) gets its value. A column the caller fills is a column
 the caller can lie about.
+
+## User columns
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+`.userId()` says a column holds the id of a user. It is a meaning, not a
+type: the column stays `text` (or `varchar`, `char`, `uuid`), and the
+descriptor the server serves carries `semantic: "user"`.
+
+```ts
+import { defineTable, col } from "@rebasepro/server/schema";
+
+export const tickets = defineTable("tickets", {
+    columns: {
+        id: col.uuid().primaryKey().defaultRandom(),
+        subject: col.text().notNull(),
+        assignedTo: col.text().userId().describe("Team member assigned to this ticket"),
+        watchers: col.array(col.text().userId())
+    },
+    rls: "admin-only"
+});
+```
+
+Two things follow from it:
+
+- The admin panel renders a user picker for the column instead of a text
+  input, and shows the user rather than the raw id.
+- A caller who may write the table may look users up to fill it. The picker's
+  read answers them even when row-level security hides other users' rows from
+  them.
+
+It works on `col.text()`, `col.varchar()`, `col.char()` and `col.uuid()`,
+on the items of an array (`col.array(col.text().userId())`), and on
+`json.string()` inside a [JSON document](/docs/schema/json/). Anywhere else it
+throws when the module loads. It declares no foreign key: write
+`rel.belongsTo(() => users)` when the database should enforce one. To have the
+server fill the column with the caller's id, use a [stamp](#stamps) instead.
 
 ## Validation
 

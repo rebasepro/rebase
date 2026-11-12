@@ -152,7 +152,7 @@ directory — useful for a separate frontend repo that talks to a Rebase backend
 | Skill | Covers |
 |---|---|
 | `rebase-basics` | Core principles, workflow and maintenance — the entry point the others assume |
-| `rebase-collections` | Defining collections, property types, validation, searchability |
+| `rebase-tables` | Authoring tables: columns, relations, `rls`, hooks, and the CMS layer on top (`customizeTable`) |
 | `rebase-backend-postgres` | The Postgres backend: setup, schema generation, migrations, pooling, read replicas |
 | `rebase-api` | The generated REST API — endpoints, filtering, sorting, pagination |
 | `rebase-sdk` | The generated TypeScript SDK: CRUD, filtering, search, auth, realtime, offline, storage |

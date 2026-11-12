@@ -27,7 +27,7 @@ export const artistStats = defineView("artist_stats", {
 Export it from `backend/schema/index.ts` like a table. It reads like any
 table — `find`, `findById`, `count`, [`aggregate`](/docs/sdk/aggregates-and-search/),
 `listen`, the REST routes, MCP and the CMS — and it is never written: every
-write is a `405 COLLECTION_READ_ONLY`. Write to the tables the view reads.
+write is a `405 TABLE_READ_ONLY`. Write to the tables the view reads.
 
 `rebase db push` creates the view after the tables, `rebase db generate`
 appends it to the migration, and a managed boot creates it in its schema step.

@@ -81,6 +81,7 @@ instead.
 | `.oneOf(values)` | `json.string()`, `json.number()` | A closed set of accepted values, typed as their union. |
 | `.onCreateNow()` | `json.date()` | The server writes the current time when the row is created. |
 | `.onUpdateNow()` | `json.date()` | The server writes the current time on every write. |
+| `.userId()` | `json.string()` | The value is a user's id: the panel offers a user picker, and a caller who may write the table may look users up to fill it. See [User columns](/docs/schema/columns/#user-columns). |
 
 Fields are optional unless `.required()`. A required key is required in the
 TypeScript type too:
