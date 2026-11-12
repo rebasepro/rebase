@@ -378,6 +378,9 @@ collection: second || undefined };
             return { surface: "admin" };
         case "meta":
             return { surface: "meta" };
+        // `GET /schema/tables` belongs to the meta surface, mounted beside it.
+        case "schema":
+            return { surface: second === "tables" ? "meta" : "other" };
         default:
             return { surface: "other" };
     }

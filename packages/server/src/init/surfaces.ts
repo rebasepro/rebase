@@ -34,7 +34,8 @@ import { parseEnvBoolean } from "@rebasepro/types";
  * - `functions` — `${basePath}/functions`, the custom function router.
  * - `cron` — `${basePath}/cron`, the cron *admin* surface. Whether jobs actually
  *   fire is {@link RuntimeOwnership.cronScheduler}, not this.
- * - `meta` — `${basePath}/meta`, the contract endpoint a generated SDK reads.
+ * - `meta` — `${basePath}/meta`, the contract endpoint a generated SDK reads,
+ *   and `${basePath}/schema/tables`, the tables described per caller.
  * - `mcp` — `/mcp` for AI clients, plus the OAuth authorization server that
  *   issues its tokens (`${basePath}/oauth`) and the two `.well-known` documents
  *   they are discovered through. One name for all three because they are

@@ -360,6 +360,28 @@ export interface BaasOptions {
 }
 
 /**
+ * Options of `GET /api/schema/tables`, the endpoint that describes the tables
+ * to the zero-config CMS, the Studio and MCP.
+ *
+ * It serves signed-in callers and credentials holding `schema:read` or a
+ * `data:*` scope, each redacted to what they may see, and is not served at
+ * all without authentication. `auth.requireAuth: false` — a public data
+ * plane — does not open it: whether anonymous callers may read rows says
+ * nothing about whether they may read the schema.
+ */
+export interface SchemaTablesOptions {
+    /**
+     * Describe to anonymous callers the tables that have a public `select`
+     * rule (`{ operation: "select", access: "public" }`, not narrowed to
+     * roles), redacted as for the least-privileged caller: no column or
+     * relation with an `access.read` list, no raw SQL, no policies. For a
+     * public site whose browser code renders from the descriptors before
+     * anyone signs in. Off by default; logged at boot when on.
+     */
+    public?: boolean;
+}
+
+/**
  * Which parts of the database a backend provisions, when `provision` is not
  * simply all or nothing. Each defaults to `true`; the database role and the
  * framework's own tables are provisioned whenever `provision` is not `false`.
@@ -494,6 +516,9 @@ export interface RebaseBackendOptions {
 
     /** Options that only apply when collections are derived from the database. */
     baas?: BaasOptions;
+
+    /** Who `GET /api/schema/tables` describes the tables to. */
+    schemaTables?: SchemaTablesOptions;
 
     /**
      * The pre-init handle to hand the boot-time schema hooks, when the caller

@@ -2,112 +2,60 @@ import { Hono } from "hono";
 import {
     RUNTIME_CONTRACT_VERSION,
     SCHEMA_VERSION_HEADER,
-    computeSchemaVersion,
-    serializeCollections,
-    type CollectionConfig,
-    type RebaseProjectContract,
-    type TableDescriptor
+    type RebaseProjectContract
 } from "@rebasepro/types";
 import type { HonoEnv } from "./types";
 import { logger } from "../utils/logger";
+import { ADMIN_SCHEMA_VIEW } from "./schema-tables";
+import type { SchemaTablesService } from "./schema-tables-routes";
 
 /**
  * The project contract endpoint.
  *
  * This is what makes a repository able to build against a project it does not
- * contain. Without it, a typed client can only be generated from local
- * collection *source*, which means every frontend must live in the same
- * repository as the backend. Serving the contract turns that around: an app
- * asks the project what its shape is, so a web app, a second web app and a
- * mobile app can each live wherever they like and none of them needs to know
- * about the others.
+ * contain. Without it, a typed client can only be generated from local schema
+ * *source*, which means every frontend must live in the same repository as
+ * the backend. Serving the contract turns that around: an app asks the
+ * project what its shape is, so a web app, a second web app and a mobile app
+ * can each live wherever they like and none of them needs to know about the
+ * others.
  *
- * Admin-gated. Collection definitions describe every table, column and relation
- * in the project, including ones no security rule would ever expose — that is a
- * map of the database, not public API documentation.
+ * `{ schemaVersion, runtime, tables }`: `tables` is what
+ * `GET /api/schema/tables` serves an administrator — the same serializer, so
+ * the two cannot disagree — with hooks as presence flags and private columns
+ * absent. Gated on `schema:read` by the caller (see create-backend): it maps
+ * every table, column, relation and policy in the project, including ones no
+ * security rule would ever expose.
  */
 
 export interface ContractRoutesConfig {
-    collectionRegistry: { getRawCollections(): CollectionConfig[] };
-    /** The compiled descriptors the schema version is computed from. */
-    tableRegistry: { list(): readonly TableDescriptor[] };
     /**
-     * The schema version recorded at build time.
-     *
-     * Preferred over recomputing, so that what a client is told matches exactly
-     * what the bundle claims. It is recomputed only when a bundle did not record
-     * one — a `baas`-mode project derives its collections from the live database
-     * at boot, so there was nothing to hash when it was built.
+     * The tables and the schema version, cached per registry revision — the
+     * same service `GET /api/schema/tables` reads, so a live change to the
+     * registry reaches both.
      */
-    schemaVersion?: string;
+    schemaTables: SchemaTablesService;
     /** Runtime package version, surfaced so a client can report what it built against. */
     runtimeVersion?: string;
-}
-
-/**
- * Strip everything a client does not need from a serialized collection.
- *
- * The generator reads the slug, the properties and the relations. It never reads
- * a security rule — but `securityRules` carries the raw SQL of every RLS
- * predicate guarding the project, which is a description of the authorization
- * model rather than of the data shape. Publishing it to anyone who can generate
- * an SDK gives away more than the endpoint is for, so it is removed here rather
- * than trusted not to matter.
- */
-function stripNonClientFields(collection: unknown): unknown {
-    if (!collection || typeof collection !== "object") return collection;
-    const {
-        securityRules: _securityRules,
-        callbacks: _callbacks,
-        ...rest
-    } = collection as Record<string, unknown>;
-
-    // Subcollections are collections, and carry their own rules. Stripping only
-    // the top level published every nested policy — the leak this exists to
-    // prevent, just one level down.
-    if (Array.isArray(rest.subcollections)) {
-        rest.subcollections = rest.subcollections.map(stripNonClientFields);
-    }
-
-    return rest;
 }
 
 export function createContractRoutes(config: ContractRoutesConfig): Hono<HonoEnv> {
     const router = new Hono<HonoEnv>();
 
-    // Computing a version walks and canonicalizes every collection, and
-    // `/schema-version` is deliberately unauthenticated and meant to be polled.
-    // Recomputing per request would make a CI convenience into a CPU
-    // amplification anyone could aim at the server. Collections do not change
-    // after boot, so once is enough.
-    let cachedVersion: string | undefined;
-    const schemaVersionOf = (): string => {
-        if (config.schemaVersion) return config.schemaVersion;
-        if (cachedVersion === undefined) cachedVersion = computeSchemaVersion(config.tableRegistry.list());
-        return cachedVersion;
-    };
+    // `/schema-version` is deliberately unauthenticated and meant to be
+    // polled; the service computes the version once per registry revision,
+    // so polling it costs nothing.
+    const schemaVersionOf = (): string => config.schemaTables.version();
 
     router.get("/contract", (c) => {
-        const collections = config.collectionRegistry.getRawCollections();
-        const serialized = serializeCollections(collections).map(stripNonClientFields);
-
-        // In `baas` mode the collections are whatever introspection found at
-        // boot, so the version has to be computed from them rather than taken
-        // from a build that never saw them.
         const schemaVersion = schemaVersionOf();
-
         const contract: RebaseProjectContract = {
             schemaVersion,
             runtime: {
                 version: config.runtimeVersion ?? "unknown",
                 contract: RUNTIME_CONTRACT_VERSION
             },
-            collections: serialized,
-            collectionSlugs: collections
-                .map(collection => collection.slug)
-                .filter((slug): slug is string => Boolean(slug))
-                .sort(),
-            generatedAt: new Date().toISOString()
+            tables: config.schemaTables.tablesFor(ADMIN_SCHEMA_VIEW)
         };
 
         c.header(SCHEMA_VERSION_HEADER, schemaVersion);

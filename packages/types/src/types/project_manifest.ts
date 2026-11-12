@@ -27,6 +27,7 @@
 
 import type { StorageSourceDefinition } from "./storage_source";
 import type { ResourceGraph } from "./resources";
+import type { TableDescriptor } from "../schema/descriptor";
 
 /**
  * Which kind of thing an app is.
@@ -834,11 +835,12 @@ export interface RebaseProjectContract {
         version: string;
         contract: number;
     };
-    /** Full collection definitions, serialized — the input to SDK generation. */
-    collections: unknown[];
-    /** Collection slugs, for cheap inspection without parsing the definitions. */
-    collectionSlugs: string[];
-    generatedAt: string;
+    /**
+     * Every table, as `GET /api/schema/tables` serves an administrator: the
+     * input to remote SDK generation (`rebase generate-sdk --from`). Hooks are
+     * presence flags; private columns are absent.
+     */
+    tables: TableDescriptor[];
 }
 
 /** Header carrying the schema version an SDK was generated from. */

@@ -248,6 +248,7 @@ describe("classifySurface", () => {
         expect(classifySurface("/api/storage/upload").surface).toBe("storage");
         expect(classifySurface("/api/functions/invoice").surface).toBe("functions");
         expect(classifySurface("/api/meta/contract").surface).toBe("meta");
+        expect(classifySurface("/api/schema/tables").surface).toBe("meta");
         // Outside the API base path is the APP's own traffic — its pages, its
         // assets — not an unclassified API call. `other` now means the second
         // thing only, so a console breakdown whose biggest row is `other` is

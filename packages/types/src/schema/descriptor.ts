@@ -241,6 +241,28 @@ export interface RlsDescriptor {
      * (admins and `schema:read` holders): the Studio's RLS editor reads these.
      */
     policies?: PolicyDescriptor[];
+    /**
+     * The junction tables of this table's `manyToMany` relations, each with
+     * the policies Postgres holds for it — included exactly when
+     * {@link policies} is. A junction has no descriptor of its own (it is the
+     * platform's table, not the author's), so its policies are listed under
+     * every table that declares a relation through it.
+     */
+    junctions?: JunctionPolicyDescriptor[];
+}
+
+/**
+ * A junction table of a `manyToMany` relation and its generated policies.
+ *
+ * @group Schema
+ */
+export interface JunctionPolicyDescriptor {
+    /** The junction table, unqualified. */
+    table: string;
+    /** Its Postgres schema. */
+    schema: string;
+    /** Its policies: derived from the endpoints' rules, so every one is `injected`. */
+    policies: PolicyDescriptor[];
 }
 
 /**

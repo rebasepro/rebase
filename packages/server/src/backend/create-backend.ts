@@ -39,6 +39,7 @@ import {
     resourceKeyOf,
     DEFAULT_STORAGE_SOURCE_KEY,
     MCP_APP_MODULES,
+    isPostgresCollectionConfig,
     type AdminScope,
     type AuthConfigDocument,
     type CollectionCallbacks,
@@ -60,6 +61,7 @@ import { createRebaseClient } from "@rebasepro/client";
 import { BackendCollectionRegistry } from "../collections/BackendCollectionRegistry";
 import { TableRegistry } from "../schema/table-registry";
 import { globalHooksAsCallbacks, resolveDeclaredTables } from "../schema/declared-tables";
+import { describeIntrospectedTables } from "../schema/introspected-tables";
 import {
     collectionsStoredBy,
     logUnprovisionedCollections,
@@ -711,13 +713,6 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     // `schemaDir` pointing at nothing declares nothing, and treating that
     // as "declared" would serve an empty API and never look at the database.
     const introspectCollections = activeCollections.length === 0;
-    if (introspectCollections && config.hooks) {
-        throw new Error(
-            "Global table hooks (`hooks`, from backend/hooks.ts) were given, but this backend declares no tables " +
-            "and introspects the database instead. A hook receives the descriptor of the table it runs for, and an " +
-            "introspected table has none. Declare the tables in backend/schema, or remove the hooks."
-        );
-    }
     // Only the surprising branch is worth a line every boot. Serving what you
     // declared is what a developer already expects; deriving collections from
     // the database because nothing was declared is the state people debug for
@@ -929,6 +924,31 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     enforceAuthSecretExclusion(activeCollections);
 
     activeCollections.forEach(collection => collectionRegistry.register(collection));
+
+    // What introspection found has no descriptors of its own: lift them, so
+    // `GET /api/schema/tables` serves a database-only project to the
+    // zero-config CMS, the schema version covers it, and a global hook gets
+    // its table's descriptor. After the secret exclusion above, so a users
+    // table found here carries its secrets as private columns.
+    if (introspectCollections && activeCollections.length > 0) {
+        const introspected = describeIntrospectedTables(activeCollections.filter(isPostgresCollectionConfig));
+        tableRegistry.replaceAll(introspected.descriptors);
+        for (const { table, reason } of introspected.skipped) {
+            logger.warn(
+                `Table "${table}" is served, but GET /api/schema/tables does not describe it: ${reason}`
+            );
+        }
+        // A hook receives its table's descriptor; on a table that has none it
+        // would throw on every call. Said now, by name, rather than per request.
+        if (config.hooks && introspected.skipped.length > 0) {
+            throw new Error(
+                "Global table hooks (`hooks`, from backend/hooks.ts) were given, and these introspected tables " +
+                `could not be described, so a hook could not be handed their descriptor: ` +
+                `${introspected.skipped.map(({ table }) => `"${table}"`).join(", ")}. ` +
+                "Declare the tables in backend/schema, or remove the hooks."
+            );
+        }
+    }
 
     const defaultDriver = driverRegistry.getOrDefault(defaultDriverId);
     if (!defaultDriver || !defaultDriverResult) {
@@ -3508,6 +3528,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     let devMailSurface: Hono<HonoEnv> | undefined;
     let logsSurface: Hono<HonoEnv> | undefined;
     let metaSurface: Hono<HonoEnv> | undefined;
+    let schemaTablesSurface: Hono<HonoEnv> | undefined;
 
     // 6b. Backup admin routes (for the Studio Backups panel).
     // Read the destination lazily from env so config changes don't need a
@@ -3725,14 +3746,64 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             );
         }
 
-        contractRouter.route("/", createContractRoutes({
-            collectionRegistry,
+        // One cache of the descriptors, the schema version and the compiled
+        // policies, per registry revision, behind both routes: the contract
+        // and `GET /schema/tables` serve the same serializer, and a change to
+        // the registry reaches both.
+        const { createSchemaTablesService, createSchemaTablesRoutes } = await import("../api/schema-tables-routes");
+        const schemaTables = createSchemaTablesService({
             tableRegistry,
-            schemaVersion: config.schemaVersion,
+            policySource: () => declaredTables.collections,
+            schemaVersion: config.schemaVersion
+        });
+
+        contractRouter.route("/", createContractRoutes({
+            schemaTables,
             runtimeVersion: config.runtimeVersion
         }));
 
         metaSurface = contractRouter;
+
+        // `GET /schema/tables` — part of the meta surface, mounted beside it
+        // at `/schema`. Any authenticated caller, redacted per caller; with no
+        // auth configured there is no caller to redact for, so it answers 404
+        // SCHEMA_UNAVAILABLE (which the client and the CMS read as "no tables
+        // served"). `auth.requireAuth: false` does not open it.
+        const verifyIfPresented: MiddlewareHandler<HonoEnv> = (() => {
+            const verify = createRequireAuth({ serviceKey: internalServiceKey, ...adminGateIdentity });
+            return async (c, next) => {
+                // A credential the pre-auths already resolved, or none at all:
+                // nothing to verify. Anything else is verified, and refused
+                // when it is not valid — a bad token is never read as anonymous.
+                if (c.get("user") || c.req.header("authorization") === undefined) return next();
+                return verify(c, next);
+            };
+        })();
+        const publicTables = config.schemaTables?.public === true;
+        if (publicTables && adminSurfacesGated) {
+            logger.info(
+                "schemaTables.public is on: GET /schema/tables describes the tables with a public select rule " +
+                "to anonymous callers (columns and relations with an access.read list, raw SQL and policies withheld)."
+            );
+        }
+        schemaTablesSurface = createSchemaTablesRoutes({
+            service: schemaTables,
+            available: adminSurfacesGated,
+            publicTables,
+            authenticate: [
+                provideServices,
+                ...(apiKeyPreAuth ? [apiKeyPreAuth] : []),
+                platformTokenPreAuth,
+                verifyIfPresented
+            ]
+        });
+        if (!adminSurfacesGated) {
+            warnOnMount(
+                "meta",
+                "GET /schema/tables answers 404 SCHEMA_UNAVAILABLE: no auth is configured (no adapter or no " +
+                "jwtSecret), so there is no caller to describe the tables to."
+            );
+        }
     }
 
     // With several databases, route subscriptions to the provider owning each
@@ -4085,6 +4156,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         }
 
         if (surfaces.meta && metaSurface) app.route(`${basePath}/meta`, groups.meta());
+        if (surfaces.meta && schemaTablesSurface) app.route(`${basePath}/schema`, group(schemaTablesSurface));
 
         if (announce) logger.debug("Rebase backend mounted", { basePath });
     };

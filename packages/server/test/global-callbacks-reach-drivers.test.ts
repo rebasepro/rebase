@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { createServer } from "node:http";
-import { col, defineTable, type DatabaseAdapter, type TableDescriptor, type TableHooks } from "@rebasepro/types";
+import { col, defineTable, type DatabaseAdapter, type PostgresCollectionConfig, type TableDescriptor, type TableHooks } from "@rebasepro/types";
 import { jest } from "@jest/globals";
 import { CollectionRegistry, createCallContext } from "@rebasepro/common";
 
@@ -28,7 +28,7 @@ const leads = (hooks?: TableHooks) => defineTable("leads", {
     ...(hooks ? { hooks } : {})
 });
 /** A Postgres-typed adapter whose driver keeps its own registry, as both real drivers do. */
-function adapter(options: { type?: string; registry?: CollectionRegistry | null } = {}): DatabaseAdapter {
+function adapter(options: { type?: string; registry?: CollectionRegistry | null; introspected?: PostgresCollectionConfig[] } = {}): DatabaseAdapter {
     const registry = options.registry === undefined ? new CollectionRegistry() : options.registry;
     return {
         type: options.type ?? "postgres",
@@ -36,6 +36,7 @@ function adapter(options: { type?: string; registry?: CollectionRegistry | null 
             return {
                 internals: {},
                 driver: fakeDataDriver(),
+                ...(options.introspected ? { collections: options.introspected } : {}),
                 ...(registry ? { collectionRegistry: registry } : {})
             };
         },
@@ -106,9 +107,39 @@ describe("global hooks", () => {
             .rejects.toThrow(/returned no collection registry that accepts global callbacks/);
     });
 
-    it("refuse to boot a backend that declares no tables — an introspected table has no descriptor to hand them", async () => {
-        await expect(boot(adapter(), { tables: [], hooks: { afterRead: ({ values }) => values } }))
-            .rejects.toThrow(/declares no tables/);
+    it("hand an introspected table's descriptor to a hook, now that introspection describes its tables", async () => {
+        // What the Postgres driver's runtime introspection hands back for one table.
+        const introspectedLeads: PostgresCollectionConfig = {
+            name: "Leads",
+            slug: "leads",
+            table: "leads",
+            schema: "public",
+            properties: { id: { name: "Id", columnName: "id", type: "string", isId: "uuid" } }
+        };
+        const registry = new CollectionRegistry();
+        const seen: TableDescriptor[] = [];
+        const hooks: TableHooks = { afterRead: ({ table, values }) => { seen.push(table); return values; } };
+        await boot(adapter({ registry, introspected: [introspectedLeads] }), { tables: [], hooks });
+
+        await registry.getGlobalCallbacks()?.afterRead?.(readProps({ id: "1" }));
+        expect(seen.map(table => table.slug)).toEqual(["leads"]);
+        expect(seen[0].rls.posture).toBe("rules");
+    });
+
+    it("refuse to boot when an introspected table could not be described — a hook would have no descriptor to receive", async () => {
+        const undescribable: PostgresCollectionConfig = {
+            name: "Leads",
+            slug: "leads",
+            table: "leads",
+            schema: "public",
+            properties: {
+                id: { name: "Id", columnName: "id", type: "string", isId: "uuid" },
+                file: { name: "File", columnName: "file", type: "string", storage: { storagePath: () => "leads/" } }
+            }
+        };
+        jest.spyOn(console, "warn").mockImplementation(() => {});
+        await expect(boot(adapter({ introspected: [undescribable] }), { tables: [], hooks: { afterRead: ({ values }) => values } }))
+            .rejects.toThrow(/could not be described.*"leads"/s);
     });
 
     it("still boot a driver with no registry when none are declared", async () => {
