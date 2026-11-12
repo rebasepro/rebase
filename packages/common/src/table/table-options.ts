@@ -1,9 +1,10 @@
 import type { ColumnDescriptor, TableDescriptor, TenantDescriptor } from "@rebasepro/types";
 import { DEFAULT_TENANT_BYPASS_ROLES } from "@rebasepro/types";
+import { DEFAULT_TABLE_SCHEMA } from "../schema/derive-names";
 
 /**
- * Table-level options read from a {@link TableDescriptor}: soft delete and
- * tenancy. The compiler already checked them (the soft-delete column exists
+ * Table-level options read from a {@link TableDescriptor}: the schema it is
+ * declared in, soft delete and tenancy. The compiler already checked them (the soft-delete column exists
  * and is temporal, the tenant column exists and has a key type), so these do
  * no defaulting of their own.
  *
@@ -51,4 +52,18 @@ export function tenantOf(table: TableDescriptor): (TenantDescriptor & { bypassRo
     const tenant = table.tenant;
     if (!tenant) return undefined;
     return { ...tenant, bypassRoles: tenant.bypassRoles ?? DEFAULT_TENANT_BYPASS_ROLES };
+}
+
+/**
+ * The Postgres schema a table names apart from the default one, or
+ * `undefined` for a table in `public`.
+ *
+ * `public` is where a table lands without a qualifier, so nothing declares it:
+ * no `CREATE SCHEMA`, no `pgSchema("public")` in a generated Drizzle file
+ * (Drizzle refuses that one). Every other schema is created and qualified.
+ *
+ * @group Table
+ */
+export function declaredSchemaOf(table: Pick<TableDescriptor, "schema">): string | undefined {
+    return table.schema === DEFAULT_TABLE_SCHEMA ? undefined : table.schema;
 }

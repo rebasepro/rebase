@@ -40,6 +40,7 @@ import {
     type ColumnDef,
     type ColumnType,
     type CompiledTable,
+    type TableDescriptor,
     hasForeignKeyOnTarget
 } from "@rebasepro/types";
 import {
@@ -62,7 +63,8 @@ import {
     resolveJunctionSpecs,
     assertBeforeQueryIsPostgresOnly,
     resolveStringColumnLength,
-    customSqlTypeProblem
+    customSqlTypeProblem,
+    declaredSchemaOf
 } from "@rebasepro/common";
 import {
     generateForeignKeyName,
@@ -942,6 +944,12 @@ export function planSchema(compiledTables: readonly CompiledTable[], options: Pl
     // B-PLAN-2: removed in step 4. The parts of the planner not yet ported to
     // the descriptor read the tables lowered into the legacy shape.
     const allCollections: CollectionConfig[] = lowerCompiledTables(compiledTables);
+    const descriptorOf = new Map(compiledTables.map(table => [table.descriptor.slug, table.descriptor]));
+    const requireDescriptor = (collection: CollectionConfig): TableDescriptor => {
+        const descriptor = descriptorOf.get(collection.slug);
+        if (!descriptor) throw new Error(`The planner lost the descriptor of table "${describe(collection)}".`);
+        return descriptor;
+    };
     // Before the filter, deliberately: a `search` block on a collection this
     // engine does not store would otherwise be dropped without a word.
     assertSearchIsPostgresOnly(allCollections);
@@ -968,9 +976,10 @@ export function planSchema(compiledTables: readonly CompiledTable[], options: Pl
     }
     const resolveCollection: ResolveCollection = (slug) => firstBySlugOrTable.get(slug);
 
-    const declaredSchemas = Array.from(new Set(
-        collections.map(c => (isPostgresCollectionConfig(c) ? c.schema : undefined)).filter(Boolean) as string[]
-    ));
+    const declaredSchemas = Array.from(new Set(collections.flatMap(c => {
+        const declared = declaredSchemaOf(requireDescriptor(c));
+        return declared === undefined ? [] : [declared];
+    })));
     const schemas = Array.from(new Set([REBASE_SCHEMA, ...declaredSchemas]));
 
     // ── Enum types ───────────────────────────────────────────────────────────
@@ -1149,7 +1158,7 @@ export function planSchema(compiledTables: readonly CompiledTable[], options: Pl
             ? planJunctionTable(
                 tableName, entry.junction.relation, entry.junction.source,
                 junctionSpecs, resolveCollection, triggerFunctionNeeded)
-            : planCollectionTable(entry.collection, resolveCollection, triggerFunctionNeeded));
+            : planCollectionTable(entry.collection, requireDescriptor(entry.collection), resolveCollection, triggerFunctionNeeded));
     }
 
     assertNoTruncationCollisions(tables, enums);
@@ -1349,11 +1358,11 @@ function assertOneJunctionShape(
 
 function planCollectionTable(
     collection: CollectionConfig,
+    descriptor: TableDescriptor,
     resolveCollection: ResolveCollection,
     triggerFunctionNeeded: { value: boolean }
 ): TablePlan {
-    const schema = schemaOf(collection);
-    const table = bareTableName(getTableName(collection));
+    const { schema, table, slug } = descriptor;
     const auth = isAuthCollection(collection);
     const columns: ColumnPlan[] = [];
     const triggers: TriggerPlan[] = [];
@@ -1401,7 +1410,7 @@ function planCollectionTable(
                 primaryKey: false,
                 unique: false,
                 sqlDefinition: authUsersColumnSql(spec),
-                source: { kind: "auth", slug: collection.slug }
+                source: { kind: "auth", slug: slug }
             });
         }
     }
@@ -1422,7 +1431,7 @@ function planCollectionTable(
             unique: false,
             generated: { expression: search.expression, stored: true },
             sqlDefinition: searchColumnTypeSql(search.expression, "tsvector"),
-            source: { kind: "search", slug: collection.slug }
+            source: { kind: "search", slug: slug }
         });
         if (search.fuzzy) {
             columns.push({
@@ -1434,12 +1443,12 @@ function planCollectionTable(
                 unique: false,
                 generated: { expression: search.fuzzy.expression, stored: true },
                 sqlDefinition: searchColumnTypeSql(search.fuzzy.expression, "text"),
-                source: { kind: "search", slug: collection.slug }
+                source: { kind: "search", slug: slug }
             });
         }
     }
 
-    const primaryKey = planPrimaryKey(collection, columns);
+    const primaryKey = planPrimaryKey(descriptor, columns);
 
     const injected = new Set(getInjectedSecurityRules(collection).map(rule => rule.name));
     const policies = withoutLiveSupersededNames(getEffectiveSecurityRules(collection).flatMap((rule, index) =>
@@ -1484,10 +1493,10 @@ function planCollectionTable(
         schema,
         table,
         qualified: `${schema}.${table}`,
-        declaredSchema: isPostgresCollectionConfig(collection) ? collection.schema : undefined,
-        varName: getTableVarName(getTableName(collection)),
+        declaredSchema: declaredSchemaOf(descriptor),
+        varName: getTableVarName(table),
         kind: "collection",
-        slug: collection.slug,
+        slug,
         columns,
         primaryKey,
         indexes,
@@ -1514,20 +1523,20 @@ function planCollectionTable(
  * gets one `PRIMARY KEY (a, b)` over the list returned here — the shape a
  * junction's key has always had.
  *
- * A collection that declares no key gets an implicit `id TEXT PRIMARY KEY`,
+ * A table that declares no key gets an implicit `id TEXT PRIMARY KEY`,
  * which is what `getPrimaryKeys` reads back.
  */
-function planPrimaryKey(collection: CollectionConfig, columns: ColumnPlan[]): string[] {
-    const keyNames = primaryKeyPropertyNames(collection);
+function planPrimaryKey(descriptor: TableDescriptor, columns: ColumnPlan[]): string[] {
+    const keyNames = descriptor.primaryKey;
 
     if (keyNames.length > 1) {
         return keyNames.map(name => {
             const column = columns.find(c => c.source.propName === name && !c.columnOwnedByProperty);
             if (!column) {
                 throw new Error(
-                    `Property "${name}" of collection "${describe(collection)}" is marked \`isId\`, and it puts ` +
+                    `Column "${name}" of table "${descriptor.slug}" is part of the primary key, and it puts ` +
                     "no column on this table, so it cannot be part of the table's primary key. Mark the " +
-                    "property that holds the column instead."
+                    "column that holds it `.primaryKey()` instead."
                 );
             }
             column.primaryKey = false;
@@ -1553,7 +1562,7 @@ function planPrimaryKey(collection: CollectionConfig, columns: ColumnPlan[]): st
             primaryKey: true,
             unique: false,
             default: { kind: "sql", expression: IMPLICIT_ID_DEFAULT },
-            source: { kind: "implicit-id", slug: collection.slug }
+            source: { kind: "implicit-id", slug: descriptor.slug }
         });
     }
     return columns.filter(c => c.primaryKey).map(c => c.column);
