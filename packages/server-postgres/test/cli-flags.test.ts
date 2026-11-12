@@ -78,7 +78,7 @@ describe("assertKnownFlags", () => {
     // mean --y?) — run …`.
     it("says it in the words every other command does, and lists the options when nothing is near", () => {
         expect(() => assertKnownFlags("db", "migrate", line("db", "migrate", "--zzz")))
-            .toThrow("`rebase db migrate` has no option --zzz — it takes --baseline, --refuse-destructive. Nothing was run. See `rebase db --help`.");
+            .toThrow("`rebase db migrate` has no option --zzz — it takes --schema-dir, --baseline, --refuse-destructive. Nothing was run. See `rebase db --help`.");
     });
 
     it("points at the help for the command that was named", () => {
