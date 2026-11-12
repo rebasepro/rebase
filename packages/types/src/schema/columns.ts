@@ -105,6 +105,13 @@ export type ValidationFor<K extends BuilderKind> =
 /** The value `.default()` accepts: what the column holds; a `Date` too, for a temporal column. */
 export type DefaultValueFor<TData, K extends BuilderKind> = K extends TemporalColumnKind ? TData | Date : TData;
 
+const STAMP_METHODS: Record<string, string> = {
+    "create:now": ".onCreateNow",
+    "update:now": ".onUpdateNow",
+    "create:user": ".onCreateUser",
+    "update:user": ".onUpdateUser"
+};
+
 /** The brand every column builder carries, so one built by another copy of this package is still recognised. */
 export const COLUMN_BRAND = "rebase.column";
 
@@ -148,6 +155,22 @@ export class ColumnBuilder<TData, TKind extends BuilderKind = BuilderKind, F ext
 
     private with<D, K extends BuilderKind, G extends ColumnFlags>(patch: Partial<ColumnDef>): ColumnBuilder<D, K, G> {
         return new ColumnBuilder<D, K, G>({ ...this.def, ...patch });
+    }
+
+    /**
+     * The patch that sets a stamp, refusing a second, different one: a column
+     * holds one stamp, so `.onCreateNow().onUpdateNow()` would otherwise keep
+     * whichever came last without a word.
+     */
+    private stamped(stamp: ColumnStamp, method: string): Partial<ColumnDef> {
+        const current = this.def.stamp;
+        if (current && (current.on !== stamp.on || current.value !== stamp.value)) {
+            throw new Error(
+                `\`.${method}()\` on a column that already has \`${STAMP_METHODS[`${current.on}:${current.value}`]}()\`: a column ` +
+                "holds one stamp. `.onUpdateNow()` alone also stamps the row when it is created."
+            );
+        }
+        return { stamp };
     }
 
     // ── Every column ─────────────────────────────────────────────────────
@@ -303,7 +326,7 @@ export class ColumnBuilder<TData, TKind extends BuilderKind = BuilderKind, F ext
     onCreateNow<K extends TemporalColumnKind>(
         this: ColumnBuilder<string, K, F>
     ): ColumnBuilder<string, K, WithDefault<F>> {
-        return this.with<string, K, WithDefault<F>>({ stamp: { on: "create", value: "now" } });
+        return this.with<string, K, WithDefault<F>>(this.stamped({ on: "create", value: "now" }, "onCreateNow"));
     }
 
     /**
@@ -313,7 +336,7 @@ export class ColumnBuilder<TData, TKind extends BuilderKind = BuilderKind, F ext
     onUpdateNow<K extends TemporalColumnKind>(
         this: ColumnBuilder<string, K, F>
     ): ColumnBuilder<string, K, WithDefault<F>> {
-        return this.with<string, K, WithDefault<F>>({ stamp: { on: "update", value: "now" } });
+        return this.with<string, K, WithDefault<F>>(this.stamped({ on: "update", value: "now" }, "onUpdateNow"));
     }
 
     // ── Acting user ──────────────────────────────────────────────────────
@@ -322,14 +345,14 @@ export class ColumnBuilder<TData, TKind extends BuilderKind = BuilderKind, F ext
     onCreateUser<K extends TextColumnKind | "uuid">(
         this: ColumnBuilder<string, K, F>
     ): ColumnBuilder<string, K, WithDefault<F>> {
-        return this.with<string, K, WithDefault<F>>({ stamp: { on: "create", value: "user" } });
+        return this.with<string, K, WithDefault<F>>(this.stamped({ on: "create", value: "user" }, "onCreateUser"));
     }
 
     /** The server writes the caller's id on every write. */
     onUpdateUser<K extends TextColumnKind | "uuid">(
         this: ColumnBuilder<string, K, F>
     ): ColumnBuilder<string, K, WithDefault<F>> {
-        return this.with<string, K, WithDefault<F>>({ stamp: { on: "update", value: "user" } });
+        return this.with<string, K, WithDefault<F>>(this.stamped({ on: "update", value: "user" }, "onUpdateUser"));
     }
 
     // ── Storage ──────────────────────────────────────────────────────────

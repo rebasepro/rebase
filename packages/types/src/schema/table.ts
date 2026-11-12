@@ -307,10 +307,41 @@ export function defineView<
     return { brand: VIEW_BRAND, name, config };
 }
 
-/** Any table, whatever its columns. */
-export type AnyTableDef = TableDef<string, ColumnsShape, RelationsShape>;
-/** Any view, whatever its columns. */
-export type AnyViewDef = ViewDef<string, ColumnsShape, RelationsShape>;
+/**
+ * A type compared member by member rather than through its type parameters.
+ *
+ * `TableConfig<C>` names `keyof C` (in `tenant`, `softDelete`, `indexes`), and
+ * TypeScript measures a type parameter read through `keyof` as contravariant —
+ * so `TableConfig<{ id: … }>` was refused where `TableConfig<ColumnsShape>`
+ * was expected, although every member is assignable. Spelling the "any" types
+ * out structurally makes the compiler compare the members, which is the
+ * question actually being asked.
+ */
+type Structural<T> = { [K in keyof T]: T[K] };
+
+/**
+ * Any table, whatever its columns: what a list of `defineTable` results is
+ * typed as (`compileTables(defs)`, `backend/schema/index.ts`).
+ *
+ * @group Schema
+ */
+export interface AnyTableDef {
+    readonly brand: typeof TABLE_BRAND;
+    readonly name: string;
+    readonly config: Structural<TableConfig<ColumnsShape, RelationsShape>>;
+    readonly auth?: AuthTableOptions;
+}
+
+/**
+ * Any view, whatever its columns.
+ *
+ * @group Schema
+ */
+export interface AnyViewDef {
+    readonly brand: typeof VIEW_BRAND;
+    readonly name: string;
+    readonly config: Structural<ViewConfig<ColumnsShape, RelationsShape>>;
+}
 
 /**
  * Whether a value is the result of `defineTable` or `defineAuthTable`, from
