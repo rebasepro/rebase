@@ -189,6 +189,8 @@ export function rebaseBackendGuard(options: RebaseBackendGuardOptions = {}): Plu
     let realBackend: string | undefined;
     let projectRoot = "";
 
+    /** Set once the backend is known; matches nothing until then. */
+    const idFilter: { id: RegExp } = { id: /(?!)/ };
     const refuse = (id: string | undefined): boolean => realBackend !== undefined && id !== undefined && isModuleInDir(id, realBackend);
 
     return {
@@ -207,6 +209,10 @@ export function rebaseBackendGuard(options: RebaseBackendGuardOptions = {}): Plu
             }
             realBackend = realPath(backend);
             projectRoot = path.dirname(realBackend);
+            // Any path segment named like the backend, in any case (the
+            // handler then decides by real path).
+            const names = [...new Set([path.basename(backend), path.basename(realBackend)])].map(name => name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+            idFilter.id = new RegExp(`[\\\\/](?:${names.join("|")})(?:[\\\\/?#]|$)`, "i");
         },
         async resolveId(source, importer, resolveOptions) {
             if (realBackend === undefined || importer === undefined || resolveOptions?.ssr) return null;
@@ -215,8 +221,10 @@ export function rebaseBackendGuard(options: RebaseBackendGuardOptions = {}): Plu
             // the project's own modules pay it. A module outside the project (a
             // linked workspace package, a dependency) that reaches backend/ is
             // still refused, by `load` and `transform`, without the import as written.
+            // A prefix test, not a real path: the bundler's ids are real paths
+            // already, and this runs for every import of the graph.
             const importerFile = fileOfModuleId(importer);
-            if (importerFile === undefined || !isModuleInDir(importerFile, projectRoot)) return null;
+            if (importerFile === undefined || !importerFile.startsWith(projectRoot + path.sep)) return null;
             const resolved = await this.resolve(source, importer, { ...resolveOptions, skipSelf: true });
             if (resolved && !resolved.external && refuse(resolved.id)) {
                 // A dev-server request for `/@fs/…` is a URL, not an import anyone wrote.
@@ -225,15 +233,25 @@ export function rebaseBackendGuard(options: RebaseBackendGuardOptions = {}): Plu
             }
             return null;
         },
-        load(id, loadOptions) {
-            if (loadOptions?.ssr || !refuse(id)) return null;
-            const importer = this.getModuleInfo(id)?.importers[0];
-            this.error(backendImportMessage({ projectRoot, importer, resolved: id }));
+        // Hook filters: the bundler calls these two only for ids under a
+        // directory named like the backend's, instead of crossing into
+        // JavaScript for every module of the graph (that cost showed up as
+        // most of a scaffold build's plugin time).
+        load: {
+            filter: idFilter,
+            handler(id, loadOptions) {
+                if (loadOptions?.ssr || !refuse(id)) return null;
+                const importer = this.getModuleInfo(id)?.importers[0];
+                this.error(backendImportMessage({ projectRoot, importer, resolved: id }));
+            }
         },
-        transform(_code, id, transformOptions) {
-            if (transformOptions?.ssr || !refuse(id)) return null;
-            const importer = this.getModuleInfo(id)?.importers[0];
-            this.error(backendImportMessage({ projectRoot, importer, resolved: id }));
+        transform: {
+            filter: idFilter,
+            handler(_code, id, transformOptions) {
+                if (transformOptions?.ssr || !refuse(id)) return null;
+                const importer = this.getModuleInfo(id)?.importers[0];
+                this.error(backendImportMessage({ projectRoot, importer, resolved: id }));
+            }
         }
     };
 }
