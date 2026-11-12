@@ -39,6 +39,7 @@ const players = defineTable("players", {
         id: col.uuid().primaryKey().defaultRandom(),
         name: col.varchar(),
         status: col.enum(["active", "benched"]),
+        position: col.text().oneOf(["keeper", "defender", "forward"]),
         rating: col.numeric(5, 2),
         goals: col.integer().default(0),
         region: col.text().dbDefault(),
@@ -97,10 +98,12 @@ describe("column type predicates", () => {
         expect(isGeopointColumn(column("profile"))).toBe(false);
     });
 
-    it("searches text kinds with ILIKE, never an enum or anything else", () => {
+    it("searches text kinds with ILIKE, never an enum, a text `.oneOf()` or anything else", () => {
         expect(isIlikeSearchable(column("name"))).toBe(true);
         expect(isIlikeSearchable(column("createdBy"))).toBe(true);
         expect(isIlikeSearchable(column("status"))).toBe(false);
+        expect(isIlikeSearchable(column("position"))).toBe(false);
+        expect(isIlikeSearchable(column("id"))).toBe(false);
         expect(isIlikeSearchable(column("updatedBy"))).toBe(false);
         expect(isIlikeSearchable(column("goals"))).toBe(false);
     });

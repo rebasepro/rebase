@@ -138,12 +138,19 @@ export function isGeopointColumn(column: ColumnDescriptor): boolean {
 
 /**
  * Whether a text search may match the column with `ILIKE`: a text kind
- * (`text`, `varchar`, `char`). An enum is not — `ILIKE` on an enum needs a
- * cast and matches labels, not text — nor is anything else. Replaces the
- * search-column choice that read `type === "string"` and skipped `enum`.
+ * (`text`, `varchar`, `char`) that is not a closed set of values.
+ *
+ * - A Postgres enum is not text — `ILIKE` on one needs a cast and matches
+ *   labels — and neither is a uuid or anything else.
+ * - A text column with `.oneOf([...])` holds one of a few ids, and searching
+ *   ids for a substring of what a person typed is noise: `act` matching every
+ *   `active` row. Skipped, as the legacy `enum` on a string property was.
+ *
+ * Replaces the search-column choice that read `type === "string"` and skipped
+ * `enum`.
  *
  * @group Table
  */
-export function isIlikeSearchable(column: ColumnDescriptor): boolean {
-    return isTextColumnType(column.type);
+export function isIlikeSearchable(column: Pick<ColumnDescriptor, "type" | "oneOf">): boolean {
+    return isTextColumnType(column.type) && column.oneOf === undefined;
 }
