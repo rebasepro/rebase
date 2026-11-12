@@ -38,6 +38,7 @@ import { ensureAuthTablesExist } from "./auth/ensure-tables";
 import { assertAuthSchemaCompatible, probeAuthSchema, resolveAuthSchema } from "./auth/schema-version";
 import { AuthSchemaTables, PostgresAuthRepository, UserService } from "./auth/services";
 import { createAuthSchema } from "./schema/auth-schema";
+import { compileHandedTables } from "./schema/collection-input";
 import { expectationOf, findUnusableAuthTables, unusableAuthTablesError, usersExpectation } from "./auth/verify-auth-tables";
 import { HistoryService } from "./history/HistoryService";
 import { ensureHistoryIndexes, ensureHistoryTableExists, historyUnavailableReason, readHistoryTableState } from "./history/ensure-history-table";
@@ -2217,7 +2218,7 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authDescriptor)) 
             const provisionOnly = ["1", "true"].includes((process.env.REBASE_PROVISION_ONLY ?? "").trim().toLowerCase());
             const plan = await ensureCollectionTables(
                 queryable,
-                collections as Parameters<typeof ensureCollectionTables>[1],
+                compileHandedTables(collections),
                 log,
                 // A change to a table a long reader holds waits in one-second
                 // slices, so live queries on it are never held behind the boot
@@ -2307,7 +2308,7 @@ schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authDescriptor)) 
             const internals = driverResult?.internals as PostgresDriverInternals | undefined;
             const outcome = await ensureCollectionPolicies(
                 queryable,
-                collections as CollectionConfig[],
+                compileHandedTables(collections),
                 log,
                 {
                     adminRoleAvailable: internals?.adminPoliciesLive === true,

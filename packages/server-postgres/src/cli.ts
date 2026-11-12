@@ -2629,8 +2629,11 @@ async function schemaStaleCommand(rawArgs: string[]): Promise<void> {
     let unreadable: string | undefined;
     if (generatedExists) {
         try {
-            const collections = await loadTables(schemaDir);
+            const tables = await loadTables(schemaDir);
             const onDisk = fs.readFileSync(schemaFile, "utf8");
+            // B-PLAN-2 step 6: the legacy FK names from the descriptors.
+            const { lowerCompiledTables } = await import("./schema/lowered-tables");
+            const collections = lowerCompiledTables(tables);
             stale = findLegacyForeignKeyNames(onDisk, collections);
             // The check the command's own summary promises, and the one it did
             // not make: render what these tables generate and compare it,
@@ -2640,7 +2643,7 @@ async function schemaStaleCommand(rawArgs: string[]): Promise<void> {
             // visibly rewrites was reported as a match.
             const postgresCollections = relationalCollections(collections);
             if (postgresCollections.length > 0) {
-                differences = compareGeneratedDeclarations(generateSchema(postgresCollections), onDisk);
+                differences = compareGeneratedDeclarations(generateSchema(tables), onDisk);
             }
         } catch (err) {
             // Best-effort by design: a schema directory that will not load

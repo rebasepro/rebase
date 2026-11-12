@@ -76,6 +76,7 @@ import { withFieldViewer } from "./services/field-viewer";
 import { generateSchemaCommit } from "./schema/generate-schema-commit";
 import { readSchemaFactsFor, type Queryable } from "./schema/ensure-collection-tables";
 import { readReconcileFacts } from "./schema/reconcile-schema";
+import { compileEditedCollections } from "./schema/collection-input";
 import { onOwnSession, openSqlCursorOnPool, readWithinBudget, refuseOversizedRows, RESET_SESSION_STATEMENTS, runSqlScriptOnPool, sqlScriptResultFromRows } from "./services/sql-script";
 import { PgNotifyListener } from "./services/pg-notify-listener";
 import { diffDatabaseBranch, mergeDatabaseBranch } from "./branching/branch-diff";
@@ -605,7 +606,7 @@ export class PostgresBackendDriver implements DataDriver {
                 sourceOnly: options?.sourceOnly,
                 existing: await readSchemaFactsFor(
                     this.schemaFactsQueryable(),
-                    after as CollectionConfig[]
+                    compileEditedCollections(after as CollectionConfig[])
                 )
             }),
             // The reviewed counterpart to boot's additive ensure: relaxing NOT
@@ -613,7 +614,9 @@ export class PostgresBackendDriver implements DataDriver {
             // the caller runs the statements once a person confirms them.
             planSchemaReconcile: async (collections, options) => readReconcileFacts(
                 this.schemaFactsQueryable(),
-                collections as CollectionConfig[],
+                // The served tables: each collection the server passes is one
+                // this driver registered.
+                (collections as CollectionConfig[]).map(collection => this.registry.requireTable(collection.slug).compiled),
                 options
             ),
             listen: (...args: Parameters<NonNullable<SQLAdmin["listen"]>>) => this.listen(...args),
