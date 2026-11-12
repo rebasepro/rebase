@@ -1466,7 +1466,7 @@ export async function openPostgresDriver(
         // warning per junction on every boot.
         const ownSlugs = new Set(collectionsOnThisSource().map(c => c.slug));
         for (const link of collectJunctionLinks(registry)) {
-            if (!ownSlugs.has(link.parentCollection.slug)) continue;
+            if (!ownSlugs.has(link.parentSlug)) continue;
             // A junction row is addressed by the two ids that name
             // the child list it belongs to, whatever its own key is.
             cdcTables.push({

@@ -100,7 +100,7 @@ const talentsCollection: CollectionConfig = {
 };
 
 const createRegistry = () => {
-    const registry = new FixtureTableRegistry();
+    const registry = new FixtureTableRegistry([talentsCollection]);
     const tables = {
         talents: talentsTable,
         talent_applications: applicationsTable,

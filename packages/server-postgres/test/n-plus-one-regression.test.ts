@@ -14,8 +14,8 @@
 import { RelationService } from "../src/services/RelationService";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
-import type { CollectionConfig, ResolvedRelation } from "@rebasepro/types";
-import { resolveCollectionRelations } from "@rebasepro/common";
+import type { CollectionConfig } from "@rebasepro/types";
+import { relationOfTable } from "./helpers/relation-descriptors";
 import { integer, pgTable, text } from "drizzle-orm/pg-core";
 import { arrayRowsFor, recordingDb, type RecordedQuery } from "./helpers/spg-b-recording-db";
 
@@ -53,11 +53,6 @@ const postsCollection: CollectionConfig = {
     ]
 };
 
-const authorRelation = (): ResolvedRelation => {
-    const relation = resolveCollectionRelations(postsCollection).author;
-    if (!relation) throw new Error("posts.author did not resolve");
-    return relation;
-};
 
 // ─── Data generators ─────────────────────────────────────────────
 const NUM_POSTS = 50;
@@ -118,7 +113,7 @@ describe("N+1 Query Regression: batchFetchRelatedEntities (owning relations)", (
             "posts",
             postIds,
             "author",
-            authorRelation()
+            relationOfTable(registry, "posts", "author")
         );
 
         // Exactly 2 queries:
@@ -145,7 +140,7 @@ describe("N+1 Query Regression: batchFetchRelatedEntities (owning relations)", (
             "posts",
             postIds,
             "author",
-            authorRelation()
+            relationOfTable(registry, "posts", "author")
         );
 
         // Every post should have a resolved author
@@ -173,7 +168,7 @@ describe("N+1 Query Regression: batchFetchRelatedEntities (owning relations)", (
             "posts",
             postIds,
             "author",
-            authorRelation()
+            relationOfTable(registry, "posts", "author")
         );
 
         // Only 1 query (FK lookup) then early-return since all FKs are null
@@ -199,7 +194,7 @@ name: "Shared Author" }];
             "posts",
             postIds,
             "author",
-            authorRelation()
+            relationOfTable(registry, "posts", "author")
         );
 
         // Still exactly 2 queries
@@ -229,7 +224,7 @@ name: "Shared Author" }];
             "posts",
             [],
             "author",
-            authorRelation()
+            relationOfTable(registry, "posts", "author")
         );
 
         expect(selects()).toHaveLength(0);

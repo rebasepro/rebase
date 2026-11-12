@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { eq, SQL } from "drizzle-orm";
 import { integer, pgTable, PgDialect, PgTable, primaryKey, serial, varchar, text } from "drizzle-orm/pg-core";
-import { CollectionConfig, EntityRelation, Relation, WhereFilterOp } from "@rebasepro/types";
+import { CollectionConfig, EntityRelation, type JoinStep, WhereFilterOp } from "@rebasepro/types";
+import { manyToMany, via } from "./helpers/relation-descriptors";
 import { resolveRelation } from "@rebasepro/common";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
@@ -60,16 +61,7 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
 
     describe("buildRelationConditions - Owning Many-to-Many", () => {
         it("should build correct conditions for owning many-to-many relation", () => {
-            const relation: Relation = {
-                kind: "manyToMany",
-                relationName: "tags",
-                target: () => namedCollection("tags"),
-                through: {
-                    table: "posts_tags",
-                    sourceColumn: "post_id",
-                    targetColumn: "tag_id"
-                }
-            };
+            const relation = manyToMany("tags", "tags", { table: "posts_tags", sourceKey: "post_id", targetKey: "tag_id" });
 
             const result = DrizzleConditionBuilder.buildRelationConditions(
                 relation,
@@ -98,16 +90,7 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
         });
 
         it("should handle array of parent entity IDs for owning relation", () => {
-            const relation: Relation = {
-                kind: "manyToMany",
-                relationName: "tags",
-                target: () => namedCollection("tags"),
-                through: {
-                    table: "posts_tags",
-                    sourceColumn: "post_id",
-                    targetColumn: "tag_id"
-                }
-            };
+            const relation = manyToMany("tags", "tags", { table: "posts_tags", sourceKey: "post_id", targetKey: "tag_id" });
 
             const result = DrizzleConditionBuilder.buildRelationConditions(
                 relation,
@@ -133,16 +116,7 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
 
     describe("buildRelationConditions - Inverse Many-to-Many", () => {
         it("should build correct conditions for inverse many-to-many relation", () => {
-            const relation: Relation = {
-                kind: "manyToMany",
-                relationName: "posts",
-                target: () => namedCollection("posts"),
-                through: {
-                    table: "posts_tags",
-                    sourceColumn: "tag_id",
-                    targetColumn: "post_id"
-                }
-            };
+            const relation = manyToMany("posts", "posts", { table: "posts_tags", sourceKey: "tag_id", targetKey: "post_id" });
 
             const result = DrizzleConditionBuilder.buildRelationConditions(
                 relation,
@@ -170,16 +144,7 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
         });
 
         it("should handle array of parent entity IDs for inverse relation", () => {
-            const relation: Relation = {
-                kind: "manyToMany",
-                relationName: "posts",
-                target: () => namedCollection("posts"),
-                through: {
-                    table: "posts_tags",
-                    sourceColumn: "tag_id",
-                    targetColumn: "post_id"
-                }
-            };
+            const relation = manyToMany("posts", "posts", { table: "posts_tags", sourceKey: "tag_id", targetKey: "post_id" });
 
             const result = DrizzleConditionBuilder.buildRelationConditions(
                 relation,
@@ -239,13 +204,7 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
                 }
             ];
 
-            const relation: Relation = {
-                kind: "via",
-                relationName: "tags_via_join",
-                target: () => namedCollection("tags"),
-                cardinality: "many",
-                joinPath: joinPathWithJunction
-            };
+            const relation = via("tags_via_join", "tags", "many", joinPathWithJunction);
 
             // Should automatically detect and use the posts_tags junction table
             const result = DrizzleConditionBuilder.buildRelationConditions(
@@ -274,13 +233,7 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
                 }
             ];
 
-            const relation: Relation = {
-                kind: "via",
-                relationName: "missing_relation",
-                target: () => namedCollection("nonexistent"),
-                cardinality: "one",
-                joinPath: joinPathWithMissingRelation
-            };
+            const relation = via("missing_relation", "nonexistent", "one", joinPathWithMissingRelation);
 
             expect(() => {
                 DrizzleConditionBuilder.buildRelationConditions(
@@ -314,13 +267,7 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
                 }
             ];
 
-            const relation: Relation = {
-                kind: "via",
-                relationName: "author_tags",
-                target: () => namedCollection("tags"),
-                cardinality: "many",
-                joinPath: complexJoinPath
-            };
+            const relation = via("author_tags", "tags", "many", complexJoinPath);
 
             const result = DrizzleConditionBuilder.buildRelationConditions(
                 relation,
@@ -355,12 +302,7 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
                 name: varchar("name").notNull()
             });
 
-            const relation: Relation = {
-                kind: "via",
-                relationName: "test_junction",
-                target: () => namedCollection("tags"),
-                cardinality: "many",
-                joinPath: [
+            const relation = via("test_junction", "tags", "many", [
                     {
                         table: "tags",
                         on: {
@@ -368,8 +310,7 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
                             to: "tags.id"
                         }
                     }
-                ]
-            };
+                ]);
 
             // Only the *reversed* name resolves, so a lookup that gave up after
             // `<from>_<to>` would fail here.
@@ -412,16 +353,7 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
 
     describe("Error handling", () => {
         it("should throw error when junction table is not found", () => {
-            const relation: Relation = {
-                kind: "manyToMany",
-                relationName: "posts",
-                target: () => namedCollection("posts"),
-                through: {
-                    table: "nonexistent_table",
-                    sourceColumn: "tag_id",
-                    targetColumn: "post_id"
-                }
-            };
+            const relation = manyToMany("posts", "posts", { table: "nonexistent_table", sourceKey: "tag_id", targetKey: "post_id" });
 
             expect(() => {
                 DrizzleConditionBuilder.buildRelationConditions(
@@ -440,16 +372,7 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
         });
 
         it("should throw error when source column is not found in junction table", () => {
-            const relation: Relation = {
-                kind: "manyToMany",
-                relationName: "posts",
-                target: () => namedCollection("posts"),
-                through: {
-                    table: "posts_tags",
-                    sourceColumn: "nonexistent_column",
-                    targetColumn: "post_id"
-                }
-            };
+            const relation = manyToMany("posts", "posts", { table: "posts_tags", sourceKey: "nonexistent_column", targetKey: "post_id" });
 
             expect(() => {
                 DrizzleConditionBuilder.buildRelationConditions(
@@ -465,16 +388,7 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
         });
 
         it("should throw error when target column is not found in junction table", () => {
-            const relation: Relation = {
-                kind: "manyToMany",
-                relationName: "posts",
-                target: () => namedCollection("posts"),
-                through: {
-                    table: "posts_tags",
-                    sourceColumn: "tag_id",
-                    targetColumn: "nonexistent_column"
-                }
-            };
+            const relation = manyToMany("posts", "posts", { table: "posts_tags", sourceKey: "tag_id", targetKey: "nonexistent_column" });
 
             expect(() => {
                 DrizzleConditionBuilder.buildRelationConditions(
@@ -492,16 +406,7 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
 
     describe("buildRelationCountQuery - Many-to-Many", () => {
         it("should build correct count query for owning many-to-many relation", () => {
-            const relation: Relation = {
-                kind: "manyToMany",
-                relationName: "tags",
-                target: () => namedCollection("tags"),
-                through: {
-                    table: "posts_tags",
-                    sourceColumn: "post_id",
-                    targetColumn: "tag_id"
-                }
-            };
+            const relation = manyToMany("tags", "tags", { table: "posts_tags", sourceKey: "post_id", targetKey: "tag_id" });
 
             const mockBaseQuery = {
                 innerJoin: jest.fn().mockReturnThis(),
@@ -535,16 +440,7 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
         });
 
         it("should build correct count query for inverse many-to-many relation", () => {
-            const relation: Relation = {
-                kind: "manyToMany",
-                relationName: "posts",
-                target: () => namedCollection("posts"),
-                through: {
-                    table: "posts_tags",
-                    sourceColumn: "tag_id",
-                    targetColumn: "post_id"
-                }
-            };
+            const relation = manyToMany("posts", "posts", { table: "posts_tags", sourceKey: "tag_id", targetKey: "post_id" });
 
             const mockBaseQuery = {
                 innerJoin: jest.fn().mockReturnThis(),
@@ -578,16 +474,7 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
 
     describe("buildRelationQuery - Many-to-Many", () => {
         it("should build correct query for owning many-to-many relation with additional filters", () => {
-            const relation: Relation = {
-                kind: "manyToMany",
-                relationName: "tags",
-                target: () => namedCollection("tags"),
-                through: {
-                    table: "posts_tags",
-                    sourceColumn: "post_id",
-                    targetColumn: "tag_id"
-                }
-            };
+            const relation = manyToMany("tags", "tags", { table: "posts_tags", sourceKey: "post_id", targetKey: "tag_id" });
 
             const mockBaseQuery = {
                 innerJoin: jest.fn().mockReturnThis(),
@@ -624,16 +511,7 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
         });
 
         it("should build correct query for inverse many-to-many relation with additional filters", () => {
-            const relation: Relation = {
-                kind: "manyToMany",
-                relationName: "posts",
-                target: () => namedCollection("posts"),
-                through: {
-                    table: "posts_tags",
-                    sourceColumn: "tag_id",
-                    targetColumn: "post_id"
-                }
-            };
+            const relation = manyToMany("posts", "posts", { table: "posts_tags", sourceKey: "tag_id", targetKey: "post_id" });
 
             const mockBaseQuery = {
                 innerJoin: jest.fn().mockReturnThis(),
@@ -670,16 +548,7 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
     describe("Real-world scenario: tags/20/posts", () => {
         it("should correctly handle the tags/20/posts scenario that was failing", () => {
             // This is the exact scenario from the user's error
-            const tagsToPostsRelation: Relation = {
-                kind: "manyToMany",
-                relationName: "posts",
-                target: () => namedCollection("posts"),
-                through: {
-                    table: "posts_tags",
-                    sourceColumn: "tag_id", // FK to this collection's PK in junction table
-                    targetColumn: "post_id" // FK to the target collection's PK in junction table
-                }
-            };
+            const tagsToPostsRelation = manyToMany("posts", "posts", { table: "posts_tags", sourceKey: "tag_id", targetKey: "post_id" });
 
             const result = DrizzleConditionBuilder.buildRelationConditions(
                 tagsToPostsRelation,
@@ -1178,20 +1047,11 @@ describe("DrizzleConditionBuilder - manyToMany scope SQL", () => {
     const { PgDialect } = require("drizzle-orm/pg-core");
     const pgDialect = new PgDialect();
 
-    const relation: Relation = {
-        kind: "manyToMany",
-        relationName: "tags",
-        target: () => namedCollection("tags"),
-        through: {
-            table: "posts_tags",
-            sourceColumn: "post_id",
-            targetColumn: "tag_id"
-        }
-    };
+    const relation = manyToMany("tags", "tags", { table: "posts_tags", sourceKey: "post_id", targetKey: "tag_id" });
 
     const build = () =>
         DrizzleConditionBuilder.buildRelationScopeCondition(
-            resolveRelation(relation, namedCollection("posts")),
+            relation,
             () => ({ table: mockPostsTable, key: [{ column: mockPostsTable.id, value: 1 }] }),
             1,
             mockTagsTable,
@@ -1247,16 +1107,10 @@ describe("DrizzleConditionBuilder - join path with bare column names", () => {
     const tables: Record<string, PgTable> = { products, order_items: orderItems, orders };
     const registry = registryWithTables(tables);
 
-    const relation: Relation = {
-        kind: "via",
-        relationName: "orders",
-        target: () => namedCollection("orders"),
-        cardinality: "many",
-        joinPath: [
+    const relation = via("orders", "orders", "many", [
             { table: "order_items", on: { from: "id", to: "product_id" } },
             { table: "orders", on: { from: "order_id", to: "id" } }
-        ]
-    };
+        ]);
 
     it("joins back from the target to the parent for an include", () => {
         const result = DrizzleConditionBuilder.buildRelationConditions(
@@ -1305,13 +1159,7 @@ describe("DrizzleConditionBuilder - join path scope with alternatives", () => {
 
     const scope = (target: CollectionConfig, targetTable: typeof people | typeof friendships, joinPath: unknown[]) =>
         renderSql(DrizzleConditionBuilder.buildRelationScopeCondition(
-            resolveRelation({
-                kind: "via",
-                relationName: "friends",
-                target: () => target,
-                cardinality: "many",
-                joinPath
-            } as Relation, peopleCollection),
+            via("friends", target.slug, "many", joinPath as JoinStep[]),
             () => ({ table: people, key: [{ column: people.id, value: 2 }] }),
             2,
             targetTable,

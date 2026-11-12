@@ -1,8 +1,8 @@
 import { eq, and, isNotNull, isNull, sql, SQL } from "drizzle-orm";
 import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 // import { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { CollectionConfig, FilterValues, JUNCTION_PIVOT_KEY, type LogicalCondition, Properties, ResolvedRelation, type ResolvedManyToMany, isManyToMany, hasForeignKeyOnTarget, joinConditions } from "@rebasepro/types";
-import { createStampKeys, getTableName, resolveCollectionRelations, fieldKeyForColumn } from "@rebasepro/common";
+import { CollectionConfig, FilterValues, JUNCTION_PIVOT_KEY, type LogicalCondition, Properties, ResolvedRelation, joinConditions } from "@rebasepro/types";
+import { createStampKeys, getTableName, resolveCollectionRelations } from "@rebasepro/common";
 import { DrizzleConditionBuilder } from "../utils/drizzle-conditions";
 import {
     assertWritableColumns,
@@ -20,6 +20,7 @@ import { rowsOfResult } from "../utils/result-rows";
 import { RelationService } from "./RelationService";
 import { beforeQueryCondition, type ReadCallContextProvider } from "./read-scope";
 import { RelationWriteService } from "./RelationWriteService";
+import { columnKeyOf, pointsBack } from "./relation-tables";
 import { FetchService } from "./FetchService";
 import { DrizzleClient } from "../interfaces";
 import { PostgresTableRegistry } from "../model/PostgresTableRegistry";
@@ -270,9 +271,9 @@ export class PersistService {
 
             if (isJunctionBackedRelation(hop.relation)) {
                 // Shared target: drop the link, not the row.
-                if (!isManyToMany(hop.relation)) {
+                if (hop.relation.kind !== "manyToMany") {
                     throw ApiError.badRequest(
-                        `"${collectionPath}" reaches '${hop.targetCollection.slug}' through a multi-hop joinPath, ` +
+                        `"${collectionPath}" reaches '${hop.targetCollection.slug}' through a \`via\` relation, ` +
                         `so there is no single link to remove. Delete the row at "${hop.targetCollection.slug}" ` +
                         "directly if that is what you meant.",
                         "RELATION_NOT_UNLINKABLE"
@@ -334,7 +335,7 @@ export class PersistService {
      * request the framework had just written to.
      *
      * Returns `undefined` when the link is not a column at all (a multi-hop
-     * `joinPath`), so the caller writes the row without stamping anything.
+     * `via`), so the caller writes the row without stamping anything.
      *
      * `relation.localKey` is deliberately not consulted: it names a column on
      * the *source* table. Falling back to it here — which is what this used to
@@ -346,17 +347,17 @@ export class PersistService {
         switch (relation.kind) {
             case "hasOne":
             case "hasMany":
-                return fieldKeyForColumn(hop.targetCollection, relation.foreignKeyOnTarget);
+                return columnKeyOf(hop.target, relation.foreignKey);
 
             case "via":
                 // The link lives in an intermediate table, not in a column on
                 // the target — nothing to stamp.
                 // A step with alternatives names no one column either; a list
                 // of one names its one.
-                return relation.joinPath.length === 1 && joinConditions(relation.joinPath[0]).length === 1
-                    ? fieldKeyForColumn(
-                        hop.targetCollection,
-                        DrizzleConditionBuilder.getColumnNamesFromColumns(joinConditions(relation.joinPath[0])[0].to)[0]
+                return relation.steps.length === 1 && joinConditions(relation.steps[0]).length === 1
+                    ? columnKeyOf(
+                        hop.target,
+                        DrizzleConditionBuilder.getColumnNamesFromColumns(joinConditions(relation.steps[0])[0].to)[0]
                     )
                     : undefined;
 
@@ -415,7 +416,7 @@ export class PersistService {
         // If saving under a nested relation path, resolve the relation it ends in.
         let effectiveCollectionPath = collectionPath;
         const effectiveValues: Partial<M> = { ...values };
-        let junctionTableInfo: { parentCollection: CollectionConfig; parentId: string | number; relation: ResolvedManyToMany; relationKey: string; } | undefined;
+        let junctionTableInfo: Parameters<RelationWriteService["handleJunctionTableCreation"]>[2] | undefined;
 
         const hop = isNestedPath(collectionPath) ? resolveNestedPath(collectionPath, this.registry) : undefined;
 
@@ -428,7 +429,7 @@ export class PersistService {
                 return parseIdValues(hop.parentId, parentPks)[parentPks[0].fieldName];
             };
 
-            if (isManyToMany(hop.relation)) {
+            if (hop.relation.kind === "manyToMany") {
                 // A junction path addresses set membership, so a write through it
                 // asserts "this row is in this parent's set" — on create *and* on
                 // update. The junction row is written after the main write below,
@@ -439,7 +440,7 @@ export class PersistService {
                 // its other parents keep it. That is why linking is safe here
                 // where reparenting (below) is not.
                 junctionTableInfo = {
-                    parentCollection: hop.parentCollection,
+                    parent: hop.parent,
                     parentId: parentIdForWrite(),
                     relation: hop.relation,
                     relationKey: hop.relationKey
@@ -463,8 +464,8 @@ export class PersistService {
                     // `sourceKey` is pointed at a column on the parent row, and
                     // stamping the id would create a child that belongs to
                     // nobody — a row the read path would never return again.
-                    const parentKeyValue = hasForeignKeyOnTarget(hop.relation)
-                        ? await this.relationService.parentKeyValue(hop.parentCollection, hop.relation, hop.parentId)
+                    const parentKeyValue = pointsBack(hop.relation)
+                        ? await this.relationService.parentKeyValue(hop.parent, hop.relation, hop.parentId)
                         : parentIdForWrite();
 
                     if (parentKeyValue === undefined) {
@@ -485,7 +486,7 @@ export class PersistService {
 
         const collection = getCollectionByPath(effectiveCollectionPath, this.registry);
         // Before anything is written or even planned: see the function.
-        assertNoReadOnlyRelationValues(effectiveValues as Record<string, unknown>, collection);
+        assertNoReadOnlyRelationValues(effectiveValues as Record<string, unknown>, this.registry.requireTable(collection.slug));
         const table = getTableForCollection(collection, this.registry);
         const idInfoArray = getPrimaryKeys(collection, this.registry);
         const primaryKeyFields = idInfoArray.map(info => info.fieldName);
@@ -935,7 +936,7 @@ export class PersistService {
         // Each row as `save` would write it, or `undefined` for the batch.
         const prepared: { data: Record<string, unknown>; set: string[]; key: string }[] = [];
         for (const row of rows) {
-            assertNoReadOnlyRelationValues(row.values, collection);
+            assertNoReadOnlyRelationValues(row.values, this.registry.requireTable(collection.slug));
             const { values: plainValues, fieldOps } = splitFieldOps(row.values, this.registry.getTable(collection.slug)?.descriptor);
             if (Object.keys(fieldOps).length > 0) return undefined;
             if (manyRelationKeys.some(key => Object.prototype.hasOwnProperty.call(plainValues, key))) return undefined;
@@ -1102,7 +1103,7 @@ export class PersistService {
 
         const prepared: { key: Record<string, unknown>; data: Record<string, unknown>; columns: string; id: string }[] = [];
         for (const { id, values } of updates) {
-            assertNoReadOnlyRelationValues(values, collection);
+            assertNoReadOnlyRelationValues(values, this.registry.requireTable(collection.slug));
             const { values: plainValues, fieldOps } = splitFieldOps(values, this.registry.getTable(collection.slug)?.descriptor);
             if (Object.keys(fieldOps).length > 0) return undefined;
             if (manyRelationKeys.some(key => Object.prototype.hasOwnProperty.call(plainValues, key))) return undefined;
@@ -1204,7 +1205,7 @@ export class PersistService {
         const collection = getCollectionByPath(collectionPath, this.registry);
         const returning = this.fetchService.insertReturning(collection.slug);
         if (!returning) return undefined;
-        assertNoReadOnlyRelationValues(values, collection);
+        assertNoReadOnlyRelationValues(values, this.registry.requireTable(collection.slug));
         const table = getTableForCollection(collection, this.registry);
         const { values: plainValues, fieldOps } = splitFieldOps(values, this.registry.getTable(collection.slug)?.descriptor);
         const resolvedRelations = resolveCollectionRelations(collection);

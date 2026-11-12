@@ -1,5 +1,5 @@
 import type { CollectionConfig } from "@rebasepro/types";
-import { resolveCollectionRelations } from "@rebasepro/common";
+import { hasMany, relationOfTable } from "./helpers/relation-descriptors";
 import { RelationService } from "../src/services/RelationService";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
@@ -18,12 +18,8 @@ import { textTable } from "./helpers/spg-c-tables";
 describe("RelationService — related rows are addressed by the whole key", () => {
     const registry = new FixtureTableRegistry();
 
-    /** A relation as the service reads it: resolved from the collection. */
-    const link = (collection: CollectionConfig, key: string) => {
-        const resolved = resolveCollectionRelations(collection)[key];
-        if (!resolved) throw new Error(`${collection.slug}.${key} did not resolve`);
-        return resolved;
-    };
+    /** A relation as the service reads it: the descriptor the table compiled to. */
+    const link = (collection: CollectionConfig, key: string) => relationOfTable(registry, collection.slug, key);
 
     // Composite-keyed target: a seat identified by (row, number).
     const seatsCollection: CollectionConfig = {
@@ -172,8 +168,12 @@ isId: true },
         };
 
         beforeEach(() => {
+            // The compiler refuses this relation outright, so the table is
+            // served without it and the descriptor is handed in by hand: what
+            // is under test is the runtime's own refusal behind the compiler's.
+            const { seats: _refusedByTheCompiler, ...servedProperties } = viaSingleFk.properties;
             jest.spyOn(registry, "getCollectionByPath").mockImplementation(path =>
-                path.startsWith("tenant_bookings") ? viaSingleFk : seatsCollection);
+                path.startsWith("tenant_bookings") ? { ...viaSingleFk, properties: servedProperties } : seatsCollection);
             jest.spyOn(registry, "getPgTable").mockImplementation(name => {
                 if (name === "tenant_bookings") return textTable("tenant_bookings", ["tenant_id", "ref"]);
                 if (name === "seats") return textTable("seats", ["seat_row", "seat_number", "booking_id"]);
@@ -190,7 +190,7 @@ isId: true },
                 "tenant_bookings",
                 ["1:::A"],
                 "seats",
-                link(viaSingleFk, "seats")
+                hasMany("seats", "seats", "booking_id")
             )).rejects.toThrow(/single foreign-key column.*composite key|composite key/i);
         });
     });

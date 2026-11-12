@@ -1,9 +1,9 @@
 import { and, asc, count, desc, eq, getTableColumns, getTableName, gt, is, isNotNull, isNull, lt, or, sql, SQL, TableRelationalConfig, TablesRelationalConfig } from "drizzle-orm";
 import { AnyPgColumn, PgTable, PgTimestamp, PgTimestampString } from "drizzle-orm/pg-core";
-import { CollectionConfig, FilterValues, INCLUDE_COUNT_KEY, isPercentileFraction, isPostgresCollectionConfig, JUNCTION_PIVOT_KEY, MAX_INCLUDE_DEPTH, OrderByTuple, ResolvedRelation, LogicalCondition, parseRelationAggregateSort } from "@rebasepro/types";
+import { CollectionConfig, FilterValues, INCLUDE_COUNT_KEY, isPercentileFraction, isPostgresCollectionConfig, JUNCTION_PIVOT_KEY, MAX_INCLUDE_DEPTH, OrderByTuple, type RelationDescriptor, LogicalCondition, parseRelationAggregateSort } from "@rebasepro/types";
 import { isTimeZoneName } from "@rebasepro/types";
 import type { DriverAggregate, DriverAggregateGroup, IncludeSpec, NullsPlacement, ReadOperation, ReadQuery, VectorSearchParams } from "@rebasepro/types";
-import { includableRelationNames, queryableFieldNames, unknownAggregateField, unknownIncludeRelation, unknownOrderByField, unknownProjectionField, resolveCollectionRelations, findRelation, fieldKeyForColumn, createRelationRefWithData, normalizeDriverOrderBy, normalizeInclude, encodeCursor, type IncludeNode, type NormalizedInclude } from "@rebasepro/common";
+import { includableRelations, queryableFieldNames, unknownAggregateField, unknownIncludeRelation, unknownOrderByField, unknownProjectionField, createRelationRefWithData, normalizeDriverOrderBy, normalizeInclude, encodeCursor, type IncludeNode, type NormalizedInclude } from "@rebasepro/common";
 import { generateForeignKeyName, toWireKey } from "@rebasepro/utils";
 import { DrizzleConditionBuilder, getUnknownFilterFieldsMode, listedColumnKeys, type FilterCompilationOptions } from "../utils/drizzle-conditions";
 import { namesHiddenFromCaller } from "./field-viewer";
@@ -119,7 +119,7 @@ export function numericAggregateAliases(
 function assertRelationReadable(
     collection: CollectionConfig,
     key: string,
-    relation: ResolvedRelation,
+    relation: RelationDescriptor,
     use: string
 ): void {
     if (canReadRelation(collection, key, relation)) return;
@@ -312,7 +312,7 @@ export class FetchService {
                 ? {
                     parentSlug: options.relatedTo.parentCollection.slug,
                     parentId: options.relatedTo.parentId,
-                    relationName: options.relatedTo.relation.relationName
+                    relationName: options.relatedTo.relation.name
                 }
                 : undefined
         };
@@ -451,7 +451,7 @@ export class FetchService {
         // the unknown relation it is for this caller.
         const sorted = namesHiddenFromCaller(collection).has(spec.relation)
             ? undefined
-            : findRelation(resolveCollectionRelations(collection), spec.relation);
+            : this.registry.getTable(collection.slug)?.relations.get(spec.relation);
         if (sorted) assertRelationReadable(collection, spec.relation, sorted, "`orderBy`");
         const primaryKeys = getPrimaryKeys(collection, this.registry);
         const idColumn = primaryKeys.length === 1
@@ -599,10 +599,10 @@ target });
         if (direct) return direct;
 
         // Owning relation, resolved: the relation names its own local key.
-        const declaredRelation = collection ? resolveCollectionRelations(collection)[orderBy] : undefined;
+        const declaredRelation = collection ? this.registry.getTable(collection.slug)?.relations.get(orderBy) : undefined;
         if (declaredRelation?.kind === "belongsTo") {
-            // `localKey` is the column; the table is keyed by the wire name.
-            const foreignKey = columnAt(fieldKeyForColumn(collection, declaredRelation.localKey));
+            // `localKey` is the column; the table is keyed by the column's key.
+            const foreignKey = columnAt(declaredRelation.localField);
             if (foreignKey) return foreignKey;
         }
 
@@ -695,28 +695,28 @@ target });
         collection: CollectionConfig,
         tree: Record<string, IncludeNode>,
         wildcard: boolean
-    ): { key: string; node: IncludeNode; relation: ResolvedRelation }[] {
-        const resolvedRelations = resolveCollectionRelations(collection);
-        const out: { key: string; node: IncludeNode; relation: ResolvedRelation }[] = [];
+    ): { key: string; node: IncludeNode; relation: RelationDescriptor }[] {
+        const owner = this.registry.requireTable(collection.slug);
+        const out: { key: string; node: IncludeNode; relation: RelationDescriptor }[] = [];
 
         if (wildcard) {
             // `*` is "every relation, one hop", tab-only relations included.
             // The admin panel names the relations its properties render and
             // sends `*` only when it cannot resolve them in the browser. A
             // relation also named explicitly keeps its options.
-            for (const [key, relation] of Object.entries(resolvedRelations)) {
+            for (const [key, relation] of owner.relations) {
                 out.push({ key, node: tree[key] ?? { children: {} }, relation });
             }
         }
 
         for (const [key, node] of Object.entries(tree)) {
-            if (wildcard && key in resolvedRelations) continue;
-            const relation = resolvedRelations[key];
+            if (wildcard && owner.relations.has(key)) continue;
+            const relation = owner.relations.get(key);
             if (!relation) {
-                // The REST check answers an include of an `excludeFromApi`
-                // relation with the same function, and neither lists one.
+                // The REST check answers an include of a private relation
+                // with the same function, and neither lists one.
                 const answer = unknownIncludeRelation(
-                    key, collection.slug ?? collection.name, includableRelationNames(collection)
+                    key, collection.slug ?? collection.name, includableRelations(owner.descriptor)
                 );
                 throw ApiError.badRequest(answer.message, "UNKNOWN_RELATION", answer.details);
             }
@@ -748,7 +748,7 @@ target });
         for (const { node, relation } of levels) {
             if (Object.keys(node.children).length === 0) continue;
             this.assertIncludeResolvable(
-                relation.target(), { wildcard: false, tree: node.children }, depth + 1
+                getCollectionByPath(relation.target, this.registry), { wildcard: false, tree: node.children }, depth + 1
             );
         }
     }
@@ -790,7 +790,7 @@ target });
      */
     private assertCountsAllowed(
         collection: CollectionConfig,
-        levels: { key: string; node: IncludeNode; relation: ResolvedRelation }[]
+        levels: { key: string; node: IncludeNode; relation: RelationDescriptor }[]
     ): void {
         const counted = levels.filter(({ node }) => node.count);
         if (counted.length === 0) return;
@@ -903,7 +903,9 @@ target });
         const levels = requested.filter(({ key, relation }) => canReadRelation(collection, key, relation));
 
         for (const { key, node, relation } of levels) {
-            const targetCollection = relation.target();
+            // The target's lowered collection, looked up by the relation's
+            // target slug, for the readers still on one (filters, codecs).
+            const targetCollection = getCollectionByPath(relation.target, this.registry);
             // Deliberately unguarded: a `where` inside an include that names a
             // column the target does not have is the caller's mistake, and it
             // is already an ApiError. Anything else is not this loop's to
@@ -1056,7 +1058,7 @@ target });
 
         const keep = new Set(fields);
         if (!distinct) for (const pk of idInfoArray) keep.add(pk.fieldName);
-        const relations = resolveCollectionRelations(collection);
+        const relations = this.registry.getTable(collection.slug)?.relations;
 
         const projection: Record<string, AnyPgColumn> = {};
         for (const name of keep) {
@@ -1068,7 +1070,7 @@ target });
             // A relation is not a column: `include` loads it, and naming it in
             // `fields` too is how a caller says to return it. Read as a typo,
             // `fields=title,author&include=author` was a 400 on every door.
-            if (name in relations) continue;
+            if (relations?.has(name)) continue;
             // The REST check answers an `excludeFromApi` field with the same
             // function, so a hidden field and a typo cannot be told apart.
             const answer = unknownProjectionField(
@@ -1150,7 +1152,7 @@ target });
                 values: related.values
             });
 
-        for (const [key, relation] of Object.entries(resolveCollectionRelations(collection))) {
+        for (const [key, relation] of this.registry.requireTable(collection.slug).relations) {
             try {
                 if (relation.cardinality === "one") {
                     const related = (await this.relationService.batchFetchRelatedEntities(
@@ -1589,10 +1591,11 @@ target });
         if (result.length === 0) return undefined;
 
         const raw = result[0] as M;
-        // Without `db`/`registry`: the parse only types the columns and turns an
-        // owned foreign key into a ref. Given them, it queried each inverse
-        // relation itself, with neither the target's scope nor its soft delete.
-        const values = await parseDataFromServer(raw, collection) as Record<string, unknown>;
+        // Without `db`: the parse only types the columns and turns an owned
+        // foreign key into a ref (the registry names its target). Given `db`,
+        // it queried each inverse relation itself, with neither the target's
+        // scope nor its soft delete.
+        const values = await parseDataFromServer(raw, collection, undefined, this.registry) as Record<string, unknown>;
         await this.loadRelationRefs(values, buildCompositeId(raw, idInfoArray), collection, collectionPath, raw);
 
         // The primary path strips inside `toFlatRow`; this one parses the row
@@ -1712,7 +1715,7 @@ target });
         // per relation per level, avoiding the N+1 that plagued the old path.
         void idInfo;
         const values = await Promise.all(results.map(async (rawRow: Record<string, unknown>) =>
-            await parseDataFromServer(rawRow as M, collection) as Record<string, unknown>));
+            await parseDataFromServer(rawRow as M, collection, undefined, this.registry) as Record<string, unknown>));
 
         // Second pass: the relations the caller named, through the same batched
         // loader every other read uses — so a row from here and a row from the

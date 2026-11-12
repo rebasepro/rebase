@@ -655,7 +655,8 @@ to: "user_profiles.user_id" } }
             };
 
             it("should handle one-to-one owning relation via joinPath on write", async () => {
-                jest.spyOn(collectionRegistry, "getCollectionByPath").mockReturnValue(postsWithAuthorViaJoinPath);
+                jest.spyOn(collectionRegistry, "getCollectionByPath").mockImplementation(path =>
+                    path.startsWith("user_profiles") ? userProfilesCollection : postsWithAuthorViaJoinPath);
                 jest.spyOn(collectionRegistry, "getPgTable").mockImplementation(tableName => {
                     if (tableName === "posts") return mockPostsTable as any;
                     if (tableName === "authors") return mockAuthorsTable as any;
@@ -711,7 +712,8 @@ authorId: 7 }]);
             });
 
             it("applies joinPath updates BEFORE main UPDATE on existing entities to prevent stale data corruption", async () => {
-                jest.spyOn(collectionRegistry, "getCollectionByPath").mockReturnValue(postsWithAuthorViaJoinPath);
+                jest.spyOn(collectionRegistry, "getCollectionByPath").mockImplementation(path =>
+                    path.startsWith("user_profiles") ? userProfilesCollection : postsWithAuthorViaJoinPath);
                 jest.spyOn(collectionRegistry, "getPgTable").mockImplementation(tableName => {
                     if (tableName === "posts") return mockPostsTable as any;
                     if (tableName === "authors") return mockAuthorsTable as any;
@@ -815,7 +817,8 @@ to: "user_profiles.user_id" } }
             };
 
             it("should handle one-to-one inverse relation via joinPath on write", async () => {
-                jest.spyOn(collectionRegistry, "getCollectionByPath").mockReturnValue(authorsWithProfileViaJoinPath);
+                jest.spyOn(collectionRegistry, "getCollectionByPath").mockImplementation(path =>
+                    path.startsWith("user_profiles") ? userProfilesCollection : authorsWithProfileViaJoinPath);
                 jest.spyOn(collectionRegistry, "getPgTable").mockImplementation(tableName => {
                     if (tableName === "authors") return mockAuthorsTable as any;
                     if (tableName === "customers") return mockCustomersTable as any;
@@ -891,7 +894,8 @@ name: "Jane Author" }]);
             };
 
             it("refuses a multi-hop to-one via with 400 RELATION_NOT_WRITABLE", async () => {
-                jest.spyOn(collectionRegistry, "getCollectionByPath").mockReturnValue(postsWithTwoHopProfile);
+                jest.spyOn(collectionRegistry, "getCollectionByPath").mockImplementation(path =>
+                    path.startsWith("user_profiles") ? userProfilesCollection : postsWithTwoHopProfile);
                 await expect(dataService.save("posts_two_hop", { title: "t", authorProfile: "1" }, 1))
                     .rejects.toMatchObject({ code: "RELATION_NOT_WRITABLE", details: { fields: ["authorProfile"] } });
                 expect(db.update).not.toHaveBeenCalled();

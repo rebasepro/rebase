@@ -103,7 +103,7 @@ const categoriesCollection: CollectionConfig = {
 };
 
 const createRegistry = () => {
-    const registry = new FixtureTableRegistry();
+    const registry = new FixtureTableRegistry([postsCollection, categoriesCollection]);
     const tables = {
         posts: postsTable,
         tags: tagsTable,

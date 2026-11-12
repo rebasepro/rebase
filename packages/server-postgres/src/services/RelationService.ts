@@ -1,69 +1,41 @@
-import { and, eq, getTableColumns, inArray, lte, notInArray, or, sql, SQL, getTableName as drizzleTableName } from "drizzle-orm";
+import { and, eq, getTableColumns, inArray, lte, or, sql, SQL } from "drizzle-orm";
 import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 import { DrizzleClient } from "../interfaces";
-import { CollectionConfig, FilterValues, OrderByTuple, ResolvedRelation, ResolvedManyToMany, ResolvedHasMany, ResolvedHasOne } from "@rebasepro/types";
-import { getTableName, getJunctionConfigForRelation, resolveCollectionRelations, findRelation, fieldKeyForColumn } from "@rebasepro/common";
-import { hasForeignKeyOnTarget, isManyToMany, joinConditions, type JoinStep, type ResolvedVia } from "@rebasepro/types";
+import type { CollectionConfig, FilterValues, OrderByTuple, RelationDescriptor } from "@rebasepro/types";
+import { joinConditions, type JoinStep } from "@rebasepro/types";
+import type { RelationOfKind } from "@rebasepro/common";
 import { DrizzleConditionBuilder, joinColumn } from "../utils/drizzle-conditions";
 import {
     getCollectionByPath,
-    getTableForCollection,
-    relationMisconfigured,
-    requirePrimaryKeys,
     parseIdValues,
     buildCompositeId,
-    joinsOnNaturalKey,
     rowIdentityCondition,
     primaryKeyColumns,
-    sourceKeyField,
-    columnNamed,
     type PrimaryKeyInfo
 } from "./collection-helpers";
+import {
+    catalogueTableOf,
+    columnKeyOf,
+    joinsOnNaturalKey,
+    keysOfTable,
+    pointsBack,
+    relationTarget,
+    requireRelation,
+    sourceKeyField,
+    type PointsBackRelation
+} from "./relation-tables";
+import type { RuntimeTable } from "../model/runtime-table";
 import { parseDataFromServer } from "../data-transformer";
 import { stripUnreadable, toRestRow } from "./row-pipeline";
 import { hiddenColumnsOption } from "../schema/search-column";
 import { PostgresTableRegistry } from "../model/PostgresTableRegistry";
-import { ApiError, logger } from "@rebasepro/server";
 import type { NestedPathHop } from "./nested-path";
-import { bindThroughJunction } from "./junction-writes";
+import { bindThroughJunction, readPivotColumns } from "./junction-writes";
 // A soft-deleted row must not come back through a relation either: a deleted
 // comment reappearing under its post is the same bug as one reappearing in the
 // listing. See `soft-delete.ts`.
 import { andSoftDelete, softDeleteCondition } from "./soft-delete";
 import { beforeQueryCondition, type ReadCallContextProvider } from "./read-scope";
-
-/**
- * The ids in a to-many relation write, whatever shape the caller sent.
- *
- * A membership list is written as either the related rows (`[{ id: 1 }]`, what
- * the admin UI sends back after reading them) or as bare keys (`[1]`, `["t-1"]`,
- * what anyone writing the API by hand sends). Only the first was read, via a
- * blind `.map(rel => rel.id)`, and a bare key therefore became `undefined`:
- * on a numeric-keyed target that surfaced as `Invalid numeric ID: undefined`,
- * and on a string-keyed one it did not surface at all — `String(undefined)`
- * wrote a junction row pointing at the literal `"undefined"`, which no read
- * would ever match. Both shapes are accepted here, in one place, because both
- * call sites had the same assumption.
- *
- * An element that carries no key is refused rather than skipped: dropping it
- * would silently write a shorter membership list than the caller asked for.
- */
-function relationTargetIds(value: unknown, relationName: string, collectionSlug: string): (string | number)[] {
-    if (!Array.isArray(value)) return [];
-
-    return value.map((element, index) => {
-        if (typeof element === "string" || typeof element === "number") return element;
-        if (element && typeof element === "object") {
-            const id = (element as { id?: unknown }).id;
-            if (typeof id === "string" || typeof id === "number") return id;
-        }
-        throw new Error(
-            `Cannot write relation "${relationName}" on "${collectionSlug}": element ${index} carries no id. ` +
-            "Pass either the related rows (`[{ id: … }]`) or their keys (`[1, 2]`), not " +
-            `${element === null ? "null" : typeof element}.`
-        );
-    });
-}
 
 /**
  * Typed wrapper for Drizzle dynamic query innerJoin.
@@ -278,32 +250,8 @@ function recordTotal(window: RelatedRowWindow | undefined, parentId: string, row
 }
 
 /**
- * The registry has no table for a collection a relation just asked about.
- *
- * "Parent table not found" was the whole message, four times over, and it names
- * neither the collection nor the table nor anything to do next. The state it
- * reports is a real one with two distinct causes worth telling apart, so the
- * message names both: the collection was never registered (its file is not
- * exported from `config/collections/index.ts`, so the driver never saw it), or
- * the generated schema has no such table (the collection is declared and
- * `schema.generated.ts` predates it).
- */
-function unregisteredTable(collectionSlug: string, table: string, role: string): Error {
-    return new Error(
-        `No registered table "${table}" for the ${role} collection "${collectionSlug}". ` +
-        "Either the collection is not exported from config/collections/index.ts, so this driver " +
-        "never registered it, or the generated Drizzle schema predates it — run " +
-        "`rebase schema generate` and restart."
-    );
-}
-
-/**
- * Service for handling all relation-related operations.
- * Handles fetching, updating, and managing row relations.
- */
-/**
  * A related record resolved by {@link RelationService}: the target row's
- * values plus the identity (`id`) and originating collection (`path`)
+ * values plus the identity (`id`) and originating table (`path`, its slug)
  * needed to build relation references. Internal to the postgres driver —
  * flattened to plain rows at the fetch-service boundary.
  */
@@ -312,9 +260,9 @@ export interface RelatedRow<M extends Record<string, unknown> = Record<string, u
     path: string;
     values: M;
     /**
-     * The junction row's own columns, for a `manyToMany` whose `through`
-     * declares `properties`. Absent for every other relation kind and for a
-     * junction that carries nothing but its two keys.
+     * The link's own columns, for a `manyToMany` that declares a `pivot`.
+     * Absent for every other relation kind and for a junction that carries
+     * nothing but its two keys.
      *
      * Kept beside `values` rather than merged into them, because it is not the
      * target's data: two posts sharing a tag see the same tag row and different
@@ -322,6 +270,38 @@ export interface RelatedRow<M extends Record<string, unknown> = Record<string, u
      * {@link JUNCTION_PIVOT_KEY}.
      */
     pivot?: Record<string, unknown>;
+}
+
+/**
+ * The two ends of one relation read, resolved once: the parent and target
+ * runtime tables, the catalogue tables statements are built on, and the key
+ * columns rows are addressed by.
+ */
+interface RelationEnds {
+    parent: RuntimeTable;
+    parentTable: PgTable;
+    parentPks: PrimaryKeyInfo[];
+    parentIdCol: AnyPgColumn;
+    target: RuntimeTable;
+    targetTable: PgTable;
+    targetPks: PrimaryKeyInfo[];
+    targetIdField: AnyPgColumn;
+    /**
+     * The target's lowered collection, for the subsystems that still render a
+     * row from one (the view-model codec, the field strip, `beforeQuery`).
+     * Looked up by the target's slug — never through the relation.
+     */
+    targetCollection: CollectionConfig;
+}
+
+/** The row a joined select keyed under `table`, or the row itself for a plain select. */
+function rowOf(row: Record<string, unknown>, table: string): Record<string, unknown> {
+    return (row[table] as Record<string, unknown> | undefined) || row;
+}
+
+/** The last table a `via` chain reaches: the target's, as the chain names it. */
+function viaEndTable(relation: RelationOfKind<"via">): string {
+    return relation.steps[relation.steps.length - 1].table;
 }
 
 export class RelationService {
@@ -337,14 +317,38 @@ export class RelationService {
         private callContext?: ReadCallContextProvider
     ) { }
 
+    /** The runtime table a parent path names (`getCollectionByPath` resolves aliases and reports unknown paths). */
+    private tableAt(path: string): RuntimeTable {
+        return this.registry.requireTable(getCollectionByPath(path, this.registry).slug);
+    }
+
+    private ends(parent: RuntimeTable, relation: RelationDescriptor): RelationEnds {
+        const target = relationTarget(this.registry, relation);
+        const targetTable = catalogueTableOf(this.registry, target);
+        const targetPks = keysOfTable(this.registry, target);
+        const parentTable = catalogueTableOf(this.registry, parent);
+        const parentPks = keysOfTable(this.registry, parent);
+        return {
+            parent,
+            parentTable,
+            parentPks,
+            parentIdCol: parentTable[parentPks[0].fieldName as keyof typeof parentTable] as AnyPgColumn,
+            target,
+            targetTable,
+            targetPks,
+            targetIdField: targetTable[targetPks[0].fieldName as keyof typeof targetTable] as AnyPgColumn,
+            targetCollection: getCollectionByPath(target.slug, this.registry)
+        };
+    }
+
     /**
-     * The **target** collection's `beforeQuery` narrowing, for rows reached
+     * The **target** table's `beforeQuery` narrowing, for rows reached
      * through a relation.
      *
      * The target's, not the parent's, because these are the target's rows: a
      * scope on `comments` has to hold whether they are listed at
      * `/comments` or loaded as `post.comments`. Without this an `include` is a
-     * way around every row filter a collection declares — the exact hole
+     * way around every row filter a table declares — the exact hole
      * `stripUnreadable` was once missing from the relation-ref branch.
      *
      * Folded into the `narrow` condition the loaders already thread through
@@ -352,24 +356,25 @@ export class RelationService {
      * dynamic relation builder all apply it or none of them do.
      */
     private narrowTargetRead(
-        parentCollection: CollectionConfig,
-        relation: ResolvedRelation,
+        parent: RuntimeTable,
+        relation: RelationDescriptor,
         parentId?: string | number
     ): Promise<SQL | undefined> {
-        const targetCollection = relation.target();
-        const targetTable = getTableForCollection(targetCollection, this.registry);
+        const target = relationTarget(this.registry, relation);
+        const targetCollection = getCollectionByPath(target.slug, this.registry);
+        const targetTable = catalogueTableOf(this.registry, target);
         return beforeQueryCondition(
             { registry: this.registry, callContext: this.callContext },
             targetCollection,
-            targetCollection.slug,
+            target.slug,
             targetTable as PgTable<never>,
             {
                 operation: "relation",
                 query: {
                     relatedTo: {
-                        parentSlug: parentCollection.slug,
+                        parentSlug: parent.slug,
                         parentId,
-                        relationName: relation.relationName
+                        relationName: relation.name
                     }
                 }
             },
@@ -388,32 +393,26 @@ export class RelationService {
      * back the list they were shown unlinks every row they were not.
      */
     async visibleTargetCondition(
-        parentCollection: CollectionConfig,
-        relation: ResolvedRelation,
+        parent: RuntimeTable,
+        relation: RelationDescriptor,
         parentId?: string | number
     ): Promise<SQL | undefined> {
-        const targetCollection = relation.target();
-        const targetTable = getTableForCollection(targetCollection, this.registry);
+        const target = relationTarget(this.registry, relation);
         return andSoftDelete(
-            await this.narrowTargetRead(parentCollection, relation, parentId),
-            this.registry.requireTable(targetCollection.slug),
-            targetTable
+            await this.narrowTargetRead(parent, relation, parentId),
+            target,
+            catalogueTableOf(this.registry, target)
         );
     }
 
     /**
      * One target row, as the {@link RelatedRow} everything here returns.
      *
-     * Eight sites built this by hand, which is how the address came to be the
-     * target's first key column in all eight — one edit, eight places to miss.
-     *
-     * `resolveNested` is the one thing they did not agree on, and the
-     * disagreement was invisible: the single-parent fetches pass `db` and
-     * `registry` to `parseDataFromServer`, so the target's *own* relations get
-     * resolved too, while the batch paths deliberately do not — a query per
-     * target row is the N+1 the batching exists to avoid. Naming the parameter
-     * makes that a decision rather than a difference between two call sites
-     * nobody was comparing.
+     * `resolveNested` is the one thing the call sites do not agree on, and on
+     * purpose: the single-parent fetches pass `db` and `registry` to
+     * `parseDataFromServer`, so the target's *own* relations get resolved too,
+     * while the batch paths deliberately do not — a query per target row is
+     * the N+1 the batching exists to avoid.
      */
     private async toRelatedRow<M extends Record<string, unknown>>(
         targetRow: Record<string, unknown>,
@@ -431,15 +430,11 @@ export class RelationService {
         } else {
             values = options?.resolveNested
                 ? await parseDataFromServer(targetRow, targetCollection, this.db, this.registry)
-                : await parseDataFromServer(targetRow, targetCollection);
+                : await parseDataFromServer(targetRow, targetCollection, undefined, this.registry);
 
             // The target's OWN exclusions, applied to the target's own columns.
-            // This is the second rendering of a relation target (row-pipeline's
-            // `renderTarget` is the first) and it reached the same clients by a
-            // different route: WebSocket fetches and every realtime frame come
-            // through here. REST was clean and `.listen()` was not, which is the
-            // worst version of this to have — the leak is invisible from the surface
-            // people test.
+            // WebSocket fetches and every realtime frame come through here, so
+            // a leak here is invisible from the REST surface people test.
             stripUnreadable(values, targetCollection);
         }
 
@@ -459,12 +454,6 @@ export class RelationService {
      * never selects — a generated search vector — are dropped first; then
      * `toRestRow` renders the rest, which applies the target's field access.
      * Built once per batch: the hidden set is a property of the table.
-     *
-     * It replaces a second pass. An include used to render each target row as
-     * the admin's view model (`parseDataFromServer`, which also minted a
-     * `{ __type: "relation" }` ref for the target's own to-one relations) and
-     * then re-render that for REST: 3.4 µs a row against 1.4 µs for the row
-     * itself, and an envelope in a response whose contract has none.
      */
     private restRendering(
         targetCollection: CollectionConfig,
@@ -480,41 +469,12 @@ export class RelationService {
     }
 
     /**
-     * The junction row's own columns, as the caller may see them.
-     *
-     * Read through the same two steps the target's columns go through:
-     * `parseDataFromServer` gives the declared type (a `date` is a Date, a
-     * NUMERIC is a number) and `stripUnreadable` drops what this caller may not
-     * read. The second is the point — `access.read: ["hr"]` on a payload
-     * property has to mean the same thing it means on a collection's, and the
-     * synthetic junction config carries the property verbatim, so the same
-     * `effectiveAccess` answers both.
-     *
-     * Only the payload keys: the two foreign keys are the link's identity, and
-     * the caller already has both — one is the row they asked from, the other
-     * is the target's own id.
-     */
-    private async readPivot(
-        junctionRow: Record<string, unknown>,
-        junctionConfig: CollectionConfig,
-        payloadKeys: string[]
-    ): Promise<Record<string, unknown>> {
-        const raw: Record<string, unknown> = {};
-        for (const key of payloadKeys) {
-            if (key in junctionRow) raw[key] = junctionRow[key];
-        }
-        const parsed = await parseDataFromServer(raw, junctionConfig) as Record<string, unknown>;
-        return stripUnreadable(parsed, junctionConfig);
-    }
-
-    /**
      * A WHERE matching any of `parentIds`, by the whole key.
      *
      * A single key is an `IN (…)`. A composite one cannot be: matching
      * `tenant_id IN (1, 1)` collects every row of tenant 1, so two parents that
      * share their first column each receive the other's relations. It becomes
-     * an OR of ANDs — one exact address per parent — which Postgres indexes the
-     * same way it would a multi-column key lookup.
+     * an OR of ANDs — one exact address per parent.
      */
     private parentKeyCondition(
         parentTable: PgTable,
@@ -542,32 +502,49 @@ export class RelationService {
     /**
      * Reject a relation that cannot express a composite-keyed parent.
      *
-     * `localKey` and `foreignKeyOnTarget` are single column names: one column
-     * cannot reference a two-column key, so such a relation has no correct
-     * reading. Left alone it would silently match on the first key column and
-     * hand a tenant's rows to its neighbour — say so instead.
+     * `localKey` and `foreignKey` are single column names: one column cannot
+     * reference a two-column key, so such a relation has no correct reading.
+     * Left alone it would silently match on the first key column and hand a
+     * tenant's rows to its neighbour — say so instead.
      */
     private assertSingleKeyAddressable(
-        parentCollection: CollectionConfig,
+        parent: RuntimeTable,
         parentPks: PrimaryKeyInfo[],
         via: string,
-        relation?: ResolvedRelation
+        relation?: RelationDescriptor
     ): void {
         // A `sourceKey` names the single column the link actually points at, so
         // the parent's key can be as wide as it likes — nothing here references
-        // it. That is the one way out of this error, and the message below now
-        // has to say so.
-        if (relation && hasForeignKeyOnTarget(relation) && relation.sourceKey) return;
+        // it. That is the one way out of this error, and the message says so.
+        if (relation && pointsBack(relation) && relation.sourceKey) return;
 
         if (parentPks.length > 1) {
             throw new Error(
-                `Relation on '${parentCollection.slug}' uses '${via}', a single foreign-key column, but ` +
-                `'${parentCollection.slug}' is keyed on ${parentPks.map(k => `'${k.fieldName}'`).join(" + ")}. ` +
+                `Relation on '${parent.slug}' uses '${via}', a single foreign-key column, but ` +
+                `'${parent.slug}' is keyed on ${parentPks.map(k => `'${k.fieldName}'`).join(" + ")}. ` +
                 `One column cannot reference a composite key — give the relation a \`sourceKey\` naming ` +
-                `a single unique column to point at, or express it with \`joinPath\`, whose ` +
+                `a single unique column to point at, or declare it with \`rel.via\`, whose steps' ` +
                 `\`on.from\`/\`on.to\` take every key column.`
             );
         }
+    }
+
+    /**
+     * The value a related row's foreign key must hold to belong to this parent.
+     *
+     * `undefined` when the parent's source key is null — which is not an error
+     * here, only in the callers that were about to write it. Exposed for
+     * {@link PersistService}, which stamps this onto a child created under a
+     * nested path and would otherwise write the id and lose the row.
+     */
+    async parentKeyValue(
+        parent: RuntimeTable,
+        relation: PointsBackRelation,
+        parentId: string | number,
+        db: DrizzleClient = this.db
+    ): Promise<string | number | undefined> {
+        const { keyByParentId } = await this.resolveSourceKeys(parent, relation, [parentId], db);
+        return keyByParentId.get(String(parentId));
     }
 
     /**
@@ -578,36 +555,14 @@ export class RelationService {
      * between them lives in the source table — so it costs one SELECT, issued
      * once for the whole batch rather than per parent.
      *
-     * Both directions come back because both are needed and deriving one from
-     * the other by hand is how a batch loader ends up attributing a child to the
-     * wrong parent: reads translate id → key to build the WHERE, and then
-     * translate key → id to attribute each row that comes back.
-     */
-    /**
-     * The value a related row's foreign key must hold to belong to this parent.
-     *
-     * `undefined` when the parent's source key is null — which is not an error
-     * here, only in the callers that were about to write it. Exposed for
-     * {@link PersistService}, which stamps this onto a child created under a
-     * nested path and would otherwise write the id and lose the row.
-     */
-    async parentKeyValue(
-        parentCollection: CollectionConfig,
-        relation: ResolvedHasOne | ResolvedHasMany,
-        parentId: string | number,
-        db: DrizzleClient = this.db
-    ): Promise<string | number | undefined> {
-        const { keyByParentId } = await this.resolveSourceKeys(parentCollection, relation, [parentId], db);
-        return keyByParentId.get(String(parentId));
-    }
-
-    /**
-     * Shared with {@link RelationWriteService}: a write needs the same source
-     * key a read does, and resolving it twice is how the two would disagree.
+     * Both directions come back because both are needed: reads translate id →
+     * key to build the WHERE, and then key → id to attribute each row that
+     * comes back. Shared with {@link RelationWriteService}: a write needs the
+     * same source key a read does.
      */
     async resolveSourceKeys(
-        parentCollection: CollectionConfig,
-        relation: ResolvedHasOne | ResolvedHasMany,
+        parent: RuntimeTable,
+        relation: PointsBackRelation,
         parentIds: (string | number)[],
         // Writes pass their transaction: reading the source key on the pool
         // while the same transaction is holding an uncommitted change to it
@@ -617,9 +572,9 @@ export class RelationService {
         const keyByParentId = new Map<string, string | number>();
         const parentIdByKey = new Map<string, string | number>();
 
-        const parentPks = requirePrimaryKeys(parentCollection, this.registry);
+        const parentPks = keysOfTable(this.registry, parent);
 
-        if (!joinsOnNaturalKey(relation, parentCollection, this.registry)) {
+        if (!joinsOnNaturalKey(this.registry, parent, relation)) {
             // The ordinary case, and it must stay free of a round-trip: the
             // key IS the id. Parsed, not passed through — an id arrives as the
             // string from a URL, and comparing "7" against an integer column is
@@ -632,13 +587,13 @@ export class RelationService {
             return { keyByParentId, parentIdByKey };
         }
 
-        const field = sourceKeyField(relation, parentCollection, this.registry);
-        const parentTable = getTableForCollection(parentCollection, this.registry);
+        const field = sourceKeyField(this.registry, parent, relation);
+        const parentTable = catalogueTableOf(this.registry, parent);
         const keyColumn = parentTable[field as keyof typeof parentTable] as AnyPgColumn;
         if (!keyColumn) {
             throw new Error(
-                `\`sourceKey: "${field}"\` on relation '${relation.relationName}' is not a column on ` +
-                `'${parentCollection.slug}'. It names a column on the source table, not on the target.`
+                `\`sourceKey: "${relation.sourceKey}"\` on relation '${relation.name}' is not a column on ` +
+                `'${parent.slug}'. It names a column on the source table, not on the target.`
             );
         }
 
@@ -658,8 +613,8 @@ export class RelationService {
             const existing = parentIdByKey.get(String(keyValue));
             if (existing !== undefined && String(existing) !== String(parentId)) {
                 throw new Error(
-                    `\`sourceKey: "${field}"\` on relation '${relation.relationName}' is not unique on ` +
-                    `'${parentCollection.slug}': rows '${existing}' and '${parentId}' both hold ` +
+                    `\`sourceKey: "${relation.sourceKey}"\` on relation '${relation.name}' is not unique on ` +
+                    `'${parent.slug}': rows '${existing}' and '${parentId}' both hold ` +
                     `'${keyValue}'. Add a unique constraint — a link that addresses more than one source ` +
                     `row cannot say which one a related row belongs to.`
                 );
@@ -671,7 +626,8 @@ export class RelationService {
     }
 
     /**
-     * Fetch rows related to a parent row through a specific relation
+     * Fetch rows related to a parent row through a specific relation.
+     * A relation the table does not declare is a 404 `UNKNOWN_RELATION`.
      */
     async fetchRelatedEntities<M extends Record<string, unknown>>(
         parentCollectionPath: string,
@@ -687,38 +643,17 @@ export class RelationService {
             databaseId?: string;
         } = {}
     ): Promise<RelatedRow<M>[]> {
-        const parentCollection = getCollectionByPath(parentCollectionPath, this.registry);
-        const resolvedRelations = resolveCollectionRelations(parentCollection);
-        const relation = findRelation(resolvedRelations, relationKey);
-
-        if (!relation) {
-            const available = Object.keys(resolvedRelations).join(", ") || "(none)";
-            // A path segment naming a relation the collection does not declare
-            // is a bad URL, not a server fault. It answered 500 INTERNAL_ERROR,
-            // which tells the caller to retry or report an outage over a
-            // request that will never succeed — and buries a message that
-            // already says exactly what is wrong.
-            //
-            // 404, like an unknown collection: the URL names nothing. The
-            // available relations stay in the message because reaching this
-            // point means the caller could already read the parent collection,
-            // and `?include=` would list the same names.
-            throw ApiError.notFound(
-                `Relation '${relationKey}' not found in table '${parentCollectionPath}'. Available relations: [${available}]`,
-                "UNKNOWN_RELATION"
-            );
-        }
-
-        return this.fetchEntitiesUsingJoins<M>(parentCollection, parentId, relation, options);
+        const parent = this.tableAt(parentCollectionPath);
+        return this.fetchEntitiesUsingJoins<M>(parent, parentId, requireRelation(parent, relationKey), options);
     }
 
     /**
-     * Fetch rows using join paths for complex relations
+     * Fetch the rows one parent reaches through `relation`.
      */
     async fetchEntitiesUsingJoins<M extends Record<string, unknown>>(
-        parentCollection: CollectionConfig,
+        parent: RuntimeTable,
         parentId: string | number,
-        relation: ResolvedRelation,
+        relation: RelationDescriptor,
         options: {
             filter?: FilterValues<Extract<keyof M, string>>;
             orderBy?: string | OrderByTuple[];
@@ -729,33 +664,18 @@ export class RelationService {
             databaseId?: string;
         } = {}
     ): Promise<RelatedRow<M>[]> {
-        const targetCollection = relation.target();
-        const targetTable = getTableForCollection(targetCollection, this.registry);
-        const idInfo = requirePrimaryKeys(targetCollection, this.registry);
-        const idField = targetTable[idInfo[0].fieldName as keyof typeof targetTable] as AnyPgColumn;
+        const { target, targetTable, targetPks, targetIdField, targetCollection, parentTable, parentPks, parentIdCol } = this.ends(parent, relation);
+        const parsedParentId = parseIdValues(parentId, parentPks)[parentPks[0].fieldName];
 
-        const parentPks = requirePrimaryKeys(parentCollection, this.registry);
-        const parentIdInfo = parentPks[0];
-        const parsedParentIdObj = parseIdValues(parentId, parentPks);
-        const parsedParentId = parsedParentIdObj[parentIdInfo.fieldName];
-        const parentTableName = getTableName(parentCollection);
-        const parentTable = this.registry.getPgTable(parentTableName);
-        if (!parentTable) throw unregisteredTable(parentCollection.slug, parentTableName, "parent");
-        const parentIdCol = parentTable[parentIdInfo.fieldName as keyof typeof parentTable] as AnyPgColumn;
+        // The target table's `beforeQuery`, resolved before either branch
+        // builds a WHERE, so a scope applied in one branch is applied in both.
+        const relatedNarrowing = await this.narrowTargetRead(parent, relation, parentId);
 
-        // The target collection's `beforeQuery`, resolved before either branch
-        // builds a WHERE. `via` used to be the branch that carried none of the
-        // conditions the other one does, so a scope applied there and not here
-        // would be a read-only relation kind that answers with every row.
-        const relatedNarrowing = await this.narrowTargetRead(parentCollection, relation, parentId);
-
-        // Handle join path relations
         if (relation.kind === "via") {
             let query = this.db.select().from(parentTable).$dynamic();
             let currentTable = parentTable;
 
-            // Apply each join in the path
-            for (const join of relation.joinPath) {
+            for (const join of relation.steps) {
                 const joinTable = this.registry.getPgTable(join.table);
                 if (!joinTable) {
                     throw new Error(`Join table not found: ${join.table}`);
@@ -770,15 +690,12 @@ export class RelationService {
                 currentTable = joinTable;
             }
 
-            // The parent row by every key column — the join starts at the
-            // parent's own table, so a condition on the first column alone
-            // reads the related rows of every parent that shares it — and the
-            // target's own soft delete beside its scope: the other branch below
-            // carries both, and a join path is only another way to reach the
-            // same rows.
+            // The parent row by every key column — a condition on the first
+            // column alone reads the related rows of every parent that shares
+            // it — and the target's own soft delete beside its scope.
             query = query.where(narrowed(
-                rowIdentityCondition(parentTable, parentPks, parentId, parentCollection.slug),
-                andSoftDelete(relatedNarrowing, this.registry.requireTable(targetCollection.slug), targetTable)
+                rowIdentityCondition(parentTable, parentPks, parentId, parent.slug),
+                andSoftDelete(relatedNarrowing, target, targetTable)
             ));
 
             if (options.limit) {
@@ -786,26 +703,21 @@ export class RelationService {
             }
 
             const results = await query;
-            const targetTableName = relation.joinPath[relation.joinPath.length - 1].table;
+            const targetTableName = viaEndTable(relation);
 
-            // Process results
             const rows: RelatedRow<M>[] = [];
             for (const row of results as Array<Record<string, unknown>>) {
-                const targetRow = (row[targetTableName] as Record<string, unknown>) || row;
-                rows.push(await this.toRelatedRow<M>(targetRow, targetCollection, idInfo, { resolveNested: true }));
+                rows.push(await this.toRelatedRow<M>(rowOf(row, targetTableName), targetCollection, targetPks, { resolveNested: true }));
             }
 
             return rows;
         }
 
-        // Handle other relation types.
-        //
         // The query builder compares the target's foreign key against a value,
         // and for a link on a natural key that value is not the id in the URL.
-        // Resolved first, before anything is built, so a parent that reaches
-        // nothing costs one statement rather than two.
-        const matchValue = hasForeignKeyOnTarget(relation)
-            ? (await this.resolveSourceKeys(parentCollection, relation, [parentId]))
+        // Resolved first, so a parent that reaches nothing costs one statement.
+        const matchValue = pointsBack(relation)
+            ? (await this.resolveSourceKeys(parent, relation, [parentId]))
                 .keyByParentId.get(String(parentId))
             : parsedParentId;
 
@@ -815,18 +727,14 @@ export class RelationService {
 
         let query = this.db.select().from(targetTable).$dynamic();
 
-        // Build additional filter conditions
         const additionalFilters: SQL[] = [];
 
-        // Soft delete on the *target*: the rows being loaded belong to the
-        // target collection, so it is that collection's flag that decides.
-        const relatedSoftDelete = softDeleteCondition(this.registry.requireTable(targetCollection.slug), targetTable);
+        // Soft delete and `beforeQuery` on the *target*: the rows being loaded
+        // belong to the target table, so it is that table's rules that decide.
+        const relatedSoftDelete = softDeleteCondition(target, targetTable);
         if (relatedSoftDelete) additionalFilters.push(relatedSoftDelete);
-
-        // And the target's `beforeQuery`, for the same reason.
         if (relatedNarrowing) additionalFilters.push(relatedNarrowing);
 
-        // Handle search conditions if searchString is provided
         if (options.searchString) {
             const searchConditions = DrizzleConditionBuilder.buildSearchConditions(
                 options.searchString,
@@ -845,7 +753,6 @@ export class RelationService {
             }
         }
 
-        // Use unified relation query builder
         query = applyDynamicRelationQuery(
             query,
             query,
@@ -854,7 +761,7 @@ export class RelationService {
             targetTable,
             parentTable,
             parentIdCol,
-            idField,
+            targetIdField,
             this.registry,
             additionalFilters
         );
@@ -864,52 +771,30 @@ export class RelationService {
         }
 
         const results = await query;
-
-        // Process results - ensure results is iterable
         if (!results || !Array.isArray(results)) {
             return [];
         }
 
         const rows: RelatedRow<M>[] = [];
-        for (const row of results) {
-            const targetRow = row[getTableName(targetCollection)] || row;
-            rows.push(await this.toRelatedRow<M>(targetRow as Record<string, unknown>, targetCollection, idInfo, { resolveNested: true }));
+        for (const row of results as Array<Record<string, unknown>>) {
+            rows.push(await this.toRelatedRow<M>(rowOf(row, target.descriptor.table), targetCollection, targetPks, { resolveNested: true }));
         }
 
         return rows;
     }
 
     /**
-     * Count related rows for a parent row
+     * Count related rows for a parent row.
+     * A relation the table does not declare is a 404 `UNKNOWN_RELATION`.
      */
     async countRelatedEntities<M extends Record<string, unknown>>(
         parentCollectionPath: string,
         parentId: string | number,
         relationKey: string,
-        options: { filter?: FilterValues<Extract<keyof M, string>>; databaseId?: string } = {}
+        _options: { filter?: FilterValues<Extract<keyof M, string>>; databaseId?: string } = {}
     ): Promise<number> {
-        const parentCollection = getCollectionByPath(parentCollectionPath, this.registry);
-        const resolvedRelations = resolveCollectionRelations(parentCollection);
-        const relation = findRelation(resolvedRelations, relationKey);
-        if (!relation) {
-            const available = Object.keys(resolvedRelations).join(", ") || "(none)";
-            // A path segment naming a relation the collection does not declare
-            // is a bad URL, not a server fault. It answered 500 INTERNAL_ERROR,
-            // which tells the caller to retry or report an outage over a
-            // request that will never succeed — and buries a message that
-            // already says exactly what is wrong.
-            //
-            // 404, like an unknown collection: the URL names nothing. The
-            // available relations stay in the message because reaching this
-            // point means the caller could already read the parent collection,
-            // and `?include=` would list the same names.
-            throw ApiError.notFound(
-                `Relation '${relationKey}' not found in table '${parentCollectionPath}'. Available relations: [${available}]`,
-                "UNKNOWN_RELATION"
-            );
-        }
-
-        return this.countRelatedRows(parentCollection, parentId, relation, []);
+        const parent = this.tableAt(parentCollectionPath);
+        return this.countRelatedRows(parent, parentId, requireRelation(parent, relationKey), []);
     }
 
     /**
@@ -922,72 +807,46 @@ export class RelationService {
      * be free to disagree with the listing it is supposed to gate.
      */
     private async countRelatedRows(
-        parentCollection: CollectionConfig,
+        parent: RuntimeTable,
         parentId: string | number,
-        relation: ResolvedRelation,
+        relation: RelationDescriptor,
         additionalFilters: SQL[]
     ): Promise<number> {
-        const targetCollection = relation.target();
-        const targetTable = getTableForCollection(targetCollection, this.registry);
-        const targetPks = requirePrimaryKeys(targetCollection, this.registry);
-        const targetIdInfo = targetPks[0];
-        const targetIdField = targetTable[targetIdInfo.fieldName as keyof typeof targetTable] as AnyPgColumn;
-
-        const parentPks = requirePrimaryKeys(parentCollection, this.registry);
-        const parentIdInfo = parentPks[0];
+        const { target, targetTable, targetIdField, parentTable, parentPks, parentIdCol } = this.ends(parent, relation);
         const parsedParentIdObj = parseIdValues(parentId, parentPks);
-        const parsedParentId = parsedParentIdObj[parentIdInfo.fieldName];
-        const parentTableName = getTableName(parentCollection);
-        const parentTable = this.registry.getPgTable(parentTableName);
-        if (!parentTable) throw unregisteredTable(parentCollection.slug, parentTableName, "parent");
-        const parentIdCol = parentTable[parentIdInfo.fieldName as keyof typeof parentTable] as AnyPgColumn;
+        const parsedParentId = parsedParentIdObj[parentPks[0].fieldName];
 
         // Same translation the listing does, and it has to be: `isRelated`
         // gates writes on this count, so a count built from a different value
         // than the read would authorise rows the read never returned.
-        const matchValue = hasForeignKeyOnTarget(relation)
-            ? (await this.resolveSourceKeys(parentCollection, relation, [parentId]))
+        const matchValue = pointsBack(relation)
+            ? (await this.resolveSourceKeys(parent, relation, [parentId]))
                 .keyByParentId.get(String(parentId))
             : parsedParentId;
 
         if (matchValue === undefined) return 0;
 
-        // Soft delete, so a relation's count agrees with what loading it
-        // returns — `isRelated` gates writes on this number.
-        const countSoftDelete = softDeleteCondition(this.registry.requireTable(targetCollection.slug), targetTable);
+        // Soft delete and `beforeQuery`, so a relation's count agrees with what
+        // loading it returns — `isRelated` gates reads, updates and deletes at
+        // a nested address on this number.
+        const countSoftDelete = softDeleteCondition(target, targetTable);
         if (countSoftDelete) additionalFilters = [...additionalFilters, countSoftDelete];
-
-        // The target's `beforeQuery`, so the count and the listing describe the
-        // same rows. `isRelated` gates reads, updates and deletes at a nested
-        // address on this number, so a count that saw rows the listing does not
-        // would authorise a write to a row the caller cannot read.
-        const countNarrowing = await this.narrowTargetRead(parentCollection, relation, parentId);
+        const countNarrowing = await this.narrowTargetRead(parent, relation, parentId);
         if (countNarrowing) additionalFilters = [...additionalFilters, countNarrowing];
 
-        // Start count with distinct to avoid duplicates from junction tables
+        // Distinct, to avoid duplicates from junction tables
         let query = this.db.select({ count: sql<number>`count(distinct ${targetIdField})` }).from(targetTable).$dynamic();
 
         // Every `via` is counted through the scope condition a nested listing
         // filters by, so the count and the listing are one condition rather
-        // than two that have to agree.
-        //
-        // The join-path count `buildRelationCountQuery` builds is not that
-        // condition. It joins each step on its first column pair and matches
-        // the parent on its first key column, so for a parent keyed on several
-        // columns it counted the rows every parent sharing that column reaches
-        // — `isRelated` would authorise a write through `1:::en_US` to a row
-        // only `1:::de_DE` reaches. And it looks a step's columns up by the
-        // Drizzle property key, where a step names the SQL column: on a
-        // generated schema (`orderId: uuid("order_id")`) every count threw
-        // "Join columns not found", and since `isRelated` gates every read at a
-        // nested address, an order opened from a product's Orders tab failed to
-        // load while the tab listed it fine.
+        // than two that have to agree — matched on every key column of the
+        // parent, and on each step's columns by SQL name or key.
         if (relation.kind === "via") {
             const scope = DrizzleConditionBuilder.buildRelationScopeCondition(
                 relation,
                 () => ({
                     table: parentTable,
-                    key: primaryKeyColumns(parentTable, parentPks, parentCollection.slug)
+                    key: primaryKeyColumns(parentTable, parentPks, parent.slug)
                         .map((column, i) => ({ column, value: parsedParentIdObj[parentPks[i].fieldName] }))
                 }),
                 parentId,
@@ -999,7 +858,6 @@ export class RelationService {
             return Number(result[0]?.count || 0);
         }
 
-        // Use unified count query builder from DrizzleConditionBuilder
         query = DrizzleConditionBuilder.buildRelationCountQuery(
             query,
             relation,
@@ -1020,24 +878,23 @@ export class RelationService {
      * Whether `targetId` is actually reachable from the parent named in `hop`.
      *
      * A nested address like `authors/1/posts/43` used to resolve to the target
-     * collection and then match on the primary key alone, so the parent segment
-     * decided nothing: the row came back, and was updated or deleted, whoever it
-     * belonged to. Reads, updates and deletes now all gate on this.
+     * table and then match on the primary key alone, so the parent segment
+     * decided nothing. Reads, updates and deletes now all gate on this.
      */
     async isRelated(hop: NestedPathHop, targetId: string | number): Promise<boolean> {
-        const targetTable = getTableForCollection(hop.targetCollection, this.registry);
-        const targetPks = requirePrimaryKeys(hop.targetCollection, this.registry);
+        const targetTable = catalogueTableOf(this.registry, hop.target);
+        const targetPks = keysOfTable(this.registry, hop.target);
         const parsedTargetId = parseIdValues(targetId, targetPks);
 
         const identity: SQL[] = targetPks.map(pk => {
             const column = targetTable[pk.fieldName as keyof typeof targetTable] as AnyPgColumn;
             if (!column) {
-                throw new Error(`ID field '${pk.fieldName}' not found in table '${hop.targetCollection.slug}'`);
+                throw new Error(`ID field '${pk.fieldName}' not found in table '${hop.target.slug}'`);
             }
             return eq(column, parsedTargetId[pk.fieldName]);
         });
 
-        return (await this.countRelatedRows(hop.parentCollection, hop.parentId, hop.relation, identity)) > 0;
+        return (await this.countRelatedRows(hop.parent, hop.parentId, hop.relation, identity)) > 0;
     }
 
     /**
@@ -1052,7 +909,7 @@ export class RelationService {
         parentCollectionPath: string,
         parentIds: (string | number)[],
         _relationKey: string,
-        relation: ResolvedRelation,
+        relation: RelationDescriptor,
         narrow?: SQL,
         options?: {
             /** How each target row is rendered; see {@link RelatedRowStyle}. */
@@ -1067,48 +924,26 @@ export class RelationService {
     ): Promise<Map<string, RelatedRow<Record<string, unknown>>>> {
         if (parentIds.length === 0) return new Map();
 
-        const parentCollection = getCollectionByPath(parentCollectionPath, this.registry);
-        const targetCollection = relation.target();
-        const targetTable = getTableForCollection(targetCollection, this.registry);
+        const parent = this.tableAt(parentCollectionPath);
+        const { target, targetTable, targetPks, targetIdField, targetCollection, parentTable, parentPks, parentIdCol } = this.ends(parent, relation);
         const render = { rest: options?.style === "rest" ? this.restRendering(targetCollection, targetTable) : undefined };
-        const targetPks = requirePrimaryKeys(targetCollection, this.registry);
         const targetIdInfo = targetPks[0];
-        const targetIdField = targetTable[targetIdInfo.fieldName as keyof typeof targetTable] as AnyPgColumn;
 
-        const parentPks = requirePrimaryKeys(parentCollection, this.registry);
-        const parentIdInfo = parentPks[0];
-        const parentTableName = getTableName(parentCollection);
-        const parentTable = this.registry.getPgTable(parentTableName);
-        if (!parentTable) throw unregisteredTable(parentCollection.slug, parentTableName, "parent");
-        const parentIdCol = parentTable[parentIdInfo.fieldName as keyof typeof parentTable] as AnyPgColumn;
+        const parsedParentIds = parentIds.map(id => parseIdValues(id, parentPks)[parentPks[0].fieldName]);
 
-        // Parse all parent IDs once
-        const parsedParentIds = parentIds.map(id => parseIdValues(id, parentPks)[parentIdInfo.fieldName]);
-
-        // Soft delete, once, for every branch below.
-        //
-        // These loaders are the only path an `include` takes now, and they
-        // reach the target four different ways — a `via` join, a junction, a
-        // foreign key, the dynamic relation builder. A `deleted_at IS NULL`
-        // written into one of them is a deleted comment that stays hidden under
-        // its post on one relation kind and reappears on another, which is
-        // exactly the rot `soft-delete.ts` exists to prevent. Folded into
-        // `narrow` here, it composes with the include's own `where` and every
-        // branch below applies both or neither.
-        // The target collection's own `beforeQuery`, folded in beside the
-        // soft-delete stamp for the same reason and at the same point.
+        // Soft delete and the target's own `beforeQuery`, once, for every
+        // branch below: folded into `narrow`, they compose with the include's
+        // own `where` and every branch applies all of them or none.
         const narrowTarget = andSoftDelete(
-            narrowBoth(narrow, await this.narrowTargetRead(parentCollection, relation)),
-            this.registry.requireTable(targetCollection.slug), targetTable
+            narrowBoth(narrow, await this.narrowTargetRead(parent, relation)),
+            target, targetTable
         );
 
-        // Handle join path relations with batching
         if (relation.kind === "via") {
             let query = this.db.select().from(parentTable).$dynamic();
             let currentTable = parentTable;
 
-            // Apply each join in the path
-            for (const join of relation.joinPath) {
+            for (const join of relation.steps) {
                 const joinTable = this.registry.getPgTable(join.table);
                 if (!joinTable) {
                     throw new Error(`Join table not found: ${join.table}`);
@@ -1127,35 +962,27 @@ export class RelationService {
             query = query.where(narrowed(this.parentKeyCondition(parentTable, parentPks, parentIds), narrowTarget));
 
             const results = await query;
-            const targetTableName = relation.joinPath[relation.joinPath.length - 1].table;
+            const targetTableName = viaEndTable(relation);
             const resultMap = new Map<string, RelatedRow<Record<string, unknown>>>();
 
             // Group by the parent's address — the same token the caller looks
             // results up by, derived the same way on both sides.
             for (const row of results as Array<Record<string, unknown>>) {
-                const parentRow = (row[getTableName(parentCollection)] || row) as Record<string, unknown>;
-                const targetRow = (row[targetTableName] || row) as Record<string, unknown>;
-
                 resultMap.set(
-                    buildCompositeId(parentRow, parentPks),
-                    await this.toRelatedRow(targetRow, targetCollection, targetPks, render)
+                    buildCompositeId(rowOf(row, parent.descriptor.table), parentPks),
+                    await this.toRelatedRow(rowOf(row, targetTableName), targetCollection, targetPks, render)
                 );
             }
 
             return resultMap;
         }
 
-        // Handle owning relations with proper FK-based batching.
-        // For owning relations, parent rows hold the FK (e.g. posts.author_id).
-        // We need to:
-        //   1. Fetch FK values from the parent table in a single query
-        //   2. Query the target table with unique FK values
-        //   3. Map results back to parent rows via their FK values
+        // Owning relation: the parent rows hold the foreign key. Read each
+        // parent's key, fetch the targets in ONE query, map back by key.
         if (relation.kind === "belongsTo") {
-            this.assertSingleKeyAddressable(parentCollection, parentPks, relation.localKey);
-            // `localKey` is the column; the generated table is keyed by the wire
-            // name, so `author_id` finds nothing where the key is `authorId`.
-            const localKeyField = fieldKeyForColumn(parentCollection, relation.localKey);
+            this.assertSingleKeyAddressable(parent, parentPks, relation.localKey);
+            // The catalogue table and the rows are keyed by the column's key.
+            const localKeyField = relation.localField;
             const localKeyCol = parentTable[localKeyField as keyof typeof parentTable] as AnyPgColumn;
             if (!localKeyCol) {
                 throw new Error(`Local key column '${relation.localKey}' not found in parent table`);
@@ -1165,9 +992,7 @@ export class RelationService {
             // already holds carries it under `localKeyField`, and is read from
             // there; only the parents whose row does not — a `fields`
             // projection that left it out, a key withheld by field access —
-            // cost a query, the ONE query this step always used to be. It
-            // re-read keys the page had just selected: a statement per
-            // belongsTo per include level, for nothing.
+            // cost a query.
             const parentToFk = new Map<string, unknown>();
             const uniqueFkValues: unknown[] = [];
             const seenFks = new Set<string>();
@@ -1212,11 +1037,9 @@ export class RelationService {
                 .from(targetTable)
                 .where(narrowed(inArray(targetIdField, uniqueFkValues), narrowTarget));
 
-            // Index target rows by their ID
             const targetById = new Map<string, Record<string, unknown>>();
             for (const row of targetResults as Array<Record<string, unknown>>) {
-                const tid = String(row[targetIdInfo.fieldName]);
-                targetById.set(tid, row);
+                targetById.set(String(row[targetIdInfo.fieldName]), row);
             }
 
             // Step 3: Map back to parent rows
@@ -1231,66 +1054,55 @@ export class RelationService {
             return resultMap;
         }
 
-        // Handle inverse relation types with batching. The parent is named by a
-        // single FK column on the target, so a composite-keyed parent has no
-        // correct reading here either.
+        // The parent is named by a single column (on the target, or in a
+        // junction), so a composite-keyed parent has no correct reading here.
         this.assertSingleKeyAddressable(
-            parentCollection,
+            parent,
             parentPks,
-            hasForeignKeyOnTarget(relation) ? relation.foreignKeyOnTarget : relation.relationName,
+            pointsBack(relation) ? relation.foreignKey : relation.name,
             relation
         );
 
         // One lookup for the whole batch, both directions: the WHERE is built
         // from the source-key values, and each row that comes back carries one
         // of those values rather than a parent id.
-        const { keyByParentId, parentIdByKey } = hasForeignKeyOnTarget(relation)
-            ? await this.resolveSourceKeys(parentCollection, relation, parentIds)
+        const { keyByParentId, parentIdByKey } = pointsBack(relation)
+            ? await this.resolveSourceKeys(parent, relation, parentIds)
             : { keyByParentId: new Map<string, string | number>(), parentIdByKey: new Map<string, string | number>() };
 
-        const matchValues = hasForeignKeyOnTarget(relation)
+        const matchValues = pointsBack(relation)
             ? [...keyByParentId.values()]
             : parsedParentIds;
         if (matchValues.length === 0) return new Map();
 
         let query = this.db.select().from(targetTable).$dynamic();
 
-        // Build the relation query with ALL parent IDs
         query = applyDynamicRelationQuery(
             query,
             query,
             relation,
-            matchValues, // Pass array instead of single ID
+            matchValues,
             targetTable,
             parentTable,
             parentIdCol,
             targetIdField,
             this.registry,
-            // Where a per-include `where` lands on this relation kind: the
-            // builder already AND-s `additionalFilters` into the relation's own
-            // conditions, so there is nothing to invent here.
+            // The builder AND-s `additionalFilters` into the relation's own
+            // conditions, so a per-include `where` lands here as well.
             narrowTarget ? [narrowTarget] : []
         );
 
         const results = await query;
         const resultMap = new Map<string, RelatedRow<Record<string, unknown>>>();
+        if (!pointsBack(relation)) return resultMap;
+        const foreignKeyField = columnKeyOf(target, relation.foreignKey);
 
-        // Map results back to parent rows
         for (const row of results as Array<Record<string, unknown>>) {
-            const targetRow = (row[getTableName(targetCollection)] || row) as Record<string, unknown>;
-
-            // The parent's key is on the target row, in the relation's own
-            // column. There used to be a second branch here that guessed the
-            // column by appending `_id` to `inverseRelationName`, reached only
-            // when the foreign key had not been resolved — which cannot happen
-            // now that resolution fills it in.
-            if (!hasForeignKeyOnTarget(relation)) continue;
+            const targetRow = rowOf(row, target.descriptor.table);
 
             // Keyed by string throughout: Drizzle returns a numeric column as a
             // number or a string depending on the column type and the driver.
-            const foreignKeyValue = targetRow[
-                fieldKeyForColumn(targetCollection, relation.foreignKeyOnTarget)
-            ] as string | number | undefined;
+            const foreignKeyValue = targetRow[foreignKeyField] as string | number | undefined;
             if (foreignKeyValue === undefined || foreignKeyValue === null) continue;
 
             const parentId = parentIdByKey.get(String(foreignKeyValue));
@@ -1312,17 +1124,14 @@ export class RelationService {
      * parent's rows rather than a `LIMIT`: a subquery ranks the keys of every
      * matching row — under the same relation condition, `narrow`, soft delete
      * and `beforeQuery` the unlimited read applies — and the read joins back to
-     * the ones ranked within the limit. It used to read every related row of
-     * every parent and cut the list in JavaScript: 200 rows served out of
-     * 200,000 read, parsed and rendered for `{ messages: { limit: 2 } }` on a
-     * page of 100 threads. Rows come back in the window's order, so the
-     * per-parent lists are already sorted.
+     * the ones ranked within the limit. Rows come back in the window's order,
+     * so the per-parent lists are already sorted.
      */
     async batchFetchRelatedEntitiesMany(
         parentCollectionPath: string,
         parentIds: (string | number)[],
         _relationKey: string,
-        relation: ResolvedRelation,
+        relation: RelationDescriptor,
         /** An extra condition on the target — see {@link batchFetchRelatedEntities}. */
         narrow?: SQL,
         window?: RelatedRowWindow,
@@ -1331,46 +1140,24 @@ export class RelationService {
     ): Promise<Map<string, RelatedRow<Record<string, unknown>>[]>> {
         if (parentIds.length === 0) return new Map();
 
-        const parentCollection = getCollectionByPath(parentCollectionPath, this.registry);
-        const targetCollection = relation.target();
-        const targetTable = getTableForCollection(targetCollection, this.registry);
+        const parent = this.tableAt(parentCollectionPath);
+        const { target, targetTable, targetPks, targetIdField, targetCollection, parentTable, parentPks, parentIdCol } = this.ends(parent, relation);
         const render = { rest: options?.style === "rest" ? this.restRendering(targetCollection, targetTable) : undefined };
-        const targetPks = requirePrimaryKeys(targetCollection, this.registry);
-        const targetIdInfo = targetPks[0];
-        const targetIdField = targetTable[targetIdInfo.fieldName as keyof typeof targetTable] as AnyPgColumn;
 
-        const parentPks = requirePrimaryKeys(parentCollection, this.registry);
-        const parentIdInfo = parentPks[0];
-        const parentTableName = getTableName(parentCollection);
-        const parentTable = this.registry.getPgTable(parentTableName);
-        if (!parentTable) throw unregisteredTable(parentCollection.slug, parentTableName, "parent");
-        const parentIdCol = parentTable[parentIdInfo.fieldName as keyof typeof parentTable] as AnyPgColumn;
+        const parsedParentIds = parentIds.map(id => parseIdValues(id, parentPks)[parentPks[0].fieldName]);
 
-        const parsedParentIds = parentIds.map(id => parseIdValues(id, parentPks)[parentIdInfo.fieldName]);
-
-        // Soft delete, once, for every branch below.
-        //
-        // These loaders are the only path an `include` takes now, and they
-        // reach the target four different ways — a `via` join, a junction, a
-        // foreign key, the dynamic relation builder. A `deleted_at IS NULL`
-        // written into one of them is a deleted comment that stays hidden under
-        // its post on one relation kind and reappears on another, which is
-        // exactly the rot `soft-delete.ts` exists to prevent. Folded into
-        // `narrow` here, it composes with the include's own `where` and every
-        // branch below applies both or neither.
-        // The target collection's own `beforeQuery`, folded in beside the
-        // soft-delete stamp for the same reason and at the same point.
+        // Soft delete and the target's own `beforeQuery`, once, for every
+        // branch below — see {@link batchFetchRelatedEntities}.
         const narrowTarget = andSoftDelete(
-            narrowBoth(narrow, await this.narrowTargetRead(parentCollection, relation)),
-            this.registry.requireTable(targetCollection.slug), targetTable
+            narrowBoth(narrow, await this.narrowTargetRead(parent, relation)),
+            target, targetTable
         );
 
-        // Handle join path relations (many-to-many through junction tables)
         if (relation.kind === "via") {
             const joins: { table: PgTable; condition: SQL }[] = [];
             let currentTable = parentTable;
 
-            for (const join of relation.joinPath) {
+            for (const join of relation.steps) {
                 const joinTable = this.registry.getPgTable(join.table);
                 if (!joinTable) throw new Error(`Join table not found: ${join.table}`);
 
@@ -1405,46 +1192,34 @@ export class RelationService {
                 const query = throughPath(this.db.select().from(parentTable).$dynamic()).where(scope);
                 results = window?.orderBy?.length ? await query.orderBy(...order) : await query;
             }
-            const targetTableName = relation.joinPath[relation.joinPath.length - 1].table;
+            const targetTableName = viaEndTable(relation);
             const resultMap = new Map<string, RelatedRow<Record<string, unknown>>[]>();
 
             for (const row of results as Array<Record<string, unknown>>) {
-                const parentRow = (row[getTableName(parentCollection)] || row) as Record<string, unknown>;
-                const targetRow = (row[targetTableName] || row) as Record<string, unknown>;
-                const parentId = buildCompositeId(parentRow, parentPks);
+                const parentId = buildCompositeId(rowOf(row, parent.descriptor.table), parentPks);
                 recordTotal(window, parentId, row);
                 const arr = resultMap.get(parentId) || [];
-                arr.push(await this.toRelatedRow(targetRow, targetCollection, targetPks, render));
+                arr.push(await this.toRelatedRow(rowOf(row, targetTableName), targetCollection, targetPks, render));
                 resultMap.set(parentId, arr);
             }
 
             return resultMap;
         }
 
-        // Handle many-to-many owning relations with junction table (relation.through)
-        // This is the standard path for posts→tags style relations where
-        // sanitizeRelation populated the `through` config.
         if (relation.kind === "manyToMany") {
             // The junction names its parent with one column, so the same
             // single-key limit applies as for a direct foreign key.
-            this.assertSingleKeyAddressable(parentCollection, parentPks, `${relation.through.table}.${relation.through.sourceColumn}`);
+            this.assertSingleKeyAddressable(parent, parentPks, `${relation.through.table}.${relation.through.sourceKey}`);
 
             // An empty map here is a lie a caller cannot see through: `posts/1/tags`
-            // answering `[]` is exactly what a post with no tags looks like. That
-            // is the failure `assertRelationsResolve` was written to make
-            // impossible at boot; this says the same thing if one gets past it.
-            const { table: junctionTable, parentColumn: sourceJunctionCol, targetColumn: targetJunctionCol } =
-                bindThroughJunction(
-                    this.registry,
-                    relation.through,
-                    `${parentCollection.slug}.${relation.relationName}`
-                );
+            // answering `[]` is exactly what a post with no tags looks like. The
+            // binder throws instead when the junction does not resolve.
+            const { table: junctionTable, parentColumn: sourceJunctionCol, targetColumn: targetJunctionCol, parentKey } =
+                bindThroughJunction(this.registry, relation, `${parent.slug}.${relation.name}`);
 
-            // SELECT target.*, junction.sourceColumn FROM junction
-            // INNER JOIN target ON junction.targetColumn = target.id
-            // WHERE junction.sourceColumn IN (parentIds)
-            // The target is joined in, so its soft-delete stamp is a condition
-            // this query can carry.
+            // SELECT target.*, junction.* FROM junction
+            // INNER JOIN target ON junction.targetKey = target.id
+            // WHERE junction.sourceKey IN (parentIds)
             const scope = narrowed(inArray(sourceJunctionCol, parsedParentIds), narrowTarget);
             const order = relatedRowOrder(targetTable, [targetIdField], window?.orderBy);
 
@@ -1477,27 +1252,18 @@ export class RelationService {
                 results = window?.orderBy?.length ? await query.orderBy(...order) : await query;
             }
             const resultMap = new Map<string, RelatedRow<Record<string, unknown>>[]>();
-            const targetTableName = getTableName(targetCollection);
-            // The junction's own columns, when it declares any. Built once per
-            // batch rather than per row: it is derived from the relation, and
-            // the relation does not change between rows.
-            const payloadKeys = Object.keys(relation.through.properties);
-            const junctionConfig = payloadKeys.length > 0
-                ? getJunctionConfigForRelation(relation.through)
-                : undefined;
+            const pivot = relation.through.pivot;
 
             for (const row of results as Array<Record<string, unknown>>) {
                 // The junction table data is namespaced under its table name
-                const junctionData = (row[relation.through.table] || row) as Record<string, unknown>;
-                const targetData = (row[targetTableName] || row) as Record<string, unknown>;
+                const junctionData = rowOf(row, relation.through.table);
+                const targetData = rowOf(row, target.descriptor.table);
 
-                const parentId = String(junctionData[relation.through.sourceColumn]);
+                const parentId = String(junctionData[parentKey]);
                 recordTotal(window, parentId, row);
                 const arr = resultMap.get(parentId) || [];
                 const related = await this.toRelatedRow(targetData, targetCollection, targetPks, render);
-                if (junctionConfig) {
-                    related.pivot = await this.readPivot(junctionData, junctionConfig, payloadKeys);
-                }
+                if (pivot.length > 0) related.pivot = readPivotColumns(junctionData, pivot);
                 arr.push(related);
                 resultMap.set(parentId, arr);
             }
@@ -1505,29 +1271,21 @@ export class RelationService {
             return resultMap;
         }
 
-        // Handle FK-based relations (one-to-many inverse). One column on the
-        // target names the parent, so a composite-keyed parent cannot be named.
-        this.assertSingleKeyAddressable(
-            parentCollection,
-            parentPks,
-            hasForeignKeyOnTarget(relation) ? relation.foreignKeyOnTarget : relation.relationName,
-            relation
-        );
+        // A `belongsTo` is to-one: it has no list of rows to load.
+        if (!pointsBack(relation)) return new Map();
 
-        const { keyByParentId, parentIdByKey } = hasForeignKeyOnTarget(relation)
-            ? await this.resolveSourceKeys(parentCollection, relation, parentIds)
-            : { keyByParentId: new Map<string, string | number>(), parentIdByKey: new Map<string, string | number>() };
+        // A foreign key on the target: one column names the parent, so a
+        // composite-keyed parent cannot be named.
+        this.assertSingleKeyAddressable(parent, parentPks, relation.foreignKey, relation);
 
-        const matchValues = hasForeignKeyOnTarget(relation)
-            ? [...keyByParentId.values()]
-            : parsedParentIds;
+        const { keyByParentId, parentIdByKey } = await this.resolveSourceKeys(parent, relation, parentIds);
+        const matchValues = [...keyByParentId.values()];
         if (matchValues.length === 0) return new Map();
 
         const targetKeys = targetPks.map(pk => targetTable[pk.fieldName as keyof typeof targetTable] as AnyPgColumn);
         const order = relatedRowOrder(targetTable, targetKeys, window?.orderBy);
-        const foreignKeyColumn = hasForeignKeyOnTarget(relation)
-            ? targetTable[fieldKeyForColumn(targetCollection, relation.foreignKeyOnTarget) as keyof typeof targetTable] as AnyPgColumn | undefined
-            : undefined;
+        const foreignKeyField = columnKeyOf(target, relation.foreignKey);
+        const foreignKeyColumn = targetTable[foreignKeyField as keyof typeof targetTable] as AnyPgColumn | undefined;
 
         let results: unknown[];
         if (window?.limit !== undefined && foreignKeyColumn) {
@@ -1556,15 +1314,8 @@ export class RelationService {
         const resultMap = new Map<string, RelatedRow<Record<string, unknown>>[]>();
 
         for (const row of results as Array<Record<string, unknown>>) {
-            const targetRow = (row[getTableName(targetCollection)] || row) as Record<string, unknown>;
-
-            // Junction-backed relations returned earlier in this method, so
-            // what reaches here names the parent with a column on the target.
-            if (!hasForeignKeyOnTarget(relation)) continue;
-
-            const foreignKeyValue = targetRow[
-                fieldKeyForColumn(targetCollection, relation.foreignKeyOnTarget)
-            ] as string | number | undefined;
+            const targetRow = rowOf(row, target.descriptor.table);
+            const foreignKeyValue = targetRow[foreignKeyField] as string | number | undefined;
             if (foreignKeyValue === undefined || foreignKeyValue === null) continue;
 
             const parentId = parentIdByKey.get(String(foreignKeyValue));

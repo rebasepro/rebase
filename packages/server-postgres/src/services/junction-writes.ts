@@ -1,11 +1,13 @@
 import { and, eq, inArray, sql, type SQL } from "drizzle-orm";
 import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 import { ApiError, logger } from "@rebasepro/server";
-import { soleJoinCondition, type Properties, type ResolvedVia } from "@rebasepro/types";
+import { JUNCTION_PIVOT_KEY, soleJoinCondition, type ColumnDescriptor, type JoinStep } from "@rebasepro/types";
+import { canReadColumn, isJsNumberType, isNativeArrayType, type RelationOfKind } from "@rebasepro/common";
 import { DrizzleClient } from "../interfaces";
 import { PostgresTableRegistry } from "../model/PostgresTableRegistry";
 import { relationMisconfigured } from "./collection-helpers";
 import { explainZeroRowWrite } from "./write-denial";
+import { currentFieldViewer } from "./field-viewer";
 
 /**
  * Writing a many-to-many means writing rows in a junction table, and doing that
@@ -13,8 +15,8 @@ import { explainZeroRowWrite } from "./write-denial";
  * and the column naming the far side.
  *
  * Those three used to be re-derived at each of the four call sites — twice for
- * `through`, twice for `joinPath`, in the owning and the inverse direction —
- * and the two `joinPath` derivations did not agree. The inverse one keyed off
+ * `through`, twice for a `via` chain, in the owning and the inverse direction —
+ * and the two chain derivations did not agree. The inverse one keyed off
  * `step.table`; the owning one asked `getTableNamesFromColumns` which table a
  * step's columns belonged to, and that answers `""` for an unqualified column
  * name. So for `{ table: "posts_tags", on: { from: "id", to: "tag_id" } }` —
@@ -42,11 +44,11 @@ export interface JunctionBinding {
     /** `<collection>.<relation>`, for error messages. */
     label: string;
     /**
-     * The link's own columns — `through.properties` — as authored. Empty for a
-     * junction that carries nothing but its two keys, and for every `via`
-     * relation (a join chain has no declared payload).
+     * The link's own columns — the relation's `pivot` (`through.pivot`). Empty
+     * for a junction that carries nothing but its two keys, and for every
+     * `via` relation (a join chain has no declared payload).
      */
-    payload: Properties;
+    payload: readonly ColumnDescriptor[];
 }
 
 /**
@@ -56,11 +58,11 @@ export interface JunctionBinding {
  * The pivot is kept apart from the id rather than merged into a row shape,
  * because the two are answered by different collections: the id is parsed
  * against the *target's* primary key, the payload validated against the
- * junction's own properties.
+ * relation's `pivot` columns.
  */
 export interface JunctionLinkWrite {
     id: unknown;
-    /** Payload values keyed by property key, already serialized for the driver. */
+    /** Payload values keyed by pivot column key, already serialized for the driver. */
     pivot?: Record<string, unknown>;
 }
 
@@ -90,24 +92,25 @@ function column(table: PgTable, name: string | undefined, label: string, role: s
     return col;
 }
 
-/** The junction a `manyToMany` names outright. */
+/** The junction a `manyToMany` names outright (`through`). */
 export function bindThroughJunction(
     registry: PostgresTableRegistry,
-    through: { table: string; sourceColumn: string; targetColumn: string; properties?: Properties },
+    relation: RelationOfKind<"manyToMany">,
     label: string
 ): JunctionBinding {
+    const { through } = relation;
     const table = registry.getPgTable(through.table);
     if (!table) {
         throw misconfigured(label, `no table '${through.table}' in the registry`);
     }
     return {
         table,
-        parentColumn: column(table, through.sourceColumn, label, "source"),
-        targetColumn: column(table, through.targetColumn, label, "target"),
-        parentKey: through.sourceColumn,
-        targetKey: through.targetColumn,
+        parentColumn: column(table, through.sourceKey, label, "source"),
+        targetColumn: column(table, through.targetKey, label, "target"),
+        parentKey: through.sourceKey,
+        targetKey: through.targetKey,
         label,
-        payload: through.properties ?? {}
+        payload: through.pivot
     };
 }
 
@@ -133,7 +136,7 @@ const tablePart = (spec: string | string[]): string | undefined => {
  */
 export function bindJoinPathJunction(
     registry: PostgresTableRegistry,
-    joinPath: ResolvedVia["joinPath"],
+    joinPath: readonly JoinStep[],
     parentTableName: string,
     targetTableName: string,
     label: string
@@ -143,7 +146,7 @@ export function bindJoinPathJunction(
         .find(table => table !== parentTableName && table !== targetTableName);
 
     if (!junctionName) {
-        throw misconfigured(label, "its joinPath has no table between the two ends to hold the links");
+        throw misconfigured(label, "its `via` steps have no table between the two ends to hold the links");
     }
 
     const table = registry.getPgTable(junctionName);
@@ -178,7 +181,7 @@ export function bindJoinPathJunction(
     if (!parentColumnName || !targetColumnName) {
         throw misconfigured(
             label,
-            `its joinPath does not connect '${parentTableName}' and '${targetTableName}' through '${junctionName}'`
+            `its \`via\` chain does not connect '${parentTableName}' and '${targetTableName}' through '${junctionName}'`
         );
     }
 
@@ -190,8 +193,8 @@ export function bindJoinPathJunction(
         targetKey: targetColumnName,
         label,
         // A `via` reaches through a table it did not declare, so there is no
-        // `through.properties` to read and nothing to write beyond the keys.
-        payload: {}
+        // `pivot` to read and nothing to write beyond the keys.
+        payload: []
     };
 }
 
@@ -311,7 +314,7 @@ export async function applyJunctionMembership(
     // like the key cannot shadow it.
     const selection: Record<string, AnyPgColumn> = { targetId: binding.targetColumn };
     const payloadKeys: string[] = [];
-    for (const key of Object.keys(binding.payload)) {
+    for (const { key } of binding.payload) {
         const payloadColumn = binding.table[key as keyof typeof binding.table] as AnyPgColumn | undefined;
         if (!payloadColumn) continue;
         selection[`${PIVOT_SELECTION_PREFIX}${key}`] = payloadColumn;
@@ -472,4 +475,96 @@ async function removeLinks(
         `for relation '${binding.label}': a row-level security policy rejected the write.`,
         "WRITE_DENIED"
     );
+}
+
+/**
+ * The link's own columns of one junction row, as this caller may read them —
+ * what an include serves under `_pivot`.
+ *
+ * Only the `pivot` columns: the two foreign keys are the link's identity, and
+ * the caller already has both. A column the caller may not read
+ * (`access.read`, `private`) is left out, as it is on any row; a NUMERIC that
+ * declares a JavaScript number comes back as one, as the target's own columns
+ * do (`toRestRow`).
+ *
+ * @param junctionRow The junction row, keyed as its catalogue table keys it.
+ */
+export function readPivotColumns(
+    junctionRow: Record<string, unknown>,
+    pivot: readonly ColumnDescriptor[]
+): Record<string, unknown> {
+    const viewer = currentFieldViewer();
+    const values: Record<string, unknown> = {};
+    for (const column of pivot) {
+        if (!(column.key in junctionRow) || !canReadColumn(column, viewer)) continue;
+        const value = junctionRow[column.key];
+        if (isJsNumberType(column.type) && typeof value === "string") {
+            const parsed = parseFloat(value);
+            values[column.key] = isNaN(parsed) ? null : parsed;
+        } else {
+            values[column.key] = value;
+        }
+    }
+    return values;
+}
+
+/**
+ * The value written into one pivot column: `"NaN"` into a number column is no
+ * number (`null`), and an array column takes an array or nothing — a scalar
+ * there is refused (400) rather than stored as something else.
+ */
+function pivotValueToServer(value: unknown, column: ColumnDescriptor, label: string): unknown {
+    if (value === null || value === undefined) return value;
+    if (isJsNumberType(column.type) && typeof value === "string" && value.trim().toLowerCase() === "nan") return null;
+    if (isNativeArrayType(column.type) && !Array.isArray(value)) {
+        throw ApiError.badRequest(
+            `The pivot column '${column.key}' of relation '${label}' expects an array.`,
+            "VALIDATION_INVALID_VALUE",
+            { relation: label, field: column.key }
+        );
+    }
+    return value;
+}
+
+/**
+ * A link's `_pivot`, as the junction row's values.
+ *
+ * Every key must be a `pivot` column of the relation, and is refused
+ * otherwise (400) rather than dropped: a dropped `role` answers 200 for a
+ * write that changed nothing. A relation with no `pivot` has nothing to write
+ * under `_pivot` at all.
+ *
+ * @param label `<table>.<relation>`, named in the errors.
+ */
+export function serializePivot(
+    pivot: Record<string, unknown>,
+    columns: readonly ColumnDescriptor[],
+    label: string
+): Record<string, unknown> {
+    const declared = columns.map(column => column.key).sort();
+    if (declared.length === 0) {
+        throw ApiError.badRequest(
+            `Relation '${label}' carries no pivot columns, so there is nothing to write under ` +
+            `\`${JUNCTION_PIVOT_KEY}\`. Declare them with \`rel.manyToMany(target, { pivot: { … } })\`.`,
+            "VALIDATION_UNKNOWN_FIELDS",
+            { relation: label }
+        );
+    }
+
+    const values: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(pivot)) {
+        const column = columns.find(candidate => candidate.key === key);
+        if (!column) {
+            throw ApiError.badRequest(
+                `The junction behind relation '${label}' has no column '${key}'. ` +
+                `Its \`pivot\` columns are: ${declared.map(k => `'${k}'`).join(", ")}.`,
+                "VALIDATION_UNKNOWN_FIELDS",
+                { relation: label, field: key, validFields: declared }
+            );
+        }
+        if (value === undefined) continue;
+        const serialized = pivotValueToServer(value, column, label);
+        if (serialized !== undefined) values[key] = serialized;
+    }
+    return values;
 }

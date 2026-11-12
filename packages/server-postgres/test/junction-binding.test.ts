@@ -1,7 +1,7 @@
 import { integer, pgTable, text } from "drizzle-orm/pg-core";
-import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
 import { bindJoinPathJunction, bindThroughJunction } from "../src/services/junction-writes";
+import { manyToMany } from "./helpers/relation-descriptors";
 
 /**
  * Finding a junction's two columns used to be written twice — once for the
@@ -28,7 +28,7 @@ describe("binding a junction's two columns", () => {
         it("takes the two columns as named", () => {
             const binding = bindThroughJunction(
                 registry,
-                { table: "posts_tags", sourceColumn: "post_id", targetColumn: "tag_id" },
+                manyToMany("tags", "tags", { table: "posts_tags", sourceKey: "post_id", targetKey: "tag_id" }),
                 "posts.tags"
             );
             expect(binding.parentColumn.name).toBe("post_id");
@@ -38,7 +38,7 @@ describe("binding a junction's two columns", () => {
         it("refuses a junction table that is not registered", () => {
             expect(() => bindThroughJunction(
                 registry,
-                { table: "nope", sourceColumn: "post_id", targetColumn: "tag_id" },
+                manyToMany("tags", "tags", { table: "nope", sourceKey: "post_id", targetKey: "tag_id" }),
                 "posts.tags"
             )).toThrow(/no table 'nope'/);
         });
@@ -46,13 +46,13 @@ describe("binding a junction's two columns", () => {
         it("refuses a column the junction does not have", () => {
             expect(() => bindThroughJunction(
                 registry,
-                { table: "posts_tags", sourceColumn: "post_id", targetColumn: "label_id" },
+                manyToMany("tags", "tags", { table: "posts_tags", sourceKey: "post_id", targetKey: "label_id" }),
                 "posts.tags"
             )).toThrow(/no target column 'label_id'/);
         });
     });
 
-    describe("declared with `joinPath`", () => {
+    describe("declared as `via` steps", () => {
         it("binds the unqualified form — the one that silently wrote nothing", () => {
             const binding = bindJoinPathJunction(
                 registry,

@@ -1,23 +1,23 @@
-import { CollectionConfig, ResolvedRelation, isManyToMany } from "@rebasepro/types";
-import { resolveCollectionRelations } from "@rebasepro/common";
+import { relationsOfKind } from "@rebasepro/common";
 
 import { PostgresTableRegistry } from "../../model/PostgresTableRegistry";
 
 /**
  * One end of a many-to-many, as seen from the junction table.
  *
- * A junction table is not a collection, so nothing in the registry maps it to
- * one — which is why a change to it was invisible to change capture. But its
- * rows are exactly the contents of a parent's child list, so a write to it is a
- * change to `<parentSlug>/<sourceId>/<relationKey>` and to nothing else.
+ * A junction table is not a table anybody declared, so nothing in the registry
+ * maps it to one — which is why a change to it was invisible to change
+ * capture. But its rows are exactly the contents of a parent's child list, so
+ * a write to it is a change to `<parentSlug>/<sourceId>/<relationKey>` and to
+ * nothing else.
  */
 export interface JunctionLink {
     schema: string;
     /** The junction table itself, e.g. `posts_tags`. */
     table: string;
-    /** The collection whose relation this is, e.g. `posts`. */
-    parentCollection: CollectionConfig;
-    /** The relation's key — the path segment a child list is addressed by. */
+    /** The slug of the table whose relation this is, e.g. `posts`. */
+    parentSlug: string;
+    /** The relation's name — the path segment a child list is addressed by. */
     relationKey: string;
     /** Junction column holding the parent's id. */
     sourceColumn: string;
@@ -26,8 +26,8 @@ export interface JunctionLink {
 }
 
 /**
- * Every junction table reachable from a registered collection, once per
- * relation that uses it.
+ * Every junction table reachable from a served table, once per `manyToMany`
+ * that uses it — read from each table's relation descriptors.
  *
  * A junction is listed once per *direction* when both sides declare it, because
  * each direction addresses a different child list: `posts/1/tags` and
@@ -35,35 +35,17 @@ export interface JunctionLink {
  */
 export function collectJunctionLinks(registry: PostgresTableRegistry): JunctionLink[] {
     const links: JunctionLink[] = [];
-    const seen = new Set<string>();
 
-    for (const collection of registry.getCollections()) {
-        let relations: Record<string, ResolvedRelation>;
-        try {
-            relations = resolveCollectionRelations(collection);
-        } catch {
-            // A collection whose relations cannot be resolved (an unresolvable
-            // target, typically mid-migration) simply contributes none.
-            continue;
-        }
-
-        for (const [relationKey, relation] of Object.entries(relations)) {
-            if (!isManyToMany(relation)) continue;
-            const through = relation.through;
-
-            // Same relation registered under both its canonical name and the
-            // declaring property key would otherwise notify the same path twice.
-            const key = `${collection.slug}::${relationKey}::${through.table}`;
-            if (seen.has(key)) continue;
-            seen.add(key);
-
+    for (const table of registry.tables()) {
+        for (const relation of relationsOfKind(table.descriptor, "manyToMany")) {
+            const { through } = relation;
             links.push({
-                schema: (collection as { schema?: string }).schema ?? "public",
+                schema: table.descriptor.schema,
                 table: through.table,
-                parentCollection: collection,
-                relationKey,
-                sourceColumn: through.sourceColumn,
-                targetColumn: through.targetColumn
+                parentSlug: table.slug,
+                relationKey: relation.name,
+                sourceColumn: through.sourceKey,
+                targetColumn: through.targetKey
             });
         }
     }
@@ -74,7 +56,7 @@ export function collectJunctionLinks(registry: PostgresTableRegistry): JunctionL
 /**
  * Index {@link collectJunctionLinks} by table, under both the qualified and the
  * bare name — a change event carries whatever the trigger reports, and a
- * collection need not declare a schema.
+ * table need not declare a schema.
  */
 export function buildJunctionLinkMap(registry: PostgresTableRegistry): Map<string, JunctionLink[]> {
     const map = new Map<string, JunctionLink[]>();

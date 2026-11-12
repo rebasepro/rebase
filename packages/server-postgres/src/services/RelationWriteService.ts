@@ -1,19 +1,23 @@
 import { and, eq, inArray, notInArray, sql } from "drizzle-orm";
 import { AnyPgColumn } from "drizzle-orm/pg-core";
-import { CollectionConfig, JUNCTION_PIVOT_KEY, Properties, Property, ResolvedManyToMany, ResolvedRelation, ResolvedVia } from "@rebasepro/types";
-import { hasForeignKeyOnTarget, isManyToMany, soleJoinCondition } from "@rebasepro/types";
-import { getTableName, resolveCollectionRelations, findRelation, fieldKeyForColumn } from "@rebasepro/common";
+import { CollectionConfig, JUNCTION_PIVOT_KEY, type ColumnDescriptor, type RelationDescriptor } from "@rebasepro/types";
+import { soleJoinCondition } from "@rebasepro/types";
+import type { RelationOfKind } from "@rebasepro/common";
 import { ApiError, logger } from "@rebasepro/server";
 import { DrizzleClient } from "../interfaces";
 import { DrizzleConditionBuilder } from "../utils/drizzle-conditions";
 import { PostgresTableRegistry } from "../model/PostgresTableRegistry";
+import type { RuntimeTable } from "../model/runtime-table";
+import { relationMisconfigured, parseIdValues } from "./collection-helpers";
 import {
-    getTableForCollection,
-    relationMisconfigured,
-    requirePrimaryKeys,
-    parseIdValues,
-    sourceKeyField
-} from "./collection-helpers";
+    catalogueTableOf,
+    columnKeyOf,
+    keysOfTable,
+    pointsBack,
+    relationTarget,
+    sourceKeyField,
+    type PointsBackRelation
+} from "./relation-tables";
 import type { NestedPathHop } from "./nested-path";
 import { RelationService } from "./RelationService";
 import type { ReadCallContextProvider } from "./read-scope";
@@ -22,52 +26,35 @@ import {
     bindJoinPathJunction,
     bindThroughJunction,
     removeJunctionLink,
+    serializePivot,
     updateJunctionPivot,
     type JunctionLinkWrite,
     type VisibleTargets
 } from "./junction-writes";
-import { serializePropertyToServer } from "../data-transformer";
 import { reachedDatabase } from "../utils/pg-error-utils";
-
-/**
- * The ids in a to-many relation write, whatever shape the caller sent.
- *
- * A membership list is written as either the related rows (`[{ id: 1 }]`, what
- * the admin UI sends back after reading them) or as bare keys (`[1]`, `["t-1"]`,
- * what anyone writing the API by hand sends). Only the first was read, via a
- * blind `.map(rel => rel.id)`, and a bare key therefore became `undefined`:
- * on a numeric-keyed target that surfaced as `Invalid numeric ID: undefined`,
- * and on a string-keyed one it did not surface at all — `String(undefined)`
- * wrote a junction row pointing at the literal `"undefined"`, which no read
- * would ever match. Both shapes are accepted here, in one place, because both
- * call sites had the same assumption.
- *
- * An element that carries no key is refused rather than skipped: dropping it
- * would silently write a shorter membership list than the caller asked for.
- */
-function relationTargetIds(value: unknown, relationName: string, collectionSlug: string): (string | number)[] {
-    return relationLinkElements(value, relationName, collectionSlug).map(element => element.id);
-}
 
 /** One element of a membership write, as the caller sent it. */
 interface RelationLinkElement {
     id: string | number;
-    /** The `_pivot` the element carried, unvalidated and unserialized. */
+    /** The element's `_pivot`, unvalidated — {@link serializePivot} checks it against the relation's `pivot`. */
     pivot?: Record<string, unknown>;
 }
 
 /**
- * The same reading, keeping the link's own values.
+ * The elements of a to-many relation write, whatever shape the caller sent.
  *
- * An element may be `{ id, _pivot: { role: "owner" } }` where the relation is a
- * `manyToMany` whose `through` declares `properties`. The `_pivot` is taken off
- * here and nowhere else: it is not a column of the target, so leaving it on the
- * element would make it look like one to every later step.
+ * A membership list is written as either the related rows (`[{ id: 1 }]`, what
+ * the admin UI sends back after reading them) or as bare keys (`[1]`, `["t-1"]`,
+ * what anyone writing the API by hand sends). Both shapes are accepted here, in
+ * one place. A row may carry the link's own columns under `_pivot`.
+ *
+ * An element that carries no key is refused rather than skipped: dropping it
+ * would silently write a shorter membership list than the caller asked for.
  */
 function relationLinkElements(
     value: unknown,
     relationName: string,
-    collectionSlug: string
+    tableSlug: string
 ): RelationLinkElement[] {
     if (!Array.isArray(value)) return [];
 
@@ -86,7 +73,7 @@ function relationLinkElements(
             }
         }
         throw new Error(
-            `Cannot write relation "${relationName}" on "${collectionSlug}": element ${index} carries no id. ` +
+            `Cannot write relation "${relationName}" on "${tableSlug}": element ${index} carries no id. ` +
             "Pass either the related rows (`[{ id: … }]`) or their keys (`[1, 2]`), not " +
             `${element === null ? "null" : typeof element}.`
         );
@@ -94,60 +81,12 @@ function relationLinkElements(
 }
 
 /**
- * A `_pivot` as the junction table's columns.
- *
- * Exported because the payload route needs the identical reading — one function
- * so a value written through `PATCH posts/1 { tags: [{ id, _pivot }] }` and the
- * same value written through `PATCH posts/1/tags/5 { _pivot }` cannot be
- * serialized two ways.
- */
-export function serializePivot(
-    pivot: Record<string, unknown>,
-    payload: Properties,
-    label: string
-): Record<string, unknown> {
-    const declared = Object.keys(payload);
-    if (declared.length === 0) {
-        throw ApiError.badRequest(
-            `Relation '${label}' carries no junction columns, so there is nothing to write under ` +
-            `\`${JUNCTION_PIVOT_KEY}\`. Declare them in \`through.properties\`.`,
-            "VALIDATION_UNKNOWN_FIELDS",
-            { relation: label }
-        );
-    }
-
-    const values: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(pivot)) {
-        const property = payload[key as keyof Properties] as Property | undefined;
-        if (!property) {
-            throw ApiError.badRequest(
-                `The junction behind relation '${label}' has no column '${key}'. ` +
-                `Its \`through.properties\` are: ${declared.sort().map(k => `'${k}'`).join(", ")}.`,
-                "VALIDATION_UNKNOWN_FIELDS",
-                { relation: label, field: key, validFields: declared.sort() }
-            );
-        }
-        // `undefined` means "I have no value for this", not "set it to NULL" —
-        // the same reading `serializeDataToServer` gives a row's own columns.
-        if (value === undefined) continue;
-        const serialized = serializePropertyToServer(value, property, key);
-        if (serialized !== undefined) values[key] = serialized;
-    }
-    return values;
-}
-
-/**
  * Writing relations: junction membership, foreign-key stamping, and the links a
  * nested path creates or removes.
  *
- * Split from {@link RelationService}, which now only reads. The two had grown
- * into one 1700-line class doing two unrelated jobs, and sharing one habit —
- * warning about a relation it could not resolve and carrying on, which surfaces
- * as an empty list on the read side and as a successful save on the write side.
- * Separating them is what made that visible as one class of defect rather than
- * eighteen scattered log lines.
- *
- * The reads it still needs — the source key a link joins on — it asks
+ * Every relation fact comes from the owning table's relation descriptor; the
+ * target is looked up by slug. The reads it needs — the source key a link
+ * joins on, the target rows the caller may see — it asks
  * {@link RelationService} for rather than reimplementing.
  */
 export class RelationWriteService {
@@ -159,14 +98,31 @@ export class RelationWriteService {
         /**
          * How this service's reads reach the identity their `beforeQuery` hooks
          * run as. Passed by the driver that constructed it; absent only in a
-         * test, where a collection declaring the hook is refused rather than
-         * read unnarrowed. See `read-scope.ts`.
+         * test, where a table declaring the hook is refused rather than read
+         * unnarrowed. See `read-scope.ts`.
          */
         private callContext?: ReadCallContextProvider
     ) {
         this.reads = new RelationService(db, registry, callContext);
     }
 
+    /** The served table a lowered collection was lowered from. */
+    private tableOf(collection: CollectionConfig): RuntimeTable {
+        return this.registry.requireTable(collection.slug);
+    }
+
+    /**
+     * The relation `name` of `owner`, for a write that names it. A write the
+     * caller split off as a relation value names a declared relation, so a
+     * miss is a wiring defect and is refused rather than skipped.
+     */
+    private relationNamed(owner: RuntimeTable, name: string): RelationDescriptor {
+        const relation = owner.relations.get(name);
+        if (!relation) {
+            throw relationMisconfigured(`${owner.slug}.${name}`, `'${owner.slug}' declares no relation '${name}'`);
+        }
+        return relation;
+    }
 
     /**
      * Remove the junction row linking a parent to `targetId`, leaving the target
@@ -174,41 +130,32 @@ export class RelationWriteService {
      *
      * This is what `DELETE authors/1/tags/5` has to mean for a many-to-many: the
      * target is shared, so deleting the row would remove the tag from every other
-     * post that uses it. It used to do exactly that — resolve the path to the
-     * `tags` table and delete by primary key.
+     * post that uses it.
      */
     async unlinkRelatedEntity(
         tx: DrizzleClient,
         hop: NestedPathHop,
         targetId: string | number
     ): Promise<void> {
-        if (!isManyToMany(hop.relation)) {
+        if (hop.relation.kind !== "manyToMany") {
             throw new Error(`Relation '${hop.relationKey}' has no junction table to unlink through`);
         }
 
-        const binding = bindThroughJunction(
-            this.registry,
-            hop.relation.through,
-            `${hop.parentCollection.slug}.${hop.relationKey}`
-        );
+        const binding = bindThroughJunction(this.registry, hop.relation, `${hop.parent.slug}.${hop.relationKey}`);
 
         await removeJunctionLink(
             tx,
             binding,
-            this.parsedId(hop.parentCollection, hop.parentId),
-            this.parsedId(hop.targetCollection, targetId),
-            { parent: hop.parentCollection.slug, relation: hop.relationKey }
+            this.parsedId(hop.parent, hop.parentId),
+            this.parsedId(hop.target, targetId),
+            { parent: hop.parent.slug, relation: hop.relationKey }
         );
     }
 
-
     /**
-     * Set the columns of one existing link, leaving the membership alone.
-     *
-     * `PATCH /api/data/:slug/:id/:relation/:targetId` with a `_pivot` body. The
-     * membership array cannot say this: one element would unlink everything
-     * else, and re-sending the whole set to change one `role` reintroduces the
-     * lost update the membership diff exists to avoid.
+     * Set the link's own columns of one existing link — `PATCH
+     * …/:relation/:targetId` with a `_pivot` body. Only a `manyToMany` that
+     * declares a `pivot` has them.
      */
     async updateRelationPivot(
         tx: DrizzleClient,
@@ -216,101 +163,84 @@ export class RelationWriteService {
         targetId: string | number,
         pivot: Record<string, unknown>
     ): Promise<void> {
-        if (!isManyToMany(hop.relation)) {
+        if (hop.relation.kind !== "manyToMany") {
             throw ApiError.badRequest(
-                `Relation '${hop.relationKey}' on '${hop.parentCollection.slug}' is a ` +
+                `Relation '${hop.relationKey}' on '${hop.parent.slug}' is a ` +
                 `${hop.relation.kind}, which has no junction row to carry \`${JUNCTION_PIVOT_KEY}\`. ` +
-                "Only a `manyToMany` with `through.properties` does.",
+                "Only a `rel.manyToMany` with a `pivot` does.",
                 "VALIDATION_UNKNOWN_FIELDS",
-                { relation: hop.relationKey, collection: hop.parentCollection.slug }
+                { relation: hop.relationKey, collection: hop.parent.slug }
             );
         }
 
-        const label = `${hop.parentCollection.slug}.${hop.relationKey}`;
-        const binding = bindThroughJunction(this.registry, hop.relation.through, label);
-        const values = serializePivot(pivot, hop.relation.through.properties, label);
+        const label = `${hop.parent.slug}.${hop.relationKey}`;
+        const binding = bindThroughJunction(this.registry, hop.relation, label);
+        const values = serializePivot(pivot, hop.relation.through.pivot, label);
 
         if (Object.keys(values).length === 0) {
             throw ApiError.badRequest(
                 `\`${JUNCTION_PIVOT_KEY}\` named no junction column to set on '${label}'.`,
                 "VALIDATION_CONSTRAINT",
-                { relation: hop.relationKey, collection: hop.parentCollection.slug }
+                { relation: hop.relationKey, collection: hop.parent.slug }
             );
         }
 
         await updateJunctionPivot(
             tx,
             binding,
-            this.parsedId(hop.parentCollection, hop.parentId),
-            this.parsedId(hop.targetCollection, targetId),
+            this.parsedId(hop.parent, hop.parentId),
+            this.parsedId(hop.target, targetId),
             values,
-            { parent: hop.parentCollection.slug, relation: hop.relationKey }
+            { parent: hop.parent.slug, relation: hop.relationKey }
         );
     }
 
-
     /**
-     * The target rows of `relation` this caller can see, for a junction diff —
-     * or `undefined` when that is all of them. See
-     * {@link RelationService.visibleTargetCondition}.
+     * The target rows a membership write diffs against, when that is not all
+     * of them: the target's `beforeQuery` scope and soft delete.
      */
     private async visibleTargets(
-        parentCollection: CollectionConfig,
-        relation: ResolvedRelation,
+        owner: RuntimeTable,
+        relation: RelationDescriptor,
         parentId: string | number
     ): Promise<VisibleTargets | undefined> {
-        const condition = await this.reads.visibleTargetCondition(parentCollection, relation, parentId);
+        const condition = await this.reads.visibleTargetCondition(owner, relation, parentId);
         if (!condition) return undefined;
-        const targetCollection = relation.target();
-        const table = getTableForCollection(targetCollection, this.registry);
-        const [idInfo] = requirePrimaryKeys(targetCollection, this.registry);
+        const target = relationTarget(this.registry, relation);
+        const table = catalogueTableOf(this.registry, target);
+        const [idInfo] = keysOfTable(this.registry, target);
         const idColumn = table[idInfo.fieldName as keyof typeof table] as AnyPgColumn;
         return { table, idColumn, condition };
     }
 
-    /** A collection's id, parsed to the type its primary key column holds. */
-    private parsedId(collection: CollectionConfig, id: string | number): unknown {
-        const pks = requirePrimaryKeys(collection, this.registry);
+    /** An id as the first key column of `table` holds it. */
+    private parsedId(table: RuntimeTable, id: string | number): unknown {
+        const pks = keysOfTable(this.registry, table);
         return parseIdValues(id, pks)[pks[0].fieldName];
     }
 
-
-    /** The same, for the membership list a to-many write names. */
-    private parsedIds(collection: CollectionConfig, ids: Array<string | number>): unknown[] {
-        if (ids.length === 0) return [];
-        const pks = requirePrimaryKeys(collection, this.registry);
-        return ids.map(id => parseIdValues(id, pks)[pks[0].fieldName]);
-    }
-
     /**
-     * A membership list as links: the target ids parsed, and each element's
-     * `_pivot` turned into the columns the junction table holds.
-     *
-     * The values go through `serializePropertyToServer` — the same function
-     * every collection column's value goes through on a save — so a `date`
-     * arrives as a Date and a `map` as JSON, keyed by the property key, which is
-     * what the drizzle junction table is keyed by. A key the junction does not
-     * declare is **refused**, not dropped: drizzle leaves an unknown key out of
-     * the statement, so dropping it is a write that reports success having
-     * stored nothing.
+     * Each element's id parsed against the target's key, and its `_pivot`
+     * checked against the relation's `pivot` columns.
      */
     private parsedLinks(
-        collection: CollectionConfig,
+        target: RuntimeTable,
         elements: RelationLinkElement[],
-        payload: Properties,
+        pivot: readonly ColumnDescriptor[],
         label: string
     ): JunctionLinkWrite[] {
         if (elements.length === 0) return [];
-        const pks = requirePrimaryKeys(collection, this.registry);
+        const pks = keysOfTable(this.registry, target);
         return elements.map(element => ({
             id: parseIdValues(element.id, pks)[pks[0].fieldName],
-            pivot: element.pivot ? serializePivot(element.pivot, payload, label) : undefined
+            pivot: element.pivot ? serializePivot(element.pivot, pivot, label) : undefined
         }));
     }
 
-
     /**
-     * Update many-to-many and junction relations
+     * Write the to-many relations named in `relationValues` — junction
+     * membership for a `manyToMany` or a single-hop `via`, foreign keys on the
+     * target for a `hasMany`.
      */
     async updateRelationsUsingJoins<M extends Record<string, unknown>>(
         tx: DrizzleClient,
@@ -318,237 +248,201 @@ export class RelationWriteService {
         id: string | number,
         relationValues: Partial<M>
     ) {
-        const resolvedRelations = resolveCollectionRelations(collection);
+        const owner = this.tableOf(collection);
 
         for (const [key, value] of Object.entries(relationValues)) {
-            const relation = findRelation(resolvedRelations, key);
+            const relation = owner.relations.get(key);
             if (!relation || relation.cardinality !== "many") continue;
 
-            const elements = relationLinkElements(value, key, collection.slug);
+            const elements = relationLinkElements(value, key, owner.slug);
             const targetEntityIds = elements.map(element => element.id);
-            const targetCollection = relation.target();
+            const target = relationTarget(this.registry, relation);
 
-            const label = `${collection.slug}.${key}`;
+            const label = `${owner.slug}.${key}`;
 
             if (relation.kind === "via") {
+                // One junction between the two ends. A longer chain was
+                // refused before the transaction began
+                // (`assertNoReadOnlyRelationValues`).
                 await applyJunctionMembership(
                     tx,
                     bindJoinPathJunction(
                         this.registry,
-                        relation.joinPath,
-                        getTableName(collection),
-                        getTableName(targetCollection),
+                        relation.steps,
+                        owner.descriptor.table,
+                        target.descriptor.table,
                         label
                     ),
-                    this.parsedId(collection, id),
-                    // A `via` declares no payload, so `{}` refuses a `_pivot`
-                    // sent through one rather than storing it nowhere.
-                    this.parsedLinks(targetCollection, elements, {}, label),
-                    await this.visibleTargets(collection, relation, id)
+                    this.parsedId(owner, id),
+                    this.parsedLinks(target, elements, [], label),
+                    await this.visibleTargets(owner, relation, id)
                 );
             } else if (relation.kind === "manyToMany") {
                 await applyJunctionMembership(
                     tx,
-                    bindThroughJunction(this.registry, relation.through, label),
-                    this.parsedId(collection, id),
-                    this.parsedLinks(targetCollection, elements, relation.through.properties, label),
-                    await this.visibleTargets(collection, relation, id)
+                    bindThroughJunction(this.registry, relation, label),
+                    this.parsedId(owner, id),
+                    this.parsedLinks(target, elements, relation.through.pivot, label),
+                    await this.visibleTargets(owner, relation, id)
                 );
-            } else if (relation.cardinality === "many" && hasForeignKeyOnTarget(relation)) {
-                // Handle one-to-many (inverse) by updating target FK to point to parent
-                const targetTable = getTableForCollection(targetCollection, this.registry);
-                const targetPks = requirePrimaryKeys(targetCollection, this.registry);
-                const targetIdInfo = targetPks[0];
-                const targetIdCol = targetTable[targetIdInfo.fieldName as keyof typeof targetTable] as AnyPgColumn;
-                // The wire name the target's table is keyed by, not the column.
-                const fkField = fieldKeyForColumn(targetCollection, relation.foreignKeyOnTarget);
-                const fkCol = targetTable[fkField as keyof typeof targetTable] as AnyPgColumn;
-
-                if (!fkCol || !targetIdCol) {
-                    throw relationMisconfigured(
-                        label,
-                        `the target table '${getTableName(targetCollection)}' has no ` +
-                        `${fkCol ? `'${targetIdInfo.fieldName}' key column` : `'${relation.foreignKeyOnTarget}' foreign-key column`}`
-                    );
-                }
-
-                // What the children's foreign key must hold — the parent's id
-                // unless the link declares a `sourceKey`, and then the value of
-                // that column on this parent row.
-                const parentKeyValue = (await this.reads.resolveSourceKeys(collection, relation, [id], tx))
-                    .keyByParentId.get(String(id));
-
-                if (parentKeyValue === undefined) {
-                    throw new Error(
-                        `Cannot write relation '${key}' on '${collection.slug}': row '${id}' has no value in ` +
-                        `\`sourceKey: "${sourceKeyField(relation, collection, this.registry)}"\`, so there is ` +
-                        "nothing for the related rows to point at."
-                    );
-                }
-
-                // Only the rows the caller could have seen linked are theirs to
-                // unlink: the list they send back is the list they were shown,
-                // which the target's scope and soft delete had already
-                // narrowed. Clearing by the foreign key alone set it to NULL on
-                // another tenant's rows and on the trashed ones.
-                const visible = await this.reads.visibleTargetCondition(collection, relation, id);
-
-                // Clear existing links not in the new set
-                if (targetEntityIds.length > 0) {
-                    const parsedTargetIds = targetEntityIds.map(id => parseIdValues(id, targetPks)[targetIdInfo.fieldName]);
-                    await tx
-                        .update(targetTable)
-                        .set({ [fkField]: null })
-                        // `notInArray`, not a hand-built fragment: the sibling
-                        // update three lines below already uses `inArray`, and
-                        // the hand-built version called `sql.join` with no
-                        // separator — the only such call in the workspace —
-                        // which renders `NOT IN ($1$2$3)`. That is a syntax
-                        // error, so writing a `hasMany` relation with two or
-                        // more children aborted the whole save transaction.
-                        .where(and(eq(fkCol, parentKeyValue), notInArray(targetIdCol as AnyPgColumn, parsedTargetIds as unknown[]), visible));
-
-                    // Set FK for the provided targets — only those that do not
-                    // point here already, and only those the caller can see.
-                    //
-                    // Already linked: a parent saved with its unchanged list
-                    // (which the admin form sends back on every save) rewrote
-                    // every child, fired the CDC trigger and the `updated_at`
-                    // touch trigger for each, and made them all look edited.
-                    //
-                    // Visible: the same scope the clear above holds to. A child
-                    // the target's `beforeQuery` or the trash hides is a row the
-                    // caller cannot address, and this took it from whichever
-                    // parent it had. It is left alone, as an id naming no row
-                    // is, so the answer says nothing about whether it exists.
-                    await tx
-                        .update(targetTable)
-                        .set({ [fkField]: parentKeyValue })
-                        .where(and(
-                            inArray(targetIdCol as AnyPgColumn, parsedTargetIds as unknown[]),
-                            sql`${fkCol} IS DISTINCT FROM ${parentKeyValue}`,
-                            visible
-                        ));
-                } else {
-                    // If empty array provided, clear all existing links for this parent
-                    await tx
-                        .update(targetTable)
-                        .set({ [fkField]: null })
-                        .where(and(eq(fkCol, parentKeyValue), visible));
-                }
+            } else if (pointsBack(relation)) {
+                await this.writeForeignKeys(tx, owner, id, relation, target, targetEntityIds, label);
             } else {
-                // Every to-many kind in the union is handled above — TypeScript
-                // narrows `relation` to `never` here — so reaching this means a
-                // relation resolved to something no writer knows. It used to be
-                // skipped with a warning, which told the caller their membership
-                // had been stored when nothing had happened.
-                throw relationMisconfigured(
-                    label,
-                    "it is a to-many relation with no way to write links — a `manyToMany` " +
-                    "needs `through`, a `hasMany` needs `foreignKeyOnTarget`"
-                );
+                // A `belongsTo` is to-one, so every to-many kind is handled
+                // above. Refused rather than skipped: a skipped write tells the
+                // caller their membership was stored.
+                throw relationMisconfigured(label, "a to-one relation has no list of links to write");
             }
         }
     }
 
+    /**
+     * A `hasMany` membership write: point the named target rows at this
+     * parent's source key, and unpoint the ones no longer named — both
+     * narrowed to the target rows the caller may see.
+     */
+    private async writeForeignKeys(
+        tx: DrizzleClient,
+        owner: RuntimeTable,
+        id: string | number,
+        relation: PointsBackRelation,
+        target: RuntimeTable,
+        targetEntityIds: (string | number)[],
+        label: string
+    ): Promise<void> {
+        const targetTable = catalogueTableOf(this.registry, target);
+        const targetPks = keysOfTable(this.registry, target);
+        const targetIdInfo = targetPks[0];
+        const targetIdCol = targetTable[targetIdInfo.fieldName as keyof typeof targetTable] as AnyPgColumn;
+        const fkField = columnKeyOf(target, relation.foreignKey);
+        const fkCol = targetTable[fkField as keyof typeof targetTable] as AnyPgColumn;
+
+        if (!fkCol || !targetIdCol) {
+            throw relationMisconfigured(
+                label,
+                `the target table '${target.descriptor.table}' has no ` +
+                `${fkCol ? `'${targetIdInfo.fieldName}' key column` : `'${relation.foreignKey}' foreign-key column`}`
+            );
+        }
+
+        // The value the target's foreign key holds for this parent: its id,
+        // or its `sourceKey` column for a link on a natural key.
+        const parentKeyValue = (await this.reads.resolveSourceKeys(owner, relation, [id], tx))
+            .keyByParentId.get(String(id));
+
+        if (parentKeyValue === undefined) {
+            throw new Error(
+                `Cannot write relation '${relation.name}' on '${owner.slug}': row '${id}' has no value in ` +
+                `\`sourceKey: "${sourceKeyField(this.registry, owner, relation)}"\`, so there is ` +
+                "nothing for the related rows to point at."
+            );
+        }
+
+        // Only the target rows the caller may see are unlinked or relinked: a
+        // child the caller was never shown keeps its parent.
+        const visible = await this.reads.visibleTargetCondition(owner, relation, id);
+
+        if (targetEntityIds.length > 0) {
+            const parsedTargetIds = targetEntityIds.map(targetId => parseIdValues(targetId, targetPks)[targetIdInfo.fieldName]);
+            await tx
+                .update(targetTable)
+                .set({ [fkField]: null })
+                .where(and(eq(fkCol, parentKeyValue), notInArray(targetIdCol as AnyPgColumn, parsedTargetIds as unknown[]), visible));
+
+            // Only the rows not already pointing here: rewriting a link that
+            // is already in place is a statement and a change event for nothing.
+            await tx
+                .update(targetTable)
+                .set({ [fkField]: parentKeyValue })
+                .where(and(
+                    inArray(targetIdCol as AnyPgColumn, parsedTargetIds as unknown[]),
+                    sql`${fkCol} IS DISTINCT FROM ${parentKeyValue}`,
+                    visible
+                ));
+        } else {
+            await tx
+                .update(targetTable)
+                .set({ [fkField]: null })
+                .where(and(eq(fkCol, parentKeyValue), visible));
+        }
+    }
 
     /**
-     * Update inverse relations (where FK is on the target table)
+     * Write the relations whose link lives away from the source row — a
+     * `hasOne` (the target's foreign key), a `manyToMany` or a `via` — named
+     * by a create or update of the source.
      */
     async updateInverseRelations(
         tx: DrizzleClient,
         sourceCollection: CollectionConfig,
         sourceEntityId: string | number,
         inverseRelationUpdates: Array<{
+            /** The relation's name. */
             relationKey: string;
-            relation: ResolvedRelation;
             newValue: unknown;
         }>
     ) {
+        const owner = this.tableOf(sourceCollection);
         for (const update of inverseRelationUpdates) {
-            const { relation, newValue } = update;
+            const { newValue } = update;
+            const relation = this.relationNamed(owner, update.relationKey);
 
             try {
-                const targetCollection = relation.target();
-                const targetTable = getTableForCollection(targetCollection, this.registry);
-                const targetPks = requirePrimaryKeys(targetCollection, this.registry);
-                const targetIdInfo = targetPks[0];
-                const sourcePks = requirePrimaryKeys(sourceCollection, this.registry);
-                const sourceIdInfo = sourcePks[0];
+                const target = relationTarget(this.registry, relation);
+                const label = `${owner.slug}.${relation.name}`;
 
                 if (relation.kind === "via") {
-                    await this.updateInverseJoinPathRelation(
+                    await this.updateInverseJoinPathRelation(tx, owner, sourceEntityId, target, relation, newValue);
+                    continue;
+                }
+
+                if (relation.kind === "manyToMany") {
+                    const elements = Array.isArray(newValue)
+                        ? relationLinkElements(newValue, relation.name, owner.slug)
+                        : [];
+                    await applyJunctionMembership(
                         tx,
-                        sourceCollection,
-                        sourceEntityId,
-                        targetCollection,
-                        relation,
-                        newValue
+                        bindThroughJunction(this.registry, relation, label),
+                        this.parsedId(owner, sourceEntityId),
+                        this.parsedLinks(target, elements, relation.through.pivot, label),
+                        await this.visibleTargets(owner, relation, sourceEntityId)
                     );
                     continue;
                 }
 
-                // A many-to-many names its own junction. This used to walk the
-                // *target's* relations looking for an owning side whose
-                // `relationName` matched `inverseRelationName`, and swap its
-                // source/target columns — a search that silently did nothing
-                // when the far side was declared differently than expected.
-                if (isManyToMany(relation)) {
-                    await this.updateManyToManyInverseRelation(
-                        tx,
-                        sourceCollection,
-                        sourceEntityId,
-                        targetCollection,
-                        relation,
-                        newValue,
-                        {
-                            table: relation.through.table,
-                            sourceColumn: relation.through.sourceColumn,
-                            targetColumn: relation.through.targetColumn,
-                            properties: relation.through.properties
-                        }
-                    );
-                    continue;
-                }
-
-                // What is left names the parent with a column on the target.
-                const label = `${sourceCollection.slug}.${relation.relationName}`;
-                if (!hasForeignKeyOnTarget(relation)) {
+                if (!pointsBack(relation)) {
                     throw relationMisconfigured(
                         label,
                         `a '${relation.kind}' relation names no column on the target to write the link into`
                     );
                 }
 
-                // The wire name the target's table is keyed by, not the column.
-                const fkField = fieldKeyForColumn(targetCollection, relation.foreignKeyOnTarget!);
+                const targetTable = catalogueTableOf(this.registry, target);
+                const targetPks = keysOfTable(this.registry, target);
+                const targetIdInfo = targetPks[0];
+                const fkField = columnKeyOf(target, relation.foreignKey);
                 const foreignKeyColumn = targetTable[fkField as keyof typeof targetTable] as AnyPgColumn;
                 if (!foreignKeyColumn) {
                     throw relationMisconfigured(
                         label,
-                        `'${relation.foreignKeyOnTarget}' is not a column on the target table ` +
-                        `'${getTableName(targetCollection)}'`
+                        `'${relation.foreignKey}' is not a column on the target table ` +
+                        `'${target.descriptor.table}'`
                     );
                 }
 
-                // The value the target's foreign key holds: this row's id, or
-                // the column named by `sourceKey` when the link joins on one.
-                const sourceKeyValue = (await this.reads.resolveSourceKeys(sourceCollection, relation, [sourceEntityId], tx))
+                const sourceKeyValue = (await this.reads.resolveSourceKeys(owner, relation, [sourceEntityId], tx))
                     .keyByParentId.get(String(sourceEntityId));
 
                 if (sourceKeyValue === undefined) {
                     throw new Error(
-                        `Cannot write relation '${relation.relationName}' on '${sourceCollection.slug}': row ` +
+                        `Cannot write relation '${relation.name}' on '${owner.slug}': row ` +
                         `'${sourceEntityId}' has no value in \`sourceKey: ` +
-                        `"${sourceKeyField(relation, sourceCollection, this.registry)}"\`, so there is nothing ` +
+                        `"${sourceKeyField(this.registry, owner, relation)}"\`, so there is nothing ` +
                         "for the related row to point at."
                     );
                 }
 
-                // The same reading as the to-many clear: the row this one
-                // points at now is only the caller's to detach if they could
-                // have seen it.
-                const visible = await this.reads.visibleTargetCondition(sourceCollection, relation, sourceEntityId);
+                const visible = await this.reads.visibleTargetCondition(owner, relation, sourceEntityId);
 
                 if (newValue === null || newValue === undefined) {
                     await tx
@@ -556,191 +450,129 @@ export class RelationWriteService {
                         .set({ [fkField]: null })
                         .where(and(eq(foreignKeyColumn, sourceKeyValue), visible));
                 } else {
-                    const parsedNewTargetIdObj = parseIdValues(newValue as string | number, targetPks);
-                    const parsedNewTargetId = parsedNewTargetIdObj[targetIdInfo.fieldName];
+                    const parsedNewTargetId = parseIdValues(newValue as string | number, targetPks)[targetIdInfo.fieldName];
                     const targetIdField = targetTable[targetIdInfo.fieldName as keyof typeof targetTable] as AnyPgColumn;
 
-                    // First, clear any existing FK that points to this source row
+                    // A `hasOne` points one row here: unpoint the current one,
+                    // then point the new one.
                     await tx
                         .update(targetTable)
                         .set({ [fkField]: null })
                         .where(and(eq(foreignKeyColumn, sourceKeyValue), visible));
 
-                    // Then, update the new target row to point to this source
-                    // row — only one the caller can see, as the to-many writer
-                    // holds to. A row the target's `beforeQuery` or the trash
-                    // hides is not theirs to take from whichever parent it has.
                     await tx
                         .update(targetTable)
                         .set({ [fkField]: sourceKeyValue })
                         .where(and(eq(targetIdField, parsedNewTargetId), visible));
                 }
             } catch (e) {
-                // This catch is here so that one relation whose columns cannot
-                // be resolved does not abort the others. A refusal is not a
-                // misconfiguration: swallowing WRITE_DENIED here reported the
-                // save as done while the database had rejected the write, which
-                // is the whole defect this path was just fixed for. `name` as
-                // well as `instanceof`, because a skewed install can hold two
-                // copies of the server package. Nor is a statement the
-                // database refused: it has aborted the transaction, so the
-                // other relations cannot be written anyway, and swallowing it
-                // left the next statement to fail with an unrelated 25P02.
                 if (e instanceof ApiError || (e as Error)?.name === "ApiError" || reachedDatabase(e)) throw e;
-                logger.warn(`Failed to update inverse relation '${relation.relationName}'`, { error: e });
+                logger.warn(`Failed to update inverse relation '${relation.name}'`, { error: e });
             }
         }
     }
 
-
     /**
-     * Handle inverse relations with joinPath
+     * A to-many `via` write through its one junction table. A chain with more
+     * than one table between the ends, or a to-one chain, writes nothing here.
      */
     private async updateInverseJoinPathRelation(
         tx: DrizzleClient,
-        sourceCollection: CollectionConfig,
+        owner: RuntimeTable,
         sourceEntityId: string | number,
-        targetCollection: CollectionConfig,
-        relation: ResolvedVia,
+        target: RuntimeTable,
+        relation: RelationOfKind<"via">,
         newValue: unknown
     ) {
-        const sourceTableName = getTableName(sourceCollection);
-        const targetTableName = getTableName(targetCollection);
+        const sourceTableName = owner.descriptor.table;
+        const targetTableName = target.descriptor.table;
 
-        // Only a path with exactly one table between the two ends holds links to
-        // write. Anything else is a read-only reach, and skipping it is a
-        // statement about the relation's shape rather than a failure to resolve
-        // one — which is why this is a `return` and the binder below throws.
-        const intermediateTables = relation.joinPath
+        const intermediateTables = relation.steps
             .map(step => step.table)
             .filter(table => table !== sourceTableName && table !== targetTableName);
 
         if (intermediateTables.length !== 1 || relation.cardinality !== "many") return;
 
+        const label = `${owner.slug}.${relation.name}`;
         try {
-            const binding = bindJoinPathJunction(
-                this.registry,
-                relation.joinPath,
-                sourceTableName,
-                targetTableName,
-                `${sourceCollection.slug}.${relation.relationName}`
-            );
+            const binding = bindJoinPathJunction(this.registry, relation.steps, sourceTableName, targetTableName, label);
 
-            // The membership this write asks for. A single value is the
-            // one-to-one case and reads as a set of one.
             const elements = Array.isArray(newValue)
-                ? relationLinkElements(newValue, relation.relationName, sourceCollection.slug)
+                ? relationLinkElements(newValue, relation.name, owner.slug)
                 : newValue === null || newValue === undefined
                     ? []
-                    : relationLinkElements([newValue], relation.relationName, sourceCollection.slug);
+                    : relationLinkElements([newValue], relation.name, owner.slug);
 
             await applyJunctionMembership(
                 tx,
                 binding,
-                this.parsedId(sourceCollection, sourceEntityId),
-                this.parsedLinks(targetCollection, elements, {}, `${sourceCollection.slug}.${relation.relationName}`),
-                await this.visibleTargets(sourceCollection, relation, sourceEntityId)
+                this.parsedId(owner, sourceEntityId),
+                this.parsedLinks(target, elements, [], label),
+                await this.visibleTargets(owner, relation, sourceEntityId)
             );
         } catch (error) {
-            logger.error(`Failed to update inverse joinPath relation '${relation.relationName}'`, { error: error });
+            logger.error(`Failed to update inverse \`via\` relation '${relation.name}'`, { error: error });
             throw error;
         }
     }
 
-
     /**
-     * Handle many-to-many inverse relation updates using junction tables
-     */
-    private async updateManyToManyInverseRelation(
-        tx: DrizzleClient,
-        sourceCollection: CollectionConfig,
-        sourceEntityId: string | number,
-        targetCollection: CollectionConfig,
-        relation: ResolvedRelation,
-        newValue: unknown,
-        junctionInfo: { table: string; sourceColumn: string; targetColumn: string; properties: Properties }
-    ) {
-        const label = `${sourceCollection.slug}.${relation.relationName}`;
-        try {
-            const elements = Array.isArray(newValue)
-                ? relationLinkElements(newValue, relation.relationName, sourceCollection.slug)
-                : [];
-
-            await applyJunctionMembership(
-                tx,
-                bindThroughJunction(this.registry, junctionInfo, label),
-                this.parsedId(sourceCollection, sourceEntityId),
-                this.parsedLinks(targetCollection, elements, junctionInfo.properties, label),
-                await this.visibleTargets(sourceCollection, relation, sourceEntityId)
-            );
-        } catch (error) {
-            logger.error(`Failed to update many-to-many inverse relation '${relation.relationName}'`, { error: error });
-            throw error;
-        }
-    }
-
-
-    /**
-     * Update one-to-one relations that use joinPath
+     * Write to-one `via` relations: copy the parent's column the chain joins
+     * on into the target row's column, clearing it from the row that held it.
      */
     async updateJoinPathOneToOneRelations(
         tx: DrizzleClient,
         parentCollection: CollectionConfig,
         parentId: string | number,
         updates: Array<{
+            /** The relation's name. */
             relationKey: string;
-            // Only a `via` relation has a join path to write through, and the
-            // caller only collects those.
-            relation: ResolvedVia;
             newTargetId: string | number | null;
         }>
     ) {
+        const parent = this.tableOf(parentCollection);
         for (const upd of updates) {
-            const { relation, newTargetId } = upd;
-            const targetCollection = relation.target();
-            const targetTable = getTableForCollection(targetCollection, this.registry);
-            const targetPks = requirePrimaryKeys(targetCollection, this.registry);
+            const { newTargetId } = upd;
+            const relation = this.relationNamed(parent, upd.relationKey);
+            const label = `${parent.slug}.${relation.name}`;
+            if (relation.kind !== "via") {
+                throw relationMisconfigured(label, `a '${relation.kind}' relation is not written as a \`via\` chain`);
+            }
+            const target = relationTarget(this.registry, relation);
+            const targetTable = catalogueTableOf(this.registry, target);
+            const targetPks = keysOfTable(this.registry, target);
             const targetIdInfo = targetPks[0];
             const targetIdCol = targetTable[targetIdInfo.fieldName as keyof typeof targetTable] as AnyPgColumn;
 
-            // Determine mapping of columns
-            //
-            // A join path is authored in SQL terms — `posts.author_id`,
-            // `user_profiles.user_id` — because that is what a join is written
-            // in. Everything below indexes a Drizzle table or builds a `set`
-            // payload with these, and both are keyed by the wire name, so the
-            // two are translated here rather than at each of the six uses.
             const { targetFKColName: targetFKColumn, parentSourceColName: parentSourceColumn } =
-                this.resolveJoinPathWriteMapping(parentCollection, relation);
-            const targetFKColName = fieldKeyForColumn(targetCollection, targetFKColumn);
-            const parentSourceColName = fieldKeyForColumn(parentCollection, parentSourceColumn);
-            const parentTable = getTableForCollection(parentCollection, this.registry);
-            const parentPks = requirePrimaryKeys(parentCollection, this.registry);
+                this.resolveJoinPathWriteMapping(parent.descriptor.table, relation);
+            const targetFKColName = columnKeyOf(target, targetFKColumn);
+            const parentSourceColName = columnKeyOf(parent, parentSourceColumn);
+            const parentTable = catalogueTableOf(this.registry, parent);
+            const parentPks = keysOfTable(this.registry, parent);
             const parentIdInfo = parentPks[0];
-            const parsedParentIdObj = parseIdValues(parentId, parentPks);
-            const parsedParentId = parsedParentIdObj[parentIdInfo.fieldName];
+            const parsedParentId = parseIdValues(parentId, parentPks)[parentIdInfo.fieldName];
 
             const parentIdCol = parentTable[parentIdInfo.fieldName as keyof typeof parentTable] as AnyPgColumn;
             const parentSourceCol = parentTable[parentSourceColName as keyof typeof parentTable] as AnyPgColumn;
             const targetFKCol = targetTable[targetFKColName as keyof typeof targetTable] as AnyPgColumn;
 
-            const label = `${parentCollection.slug}.${relation.relationName}`;
             if (!parentSourceCol) {
                 throw relationMisconfigured(
                     label,
-                    `its joinPath reads '${parentSourceColName}', which is not a column on ` +
-                    `'${getTableName(parentCollection)}'`
+                    `its \`via\` steps read '${parentSourceColName}', which is not a column on ` +
+                    `'${parent.descriptor.table}'`
                 );
             }
             if (!targetFKCol) {
                 throw relationMisconfigured(
                     label,
-                    `its joinPath writes '${targetFKColName}', which is not a column on ` +
-                    `'${getTableName(targetCollection)}'`
+                    `its \`via\` steps write '${targetFKColName}', which is not a column on ` +
+                    `'${target.descriptor.table}'`
                 );
             }
 
-            // Fetch the parent row to obtain the value for parentSourceCol
+            // The parent's current value of the column the chain joins on.
             const parentRows = await tx
                 .select({ val: parentSourceCol })
                 .from(parentTable)
@@ -749,14 +581,9 @@ export class RelationWriteService {
             if (parentRows.length === 0) continue;
             const parentFKValue = parentRows[0].val as string | number | null;
 
-            // The target rows this caller can see — the target's `beforeQuery`
-            // scope and its soft delete — as the `hasOne` and to-many writers
-            // read them: a row they hide is neither detached from this parent
-            // nor taken from another one.
-            const visible = await this.reads.visibleTargetCondition(parentCollection, relation, parentId);
+            const visible = await this.reads.visibleTargetCondition(parent, relation, parentId);
 
             if (newTargetId === null || newTargetId === undefined) {
-                // Clear any target rows currently linked to this parent via the FK
                 if (parentFKValue !== null && parentFKValue !== undefined) {
                     await tx.update(targetTable)
                         .set({ [targetFKColName]: null })
@@ -765,23 +592,17 @@ export class RelationWriteService {
                 continue;
             }
 
-            // Parse the new target id
-            const parsedTargetIdObj = parseIdValues(newTargetId, targetPks);
-            const parsedTargetId = parsedTargetIdObj[targetIdInfo.fieldName];
+            const parsedTargetId = parseIdValues(newTargetId, targetPks)[targetIdInfo.fieldName];
 
-            // Ensure one-to-one by clearing existing link from any target rows with this parent FK
             if (parentFKValue !== null && parentFKValue !== undefined) {
+                // Clear the link from whichever target row holds it now.
                 await tx.update(targetTable)
                     .set({ [targetFKColName]: null })
                     .where(and(eq(targetFKCol, String(parentFKValue)), visible));
             } else {
-                // Not a configuration problem: the row is simply missing the
-                // value the link joins on, so there is nothing for the target
-                // to point at. The `hasMany` writer already refuses this case
-                // in the same words rather than saving a row it did not write.
                 throw ApiError.badRequest(
                     `Cannot write relation '${label}': row '${parentId}' has no value in ` +
-                    `'${parentSourceColName}', which is the column its joinPath joins on, so there ` +
+                    `'${parentSourceColName}', which is the column its \`via\` steps join on, so there ` +
                     "is nothing for the related row to point at.",
                     "RELATION_SOURCE_KEY_EMPTY"
                 );
@@ -794,30 +615,25 @@ export class RelationWriteService {
         }
     }
 
-
     /**
-     * Resolve joinPath write mapping for one-to-one relations
+     * Which parent column a to-one `via` write copies into which target
+     * column: the last step's `to`, and — walking back by position (or by a
+     * `table.column` spelling) — the first step's `from`.
+     *
+     * @param parentTableName The parent's SQL table name.
      */
     resolveJoinPathWriteMapping(
-        parentCollection: CollectionConfig,
-        relation: ResolvedVia
+        parentTableName: string,
+        relation: RelationOfKind<"via">
     ): { targetFKColName: string; parentSourceColName: string } {
-        if (!relation.joinPath || relation.joinPath.length === 0) {
-            throw new Error("resolveJoinPathWriteMapping requires a joinPath relation");
+        const joinPath = relation.steps;
+        if (joinPath.length === 0) {
+            throw new Error(`The \`via\` relation '${relation.name}' has no steps to write through`);
         }
-        const parentTableName = getTableName(parentCollection);
-        const joinPath = relation.joinPath;
         let index = joinPath.length - 1;
         const targetFKColName = DrizzleConditionBuilder.getColumnNamesFromColumns(soleJoinCondition(joinPath[index]).to)[0];
         let currentFrom = soleJoinCondition(joinPath[index]).from;
 
-        // Back along the path to the step whose `from` is on the parent's
-        // table. A `table.column` spelling names that table; a bare column —
-        // the form `JoinStep` documents — is on the previous step's table, or
-        // the parent's for the first step. Reading the table only from the
-        // spelling meant a documented one-to-one `via` (`{ from: "id", to:
-        // "product_id" }`) named no table, matched no step, and refused every
-        // write with "Could not resolve parent source column".
         let safety = 0;
         while (safety++ < 10) {
             const qualifiedTable = DrizzleConditionBuilder.getTableNamesFromColumns(currentFrom)[0];
@@ -833,56 +649,46 @@ export class RelationWriteService {
                 })
                 : index - 1;
             if (prevIndex < 0) {
-                throw new Error(`Could not resolve parent source column for joinPath relation '${relation.relationName}'`);
+                throw new Error(`Could not resolve the parent source column of the \`via\` relation '${relation.name}'`);
             }
             index = prevIndex;
             currentFrom = soleJoinCondition(joinPath[index]).from;
         }
         const parentSourceColName = DrizzleConditionBuilder.getColumnNamesFromColumns(currentFrom)[0];
-        return { targetFKColName,
-parentSourceColName };
+        return {
+            targetFKColName,
+            parentSourceColName
+        };
     }
 
-
     /**
-     * Handle junction table creation for many-to-many path-based saves
+     * Link a row created under a many-to-many path (`POST posts/1/tags`) to its
+     * parent: one junction row, idempotently.
      */
     async handleJunctionTableCreation(
         tx: DrizzleClient,
         newEntityId: string | number,
         junctionTableInfo: {
-            parentCollection: CollectionConfig;
+            /** The parent table. */
+            parent: RuntimeTable;
+            /** The parent's id, parsed against its key. */
             parentId: string | number;
-            // Only a junction-backed relation has a link to write, and the
-            // caller only builds this for one — stated here so the body needs
-            // no narrowing.
-            relation: ResolvedManyToMany;
+            relation: RelationOfKind<"manyToMany">;
             relationKey: string;
         }
     ) {
-        const { parentCollection, parentId, relation, relationKey } = junctionTableInfo;
-        const targetCollection = relation.target();
+        const { parent, parentId, relation, relationKey } = junctionTableInfo;
+        const target = relationTarget(this.registry, relation);
 
         try {
-            const binding = bindThroughJunction(
-                this.registry,
-                relation.through,
-                `${parentCollection.slug}.${relationKey}`
-            );
+            const binding = bindThroughJunction(this.registry, relation, `${parent.slug}.${relationKey}`);
 
-            const parsedNewEntityId = this.parsedId(targetCollection, newEntityId);
+            const parsedNewEntityId = this.parsedId(target, newEntityId);
 
-            // Create the junction table entry linking parent to the target row.
-            const junctionData = {
+            await tx.insert(binding.table).values({
                 [binding.parentKey]: parentId,
                 [binding.targetKey]: parsedNewEntityId
-            };
-
-            // Idempotent: a link either exists or it does not, so asking for one
-            // twice is not an error. This is what lets `PUT parent/id/child/childId`
-            // mean "this row belongs to this parent's set" — the only way to
-            // attach an *existing* row, which previously had none.
-            await tx.insert(binding.table).values(junctionData).onConflictDoNothing();
+            }).onConflictDoNothing();
 
             logger.info(`Linked '${relationKey}' ${parsedNewEntityId} to ${parentId}`);
         } catch (error) {

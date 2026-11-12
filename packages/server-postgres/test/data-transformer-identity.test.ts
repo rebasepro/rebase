@@ -86,8 +86,11 @@ isId: true },
         ]
     };
 
+    // Its own slug: a table is served under one slug, and the registry
+    // compiles the table that slug names.
     const eventsWithSeats: CollectionConfig = {
         ...eventsCollection,
+        slug: "events_with_seats",
         properties: {
             sku: { type: "string",
 isId: true },
@@ -109,6 +112,7 @@ isId: true },
             return tables[name];
         });
         jest.spyOn(registry, "getCollectionByPath").mockImplementation(path => {
+            if (path.startsWith("events_with_seats")) return eventsWithSeats;
             if (path.startsWith("events")) return eventsCollection;
             if (path.startsWith("attendees")) return attendeesCollection;
             if (path.startsWith("seats")) return seatsCollection;

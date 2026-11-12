@@ -15,11 +15,11 @@
  * thirteenth. These tests establish it the way the driver does.
  */
 import { CollectionConfig } from "@rebasepro/types";
-import { resolveCollectionRelations } from "@rebasepro/common";
 import { toFlatRow, toRestRow, stripUnreadable, canReadRelation } from "../src/services/row-pipeline";
 import { withFieldViewer, currentFieldViewer } from "../src/services/field-viewer";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
+import { belongsTo, manyToMany } from "./helpers/relation-descriptors";
 
 const staff: CollectionConfig = {
     name: "Staff",
@@ -335,12 +335,25 @@ describe("a relation an include may load (`canReadRelation`)", () => {
         ]
     };
 
-    const relations = resolveCollectionRelations(projects);
+    // The relations as compiled descriptors, written out: the lift refuses
+    // `owner` (a property naming another relation), which is what this case
+    // pins on the legacy side.
+    const relations = new Map([
+        ["labels", manyToMany("labels", "tags", { table: "projects_tags", sourceKey: "project_id", targetKey: "tag_id" })],
+        ["manager", belongsTo("manager", "staff", "manager_id", "managerId")],
+        ["reviewer", belongsTo("reviewer", "staff", "reviewer_id", "reviewerId")],
+        ["sponsor", belongsTo("sponsor", "staff", "sponsor_id", "sponsorId")]
+    ]);
+    const relationAt = (key: string) => {
+        const relation = relations.get(key);
+        if (!relation) throw new Error(`projects declares no relation '${key}'`);
+        return relation;
+    };
     const readable = (key: string, roles: string[]) =>
-        withFieldViewer({ roles }, () => canReadRelation(projects, key, relations[key]));
+        withFieldViewer({ roles }, () => canReadRelation(projects, key, relationAt(key)));
 
     it.each(["labels", "manager", "reviewer"])("withholds '%s' from a caller without the role", (key) => {
-        expect(relations[key]).toBeDefined();
+        expect(relations.get(key)).toBeDefined();
         expect(readable(key, ["staff"])).toBe(false);
     });
 

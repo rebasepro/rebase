@@ -1,10 +1,11 @@
-import { CollectionConfig, Property, ResolvedRelation } from "@rebasepro/types";
-import { apiHiddenFieldNames, findRelation, resolveCollectionRelations } from "@rebasepro/common";
+import type { CollectionConfig, RelationDescriptor } from "@rebasepro/types";
 import { namesHiddenFromCaller } from "./field-viewer";
 import { ApiError } from "@rebasepro/server";
 
 import { getCollectionByPath } from "./collection-helpers";
 import { PostgresTableRegistry } from "../model/PostgresTableRegistry";
+import type { RuntimeTable } from "../model/runtime-table";
+import { isSharedRelation, relationTarget, relationWritable, requireRelation } from "./relation-tables";
 
 /**
  * The last hop of a nested collection path, e.g. `authors/1/posts`.
@@ -16,14 +17,21 @@ import { PostgresTableRegistry } from "../model/PostgresTableRegistry";
  * a path named. It lives here once now.
  */
 export interface NestedPathHop {
-    /** The collection the final relation is declared on (e.g. `authors`). */
-    parentCollection: CollectionConfig;
+    /** The table the final relation is declared on (e.g. `authors`). */
+    parent: RuntimeTable;
     /** The parent's id as it appeared in the path, unparsed. */
     parentId: string;
-    /** The path segment that named the relation (e.g. `posts`). */
+    /** The path segment that named the relation (e.g. `posts`): the relation's name. */
     relationKey: string;
-    relation: ResolvedRelation;
-    /** `relation.target()`, resolved once. */
+    relation: RelationDescriptor;
+    /** The table the relation points at (`registry.requireTable(relation.target)`). */
+    target: RuntimeTable;
+    /**
+     * The lowered collections of {@link parent} and {@link target}, looked up
+     * by slug, for the subsystems that still read one (the codecs, the field
+     * strip, `beforeQuery`). Removed with the lowered collections (K8).
+     */
+    parentCollection: CollectionConfig;
     targetCollection: CollectionConfig;
 }
 
@@ -64,48 +72,31 @@ export function resolveNestedPath(
     }
 
     let parentCollection = getCollectionByPath(segments[0], registry);
+    let parent = registry.requireTable(parentCollection.slug);
     let parentId = segments[1];
 
     for (let i = 2; i < segments.length; i += 2) {
         const relationKey = segments[i];
-        const resolvedRelations = resolveCollectionRelations(parentCollection);
         // A relation the API does not have is a segment that names nothing,
         // for this caller — and is never offered among the ones there are.
-        const relation = namesHiddenFromCaller(parentCollection).has(relationKey)
-            ? undefined
-            : findRelation(resolvedRelations, relationKey);
-
-        if (!relation) {
-            const apiHidden = apiHiddenFieldNames(parentCollection);
-            const available = Object.keys(resolvedRelations).filter(key => !apiHidden.has(key)).join(", ") || "(none)";
-            // A path segment naming a relation the collection does not declare
-            // is a bad URL, not a server fault. It answered 500 INTERNAL_ERROR,
-            // which tells the caller to retry or report an outage over a
-            // request that will never succeed — and buries a message that
-            // already says exactly what is wrong.
-            //
-            // 404, like an unknown collection: the URL names nothing. The
-            // available relations stay in the message because reaching this
-            // point means the caller could already read the parent collection,
-            // and `?include=` would list the same names.
-            throw ApiError.notFound(
-                `Relation '${relationKey}' not found in table '${parentCollection.slug}'. Available relations: [${available}]`,
-                "UNKNOWN_RELATION"
-            );
-        }
-
-        const targetCollection = relation.target();
+        // An unknown one is a 404 `UNKNOWN_RELATION` listing the others.
+        const relation = requireRelation(parent, relationKey, namesHiddenFromCaller(parentCollection));
+        const target = relationTarget(registry, relation);
+        const targetCollection = getCollectionByPath(target.slug, registry);
 
         if (i === segments.length - 1) {
             return {
-                parentCollection,
+                parent,
                 parentId,
                 relationKey,
                 relation,
+                target,
+                parentCollection,
                 targetCollection
             };
         }
 
+        parent = target;
         parentCollection = targetCollection;
         parentId = segments[i + 1];
     }
@@ -116,12 +107,12 @@ export function resolveNestedPath(
 }
 
 /**
- * A relation reached through a junction table — many-to-many, or a multi-hop
- * `joinPath`. The target row is shared with other parents, so writing "through"
+ * A relation reached through a junction table — many-to-many, or a `via`
+ * chain. The target row is shared with other parents, so writing "through"
  * such a path addresses the *link*, not the row.
  */
-export function isJunctionBackedRelation(relation: ResolvedRelation): boolean {
-    return relation.shared;
+export function isJunctionBackedRelation(relation: RelationDescriptor): boolean {
+    return isSharedRelation(relation);
 }
 
 /**
@@ -135,29 +126,26 @@ export function isJunctionBackedRelation(relation: ResolvedRelation): boolean {
  * RELATION_MISCONFIGURED telling the caller to regenerate a schema that was
  * fine, and a to-one one re-pointed the target at the first step's column.
  *
- * Matched the way the write path matches: a key that is a relation's own name
- * (the to-many split), or a `relation` property that resolves to one (the
- * to-one transformer). An `undefined` value is no value — the transformer skips
- * it — so it is not a write; `null` is, since it would unlink.
+ * Matched by the relation's own name, which is the key a body writes it
+ * under. An `undefined` value is no value — the transformer skips it — so it
+ * is not a write; `null` is, since it would unlink.
  */
-export function assertNoReadOnlyRelationValues(values: Record<string, unknown>, collection: CollectionConfig): void {
-    const properties: Record<string, Property | undefined> = collection.properties ?? {};
-    let relations: Record<string, ResolvedRelation> | undefined;
+export function assertNoReadOnlyRelationValues(values: Record<string, unknown>, table: RuntimeTable): void {
     const named: string[] = [];
     for (const [key, value] of Object.entries(values)) {
         if (value === undefined) continue;
-        relations ??= resolveCollectionRelations(collection);
-        const relation = relations[key] ?? (properties[key]?.type === "relation" ? findRelation(relations, key) : undefined);
-        if (relation && !relation.writable) named.push(key);
+        // Only a `via` can be read-only, and it is written under its own name.
+        const relation = table.relations.get(key);
+        if (relation && !relationWritable(relation)) named.push(key);
     }
     if (named.length === 0) return;
     const list = named.map(key => `'${key}'`).join(", ");
     throw ApiError.badRequest(
-        `${list} on '${collection.slug}' ${named.length > 1 ? "are multi-hop or either-column `via` relations" : "is a multi-hop or either-column `via` relation"}, ` +
+        `${list} on '${table.slug}' ${named.length > 1 ? "are multi-hop or either-column `via` relations" : "is a multi-hop or either-column `via` relation"}, ` +
         "which is read-only: only single-hop via relations are writable — a to-one chain of one step, or a to-many " +
         "chain through one junction table, each step joining on one condition. Write the rows the chain joins directly.",
         "RELATION_NOT_WRITABLE",
-        { collection: collection.slug, fields: named }
+        { collection: table.slug, fields: named }
     );
 }
 
@@ -184,14 +172,14 @@ export function assertWritableThrough(hop: NestedPathHop, path: string): void {
     // used to test `cardinality !== "many"` — a second expression of one rule,
     // free to disagree with the first, which is the shape of defect the
     // resolved union exists to remove.
-    if (relation.kind !== "via" && relation.writable && relation.cardinality === "many") return;
+    if (relation.kind !== "via" && relation.cardinality === "many") return;
 
     if (relation.kind === "via") {
         throw ApiError.badRequest(
             `"${path}" ends in '${hop.relationKey}', a \`via\` relation, which a nested path does not write ` +
-            `through — write the row at "${hop.targetCollection.slug}" directly` +
+            `through — write the row at "${hop.target.slug}" directly` +
             (relation.writable
-                ? `, and link it by setting '${hop.relationKey}' in an update of the '${hop.parentCollection.slug}' row.`
+                ? `, and link it by setting '${hop.relationKey}' in an update of the '${hop.parent.slug}' row.`
                 : "."),
             "RELATION_NOT_WRITABLE"
         );
@@ -199,8 +187,8 @@ export function assertWritableThrough(hop: NestedPathHop, path: string): void {
 
     throw ApiError.badRequest(
         `"${path}" ends in the to-one relation '${hop.relationKey}', which cannot be written through: ` +
-        `the foreign key for a to-one relation lives on '${hop.parentCollection.slug}', not on ` +
-        `'${hop.targetCollection.slug}'. Write the target row at "${hop.targetCollection.slug}" and set ` +
+        `the foreign key for a to-one relation lives on '${hop.parent.slug}', not on ` +
+        `'${hop.target.slug}'. Write the target row at "${hop.target.slug}" and set ` +
         `'${hop.relationKey}' on the parent instead.`,
         "RELATION_NOT_WRITABLE"
     );

@@ -1,5 +1,5 @@
-import type { CollectionConfig, ManyToManyRelation, ResolvedRelation } from "@rebasepro/types";
-import { resolveCollectionRelations } from "@rebasepro/common";
+import { jest } from "@jest/globals";
+import type { CollectionConfig, ManyToManyRelation } from "@rebasepro/types";
 import { pgTable, text } from "drizzle-orm/pg-core";
 import { RelationWriteService } from "../src/services/RelationWriteService";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
@@ -67,11 +67,16 @@ describe("junction writes diff rather than replace", () => {
     };
     registry.registerMultiple([postsCollection, tagsCollection]);
 
-    /** `postsCollection`'s one relation — or `relation` in its place — resolved. */
-    const resolvedTagsRelation = (relation: ManyToManyRelation = tagsRelation): ResolvedRelation => {
-        const resolved = resolveCollectionRelations({ ...postsCollection, relations: [relation] }).tags;
-        if (!resolved) throw new Error("the tags relation did not resolve");
-        return resolved;
+    /**
+     * A registry serving `postsCollection` with `relation` in place of its one
+     * relation, over the same tables.
+     */
+    const registryWith = (relation: ManyToManyRelation): PostgresTableRegistry => {
+        const other = new FixtureTableRegistry([{ ...postsCollection, relations: [relation] }, tagsCollection]);
+        other.registerPgTable(postsTable, "posts");
+        other.registerPgTable(tagsTable, "tags");
+        other.registerPgTable(postsTagsTable, "posts_tags");
+        return other;
     };
 
     /**
@@ -179,7 +184,7 @@ describe("junction writes diff rather than replace", () => {
         // from where it was just fixed.
         const recording = recordingTx(["t-1", "t-2"], 0);
         const service = new RelationWriteService(recording.db, registry);
-        const inverse = [{ relationKey: "tags", relation: resolvedTagsRelation(), newValue: [] }];
+        const inverse = [{ relationKey: "tags", newValue: [] }];
 
         await expect(service.updateInverseRelations(
             recording.db, postsCollection, "p1", inverse
@@ -192,15 +197,11 @@ describe("junction writes diff rather than replace", () => {
         // same defect, so a running server cannot reach this — it is the second
         // line, for a registry assembled by hand.
         const recording = recordingTx([]);
-        const service = new RelationWriteService(recording.db, registry);
-        const inverse = [{
-            relationKey: "tags",
-            relation: resolvedTagsRelation({
-                ...tagsRelation,
-                through: { table: "does_not_exist", sourceColumn: "post_id", targetColumn: "tag_id" }
-            }),
-            newValue: []
-        }];
+        const service = new RelationWriteService(recording.db, registryWith({
+            ...tagsRelation,
+            through: { table: "does_not_exist", sourceColumn: "post_id", targetColumn: "tag_id" }
+        }));
+        const inverse = [{ relationKey: "tags", newValue: [] }];
 
         await expect(service.updateInverseRelations(
             recording.db, postsCollection, "p1", inverse
@@ -212,13 +213,14 @@ describe("junction writes diff rather than replace", () => {
         // that is not a decision about the caller: one relation blowing up on a
         // driver error should not abort the ones after it.
         const recording = recordingTx([]);
-        const service = new RelationWriteService(recording.db, registry);
-        const relation = resolvedTagsRelation();
-        const inverse = [{
-            relationKey: "tags",
-            relation: { ...relation, target: () => { throw new Error("target thunk exploded"); } },
-            newValue: []
-        }];
+        const exploding = registryWith(tagsRelation);
+        const requireTable = exploding.requireTable.bind(exploding);
+        jest.spyOn(exploding, "requireTable").mockImplementation(slug => {
+            if (slug === "tags") throw new Error("target lookup exploded");
+            return requireTable(slug);
+        });
+        const service = new RelationWriteService(recording.db, exploding);
+        const inverse = [{ relationKey: "tags", newValue: [] }];
 
         await expect(service.updateInverseRelations(
             recording.db, postsCollection, "p1", inverse

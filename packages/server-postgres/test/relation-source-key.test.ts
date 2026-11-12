@@ -1,5 +1,5 @@
-import type { CollectionConfig, ResolvedHasMany } from "@rebasepro/types";
-import { resolveCollectionRelations } from "@rebasepro/common";
+import type { CollectionConfig } from "@rebasepro/types";
+import { relationOfTable } from "./helpers/relation-descriptors";
 import { RelationService } from "../src/services/RelationService";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
@@ -54,12 +54,8 @@ describe("hasMany/hasOne — sourceKey", () => {
         }
     };
 
-    /** The `applications` link as the services see it: resolved, with its defaults filled in. */
-    const applicationsLink = (): ResolvedHasMany => {
-        const link = resolveCollectionRelations(talents).applications;
-        if (link?.kind !== "hasMany") throw new Error("talents.applications is not a hasMany");
-        return link;
-    };
+    /** The `applications` link as the services see it: the relation descriptor the table compiled to. */
+    const applicationsLink = () => relationOfTable(registry, "talents", "applications");
 
     /**
      * A db that answers each `select()` with the next queued result set and
@@ -182,9 +178,11 @@ describe("hasMany/hasOne — sourceKey", () => {
         const tx = queuedDb([[{ id: 7, auth_user_id: "fresh" }]]);
         const relationService = new RelationService(pool.db, registry);
 
+        const link = applicationsLink();
+        if (link.kind !== "hasMany") throw new Error("talents.applications is not a hasMany");
         const value = await relationService.parentKeyValue(
-            talents,
-            applicationsLink(),
+            registry.requireTable("talents"),
+            link,
             7,
             tx.db
         );

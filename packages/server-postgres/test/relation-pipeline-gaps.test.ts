@@ -22,6 +22,7 @@ import { RelationService } from "../src/services/RelationService";
 import { RelationWriteService } from "../src/services/RelationWriteService";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
+import { relationOfTable } from "./helpers/relation-descriptors";
 import { CollectionConfig, Relation, RelationProperty } from "@rebasepro/types";
 import { resolveCollectionRelations, resolveRelation } from "@rebasepro/common";
 import { integer, pgTable, text } from "drizzle-orm/pg-core";
@@ -34,11 +35,9 @@ const mockPostsTagsTable = pgTable("posts_tags", { post_id: integer("post_id"), 
 const mockAuthorsTable = pgTable("authors", { id: integer("id"), name: text("name") });
 
 /** A relation as the services read it: resolved from the collection. */
-const link = (collection: CollectionConfig, key: string) => {
-    const resolved = resolveCollectionRelations(collection)[key];
-    if (!resolved) throw new Error(`${collection.slug}.${key} did not resolve`);
-    return resolved;
-};
+/** A relation as the services read it: the descriptor the collection's table compiles to. */
+const link = (collection: CollectionConfig, key: string) =>
+    relationOfTable(new FixtureTableRegistry([collection]), collection.slug, key);
 
 // ─── Mock Collections ─────────────────────────────────────────────────
 
@@ -702,11 +701,7 @@ email: "f@test.com" }]
         ]);
 
         const service = new RelationService(db, registry);
-        const relation = resolveRelation(
-            (tasksCollection.properties.client as RelationProperty).relation!,
-            tasksCollection,
-            "client"
-        );
+        const relation = link(tasksCollection, "client");
 
         const results = await service.batchFetchRelatedEntities(
             "tasks", [taskUuid], "client", relation
@@ -743,11 +738,7 @@ email: "f@test.com" }]
         ]);
 
         const service = new RelationService(db, registry);
-        const relation = resolveRelation(
-            (tasksCollection.properties.client as RelationProperty).relation!,
-            tasksCollection,
-            "client"
-        );
+        const relation = link(tasksCollection, "client");
 
         const results = await service.batchFetchRelatedEntities(
             "tasks", [task1, task2], "client", relation
@@ -768,11 +759,7 @@ fkValue: null }]
         ]);
 
         const service = new RelationService(db, registry);
-        const relation = resolveRelation(
-            (tasksCollection.properties.client as RelationProperty).relation!,
-            tasksCollection,
-            "client"
-        );
+        const relation = link(tasksCollection, "client");
 
         const results = await service.batchFetchRelatedEntities(
             "tasks", [task1], "client", relation

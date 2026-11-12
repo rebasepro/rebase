@@ -8,6 +8,7 @@ import {
     getUnknownFilterFieldsMode
 } from "../src/utils/drizzle-conditions";
 import type { WhereFilterOp } from "@rebasepro/types";
+import { FixtureTableRegistry } from "./helpers/tables";
 
 /**
  * A filter field that resolves to no column used to be logged and dropped.
@@ -61,6 +62,10 @@ const accountsCollection: CollectionConfig = {
         }
     }
 };
+
+/** The registry a driver hands the builder: the relation is resolved off the table's descriptor. */
+const accountsRegistry = new FixtureTableRegistry([accountsCollection]);
+accountsRegistry.registerPgTable(accountsTable, "accounts");
 
 afterEach(() => {
     configureUnknownFilterFields("error");
@@ -195,7 +200,7 @@ describe("unknown filter fields", () => {
                 { userProfile: ["==", 3] },
                 accountsTable,
                 "accounts",
-                { collection: accountsCollection }
+                { collection: accountsCollection, registry: accountsRegistry }
             );
             expect(conditions).toHaveLength(1);
             expect(pgDialect.sqlToQuery(conditions[0]).sql).toBe('"accounts"."user_profile_id" = $1');
@@ -210,7 +215,7 @@ describe("unknown filter fields", () => {
                 { users: ["==", 3] },
                 accountsTable,
                 "accounts",
-                { collection: accountsCollection }
+                { collection: accountsCollection, registry: accountsRegistry }
             );
             expect(conditions).toHaveLength(1);
             expect(pgDialect.sqlToQuery(conditions[0]).sql).toBe('"accounts"."user_id" = $1');
@@ -224,7 +229,7 @@ describe("unknown filter fields", () => {
                 { owner: ["==", 3] },
                 accountsTable,
                 "accounts",
-                { collection: accountsCollection }
+                { collection: accountsCollection, registry: accountsRegistry }
             );
             expect(conditions).toHaveLength(1);
             expect(pgDialect.sqlToQuery(conditions[0]).sql).toBe('"accounts"."owner_uid" = $1');
@@ -255,7 +260,7 @@ describe("unknown filter fields", () => {
                 },
                 accountsTable,
                 "accounts",
-                { collection: accountsCollection }
+                { collection: accountsCollection, registry: accountsRegistry }
             );
             expect(condition).not.toBeNull();
         });

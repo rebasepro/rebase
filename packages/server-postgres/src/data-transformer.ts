@@ -1,13 +1,15 @@
 import { eq } from "drizzle-orm";
 import { AnyPgColumn } from "drizzle-orm/pg-core";
 import { CollectionConfig, Properties, Property, ResolvedRelation, RelationProperty, Vector, BinaryProperty, hasForeignKeyOnTarget, type ResolvedBelongsTo, type ResolvedForeignKeyOnTarget, type ResolvedVia } from "@rebasepro/types";
-import { getTableName, resolveCollectionRelations, findRelation, fieldKeyForColumn, createRelationRef, DEFAULT_ONE_OF_TYPE, DEFAULT_ONE_OF_VALUE } from "@rebasepro/common";
+import { resolveCollectionRelations, findRelation, fieldKeyForColumn, createRelationRef, DEFAULT_ONE_OF_TYPE, DEFAULT_ONE_OF_VALUE } from "@rebasepro/common";
 import { isPrototypePollutingKey } from "@rebasepro/utils";
 import { PostgresTableRegistry } from "./model/PostgresTableRegistry";
-import { getPrimaryKeys, buildCompositeId, rowIdentityCondition } from "./services/collection-helpers";
+import { buildCompositeId, rowIdentityCondition, tableKeys } from "./services/collection-helpers";
 import { applyDynamicJoin, joinStepCondition } from "./services/RelationService";
 import { ApiError, logger } from "@rebasepro/server";
 import type { DrizzleClient } from "./interfaces";
+import type { RuntimeTable } from "./model/runtime-table";
+import { columnKeyOf } from "./services/relation-tables";
 
 /**
  * Data transformation utilities for converting between frontend and database formats.
@@ -443,143 +445,152 @@ export async function parseDataFromServer<M extends Record<string, unknown>>(
     // Shared scalar + relation value normalization
     const result = normalizeScalarValues(data, properties, collection, resolvedRelations, { skipRelations: false });
 
-    // Add relation properties that should be populated from FK values or inverse queries
-    for (const [propKey, property] of Object.entries(properties)) {
-        if (property.type === "relation" && !(propKey in result)) {
-            // Find the normalized relation for this property
-            const relation = findRelation(resolvedRelations, propKey);
-            if (relation) {
-                const localField = relation.kind === "belongsTo"
-                    ? fieldKeyForColumn(collection, relation.localKey)
-                    : "";
-                if (relation.kind === "belongsTo" && localField in data) {
-                    // Owning relation: FK is in current table, under its wire name
-                    const fkValue = data[localField as keyof M];
-                    if (fkValue !== null && fkValue !== undefined) {
-                        try {
-                            const targetCollection = relation.target();
-                            result[propKey] = createRelationRef(fkValue.toString(), targetCollection.slug);
-                        } catch (e) {
-                            logger.warn(`Could not resolve target collection for relation property: ${propKey}`, { error: e });
-                        }
-                    }
-                } else if (hasForeignKeyOnTarget(relation) && db && registry) {
-                    // Inverse relation: FK is in target table, need to query for it
-                    try {
-                        const targetCollection = relation.target();
-                        const targetTable = registry.getPgTable(getTableName(targetCollection));
-                        const pks = getPrimaryKeys(collection, registry!);
-                        // What the target's foreign key holds. Ordinarily this
-                        // row's id; for a link on a natural key, the value of
-                        // the column it points at — which is on the row already,
-                        // so this costs nothing extra.
-                        const currentId = relation.sourceKey
-                            ? (data as Record<string, unknown>)[relation.sourceKey] as string | number | undefined
-                            : buildCompositeId(data, pks);
-
-                        if (targetTable && currentId !== undefined && currentId !== null && currentId !== "") {
-                            const fkFieldKey = fieldKeyForColumn(targetCollection, relation.foreignKeyOnTarget);
-                            const foreignKeyColumn = targetTable[fkFieldKey as keyof typeof targetTable] as AnyPgColumn;
-                            if (foreignKeyColumn) {
-                                // Query the target table to find row that references this row
-                                const relatedRows = await db
-                                    .select()
-                                    .from(targetTable)
-                                    .where(eq(foreignKeyColumn, currentId))
-                                    .limit(relation.cardinality === "one" ? 1 : 100); // Limit for one-to-one vs one-to-many
-
-                                if (relatedRows.length > 0) {
-                                    if (relation.cardinality === "one") {
-                                        // One-to-one: return single relation object
-                                        const targetPks = getPrimaryKeys(targetCollection, registry!);
-                                        const relatedRow = relatedRows[0] as Record<string, unknown>;
-                                        result[propKey] = createRelationRef(buildCompositeId(relatedRow, targetPks), targetCollection.slug);
-                                    } else {
-                                        // One-to-many: return array of relation objects
-                                        const targetPks = getPrimaryKeys(targetCollection, registry!);
-                                        result[propKey] = relatedRows.map((row: Record<string, unknown>) =>
-                                            createRelationRef(buildCompositeId(row, targetPks), targetCollection.slug)
-                                        );
-                                    }
-                                }
-                            }
-                        }
-                    } catch (e) {
-                        logger.warn(`Could not resolve inverse relation property: ${propKey}`, { error: e });
-                    }
-                } else if (relation.kind === "via" && db && registry) {
-                    // Join path relation: Multi-hop relation using joins
-                    try {
-                        const targetCollection = relation.target();
-                        const pks = getPrimaryKeys(collection, registry!);
-                        const currentId = buildCompositeId(data, pks);
-
-                        if (currentId) {
-                            // Build the join query following the join path
-                            const sourceTable = registry.getPgTable(getTableName(collection));
-                            if (!sourceTable) {
-                                logger.warn(`Source table not found for collection: ${collection.slug}`);
-                                continue;
-                            }
-
-                            let query = db.select().from(sourceTable);
-                            let currentTable = sourceTable;
-
-                            // Apply each join in the path
-                            for (const join of relation.joinPath) {
-                                const joinTable = registry.getPgTable(join.table);
-                                if (!joinTable) {
-                                    logger.warn(`Join table not found: ${join.table}`);
-                                    break;
-                                }
-
-                                // Every column pair of the step, for a step that joins on a tuple.
-                                const step = joinStepCondition(currentTable, joinTable, join);
-                                if ("missing" in step) {
-                                    logger.warn(`Join columns not found: ${step.missing}`);
-                                    break;
-                                }
-
-                                query = applyDynamicJoin(query, joinTable, step.condition);
-                                currentTable = joinTable;
-                            }
-
-                            // The current row, by every key column. Without a
-                            // condition on each of them the join reads the
-                            // related rows of every row sharing the first one —
-                            // or, with none at all, of the whole table.
-                            const currentRow = rowIdentityCondition(sourceTable, pks, currentId, collection.slug);
-
-                            // Execute the query
-                            const joinResults = await query.where(currentRow).limit(relation.cardinality === "one" ? 1 : 100);
-
-                            if (joinResults.length > 0) {
-                                const targetPks = getPrimaryKeys(targetCollection, registry!);
-                                const targetTableName = relation.joinPath[relation.joinPath.length - 1].table;
-
-                                if (relation.cardinality === "one") {
-                                    // One-to-one: return single relation object
-                                    const joinResult = joinResults[0] as Record<string, unknown>;
-                                    const targetRow = (joinResult[targetTableName] || joinResult) as Record<string, unknown>;
-                                    result[propKey] = createRelationRef(buildCompositeId(targetRow, targetPks), targetCollection.slug);
-                                } else {
-                                    // One-to-many: return array of relation objects
-                                    result[propKey] = joinResults.map((joinResult: Record<string, unknown>) => {
-                                        const targetRow = (joinResult[targetTableName] || joinResult) as Record<string, unknown>;
-                                        return createRelationRef(buildCompositeId(targetRow, targetPks), targetCollection.slug);
-                                    });
-                                }
-                            }
-                        }
-                    } catch (e) {
-                        logger.warn(`Could not resolve join path relation property: ${propKey}`, { error: e });
-                    }
-                }
-            }
-        }
+    // The relation properties the row does not carry yet: a ref from the
+    // row's own foreign key, or one read from the target (`db`, `registry`).
+    if (registry) {
+        const owner = registry.getTable(collection.slug);
+        if (owner) await loadRelationRefs(data, result, properties, owner, registry, db);
     }
 
     return result as M;
+}
+
+/**
+ * The admin view model's relation refs for one row, read from the owning
+ * table's relation descriptors: every relation property the row does not
+ * already carry gets a `{ __type: "relation" }` ref — from the row's own
+ * foreign key for a `belongsTo` (no query), and, when `db` is given, from the
+ * target for a `hasOne`/`hasMany` (the rows whose foreign key holds this row's
+ * id or `sourceKey`) and a `via` (the chain joined from this row). One query
+ * per such relation, capped at 1 row for a to-one and 100 for a to-many.
+ */
+async function loadRelationRefs(
+    data: Record<string, unknown>,
+    result: Record<string, unknown>,
+    properties: Properties,
+    owner: RuntimeTable,
+    registry: PostgresTableRegistry,
+    db: DrizzleClient | undefined
+): Promise<void> {
+    for (const [propKey, property] of Object.entries(properties)) {
+        if (property.type !== "relation" || propKey in result) continue;
+        const relation = owner.relations.get(propKey);
+        if (!relation) continue;
+        const target = registry.getTable(relation.target);
+        if (!target) {
+            logger.warn(`Could not resolve the target table '${relation.target}' of relation property: ${propKey}`);
+            continue;
+        }
+
+        if (relation.kind === "belongsTo") {
+            // Owning relation: the foreign key is on this row, under its key.
+            if (!(relation.localField in data)) continue;
+            const fkValue = data[relation.localField];
+            if (fkValue !== null && fkValue !== undefined) {
+                result[propKey] = createRelationRef(String(fkValue), target.slug);
+            }
+            continue;
+        }
+
+        if (!db) continue;
+
+        if (relation.kind === "hasOne" || relation.kind === "hasMany") {
+            // Inverse relation: the foreign key is on the target table.
+            try {
+                const targetTable = registry.getPgTable(target.descriptor.table);
+                // What the target's foreign key holds. Ordinarily this row's
+                // id; for a link on a natural key, the value of the column it
+                // points at — which is on the row already, so this costs
+                // nothing extra.
+                const currentId = relation.sourceKey
+                    ? data[columnKeyOf(owner, relation.sourceKey)] as string | number | undefined
+                    : buildCompositeId(data, tableKeys(owner));
+
+                if (targetTable && currentId !== undefined && currentId !== null && currentId !== "") {
+                    const foreignKeyColumn = targetTable[columnKeyOf(target, relation.foreignKey) as keyof typeof targetTable] as AnyPgColumn;
+                    if (foreignKeyColumn) {
+                        const relatedRows = await db
+                            .select()
+                            .from(targetTable)
+                            .where(eq(foreignKeyColumn, currentId))
+                            .limit(relation.cardinality === "one" ? 1 : 100);
+
+                        if (relatedRows.length > 0) {
+                            const targetPks = tableKeys(target);
+                            if (relation.cardinality === "one") {
+                                result[propKey] = createRelationRef(buildCompositeId(relatedRows[0] as Record<string, unknown>, targetPks), target.slug);
+                            } else {
+                                result[propKey] = relatedRows.map((row: Record<string, unknown>) =>
+                                    createRelationRef(buildCompositeId(row, targetPks), target.slug)
+                                );
+                            }
+                        }
+                    }
+                }
+            } catch (e) {
+                logger.warn(`Could not resolve inverse relation property: ${propKey}`, { error: e });
+            }
+            continue;
+        }
+
+        if (relation.kind === "via") {
+            // A `via` chain, joined from this row.
+            try {
+                const pks = tableKeys(owner);
+                const currentId = buildCompositeId(data, pks);
+                if (!currentId) continue;
+
+                const sourceTable = registry.getPgTable(owner.descriptor.table);
+                if (!sourceTable) {
+                    logger.warn(`Source table not found for table: ${owner.slug}`);
+                    continue;
+                }
+
+                let query = db.select().from(sourceTable);
+                let currentTable = sourceTable;
+                for (const join of relation.steps) {
+                    const joinTable = registry.getPgTable(join.table);
+                    if (!joinTable) {
+                        logger.warn(`Join table not found: ${join.table}`);
+                        break;
+                    }
+
+                    // Every column pair of the step, for a step that joins on a tuple.
+                    const step = joinStepCondition(currentTable, joinTable, join);
+                    if ("missing" in step) {
+                        logger.warn(`Join columns not found: ${step.missing}`);
+                        break;
+                    }
+
+                    query = applyDynamicJoin(query, joinTable, step.condition);
+                    currentTable = joinTable;
+                }
+
+                // The current row, by every key column. Without a condition on
+                // each of them the join reads the related rows of every row
+                // sharing the first one — or, with none at all, of the whole table.
+                const currentRow = rowIdentityCondition(sourceTable, pks, currentId, owner.slug);
+                const joinResults = await query.where(currentRow).limit(relation.cardinality === "one" ? 1 : 100);
+
+                if (joinResults.length > 0) {
+                    const targetPks = tableKeys(target);
+                    const targetTableName = relation.steps[relation.steps.length - 1].table;
+                    const targetRowOf = (joinResult: Record<string, unknown>) =>
+                        (joinResult[targetTableName] || joinResult) as Record<string, unknown>;
+
+                    if (relation.cardinality === "one") {
+                        result[propKey] = createRelationRef(buildCompositeId(targetRowOf(joinResults[0] as Record<string, unknown>), targetPks), target.slug);
+                    } else {
+                        result[propKey] = joinResults.map((joinResult: Record<string, unknown>) =>
+                            createRelationRef(buildCompositeId(targetRowOf(joinResult), targetPks), target.slug)
+                        );
+                    }
+                }
+            } catch (e) {
+                logger.warn(`Could not resolve \`via\` relation property: ${propKey}`, { error: e });
+            }
+        }
+    }
 }
 
 /**

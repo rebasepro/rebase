@@ -26,8 +26,8 @@ import { Table } from "drizzle-orm";
 import { RelationService } from "../src/services/RelationService";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
-import { CollectionConfig, ResolvedRelation } from "@rebasepro/types";
-import { findRelation, resolveCollectionRelations } from "@rebasepro/common";
+import type { CollectionConfig, RelationDescriptor } from "@rebasepro/types";
+import { relationOfTable } from "./helpers/relation-descriptors";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 // ─── Mock Tables ──────────────────────────────────────────────────────
@@ -217,16 +217,11 @@ function generateJunctionRows(
 // ─── Tests ────────────────────────────────────────────────────────────
 
 /**
- * The relation as `FetchService` hands it over: resolved.
- *
- * These fixtures are *authored* collections, and an authored `through` may
- * leave `properties` out — the resolver is what fills it with `{}` so every
- * consumer reads one shape. Casting an authored relation into a
- * `ResolvedRelation` parameter skipped that step, and the parameter's type
- * then promised a field nothing had filled in.
+ * The relation as `FetchService` hands it over: the descriptor the
+ * collection's table compiles to, every key spelled out.
  */
-function resolved(collection: CollectionConfig, relationName: string): ResolvedRelation {
-    return findRelation(resolveCollectionRelations(collection), relationName)!;
+function resolved(collection: CollectionConfig, relationName: string): RelationDescriptor {
+    return relationOfTable(new FixtureTableRegistry([collection]), collection.slug, relationName);
 }
 
 describe("batchFetchRelatedEntitiesMany: M2M through junction table regression", () => {

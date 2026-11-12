@@ -4,7 +4,7 @@ import { PersistService } from "../src/services/PersistService";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
 import { assertWritableThrough, type NestedPathHop } from "../src/services/nested-path";
-import { resolveCollectionRelations } from "@rebasepro/common";
+import { relationOfTable } from "./helpers/relation-descriptors";
 import { unusedDb } from "./helpers/spg-c-db";
 
 /**
@@ -127,10 +127,15 @@ describe("a create or update naming a via relation", () => {
 
 describe("a nested write through a via relation", () => {
     it("is refused even for a single-hop one: the nested door does not link through a chain", () => {
-        const relation = resolveCollectionRelations(users).tags;
-        if (!relation) throw new Error("users.tags did not resolve");
+        const registry = new FixtureTableRegistry([users, tags, badges]);
         const hop: NestedPathHop = {
-            parentCollection: users, parentId: "u-1", relationKey: "tags", relation, targetCollection: tags
+            parent: registry.requireTable("users"),
+            parentId: "u-1",
+            relationKey: "tags",
+            relation: relationOfTable(registry, "users", "tags"),
+            target: registry.requireTable("tags"),
+            parentCollection: users,
+            targetCollection: tags
         };
         expect(() => assertWritableThrough(hop, "users/u-1/tags")).toThrow(expect.objectContaining({ code: "RELATION_NOT_WRITABLE" }));
     });

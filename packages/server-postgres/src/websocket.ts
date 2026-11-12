@@ -1477,7 +1477,7 @@ roles: verifiedUser.roles }
                     if (!registry) throw ApiError.forbidden(`A write through '${path}' cannot be checked: this server has no table registry.`, "FIELD_NOT_WRITABLE");
                     const hop = resolveNestedPath(path, registry);
                     const parent = hop && registry.getTable(hop.parentCollection.slug)?.descriptor;
-                    const relation = parent && hop && relationOf(parent, hop.relation.relationName);
+                    const relation = parent && hop && relationOf(parent, hop.relation.name);
                     const target = relation && registry.getTable(relation.target)?.descriptor;
                     if (!parent || !relation || !target) {
                         throw ApiError.forbidden(

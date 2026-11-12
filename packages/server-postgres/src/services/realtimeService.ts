@@ -4089,13 +4089,13 @@ lastSeen: Date.now() });
                 // again — it used to be skipped, and that link or unlink
                 // reached nobody.
                 this.debugLog(
-                    `📡 [CDC] Junction row on ${event.table} does not name '${link.sourceColumn}'/'${link.targetColumn}' — refreshing every list of ${link.parentCollection.slug}.${link.relationKey}.`
+                    `📡 [CDC] Junction row on ${event.table} does not name '${link.sourceColumn}'/'${link.targetColumn}' — refreshing every list of ${link.parentSlug}.${link.relationKey}.`
                 );
                 await this.notifyEveryListOf(link, { _rebase_invalidated: true });
                 continue;
             }
 
-            const path = `${link.parentCollection.slug}/${String(sourceId)}/${link.relationKey}`;
+            const path = `${link.parentSlug}/${String(sourceId)}/${link.relationKey}`;
             // An unlink removes the target from this list; a link invalidates it
             // so each subscriber refetches under its own RLS context.
             const row = event.op === "DELETE" ? null : { _rebase_invalidated: true };
@@ -4104,7 +4104,7 @@ lastSeen: Date.now() });
                 path,
                 String(targetId),
                 row,
-                (link.parentCollection as { databaseId?: string }).databaseId,
+                undefined,
                 /* broadcast */ false,
                 /* origin */ "cdc"
             );
@@ -4119,12 +4119,12 @@ lastSeen: Date.now() });
      * single list.
      */
     private async notifyEveryListOf(link: JunctionLink, row: Record<string, unknown> | null): Promise<void> {
-        const prefix = `${link.parentCollection.slug}/`;
+        const prefix = `${link.parentSlug}/`;
         const suffix = `/${link.relationKey}`;
         const lists = [...this.subscribedPaths.keys()].filter((path) =>
             path.startsWith(prefix) && path.endsWith(suffix) && path.split("/").length === 3);
         for (const path of lists) {
-            await this.notifyUpdate(path, ANY_ROW, row, (link.parentCollection as { databaseId?: string }).databaseId, /* broadcast */ false, /* origin */ "cdc");
+            await this.notifyUpdate(path, ANY_ROW, row, undefined, /* broadcast */ false, /* origin */ "cdc");
         }
     }
 

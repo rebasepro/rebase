@@ -1,9 +1,9 @@
 import { describe, expect, it } from "@jest/globals";
-import type { CollectionConfig, ResolvedVia } from "@rebasepro/types";
+import type { JoinStep } from "@rebasepro/types";
 import { RelationWriteService } from "../src/services/RelationWriteService";
-import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
 import { recordingDb } from "./helpers/spg-b-recording-db";
+import { via } from "./helpers/relation-descriptors";
 
 /**
  * Which parent column a one-to-one `via` write copies into the target.
@@ -16,39 +16,27 @@ import { recordingDb } from "./helpers/spg-b-recording-db";
  * side.
  */
 
-const products: CollectionConfig = { slug: "products", name: "Products", table: "products", properties: {} };
 const service = new RelationWriteService(recordingDb().db, new FixtureTableRegistry());
 
-function via(joinPath: ResolvedVia["joinPath"]): ResolvedVia {
-    return {
-        kind: "via",
-        relationName: "detail",
-        target: () => products,
-        cardinality: "one",
-        targetSlug: "products",
-        writable: true,
-        shared: false,
-        joinPath
-    };
-}
+const detail = (steps: JoinStep[]) => via("detail", "products", "one", steps, true);
 
 describe("resolveJoinPathWriteMapping", () => {
 
     it("reads a documented single step: from on the parent, to on the target", () => {
-        expect(service.resolveJoinPathWriteMapping(products, via([
+        expect(service.resolveJoinPathWriteMapping("products", detail([
             { table: "product_details", on: { from: "id", to: "product_id" } }
         ]))).toEqual({ targetFKColName: "product_id", parentSourceColName: "id" });
     });
 
     it("walks a documented path back to its first step, by position", () => {
-        expect(service.resolveJoinPathWriteMapping(products, via([
+        expect(service.resolveJoinPathWriteMapping("products", detail([
             { table: "order_items", on: { from: "sku", to: "product_sku" } },
             { table: "orders", on: { from: "order_id", to: "id" } }
         ]))).toEqual({ targetFKColName: "id", parentSourceColName: "sku" });
     });
 
     it("still follows a table.column spelling", () => {
-        expect(service.resolveJoinPathWriteMapping(products, via([
+        expect(service.resolveJoinPathWriteMapping("products", detail([
             { table: "product_details", on: { from: "products.id", to: "product_details.product_id" } }
         ]))).toEqual({ targetFKColName: "product_id", parentSourceColName: "id" });
     });

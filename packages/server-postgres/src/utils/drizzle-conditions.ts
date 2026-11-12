@@ -3,8 +3,7 @@ import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 import {
     ALL_WHERE_FILTER_OPS,
     CollectionConfig, FilterValues, WhereFilterOp, JoinStep, joinConditions, LogicalCondition, FilterCondition,
-    ResolvedRelation, ResolvedBelongsTo, ResolvedHasOne, ResolvedHasMany,
-    ResolvedForeignKeyOnTarget, ResolvedManyToMany, hasForeignKeyOnTarget, isManyToMany,
+    type RelationDescriptor,
     encodeRelationAggregateSort, parseCaseFoldedFieldPath, type RelationAggregateFn, type RelationAggregateSort
 } from "@rebasepro/types";
 import {
@@ -15,7 +14,7 @@ import {
     unknownFilterField,
     unknownVectorProperty,
     unknownRelationTargetField,
-    fieldKeyForColumn, getColumnName, getTableName, normalizeToEntityRelation, resolveCollectionRelations, toFilterTuples
+    getColumnName, normalizeToEntityRelation, toFilterTuples, type RelationOfKind
 } from "@rebasepro/common";
 import { currentFieldViewer, namesHiddenFromCaller } from "../services/field-viewer";
 import { generateForeignKeyName, splitSearchTerms, toWireKey } from "@rebasepro/utils";
@@ -40,6 +39,8 @@ import { PostgresTableRegistry } from "../model/PostgresTableRegistry";
 import { ConditionBuilderStatic } from "../interfaces";
 import { ApiError, logger } from "@rebasepro/server";
 import { columnAtKey, columnNamed, getColumnMeta } from "../services/collection-helpers";
+import { columnOfTable, pointsBack, type PointsBackRelation } from "../services/relation-tables";
+import type { RuntimeTable } from "../model/runtime-table";
 
 /**
  * What to do with a filter field that resolves to no column at all.
@@ -113,7 +114,7 @@ export const escapeLikePattern = (value: string): string =>
  * The Drizzle column a relation's column name addresses on a table.
  *
  * A relation names its link in *column* terms — `localKey: "author_id"`,
- * `foreignKeyOnTarget: "author_id"` — because that is what the database and
+ * `foreignKey: "author_id"` — because that is what the database and
  * every FK constraint call it. A Drizzle table is keyed by the *wire* name,
  * `authorId`. Indexing the table with the column, which is what every one of
  * these call sites used to do, therefore finds nothing the moment the two
@@ -130,7 +131,7 @@ export const escapeLikePattern = (value: string): string =>
  * a diagnosis. The name in the message is the one the relation *declares*, and
  * the two things it can mean are opposite: the table exists in the database and
  * the generated Drizzle schema predates it, or the table was never created and
- * the relation's `through.table` is a typo. Both are one command away from
+ * the relation's `through` is a typo. Both are one command away from
  * being settled, and neither was named.
  */
 function junctionTableMissing(junctionName: string): Error {
@@ -138,18 +139,20 @@ function junctionTableMissing(junctionName: string): Error {
         `The relation declares a junction table "${junctionName}", and no such table is registered. ` +
         "Either the generated Drizzle schema predates it — run `rebase schema generate` — or the " +
         "table does not exist yet: `rebase db push` creates the junctions a relation declares. " +
-        "If neither helps, check the `through.table` name on the relation."
+        "If neither helps, check the `through` name on the relation (`rel.manyToMany(target, { through })`)."
     );
 }
 
+/**
+ * The catalogue column of `table` for a column a relation names in SQL terms
+ * (`localKey`, `foreignKey`, `sourceKey`), keyed as `owner`'s descriptor keys
+ * it. See `columnKeyOf`.
+ */
 const relationColumn = (
     table: PgTable<any>,
-    collection: CollectionConfig | undefined,
+    owner: RuntimeTable | undefined,
     column: string
-): AnyPgColumn | undefined => {
-    const key = fieldKeyForColumn(collection, column);
-    return columnAtKey(table, key);
-};
+): AnyPgColumn | undefined => columnOfTable(table, owner, column);
 
 /**
  * A table's column by the name a `joinPath` step gives it — the SQL column — or
@@ -166,14 +169,32 @@ export function joinColumn(table: PgTable<any>, name: string): AnyPgColumn | und
     return columnNamed(table, getColumnName(name));
 }
 
-/** The target collection of a relation, or `undefined` if its thunk cannot resolve. */
-const targetOf = (relation: ResolvedRelation): CollectionConfig | undefined => {
-    try {
-        return relation.target();
-    } catch {
-        return undefined;
+/** The served table a relation points at, or `undefined` when this driver does not serve it. */
+const targetOf = (relation: RelationDescriptor, registry: PostgresTableRegistry | undefined): RuntimeTable | undefined =>
+    registry?.getTable(relation.target);
+
+/** A relation a filter, sort or count can correlate a subquery through: every kind but `via`. */
+type CorrelatedRelation = Exclude<RelationDescriptor, { kind: "via" }>;
+
+/** The pg table, the columns and the label of a `manyToMany`'s junction, or a thrown error naming what is missing. */
+function junctionColumns(
+    relation: RelationOfKind<"manyToMany">,
+    registry: PostgresTableRegistry
+): { junctionTable: PgTable<any>; sourceCol: AnyPgColumn; targetCol: AnyPgColumn } {
+    const { table: junctionName, sourceKey, targetKey } = relation.through;
+    const junctionTable = registry.getPgTable(junctionName);
+    if (!junctionTable) {
+        throw junctionTableMissing(junctionName);
     }
-};
+    const sourceCol = columnAtKey(junctionTable, sourceKey);
+    const targetCol = columnAtKey(junctionTable, targetKey);
+    if (!sourceCol || !targetCol) {
+        throw new Error(
+            `Junction columns '${sourceKey}'/'${targetKey}' not found in '${junctionName}'`
+        );
+    }
+    return { junctionTable, sourceCol, targetCol };
+}
 
 /**
  * The SQL each aggregate sort function compiles to.
@@ -327,7 +348,7 @@ type FilterTarget =
     }
     | {
         kind: "relation";
-        relation: ResolvedForeignKeyOnTarget | ResolvedManyToMany;
+        relation: PointsBackRelation | RelationOfKind<"manyToMany">;
         /** Bound here so the compile step cannot be reached without them. */
         registry: PostgresTableRegistry;
         sourceIdColumn: AnyPgColumn;
@@ -344,7 +365,7 @@ type FilterTarget =
          * in the type would let a later edit reach the compile step with a
          * relation there is no correlation for.
          */
-        relation: ResolvedBelongsTo | ResolvedForeignKeyOnTarget | ResolvedManyToMany;
+        relation: CorrelatedRelation;
         registry: PostgresTableRegistry;
         /** The column on *this* table the subquery correlates back to. */
         sourceIdColumn: AnyPgColumn;
@@ -537,11 +558,11 @@ export class DrizzleConditionBuilder {
      *   - `through`   → `EXISTS (SELECT 1 FROM junction …)`, correlated on the
      *                   target's key, so the junction never multiplies rows the
      *                   way an `INNER JOIN` would.
-     *   - `joinPath`  → the same `EXISTS`, with the path's steps joined inside
+     *   - `via`       → the same `EXISTS`, with the chain's steps joined inside
      *                   it and the final step correlating to the outer row.
      */
     static buildRelationScopeCondition(
-        relation: ResolvedRelation,
+        relation: RelationDescriptor,
         /**
          * Lazy: `via`, `belongsTo`, and a foreign key that points at a
          * `sourceKey` need the parent's own table. A junction and a plain
@@ -572,23 +593,12 @@ export class DrizzleConditionBuilder {
             case "via": {
                 const { table, key } = parent();
                 return this.buildJoinPathScopeCondition(
-                    relation.joinPath, table, key, targetTable, registry
+                    relation.steps, table, key, targetTable, registry
                 );
             }
 
             case "manyToMany": {
-                const { table: junctionName, sourceColumn, targetColumn } = relation.through;
-                const junctionTable = registry.getPgTable(junctionName);
-                if (!junctionTable) {
-                    throw junctionTableMissing(junctionName);
-                }
-                const sourceCol = junctionTable[sourceColumn as keyof typeof junctionTable] as AnyPgColumn;
-                const targetCol = junctionTable[targetColumn as keyof typeof junctionTable] as AnyPgColumn;
-                if (!sourceCol || !targetCol) {
-                    throw new Error(
-                        `Junction columns '${sourceColumn}'/'${targetColumn}' not found in '${junctionName}'`
-                    );
-                }
+                const { junctionTable, sourceCol, targetCol } = junctionColumns(relation, registry);
                 // Correlated, not joined: a join through a junction multiplies
                 // the target rows by the number of matching links and silently
                 // breaks `limit`/`offset`.
@@ -614,11 +624,11 @@ export class DrizzleConditionBuilder {
 
             case "hasOne":
             case "hasMany": {
-                const fkColumn = relationColumn(targetTable, targetOf(relation), relation.foreignKeyOnTarget);
+                const fkColumn = relationColumn(targetTable, targetOf(relation, registry), relation.foreignKey);
                 if (!fkColumn) {
                     throw new Error(
-                        `Foreign key column '${relation.foreignKeyOnTarget}' not found in the target table of ` +
-                        `relation '${relation.relationName}'.`
+                        `Foreign key column '${relation.foreignKey}' not found in the target table of ` +
+                        `relation '${relation.name}'.`
                     );
                 }
                 if (!relation.sourceKey) return eq(fkColumn, parentId);
@@ -649,7 +659,7 @@ export class DrizzleConditionBuilder {
     }
 
     /**
-     * `EXISTS` for an explicit `joinPath`.
+     * `EXISTS` for a `via` relation's steps.
      *
      * The path is declared source → target. The subquery replays every step but
      * the last from inside, and turns the last one into the correlation with the
@@ -658,7 +668,7 @@ export class DrizzleConditionBuilder {
      * that revisits a table (a self-referencing many-to-many) unambiguous.
      */
     private static buildJoinPathScopeCondition(
-        joinPath: JoinStep[],
+        joinPath: readonly JoinStep[],
         parentTable: PgTable<any>,
         /** The parent row's key, every column with its value. */
         parentKey: { column: AnyPgColumn; value: string | number }[],
@@ -713,7 +723,7 @@ export class DrizzleConditionBuilder {
         const targetColumn = (name: string): AnyPgColumn => {
             const column = joinColumn(targetTable, name);
             if (!column) {
-                throw new Error(`Join step column '${name}' not found in the target table of this joinPath`);
+                throw new Error(`Join step column '${name}' not found in the target table of this \`via\` relation`);
             }
             return column;
         };
@@ -805,11 +815,12 @@ export class DrizzleConditionBuilder {
         }
 
         if (collection) {
-            const relation = resolveCollectionRelations(collection)[field];
+            const owner = registry?.getTable(collection.slug);
+            const relation = owner?.relations.get(field);
 
             // Owning relation, resolved: the relation names its own local key.
             if (relation?.kind === "belongsTo") {
-                const foreignKey = relationColumn(table, collection, relation.localKey);
+                const foreignKey = columnAtKey(table, relation.localField) ?? relationColumn(table, owner, relation.localKey);
                 if (foreignKey) return { kind: "column", column: foreignKey };
             }
 
@@ -817,19 +828,20 @@ export class DrizzleConditionBuilder {
             // out: its join path is authored source → target with no stated
             // inverse, so reversing it into a filter is a different problem
             // from the two shapes below rather than a third case of them.
-            if (relation && (hasForeignKeyOnTarget(relation) || isManyToMany(relation)) && registry && sourceIdColumn) {
+            if (relation && (pointsBack(relation) || relation.kind === "manyToMany") && registry && sourceIdColumn) {
                 // The `EXISTS` correlates the target's foreign key with a column
                 // on *this* table, and that is the primary key only when the
                 // link joins on it. A `sourceKey` names a different one, and
                 // correlating on the id anyway silently matches nothing —
                 // "filter by this relation" would quietly return zero rows.
-                const correlationColumn = hasForeignKeyOnTarget(relation) && relation.sourceKey
-                    ? relationColumn(table, collection, relation.sourceKey)
+                const sourceKey = pointsBack(relation) ? relation.sourceKey : undefined;
+                const correlationColumn = sourceKey
+                    ? relationColumn(table, owner, sourceKey)
                     : sourceIdColumn;
                 if (!correlationColumn) {
                     throw new Error(
-                        `\`sourceKey: "${(relation as ResolvedForeignKeyOnTarget).sourceKey}"\` on relation ` +
-                        `'${relation.relationName}' is not a column on '${collectionPath}', so a filter on ` +
+                        `\`sourceKey: "${sourceKey}"\` on relation ` +
+                        `'${relation.name}' is not a column on '${collectionPath}', so a filter on ` +
                         "that relation has nothing to correlate against."
                     );
                 }
@@ -840,9 +852,9 @@ export class DrizzleConditionBuilder {
             // its id. Resolved last of the relation shapes, so a relation
             // literally named with a dot still wins above.
             const relationField = parseRelationFieldPath(field);
-            if (relationField && registry && sourceIdColumn) {
+            if (relationField && registry && owner && sourceIdColumn) {
                 const target = this.resolveRelationFieldTarget(
-                    table, relationField, collection, registry, sourceIdColumn, field, collectionPath
+                    table, relationField, owner, registry, sourceIdColumn, field, collectionPath
                 );
                 if (target) return target;
             }
@@ -918,13 +930,13 @@ export class DrizzleConditionBuilder {
     private static resolveRelationFieldTarget(
         table: PgTable<any>,
         path: { relationKey: string; fieldKey: string },
-        collection: CollectionConfig,
+        owner: RuntimeTable,
         registry: PostgresTableRegistry,
         sourceIdColumn: AnyPgColumn,
         field: string,
         collectionPath: string
     ): FilterTarget | undefined {
-        const relation = resolveCollectionRelations(collection)[path.relationKey];
+        const relation = owner.relations.get(path.relationKey);
         if (!relation) return undefined;
 
         if (relation.kind === "via") {
@@ -937,21 +949,21 @@ export class DrizzleConditionBuilder {
             );
         }
 
-        const targetCollection = targetOf(relation);
-        const targetTable = targetCollection && registry.getPgTable(getTableName(targetCollection));
-        if (!targetCollection || !targetTable) {
+        const target = targetOf(relation, registry);
+        const targetTable = target && registry.getPgTable(target.descriptor.table);
+        if (!target || !targetTable) {
             throw new Error(
-                `Table not found for the target of relation '${relation.relationName}' on '${collectionPath}', ` +
+                `Table not found for the target of relation '${relation.name}' on '${collectionPath}', ` +
                 `so '${field}' has nothing to filter against.`
             );
         }
 
-        const targetColumn = relationColumn(targetTable, targetCollection, path.fieldKey)
+        const targetColumn = relationColumn(targetTable, target, path.fieldKey)
             ?? columnAtKey(targetTable, path.fieldKey);
         if (!targetColumn) {
             const answer = unknownRelationTargetField(
                 { field, relationKey: path.relationKey, fieldKey: path.fieldKey },
-                { slug: targetCollection.slug, validFields: listedColumnKeys(targetTable, targetCollection) },
+                { slug: target.slug, validFields: listedColumnKeys(targetTable, registry.getCollectionByPath(target.slug)) },
                 collectionPath
             );
             throw ApiError.badRequest(answer.message, "UNKNOWN_FILTER_FIELD", answer.details);
@@ -962,13 +974,13 @@ export class DrizzleConditionBuilder {
         // from its own foreign key, and a many-to-many from the primary key the
         // junction was built against.
         const correlationColumn = relation.kind === "belongsTo"
-            ? relationColumn(table, collection, relation.localKey)
-            : hasForeignKeyOnTarget(relation) && relation.sourceKey
-                ? relationColumn(table, collection, relation.sourceKey)
+            ? relationColumn(table, owner, relation.localKey)
+            : pointsBack(relation) && relation.sourceKey
+                ? relationColumn(table, owner, relation.sourceKey)
                 : sourceIdColumn;
         if (!correlationColumn) {
             throw new Error(
-                `Relation '${relation.relationName}' on '${collectionPath}' names a key that is not a column ` +
+                `Relation '${relation.name}' on '${collectionPath}' names a key that is not a column ` +
                 `there, so '${field}' has nothing to correlate against.`
             );
         }
@@ -1227,7 +1239,7 @@ export class DrizzleConditionBuilder {
      * the same table), where the subquery's table and the outer one coincide.
      */
     static buildRelationFilterCondition(
-        relation: ResolvedForeignKeyOnTarget | ResolvedManyToMany,
+        relation: PointsBackRelation | RelationOfKind<"manyToMany">,
         op: WhereFilterOp,
         value: unknown,
         sourceIdColumn: AnyPgColumn,
@@ -1244,35 +1256,24 @@ export class DrizzleConditionBuilder {
         let comparedColumn: AnyPgColumn;
 
         if (relation.kind === "manyToMany") {
-            const { table: junctionName, sourceColumn, targetColumn } = relation.through;
-            const junctionTable = registry.getPgTable(junctionName);
-            if (!junctionTable) {
-                throw junctionTableMissing(junctionName);
-            }
-            const sourceCol = junctionTable[sourceColumn as keyof typeof junctionTable] as AnyPgColumn;
-            const targetCol = junctionTable[targetColumn as keyof typeof junctionTable] as AnyPgColumn;
-            if (!sourceCol || !targetCol) {
-                throw new Error(
-                    `Junction columns '${sourceColumn}'/'${targetColumn}' not found in '${junctionName}'`
-                );
-            }
+            const { junctionTable, sourceCol, targetCol } = junctionColumns(relation, registry);
             scanTable = junctionTable;
             correlation = sql`${ref(sourceCol)} = ${sourceIdColumn}`;
             comparedColumn = targetCol;
         } else {
-            const targetCollection = relation.target();
-            const targetTable = registry.getPgTable(getTableName(targetCollection));
+            const target = targetOf(relation, registry);
+            const targetTable = target && registry.getPgTable(target.descriptor.table);
             if (!targetTable) {
                 throw new Error(
-                    `Table not found for the target of relation '${relation.relationName}' ` +
-                    `(table '${targetCollection.slug}')`
+                    `Table not found for the target of relation '${relation.name}' ` +
+                    `(table '${relation.target}')`
                 );
             }
-            const fkColumn = relationColumn(targetTable, targetCollection, relation.foreignKeyOnTarget);
+            const fkColumn = relationColumn(targetTable, target, relation.foreignKey);
             if (!fkColumn) {
                 throw new Error(
-                    `Foreign key column '${relation.foreignKeyOnTarget}' not found in the target table of ` +
-                    `relation '${relation.relationName}'.`
+                    `Foreign key column '${relation.foreignKey}' not found in the target table of ` +
+                    `relation '${relation.name}'.`
                 );
             }
             // The filter value is a target row's id, so that is what the
@@ -1280,7 +1281,7 @@ export class DrizzleConditionBuilder {
             const targetIdColumn = this.primaryKeyColumn(targetTable);
             if (!targetIdColumn) {
                 throw new Error(
-                    `No primary key or "id" column in the target table of relation '${relation.relationName}', ` +
+                    `No primary key or "id" column in the target table of relation '${relation.name}', ` +
                     `so a filter on it has nothing to match against.`
                 );
             }
@@ -1459,22 +1460,11 @@ export class DrizzleConditionBuilder {
         let correlation: SQL;
 
         if (relation.kind === "manyToMany") {
-            const { table: junctionName, sourceColumn, targetColumn: junctionTargetColumn } = relation.through;
-            const junctionTable = target.registry.getPgTable(junctionName);
-            if (!junctionTable) {
-                throw junctionTableMissing(junctionName);
-            }
-            const sourceCol = junctionTable[sourceColumn as keyof typeof junctionTable] as AnyPgColumn;
-            const targetCol = junctionTable[junctionTargetColumn as keyof typeof junctionTable] as AnyPgColumn;
-            if (!sourceCol || !targetCol) {
-                throw new Error(
-                    `Junction columns '${sourceColumn}'/'${junctionTargetColumn}' not found in '${junctionName}'`
-                );
-            }
+            const { junctionTable, sourceCol, targetCol } = junctionColumns(relation, target.registry);
             const targetKey = this.primaryKeyColumn(targetTable);
             if (!targetKey) {
                 throw new Error(
-                    `No primary key or "id" column in the target table of relation '${relation.relationName}', ` +
+                    `No primary key or "id" column in the target table of relation '${relation.name}', ` +
                     `so '${field}' has nothing to join the junction against.`
                 );
             }
@@ -1485,18 +1475,18 @@ export class DrizzleConditionBuilder {
             const targetKey = this.primaryKeyColumn(targetTable);
             if (!targetKey) {
                 throw new Error(
-                    `No primary key or "id" column in the target table of relation '${relation.relationName}', ` +
+                    `No primary key or "id" column in the target table of relation '${relation.name}', ` +
                     `so '${field}' has nothing to correlate against.`
                 );
             }
             from = sql`${targetTable} AS ${sql.identifier(alias)}`;
             correlation = sql`${sql.identifier(alias)}.${sql.identifier(targetKey.name)} = ${target.sourceIdColumn}`;
         } else {
-            const foreignKey = relationColumn(targetTable, targetOf(relation), relation.foreignKeyOnTarget);
+            const foreignKey = relationColumn(targetTable, targetOf(relation, target.registry), relation.foreignKey);
             if (!foreignKey) {
                 throw new Error(
-                    `Foreign key column '${relation.foreignKeyOnTarget}' not found in the target table of ` +
-                    `relation '${relation.relationName}'.`
+                    `Foreign key column '${relation.foreignKey}' not found in the target table of ` +
+                    `relation '${relation.name}'.`
                 );
             }
             from = sql`${targetTable} AS ${sql.identifier(alias)}`;
@@ -1678,9 +1668,10 @@ export class DrizzleConditionBuilder {
     ): SQL {
         // A relation the API does not have is not a relation there, for this
         // caller — the same answer, byte for byte, as one never declared.
+        const ownerTable = registry.getTable(collection.slug);
         const relation = namesHiddenFromCaller(collection).has(spec.relation)
             ? undefined
-            : resolveCollectionRelations(collection)[spec.relation];
+            : ownerTable?.relations.get(spec.relation);
         if (!relation) {
             throw ApiError.badRequest(
                 `Cannot sort by '${encodeRelationAggregateSort(spec)}' on table '${collectionPath}': ` +
@@ -1698,11 +1689,13 @@ export class DrizzleConditionBuilder {
             );
         }
 
-        const targetCollection = targetOf(relation);
-        const targetTable = targetCollection && registry.getPgTable(getTableName(targetCollection));
-        if (!targetCollection || !targetTable) {
+        const target = targetOf(relation, registry);
+        const targetTable = target && registry.getPgTable(target.descriptor.table);
+        // The target's lowered collection, for the field checks still read off one.
+        const targetCollection = target ? registry.getCollectionByPath(target.slug) ?? undefined : undefined;
+        if (!target || !targetTable) {
             throw new Error(
-                `Table not found for the target of relation '${relation.relationName}' on '${collectionPath}', ` +
+                `Table not found for the target of relation '${relation.name}' on '${collectionPath}', ` +
                 "so there is nothing to aggregate."
             );
         }
@@ -1713,14 +1706,14 @@ export class DrizzleConditionBuilder {
         // never got this far — `parseRelationAggregateSort` refuses it.
         let aggregand: SQL = sql`*`;
         if (spec.field) {
-            const column = namesHiddenFromCaller(targetCollection).has(spec.field)
+            const column = targetCollection && namesHiddenFromCaller(targetCollection).has(spec.field)
                 ? undefined
-                : relationColumn(targetTable, targetCollection, spec.field)
+                : relationColumn(targetTable, target, spec.field)
                     ?? columnAtKey(targetTable, spec.field);
             if (!column) {
                 const validFields = listedColumnKeys(targetTable, targetCollection);
                 throw ApiError.badRequest(
-                    `Unknown field '${spec.field}' on '${targetCollection.slug}', the target of relation ` +
+                    `Unknown field '${spec.field}' on '${target.slug}', the target of relation ` +
                     `'${spec.relation}' on table '${collectionPath}'` +
                     (validFields.length > 0 ? `. Valid fields: ${validFields.join(", ")}` : ""),
                     "UNKNOWN_ORDER_BY_FIELD",
@@ -1728,7 +1721,7 @@ export class DrizzleConditionBuilder {
                         field: encodeRelationAggregateSort(spec),
                         collection: collectionPath,
                         relation: spec.relation,
-                        targetCollection: targetCollection.slug,
+                        targetCollection: target.slug,
                         ...(validFields.length > 0 && { validFields })
                     }
                 );
@@ -1751,22 +1744,11 @@ export class DrizzleConditionBuilder {
         let correlation: SQL;
 
         if (relation.kind === "manyToMany") {
-            const { table: junctionName, sourceColumn, targetColumn } = relation.through;
-            const junctionTable = registry.getPgTable(junctionName);
-            if (!junctionTable) {
-                throw junctionTableMissing(junctionName);
-            }
-            const sourceCol = junctionTable[sourceColumn as keyof typeof junctionTable] as AnyPgColumn;
-            const targetCol = junctionTable[targetColumn as keyof typeof junctionTable] as AnyPgColumn;
-            if (!sourceCol || !targetCol) {
-                throw new Error(
-                    `Junction columns '${sourceColumn}'/'${targetColumn}' not found in '${junctionName}'`
-                );
-            }
+            const { junctionTable, sourceCol, targetCol } = junctionColumns(relation, registry);
             const targetKey = this.primaryKeyColumn(targetTable);
             if (!targetKey) {
                 throw new Error(
-                    `No primary key or "id" column in the target table of relation '${relation.relationName}'.`
+                    `No primary key or "id" column in the target table of relation '${relation.name}'.`
                 );
             }
             const junctionAlias = "__rel_agg_junction";
@@ -1774,10 +1756,10 @@ export class DrizzleConditionBuilder {
             correlation = sql`${sql.identifier(junctionAlias)}.${sql.identifier(sourceCol.name)} = ${source}`;
         } else if (relation.kind === "belongsTo") {
             const targetKey = this.primaryKeyColumn(targetTable);
-            const localKey = relationColumn(table, collection, relation.localKey);
+            const localKey = columnAtKey(table, relation.localField) ?? relationColumn(table, ownerTable, relation.localKey);
             if (!targetKey || !localKey) {
                 throw new Error(
-                    `Relation '${relation.relationName}' on '${collectionPath}' names a key that is not a column, ` +
+                    `Relation '${relation.name}' on '${collectionPath}' names a key that is not a column, ` +
                     "so there is nothing to aggregate against."
                 );
             }
@@ -1790,22 +1772,22 @@ export class DrizzleConditionBuilder {
                 : sql`(SELECT ${sql.identifier(localKey.name)} FROM ${table} WHERE ${sourceIdColumn} = ${correlateTo})`;
             correlation = sql`${sql.identifier(alias)}.${sql.identifier(targetKey.name)} = ${owner}`;
         } else {
-            const foreignKey = relationColumn(targetTable, targetCollection, relation.foreignKeyOnTarget);
+            const foreignKey = relationColumn(targetTable, target, relation.foreignKey);
             if (!foreignKey) {
                 throw new Error(
-                    `Foreign key column '${relation.foreignKeyOnTarget}' not found in the target table of ` +
-                    `relation '${relation.relationName}'.`
+                    `Foreign key column '${relation.foreignKey}' not found in the target table of ` +
+                    `relation '${relation.name}'.`
                 );
             }
             // `sourceKey` names a column other than the primary key when the
             // link joins on one; correlating on the id anyway aggregates over
             // nothing and every row sorts as though it had no related rows.
             const sourceKeyColumn = relation.sourceKey
-                ? relationColumn(table, collection, relation.sourceKey)
+                ? relationColumn(table, ownerTable, relation.sourceKey)
                 : sourceIdColumn;
             if (!sourceKeyColumn) {
                 throw new Error(
-                    `\`sourceKey: "${relation.sourceKey}"\` on relation '${relation.relationName}' is not a ` +
+                    `\`sourceKey: "${relation.sourceKey}"\` on relation '${relation.name}' is not a ` +
                     `column on '${collectionPath}'.`
                 );
             }
@@ -1994,7 +1976,7 @@ export class DrizzleConditionBuilder {
      * difference and one of the places the two could drift apart.
      */
     static buildRelationConditions(
-        relation: ResolvedRelation,
+        relation: RelationDescriptor,
         parentId: string | number | (string | number)[],
         targetTable: PgTable<any>,
         parentTable: PgTable<any>,
@@ -2011,7 +1993,7 @@ export class DrizzleConditionBuilder {
         switch (relation.kind) {
             case "via": {
                 const { joins, finalCondition } = this.buildJoinPathConditions(
-                    relation.joinPath, targetTable, parentTable, parentIdColumn, parentId, registry
+                    relation.steps, targetTable, parentTable, parentIdColumn, parentId, registry
                 );
                 joinConditions.push(...joins);
                 whereConditions.push(finalCondition);
@@ -2020,7 +2002,7 @@ export class DrizzleConditionBuilder {
 
             case "manyToMany": {
                 const junctionResult = this.buildJunctionTableConditions(
-                    relation.through, targetIdColumn, parentId, registry
+                    relation, targetIdColumn, parentId, registry
                 );
                 joinConditions.push(junctionResult.join);
                 whereConditions.push(junctionResult.condition);
@@ -2031,7 +2013,7 @@ export class DrizzleConditionBuilder {
             case "hasMany":
             case "belongsTo":
                 whereConditions.push(
-                    this.buildSimpleRelationCondition(relation, targetTable, parentTable, parentId)
+                    this.buildSimpleRelationCondition(relation, targetTable, parentId, registry)
                 );
                 break;
 
@@ -2049,7 +2031,7 @@ whereConditions };
      * Build conditions for join path relations
      */
     private static buildJoinPathConditions(
-        joinPath: JoinStep[],
+        joinPath: readonly JoinStep[],
         targetTable: PgTable<any>,
         parentTable: PgTable<any>,
         parentIdColumn: AnyPgColumn,
@@ -2134,7 +2116,7 @@ whereConditions };
      * junction for one alternative of several is guessing twice.
      */
     private static buildReverseJoinStep(
-        joinPath: JoinStep[],
+        joinPath: readonly JoinStep[],
         index: number,
         sourceTableName: string,
         currentTable: PgTable<any>,
@@ -2330,25 +2312,12 @@ whereConditions };
      * Build conditions for junction table (many-to-many) relations
      */
     private static buildJunctionTableConditions(
-        through: { table: string; sourceColumn: string; targetColumn: string },
+        relation: RelationOfKind<"manyToMany">,
         targetIdColumn: AnyPgColumn,
         parentId: string | number | (string | number)[],
         registry: PostgresTableRegistry
     ): { join: { table: PgTable<any>; condition: SQL }; condition: SQL } {
-        const junctionTable = registry.getPgTable(through.table);
-        if (!junctionTable) {
-            throw junctionTableMissing(through.table);
-        }
-
-        const junctionSourceCol = junctionTable[through.sourceColumn as keyof typeof junctionTable] as AnyPgColumn;
-        const junctionTargetCol = junctionTable[through.targetColumn as keyof typeof junctionTable] as AnyPgColumn;
-
-        if (!junctionSourceCol) {
-            throw new Error(`Source column '${through.sourceColumn}' not found in junction table '${through.table}'`);
-        }
-        if (!junctionTargetCol) {
-            throw new Error(`Target column '${through.targetColumn}' not found in junction table '${through.table}'`);
-        }
+        const { junctionTable, junctionSourceCol, junctionTargetCol } = this.junctionKeyColumns(relation, registry);
 
         // Handle both single ID and array of IDs
         const condition = Array.isArray(parentId)
@@ -2375,10 +2344,10 @@ whereConditions };
      * relation arrive here under-specified. It cannot now.
      */
     private static buildSimpleRelationCondition(
-        relation: ResolvedBelongsTo | ResolvedHasOne | ResolvedHasMany,
+        relation: RelationOfKind<"belongsTo"> | PointsBackRelation,
         targetTable: PgTable<any>,
-        parentTable: PgTable<any>,
-        parentId: string | number | (string | number)[]
+        parentId: string | number | (string | number)[],
+        registry: PostgresTableRegistry
     ): SQL {
         const match = (column: AnyPgColumn) =>
             Array.isArray(parentId) ? inArray(column, parentId) : eq(column, parentId);
@@ -2389,17 +2358,17 @@ whereConditions };
             const targetIdCol = this.primaryKeyColumn(targetTable);
             if (!targetIdCol) {
                 throw new Error(
-                    `No primary key or "id" column in the target table of relation '${relation.relationName}'.`
+                    `No primary key or "id" column in the target table of relation '${relation.name}'.`
                 );
             }
             return match(targetIdCol);
         }
 
-        const foreignKeyCol = relationColumn(targetTable, targetOf(relation), relation.foreignKeyOnTarget);
+        const foreignKeyCol = relationColumn(targetTable, targetOf(relation, registry), relation.foreignKey);
         if (!foreignKeyCol) {
             throw new Error(
-                `Foreign key column '${relation.foreignKeyOnTarget}' not found in the target table of relation ` +
-                `'${relation.relationName}'. A link through a junction is \`kind: "manyToMany"\`.`
+                `Foreign key column '${relation.foreignKey}' not found in the target table of relation ` +
+                `'${relation.name}'. A link through a junction is \`rel.manyToMany\`.`
             );
         }
         return match(foreignKeyCol);
@@ -2875,7 +2844,7 @@ whereConditions };
      */
     static buildRelationQuery<T extends DrizzleDynamicQuery>(
         baseQuery: T,
-        relation: ResolvedRelation,
+        relation: RelationDescriptor,
         parentId: string | number | (string | number)[],
         targetTable: PgTable<any>,
         parentTable: PgTable<any>,
@@ -2924,7 +2893,7 @@ whereConditions };
      */
     static buildRelationCountQuery<T extends DrizzleDynamicQuery>(
         baseCountQuery: T,
-        relation: ResolvedRelation,
+        relation: RelationDescriptor,
         parentId: string | number,
         targetTable: PgTable<any>,
         parentTable: PgTable<any>,
@@ -2936,20 +2905,20 @@ whereConditions };
         switch (relation.kind) {
             case "via":
                 return this.buildJoinPathCountQuery(
-                    baseCountQuery, relation.joinPath, targetTable, parentTable,
+                    baseCountQuery, relation.steps, targetTable, parentTable,
                     parentIdColumn, parentId, registry, additionalFilters
                 );
 
             case "manyToMany":
                 return this.buildJunctionCountQuery(
-                    baseCountQuery, relation.through, targetIdColumn, parentId, registry, additionalFilters
+                    baseCountQuery, relation, targetIdColumn, parentId, registry, additionalFilters
                 );
 
             case "belongsTo":
             case "hasOne":
             case "hasMany": {
                 const allConditions = [
-                    this.buildSimpleRelationCondition(relation, targetTable, parentTable, parentId),
+                    this.buildSimpleRelationCondition(relation, targetTable, parentId, registry),
                     ...(additionalFilters ?? [])
                 ];
                 return baseCountQuery.where(and(...allConditions));
@@ -2967,7 +2936,7 @@ whereConditions };
      */
     private static buildJoinPathCountQuery<T extends DrizzleDynamicQuery>(
         baseCountQuery: T,
-        joinPath: JoinStep[],
+        joinPath: readonly JoinStep[],
         targetTable: PgTable<any>,
         parentTable: PgTable<any>,
         parentIdColumn: AnyPgColumn,
@@ -3004,26 +2973,13 @@ whereConditions };
      */
     private static buildJunctionCountQuery<T extends DrizzleDynamicQuery>(
         baseCountQuery: T,
-        through: { table: string; sourceColumn: string; targetColumn: string },
+        relation: RelationOfKind<"manyToMany">,
         targetIdColumn: AnyPgColumn,
         parentId: string | number,
         registry: PostgresTableRegistry,
         additionalFilters?: SQL[]
     ): T {
-        const junctionTable = registry.getPgTable(through.table);
-        if (!junctionTable) {
-            throw junctionTableMissing(through.table);
-        }
-
-        const junctionSourceCol = junctionTable[through.sourceColumn as keyof typeof junctionTable] as AnyPgColumn;
-        const junctionTargetCol = junctionTable[through.targetColumn as keyof typeof junctionTable] as AnyPgColumn;
-
-        if (!junctionSourceCol) {
-            throw new Error(`Source column '${through.sourceColumn}' not found in junction table '${through.table}'`);
-        }
-        if (!junctionTargetCol) {
-            throw new Error(`Target column '${through.targetColumn}' not found in junction table '${through.table}'`);
-        }
+        const { junctionTable, junctionSourceCol, junctionTargetCol } = this.junctionKeyColumns(relation, registry);
 
         const baseConditions = [eq(junctionSourceCol, parentId)];
         if (additionalFilters && additionalFilters.length > 0) {
@@ -3053,8 +3009,32 @@ whereConditions };
      * failed. The tab's own listing worked — it walks the path forward from
      * the parent, by position — so only the record behind it broke.
      */
+    /**
+     * A junction's pg table and its two key columns, for the join and count
+     * builders: each missing piece is its own error, naming the junction.
+     */
+    private static junctionKeyColumns(
+        relation: RelationOfKind<"manyToMany">,
+        registry: PostgresTableRegistry
+    ): { junctionTable: PgTable<any>; junctionSourceCol: AnyPgColumn; junctionTargetCol: AnyPgColumn } {
+        const { through } = relation;
+        const junctionTable = registry.getPgTable(through.table);
+        if (!junctionTable) {
+            throw junctionTableMissing(through.table);
+        }
+        const junctionSourceCol = columnAtKey(junctionTable, through.sourceKey);
+        const junctionTargetCol = columnAtKey(junctionTable, through.targetKey);
+        if (!junctionSourceCol) {
+            throw new Error(`Source column '${through.sourceKey}' not found in junction table '${through.table}'`);
+        }
+        if (!junctionTargetCol) {
+            throw new Error(`Target column '${through.targetKey}' not found in junction table '${through.table}'`);
+        }
+        return { junctionTable, junctionSourceCol, junctionTargetCol };
+    }
+
     private static joinStepTableNames(
-        joinPath: JoinStep[],
+        joinPath: readonly JoinStep[],
         index: number,
         sourceTableName: string
     ): { fromTableName: string; toTableName: string } {

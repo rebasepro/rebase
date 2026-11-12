@@ -3,6 +3,7 @@ import { integer, pgTable, varchar } from "drizzle-orm/pg-core";
 import { RelationService } from "../src/services/RelationService";
 import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
+import { relationOfTable } from "./helpers/relation-descriptors";
 import * as transformer from "../src/data-transformer";
 import { arrayRowsFor, recordingDb } from "./helpers/spg-b-recording-db";
 
@@ -61,10 +62,8 @@ describe("the include loader renders a related row once", () => {
             path === "posts" ? postsCollection : commentsCollection);
     });
 
-    const relation = () => Object.values(
-        // Resolved the way the loader resolves it.
-        jest.requireActual<typeof import("@rebasepro/common")>("@rebasepro/common").resolveCollectionRelations(postsCollection)
-    )[0];
+    // Read off the table the way the loader reads it.
+    const relation = () => relationOfTable(registry, "posts", "comments");
 
     it("does not build the admin view model for a REST include", async () => {
         const parse = jest.spyOn(transformer, "parseDataFromServer");
