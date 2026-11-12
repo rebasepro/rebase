@@ -507,6 +507,19 @@ describe("compileTables — refusals", () => {
             ]);
         });
 
+        it("refuses an array item's column-only modifiers, and keeps the item rules", () => {
+            const t = table("t", {
+                id: id(),
+                items: col.array(col.text().notNull().default("x").access({ read: ["a"] })),
+                fine: col.array(col.text().validate({ max: 3 }).oneOf(["a", "b"]).describe("an item"))
+            });
+            expect(problemsOf([t])).toEqual([{
+                table: "t",
+                key: "items",
+                message: expect.stringContaining("the array's items declare `.notNull()`, a default, `.access()`, which apply to a column, not to the items of one")
+            }]);
+        });
+
         it("refuses a private primary key and an instant as a key", () => {
             const t = table("t", { id: rawColumn({ type: { kind: "uuid" }, primaryKey: true, notNull: true, private: true }) });
             expect(problemsOf([t])).toEqual([{ table: "t", key: "id", message: expect.stringContaining("a primary-key column cannot be `.private()`") }]);

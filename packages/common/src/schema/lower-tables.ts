@@ -127,32 +127,8 @@ export interface PendingTableFeature {
  */
 export const PENDING_TABLE_FEATURES = [
     {
-        id: "array-element-modifiers",
-        description: "An array element declaring more than `.validate()`, `.oneOf()`, storage or `.transform()` (a default, `.notNull()`, `.unique()`, access…). Those apply to a column, not to the items of one."
-    },
-    {
-        id: "text-one-of",
-        description: "`.oneOf([...])` on a text column outside an array. The planner plans the column as TEXT from its definition, but the runtime reads a closed set of strings only as a legacy `enum`, which its other readers (search, the doctor, enum label upkeep) take for a Postgres enum type; use `col.enum()` until write validation reads the descriptor."
-    },
-    {
         id: "has-many-order-by",
         description: "`rel.hasMany(target, { orderBy })`. Related rows come back in the caller's order only."
-    },
-    {
-        id: "json-document-shape",
-        description: "A `json`/`jsonb` column whose shape is a scalar or a `json.oneOf()` at the top. A document is an object or an array today."
-    },
-    {
-        id: "json-one-of-placement",
-        description: "`json.oneOf()` anywhere but as the item of a `json.array()`. Typed blocks exist only as array items today."
-    },
-    {
-        id: "json-unknown-field",
-        description: "`json.unknown()` as a field of a `json.object()` or a variant of a `json.oneOf()`. Only an array item may be left untyped today."
-    },
-    {
-        id: "array-unique-items",
-        description: "`.validate({ uniqueItems: true })` on an array. The API does not check it yet."
     }
 ] as const satisfies readonly PendingTableFeature[];
 
@@ -1070,7 +1046,9 @@ function arrayValidation(flags: Flags, rules: ColumnValidation | undefined, at: 
     if (r.requiredMessage !== undefined) out.requiredMessage = r.requiredMessage;
     if (r.minItems !== undefined) out.min = r.minItems;
     if (r.maxItems !== undefined) out.max = r.maxItems;
-    if (r.uniqueItems === true) pending(at, "array-unique-items");
+    // `uniqueItems` is not carried: the REST write validation reads it from
+    // the column's descriptor, and nothing reads it here. (This bridge is
+    // deleted in slice K8.)
     return Object.keys(out).length > 0 ? out : undefined;
 }
 
@@ -1108,7 +1086,10 @@ function lowerStringColumn(
         case "text":
             break;
     }
-    if (def.oneOf !== undefined) pending(at, "text-one-of");
+    // A text column's `.oneOf()` is not carried as a legacy `enum`, which its
+    // readers (search, the doctor, enum label upkeep) take for a Postgres enum
+    // type: the REST write validation and OpenAPI read the closed set from the
+    // column's descriptor. (This bridge is deleted in slice K8.)
     if (def.storage !== undefined) property.storage = lowerStorage(def.storage);
     if (def.stamp?.value === "user") property.autoValue = def.stamp.on === "create" ? "user_on_create" : "user_on_update";
     if (def.semantic === "user") property.userSelect = true;
@@ -1211,7 +1192,14 @@ function lowerDocumentColumn(def: ColumnDef, kind: "json" | "jsonb", base: BaseF
         if (Array.isArray(literal)) property.defaultValue = literal;
         return property;
     }
-    return pending(ctx.at, "json-document-shape");
+    // A document whose top is a scalar or a `json.oneOf()`: lowered to a map
+    // with no fields, which the codecs pass through as the JSON it is. The
+    // REST write validation and OpenAPI read its shape from the column's
+    // descriptor; nothing reads one here. (This bridge is deleted in slice K8.)
+    const property: MapProperty = { type: "map", ...base, ...baseValidation(flagsOf(def), def.validate, ctx.at) };
+    if (kind === "json") property.columnType = "json";
+    if (shape.transform !== undefined) property.callbacks = lowerTransform(shape.transform, ctx.slug, ctx.describe);
+    return property;
 }
 
 /**
@@ -1246,11 +1234,8 @@ function lowerArrayColumn(def: ColumnDef, of: ColumnType, base: BaseFields, ctx:
         );
     }
     const legacyName = of.kind === "numeric" && (of.precision !== undefined || of.scale !== undefined) ? undefined : ARRAY_COLUMN_TYPES[of.kind];
-    if (element && (element.notNull || element.unique || element.primaryKey || element.default !== undefined
-        || element.generatedAs !== undefined || element.readOnly || element.private || element.access !== undefined
-        || element.stamp !== undefined || element.json !== undefined || element.vectorIndex !== undefined)) {
-        pending(at, "array-element-modifiers");
-    }
+    // An element's column-only modifiers (a default, `.notNull()`, access…)
+    // are refused by the compiler (`checkColumnDef`), before lowering.
     const property: ArrayProperty = { type: "array", ...base, ...(legacyName !== undefined ? { columnType: legacyName } : {}) };
     property.of = arrayElementProperty(of, element, def.storage, ctx);
     const validation = arrayValidation(flagsOf(def), def.validate, at);
@@ -1305,7 +1290,11 @@ const nestedAt = (ctx: ColumnContext, suffix: string): ColumnContext => ({
 function applyObjectShape(property: MapProperty, shape: Extract<JsonShapeDef, { kind: "object" }>, ctx: ColumnContext): void {
     const fields: Properties = {};
     for (const [key, field] of Object.entries(shape.fields)) {
-        if (field.kind === "unknown") pending(nestedAt(ctx, `.${key}`).at, "json-unknown-field");
+        // A `json.unknown()` field is left out: a map passes a key it does not
+        // name through as it is, which is what "anything" means. The REST
+        // write validation reads the shape from the descriptor. (This bridge
+        // is deleted in slice K8.)
+        if (field.kind === "unknown") continue;
         fields[key] = jsonFieldProperty(field, nestedAt(ctx, `.${key}`));
     }
     // A shape with no fields is a map that declares none (a key-value map
@@ -1321,7 +1310,9 @@ function applyArrayShape(property: ArrayProperty, shape: Extract<JsonShapeDef, {
     if (item.kind === "oneOf") {
         const variants: Properties = {};
         for (const [key, variant] of Object.entries(item.variants)) {
-            if (variant.kind === "unknown") pending(nestedAt(ctx, `[${key}]`).at, "json-unknown-field");
+            // An untyped variant is left out: a block whose type names no
+            // variant here is passed through as it is. (Bridge deleted in K8.)
+            if (variant.kind === "unknown") continue;
             variants[key] = jsonFieldProperty(variant, nestedAt(ctx, `[${key}]`));
         }
         property.oneOf = {
@@ -1396,9 +1387,14 @@ function jsonFieldProperty(node: JsonShapeDef, ctx: ColumnContext): Property {
             return property;
         }
         case "oneOf":
-            return pending(at, "json-one-of-placement");
-        case "unknown":
-            return pending(at, "json-unknown-field");
+        case "unknown": {
+            // Typed blocks outside an array item, or an untyped value: a map
+            // with no fields, passed through as the JSON it is. The REST write
+            // validation and OpenAPI read the shape from the descriptor; no
+            // reader needs it here. (This bridge is deleted in slice K8.)
+            const property: MapProperty = { type: "map", ...common, ...baseValidation(flags, undefined, at) };
+            return property;
+        }
     }
 }
 

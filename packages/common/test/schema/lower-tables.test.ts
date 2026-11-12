@@ -708,14 +708,40 @@ describe("lowerTables — refusals", () => {
 
     /** One definition per pending feature, each refused with that feature's id. */
     const PENDING: Record<PendingTableFeatureId, () => (AnyTableDef | AnyViewDef)[]> = {
-        "array-element-modifiers": () => [defineTable("t", { columns: { id, a: col.array(col.text().notNull()) }, rls: "admin-only" })],
-        "text-one-of": () => [defineTable("t", { columns: { id, s: col.text().oneOf(["a", "b"]) }, rls: "admin-only" })],
-        "has-many-order-by": () => [defineTable("t", { columns: { id }, relations: { posts: rel.hasMany(() => users, { orderBy: ["id", "asc"] }) }, rls: "admin-only" }), users],
-        "json-document-shape": () => [defineTable("t", { columns: { id, j: col.jsonb(json.string()) }, rls: "admin-only" })],
-        "json-one-of-placement": () => [defineTable("t", { columns: { id, j: col.jsonb(json.object({ b: json.oneOf({ x: json.string() }) })) }, rls: "admin-only" })],
-        "json-unknown-field": () => [defineTable("t", { columns: { id, j: col.jsonb(json.object({ u: json.unknown() })) }, rls: "admin-only" })],
-        "array-unique-items": () => [defineTable("t", { columns: { id, a: col.array(col.text()).validate({ uniqueItems: true }) }, rls: "admin-only" })]
+        "has-many-order-by": () => [defineTable("t", { columns: { id }, relations: { posts: rel.hasMany(() => users, { orderBy: ["id", "asc"] }) }, rls: "admin-only" }), users]
     };
+
+    /**
+     * What was pending until the REST write validation read the descriptor:
+     * each now lowers to the nearest legacy shape without the rule (nothing
+     * reads the rule from the lowered shape; the bridge goes with slice K8).
+     */
+    it("lowers what the write validation now enforces from the descriptor, without the rule", () => {
+        const [table] = lowerTables([defineTable("t", {
+            columns: {
+                id,
+                s: col.text().oneOf(["a", "b"]),
+                a: col.array(col.text()).validate({ uniqueItems: true }),
+                scalar: col.jsonb(json.string()),
+                blocks: col.jsonb(json.oneOf({ x: json.string() })),
+                doc: col.jsonb(json.object({ b: json.oneOf({ x: json.string() }), u: json.unknown(), n: json.number() })),
+                list: col.jsonb(json.array(json.oneOf({ x: json.string(), any: json.unknown() })))
+            },
+            rls: "admin-only"
+        })]);
+        const props = table.properties;
+        expect(props.s).toMatchObject({ type: "string" });
+        expect(props.s).not.toHaveProperty("enum");
+        expect(props.a).toMatchObject({ type: "array" });
+        expect(props.a.validation).toBeUndefined();
+        expect(props.scalar).toMatchObject({ type: "map" });
+        expect(props.scalar).not.toHaveProperty("properties");
+        expect(props.blocks).toMatchObject({ type: "map" });
+        expect(props.doc).toMatchObject({ type: "map", properties: { b: { type: "map" }, n: { type: "number" } } });
+        expect(props.doc).not.toHaveProperty("properties.u");
+        expect(props.list).toMatchObject({ type: "array", oneOf: { properties: { x: { type: "string" } } } });
+        expect(props.list).not.toHaveProperty("oneOf.properties.any");
+    });
 
     it("lists each pending feature once", () => {
         const ids = PENDING_TABLE_FEATURES.map(feature => feature.id);

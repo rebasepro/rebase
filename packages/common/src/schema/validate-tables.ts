@@ -118,8 +118,39 @@ export function checkColumnDef(
         if (def.element.oneOf !== undefined && def.element.oneOf.length === 0) {
             refuse("the array's items take `.oneOf([])`, which accepts no value at all. List the accepted values.");
         }
+        const columnOnly = elementColumnModifiers(def.element);
+        if (columnOnly.length > 0) {
+            refuse(
+                `the array's items declare ${columnOnly.join(", ")}, which apply to a column, not to the items of one. ` +
+                "An item takes `.validate()`, `.oneOf()`, storage, `.userId()`, `.describe()` and `.transform()`; put a " +
+                "default, `.notNull()`, `.unique()`, access, a stamp or `.private()` on the array column itself."
+            );
+        }
     }
     return problems;
+}
+
+/**
+ * The modifiers an array's item declares that only a column can carry: a
+ * default, nullability, a key, uniqueness, generation, access, privacy, a
+ * stamp, a JSON shape, a vector index. The item rules the API checks
+ * (`validate`, `oneOf`), storage, `.userId()`, the description and a
+ * transform apply to each item and are kept.
+ */
+function elementColumnModifiers(element: ColumnDef): string[] {
+    const out: string[] = [];
+    if (element.notNull) out.push("`.notNull()`");
+    if (element.unique) out.push("`.unique()`");
+    if (element.primaryKey) out.push("`.primaryKey()`");
+    if (element.default !== undefined) out.push("a default");
+    if (element.generatedAs !== undefined) out.push("`.generatedAs()`");
+    if (element.readOnly) out.push("`.readOnly()`");
+    if (element.private) out.push("`.private()`");
+    if (element.access !== undefined) out.push("`.access()`");
+    if (element.stamp !== undefined) out.push("a stamp");
+    if (element.json !== undefined) out.push("a JSON shape");
+    if (element.vectorIndex !== undefined) out.push("a vector index");
+    return out;
 }
 
 /** Problems in a column type itself: an enum with no or repeated values, a non-positive size. */
