@@ -1,5 +1,4 @@
-import { CollectionConfig } from "@rebasepro/types";
-import { getTableName, resolveCollectionRelations, relationalCollections } from "@rebasepro/common";
+import type { TableDescriptor } from "@rebasepro/types";
 import { generateForeignKeyName, legacyForeignKeyName } from "@rebasepro/utils";
 
 /**
@@ -78,11 +77,11 @@ function declaresColumn(block: string, column: string): boolean {
 
 /**
  * @param generatedSource contents of `backend/src/schema.generated.ts`
- * @param collections     the project's collections, as this release reads them
+ * @param tables          the project's compiled tables
  */
 export function findLegacyForeignKeyNames(
     generatedSource: string,
-    collections: CollectionConfig[]
+    tables: readonly TableDescriptor[]
 ): LegacyForeignKeyName[] {
     const found: LegacyForeignKeyName[] = [];
     const seen = new Set<string>();
@@ -120,43 +119,26 @@ export function findLegacyForeignKeyNames(
         found.push({ table, legacy, current, relation });
     };
 
-    // Same rule as the generator whose output this reads: a collection that
-    // gets no table cannot have named a column in it. Inert in practice today —
-    // the finding also requires the generated file to declare the table — but
-    // the guard is what keeps that true when a non-SQL collection's slug happens
-    // to match a SQL one's table.
-    for (const collection of relationalCollections(collections)) {
-        const sourceTable = getTableName(collection);
-
-        for (const [name, relation] of Object.entries(resolveCollectionRelations(collection))) {
-            const at = `${collection.slug}.${name}`;
-
-            let target: CollectionConfig | undefined;
-            try {
-                target = relation.target?.();
-            } catch {
-                // A throwing target thunk is its own defect, reported at boot by
-                // `validate-relations`. Nothing to say about its column names.
-                continue;
-            }
-
+    const bySlug = new Map(tables.map(table => [table.slug, table]));
+    for (const table of tables) {
+        for (const relation of table.relations) {
+            const at = `${table.slug}.${relation.name}`;
+            // A target this set does not hold is reported at boot by
+            // `validate-relations`; nothing to say about its column names.
+            const target = bySlug.get(relation.target);
             switch (relation.kind) {
                 case "belongsTo":
-                    consider(sourceTable, relation.localKey, relation.relationName, at);
+                    consider(table.table, relation.localKey, relation.name, at);
                     break;
 
                 case "hasOne":
                 case "hasMany":
-                    if (target) {
-                        consider(getTableName(target), relation.foreignKeyOnTarget, collection.slug, at);
-                    }
+                    if (target) consider(target.table, relation.foreignKey, table.slug, at);
                     break;
 
                 case "manyToMany":
-                    consider(relation.through.table, relation.through.sourceColumn, collection.slug, at);
-                    if (target) {
-                        consider(relation.through.table, relation.through.targetColumn, target.slug, at);
-                    }
+                    consider(relation.through.table, relation.through.sourceKey, table.slug, at);
+                    if (target) consider(relation.through.table, relation.through.targetKey, target.slug, at);
                     break;
 
                 default:
@@ -189,26 +171,26 @@ export function describeLegacyForeignKeyNames(found: LegacyForeignKeyName[]): st
 // only about *names*, which is what the rest of the system reads out of the
 // file, so reformatting the generator cannot make it red.
 
-/** Something the collections derive that the generated schema does not declare. */
+/** Something the tables derive that the generated schema does not declare. */
 export interface MissingGeneratedName {
     /** The table it belongs to, or is. */
     table: string;
     /** The column, when a column is what is missing. */
     column?: string;
-    /** `<collection>` or `<collection>.<relation>`, for the message. */
+    /** `<table>` or `<table>.<relation>`, for the message. */
     source: string;
 }
 
 /**
- * Tables and derived foreign-key columns the collections name and the generated
+ * Tables and derived foreign-key columns the tables name and the generated
  * schema does not.
  *
  * @param generatedSource contents of `backend/src/schema.generated.ts`
- * @param collections     the project's collections, as this release reads them
+ * @param tables          the project's compiled tables
  */
 export function findMissingGeneratedNames(
     generatedSource: string,
-    collections: CollectionConfig[]
+    tables: readonly TableDescriptor[]
 ): MissingGeneratedName[] {
     const missing: MissingGeneratedName[] = [];
     const seen = new Set<string>();
@@ -230,37 +212,29 @@ export function findMissingGeneratedNames(
         if (!declaresColumn(block, column)) report(table, source, column);
     };
 
-    for (const collection of relationalCollections(collections)) {
-        const sourceTable = getTableName(collection);
-        if (!tableBlock(generatedSource, sourceTable)) {
-            report(sourceTable, collection.slug);
+    const bySlug = new Map(tables.map(table => [table.slug, table]));
+    for (const table of tables) {
+        if (!tableBlock(generatedSource, table.table)) {
+            report(table.table, table.slug);
             continue;
         }
 
-        for (const [name, relation] of Object.entries(resolveCollectionRelations(collection))) {
-            const at = `${collection.slug}.${name}`;
-
-            let target: CollectionConfig | undefined;
-            try {
-                target = relation.target?.();
-            } catch {
-                // Its own defect, reported at boot by `validate-relations`.
-                continue;
-            }
-
+        for (const relation of table.relations) {
+            const at = `${table.slug}.${relation.name}`;
+            const target = bySlug.get(relation.target);
             switch (relation.kind) {
                 case "belongsTo":
-                    requireColumn(sourceTable, relation.localKey, at);
+                    requireColumn(table.table, relation.localKey, at);
                     break;
 
                 case "hasOne":
                 case "hasMany":
-                    if (target) requireColumn(getTableName(target), relation.foreignKeyOnTarget, at);
+                    if (target) requireColumn(target.table, relation.foreignKey, at);
                     break;
 
                 case "manyToMany":
-                    requireColumn(relation.through.table, relation.through.sourceColumn, at);
-                    requireColumn(relation.through.table, relation.through.targetColumn, at);
+                    requireColumn(relation.through.table, relation.through.sourceKey, at);
+                    requireColumn(relation.through.table, relation.through.targetKey, at);
                     break;
 
                 default:

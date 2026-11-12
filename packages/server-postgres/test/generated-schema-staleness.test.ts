@@ -20,7 +20,7 @@
  * The wide question would flag every formatting change as a fatal staleness and
  * make the check impossible to leave switched on.
  */
-import { CollectionConfig } from "@rebasepro/types";
+import type { CollectionConfig } from "@rebasepro/types";
 import { generateForeignKeyName, legacyForeignKeyName } from "@rebasepro/utils";
 import {
     compareGeneratedDeclarations,
@@ -29,6 +29,10 @@ import {
 } from "../src/schema/generated-schema-staleness";
 
 import { findLegacyForeignKeyNames, findMissingGeneratedNames } from "../src/schema/generated-schema-staleness";
+import { compileSet } from "./helpers/plan-tables";
+
+/** The fixtures as the check reads them: compiled descriptors. */
+const described = (collections: CollectionConfig[]) => compileSet(collections).map(table => table.descriptor);
 
 // ── Collections ──────────────────────────────────────────────────────────────
 
@@ -107,7 +111,7 @@ describe("findLegacyForeignKeyNames", () => {
     });
 
     it("finds the legacy junction column and says what it should be", () => {
-        const found = findLegacyForeignKeyNames(generatedWith(LEGACY), [products, categories]);
+        const found = findLegacyForeignKeyNames(generatedWith(LEGACY), described([products, categories]));
 
         expect(found).toHaveLength(1);
         expect(found[0]).toEqual(
@@ -120,7 +124,7 @@ describe("findLegacyForeignKeyNames", () => {
     });
 
     it("says nothing about a schema that has already been regenerated", () => {
-        expect(findLegacyForeignKeyNames(generatedWith(CURRENT), [products, categories])).toEqual([]);
+        expect(findLegacyForeignKeyNames(generatedWith(CURRENT), described([products, categories]))).toEqual([]);
     });
 
     it("says nothing for relations whose derived name never moved", () => {
@@ -133,7 +137,7 @@ export const postsTags = pgTable("posts_tags", {
     tag_id: text("tag_id")
 });
 `;
-        expect(findLegacyForeignKeyNames(generated, [posts, tags])).toEqual([]);
+        expect(findLegacyForeignKeyNames(generated, described([posts, tags]))).toEqual([]);
     });
 
     it("does not flag a legacy-looking name the author chose explicitly", () => {
@@ -156,7 +160,7 @@ export const postsTags = pgTable("posts_tags", {
             }
         };
 
-        expect(findLegacyForeignKeyNames(generatedWith(LEGACY), [pinned, categories])).toEqual([]);
+        expect(findLegacyForeignKeyNames(generatedWith(LEGACY), described([pinned, categories]))).toEqual([]);
     });
 
     it("ignores the legacy name appearing somewhere that is not a column", () => {
@@ -169,7 +173,7 @@ export const categoriesProducts = pgTable("categories_products", {
     ${CURRENT}: text("${CURRENT}")
 });
 `;
-        expect(findLegacyForeignKeyNames(generated, [products, categories])).toEqual([]);
+        expect(findLegacyForeignKeyNames(generated, described([products, categories]))).toEqual([]);
     });
 });
 
@@ -215,13 +219,13 @@ describe("findMissingGeneratedNames", () => {
     const ARTICLES_WITHOUT_FK = `export const articles = pgTable("articles", { id: text("id") });`;
 
     it("reports a table the generated schema does not declare", () => {
-        const found = findMissingGeneratedNames(AUTHORS_TABLE, collections);
+        const found = findMissingGeneratedNames(AUTHORS_TABLE, described(collections));
 
         expect(found).toContainEqual(expect.objectContaining({ table: "articles", source: "articles" }));
     });
 
     it("reports a derived foreign-key column the table does not declare", () => {
-        const found = findMissingGeneratedNames(`${ARTICLES_WITHOUT_FK}\n${AUTHORS_TABLE}`, collections);
+        const found = findMissingGeneratedNames(`${ARTICLES_WITHOUT_FK}\n${AUTHORS_TABLE}`, described(collections));
 
         expect(found).toContainEqual(
             expect.objectContaining({ table: "articles", column: "author_id" })
@@ -229,7 +233,7 @@ describe("findMissingGeneratedNames", () => {
     });
 
     it("says nothing when everything is declared", () => {
-        expect(findMissingGeneratedNames(`${ARTICLES_WITH_FK}\n${AUTHORS_TABLE}`, collections)).toEqual([]);
+        expect(findMissingGeneratedNames(`${ARTICLES_WITH_FK}\n${AUTHORS_TABLE}`, described(collections))).toEqual([]);
     });
 
     it("sees a table declared through a schema, not only through pgTable", () => {
@@ -237,13 +241,13 @@ describe("findMissingGeneratedNames", () => {
         // every scaffold's auth collection is written, and matching only
         // `pgTable(` reported it absent — which also meant the *rename* check
         // never inspected a single table outside `public`.
-        const found = findMissingGeneratedNames(`${ARTICLES_WITH_FK}\n${AUTHORS_TABLE}`, collections);
+        const found = findMissingGeneratedNames(`${ARTICLES_WITH_FK}\n${AUTHORS_TABLE}`, described(collections));
 
         expect(found.map(f => f.table)).not.toContain("authors");
     });
 
     it("reports an absent table once, not once per column it would have held", () => {
-        const found = findMissingGeneratedNames(AUTHORS_TABLE, collections);
+        const found = findMissingGeneratedNames(AUTHORS_TABLE, described(collections));
 
         expect(found.filter(f => f.table === "articles")).toHaveLength(1);
     });

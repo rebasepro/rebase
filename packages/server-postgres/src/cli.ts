@@ -2622,7 +2622,6 @@ async function schemaStaleCommand(rawArgs: string[]): Promise<void> {
     const { findLegacyForeignKeyNames, compareGeneratedDeclarations, staleVerdict } =
         await import("./schema/generated-schema-staleness");
     const { generateSchema } = await import("./schema/generate-drizzle-schema-logic");
-    const { relationalCollections } = await import("@rebasepro/common");
 
     let stale: ReturnType<typeof findLegacyForeignKeyNames> = [];
     let differences: ReturnType<typeof compareGeneratedDeclarations> = [];
@@ -2631,18 +2630,14 @@ async function schemaStaleCommand(rawArgs: string[]): Promise<void> {
         try {
             const tables = await loadTables(schemaDir);
             const onDisk = fs.readFileSync(schemaFile, "utf8");
-            // B-PLAN-2 step 6: the legacy FK names from the descriptors.
-            const { lowerCompiledTables } = await import("./schema/lowered-tables");
-            const collections = lowerCompiledTables(tables);
-            stale = findLegacyForeignKeyNames(onDisk, collections);
+            stale = findLegacyForeignKeyNames(onDisk, tables.map(table => table.descriptor));
             // The check the command's own summary promises, and the one it did
             // not make: render what these tables generate and compare it,
             // declaration by declaration, with the file on disk. Without this
             // the verdict rested entirely on `findLegacyForeignKeyNames`, which
             // looks for one historical naming defect — so a file the generator
             // visibly rewrites was reported as a match.
-            const postgresCollections = relationalCollections(collections);
-            if (postgresCollections.length > 0) {
+            if (tables.length > 0) {
                 differences = compareGeneratedDeclarations(generateSchema(tables), onDisk);
             }
         } catch (err) {
