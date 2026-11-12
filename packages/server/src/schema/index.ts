@@ -21,6 +21,8 @@ export {
     col,
     rel,
     json,
+    pgEnum,
+    sql,
     policy,
     isTableDef,
     isAuthTableDef,
@@ -56,6 +58,9 @@ export type {
     TableDeleteProps,
     TableRow,
     ColumnTransform,
+    // Drizzle-spelled column helpers.
+    PgEnum,
+    SqlTemplate,
     ColumnBeforeSaveProps,
     ColumnAfterReadProps,
     // Row types.

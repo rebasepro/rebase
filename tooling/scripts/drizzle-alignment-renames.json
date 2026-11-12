@@ -1,0 +1,34 @@
+{
+    "//": "RETIRED_SPELLINGS of the Drizzle alignment of col.* (contract: ~/.rebase-audits/pgfirst/drizzle-alignment.md). Every old spelling still compiles and carries `@deprecated — sweep: use <new>`; the sweep converts every call site (code, templates, examples, saas, tests, docs, skills) to `new`, then deletes the old spelling. Printers (codemod, schema introspect, the Studio schema editor) already write `new`. `new` builds the identical ColumnDef (packages/common/test/schema/drizzle-alignment.test.ts).",
+    "imports": "A file that uses `sql` or `pgEnum` imports them from the same entry as `col`: `import { defineTable, col, pgEnum, sql } from \"@rebasepro/server/schema\"`.",
+    "RETIRED_SPELLINGS": [
+        { "old": "col.<builder>(…).column(\"sql_name\")", "new": "col.<builder>(\"sql_name\", …)", "note": "The SQL name is the builder's leading argument. On an array it goes on the item builder: col.array(col.text()).column(\"x\") → col.text(\"x\").array(). On a pgEnum column: postStatus(\"x\")." },
+        { "old": "col.varchar(n)", "new": "col.varchar({ length: n })" },
+        { "old": "col.varchar()", "new": "col.varchar({ length: 255 })", "note": "After the sweep a bare col.varchar() is refused (unbounded in Drizzle)." },
+        { "old": "col.char(n)", "new": "col.char({ length: n })" },
+        { "old": "col.char()", "new": "col.char({ length: 255 })", "note": "After the sweep a bare col.char() is refused (char(1) in Drizzle)." },
+        { "old": "col.text().oneOf([\"a\", \"b\"])", "new": "col.text({ enum: [\"a\", \"b\"] })", "note": "Also col.varchar(n).oneOf([...]) → col.varchar({ length: n, enum: [...] }) and char. .oneOf() stays on number columns and JSON fields." },
+        { "old": "col.bigint()", "new": "col.bigint({ mode: \"number\" })" },
+        { "old": "col.bigserial()", "new": "col.bigserial({ mode: \"number\" })" },
+        { "old": "col.numeric(p)", "new": "col.numeric({ precision: p })" },
+        { "old": "col.numeric(p, s)", "new": "col.numeric({ precision: p, scale: s })" },
+        { "old": "col.timestamptz()", "new": "col.timestamp({ withTimezone: true })" },
+        { "old": "col.vector(d)", "new": "col.vector({ dimensions: d })" },
+        { "old": "col.vector(d, { index })", "new": "col.vector({ dimensions: d, index })" },
+        { "old": "col.jsonb<T>()", "new": "col.jsonb().$type<T>()", "note": "Same for col.json<T>(). col.jsonb(json.object({...})) is unchanged." },
+        { "old": "col.array(col.<item>…)", "new": "col.<item>….array()", "note": "Item modifiers (.validate, .oneOf / { enum }, .userId, .transform, .describe) stay before .array(); column modifiers go after it." },
+        { "old": "col.enum([...], { name: \"type_name\" })", "new": "const typeNameEnum = pgEnum(\"type_name\", [...]); … typeNameEnum()", "note": "Declare once per module (or in a shared module and import it). col.enum([...]) without a name is unchanged." },
+        { "old": "col.custom(\"type\")", "new": "col.custom({ dataType: \"type\" })", "note": "col.custom<T>(\"type\") → col.custom({ dataType: \"type\" }).$type<T>(). After the sweep a lone string is the SQL column name." },
+        { "old": ".defaultSql(\"expr\")", "new": ".default(sql`expr`)", "note": "On a timestamp/date/time column, .defaultSql(\"now()\") → .defaultNow()." },
+        { "old": ".generatedAs(\"expr\")", "new": ".generatedAlwaysAs(sql`expr`)" },
+        { "old": ".identity()", "new": ".generatedByDefaultAsIdentity()" }
+    ],
+    "UNCHANGED": [
+        "col.uuid() col.text() col.smallint() col.integer() col.serial() col.smallserial() col.real() col.doublePrecision() col.boolean() col.date() col.time() col.bytea() col.jsonb() col.json() col.geopoint() col.storage({...}) col.enum([...])",
+        ".notNull() .primaryKey() .unique() .default(value) .defaultRandom() .dbDefault() .readOnly() .private() .access() .validate() .oneOf() (numbers) .describe() .transform() .onCreateNow() .onUpdateNow() .onCreateUser() .onUpdateUser() .userId() .multiple()"
+    ],
+    "REFUSED_AFTER_SWEEP": [
+        "col.varchar() / col.char() without a length",
+        "col.custom(\"type\") with a lone string"
+    ]
+}

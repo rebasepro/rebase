@@ -84,7 +84,9 @@ export type JsonKind = JsonShape["kind"];
 
 /** A point on Earth, as a JSON document stores it. */
 export interface JsonGeoPoint {
+    /** Degrees north of the equator, −90 to 90 (south is negative). */
     latitude: number;
+    /** Degrees east of Greenwich, −180 to 180 (west is negative). */
     longitude: number;
 }
 
