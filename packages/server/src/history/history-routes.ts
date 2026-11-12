@@ -18,45 +18,101 @@ import type { RestTables, ServedTable } from "../api/rest/served-table";
 const HISTORY_SNAPSHOT_KEYS = ["values", "previous_values"] as const;
 
 /**
- * A history entry, with the fields this caller cannot read taken out of its
- * stored snapshots.
+ * History entries as this caller may see them: every snapshot served as a read
+ * of the table serves the row.
  *
- * History stores the **whole row** — that is what makes it a revert target — and
- * it is served to anyone who can read the row, not only to admins: the route's
- * gate is "can you fetch this entity", nothing more. So a field the data API
- * withholds was in every history entry of every row the caller could open, which
- * is the read rule with an audit log around it. Both snapshots are rewritten
- * ({@link HISTORY_SNAPSHOT_KEYS}): stripping one leaves the same value one key
- * over.
+ * History stores the **whole row as it was written** — the stored values,
+ * before any hook, because that is what a revert writes back — and it is served
+ * to anyone who can read the row, not only to admins: the route's gate is "can
+ * you fetch this entity", nothing more. So each snapshot goes through what a
+ * live read goes through, in the same order:
  *
- * The snapshots are rewritten rather than the entry dropped: the caller is
- * entitled to know that a version exists, who made it and when. Only the
- * withheld columns leave. The revert route reads the stored entry through the
- * history service, not through this projection; what it may write back is
+ *  1. the field rules, here, from the descriptor: a column the caller may not
+ *     read (`.private()`, `.access({ read })`, a withheld relation and its
+ *     foreign key) leaves both snapshots ({@link HISTORY_SNAPSHOT_KEYS} —
+ *     stripping one leaves the same value one key over) and `changed_fields`.
+ *     So does a key the table has **no column for today**: a column dropped
+ *     since, or a field an old `afterRead` once recorded. What rules applied
+ *     to it is not known any more, so it is withheld (fail closed);
+ *  2. the driver's {@link DataDriver.serveStoredRows}: the same strip for the
+ *     caller's viewer, then the table's one `afterRead` chain — global, the
+ *     table's, its columns' transforms — with the caller as `context`. Not
+ *     re-implemented here: the driver's chain is the only one.
+ *
+ * A compact entry (`format: 2`) stores only the changed fields' previous
+ * values. Its hooks are handed the whole previous row — the entry's `values`
+ * with those fields put back, which is what the row held — and the fields the
+ * entry stores are taken back out of the result, so a hook that reads one
+ * column to mask another sees the row it expects and nothing is added.
+ *
+ * Today's hooks mask yesterday's rows. A hook that needs what a snapshot does
+ * not carry and throws fails the request: the history is not served rather
+ * than served unmasked. A driver without `serveStoredRows` is refused the same
+ * way (501).
+ *
+ * The entry itself stays, with `updated_by` and `updated_at`: the caller is
+ * entitled to know that a version exists, who made it and when — that is what
+ * the history of a row is for. The revert route reads the stored entry through
+ * the history service, not through this projection; what it may write back is
  * {@link restorableValues}'s question.
  */
-function stripHistoryValues(
+async function servedHistoryEntries(
     entries: Record<string, unknown>[],
     table: TableDescriptor,
-    viewer: { roles?: readonly string[] } | undefined
-): Record<string, unknown>[] {
+    viewer: FieldViewer,
+    driver: DataDriver
+): Promise<Record<string, unknown>[]> {
+    if (entries.length === 0) return entries;
+    if (!driver.serveStoredRows) {
+        throw new ApiError(501, "HISTORY_UNSERVABLE",
+            `History of table '${table.slug}' cannot be served: this data driver cannot run the table's read rules ` +
+            "and afterRead hooks over stored rows (`serveStoredRows`), and history is not served unmasked.");
+    }
     const { refused } = restrictedKeys(table, viewer, "read");
-
-    return entries.map(entry => {
-        const stripped: Record<string, unknown> = { ...entry };
-        for (const key of HISTORY_SNAPSHOT_KEYS) {
-            const snapshot = entry[key];
-            if (!isPlainValues(snapshot)) continue;
-            const kept: Record<string, unknown> = {};
-            for (const [field, value] of Object.entries(snapshot)) {
-                // An entry recorded before deletes stopped reading the admin
-                // view model embeds each related row; the caller may read this
-                // row, not those. Served as references, like new entries.
-                if (!refused.has(field)) kept[field] = withRelationReferencesOnly(value);
-            }
-            stripped[key] = kept;
+    const known = new Set<string>([...table.columns.map(column => column.key), ...table.relations.map(relation => relation.name)]);
+    const readable = (key: string): boolean => known.has(key) && !refused.has(key);
+    const narrow = (snapshot: unknown): Record<string, unknown> | undefined => {
+        if (!isPlainValues(snapshot)) return undefined;
+        const kept: Record<string, unknown> = {};
+        for (const [key, value] of Object.entries(snapshot)) {
+            // An entry recorded before deletes stopped reading the admin view
+            // model embeds each related row; the caller may read this row, not
+            // those. Served as references, like new entries.
+            if (readable(key)) kept[key] = withRelationReferencesOnly(value);
         }
-        return stripped;
+        return kept;
+    };
+
+    // One call for every snapshot of the page: rows[] in entry order, each
+    // entry's `values` then its whole previous row.
+    const rows: Record<string, unknown>[] = [];
+    const plan = entries.map(entry => {
+        const values = narrow(entry.values);
+        const previous = narrow(entry.previous_values);
+        const compact = entry.format === 2;
+        const at = { values: -1, previous: -1 };
+        if (values) at.values = rows.push(values) - 1;
+        if (previous) at.previous = rows.push(compact ? { ...values, ...previous } : previous) - 1;
+        return { entry, at, previousKeys: compact && previous ? Object.keys(previous) : undefined };
+    });
+    const served = await driver.serveStoredRows(table.slug, rows);
+    if (served.length !== rows.length) {
+        throw ApiError.internal(`History of table '${table.slug}': the driver served ${served.length} of ${rows.length} snapshots`);
+    }
+
+    return plan.map(({ entry, at, previousKeys }) => {
+        const out: Record<string, unknown> = { ...entry };
+        if (Array.isArray(entry.changed_fields)) {
+            out.changed_fields = entry.changed_fields.filter(field => typeof field === "string" && readable(field));
+        }
+        if (isPlainValues(entry.values)) out.values = at.values >= 0 ? served[at.values] : {};
+        if (isPlainValues(entry.previous_values)) {
+            const previous = at.previous >= 0 ? served[at.previous] : {};
+            out.previous_values = previousKeys
+                ? Object.fromEntries(previousKeys.filter(key => key in previous).map(key => [key, previous[key]]))
+                : previous;
+        }
+        return out;
     });
 }
 /**
@@ -79,10 +135,13 @@ function stripHistoryValues(
  *    never a silent partial revert that reports success;
  *  - one whose value is unchanged is left out of the write, which is the same
  *    row either way;
- *  - one the caller cannot read is left as it is. The history list strips it
- *    from their view of the version, so it is not part of what they chose to
- *    restore, and `current` — read through their scoped driver — does not carry
- *    it to compare against. Private columns fall here for everyone.
+ *  - one the caller cannot read is left as it is, whether or not they may
+ *    write it. The history list strips it from their view of the version, so
+ *    it is not part of what they chose to restore, and `current` — read
+ *    through their scoped driver — does not carry it to compare against.
+ *    Private columns fall here for everyone. (This was only so for a column
+ *    closed both ways: a column with `access.read` and no `access.write` went
+ *    back to a value the caller had never been shown.)
  */
 function restorableValues(
     stored: Record<string, unknown>,
@@ -91,15 +150,16 @@ function restorableValues(
     viewer: FieldViewer
 ): Record<string, unknown> {
     const closed = restrictedKeys(table, viewer, "write").refused;
-    if (closed.size === 0) return stored;
     const unreadable = restrictedKeys(table, viewer, "read").refused;
+    if (closed.size === 0 && unreadable.size === 0) return stored;
 
     const restorable: Record<string, unknown> = {};
     const changed: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(stored)) {
+        if (unreadable.has(key)) continue;
         if (!closed.has(key)) {
             restorable[key] = value;
-        } else if (!unreadable.has(key) && !sameStoredValue(value, current[key])) {
+        } else if (!sameStoredValue(value, current[key])) {
             changed[key] = value;
         }
     }
@@ -291,7 +351,7 @@ export function createHistoryRoutes(params: {
         c: Context<HonoEnv>,
         served: ServedTable,
         id: string
-    ): Promise<Record<string, unknown>> {
+    ): Promise<{ row: Record<string, unknown>; scoped: DataDriver }> {
         const slug = served.table.slug;
         // A revert is a write: refused while simulating access.
         refuseSimulatedWrite(c, httpMethodToOperation(c.req.method));
@@ -303,7 +363,7 @@ export function createHistoryRoutes(params: {
                 { requiredScope: `${scope}:${slug}` });
         }
 
-        const scoped = c.get("driver") as DataDriver | undefined;
+        const scoped = c.get("driver");
         if (!scoped) throw ApiError.internal("Scoped driver not available");
 
         // The REST read of the row: its columns, through the same policies.
@@ -317,7 +377,7 @@ export function createHistoryRoutes(params: {
         if (!row) {
             throw ApiError.notFound(`No row with id '${id}' in table '${slug}'`);
         }
-        return row;
+        return { row, scoped };
     }
 
     /**
@@ -343,7 +403,7 @@ export function createHistoryRoutes(params: {
         const offset = Number.isNaN(parsedOffset) ? 0 : parsedOffset;
 
         const served = historyTable(slug);
-        await authorizeEntityRead(c, served, id);
+        const { scoped } = await authorizeEntityRead(c, served, id);
 
         const tableName = served.table.slug;
 
@@ -361,7 +421,7 @@ export function createHistoryRoutes(params: {
         });
 
         return c.json({
-            data: stripHistoryValues(result.data, served.table, requestViewer(c)),
+            data: await servedHistoryEntries(result.data, served.table, requestViewer(c), scoped),
             meta: {
                 total: result.total,
                 limit: appliedLimit,
@@ -387,7 +447,7 @@ export function createHistoryRoutes(params: {
         // Before looking the entry up at all: the lookup is by history id alone,
         // across every table, so answering "no such entry" vs "not yours" for an
         // id the caller cannot see is itself a read of the history table.
-        const current = await authorizeEntityRead(c, served, id);
+        const { row: current, scoped } = await authorizeEntityRead(c, served, id);
 
         // Fetch the history entry
         const historyEntry = await historyService.fetchHistoryEntry(historyId);
@@ -409,7 +469,7 @@ export function createHistoryRoutes(params: {
         // Narrowed to columns only where `current` is the REST row: a driver
         // without the REST read hands back its own rendering, whose keys are
         // not the columns.
-        const restRow = Boolean((c.get("driver") as DataDriver | undefined)?.restFetchService);
+        const restRow = Boolean(scoped.restFetchService);
         const { values: columnValues, dropped } = restRow
             ? columnValuesOf(withoutDateEnvelopes(historyEntry.values), current, table, viewer)
             : { values: withoutDateEnvelopes(historyEntry.values), dropped: [] };
@@ -424,11 +484,11 @@ export function createHistoryRoutes(params: {
         // absent — an RLS-free write, reached by the absence of a value rather
         // than by any decision. `authorizeEntityRead` above already refuses that
         // request, so the fallback was unreachable; it is gone rather than left
-        // armed for whoever moves the authorization call.
-        const authDriver = c.get("driver") as DataDriver;
+        // armed for whoever moves the authorization call: the driver is the
+        // one it returned.
         const path = table.slug;
 
-        const savedEntity = await authDriver.save({
+        const savedEntity = await scoped.save({
             path,
             id: String(id),
             values,

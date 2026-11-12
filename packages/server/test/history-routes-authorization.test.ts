@@ -96,7 +96,9 @@ function mount(options: {
     const fetchOne = jest.fn(async ({ id }: { id: string | number }) =>
         (visibleToCaller.includes(String(id)) ? { id, title: "visible" } : undefined));
     const save = jest.fn().mockResolvedValue({ id: "post-alice", ...ALICES_SECRET });
-    const scopedDriver = fakeDataDriver({ fetchOne, save });
+    // Serves stored rows as handed: the driver's strip and hooks are
+    // `history-served-as-read.test.ts`'s, over a real driver.
+    const scopedDriver = fakeDataDriver({ fetchOne, save, serveStoredRows: async (_path: string, rows: Record<string, unknown>[]) => rows });
 
     const registry: Pick<BackendCollectionRegistry, "getCollections"> = {
         getCollections: () => [collection("posts"), collection("comments")]

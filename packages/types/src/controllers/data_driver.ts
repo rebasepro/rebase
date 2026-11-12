@@ -851,6 +851,28 @@ export interface DataDriver {
     }): AsyncIterable<Record<string, unknown>[]>;
 
     /**
+     * Rows of a table this caller did not read through the driver, served as a
+     * read of that table serves them: the columns the caller may not read
+     * (`.private()`, `.access({ read })`, a withheld relation and its foreign
+     * key) taken out, then the table's `afterRead` chain — global, the
+     * table's, its columns' `.transform({ afterRead })` — run once, with this
+     * driver's caller as `context`.
+     *
+     * For stored copies of rows served back to a caller: a history entry's
+     * snapshots are the row as it was written, before any hook, and without
+     * this they would hand a caller what every other read of the table masks.
+     * The rows are the table's REST shape (column keys); a key the table has
+     * no column for is the caller's to remove first — this takes out what the
+     * table restricts, and cannot know what a dropped column held.
+     *
+     * A hook that throws fails the call: nothing is served unmasked.
+     *
+     * Optional. A server door that serves stored rows refuses to serve them
+     * through a driver without it, rather than serve them unmasked.
+     */
+    serveStoredRows?(path: string, rows: Record<string, unknown>[]): Promise<Record<string, unknown>[]>;
+
+    /**
      * Check if the given filter combination is valid
      * @param props
      */

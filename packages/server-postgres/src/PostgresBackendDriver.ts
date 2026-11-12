@@ -63,7 +63,8 @@ import { resolveSoftDelete, rowInTrashError } from "./services/soft-delete";
 import type { RuntimeTable } from "./model/runtime-table";
 import { currentWriteScope, runInWriteScope, WriteTransactionScope } from "./services/write-transaction-scope";
 import { currentWriteDepth, inWriteFrame, type WriteFrame } from "./services/write-depth";
-import { afterDelete, afterReadOnRow, afterReadOnRows, afterSave, afterSaveError, beforeDeleteVetoes, beforeSave, declaresAnyHook, hasAfterRead, hasBeforeQueryHook, hasBeforeSave, hasRowHook, resolveTableHooks, type TableHookSet } from "./services/table-hooks";
+import { afterDelete, afterReadOnRow, afterReadOnRows, afterSave, afterSaveError, beforeDeleteVetoes, beforeSave, declaresAnyHook, hasAfterRead, hasBeforeQueryHook, hasBeforeSave, hasRowHook, requireHookTable, resolveTableHooks, type TableHookSet } from "./services/table-hooks";
+import { stripUnreadable } from "./services/row-pipeline";
 import { HistoryService } from "./history/HistoryService";
 import { ApiError, logger, resolveBatchRefs } from "@rebasepro/server";
 import { extractPgError, isRoleSwitchingPermissionError, reachedDatabase } from "./utils/pg-error-utils";
@@ -935,6 +936,22 @@ export class PostgresBackendDriver implements DataDriver {
      */
     scanStoredRows(props: { path: string; collection: CollectionConfig; pageSize?: number }): AsyncIterable<Record<string, unknown>[]> {
         return this.dataService.getFetchService().scanStoredRows(props.path, props.pageSize);
+    }
+
+    /**
+     * Stored rows of a table, served as a read serves them — see
+     * {@link DataDriver.serveStoredRows}. The same two steps a REST read takes
+     * after the SELECT: the field strip (`stripUnreadable`, for the viewer the
+     * caller's transaction set — none on this unscoped driver, which is the
+     * trusted server plane), then the one `afterRead` chain. Each row is
+     * copied first: the caller's stored values are not rewritten.
+     */
+    async serveStoredRows(path: string, rows: Record<string, unknown>[]): Promise<Record<string, unknown>[]> {
+        if (rows.length === 0) return rows;
+        const set = this.hooksAt(undefined, path);
+        const descriptor = requireHookTable(set, path);
+        const visible = rows.map(row => stripUnreadable({ ...row }, descriptor));
+        return this.applyAfterRead(visible, path);
     }
 
     /**
@@ -3502,6 +3519,17 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
             cursorFor: (collectionPath, row, orderBy) =>
                 this.delegate.restFetchService.cursorFor?.(collectionPath, row, orderBy)
         };
+    }
+
+    /**
+     * Stored rows of a table, served to this caller as a read serves them — see
+     * {@link DataDriver.serveStoredRows}. In this caller's read-only
+     * transaction, as every read here is: that is what sets the field viewer
+     * the strip reads, and the identity `afterRead` is told about.
+     */
+    async serveStoredRows(path: string, rows: Record<string, unknown>[]): Promise<Record<string, unknown>[]> {
+        if (rows.length === 0) return rows;
+        return this.withTransaction(delegate => delegate.serveStoredRows(path, rows), { accessMode: "read only" });
     }
 
     /**

@@ -58,7 +58,8 @@ function mount(entry: Entry | null) {
     const scopedDriver = fakeDataDriver({
         fetchOne: jest.fn(async ({ id }: { id: string | number }) =>
             (String(id) === "post-1" ? { id, title: "current title" } : undefined)),
-        save
+        save,
+        serveStoredRows: async (_path: string, rows: Record<string, unknown>[]) => rows
     });
 
     const app = new Hono<HonoEnv>();
@@ -161,8 +162,26 @@ describe("GET /:slug/:id/history serves relations as references", () => {
             }),
             fetchHistoryEntry: jest.fn()
         };
-        const registry: Registry = { getCollections: () => [collection("posts")] };
-        const scopedDriver = fakeDataDriver({ fetchOne: jest.fn(async ({ id }: { id: string | number }) => ({ id })) });
+        // The table declares each key the entry holds: a key it has no column
+        // or relation for is withheld from the list outright.
+        const authors: CollectionConfig = { name: "authors", slug: "authors", properties: { id: { type: "number", isId: "increment" } } };
+        const posts: CollectionConfig = {
+            name: "posts",
+            slug: "posts",
+            history: true,
+            properties: {
+                id: { type: "string", isId: "uuid" },
+                title: { type: "string" },
+                author: { type: "relation" },
+                readers: { type: "relation" }
+            },
+            relations: [
+                { kind: "belongsTo", relationName: "author", target: () => authors, localKey: "author_id" },
+                { kind: "hasMany", relationName: "readers", target: () => authors, foreignKeyOnTarget: "post_id" }
+            ]
+        };
+        const registry: Registry = { getCollections: () => [posts, authors] };
+        const scopedDriver = fakeDataDriver({ fetchOne: jest.fn(async ({ id }: { id: string | number }) => ({ id })), serveStoredRows: async (_path: string, rows: Record<string, unknown>[]) => rows });
         const app = new Hono<HonoEnv>();
         app.use("/*", async (c, next) => { c.set("driver", scopedDriver); await next(); });
         app.route("/api/data", createHistoryRoutes({ historyService, tables: () => tablesFromCollections(registry.getCollections()), driver: fakeDataDriver() }));
