@@ -3,7 +3,8 @@ import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 import { Hono } from "hono";
-import type { CollectionConfig } from "@rebasepro/types";
+import { col, defineTable, json } from "@rebasepro/types";
+import { compileTables } from "@rebasepro/common";
 import { HonoEnv } from "../src/api/types";
 import { errorHandler } from "../src/api/errors";
 import { LocalStorageController } from "../src/storage/LocalStorageController";
@@ -11,50 +12,33 @@ import { createStorageRoutes } from "../src/storage/routes";
 import {
     createUploadConstraintResolver,
     isAcceptedFile,
-    readUploadPropertyContext
-} from "../src/storage/property-limits";
+    readUploadColumnContext
+} from "../src/storage/column-limits";
 
 /**
- * `storage.maxSize` and `storage.acceptedFiles` were declared per property,
- * published in the generated types, rendered by the panel's file picker — and
- * enforced by the browser and nothing else. `curl -F file=@payload.exe` past
- * the picker put a 40 MB executable in a bucket whose config said "images,
- * under 200 KB".
+ * A storage column's `maxBytes` and `accept` were published in the generated
+ * types, rendered by the panel's file picker — and once enforced by the
+ * browser and nothing else. `curl -F file=@payload.exe` past the picker put a
+ * 40 MB executable in a bucket whose schema said "images, under 200 KB".
  */
-const posts: CollectionConfig = {
-    slug: "posts",
-    name: "Posts",
-    table: "posts",
-    properties: {
-        id: { type: "number", isId: "increment" },
-        cover: {
-            type: "string",
-            storage: { storagePath: "covers", maxSize: 1024, acceptedFiles: ["image/*"] }
-        },
-        attachment: {
-            type: "string",
-            storage: { storagePath: "docs", acceptedFiles: [".pdf"] }
-        },
-        gallery: {
-            type: "array",
-            of: { type: "string", storage: { storagePath: "gallery", maxSize: 512 } }
-        },
-        meta: {
-            type: "map",
-            properties: {
-                avatar: { type: "string", storage: { storagePath: "avatars", maxSize: 256 } }
-            }
-        },
-        // A storage property that declares no limits at all.
-        loose: { type: "string", storage: { storagePath: "loose" } },
-        title: { type: "string" }
-    }
-};
+const [posts] = compileTables([defineTable("posts", {
+    columns: {
+        id: col.serial().primaryKey(),
+        cover: col.storage({ path: "covers", maxBytes: 1024, accept: ["image/*"] }),
+        attachment: col.storage({ path: "docs", accept: [".pdf"] }),
+        gallery: col.storage({ path: "gallery", maxBytes: 512 }).multiple(),
+        meta: col.jsonb(json.object({ avatar: json.storage({ path: "avatars", maxBytes: 256 }) })),
+        // A storage column that declares no limits at all.
+        loose: col.storage({ path: "loose" }),
+        title: col.text()
+    },
+    rls: "admin-only"
+})]);
 
 describe("createUploadConstraintResolver", () => {
     const resolve = createUploadConstraintResolver([posts]);
 
-    it("finds a top-level storage property", () => {
+    it("finds a top-level storage column", () => {
         expect(resolve("posts", "cover")).toEqual({
             maxSize: 1024,
             acceptedFiles: ["image/*"],
@@ -62,23 +46,23 @@ describe("createUploadConstraintResolver", () => {
         });
     });
 
-    it("descends into a map", () => {
+    it("descends into a json object", () => {
         expect(resolve("posts", "meta.avatar")?.maxSize).toBe(256);
     });
 
-    it("reads the element type of an array of files", () => {
-        // The file being uploaded is an *element*, so the `of` is what carries
-        // the storage block.
+    it("reads the items of a column of several files", () => {
+        // The file being uploaded is an *item*, and every item obeys the
+        // column's storage rules.
         expect(resolve("posts", "gallery")?.maxSize).toBe(512);
         expect(resolve("posts", "gallery.2")?.maxSize).toBe(512);
     });
 
-    it("says nothing for a property that declares no limits", () => {
+    it("says nothing for a column that declares no limits", () => {
         expect(resolve("posts", "loose")).toBeUndefined();
         expect(resolve("posts", "title")).toBeUndefined();
     });
 
-    it("says nothing for an unknown collection or property", () => {
+    it("says nothing for an unknown table or column", () => {
         expect(resolve("nope", "cover")).toBeUndefined();
         expect(resolve("posts", "nope")).toBeUndefined();
     });
@@ -111,17 +95,18 @@ describe("isAcceptedFile", () => {
     });
 });
 
-describe("readUploadPropertyContext", () => {
+describe("readUploadColumnContext", () => {
     it("reads both fields or nothing", () => {
-        expect(readUploadPropertyContext({ collection: "posts", property: "cover" }))
-            .toEqual({ collection: "posts", property: "cover" });
-        expect(readUploadPropertyContext({ collection: "posts" })).toBeUndefined();
-        expect(readUploadPropertyContext({ collection: "  ", property: "cover" })).toBeUndefined();
-        expect(readUploadPropertyContext(undefined)).toBeUndefined();
+        // The wire fields are the client's: `collection` names the table, `property` the column.
+        expect(readUploadColumnContext({ collection: "posts", property: "cover" }))
+            .toEqual({ table: "posts", column: "cover" });
+        expect(readUploadColumnContext({ collection: "posts" })).toBeUndefined();
+        expect(readUploadColumnContext({ collection: "  ", property: "cover" })).toBeUndefined();
+        expect(readUploadColumnContext(undefined)).toBeUndefined();
     });
 });
 
-describe("POST /upload enforces the destination property's limits", () => {
+describe("POST /upload enforces the destination column's limits", () => {
     let app: Hono<HonoEnv>;
     let tempDir: string;
 
@@ -155,19 +140,19 @@ describe("POST /upload enforces the destination property's limits", () => {
         await fs.promises.rm(tempDir, { recursive: true, force: true });
     });
 
-    it("refuses a file over the property's maxSize with a 413 naming the property", async () => {
+    it("refuses a file over the column's maxBytes with a 413 naming the column", async () => {
         const res = await upload(new Blob(["x".repeat(2048)], { type: "image/png" }), "big.png", {
             collection: "posts",
             property: "cover"
         });
         expect(res.status).toBe(413);
-        const body = await res.json() as { error: { code: string; message: string; details?: { property?: string; maxSize?: number } } };
+        const body = await res.json() as { error: { code: string; message: string; details?: { column?: string; maxSize?: number } } };
         expect(body.error.code).toBe("STORAGE_FILE_TOO_LARGE");
         expect(body.error.message).toContain("posts.cover");
         expect(body.error.details?.maxSize).toBe(1024);
     });
 
-    it("refuses a file the property does not accept with a 400", async () => {
+    it("refuses a file the column does not accept with a 400", async () => {
         const res = await upload(new Blob(["x"], { type: "application/x-msdownload" }), "payload.exe", {
             collection: "posts",
             property: "cover"
@@ -186,7 +171,7 @@ describe("POST /upload enforces the destination property's limits", () => {
         expect(res.status).toBe(201);
     });
 
-    it("enforces an array property's element limits", async () => {
+    it("enforces a column of several files item limits", async () => {
         const res = await upload(new Blob(["x".repeat(1000)], { type: "image/png" }), "g.png", {
             collection: "posts",
             property: "gallery"
@@ -194,7 +179,7 @@ describe("POST /upload enforces the destination property's limits", () => {
         expect(res.status).toBe(413);
     });
 
-    it("enforces a nested map property's limits", async () => {
+    it("enforces a json field.s limits", async () => {
         const res = await upload(new Blob(["x".repeat(1000)], { type: "image/png" }), "a.png", {
             collection: "posts",
             property: "meta.avatar"
@@ -202,14 +187,14 @@ describe("POST /upload enforces the destination property's limits", () => {
         expect(res.status).toBe(413);
     });
 
-    it("falls back to the global cap when the request names no property", async () => {
-        // An upload that names no property has no property limit to check, and
+    it("falls back to the global cap when the request names no column", async () => {
+        // An upload that names no column has no column limit to check, and
         // refusing every context-less upload would break every existing client.
         const res = await upload(new Blob(["x".repeat(4096)], { type: "application/x-msdownload" }), "anything.exe");
         expect(res.status).toBe(201);
     });
 
-    it("falls back when the named property declares no limits", async () => {
+    it("falls back when the named column declares no limits", async () => {
         const res = await upload(new Blob(["x".repeat(4096)], { type: "application/x-msdownload" }), "l.exe", {
             collection: "posts",
             property: "loose"
@@ -217,8 +202,8 @@ describe("POST /upload enforces the destination property's limits", () => {
         expect(res.status).toBe(201);
     });
 
-    it("cannot be widened by naming an unknown property", async () => {
-        // Naming a property can make an upload stricter or leave it at the
+    it("cannot be widened by naming an unknown column", async () => {
+        // Naming a column can make an upload stricter or leave it at the
         // global cap; it can never widen anything, because the rules come from
         // the server's registry and not from the request.
         const res = await upload(new Blob(["x".repeat(2048)], { type: "image/png" }), "big.png", {
@@ -230,7 +215,7 @@ describe("POST /upload enforces the destination property's limits", () => {
             collection: "posts",
             property: "does-not-exist"
         });
-        // Unknown property → no property rule → the global cap, which this file
+        // Unknown column → no column rule → the global cap, which this file
         // is under. The caller gained nothing they did not already have by
         // omitting the context entirely.
         expect(widened.status).toBe(201);
@@ -288,7 +273,7 @@ describe("POST /tus enforces the same limits, before the first chunk", () => {
         expect(body.error.code).toBe("STORAGE_FILE_TOO_LARGE");
     });
 
-    it("refuses a type the property does not accept", async () => {
+    it("refuses a type the column does not accept", async () => {
         const res = await create(10, {
             filename: "payload.exe",
             filetype: "application/x-msdownload",
@@ -310,7 +295,7 @@ describe("POST /tus enforces the same limits, before the first chunk", () => {
         expect(res.status).toBe(201);
     });
 
-    it("falls back to the global cap with no property context", async () => {
+    it("falls back to the global cap with no column context", async () => {
         const res = await create(2048, { filename: "anything.exe", filetype: "application/x-msdownload" });
         expect(res.status).toBe(201);
     });

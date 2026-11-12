@@ -11,7 +11,7 @@
  *            on the durable job queue, or — on a backend that runs no job
  *            queue — runs it in this process, in the background, and says so;
  *   status — the record: progress while it runs (files listed, rows read,
- *            collections that could not be read), the report when it is done;
+ *            tables that could not be read), the report when it is done;
  *   delete — only from a completed scan, recent, that read every collection.
  *            It is background work too: every row and history entry is read
  *            again against the scan's candidates alone, and each file is asked
@@ -23,13 +23,15 @@
  * any database driver, with nothing added to the schema.
  */
 import { randomUUID } from "crypto";
-import type { CollectionCallbacks, CollectionConfig, DataDriver } from "@rebasepro/types";
+import type { DataDriver, TableDescriptor, TableHooks } from "@rebasepro/types";
 import { DEFAULT_STORAGE_SOURCE_KEY } from "@rebasepro/types";
 import { ApiError } from "../api/errors";
 import { logger } from "../utils/logger";
 import type { JobQueueClient } from "../jobs/types";
 import type { StorageController } from "./types";
 import type { StorageRegistry } from "./storage-registry";
+import type { RegisteredTable } from "../schema/table-registry";
+import type { DriverCollectionOf } from "../schema/driver-seam";
 import { canonicalStorageId } from "./keys";
 import { MAINTENANCE_PREFIX } from "./maintenance-keys";
 import {
@@ -132,11 +134,14 @@ export interface OrphanScanTaskPayload {
 export interface OrphanScanServiceConfig {
     registry?: StorageRegistry;
     controller?: StorageController;
-    /** The collections whose rows are read for references, read when a scan runs. */
-    collections: () => readonly CollectionConfig[];
-    /** The unscoped driver serving a collection. See `StorageMaintenanceRoutesConfig.driverFor`. */
-    driverFor: (collection: CollectionConfig) => DataDriver | undefined;
-    globalCallbacks?: () => CollectionCallbacks | undefined;
+    /** The tables whose rows are read for references, with their hooks, read when a scan runs. */
+    tables: () => readonly RegisteredTable[];
+    /** The unscoped driver serving a table. See `StorageMaintenanceRoutesConfig.driverFor`. */
+    driverFor: (table: TableDescriptor) => DataDriver | undefined;
+    /** What the driver's read calls name a table by (see `DriverCollectionOf`). */
+    driverCollection: DriverCollectionOf;
+    /** The global table hooks, read when a scan runs. */
+    globalHooks?: () => TableHooks | undefined;
     history?: StoredHistory;
     /**
      * The durable job queue, read when a scan starts: present, the scan is a
@@ -350,9 +355,10 @@ export function createOrphanScanService(config: OrphanScanServiceConfig): Orphan
         try {
             state.result = await findOrphans({
                 controller,
-                collections: config.collections(),
+                tables: config.tables(),
                 driverFor: config.driverFor,
-                globalCallbacks: config.globalCallbacks?.(),
+                driverCollection: config.driverCollection,
+                globalHooks: config.globalHooks?.(),
                 history: config.history,
                 olderThanMs: state.olderThanHours * 3_600_000,
                 now: now(),
@@ -387,9 +393,10 @@ export function createOrphanScanService(config: OrphanScanServiceConfig): Orphan
             const outcome = await deleteScannedOrphans({
                 controller,
                 candidates: result.orphans,
-                collections: config.collections(),
+                tables: config.tables(),
                 driverFor: config.driverFor,
-                globalCallbacks: config.globalCallbacks?.(),
+                driverCollection: config.driverCollection,
+                globalHooks: config.globalHooks?.(),
                 history: config.history,
                 olderThanMs: state.olderThanHours * 3_600_000,
                 now,
@@ -403,7 +410,7 @@ export function createOrphanScanService(config: OrphanScanServiceConfig): Orphan
             deletion.result = { deleted: outcome.deleted, kept: outcome.kept, failed: outcome.failed };
             if (outcome.unscanned.length > 0) {
                 deletion.status = "failed";
-                deletion.error = "Some collections could not be read again, so a file they name now would look unused. " +
+                deletion.error = "Some tables could not be read again, so a file they name now would look unused. " +
                     "Nothing was deleted: " + outcome.unscanned.map(entry => `${entry.collection} (${entry.reason})`).join("; ");
             } else {
                 deletion.status = "completed";
@@ -486,7 +493,7 @@ export function createOrphanScanService(config: OrphanScanServiceConfig): Orphan
             const unscanned: UnscannedCollection[] = state.result.unscanned;
             if (unscanned.length > 0) {
                 throw ApiError.conflict(
-                    "Some collections could not be read, so a file they name would look unused. Nothing was deleted: " +
+                    "Some tables could not be read, so a file they name would look unused. Nothing was deleted: " +
                     unscanned.map(entry => `${entry.collection} (${entry.reason})`).join("; "),
                     "STORAGE_SCAN_INCOMPLETE",
                     { unscanned }

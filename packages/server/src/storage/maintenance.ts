@@ -8,12 +8,13 @@
  * is unused. What can know is a scan of every row against every object, which
  * is what this is. It errs one way only: a string anywhere in any row that
  * could name an object keeps that object, whichever source it is in and
- * whichever property holds it. A file is reported only when nothing points at
+ * whichever column holds it. A file is reported only when nothing points at
  * it at all.
  */
-import type { CollectionCallbacks, CollectionConfig, DataDriver } from "@rebasepro/types";
+import type { DataDriver, TableDescriptor, TableHooks, TransformNode } from "@rebasepro/types";
 import { storageTargetsInText } from "@rebasepro/types";
-import { buildPropertyCallbacks } from "@rebasepro/common";
+import type { RegisteredTable } from "../schema/table-registry";
+import type { DriverCollectionOf } from "../schema/driver-seam";
 import type { StorageController } from "./types";
 import { isRenditionKey } from "./rendition-cache";
 import { randomUUID } from "crypto";
@@ -155,43 +156,56 @@ export interface UnscannedCollection {
     reason: string;
 }
 
+/** Whether a field-level hook tree runs an `afterRead` anywhere. */
+function transformReads(node: TransformNode): boolean {
+    if (node.transform?.afterRead) return true;
+    if (node.items && transformReads(node.items)) return true;
+    return Object.values(node.fields ?? {}).some(transformReads)
+        || Object.values(node.variants ?? {}).some(transformReads);
+}
+
 /**
- * Whether reading a collection through `fetchCollection` could hide a row or
- * change a value: a `beforeQuery` or an `afterRead`, the collection's own, a
- * global one, or a property's.
+ * Whether reading a table through `fetchCollection` could hide a row or
+ * change a value: a `beforeQuery` or an `afterRead` — the table's own (as
+ * compiled, or attached with `setTableHooks`), a global one, or a column's
+ * `.transform({ afterRead })` at any depth. The descriptor's hook flags count
+ * too, so a table whose code is not in hand is judged by what it declares.
  */
-export function hasReadHooks(collection: CollectionConfig, globalCallbacks?: CollectionCallbacks): boolean {
-    const own = collection.callbacks;
+export function hasReadHooks(table: RegisteredTable, globalHooks?: TableHooks): boolean {
+    const own = table.hooks;
+    const flags = table.descriptor.hooks;
     return Boolean(
         own?.beforeQuery || own?.afterRead
-        || globalCallbacks?.beforeQuery || globalCallbacks?.afterRead
-        || (collection.properties && buildPropertyCallbacks(collection.properties)?.afterRead)
+        || flags?.beforeQuery || flags?.afterRead
+        || globalHooks?.beforeQuery || globalHooks?.afterRead
+        || Object.values(table.transforms ?? {}).some(transformReads)
+        || table.descriptor.columns.some(column => column.transforms?.afterRead)
     );
 }
 
 /**
  * Remove from `keys` every key some row names.
  *
- * Every row of every collection is read — soft-deleted rows too, since a
+ * Every row of every table is read — soft-deleted rows too, since a
  * restore brings their files back — a page at a time, through the driver that
- * serves the collection. What is left in `keys` afterwards is named by no row.
- * A collection that could not be read is returned, and its rows count for
+ * serves the table. What is left in `keys` afterwards is named by no row.
+ * A table that could not be read is returned, and its rows count for
  * nothing: a caller must not treat what is left as unused when any is.
  *
  * Rows are read as stored, through the driver's `scanStoredRows`. A driver
- * without it is read through `fetchCollection` only for a collection with no
+ * without it is read through `fetchCollection` only for a table with no
  * read hooks: a `beforeQuery` scoping rows to `context.user` — there is none
  * here — or an `afterRead` rewriting a file field would hide a reference, and
- * the file it names would be deleted as unused. Such a collection is
+ * the file it names would be deleted as unused. Such a table is
  * returned as unscanned instead.
  */
 export async function removeReferencedKeys(
     keys: Set<string>,
-    collections: readonly CollectionConfig[],
-    driverFor: (collection: CollectionConfig) => DataDriver | undefined,
+    tables: readonly RegisteredTable[],
+    readers: Pick<ReferenceSources, "driverFor" | "driverCollection">,
     options: {
         pageSize?: number;
-        globalCallbacks?: CollectionCallbacks;
+        globalHooks?: TableHooks;
         /** Counted into as it goes, and `onProgress` called after each page. */
         progress?: ScanProgress;
         onProgress?: () => void;
@@ -217,25 +231,27 @@ export async function removeReferencedKeys(
         unscanned.push(entry);
         progress?.unscanned.push(entry);
     };
-    if (progress) progress.collectionsTotal += collections.length;
+    if (progress) progress.collectionsTotal += tables.length;
 
-    for (const collection of collections) {
+    for (const table of tables) {
+        const slug = table.descriptor.slug;
         options.signal?.throwIfAborted();
-        if (progress) progress.currentCollection = collection.slug;
+        if (progress) progress.currentCollection = slug;
         try {
-            const driver = driverFor(collection);
-            if (!driver) {
-                notRead({ collection: collection.slug, reason: "no data driver serves it here" });
+            const driver = readers.driverFor(table.descriptor);
+            const collection = readers.driverCollection(slug);
+            if (!driver || !collection) {
+                notRead({ collection: slug, reason: "no data driver serves it here" });
                 continue;
             }
             try {
                 if (driver.scanStoredRows) {
-                    for await (const rows of driver.scanStoredRows({ path: collection.slug, collection, pageSize })) {
+                    for await (const rows of driver.scanStoredRows({ path: slug, collection, pageSize })) {
                         pageRead(rows);
                     }
-                } else if (hasReadHooks(collection, options.globalCallbacks)) {
+                } else if (hasReadHooks(table, options.globalHooks)) {
                     notRead({
-                        collection: collection.slug,
+                        collection: slug,
                         reason: "it has a beforeQuery or afterRead hook, and its data driver cannot read its rows past them"
                     });
                     continue;
@@ -243,7 +259,7 @@ export async function removeReferencedKeys(
                     let after: Record<string, unknown> | undefined;
                     for (;;) {
                         const rows = await driver.fetchCollection({
-                            path: collection.slug,
+                            path: slug,
                             collection,
                             limit: pageSize,
                             withDeleted: true,
@@ -254,12 +270,12 @@ export async function removeReferencedKeys(
                         after = rows[rows.length - 1];
                     }
                 }
-                scanned.push(collection.slug);
+                scanned.push(slug);
             } catch (error: unknown) {
-                // A stopped scan is not a collection that could not be read.
+                // A stopped scan is not a table that could not be read.
                 if (options.signal?.aborted) throw error;
                 notRead({
-                    collection: collection.slug,
+                    collection: slug,
                     reason: error instanceof Error ? error.message : String(error)
                 });
             }
@@ -315,8 +331,8 @@ async function removeKeysNamedAnywhere(
     keys: Set<string>,
     options: ReferenceSources & { progress?: ScanProgress; onProgress?: () => void; signal?: AbortSignal }
 ): Promise<{ scanned: string[]; unscanned: UnscannedCollection[] }> {
-    const { scanned, unscanned } = await removeReferencedKeys(keys, options.collections, options.driverFor, {
-        globalCallbacks: options.globalCallbacks,
+    const { scanned, unscanned } = await removeReferencedKeys(keys, options.tables, options, {
+        globalHooks: options.globalHooks,
         progress: options.progress,
         onProgress: options.onProgress,
         signal: options.signal
@@ -357,10 +373,14 @@ export interface StoredHistory {
 
 /** Where references to stored files are read from: every row, and history. */
 export interface ReferenceSources {
-    collections: readonly CollectionConfig[];
-    driverFor: (collection: CollectionConfig) => DataDriver | undefined;
-    /** The callbacks every collection runs, which may scope or rewrite its reads. */
-    globalCallbacks?: CollectionCallbacks;
+    /** The tables whose rows are read, with the hooks that may scope or rewrite their reads. */
+    tables: readonly RegisteredTable[];
+    /** The unscoped driver serving a table here, or `undefined` when none does. */
+    driverFor: (table: TableDescriptor) => DataDriver | undefined;
+    /** What the driver's read calls name the table by (see `DriverCollectionOf`). */
+    driverCollection: DriverCollectionOf;
+    /** The hooks every table runs (`backend/hooks.ts`), which may scope or rewrite its reads. */
+    globalHooks?: TableHooks;
     /**
      * Row history, when the backend keeps it: a revert restores the values an
      * entry holds, so a file only history names is still in use. One that

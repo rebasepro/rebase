@@ -5,7 +5,8 @@ import type { CollectionConfig, DatabaseAdapter, DatabaseAdapterInitConfig } fro
 import { initializeRebaseBackend, type RebaseBackendConfig } from "../src/init";
 import type { HonoEnv } from "../src/api/types";
 import { fakeDataDriver } from "./helpers/server-a-fakes";
-import { tablesFrom } from "./helpers/tables";
+import { plainTable, tablesFrom } from "./helpers/tables";
+import { compileSchemaDefs } from "../src/schema/load-schema";
 
 /**
  * `initializeRebaseBackend` provisions the collection schema. Every caller.
@@ -136,7 +137,10 @@ describe("initializeRebaseBackend provisions the collection schema", () => {
     it("does not create tables for a project that introspects its collections", async () => {
         // Declaring nothing means the database is the source of truth. Creating
         // anything here would push a schema into a database only meant to be
-        // read.
+        // read. An introspecting driver reports each table it found twice: the
+        // collection the driver serves, and the descriptor read from the
+        // catalogue (`InitializedDriver.tables`).
+        const found = compileSchemaDefs([plainTable("found")]);
         const rec = recorder();
         await initializeRebaseBackend({
             app: new Hono<HonoEnv>(),
@@ -145,7 +149,7 @@ describe("initializeRebaseBackend provisions the collection schema", () => {
                 async initializeDriver(config) {
                     rec.order.push("initializeDriver");
                     rec.initConfig = config;
-                    return { internals: {}, driver: fakeDataDriver(), collections: [collection("found")] };
+                    return { internals: {}, driver: fakeDataDriver(), collections: found.collections, tables: found.descriptors };
                 }
             })
         });

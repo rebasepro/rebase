@@ -12,13 +12,15 @@
  *   POST   /move/verify  (the same body)            what a move left behind
  */
 import { Hono, type Context } from "hono";
-import type { CollectionCallbacks, CollectionConfig, DataDriver } from "@rebasepro/types";
+import type { DataDriver, TableDescriptor, TableHooks } from "@rebasepro/types";
 import { warnDeprecated } from "@rebasepro/common";
 import type { HonoEnv } from "../api/types";
 import { ApiError } from "../api/errors";
 import type { JobQueueClient } from "../jobs/types";
 import type { StorageController } from "./types";
 import type { StorageRegistry } from "./storage-registry";
+import type { RegisteredTable } from "../schema/table-registry";
+import type { DriverCollectionOf } from "../schema/driver-seam";
 import { canonicalStorageId } from "./keys";
 import { findOrphans, InvalidMaintenanceRequestError, moveObjects, storesInSamePlace, verifyMove } from "./maintenance";
 import {
@@ -31,16 +33,18 @@ import {
 export interface StorageMaintenanceRoutesConfig {
     registry?: StorageRegistry;
     controller?: StorageController;
-    /** The collections whose rows are read for references, read per request. */
-    collections: () => readonly CollectionConfig[];
+    /** The tables whose rows are read for references, with their hooks, read per request. */
+    tables: () => readonly RegisteredTable[];
     /**
-     * The unscoped driver serving a collection: every row, whoever wrote it.
+     * The unscoped driver serving a table: every row, whoever wrote it.
      * Its `scanStoredRows` is read when it has one — rows as stored, past
      * every read hook.
      */
-    driverFor: (collection: CollectionConfig) => DataDriver | undefined;
-    /** The global callbacks, read per request: a global read hook makes every collection hooked. */
-    globalCallbacks?: () => CollectionCallbacks | undefined;
+    driverFor: (table: TableDescriptor) => DataDriver | undefined;
+    /** What the driver's read calls name a table by (see `DriverCollectionOf`). */
+    driverCollection: DriverCollectionOf;
+    /** The global table hooks, read per request: a global read hook makes every table hooked. */
+    globalHooks?: () => TableHooks | undefined;
     /** Row history, when kept: a file only an entry names is restored by a revert. */
     history?: { scanStoredValues?(pageSize?: number): AsyncIterable<unknown[]> };
     /** The durable job queue a scan runs on, read per scan. Absent: scans run in this process. */
@@ -78,9 +82,10 @@ export function createStorageMaintenanceRoutes(config: StorageMaintenanceRoutesC
         const controller = sourceOf(storageId, "storageId");
         return findOrphans({
             controller,
-            collections: config.collections(),
+            tables: config.tables(),
             driverFor: config.driverFor,
-            globalCallbacks: config.globalCallbacks?.(),
+            driverCollection: config.driverCollection,
+            globalHooks: config.globalHooks?.(),
             history: config.history,
             olderThanMs: parseOlderThanHours(olderThan) * 3_600_000
         });
@@ -129,7 +134,7 @@ export function createStorageMaintenanceRoutes(config: StorageMaintenanceRoutesC
         const found = await report(storageId, c.req.query("olderThanHours"));
         if (found.unscanned.length > 0) {
             throw ApiError.conflict(
-                "Some collections could not be read, so a file they name would look unused. Nothing was deleted: " +
+                "Some tables could not be read, so a file they name would look unused. Nothing was deleted: " +
                 found.unscanned.map(entry => `${entry.collection} (${entry.reason})`).join("; "),
                 "STORAGE_SCAN_INCOMPLETE",
                 { unscanned: found.unscanned }

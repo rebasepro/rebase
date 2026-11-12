@@ -26,14 +26,14 @@ export { TusHandler } from "./tus-handler";
 export {
     createUploadConstraintResolver,
     createUploadPathResolver,
-    assertUploadWithinPropertyLimits,
+    assertUploadWithinColumnLimits,
     assertUploadWithinPathLimits,
     isAcceptedFile,
-    readUploadPropertyContext,
-    UPLOAD_COLLECTION_FIELD,
-    UPLOAD_PROPERTY_FIELD
-} from "./property-limits";
-export type { UploadConstraints, ResolveUploadConstraints, ResolveUploadPathConstraints } from "./property-limits";
+    readUploadColumnContext,
+    UPLOAD_TABLE_FIELD,
+    UPLOAD_COLUMN_FIELD
+} from "./column-limits";
+export type { UploadConstraints, ResolveUploadConstraints, ResolveUploadPathConstraints } from "./column-limits";
 
 import { BackendStorageConfig, StorageController } from "./types";
 import { LocalStorageController } from "./LocalStorageController";

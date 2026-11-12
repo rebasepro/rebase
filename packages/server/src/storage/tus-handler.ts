@@ -29,11 +29,11 @@ import {
 } from "./request-keys";
 import {
     assertUploadWithinPathLimits,
-    assertUploadWithinPropertyLimits,
-    readUploadPropertyContext,
+    assertUploadWithinColumnLimits,
+    readUploadColumnContext,
     type ResolveUploadConstraints,
     type ResolveUploadPathConstraints
-} from "./property-limits";
+} from "./column-limits";
 
 /** Metadata for an in-progress resumable upload. */
 interface TusUpload {
@@ -74,7 +74,7 @@ interface TusUpload {
     key: string;
     /**
      * The content type the object is stored with, resolved at creation. Same
-     * discipline as {@link TusUpload.key}: the property limits judged this
+     * discipline as {@link TusUpload.key}: the column limits judged this
      * value, so `finalize` writes this value and does not re-derive it.
      */
     contentType?: string;
@@ -252,18 +252,18 @@ export class TusHandler {
          */
         private maxFileSize?: number,
         /**
-         * The destination property's own `maxSize` / `acceptedFiles`.
+         * The destination storage column's own `maxBytes` / `accept`.
          *
          * Read from `Upload-Metadata` (`collection` and `property`), which is
          * where a resumable upload carries everything else about its
          * destination. Checked at `create`, from the declared `Upload-Length`
-         * and the metadata's content type, so a file the property will not
+         * and the metadata's content type, so a file the column will not
          * accept is refused before the first chunk rather than after the last.
          */
         private uploadConstraints?: ResolveUploadConstraints,
         /**
-         * The limits of the properties whose storage path the upload's key
-         * falls in — checked whether or not the upload names a property, as
+         * The limits of the storage columns whose path the upload's key
+         * falls in — checked whether or not the upload names a column, as
          * `POST /upload` checks them.
          */
         private uploadPathConstraints?: ResolveUploadPathConstraints
@@ -415,18 +415,18 @@ export class TusHandler {
         // The type the object will be stored with, resolved once and carried
         // on the upload like the key is. The metadata can name it twice —
         // `contentType`, and tus-js-client's `filetype` — and the check below
-        // used to prefer one while `finalize` stored the other, so a property
+        // used to prefer one while `finalize` stored the other, so a column
         // that accepts only images judged `image/png` and stored `text/html`.
         const contentType = metadata.contentType || metadata.filetype || undefined;
 
-        // The property's own limits, judged from the declared length and the
+        // The column's own limits, judged from the declared length and the
         // metadata's filename/type — before a single chunk is accepted. The
         // controller's own check runs at finalize, which is an hour of the
         // customer's bandwidth too late.
-        const uploadContext = readUploadPropertyContext(metadata);
+        const uploadContext = readUploadColumnContext(metadata);
         if (uploadContext && this.uploadConstraints) {
-            assertUploadWithinPropertyLimits(
-                this.uploadConstraints(uploadContext.collection, uploadContext.property),
+            assertUploadWithinColumnLimits(
+                this.uploadConstraints(uploadContext.table, uploadContext.column),
                 {
                     size: uploadLength,
                     type: contentType,

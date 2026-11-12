@@ -11,8 +11,9 @@ import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
-import type { CollectionConfig, DataDriver, FetchCollectionProps, StorageSourceDefinition } from "@rebasepro/types";
+import type { DataDriver, FetchCollectionProps, StorageSourceDefinition } from "@rebasepro/types";
 import { bucket, resetDeclaredResources, declaredStorageSources } from "@rebasepro/types";
+import { plainTable, servedTablesFor } from "./helpers/tables";
 
 import { LocalStorageController } from "../src/storage/LocalStorageController";
 import {
@@ -25,7 +26,6 @@ import {
 import { validateCronExpression } from "../src/cron/cron-scheduler";
 import type { HonoEnv } from "../src/api/types";
 import { fakeBootstrapper, fakeDataDriver, idleServer } from "./helpers/server-b-fakes";
-import { tablesFrom } from "./helpers/tables";
 
 const HOUR = 3_600_000;
 
@@ -39,7 +39,8 @@ function driverOver(rows: Record<string, unknown>[], fail?: string): DataDriver 
     });
 }
 
-const collection = (slug: string): CollectionConfig => ({ slug, name: slug, table: slug, properties: {} });
+/** The table `voice_cache`, with the driver seam that names it to a driver. */
+const served = servedTablesFor([plainTable("voice_cache")]);
 const source = (over: Partial<StorageSourceDefinition> = {}): StorageSourceDefinition =>
     ({ key: "(default)", engine: "local", transport: "server", ...over });
 
@@ -57,7 +58,7 @@ describe("the sweep a bucket declares", () => {
     it("is one cron job per source that asks, with safe defaults", () => {
         const { jobs, problems } = orphanSweepJobs(
             [source({ orphanSweep: {} }), source({ key: "voice", orphanSweep: { olderThanHours: 72, schedule: "0 3 * * 0" } }), source({ key: "plain" })],
-            { collections: () => [], driverFor: () => undefined }
+            { tables: () => [], driverCollection: served.driverCollection, driverFor: () => undefined }
         );
         expect(problems).toEqual([]);
         expect(jobs.map(j => j.id)).toEqual(["storage-orphan-sweep-default", "storage-orphan-sweep-voice"]);
@@ -71,7 +72,7 @@ describe("the sweep a bucket declares", () => {
     it("refuses a grace period short enough to take an upload whose row is not saved yet", () => {
         const { jobs, problems } = orphanSweepJobs(
             [source({ key: "voice", orphanSweep: { olderThanHours: 2 } })],
-            { collections: () => [], driverFor: () => undefined }
+            { tables: () => [], driverCollection: served.driverCollection, driverFor: () => undefined }
         );
         expect(jobs).toEqual([]);
         expect(problems[0]).toMatch(/at least 24/);
@@ -80,7 +81,7 @@ describe("the sweep a bucket declares", () => {
     it("refuses a bucket the backend never reaches", () => {
         const { jobs, problems } = orphanSweepJobs(
             [source({ key: "direct", transport: "direct", orphanSweep: {} })],
-            { collections: () => [], driverFor: () => undefined }
+            { tables: () => [], driverCollection: served.driverCollection, driverFor: () => undefined }
         );
         expect(jobs).toEqual([]);
         expect(problems[0]).toMatch(/"direct"/);
@@ -117,7 +118,8 @@ describe("one sweep", () => {
     it("deletes the unnamed file past the grace period, and only that one", async () => {
         const result = await runOrphanSweep("(default)", 168, {
             controller: storage,
-            collections: () => [collection("voice_cache")],
+            tables: () => served.tables,
+            driverCollection: served.driverCollection,
             driverFor: () => driverOver([{ id: "1", audio: "voice/named.wav" }])
         }, ctx);
 
@@ -128,10 +130,11 @@ describe("one sweep", () => {
         expect(lines.join("\n")).toMatch(/Deleted 1 unreferenced file/);
     });
 
-    it("deletes nothing when a collection cannot be read", async () => {
+    it("deletes nothing when a table cannot be read", async () => {
         const result = await runOrphanSweep("(default)", 168, {
             controller: storage,
-            collections: () => [collection("voice_cache")],
+            tables: () => served.tables,
+            driverCollection: served.driverCollection,
             driverFor: () => driverOver([], "connection refused")
         }, ctx);
 
@@ -143,7 +146,8 @@ describe("one sweep", () => {
 
     it("fails the run, rather than sweeping nothing, when the source is not configured", async () => {
         await expect(runOrphanSweep("voice", 168, {
-            collections: () => [],
+            tables: () => [],
+            driverCollection: served.driverCollection,
             driverFor: () => undefined
         }, ctx)).rejects.toThrow(/"voice" is not configured/);
     });
@@ -174,7 +178,7 @@ describe("a backend whose bucket declares a sweep", () => {
         const backend = await initializeRebaseBackend({
             app: new Hono<HonoEnv>(),
             server: idleServer(),
-            ...tablesFrom([collection("voice_cache")]),
+            tables: [plainTable("voice_cache")],
             cronPersistence: false,
             bootstrappers: [bootstrapper],
             storage: { type: "local", basePath: root }

@@ -61,6 +61,7 @@ import { BackendCollectionRegistry } from "../collections/BackendCollectionRegis
 import { TableRegistry } from "../schema/table-registry";
 import { globalHooksAsCallbacks, resolveDeclaredTables } from "../schema/declared-tables";
 import { introspectedDescriptors, type IntrospectedDriverResult } from "../schema/introspected-tables";
+import type { DriverCollectionOf } from "../schema/driver-seam";
 import {
     collectionsStoredBy,
     logUnprovisionedCollections,
@@ -689,7 +690,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         schemaDir: config.schemaDir
     });
     const tableRegistry = new TableRegistry();
-    tableRegistry.replaceAll(declaredTables.descriptors);
+    tableRegistry.replaceAll(declaredTables.tables);
     /** The lowered tables whose compiled policies are served; replaced by a live schema apply. */
     let servedPolicyCollections: PostgresCollectionConfig[] = declaredTables.collections;
     const describeTable = (slug: string): TableDescriptor | undefined => tableRegistry.get(slug);
@@ -964,6 +965,17 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         );
     }
     const defaultBootstrapper = bootstrappers.find(b => b.id === defaultDriverId || b.type === defaultDriverId) || bootstrappers[0];
+
+    // The B-R7 seam (see `schema/driver-seam.ts`): table-model code decides
+    // from descriptors and names a table to a driver call by its lowered
+    // collection, which it asks for here and reads nothing from.
+    const driverCollection: DriverCollectionOf = slug => collectionRegistry.getRaw(slug);
+    // The unscoped driver of the database a table lives in (`database` on
+    // `defineTable`); `undefined` when that source has no driver here.
+    const unscopedDriverServing = (table: TableDescriptor): DataDriver | undefined => {
+        const key = table.database ?? DEFAULT_DRIVER_ID;
+        return key === DEFAULT_DRIVER_ID ? defaultDriver : driverRegistry.get(key);
+    };
     const defaultRealtimeService = defaultDriverResult.realtimeProvider;
 
     // Resolve a collection path (e.g. "products", "authors/1/posts") to its
@@ -2583,15 +2595,13 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         const maintenanceSources = {
             registry: storageRegistry,
             controller: storageController,
-            collections: () => collectionRegistry.getRawCollections(),
+            tables: () => tableRegistry.tables(),
             // Unscoped, and read through `scanStoredRows` — past policies
             // and read hooks alike: a row a policy or a `beforeQuery` hides
             // from the admin still names its files.
-            driverFor: (collection: CollectionConfig) => {
-                const key = resolveDataSource(collection, dataSourceRegistry).key;
-                return !key || key === DEFAULT_DRIVER_ID ? defaultDriver : driverRegistry.get(key);
-            },
-            globalCallbacks: () => collectionRegistry.getGlobalCallbacks(),
+            driverFor: unscopedDriverServing,
+            driverCollection,
+            globalHooks: () => config.hooks,
             // A revert restores what an entry holds: its files are in use.
             history: historyConfigResult?.historyService,
             // Read per scan: the queue is built further down. Without one, a
@@ -2631,18 +2641,18 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             // and that caps each chunk, not the file: a chunked upload is many
             // small bodies. So it has to be told the file limit.
             maxFileSize: storageMaxSize,
-            // Per-property `maxSize` / `acceptedFiles`, resolved from the
-            // registry rather than from the request: the limits have to be the
-            // server's, or a caller could send their own alongside the file.
-            // Read lazily so a collection registered after this point (the
-            // introspected ones) is still covered.
-            uploadConstraints: (slug, property) =>
-                createUploadConstraintResolver(collectionRegistry.getRawCollections())(slug, property),
+            // Per-column `maxBytes` / `accept`, resolved from the table
+            // descriptors rather than from the request: the limits have to be
+            // the server's, or a caller could send their own alongside the file.
+            // Read lazily so a table registered after this point (the
+            // introspected ones, a live schema edit) is still covered.
+            uploadConstraints: (slug, column) =>
+                createUploadConstraintResolver(tableRegistry.list())(slug, column),
             // And the same limits by where the file lands: every upload into a
-            // property's `storagePath` meets them, whether or not it names the
-            // property. Compiled once per collection list.
+            // column's storage `path` meets them, whether or not it names the
+            // column. Compiled once per registry revision.
             uploadPathConstraints: (storageId, key) =>
-                createUploadPathResolver(collectionRegistry.getRawCollections())(storageId, key)
+                createUploadPathResolver(tableRegistry.list())(storageId, key)
         });
 
         // Wrapper router: middleware must be registered BEFORE the routes it
@@ -3992,6 +4002,9 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
                 "To keep the table's own, attach a hooks object that also calls them (`definition.config.hooks`)."
             );
         }
+        // The table model's copy: what storage's read-hook check and every
+        // other table-model reader see. The descriptor stays as compiled.
+        if (tableRegistry.setHooks(slug, hooks)) attached++;
         if (attached === 0) {
             logger.warn(`[hooks] Table "${slug}" not found in any registry — hooks not attached.`);
         }

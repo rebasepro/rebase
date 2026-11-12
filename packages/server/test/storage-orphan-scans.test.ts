@@ -3,7 +3,8 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import { Hono } from "hono";
-import type { CollectionConfig, DataDriver, FetchCollectionProps } from "@rebasepro/types";
+import type { DataDriver, FetchCollectionProps, TableDescriptor } from "@rebasepro/types";
+import { plainTable, servedTablesFor } from "./helpers/tables";
 
 import { LocalStorageController } from "../src/storage/LocalStorageController";
 import { DefaultStorageRegistry } from "../src/storage/storage-registry";
@@ -51,7 +52,8 @@ function driverOver(rows: () => Record<string, unknown>[], fail?: () => string |
     });
 }
 
-const collection = (slug: string): CollectionConfig => ({ slug, name: slug, table: slug, properties: {} });
+/** The tables `users` and `posts`, with the driver seam that names them to a driver. */
+const served = servedTablesFor([plainTable("users"), plainTable("posts")]);
 
 async function put(controller: LocalStorageController, key: string, content = "x"): Promise<void> {
     await controller.putObject({ file: new File([content], key.split("/").pop() ?? "f", { type: "text/plain" }), key });
@@ -109,8 +111,9 @@ describe("the orphan scan, in the background", () => {
 
     const sources = () => ({
         registry: DefaultStorageRegistry.create({ "(default)": storage }),
-        collections: () => [collection("users"), collection("posts")],
-        driverFor: (c: CollectionConfig) => driverOver(() => rows[c.slug], () => c.slug === "posts" ? failing : undefined),
+        tables: () => served.tables,
+        driverCollection: served.driverCollection,
+        driverFor: (t: TableDescriptor) => driverOver(() => rows[t.slug], () => t.slug === "posts" ? failing : undefined),
         now: () => clock
     });
 
@@ -173,7 +176,7 @@ describe("the orphan scan, in the background", () => {
         expect((await json(await app.request(`/admin/storage/orphans/scans/${state.id}`))).data.completedAt).toBe(done.completedAt);
     });
 
-    it("says which collections it could not read, as it goes, and a delete from it is refused", async () => {
+    it("says which tables it could not read, as it goes, and a delete from it is refused", async () => {
         failing = "connection refused";
         const queue = recordingQueue();
         const scans = createOrphanScanService({ ...sources(), jobs: () => queue });

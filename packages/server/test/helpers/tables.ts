@@ -2,14 +2,20 @@ import fs from "fs";
 import path from "path";
 import { pathToFileURL } from "url";
 import { collectionsToTableDefs } from "@rebasepro/common";
+import { col, defineTable } from "@rebasepro/types";
 import type {
     AnyCollectionConfig,
     AnyTableDef,
     AnyViewDef,
     CollectionConfig,
+    CompiledTable,
     DefaultRls,
-    SecurityRule
+    PostgresCollectionConfig,
+    SecurityRule,
+    TableDescriptor
 } from "@rebasepro/types";
+import { compileSchemaDefs } from "../../src/schema/load-schema";
+import type { DriverCollectionOf } from "../../src/schema/driver-seam";
 
 /**
  * The temporary lift for test fixtures.
@@ -42,6 +48,48 @@ export function tablesFrom(
     const narrowed: CollectionConfig[] = collections.map(collection => collection);
     const { tables, defaultRls } = collectionsToTableDefs(narrowed, options);
     return defaultRls ? { tables, defaultRls } : { tables };
+}
+
+/**
+ * What a fixture compiles to: the compiled tables, their descriptors, and the
+ * collections they were lowered into (what the data driver is handed until
+ * slice B-R7; removed with K8). `{ descriptors, collections }` is exactly what
+ * `new RestApiGenerator(...)` takes.
+ */
+export interface FixtureTables {
+    tables: CompiledTable[];
+    descriptors: TableDescriptor[];
+    collections: PostgresCollectionConfig[];
+}
+
+/**
+ * Lift legacy fixture collections, compile them and lower them — the boot's
+ * own path (`compileSchemaDefs`) — for a test that builds routes, a validator
+ * or a document from them rather than booting a backend.
+ */
+export function tablesFromCollections(
+    collections: readonly (CollectionConfig | AnyCollectionConfig)[],
+    options: { defaultSecurityRules?: readonly SecurityRule[] } = {}
+): FixtureTables {
+    const { tables, defaultRls } = tablesFrom(collections, options);
+    return compileTables(tables, defaultRls);
+}
+
+/** Compile and lower table definitions, as the boot does. */
+export function compileTables(defs: readonly (AnyTableDef | AnyViewDef)[], defaultRls?: DefaultRls): FixtureTables {
+    return compileSchemaDefs(defs, defaultRls);
+}
+
+/** The descriptor of the table with this slug, from a fixture; throws when there is none. */
+export function descriptorOf(fixture: Pick<FixtureTables, "descriptors">, slug: string): TableDescriptor {
+    const found = fixture.descriptors.find(descriptor => descriptor.slug === slug);
+    if (!found) throw new Error(`The fixture has no table "${slug}".`);
+    return found;
+}
+
+/** The descriptor one legacy fixture collection compiles to. */
+export function tableFrom(collection: CollectionConfig | AnyCollectionConfig): TableDescriptor {
+    return descriptorOf(tablesFromCollections([collection]), collection.slug);
 }
 
 /**
@@ -80,4 +128,27 @@ export async function tablesFromLegacyDirectory(dir: string): Promise<LiftedTabl
         break;
     }
     return tablesFrom(collections, defaultSecurityRules ? { defaultSecurityRules } : {});
+}
+
+/**
+ * Tables as the server's table-model code receives them: compiled (with their
+ * hooks and transforms) and paired with the B-R7 driver seam, which answers a
+ * slug with the collection the table was lowered into for the data driver.
+ *
+ * ```ts
+ * const { tables, driverCollection } = servedTablesFor([posts, authors]);
+ * ```
+ */
+export function servedTablesFor(
+    defs: readonly (AnyTableDef | AnyViewDef)[],
+    defaultRls?: DefaultRls
+): { tables: CompiledTable[]; driverCollection: DriverCollectionOf } {
+    const { tables, collections } = compileSchemaDefs(defs, defaultRls);
+    const bySlug = new Map<string, CollectionConfig>(collections.map(collection => [collection.slug, collection]));
+    return { tables, driverCollection: slug => bySlug.get(slug) };
+}
+
+/** A table with a text key and nothing else, named `slug`: a fixture whose rows a fake driver supplies. */
+export function plainTable(slug: string): AnyTableDef {
+    return defineTable(slug, { columns: { id: col.text().primaryKey() }, rls: "admin-only" });
 }

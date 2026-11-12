@@ -18,7 +18,7 @@
  * result, a timeout that aborts the scan, and a place in the admin's cron list
  * where it can be paused or run by hand.
  */
-import type { CollectionConfig, CronJobContext, StorageSourceDefinition } from "@rebasepro/types";
+import type { CronJobContext, StorageSourceDefinition } from "@rebasepro/types";
 import { DEFAULT_STORAGE_SOURCE_KEY } from "@rebasepro/types";
 
 import type { LoadedCronJob } from "../cron/cron-loader";
@@ -42,11 +42,13 @@ export function orphanSweepJobId(sourceKey: string): string {
 }
 
 /** Where the sweep reads its files and references from. */
-export interface OrphanSweepDeps extends Omit<ReferenceSources, "collections" | "globalCallbacks"> {
+export interface OrphanSweepDeps extends Omit<ReferenceSources, "tables" | "globalHooks"> {
     registry?: StorageRegistry;
     controller?: StorageController;
-    collections: () => readonly CollectionConfig[];
-    globalCallbacks?: () => ReferenceSources["globalCallbacks"];
+    /** The tables whose rows are read for references, read when a sweep runs. */
+    tables: () => ReferenceSources["tables"];
+    /** The global table hooks, read when a sweep runs. */
+    globalHooks?: () => ReferenceSources["globalHooks"];
     now?: () => number;
 }
 
@@ -128,9 +130,10 @@ export async function runOrphanSweep(
     }
 
     const sources: ReferenceSources = {
-        collections: deps.collections(),
+        tables: deps.tables(),
         driverFor: deps.driverFor,
-        globalCallbacks: deps.globalCallbacks?.(),
+        driverCollection: deps.driverCollection,
+        globalHooks: deps.globalHooks?.(),
         history: deps.history
     };
     const olderThanMs = olderThanHours * 3_600_000;

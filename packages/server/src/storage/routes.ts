@@ -26,11 +26,11 @@ import { UnknownStorageSourceError, type StorageRegistry } from "./storage-regis
 import { DEFAULT_STORAGE_SOURCE_KEY, isAnonymousUid, isPublicStorageKey, scopeGrants, type DownloadConfig, type DownloadMetadata, type StorageSourceDefinition, type AuthAdapter } from "@rebasepro/types";
 import {
     assertUploadWithinPathLimits,
-    assertUploadWithinPropertyLimits,
-    readUploadPropertyContext,
+    assertUploadWithinColumnLimits,
+    readUploadColumnContext,
     type ResolveUploadConstraints,
     type ResolveUploadPathConstraints
-} from "./property-limits";
+} from "./column-limits";
 import { objectValidators, isNotModified, applyCacheHeaders, buildEntityTag } from "./cache-headers";
 import { parseRange, contentRange, unsatisfiableContentRange } from "./range";
 import { requireAuth as jwtRequireAuth, optionalAuth as jwtOptionalAuth, queryTokenAuth, fileTokenAuth, publicObjectAuth, refuse } from "../auth/middleware";
@@ -261,21 +261,21 @@ export interface StorageRoutesConfig {
      */
     maxFileSize?: number;
     /**
-     * Per-property upload limits, looked up by collection slug and property
-     * path — `StorageConfig.maxSize` and `StorageConfig.acceptedFiles`.
+     * Per-column upload limits, looked up by table slug and column address —
+     * the storage column's `maxBytes` and `accept`.
      *
      * The global `maxFileSize` above is a ceiling for the *endpoint*; these are
-     * the rules a particular property declared, and until now the only thing
-     * enforcing them was the browser's file picker. See `property-limits.ts`.
+     * the rules a particular column declared, which the browser's file picker
+     * alone used to enforce. See `column-limits.ts`.
      *
-     * Omitted, or handed a request with no property context, uploads fall back
+     * Omitted, or handed a request with no column context, uploads fall back
      * to the global cap exactly as before.
      */
     uploadConstraints?: ResolveUploadConstraints;
     /**
-     * The limits of the properties whose `storagePath` an upload's key falls
+     * The limits of the storage columns whose `path` an upload's key falls
      * in, by source and key — see `createUploadPathResolver`. Applied to every
-     * upload, whether or not it names a property, so a property's limits hold
+     * upload, whether or not it names a column, so a column's limits hold
      * for every file written where its files go.
      */
     uploadPathConstraints?: ResolveUploadPathConstraints;
@@ -802,23 +802,23 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
             );
         }
 
-        // Before authorization and before a byte is stored. The property the
-        // file is destined for declares its own `maxSize` and `acceptedFiles`,
-        // and until now only the browser's file picker read them — so a `curl`
+        // Before authorization and before a byte is stored. The column the
+        // file is destined for declares its own `maxBytes` and `accept`,
+        // and once only the browser's file picker read them — so a `curl`
         // past the picker put whatever it liked in the avatar bucket. Absent
         // context leaves the global cap in charge, which is what every existing
         // client relies on.
-        const uploadContext = readUploadPropertyContext(body as Record<string, unknown>);
+        const uploadContext = readUploadColumnContext(body as Record<string, unknown>);
         const fileFacts = { size: uploadedFile.size, type: uploadedFile.type, name: uploadedFile.name };
         if (uploadContext && config.uploadConstraints) {
-            assertUploadWithinPropertyLimits(
-                config.uploadConstraints(uploadContext.collection, uploadContext.property),
+            assertUploadWithinColumnLimits(
+                config.uploadConstraints(uploadContext.table, uploadContext.column),
                 fileFacts
             );
         }
         // And the rules of the path the file lands in, named or not: a
-        // property's limits hold for every file written where its files go,
-        // and naming a looser property does not unlock a stricter one's path.
+        // column's limits hold for every file written where its files go,
+        // and naming a looser column does not unlock a stricter one's path.
         if (config.uploadPathConstraints) {
             assertUploadWithinPathLimits(config.uploadPathConstraints(canonicalStorageId(storageId), finalKey), fileFacts);
         }
@@ -1574,7 +1574,7 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
         // What this deployment accepts, so the resumable path refuses a file
         // that is too large at creation rather than after receiving it.
         config.maxFileSize,
-        // And what the destination *property* accepts. A limit enforced on
+        // And what the destination *column* accepts. A limit enforced on
         // `POST /upload` alone would leave the resumable route as the way
         // around it — which is exactly how the global cap came to be missing
         // from this path in the first place.

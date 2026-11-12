@@ -3,7 +3,7 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import { Hono } from "hono";
-import type { CollectionConfig, DataDriver, FetchCollectionProps } from "@rebasepro/types";
+import type { DataDriver, FetchCollectionProps } from "@rebasepro/types";
 import { storageReference } from "@rebasepro/types";
 
 import { LocalStorageController } from "../src/storage/LocalStorageController";
@@ -13,12 +13,13 @@ import { createStorageMaintenanceRoutes } from "../src/storage/maintenance-route
 import { errorHandler } from "../src/api/errors";
 import { fakeDataDriver } from "./helpers/server-b-fakes";
 import type { HonoEnv } from "../src/api/types";
+import { plainTable, servedTablesFor } from "./helpers/tables";
 
 /**
  * `rebase storage orphans` and `rebase storage move`.
  *
  * Nothing deletes a stored file when its field is cleared or its row deleted,
- * and changing a property's source leaves its files behind in the old one.
+ * and changing a column's storage source leaves its files behind in the old one.
  * These find the files no row names, and copy a folder of files across.
  */
 
@@ -36,7 +37,11 @@ function driverOver(rows: Record<string, unknown>[], fail?: string): DataDriver 
     });
 }
 
-const collection = (slug: string): CollectionConfig => ({ slug, name: slug, table: slug, properties: {} });
+/** The tables `users` and `posts`, with the driver seam that names them to a driver. */
+const served = servedTablesFor([plainTable("users"), plainTable("posts")]);
+const users = served.tables[0];
+const both = { tables: served.tables, driverCollection: served.driverCollection };
+const none = { tables: [], driverCollection: served.driverCollection };
 
 async function put(controller: LocalStorageController, key: string, content = "x"): Promise<void> {
     await controller.putObject({ file: new File([content], key.split("/").pop() ?? "f", { type: "text/plain" }), key });
@@ -94,8 +99,8 @@ describe("storage orphans", () => {
         const data = rows();
         const report = await findOrphans({
             controller: storage,
-            collections: [collection("users"), collection("posts")],
-            driverFor: (c) => driverOver(data[c.slug as keyof typeof data]),
+            ...both,
+            driverFor: (t) => driverOver(data[t.slug as keyof typeof data]),
             olderThanMs: 24 * HOUR
         });
 
@@ -106,11 +111,12 @@ describe("storage orphans", () => {
         expect(report.unscanned).toEqual([]);
     });
 
-    it("reads every page of a collection", async () => {
+    it("reads every page of a table", async () => {
         const many = Array.from({ length: 1200 }, (_, i) => ({ id: String(i), avatar: i === 1199 ? "avatars/old.png" : "x" }));
         const report = await findOrphans({
             controller: storage,
-            collections: [collection("users")],
+            tables: [users],
+            driverCollection: served.driverCollection,
             driverFor: () => driverOver(many),
             olderThanMs: 24 * HOUR
         });
@@ -120,10 +126,7 @@ describe("storage orphans", () => {
     it("reads rows as stored when the driver can, and never through a read hook otherwise", async () => {
         const data = rows();
         // The documented `beforeQuery`: a scan has no user, so it would see no row.
-        const hooked: CollectionConfig = {
-            ...collection("users"),
-            callbacks: { beforeQuery: () => ({ filter: { owner_id: ["==", null] } }) }
-        };
+        const hooked = { ...users, hooks: { beforeQuery: () => ({ filter: { owner_id: ["==", null] } }) } };
         const fetchOnly = driverOver([]);
         const scanning: DataDriver = {
             ...driverOver([]),
@@ -131,19 +134,19 @@ describe("storage orphans", () => {
         };
 
         const refused = await findOrphans({
-            controller: storage, collections: [hooked], driverFor: () => fetchOnly, olderThanMs: 24 * HOUR
+            controller: storage, tables: [hooked], driverCollection: served.driverCollection, driverFor: () => fetchOnly, olderThanMs: 24 * HOUR
         });
         expect(refused.unscanned.map(u => u.collection)).toEqual(["users"]);
 
-        // A global hook applies to every collection.
+        // A global hook applies to every table.
         const global = await findOrphans({
-            controller: storage, collections: [collection("users")], driverFor: () => fetchOnly, olderThanMs: 24 * HOUR,
-            globalCallbacks: { afterRead: ({ row }) => row }
+            controller: storage, tables: [users], driverCollection: served.driverCollection, driverFor: () => fetchOnly, olderThanMs: 24 * HOUR,
+            globalHooks: { afterRead: ({ values }) => values }
         });
         expect(global.unscanned.map(u => u.collection)).toEqual(["users"]);
 
         const scanned = await findOrphans({
-            controller: storage, collections: [hooked], driverFor: () => scanning, olderThanMs: 24 * HOUR
+            controller: storage, tables: [hooked], driverCollection: served.driverCollection, driverFor: () => scanning, olderThanMs: 24 * HOUR
         });
         expect(scanned.unscanned).toEqual([]);
         expect(scanned.orphans.map(o => o.key)).not.toContain("avatars/kept.png");
@@ -153,8 +156,8 @@ describe("storage orphans", () => {
         const data = rows();
         const kept = await findOrphans({
             controller: storage,
-            collections: [collection("users"), collection("posts")],
-            driverFor: (c) => driverOver(data[c.slug as keyof typeof data]),
+            ...both,
+            driverFor: (t) => driverOver(data[t.slug as keyof typeof data]),
             history: { async *scanStoredValues() { yield [[{ avatar: "avatars/kept.png" }, { avatar: "avatars/old.png" }]]; } },
             olderThanMs: 24 * HOUR
         });
@@ -163,8 +166,8 @@ describe("storage orphans", () => {
 
         const unread = await findOrphans({
             controller: storage,
-            collections: [collection("users"), collection("posts")],
-            driverFor: (c) => driverOver(data[c.slug as keyof typeof data]),
+            ...both,
+            driverFor: (t) => driverOver(data[t.slug as keyof typeof data]),
             history: {},
             olderThanMs: 24 * HOUR
         });
@@ -178,8 +181,9 @@ describe("storage orphans", () => {
             hono.onError(errorHandler);
             hono.route("/admin/storage", createStorageMaintenanceRoutes({
                 registry: DefaultStorageRegistry.create({ "(default)": storage }),
-                collections: () => [collection("users"), collection("posts")],
-                driverFor: (c) => driverOver(data[c.slug as keyof typeof data], c.slug === "posts" ? fail : undefined)
+                tables: () => served.tables,
+                driverCollection: served.driverCollection,
+                driverFor: (t) => driverOver(data[t.slug as keyof typeof data], t.slug === "posts" ? fail : undefined)
             }));
             return hono;
         };
@@ -351,7 +355,8 @@ describe("storage move", () => {
             hono.onError(errorHandler);
             hono.route("/admin/storage", createStorageMaintenanceRoutes({
                 registry: DefaultStorageRegistry.create({ "(default)": from, uploads: target }),
-                collections: () => [],
+                tables: () => [],
+                driverCollection: none.driverCollection,
                 driverFor: () => undefined
             }));
             const refused = await hono.request("/admin/storage/move", {
@@ -375,7 +380,8 @@ describe("storage move", () => {
         hono.onError(errorHandler);
         hono.route("/admin/storage", createStorageMaintenanceRoutes({
             registry: DefaultStorageRegistry.create({ "(default)": from, media: to }),
-            collections: () => [],
+            tables: () => [],
+            driverCollection: none.driverCollection,
             driverFor: () => undefined
         }));
         const same = await hono.request("/admin/storage/move", { method: "POST", body: JSON.stringify({ from: "media", to: "media" }) });

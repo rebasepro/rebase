@@ -14,7 +14,8 @@ import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 import { Hono } from "hono";
-import type { CollectionConfig } from "@rebasepro/types";
+import { col, defineTable, json } from "@rebasepro/types";
+import { compileTables } from "@rebasepro/common";
 import { HonoEnv } from "../src/api/types";
 import { errorHandler } from "../src/api/errors";
 import { fakeBootstrapper, idleServer } from "./helpers/server-b-fakes";
@@ -25,56 +26,24 @@ import { createStorageRoutes } from "../src/storage/routes";
 import {
     createUploadConstraintResolver,
     createUploadPathResolver
-} from "../src/storage/property-limits";
-import { tablesFrom } from "./helpers/tables";
+} from "../src/storage/column-limits";
 
-const posts: CollectionConfig = {
-    slug: "posts",
-    name: "Posts",
-    table: "posts",
-    properties: {
-        id: { type: "number", isId: "increment" },
-        cover: {
-            type: "string",
-            storage: { storagePath: "covers", maxSize: 1024, acceptedFiles: ["image/*"] }
-        },
-        avatar: {
-            type: "string",
-            storage: { storagePath: "users/{entityId}/avatar", acceptedFiles: ["image/*"] }
-        },
-        badge: {
-            type: "string",
-            storage: { storagePath: "badges/{id}", acceptedFiles: ["image/*"] }
-        },
-        gallery: {
-            type: "array",
-            of: { type: "string", storage: { storagePath: "shared", acceptedFiles: ["image/*"] } }
-        },
-        attachment: {
-            type: "string",
-            storage: { storagePath: "shared", acceptedFiles: [".pdf"] }
-        },
-        logo: {
-            type: "string",
-            storage: { storagePath: "logos", public: true, acceptedFiles: ["image/*"] }
-        },
-        clip: {
-            type: "string",
-            storage: { storagePath: "clips", storageSource: "media", acceptedFiles: ["video/*"] }
-        },
-        nested: {
-            type: "map",
-            properties: {
-                scan: { type: "string", storage: { storagePath: "{path}/scans", acceptedFiles: [".pdf"] } }
-            }
-        },
-        computed: {
-            type: "string",
-            storage: { storagePath: () => "computed", acceptedFiles: ["image/*"] }
-        },
-        loose: { type: "string", storage: { storagePath: "loose" } }
-    }
-};
+const postsDef = defineTable("posts", {
+    columns: {
+        id: col.serial().primaryKey(),
+        cover: col.storage({ path: "covers", maxBytes: 1024, accept: ["image/*"] }),
+        avatar: col.storage({ path: "users/{entityId}/avatar", accept: ["image/*"] }),
+        badge: col.storage({ path: "badges/{id}", accept: ["image/*"] }),
+        gallery: col.storage({ path: "shared", accept: ["image/*"] }).multiple(),
+        attachment: col.storage({ path: "shared", accept: [".pdf"] }),
+        logo: col.storage({ path: "logos", public: true, accept: ["image/*"] }),
+        clip: col.storage({ path: "clips", source: "media", accept: ["video/*"] }),
+        nested: col.jsonb(json.object({ scan: json.storage({ path: "{path}/scans", accept: [".pdf"] }) })),
+        loose: col.storage({ path: "loose" })
+    },
+    rls: "admin-only"
+});
+const [posts] = compileTables([postsDef]);
 
 describe("createUploadPathResolver", () => {
     const rules = createUploadPathResolver([posts]);
@@ -113,8 +82,7 @@ describe("createUploadPathResolver", () => {
         expect(sources("media", "covers/a.png")).toEqual([]);
     });
 
-    it("has no rule for a storage path computed by a function, or a property with no limits", () => {
-        expect(sources("(default)", "computed/a.exe")).toEqual([]);
+    it("has no rule for a column with no limits", () => {
         expect(sources("(default)", "loose/a.exe")).toEqual([]);
     });
 });
@@ -203,12 +171,6 @@ describe("every upload door holds a file to the rule of the path it lands in", (
     });
 });
 
-/** `posts` as a table can declare it: every storage path a template. */
-const servedPosts: CollectionConfig = {
-    ...posts,
-    properties: Object.fromEntries(Object.entries(posts.properties).filter(([key]) => key !== "computed"))
-};
-
 describe("a booted backend", () => {
     it("holds uploads to the storage paths of the collections it serves", async () => {
         const { initializeRebaseBackend } = await import("../src/init");
@@ -220,10 +182,7 @@ describe("a booted backend", () => {
             await initializeRebaseBackend({
                 app,
                 server: idleServer(),
-                // Without the function-path property: the table model states a
-                // storage path as a template only (a function path is the
-                // browser's, in `customizeTable`), so it cannot be served.
-                ...tablesFrom([servedPosts]),
+                tables: [postsDef],
                 bootstrappers: [fakeBootstrapper()],
                 auth: signedInEditor(),
                 storage: { type: "local", basePath: root }
