@@ -41,6 +41,7 @@ import {
     type ColumnType,
     type CompiledTable,
     type TableDescriptor,
+    type ColumnDescriptor,
     hasForeignKeyOnTarget
 } from "@rebasepro/types";
 import {
@@ -225,7 +226,7 @@ export const primaryKeyPgType = (collection: CollectionConfig, via: string): PgT
     const { name, prop } = getPrimaryKeyProp(collection, via);
     const definition = prop?.type === "relation" ? undefined : tableColumnOf(prop);
     if (definition) {
-        return withoutSequence(definedPgType(definition, { collection, propName: name, column: definedColumnName(name, definition) }));
+        return withoutSequence(definedPgType(definition, collectionSite(collection, name, definedColumnName(name, definition))));
     }
     if (prop?.type === "number") {
         return withoutSequence(numberType(name, prop as NumberProperty, collection, true));
@@ -371,7 +372,7 @@ export const columnPgType = (
 ): PgType => {
     // A link is typed by what it points at, whatever column it absorbed.
     const definition = prop.type === "relation" ? undefined : tableColumnOf(prop);
-    if (definition) return definedPgType(definition, { collection, propName, column: definedColumnName(propName, definition) });
+    if (definition) return definedPgType(definition, collectionSite(collection, propName, definedColumnName(propName, definition)));
     switch (prop.type) {
         case "string":
             return stringType(propName, prop as StringProperty, collection);
@@ -566,13 +567,26 @@ const columnDefault = (
 
 /** Where a defined column lands: what its enum type, if any, is named after. */
 interface DefinedColumnSite {
-    /** The collection, or the synthetic one standing in for a junction. */
-    collection: CollectionConfig;
-    /** The property key — an unnamed enum's Drizzle variable is named after it. */
+    /** The Postgres schema of the table (a junction's is `public`). */
+    schema: string;
+    /** The table, unqualified — an unnamed enum's type is named after it. */
+    table: string;
+    /** The table as a refusal names it: its slug, or a junction's table. */
+    owner: string;
+    /** The column key — an unnamed enum's Drizzle variable is named after it. */
     propName: string;
     /** The SQL column — an unnamed enum's type is named after it. */
     column: string;
 }
+
+/** The site of a column on a lowered collection (or a junction's synthetic one). */
+const collectionSite = (collection: CollectionConfig, propName: string, column: string): DefinedColumnSite => ({
+    schema: schemaOf(collection),
+    table: getTableName(collection),
+    owner: describe(collection),
+    propName,
+    column
+});
 
 /** A defined column's SQL name: the one it states, or the snake_case of its key. */
 const definedColumnName = (propName: string, definition: ColumnDef): string =>
@@ -596,6 +610,10 @@ const NON_ELEMENT_KINDS: ReadonlySet<ColumnType["kind"]> = new Set(["json", "jso
  */
 export const definedPgType = (definition: ColumnDef, site: DefinedColumnSite): PgType =>
     pgTypeOf(definition.type, site);
+
+/** The Postgres type a column descriptor states — the same renaming as {@link definedPgType}. */
+const describedPgType = (column: ColumnDescriptor, site: DefinedColumnSite): PgType =>
+    pgTypeOf(column.type, site);
 
 const pgTypeOf = (type: ColumnType, site: DefinedColumnSite): PgType => {
     switch (type.kind) {
@@ -628,7 +646,7 @@ const pgTypeOf = (type: ColumnType, site: DefinedColumnSite): PgType => {
         case "array":
             if (NON_ELEMENT_KINDS.has(type.of.kind)) {
                 throw new Error(
-                    `Column "${site.column}" of "${describe(site.collection)}" is an array of ` +
+                    `Column "${site.column}" of "${site.owner}" is an array of ` +
                     `\`${type.of.kind}\`, which is not an element type Rebase stores in a Postgres array. ` +
                     "An array column holds scalars (text, uuid, numbers, booleans, dates, enums); a list of " +
                     "documents or vectors is a `col.jsonb()` column."
@@ -642,7 +660,7 @@ const pgTypeOf = (type: ColumnType, site: DefinedColumnSite): PgType => {
             const problem = customSqlTypeProblem(type.sqlType);
             if (problem !== undefined) {
                 throw new Error(
-                    `Column "${site.column}" of "${describe(site.collection)}" is \`col.custom(${JSON.stringify(type.sqlType)})\`, ` +
+                    `Column "${site.column}" of "${site.owner}" is \`col.custom(${JSON.stringify(type.sqlType)})\`, ` +
                     `and that type name ${problem}. Write the Postgres type as \`format_type\` prints it.`
                 );
             }
@@ -669,14 +687,13 @@ const sharedEnumVarName = (schema: string, name: string): string =>
     `${getTableVarName(schema === "public" ? name : `${schema}_${name}`)}Enum`;
 
 const definedEnumType = (type: Extract<ColumnType, { kind: "enum" }>, site: DefinedColumnSite): PgType => {
-    const table = getTableName(site.collection);
-    const schema = schemaOf(site.collection);
+    const { table, schema } = site;
     // As `enumLabelsOf` reads a legacy enum: an empty label is no label, and a
     // type with none is refused rather than created empty.
     const labels = type.values.filter(label => label.length > 0);
     if (labels.length === 0) {
         throw new Error(
-            `Column "${site.column}" of "${describe(site.collection)}" is an enum with no values. A Postgres enum ` +
+            `Column "${site.column}" of "${site.owner}" is an enum with no values. A Postgres enum ` +
             "type needs at least one label."
         );
     }
@@ -698,25 +715,25 @@ const definedEnumOf = (type: PgType): Extract<PgType, { kind: "enum" }> | undefi
 };
 
 /**
- * A defined column's DEFAULT.
+ * A column's DEFAULT, from its descriptor.
  *
  * The precedence the legacy reading has — the key's strategy, then the time
  * stamp, then a SQL expression, then a literal — over the one `default` a
- * definition holds. `identity` is planned on any integer column now, key or
- * not, at the width the column declares. `database` plans none: the database
- * owns that default. A generated column has none at all.
+ * column holds. `identity` is planned on any integer column, key or not, at
+ * the width the column declares. `database` plans none: the database owns
+ * that default. A generated column has none at all.
  */
-const definedColumnDefault = (definition: ColumnDef, type: PgType): ColumnDefault | undefined => {
-    if (definition.generatedAs !== undefined) return undefined;
-    const declared = definition.default;
+const describedColumnDefault = (column: ColumnDescriptor, type: PgType): ColumnDefault | undefined => {
+    if (column.generated !== undefined) return undefined;
+    const declared = column.default;
     if (declared?.kind === "identity") return { kind: "identity" };
-    if (definition.primaryKey) {
+    if (column.primaryKey) {
         // A key's strategy, as written: the expression is not trimmed (the
         // legacy `isId` reading never trimmed it either).
         if (declared?.kind === "random-uuid") return { kind: "sql", expression: "gen_random_uuid()" };
         if (declared?.kind === "sql") return { kind: "sql", expression: declared.expression };
     }
-    if (definition.stamp?.value === "now" && (type.kind === "timestamptz" || type.kind === "date" || type.kind === "time")) {
+    if (column.stamp?.value === "now" && (type.kind === "timestamptz" || type.kind === "date" || type.kind === "time")) {
         return { kind: "sql", expression: "now()" };
     }
     if (declared?.kind === "random-uuid") return { kind: "sql", expression: "gen_random_uuid()" };
@@ -784,32 +801,32 @@ const definedLiteralDefault = (value: unknown, type: PgType): ColumnDefault | un
 };
 
 /**
- * One column planned from its definition — the defined twin of
- * {@link planPropertyColumn}, which hands over to it whenever the property
- * carries one, collection table and junction payload alike.
+ * One column planned from its descriptor — collection table and junction
+ * pivot alike. {@link planPropertyColumn} hands over to it whenever the table
+ * describes the column.
  */
-function planDefinedColumn(propName: string, definition: ColumnDef, ctx: PropertyColumnContext): ColumnPlan {
+function planDescribedColumn(described: ColumnDescriptor, ctx: PropertyColumnContext): ColumnPlan {
     const { collection, schema, table, auth } = ctx;
-    const column = definedColumnName(propName, definition);
-    const isKey = definition.primaryKey;
-    const type = definedPgType(definition, { collection, propName, column });
+    const { key, column } = described;
+    const isKey = described.primaryKey === true;
+    const type = describedPgType(described, { schema, table, owner: describe(collection), propName: key, column });
     const authDefinition = auth && !isKey ? authUsersColumnDefinition(column) : undefined;
 
     const plan: ColumnPlan = {
-        key: propName,
+        key,
         column,
         type,
-        nullable: !(isKey || definition.notNull),
+        nullable: !isKey && described.nullable,
         primaryKey: isKey,
-        unique: !isKey && definition.unique,
-        default: definedColumnDefault(definition, type),
+        unique: !isKey && described.unique === true,
+        default: describedColumnDefault(described, type),
         sqlDefinition: authDefinition,
-        source: { kind: "property", propName, slug: collection.slug }
+        source: { kind: "property", propName: key, slug: collection.slug }
     };
-    if (definition.generatedAs !== undefined) {
-        plan.generated = { expression: definition.generatedAs, stored: true };
+    if (described.generated !== undefined) {
+        plan.generated = { expression: described.generated.expression, stored: true };
     }
-    if (definition.stamp?.on === "update" && definition.stamp.value === "now") {
+    if (described.stamp?.on === "update" && described.stamp.value === "now") {
         plan.touchOnUpdate = true;
         ctx.triggerFunctionNeeded.value = true;
         ctx.triggers.push({
@@ -1035,14 +1052,13 @@ export function planSchema(compiledTables: readonly CompiledTable[], options: Pl
      * they must agree on its values — `compileTables` refuses a disagreement
      * first, and so does this, for a plan reached any other way.
      */
-    const collectDefinedEnumType = (
+    const collectDescribedEnumType = (
         collection: CollectionConfig,
-        propName: string,
-        definition: ColumnDef,
+        described: ColumnDescriptor,
         declaredSchema: string | undefined
     ): void => {
-        const column = definedColumnName(propName, definition);
-        const enumType = definedEnumOf(definedPgType(definition, { collection, propName, column }));
+        const { key: propName, column } = described;
+        const enumType = definedEnumOf(describedPgType(described, collectionSite(collection, propName, column)));
         if (!enumType) return;
         const { schema, name, labels } = enumType;
         const table = getTableName(collection);
@@ -1083,19 +1099,20 @@ export function planSchema(compiledTables: readonly CompiledTable[], options: Pl
     const collectEnumTypes = (
         collection: CollectionConfig,
         properties: Properties,
-        declaredSchema: string | undefined
+        declaredSchema: string | undefined,
+        columnOf: (key: string) => ColumnDescriptor | undefined
     ): void => {
         for (const [propName, rawProp] of Object.entries(properties)) {
             const prop = rawProp as Property;
             // A link is typed by its target's key, whose type its table declares.
-            const definition = prop.type === "relation" ? undefined : tableColumnOf(prop);
-            if (definition) {
+            const described = prop.type === "relation" ? undefined : columnOf(propName);
+            if (described) {
                 // A closed value set that is no enum type (`.oneOf()`) still
                 // refuses an empty list, as `enumLabelsOf` refuses one.
-                if (definition.oneOf !== undefined && definition.oneOf.every(value => String(value).length === 0)) {
+                if (described.oneOf !== undefined && described.oneOf.every(value => String(value).length === 0)) {
                     enumLabelsOf(propName, { type: "string", enum: [] }, collection);
                 }
-                collectDefinedEnumType(collection, propName, definition, declaredSchema);
+                collectDescribedEnumType(collection, described, declaredSchema);
                 continue;
             }
             if (!("enum" in prop) || !prop.enum) continue;
@@ -1135,10 +1152,12 @@ export function planSchema(compiledTables: readonly CompiledTable[], options: Pl
         }
     };
     for (const collection of collections) {
+        const descriptor = requireDescriptor(collection);
         collectEnumTypes(
             collection,
             (collection.properties ?? {}) as Properties,
-            isPostgresCollectionConfig(collection) ? collection.schema : undefined
+            declaredSchemaOf(descriptor),
+            key => columnByKey(descriptor, key)
         );
     }
 
@@ -1179,9 +1198,11 @@ export function planSchema(compiledTables: readonly CompiledTable[], options: Pl
     // is compared byte-for-byte against its committed copy, and a junction
     // whose type interleaved with the collections' would reorder that file
     // whenever a `through.properties` block moved.
-    for (const spec of junctionSpecs.values()) {
+    for (const [junctionName, spec] of junctionSpecs) {
         if (Object.keys(spec.properties).length === 0) continue;
-        collectEnumTypes(getJunctionCollectionConfig(spec), spec.properties, undefined);
+        const pivot = tableJunctions.get(junctionName)?.pivot ?? [];
+        collectEnumTypes(getJunctionCollectionConfig(spec), spec.properties, undefined,
+            key => pivot.find(pivotColumn => pivotColumn.key === key));
     }
 
     const triggerFunctionNeeded = { value: false };
@@ -1422,6 +1443,7 @@ function planCollectionTable(
             schema,
             table,
             auth,
+            columnOf: key => columnByKey(descriptor, key),
             triggers,
             triggerFunctionNeeded
         }));
@@ -1614,6 +1636,8 @@ interface PropertyColumnContext {
     table: string;
     /** Whether `auth-users-columns` owns this table's columns. */
     auth: boolean;
+    /** The table's descriptor of a column, by key — a table's column or a junction's pivot. */
+    columnOf: (key: string) => ColumnDescriptor | undefined;
     /** Collected `BEFORE UPDATE` triggers, appended to. */
     triggers: TriggerPlan[];
     triggerFunctionNeeded: { value: boolean };
@@ -1641,8 +1665,8 @@ function planPropertyColumn(
     prop: Property,
     ctx: PropertyColumnContext
 ): ColumnPlan {
-    const definition = tableColumnOf(prop);
-    if (definition) return planDefinedColumn(propName, definition, ctx);
+    const described = ctx.columnOf(propName);
+    if (described) return planDescribedColumn(described, ctx);
     const { collection, resolveCollection, schema, table, auth } = ctx;
 
     const isId = isIdProperty(propName, prop, collection);
@@ -1949,7 +1973,7 @@ function planRelationColumn(
         key: fkFieldKey,
         column: relation.localKey,
         type: ownerDefinition
-            ? definedPgType(ownerDefinition, { collection, propName: fkFieldKey, column: relation.localKey })
+            ? definedPgType(ownerDefinition, collectionSite(collection, fkFieldKey, relation.localKey))
             : primaryKeyPgType(target, via),
         nullable: ownerDefinition ? !(ownerDefinition.notNull || ownerDefinition.primaryKey) : !required,
         primaryKey: false,
@@ -2143,6 +2167,7 @@ function planJunctionTable(
     const onDelete = relation.onDelete ?? "CASCADE";
 
     const spec = junctionSpecs.get(table);
+    const junction = tableJunctions.get(table);
     const legacyFor = (collection: CollectionConfig, column: string): string | undefined => {
         // A junction column's default name is derived from the endpoint
         // collection's slug — normally plural, so this is where the
@@ -2204,6 +2229,7 @@ function planJunctionTable(
                 schema,
                 table,
                 auth: false,
+                columnOf: key => junction?.pivot.find(pivotColumn => pivotColumn.key === key),
                 triggers,
                 triggerFunctionNeeded
             });
@@ -2220,7 +2246,6 @@ function planJunctionTable(
     // with derived policies — reads follow the endpoints' visibility, writes
     // follow the declaring side's update rules. Without them they were the one
     // kind of generated table with no RLS at all.
-    const junction = tableJunctions.get(table);
     const junctionTable = junction ? junctionPolicyTable(junction) : undefined;
     const policies = junction && junctionTable
         ? withoutLiveSupersededNames(tableJunctionRules(junction).flatMap((rule, index) =>
