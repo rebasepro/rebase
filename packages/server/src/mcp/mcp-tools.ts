@@ -97,7 +97,7 @@ export interface McpToolContext {
     /**
      * The deployment's auth adapter. The auth table's rows are the users, so
      * the write tools hand a write to one to it, as REST and `/admin/users`
-     * do. See `api/rest/auth-collection-writes.ts`.
+     * do. See `api/rest/auth-table-writes.ts`.
      */
     authAdapter?: AuthAdapter;
     /**
