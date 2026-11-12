@@ -8,10 +8,12 @@
  * (`--json`) for a script or an agent. Exits 1 when the run was refused or the
  * SQL check failed.
  */
+import fs from "node:fs";
 import path from "node:path";
 import chalk from "chalk";
 
-import { migrateCollectionsToTables } from "./migrate";
+import { gitState, migrateCollectionsToTables } from "./migrate";
+import { rewriteSdkCalls, type SdkRewriteReport } from "./sdk-calls";
 import type { MigrationReport } from "./types";
 
 /** The help page. */
@@ -37,6 +39,7 @@ ${chalk.bold("Options")}
   --check     Verify an already migrated project: the tables must render the same SQL as config/collections
   --json      One JSON document on stdout: files, refusals, notes, manual steps, the SQL check
   --force     Run on a dirty git tree, and replace output files that differ
+  --skip-sdk-calls  Leave the project's SDK calls as they are (see rebase migrate sdk-calls)
 
 ${chalk.bold("Safety")}
   Every run evaluates config/collections as the server did, converts it, writes the result
@@ -90,6 +93,7 @@ function printReport(report: MigrationReport): void {
             if (step.snippet) for (const line of step.snippet.split("\n")) console.log(chalk.cyan(`         ${line}`));
         });
     }
+    if (report.sdk) printSdkSection(report.sdk);
     const verification = report.verification;
     if (verification) {
         console.log("");
@@ -134,7 +138,7 @@ function printReport(report: MigrationReport): void {
  * @param moduleAliases specifiers mapped to files for evaluating the project (the in-repo entry points `@rebasepro/*` at source)
  */
 export async function runCollectionsToTables(
-    flags: { check?: boolean; dryRun?: boolean; json?: boolean; force?: boolean },
+    flags: { check?: boolean; dryRun?: boolean; json?: boolean; force?: boolean; skipSdkCalls?: boolean },
     dir: string | undefined,
     moduleAliases?: Record<string, string>
 ): Promise<MigrationReport> {
@@ -144,10 +148,76 @@ export async function runCollectionsToTables(
         ...(flags.check ? { check: true } : {}),
         ...(flags.dryRun ? { dryRun: true } : {}),
         ...(flags.force ? { force: true } : {}),
+        ...(flags.skipSdkCalls ? { skipSdkCalls: true } : {}),
         ...(moduleAliases ? { moduleAliases } : {})
     });
     if (flags.json) console.log(JSON.stringify(report, null, 2));
     else printReport(report);
     if (report.status === "blocked" || report.status === "failed") process.exitCode = 1;
+    return report;
+}
+
+/** The SDK-call rewrite's part of a report. */
+function printSdkSection(sdk: SdkRewriteReport): void {
+    const total = Object.values(sdk.counts).reduce((sum, count) => sum + (count ?? 0), 0);
+    console.log("");
+    console.log(chalk.bold(`  SDK calls: ${total} rewrite(s) in ${sdk.files.length} file(s)${sdk.typeAware ? " (receivers checked by type where a program could be built)" : ""}`));
+    for (const [rule, count] of Object.entries(sdk.counts)) console.log(`    ${rule}: ${count}`);
+    if (sdk.left.length > 0) {
+        console.log(chalk.yellow(`  Left unchanged (${sdk.left.length}) — check each:`));
+        for (const left of sdk.left) console.log(`    ${left.file}:${left.line} ${chalk.gray(left.code)} — ${left.reason}`);
+    }
+}
+
+/** The help page of `rebase migrate sdk-calls`. */
+export function printSdkCallsHelp(): void {
+    console.log(`
+${chalk.bold("rebase migrate sdk-calls")} — rewrite a project's own code for the SDK rename
+
+${chalk.bold("Usage")}
+  rebase migrate sdk-calls [dir] [--dry-run] [--json] [--force]
+
+  Part of ${chalk.cyan("rebase migrate collections-to-tables")}; run it alone on a project already migrated.
+  data.collection("x") → data.table("x") on the SDK data surface, createRebaseClient options,
+  generated type names, batch operations, error codes, offline options, typed accessors,
+  setCollectionCallbacks → setTableHooks (hook props adapted), storageAuthorize data.
+  A .collection( call whose receiver is not the SDK is left as written and listed.
+  Generated SDK files are not rewritten: run rebase generate-sdk.
+
+${chalk.bold("Options")}
+  --dry-run   Print what would change; write nothing
+  --json      One JSON document on stdout
+  --force     Run on a dirty (or absent) git tree
+`);
+}
+
+/**
+ * Run \`rebase migrate sdk-calls\`.
+ *
+ * @param dir the project directory, as typed
+ * @param aliases specifiers mapped to files, for the type checker (in-repo runs)
+ */
+export async function runSdkCalls(flags: { dryRun?: boolean; json?: boolean; force?: boolean }, dir: string | undefined, aliases?: Record<string, string>): Promise<SdkRewriteReport | undefined> {
+    const root = path.resolve(dir ?? process.cwd());
+    if (!flags.dryRun && !flags.force) {
+        const state = gitState(root);
+        if (!state.clean) {
+            if (flags.json) console.log(JSON.stringify({ error: { message: state.reason, code: "dirty_tree" } }, null, 2));
+            else console.error(chalk.red(`✗ ${state.reason}`));
+            process.exitCode = 1;
+            return undefined;
+        }
+    }
+    const legacyConfig = path.join(root, "config");
+    const { files, report } = await rewriteSdkCalls(root, { skipDirs: [legacyConfig], ...(aliases ? { aliases } : {}) });
+    if (!flags.dryRun) for (const [file, content] of files) fs.writeFileSync(file, content);
+    if (flags.json) {
+        console.log(JSON.stringify({ status: flags.dryRun ? "planned" : files.size > 0 ? "rewritten" : "nothing-to-do", ...report }, null, 2));
+    } else {
+        console.log(chalk.bold(`\nrebase migrate sdk-calls — ${root}`));
+        printSdkSection(report);
+        for (const step of report.manualSteps) console.log(`\n  ${chalk.bold(step.title)}${step.file ? chalk.gray(` (${step.file})`) : ""}\n    ${step.detail}`);
+        console.log(flags.dryRun ? "\n  Dry run: nothing was written.\n" : files.size > 0 ? "\n  Rewritten. Review the diff, then run your type check.\n" : "\n  Nothing to rewrite.\n");
+    }
     return report;
 }

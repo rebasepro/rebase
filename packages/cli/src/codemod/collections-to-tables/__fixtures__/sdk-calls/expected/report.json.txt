@@ -1,0 +1,62 @@
+{
+  "files": [
+    {
+      "path": "backend/hooks.ts",
+      "edits": 6
+    },
+    {
+      "path": "backend/src/index.ts",
+      "edits": 1
+    },
+    {
+      "path": "backend/storage.ts",
+      "edits": 1
+    },
+    {
+      "path": "frontend/src/client.ts",
+      "edits": 12
+    },
+    {
+      "path": "typed/src/use.ts",
+      "edits": 1
+    }
+  ],
+  "counts": {
+    "table-hooks": 5,
+    "collection-call": 5,
+    "boot-options": 1,
+    "storage-authorize": 1,
+    "generated-types": 4,
+    "error-codes": 1,
+    "offline-options": 1,
+    "client-options": 1,
+    "batch-op": 1,
+    "typed-accessor": 1
+  },
+  "left": [
+    {
+      "file": "frontend/src/firestore.ts",
+      "line": 8,
+      "code": "registry.collection(\"events\")",
+      "reason": "left unchanged: receiver not recognised"
+    }
+  ],
+  "manualSteps": [
+    {
+      "title": "Update the backend options in backend/src/index.ts",
+      "detail": "Line 4: `callbacks` belong to the collection model. Pass the tables instead — `schemaDir` (the directory whose index exports them) or `tables` + `defaultRls` imported from backend/schema; `hooks` (backend/hooks.ts) for global hooks; the auth table is the one defined with `defineAuthTable`, so `auth.collection` goes.",
+      "snippet": "initializeRebaseBackend({\n    schemaDir: path.join(__dirname, \"<relative path to backend/schema>\"),\n    // or: tables: Object.values(await import(\"<backend/schema>\")), defaultRls,\n    // hooks,              (from backend/hooks.ts, if you had global callbacks)\n    // auth: { … },        (without `collection`)\n    …\n})",
+      "file": "backend/src/index.ts"
+    },
+    {
+      "title": "Regenerate the typed SDK",
+      "detail": "frontend/src/generated/sdk/database.types.ts is generated SDK output from before the rename; the rewrite never edits generated files. Run `rebase generate-sdk` (with the same output path and options as before) to write it again.",
+      "snippet": "rebase generate-sdk"
+    }
+  ],
+  "notes": [],
+  "generated": [
+    "frontend/src/generated/sdk/database.types.ts"
+  ],
+  "typeAware": true
+}

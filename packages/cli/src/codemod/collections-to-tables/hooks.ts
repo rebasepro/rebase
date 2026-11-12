@@ -22,6 +22,12 @@ export interface PropRenames {
     collection: "table";
     /** `values`, for the hooks that received the row as `row`. */
     row?: "values";
+    /**
+     * The renamed `collection` was a plain value (a slug) and `table` is the
+     * same value — `StorageAuthorizeData.collection` → `.table` — so no use of
+     * it needs checking.
+     */
+    collectionIsValue?: boolean;
 }
 
 /** The hooks whose legacy props named the row `row`. */
@@ -110,13 +116,23 @@ function rewriteParameter(
     const nameNode = parameter.getNameNode();
     const body = fn.getBody();
 
+    // An inline type for the props names the old keys too: `{ collection: string }`.
+    const typeNode = parameter.getTypeNode();
+    if (typeNode && N.isTypeLiteral(typeNode)) {
+        for (const member of typeNode.getMembers()) {
+            if (!N.isPropertySignature(member)) continue;
+            const next = renamed[member.getName()];
+            if (next !== undefined) edits.push({ start: member.getNameNode().getStart(), end: member.getNameNode().getEnd(), text: next });
+        }
+    }
+
     if (N.isObjectBindingPattern(nameNode)) {
         for (const element of nameNode.getElements()) {
             const propertyNameNode = element.getPropertyNameNode();
             const local = element.getNameNode();
             if (element.getDotDotDotToken()) {
                 if (!N.isIdentifier(local)) continue;
-                rewriteMemberReads(ctx, body, local, renamed, edits, todos, `the rest of the props, \`...${local.getText()}\``);
+                rewriteMemberReads(ctx, body, local, renamed, edits, todos, `the rest of the props, \`...${local.getText()}\``, renames.collectionIsValue === true);
                 continue;
             }
             const key = propertyNameNode ? propertyNameNode.getText() : local.getText();
@@ -127,7 +143,7 @@ function rewriteParameter(
             } else {
                 edits.push({ start: local.getStart(), end: local.getEnd(), text: `${next}: ${local.getText()}` });
             }
-            if (key !== "collection") continue;
+            if (key !== "collection" || renames.collectionIsValue) continue;
             if (N.isIdentifier(local)) {
                 const unsafe = referencesTo(ctx, body, local).filter(identifier => !isSafeDescriptorRead(ctx, identifier));
                 if (unsafe.length > 0) {
@@ -144,7 +160,7 @@ function rewriteParameter(
         return;
     }
     if (N.isIdentifier(nameNode)) {
-        rewriteMemberReads(ctx, body, nameNode, renamed, edits, todos, `the props object, \`${nameNode.getText()}\``);
+        rewriteMemberReads(ctx, body, nameNode, renamed, edits, todos, `the props object, \`${nameNode.getText()}\``, renames.collectionIsValue === true);
         return;
     }
     todos.push("takes its props in a form the codemod does not rewrite; it now gets `table` for `collection` and `values` for `row`.");
@@ -158,7 +174,8 @@ function rewriteMemberReads(
     renamed: Record<string, string>,
     edits: Edit[],
     todos: string[],
-    what: string
+    what: string,
+    collectionIsValue = false
 ): void {
     const { Node: N } = ctx.tsm;
     for (const reference of referencesTo(ctx, scope, binding)) {
@@ -169,7 +186,7 @@ function rewriteMemberReads(
             if (next === undefined) continue;
             const nameNode = parent.getNameNode();
             edits.push({ start: nameNode.getStart(), end: nameNode.getEnd(), text: next });
-            if (name === "collection") {
+            if (name === "collection" && !collectionIsValue) {
                 const outer = parent.getParent();
                 const safe = outer !== undefined && N.isPropertyAccessExpression(outer) && outer.getExpression() === parent &&
                     DESCRIPTOR_SAFE_READS.has(outer.getName());
@@ -226,10 +243,11 @@ function withTodos(ctx: AstContext, text: string, todos: readonly string[]): str
  *
  * @param member where it is in the legacy literal
  * @param hook the hook's name: decides whether `row` is renamed
+ * @param options `collectionIsValue` when the renamed `collection` held a plain value
  */
-export function carryHook(ctx: AstContext, member: Member, hook: string): CarriedFunction {
+export function carryHook(ctx: AstContext, member: Member, hook: string, options: { collectionIsValue?: boolean } = {}): CarriedFunction {
     const text = memberFunctionText(ctx, member);
-    const renames = renamesFor(hook);
+    const renames: PropRenames = { ...renamesFor(hook), ...(options.collectionIsValue ? { collectionIsValue: true } : {}) };
     const sf = ctx.project.createSourceFile(`/__rebase_migrate__/hook-${scratchCounter++}.ts`, `const __hook = ${text};`, { overwrite: true });
     const offset = "const __hook = ".length;
     const todos: string[] = [];

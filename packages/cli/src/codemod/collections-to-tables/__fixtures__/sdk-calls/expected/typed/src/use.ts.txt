@@ -1,0 +1,7 @@
+import type { CreateRebaseClientResult } from "@rebasepro/client";
+
+/** A receiver the list does not name, recognised by its type. */
+export async function count(sdk: CreateRebaseClientResult) {
+    const surface = sdk.data;
+    return surface.table("posts").count();
+}

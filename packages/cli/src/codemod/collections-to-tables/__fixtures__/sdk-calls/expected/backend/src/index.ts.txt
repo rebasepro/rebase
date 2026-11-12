@@ -1,0 +1,7 @@
+import path from "path";
+import { initializeRebaseBackend } from "@rebasepro/server";
+
+export const backend = initializeRebaseBackend({
+    schemaDir: path.join(__dirname, "../schema"),
+    callbacks: {}
+});

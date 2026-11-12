@@ -413,8 +413,8 @@ const LEGACY_APIS: readonly { pattern: RegExp; api: string; replacement: string 
 ];
 
 /** Every use of a renamed collection-model server API in the project's own code (outside `config/`). */
-export function findLegacyApiUses(root: string, configDir: string, skip: ReadonlySet<string>): LegacyApiUse[] {
-    return scanSources(root, configDir, skip).apis;
+export function findLegacyApiUses(root: string, configDir: string, skip: ReadonlySet<string>, handled: ReadonlySet<string> = new Set()): LegacyApiUse[] {
+    return scanSources(root, configDir, skip).apis.filter(use => !handled.has(use.api));
 }
 
 function scanSources(root: string, configDir: string, skip: ReadonlySet<string>): { importers: ConfigImporter[]; apis: LegacyApiUse[] } {

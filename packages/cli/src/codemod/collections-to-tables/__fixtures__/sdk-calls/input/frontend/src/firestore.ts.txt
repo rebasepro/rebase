@@ -1,0 +1,8 @@
+import { collection, getFirestore } from "firebase/firestore";
+
+const db = getFirestore();
+export const ref = collection(db, "events");
+
+// A method of the project's own that happens to be called `collection`.
+const registry = { collection: (name: string) => name };
+export const named = registry.collection("events");

@@ -15,11 +15,19 @@ import { parseCommandArgs, wantsHelp } from "../utils/args";
 import { unknownCommand } from "../utils/unknown-command";
 
 /** The subcommands `rebase migrate` dispatches. The CLI's vocabulary and the docs verifier read this. */
-export const MIGRATE_SUBCOMMANDS = ["collections-to-tables"] as const;
+export const MIGRATE_SUBCOMMANDS = ["collections-to-tables", "sdk-calls"] as const;
 
 /** Every flag `rebase migrate collections-to-tables` accepts. Its help page and the docs verifier read this. */
 export const COLLECTIONS_TO_TABLES_FLAGS = {
     "--check": Boolean,
+    "--dry-run": Boolean,
+    "--json": Boolean,
+    "--force": Boolean,
+    "--skip-sdk-calls": Boolean
+} as const;
+
+/** Every flag `rebase migrate sdk-calls` accepts. Its help page and the docs verifier read this. */
+export const SDK_CALLS_FLAGS = {
     "--dry-run": Boolean,
     "--json": Boolean,
     "--force": Boolean
@@ -34,6 +42,7 @@ ${chalk.bold("Usage")}
 
 ${chalk.bold("Subcommands")}
   ${chalk.blue.bold("collections-to-tables")} ${chalk.gray("[dir]")}   config/collections → backend/schema + frontend/src/cms, SQL-checked
+  ${chalk.blue.bold("sdk-calls")} ${chalk.gray("[dir]")}               data.collection("x") → data.table("x") and the other SDK renames, in your own code
 
 Run ${chalk.cyan("rebase migrate <subcommand> --help")} for its options.
 `);
@@ -62,6 +71,27 @@ export async function migrateCommand(subcommand: string | undefined, rawArgs: st
             });
             await runCollectionsToTables({
                 check: flags["--check"] === true,
+                dryRun: flags["--dry-run"] === true,
+                json: flags["--json"] === true,
+                force: flags["--force"] === true,
+                skipSdkCalls: flags["--skip-sdk-calls"] === true
+            }, positionals[1]);
+            return;
+        }
+        case "sdk-calls": {
+            const { printSdkCallsHelp, runSdkCalls } = await import("../codemod/collections-to-tables/command");
+            if (wantsHelp(rawArgs)) {
+                printSdkCallsHelp();
+                return;
+            }
+            const { flags, positionals } = parseCommandArgs({
+                spec: SDK_CALLS_FLAGS,
+                rawArgs,
+                commandWords: 1,
+                command: "migrate sdk-calls",
+                maxPositionals: 2
+            });
+            await runSdkCalls({
                 dryRun: flags["--dry-run"] === true,
                 json: flags["--json"] === true,
                 force: flags["--force"] === true

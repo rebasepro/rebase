@@ -1,0 +1,12 @@
+import type { CollectionCallbacks } from "@rebasepro/types";
+import type { RebaseBackendInstance } from "@rebasepro/server";
+
+export function register(backend: RebaseBackendInstance): void {
+    const hooks: CollectionCallbacks = {
+        afterRead: ({ row }) => row,
+        async afterSave(props) {
+            await props.context.data.collection("audit").create({ slug: props.collection.slug });
+        }
+    };
+    backend.setCollectionCallbacks("posts", hooks);
+}

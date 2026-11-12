@@ -1,0 +1,25 @@
+import { createRebaseClient } from "@rebasepro/client";
+import type { TableName, TablesDictionary } from "./generated/sdk/database.types";
+
+export const client = createRebaseClient({
+    baseUrl: "",
+    tablesDictionary: {},
+    offline: { maxCachedRowsPerTable: 100 }
+});
+
+export async function list(name: TableName) {
+    const rows = await client.data.table(name).find();
+    const posts = client.data.postsTable;
+    await client.table("posts").find();
+    const data = client.data;
+    await data.table<{ id: string }>("tags").find();
+    return { rows, posts };
+}
+
+export function isMissing(error: { code: string }): boolean {
+    return error.code === "UNKNOWN_TABLE";
+}
+
+export const batch = [{ op: "create", table: "posts", values: {} }];
+
+export type Dictionary = TablesDictionary;

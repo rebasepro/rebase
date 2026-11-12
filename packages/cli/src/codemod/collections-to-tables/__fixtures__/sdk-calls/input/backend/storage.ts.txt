@@ -1,0 +1,2 @@
+export const storageAuthorize = ({ collection, operation }: { collection: string; operation: string }): boolean =>
+    collection === "posts" || operation === "read";

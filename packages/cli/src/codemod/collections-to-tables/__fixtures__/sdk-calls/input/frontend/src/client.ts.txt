@@ -1,0 +1,25 @@
+import { createRebaseClient } from "@rebasepro/client";
+import type { CollectionName, CollectionsDictionary } from "./generated/sdk/database.types";
+
+export const client = createRebaseClient({
+    baseUrl: "",
+    collectionsDictionary: {},
+    offline: { maxCachedRowsPerCollection: 100 }
+});
+
+export async function list(name: CollectionName) {
+    const rows = await client.data.collection(name).find();
+    const posts = client.data.postsCollection;
+    await client.collection("posts").find();
+    const data = client.data;
+    await data.collection<{ id: string }>("tags").find();
+    return { rows, posts };
+}
+
+export function isMissing(error: { code: string }): boolean {
+    return error.code === "UNKNOWN_COLLECTION";
+}
+
+export const batch = [{ op: "create", collection: "posts", values: {} }];
+
+export type Dictionary = CollectionsDictionary;

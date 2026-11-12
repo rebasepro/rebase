@@ -27,6 +27,7 @@ import { addUnattached, collectComments, placeComments, placeIndexComments } fro
 import { planCustomizations, printCmsIndex } from "./customization";
 import { planFirestoreCollection } from "./firestore";
 import { findSplitConstants, planSplitConstants } from "./split-constants";
+import { rewriteSdkCalls } from "./sdk-calls";
 import { Journal } from "./journal";
 import { createSchemaModuleImporter } from "../../utils/import-schema-module";
 import { LegacyLoadError, loadLegacyProject } from "./load-legacy";
@@ -58,8 +59,12 @@ function isOwnedOutput(plan: PlanContext, file: string, cmsDir: string | undefin
         (cmsDir !== undefined && !path.relative(cmsDir, file).startsWith(".."));
 }
 
-/** Whether the project's git tree is clean, or why it is not usable as a safety net. */
-function gitState(root: string): { clean: true } | { clean: false; reason: string } {
+/**
+ * Whether the project's git tree is clean, or why it is not usable as a safety net.
+ *
+ * @param root the project root
+ */
+export function gitState(root: string): { clean: true } | { clean: false; reason: string } {
     const result = spawnSync("git", ["-C", root, "status", "--porcelain", "--untracked-files=normal", "--", "."], { encoding: "utf8" });
     if (result.error || result.status !== 0) {
         return { clean: false, reason: `${root} is not inside a git repository, so a run could not be undone with git. Commit the project first, or pass --force.` };
@@ -338,7 +343,7 @@ export async function migrateCollectionsToTables(options: MigrateOptions): Promi
 
     // Server APIs of the collection model in the project's own code.
     const apiUses = new Map<string, { api: string; replacement: string; lines: number[] }>();
-    for (const use of findLegacyApiUses(root, configDir, new Set(plan.files.keys()))) {
+    for (const use of findLegacyApiUses(root, configDir, new Set(plan.files.keys()), options.skipSdkCalls ? new Set() : new Set(["setCollectionCallbacks", "collectionsDir"]))) {
         const key = `${use.file}\0${use.api}`;
         const entry = apiUses.get(key) ?? { api: use.api, replacement: use.replacement, lines: [] };
         entry.lines.push(use.line);
@@ -351,6 +356,24 @@ export async function migrateCollectionsToTables(options: MigrateOptions): Promi
             detail: `\`${api}\` (line${lines.length > 1 ? "s" : ""} ${lines.join(", ")}) belongs to the collection model. Use ${replacement}.`,
             file: relativeToRoot(plan, file)
         });
+    }
+
+    // The project's own SDK calls and server API uses, renamed (on the files as they are about to be written).
+    if (!options.skipSdkCalls) {
+        const overrides = new Map([...plan.files].map(([file, { content }]) => [file, content]));
+        const sdk = await rewriteSdkCalls(root, {
+            overrides,
+            skipDirs: [configDir],
+            ...(options.moduleAliases ? { aliases: options.moduleAliases } : {}),
+            schemaDir,
+            collectionsDir: legacy.collectionsDir
+        });
+        for (const [file, content] of sdk.files) {
+            const planned = plan.files.get(file);
+            plan.files.set(file, { content, role: planned ? `${planned.role}, SDK calls` : `SDK calls (${relativeToRoot(plan, file)})` });
+        }
+        report.sdk = sdk.report;
+        plan.manualSteps.push(...sdk.report.manualSteps);
     }
 
     const unmoved = unmovedConfigFiles(plan, configDir, handled);

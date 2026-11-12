@@ -1,0 +1,12 @@
+import type { TableHooks } from "@rebasepro/types";
+import type { RebaseBackendInstance } from "@rebasepro/server";
+
+export function register(backend: RebaseBackendInstance): void {
+    const hooks: TableHooks = {
+        afterRead: ({ values: row }) => row,
+        afterSave: async (props) => {
+            await props.context.data.table("audit").create({ slug: props.table.slug });
+        }
+    };
+    backend.setTableHooks("posts", hooks);
+}

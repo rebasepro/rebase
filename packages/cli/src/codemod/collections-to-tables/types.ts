@@ -4,6 +4,8 @@
  * (`--json`) and the source of the human one.
  */
 
+import type { SdkRewriteReport } from "./sdk-calls";
+
 /** Where a construct the codemod looked at lives in the legacy source. */
 export interface SourceLocation {
     /** The file, relative to the project root. */
@@ -99,6 +101,8 @@ export interface MigrationReport {
     notes: Note[];
     manualSteps: ManualStep[];
     verification?: VerificationResult;
+    /** What the SDK-call rewrite did (absent with `skipSdkCalls`). */
+    sdk?: SdkRewriteReport;
     /** The `git rm -r` line to run once verification passed: deleting the legacy files is the user's step. */
     removeCommand?: string;
 }
@@ -119,4 +123,6 @@ export interface MigrateOptions {
      * a user's project resolves through its own `node_modules`.
      */
     moduleAliases?: Record<string, string>;
+    /** Leave the project's SDK calls as they are (`--skip-sdk-calls`); by default they are rewritten too. */
+    skipSdkCalls?: boolean;
 }

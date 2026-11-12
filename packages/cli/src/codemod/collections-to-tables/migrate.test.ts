@@ -203,7 +203,7 @@ describe("modes", () => {
         expect(report.files.map(file => file.path)).toContain("backend/schema/index.ts");
         // The --json shape: plain data, every field present.
         const json = JSON.parse(JSON.stringify(report)) as Record<string, unknown>;
-        expect(Object.keys(json).sort()).toEqual(["collections", "files", "manualSteps", "notes", "projectRoot", "refusals", "status"]);
+        expect(Object.keys(json).sort()).toEqual(["collections", "files", "manualSteps", "notes", "projectRoot", "refusals", "sdk", "status"]);
         for (const file of report.files) expect(Object.keys(file).sort()).toEqual(["action", "content", "path", "role"]);
     }, 120_000);
 
