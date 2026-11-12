@@ -1174,6 +1174,18 @@ export interface RebaseTranslations {
     studio_rls_rule_rows?: string;
     studio_rls_rule_writes?: string;
     studio_rls_rule_redacted?: string;
+    /** Button that reloads the tables after the schema file changed on disk */
+    schema_edit_reload?: string;
+    /** Shown when a schema file changed on disk after the edit was prepared */
+    schema_edit_file_changed?: string;
+    /** Shown above the problems when a schema edit would leave a schema that does not compile */
+    schema_edit_does_not_compile?: string;
+    /** Shown for a field the schema editor reads as written in code */
+    schema_field_edited_in_code?: string;
+    /** Caption of the slug and table fields of an existing table */
+    schema_rename_is_a_migration?: string;
+    /** Why a Firestore collection is read-only in the collection editor; {{slug}} is its slug */
+    schema_external_collection_read_only?: string;
     /** Title of the confirmation before a table's inherited rules are replaced by its own */
     schema_rules_detach_title?: string;
     /** Body of that confirmation; {{table}} is the table slug */

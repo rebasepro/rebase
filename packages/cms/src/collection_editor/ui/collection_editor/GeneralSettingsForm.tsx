@@ -99,7 +99,7 @@ export function GeneralSettingsForm({
                             {isNewCollection ? "New collection" : `${values?.name} collection`}
                         </Typography>
                         <DefaultDatabaseField databaseId={values.databaseId}
-                            disabled={configController?.readOnly}
+                            disabled={configController?.readOnly || !isNewCollection}
                             onDatabaseIdUpdate={updateDatabaseId}/>
 
                         <Tooltip title={t("change_icon")}
@@ -153,7 +153,8 @@ export function GeneralSettingsForm({
                             <FieldCaption error={touched.table && Boolean(errors.table)}>
                                 {touched.table && Boolean(errors.table)
                                     ? errors.table
-                                    : isSubcollection ? "Relative path to the parent (no need to include the parent path)" : "PostgreSQL table name for this collection"}
+                                    : !isNewCollection ? t("schema_rename_is_a_migration")
+                                        : isSubcollection ? "Relative path to the parent (no need to include the parent path)" : "PostgreSQL table name for this collection"}
                             </FieldCaption>
                         </div>
 
@@ -201,7 +202,9 @@ export function GeneralSettingsForm({
                                 label={"Collection ID"}
                                 error={showErrors && Boolean(errors.slug)}/>
                             <FieldCaption error={touched.slug && Boolean(errors.slug)}>
-                                {touched.slug && Boolean(errors.slug) ? errors.slug : "This ID identifies this collection. Typically the same as the path."}
+                                {touched.slug && Boolean(errors.slug) ? errors.slug
+                                    : !isNewCollection ? t("schema_rename_is_a_migration")
+                                        : "This ID identifies this collection. Typically the same as the path."}
                             </FieldCaption>
                         </div>
 

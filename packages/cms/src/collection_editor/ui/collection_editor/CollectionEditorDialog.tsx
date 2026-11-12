@@ -2,7 +2,6 @@ import * as React from "react";
 import { useEffect, useRef, useState } from "react";
 import {
     ConfirmationDialog,
-    ErrorView,
     UnsavedChangesDialog,
     useAuthController,
     useCustomizationController,
@@ -18,6 +17,8 @@ import {
     useUrlController
 } from "../../_cms_internals";
 import { useSafeSnackbarController } from "../../useSafeSnackbarController";
+import { SchemaEditRefusalView } from "./SchemaEditRefusalView";
+import { ConfigControllerContext } from "../../ConfigControllerProvider";
 import {
     ArrowLeftIcon,
     Button,
@@ -184,6 +185,7 @@ export function CollectionEditor(props: CollectionEditorDialogProps & {
     setFormDirty: (dirty: boolean) => void
 }) {
     const { standalone } = props;
+    const { t } = useTranslation();
 
     const customizationController = useCustomizationController();
     const navigationState = useNavigationStateController();
@@ -312,15 +314,33 @@ export function CollectionEditor(props: CollectionEditorDialogProps & {
         return <CircularProgressCenter/>;
     }
 
-    return <CollectionEditorInternal
+    // A collection whose rows live elsewhere (Firestore) is defined in the
+    // frontend, which the schema editor does not write: shown, read-only, with
+    // where to edit it — for the forms below too, which read the controller
+    // from context.
+    const external = !props.isNewCollection && initialValues.engine === "firestore";
+    const configController = external
+        ? {
+            ...props.configController,
+            readOnly: true,
+            readOnlyReason: t("schema_external_collection_read_only", { slug: initialValues.slug })
+        }
+        : props.configController;
+
+    const editor = <CollectionEditorInternal
         {...props}
+        configController={configController}
         initialValues={initialValues}
         existingPaths={existingPaths}
         existingIds={existingIds}
         includeTemplates={includeTemplates}
         collection={collection}
         setCollection={setCollection}
-        propertyConfigs={propertyConfigs}/>
+        propertyConfigs={propertyConfigs}/>;
+
+    return external
+        ? <ConfigControllerContext.Provider value={configController}>{editor}</ConfigControllerContext.Provider>
+        : editor;
 
 }
 
@@ -381,6 +401,8 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
     const urlControllerRaw = useUrlController();
     const collectionRegistryRaw = useCollectionRegistryController();
     const snackbarControllerRaw = useSafeSnackbarController();
+    // Absent in standalone mode, where there is no navigation to refresh.
+    const navigationStateRaw = useNavigationStateController();
 
     // In standalone mode, use safe defaults
     const importConfig = standalone ? undefined : importConfigRaw;
@@ -912,7 +934,12 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
                                 doCollectionInference={doCollectionInference}
                                 propertyConfigs={propertyConfigs}
                                 propertyTypePresets={propertyTypePresets}
-                                hiddenPropertyTypes={hiddenPropertyTypes}
+                                // A table's columns are the col.* types: a document
+                                // reference (a Firestore path) is none of them — a
+                                // table points at another with a relation.
+                                hiddenPropertyTypes={values.engine === "firestore"
+                                    ? hiddenPropertyTypes
+                                    : [...(hiddenPropertyTypes ?? []), "reference"]}
                                 renderExtraPropertyFields={renderExtraPropertyFields}
                                 extraIcon={extraView?.icon &&
                                     <IconButton aria-label={t("open_view")}
@@ -925,7 +952,11 @@ function CollectionEditorInternal<M extends Record<string, unknown>>({
                     </div>
                     {(!fullScreen || isNewCollection || !!error) && (
                         <div className="shrink-0 w-full p-4 sm:px-6 sm:py-4 border-t border-hairline flex items-center justify-between gap-4">
-                            {error && <ErrorView error={error}/>}
+                            {error && <SchemaEditRefusalView error={error}
+                                onReload={() => {
+                                    setError(undefined);
+                                    navigationStateRaw?.refreshNavigation();
+                                }}/>}
 
                             {isNewCollection && includeTemplates && currentView === "import_data_mapping" &&
                                 <Button variant={"text"}

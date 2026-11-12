@@ -9,6 +9,7 @@ import {
 import { useSafeSnackbarController } from "../../useSafeSnackbarController";
 import { ErrorBoundary } from "@rebasepro/ui";
 import {
+    Alert,
     Button,
     CircularProgress,
     cls,
@@ -90,6 +91,8 @@ export function CollectionPropertiesEditorForm({
     const { t } = useTranslation();
     const configControllerFromContext = useCollectionsConfigController();
     const configController = standalone ? { readOnly: false } : configControllerFromContext;
+    // What the schema editor reads as written in code: shown, never offered for editing.
+    const editedInCode = standalone ? undefined : configControllerFromContext?.tableSource?.(values.slug)?.fields;
 
     const largeLayout = useLargeLayout();
     const asDialog = standalone ? false : !largeLayout
@@ -497,6 +500,7 @@ export function CollectionPropertiesEditorForm({
                             onPropertyClick={onPropertyClick}
                             onPropertyMove={onPropertyMove}
                             onPropertyRemove={(isNewCollection || (inferredPropertyKeys && inferredPropertyKeys.length > 0)) && !configController?.readOnly ? deleteProperty : undefined}
+                            editedInCode={editedInCode}
                             errors={errors}/>
                     </ErrorBoundary>
 
@@ -519,6 +523,7 @@ export function CollectionPropertiesEditorForm({
                         {selectedPropertyFullId &&
                             !!selectedProperty &&
                             !isPropertyBuilder(selectedProperty as Property) &&
+                            !(selectedPropertyKey && !selectedPropertyNamespace && editedInCode?.[selectedPropertyKey]) &&
                             <PropertyForm
                                 inArray={false}
                                 key={`edit_view_${selectedPropertyIndex}_${generationCounter}`}
@@ -564,6 +569,12 @@ export function CollectionPropertiesEditorForm({
                             <Typography variant={"label"} className="flex items-center justify-center">
                                 {"This property is defined as a property builder in code"}
                             </Typography>}
+
+                        {selectedPropertyKey && !selectedPropertyNamespace && editedInCode?.[selectedPropertyKey] &&
+                            <Alert color="base" size="small" role={null}>
+                                <Typography variant="body2">{t("schema_field_edited_in_code")}</Typography>
+                                <Typography variant="caption" color="secondary">{editedInCode[selectedPropertyKey]}</Typography>
+                            </Alert>}
                     </div>
                 </div>}
 

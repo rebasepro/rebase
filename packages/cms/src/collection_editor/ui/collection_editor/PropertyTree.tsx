@@ -57,7 +57,8 @@ export const PropertyTree = React.memo(
         onPropertyMove,
         onPropertyRemove,
         className,
-        inferredPropertyKeys
+        inferredPropertyKeys,
+        editedInCode
     }: {
         namespace?: string;
         selectedPropertyKey?: string;
@@ -70,6 +71,8 @@ export const PropertyTree = React.memo(
         onPropertyRemove?: (propertyKey: string, namespace?: string) => void;
         className?: string;
         inferredPropertyKeys?: string[];
+        /** Top-level fields the schema editor reads as written in code, with why: shown read-only. */
+        editedInCode?: Record<string, string>;
     }) {
 
         // Filter propertiesOrder to only include top-level keys (no dots) that exist in properties
@@ -168,7 +171,7 @@ export const PropertyTree = React.memo(
                                         onPropertyRemove={onPropertyRemove}
                                         onPropertyClick={onPropertyClick}
                                         selectedPropertyKey={selectedPropertyKey}
-
+                                        editedInCode={namespace ? undefined : editedInCode?.[propertyKey]}
                                     />
                                 );
                             }).filter(Boolean)}
@@ -192,7 +195,8 @@ export function PropertyTreeEntry({
     onPropertyClick,
     onPropertyMove,
     onPropertyRemove,
-    inferredPropertyKeys
+    inferredPropertyKeys,
+    editedInCode
 }: {
     id: string;
     propertyKey: string;
@@ -206,6 +210,8 @@ export function PropertyTreeEntry({
     onPropertyMove?: (propertiesOrder: string[], namespace?: string) => void;
     onPropertyRemove?: (propertyKey: string, namespace?: string) => void;
     inferredPropertyKeys?: string[];
+    /** Why the schema editor reads this field as written in code, when it does. */
+    editedInCode?: string;
 }) {
     const { t } = useTranslation();
 
@@ -251,7 +257,7 @@ export function PropertyTreeEntry({
     }
 
     const selected = selectedPropertyKey === fullId;
-    const editable = property && !isPropertyBuilder(property);
+    const editable = property && !isPropertyBuilder(property) && editedInCode === undefined;
 
     // Check if this property was AI-modified
     const aiModifiedPaths = useAIModifiedPaths();
@@ -283,10 +289,19 @@ export function PropertyTreeEntry({
                             includeName={true}
                             selected={selected}
                             hasError={hasError}/>
-                        : <NonEditablePropertyPreview name={propertyKey}
-                            property={property}
-                            onClick={onPropertyClick ? () => onPropertyClick(propertyKey, namespace) : undefined}
-                            selected={selected}/>}
+                        : editedInCode !== undefined
+                            ? <Tooltip title={editedInCode} asChild={true}>
+                                <div>
+                                    <NonEditablePropertyPreview name={propertyKey}
+                                        property={property}
+                                        onClick={onPropertyClick ? () => onPropertyClick(propertyKey, namespace) : undefined}
+                                        selected={selected}/>
+                                </div>
+                            </Tooltip>
+                            : <NonEditablePropertyPreview name={propertyKey}
+                                property={property}
+                                onClick={onPropertyClick ? () => onPropertyClick(propertyKey, namespace) : undefined}
+                                selected={selected}/>}
                 </div>
 
                 <div className="absolute top-1/2 -translate-y-1/2 right-2 flex flex-row items-center gap-1">
