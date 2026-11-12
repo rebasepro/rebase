@@ -39,17 +39,19 @@
  * refactor green defeats the one thing this file exists for. If a refactor
  * changes a golden, the refactor is wrong until proven otherwise.
  *
- * ## How a later slice plugs a new model in
+ * ## The planner takes compiled tables
  *
- * `helpers/plan-corpus.ts` exports the corpus as data (`loadPlanCorpus()` →
- * `{ id, collections, options }[]`, and `PLAN_REFUSALS`) and the renderer
- * (`renderAllOutputs(collections, options)` → `Record<fileName, string>`). An
- * equivalence suite converts each set's collections into the new table model,
- * lowers them into whatever the planner then takes, and asserts
- * `renderAllOutputs(lowered, set.options)` equals the goldens through
- * `readGolden` — or equals `renderAllOutputs(set.collections, …)`
- * directly, file by file, for a plan-level deep comparison via `plan.json`.
- * The goldens keep guarding after the legacy path is deleted.
+ * The goldens were recorded from the legacy planner, which took collections.
+ * The planner now takes `CompiledTable[]` only, so each frozen legacy set is
+ * lifted (`collectionsToTableDefs`) and compiled (`compileSchema`) first —
+ * `compileSet` in `helpers/plan-tables.ts` — and rendered with
+ * `renderAllOutputs(tables, options)`. Where the lifted set cannot reproduce a
+ * recorded byte, the (set, output) is listed with its reason in
+ * `PLAN_GOLDEN_ALLOWED_DIFFERENCES`; a refusal that now happens before the
+ * planner, in the table model's words, in `PLAN_REFUSAL_ALLOWED_MESSAGES`.
+ * Never by editing a golden. (This folds in what `plan-equivalence.test.ts`
+ * proved while the planner still took collections: that the lift and the
+ * lowering reproduced the goldens.)
  *
  * Cheap on purpose: no database, no PGlite, no Docker — the planner is pure
  * once its environment is pinned (`withPinnedPlannerWorld`).

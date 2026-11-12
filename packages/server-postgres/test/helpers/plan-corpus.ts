@@ -11,7 +11,7 @@
  *
  * The corpus is legacy collection sets on purpose: the goldens were recorded
  * from them on `main`, and the table path is proven against the same goldens
- * by lifting each set (`plan-equivalence.test.ts`). Every set read from disk
+ * by lifting each set (`plan-golden.test.ts`, through `helpers/plan-tables.ts`). Every set read from disk
  * is a FROZEN copy under `test/fixtures/plan-corpus-legacy/` (the control
  * plane's under `saas/test/plan-corpus-legacy/`) — never the live project,
  * which moves to the table model under the goldens' feet. See

@@ -12,7 +12,7 @@
  * descriptor of its table — one reason per rule, never a list of lines — and
  * every rule must still be needed by some set.
  *
- * Sets are converted exactly as `plan-equivalence.test.ts` converts them,
+ * Sets are converted exactly as `helpers/plan-tables.ts` converts them for plan-golden,
  * including its two input adjustments.
  */
 import fs from "node:fs";
@@ -42,7 +42,7 @@ function sdkGoldenPath(set: PlanCorpusSet): string {
 }
 
 /**
- * The input adjustments of `plan-equivalence.test.ts` — fields the table model
+ * The input adjustments of `helpers/plan-tables.ts` — fields the table model
  * cannot say, stripped before converting — with the keys each takes out of the
  * SDK.
  */
@@ -70,7 +70,7 @@ const INPUT_ADJUSTMENTS: { set: string; reason: string; apply: (collections: Col
     }
 ];
 
-/** The directory's `defaultSecurityRules`, as the loader leaves them (see `plan-equivalence.test.ts`). */
+/** The directory's `defaultSecurityRules`, as the loader leaves them (see `helpers/plan-tables.ts`). */
 function sharedDefaultRules(collections: readonly CollectionConfig[]): readonly SecurityRule[] | undefined {
     if (collections.some(collection => !collection.securityRules?.length)) return undefined;
     const counts = new Map<readonly SecurityRule[], number>();

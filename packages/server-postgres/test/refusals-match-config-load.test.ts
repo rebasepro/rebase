@@ -66,7 +66,7 @@ describe("a configuration the schema planner refuses", () => {
         expect(() => planCollections(everything)).not.toThrow();
 
         // The two legacy shapes the lift refuses on purpose, stripped as
-        // `plan-equivalence.test.ts` strips them (neither moves a planned
+        // `compileSet` (helpers/plan-tables.ts) strips them (neither moves a planned
         // byte), so the whole matrix reaches the compiler and the lowering
         // rather than stopping at the lift.
         const arrs = everything.find(c => c.slug === "arrs")?.properties.ofTuple;

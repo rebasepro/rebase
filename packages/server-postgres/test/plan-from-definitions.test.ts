@@ -48,12 +48,37 @@ describe("the planner plans a lowered column from its definition", () => {
             try {
                 collections = lowered(set.collections);
             } catch {
-                continue; // a set the bridges adjust first; plan-equivalence covers it
+                continue; // a set the bridges adjust first; plan-golden covers it
             }
             for (const collection of collections) {
                 for (const [key, property] of Object.entries(collection.properties)) {
                     const carries = property.type === "relation" ? property.tableRelation !== undefined : property.tableColumn !== undefined;
                     expect({ set: set.id, table: collection.slug, key, carries }).toEqual({ set: set.id, table: collection.slug, key, carries: true });
+                }
+            }
+        }
+    });
+
+    // Moved from plan-equivalence.test.ts (folded into plan-golden, B-PLAN-2
+    // step 5): the lowering hands every relation target back as the very
+    // collection that table lowered to, memoised.
+    it("hands every relation target back as the very collection that table lowered to", () => {
+        for (const set of corpus.sets) {
+            let collections: LoweredCollection[];
+            try {
+                collections = lowered(set.collections);
+            } catch {
+                continue; // a set the lift adjusts first; plan-golden covers it
+            }
+            const members = new Set<CollectionConfig>(collections);
+            for (const collection of collections) {
+                for (const relation of collection.relations ?? []) {
+                    const target = relation.target();
+                    expect(relation.target()).toBe(target);
+                    if (collections.some(c => c.slug === target.slug)) {
+                        expect({ set: set.id, from: collection.slug, relation: relation.relationName, member: members.has(target) })
+                            .toEqual({ set: set.id, from: collection.slug, relation: relation.relationName, member: true });
+                    }
                 }
             }
         }
