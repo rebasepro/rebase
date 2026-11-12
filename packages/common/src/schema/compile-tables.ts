@@ -52,7 +52,7 @@ import {
     deriveTargetForeignKey,
     deriveViaWritable
 } from "./derive-names";
-import { resolveRls } from "./resolve-rls";
+import { resolveRls, ruleShapeProblems } from "./resolve-rls";
 import { checkColumnDef, checkRuleFields, sameColumnType } from "./validate-tables";
 
 /**
@@ -878,7 +878,11 @@ function checkRules(
         if (relation.kind === "belongsTo") names.add(relation.name);
     }
     if (auth) for (const name of AUTH_TABLE_NAMES) names.add(name);
-    return rls.rules.flatMap((rule, index) => checkRuleFields(table, rule, index, { names }));
+    return rls.rules.flatMap((rule, index) => [
+        ...ruleShapeProblems(rule, rule.name ? `rule "${rule.name}"` : `rule #${index}`)
+            .map(message => ({ table, key: `rls[${index}]`, message })),
+        ...checkRuleFields(table, rule, index, { names })
+    ]);
 }
 
 // ── Across tables ────────────────────────────────────────────────────────────

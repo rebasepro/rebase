@@ -29,11 +29,15 @@ export type SecurityOperation = "select" | "insert" | "update" | "delete" | "all
  * - `"public"` — every caller who reaches the database, signed in or not.
  * - `"authenticated"` — a signed-in caller: the `rebase.uid()` is neither the
  *   server context's `NULL` nor an anonymous visitor's sentinel (see
- *   `policy.authenticated()`).
+ *   `policy.authenticated()`). On a project with anonymous sign-in this
+ *   includes guests: a guest session has a real uid.
+ * - `"registered"` — a signed-in caller who has an account: `"authenticated"`
+ *   minus guest sessions (see `policy.registered()`). What most rules meaning
+ *   "a signed-in person" want on a project with anonymous sign-in enabled.
  *
  * @group Models
  */
-export type SecurityRuleAccess = "public" | "authenticated";
+export type SecurityRuleAccess = "public" | "authenticated" | "registered";
 
 /**
  * Flexible Row Level Security rule for a collection.
@@ -72,6 +76,7 @@ export type SecurityRule =
     | OwnerSecurityRule
     | PublicSecurityRule
     | AuthenticatedSecurityRule
+    | RegisteredSecurityRule
     | ConditionalAccessSecurityRule
     | CheckedAccessSecurityRule
     | StructuredSecurityRule
@@ -281,12 +286,47 @@ export interface AuthenticatedSecurityRule extends SecurityRuleBase {
 }
 
 /**
+ * Security rule that grants any signed-in caller who has an account row
+ * access, with no row filter: {@link AuthenticatedSecurityRule} minus guest
+ * sessions. Generates the test `policy.registered()` compiles to — signed in,
+ * and `rebase.is_anonymous()` is false.
+ *
+ * On a project with anonymous sign-in, a guest (`POST /auth/anonymous`) has a
+ * real uid and a real session, so `access: "authenticated"` admits anyone who
+ * presses "Continue as guest". Reach for `"registered"` when the rule is about
+ * a person who could be held responsible: writing a review, joining an
+ * organization, spending money.
+ *
+ * A new shape with its own policy name (see `getPolicyNameHash`).
+ *
+ * Cannot be combined with `using`, `withCheck`, or `ownerField`. To narrow the
+ * rows, add a `condition` — that is a {@link ConditionalAccessSecurityRule}.
+ *
+ * @example
+ * // Only callers with an account may post a review
+ * { operation: "insert", access: "registered" }
+ *
+ * @group Models
+ */
+export interface RegisteredSecurityRule extends SecurityRuleBase {
+    /** Grant row access, with no row filter, to any signed-in caller who is not a guest. */
+    access: "registered";
+    ownerField?: never;
+    using?: never;
+    withCheck?: never;
+    condition?: never;
+    check?: never;
+}
+
+/**
  * Security rule that grants `access` on the rows matching a condition:
  * "anyone (or any signed-in caller) may do this, on rows where …".
  *
  * - `access: "public"` compiles to `USING (<condition>)` — no caller test.
  * - `access: "authenticated"` compiles to
  *   `USING (<signed in> AND <condition>)`.
+ * - `access: "registered"` compiles to
+ *   `USING (<signed in, not a guest> AND <condition>)`.
  *
  * The write clause is derived as a structured rule derives it: `WITH CHECK`
  * from `check`, falling back to `condition`, gated by `access` the same way.

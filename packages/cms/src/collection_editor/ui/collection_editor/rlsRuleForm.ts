@@ -10,6 +10,7 @@ import type {
     RawSQLCheckOnlySecurityRule,
     RawSQLSecurityRule,
     RedactedSecurityRule,
+    RegisteredSecurityRule,
     RolesOnlySecurityRule,
     SecurityRule,
     StructuredSecurityRule
@@ -29,6 +30,7 @@ import { policyConditionToExpression, policyToPostgres } from "@rebasepro/common
  * - `shorthand`: a `PolicyShorthand` condition / check (`{ status: "published" }`);
  * - `conditional_access`: `access` together with a condition / check;
  * - `authenticated`: bare `access: "authenticated"`;
+ * - `registered`: bare `access: "registered"`;
  * - `redacted`: the server withheld the rule's clauses from this caller.
  *
  * Those are shown read-only (see {@link isEditableInForm}): listed with what
@@ -37,7 +39,7 @@ import { policyConditionToExpression, policyToPostgres } from "@rebasepro/common
  */
 export type RlsRuleForm =
     | "raw" | "owner" | "public" | "structured" | "roles_only"
-    | "shorthand" | "conditional_access" | "authenticated" | "redacted";
+    | "shorthand" | "conditional_access" | "authenticated" | "registered" | "redacted";
 
 /**
  * Every `SecurityRule` member {@link rlsRuleForm} classifies. A member added
@@ -46,7 +48,7 @@ export type RlsRuleForm =
  * treats it.
  */
 type ClassifiedRule =
-    | OwnerSecurityRule | PublicSecurityRule | AuthenticatedSecurityRule
+    | OwnerSecurityRule | PublicSecurityRule | AuthenticatedSecurityRule | RegisteredSecurityRule
     | ConditionalAccessSecurityRule | CheckedAccessSecurityRule | StructuredSecurityRule
     | RawSQLSecurityRule | RawSQLCheckOnlySecurityRule | RolesOnlySecurityRule | RedactedSecurityRule;
 const RULE_FORMS_COVER_THE_UNION: [Exclude<SecurityRule, ClassifiedRule>] extends [never] ? true : false = true;
@@ -59,7 +61,8 @@ export function rlsRuleForm(rule: SecurityRule): RlsRuleForm {
     if (rule.ownerField != null) return "owner";
     if (rule.access !== undefined) {
         if (rule.condition != null || rule.check != null) return "conditional_access";
-        return rule.access === "authenticated" ? "authenticated" : "public";
+        if (rule.access === "authenticated") return "authenticated";
+        return rule.access === "registered" ? "registered" : "public";
     }
     if (isPolicyShorthand(rule.condition) || isPolicyShorthand(rule.check)) return "shorthand";
     if (rule.condition != null || rule.check != null) return "structured";
@@ -78,6 +81,7 @@ export function isEditableInForm(form: RlsRuleForm): boolean {
         case "shorthand":
         case "conditional_access":
         case "authenticated":
+        case "registered":
         case "redacted":
             return false;
     }

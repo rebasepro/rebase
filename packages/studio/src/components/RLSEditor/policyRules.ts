@@ -10,6 +10,7 @@ import type {
     RawSQLCheckOnlySecurityRule,
     RawSQLSecurityRule,
     RedactedSecurityRule,
+    RegisteredSecurityRule,
     RolesOnlySecurityRule,
     SecurityRule,
     SecurityRuleAccess,
@@ -59,7 +60,7 @@ export type PolicyRuleForm =
  * — the one place to decide how the editor treats it.
  */
 type ClassifiedRule =
-    | OwnerSecurityRule | PublicSecurityRule | AuthenticatedSecurityRule
+    | OwnerSecurityRule | PublicSecurityRule | AuthenticatedSecurityRule | RegisteredSecurityRule
     | ConditionalAccessSecurityRule | CheckedAccessSecurityRule | StructuredSecurityRule
     | RawSQLSecurityRule | RawSQLCheckOnlySecurityRule | RolesOnlySecurityRule | RedactedSecurityRule;
 const RULE_FORMS_COVER_THE_UNION: [Exclude<SecurityRule, ClassifiedRule>] extends [never] ? true : false = true;

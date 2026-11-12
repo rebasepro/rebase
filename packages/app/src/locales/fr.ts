@@ -1035,6 +1035,7 @@ export const fr: RebaseTranslations = {
     studio_rls_rule_edit_in_code: "Cette règle est écrite sous une forme que cet éditeur ne peut pas modifier sans la réécrire. Modifiez-la dans le fichier source de la collection.",
     studio_rls_rule_who_public: "Qui : tout le monde",
     studio_rls_rule_who_authenticated: "Qui : utilisateurs connectés",
+    studio_rls_rule_who_registered: "Qui : utilisateurs avec un compte (sans invités)",
     studio_rls_rule_rows: "Lignes : {{condition}}",
     studio_rls_rule_writes: "Écritures : {{condition}}",
     studio_rls_rule_redacted: "Définie sur le serveur",

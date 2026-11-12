@@ -1035,6 +1035,7 @@ export const hi: RebaseTranslations = {
     studio_rls_rule_edit_in_code: "यह नियम ऐसे रूप में लिखा है जिसे यह एडिटर दोबारा लिखे बिना नहीं बदल सकता। इसे कलेक्शन की सोर्स फ़ाइल में संपादित करें।",
     studio_rls_rule_who_public: "कौन: कोई भी",
     studio_rls_rule_who_authenticated: "कौन: साइन-इन उपयोगकर्ता",
+    studio_rls_rule_who_registered: "कौन: खाते वाले साइन-इन उपयोगकर्ता (अतिथि नहीं)",
     studio_rls_rule_rows: "पंक्तियाँ: {{condition}}",
     studio_rls_rule_writes: "लेखन: {{condition}}",
     studio_rls_rule_redacted: "सर्वर पर परिभाषित",

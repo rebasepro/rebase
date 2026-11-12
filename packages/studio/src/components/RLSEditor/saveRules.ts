@@ -65,7 +65,11 @@ export function asSecurityRule(rule: PolicyRule): SecurityRule {
     if (access !== undefined) {
         if (condition !== undefined) return { ...base, access, condition, ...(check !== undefined ? { check } : {}) };
         if (check !== undefined) return { ...base, access, check };
-        return access === "public" ? { ...base, access: "public" } : { ...base, access: "authenticated" };
+        switch (access) {
+            case "public": return { ...base, access: "public" };
+            case "authenticated": return { ...base, access: "authenticated" };
+            case "registered": return { ...base, access: "registered" };
+        }
     }
     if (condition !== undefined) return { ...base, condition, ...(check !== undefined ? { check } : {}) };
     return base;

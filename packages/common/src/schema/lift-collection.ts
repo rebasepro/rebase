@@ -89,6 +89,7 @@ import { fieldKeyForColumn, findRelation, getTableName, resolveCollectionRelatio
 import { resolveRelation } from "../util/resolve-relation";
 import { SchemaDefinitionError, isSchemaDefinitionError } from "./errors";
 import { liftRuleSpelling, liftTenantSourceSpelling } from "./lift-rule-spelling";
+import { legacyRuleRefusal } from "./resolve-rls";
 
 // ── Notes ────────────────────────────────────────────────────────────────────
 
@@ -193,6 +194,13 @@ export function collectionsToTableDefs(
     collections: readonly CollectionConfig[],
     options: LiftOptions = {}
 ): LiftResult {
+    // A default rule that would compile to something wider than it did on the
+    // previous version is refused before any table inherits it.
+    const defaultProblems = (options.defaultSecurityRules ?? []).flatMap((rule, index) => {
+        const message = legacyRuleRefusal(rule, rule.name ? `default rule "${rule.name}"` : `default rule #${index}`);
+        return message ? [{ table: "defaultSecurityRules", key: `[${index}]`, message }] : [];
+    });
+    if (defaultProblems.length > 0) throw new SchemaDefinitionError(defaultProblems);
     const lifter = new Lifter(collections, options);
     const tables = lifter.liftAll();
     const defaultRls = nonEmpty((options.defaultSecurityRules ?? []).map(liftRuleSpelling));
@@ -1310,6 +1318,14 @@ class CollectionLift {
         const rules = c.securityRules;
         const defaults = this.lifter.defaultRules();
         const inherits = defaults.length > 0 && (rules === defaults || !rules || rules.length === 0);
+        if (!inherits) {
+            // Never carried wider than it compiled: see `legacyRuleRefusal`.
+            const refusals = (rules ?? []).flatMap((rule, index) => {
+                const message = legacyRuleRefusal(rule, rule.name ? `rule "${rule.name}"` : `rule #${index}`);
+                return message ? [message] : [];
+            });
+            if (refusals.length > 0) this.refuse("securityRules", refusals.join("\n"));
+        }
         const declared = nonEmpty((rules ?? []).map(liftRuleSpelling));
         const posture: RlsPosture = inherits ? "inherit" : declared ?? "admin-only";
         if (c.disableDefaultPolicies) {

@@ -1171,6 +1171,7 @@ export interface RebaseTranslations {
     studio_rls_rule_edit_in_code?: string;
     studio_rls_rule_who_public?: string;
     studio_rls_rule_who_authenticated?: string;
+    studio_rls_rule_who_registered?: string;
     studio_rls_rule_rows?: string;
     studio_rls_rule_writes?: string;
     studio_rls_rule_redacted?: string;

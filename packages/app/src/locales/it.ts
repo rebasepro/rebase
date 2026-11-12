@@ -1035,6 +1035,7 @@ export const it: RebaseTranslations = {
     studio_rls_rule_edit_in_code: "Questa regola è scritta in una forma che questo editor non può cambiare senza riscriverla. Modificala nel file sorgente della collection.",
     studio_rls_rule_who_public: "Chi: chiunque",
     studio_rls_rule_who_authenticated: "Chi: utenti autenticati",
+    studio_rls_rule_who_registered: "Chi: utenti con un account (niente ospiti)",
     studio_rls_rule_rows: "Righe: {{condition}}",
     studio_rls_rule_writes: "Scritture: {{condition}}",
     studio_rls_rule_redacted: "Definita sul server",

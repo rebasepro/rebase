@@ -1,4 +1,4 @@
-import { PolicyExpression, SecurityRule, SecurityRuleAccess, isRedactedSecurityRule, policy } from "@rebasepro/types";
+import { PolicyExpression, SecurityRule, isRedactedSecurityRule, policy } from "@rebasepro/types";
 import { sqlToPolicy } from "./sqlToPolicy";
 import { policyConditionToExpression, type PolicyConditionSite } from "./policyCondition";
 
@@ -20,7 +20,15 @@ export interface RuleConditions {
  * object form, see {@link policyConditionToExpression}), and raw
  * `using`/`withCheck` — into a single normalized {@link PolicyExpression}
  * pair. `access` combined with a condition gates it: `"public"` leaves the
- * condition as it is, `"authenticated"` ANDs `policy.authenticated()` on.
+ * condition as it is, `"authenticated"` ANDs `policy.authenticated()` on,
+ * `"registered"` ANDs `policy.registered()` on.
+ *
+ * Total: every clause a rule carries is ANDed in, never dropped because
+ * another is present. The compiler refuses the combinations the
+ * `SecurityRule` union excludes (`access` beside `ownerField` or raw SQL,
+ * `ownerField` beside a condition…, see `ruleShapeProblems`); should one
+ * reach here anyway, it compiles to the conjunction — as narrow as every
+ * clause in it — rather than to whichever clause was checked first.
  *
  * **This is the linchpin against drift:** both the Postgres DDL generators and
  * the client-side evaluator consume this one function, so there is exactly one
@@ -42,36 +50,74 @@ export function securityRuleToConditions(rule: SecurityRule, site: Pick<PolicyCo
 }
 
 /**
- * A condition under an `access` gate. `"public"` adds nothing — `true AND c`
- * is `c` — so a public rule's clause is its condition, as written.
+ * The caller test an `access` value stands for, or `undefined` for none:
+ * `"public"` tests nothing (`true AND c` is `c`), `"authenticated"` is
+ * `policy.authenticated()`, `"registered"` is `policy.registered()`. A value
+ * the type does not know — a JavaScript caller, a cast, a typo — admits
+ * nobody: the compiler refuses such a rule before it gets here, and this
+ * keeps the desugaring total and closed for any caller that did not.
  */
-function gated(access: SecurityRuleAccess | undefined, condition: PolicyExpression): PolicyExpression {
-    return access === "authenticated" ? policy.and(policy.authenticated(), condition) : condition;
+function accessTest(access: unknown): PolicyExpression | undefined {
+    if (access === undefined || access === null || access === "public") return undefined;
+    if (access === "authenticated") return policy.authenticated();
+    if (access === "registered") return policy.registered();
+    return policy.false();
+}
+
+/**
+ * Every term of a clause, ANDed under the rule's `access` test: one term
+ * alone is returned as it is (so a rule of one clause compiles exactly as it
+ * always has), `access` gates it as `and(test, term)`, and several terms —
+ * a combination the compiler refuses, reaching here only from a caller that
+ * skipped it — are all kept. A clause is never dropped for another: the
+ * result is at least as narrow as every clause the rule carries.
+ */
+function conjoin(access: unknown, terms: readonly PolicyExpression[]): PolicyExpression | null {
+    const test = accessTest(access);
+    if (terms.length === 0) {
+        if (test) return test;
+        return access === "public" ? policy.true() : null;
+    }
+    const body = terms.length === 1 ? terms[0] : policy.and(...terms);
+    if (!test) return body;
+    return terms.length === 1 ? policy.and(test, body) : policy.and(test, ...terms);
 }
 
 /** What a withheld clause desugars to: SQL nobody here can evaluate. */
 const REDACTED_CLAUSE_SQL = "/* withheld by the server */";
 
-function baseUsing(rule: SecurityRule, site: Pick<PolicyConditionSite, "table">): PolicyExpression | null {
-    if (isRedactedSecurityRule(rule)) return gated(rule.access, policy.raw(REDACTED_CLAUSE_SQL));
-    // A legacy rule never carries `access` beside a condition, so for it this
-    // is the condition itself — the same object, compiled as it always was.
-    if (rule.condition != null) return gated(rule.access, policyConditionToExpression(rule.condition, { ...site, clause: "condition" }));
-    if (rule.using != null) return sqlToPolicy(rule.using);
-    // `access` alone (or with only a `check`): the caller test itself.
-    if (rule.access === "public") return policy.true();
-    if (rule.access === "authenticated") return policy.authenticated();
-    if (rule.ownerField) return policy.compare(policy.field(rule.ownerField), "eq", policy.authUid());
-    return null;
+function ownerTerm(rule: SecurityRule): PolicyExpression[] {
+    return rule.ownerField ? [policy.compare(policy.field(rule.ownerField), "eq", policy.authUid())] : [];
 }
 
+/**
+ * The `USING` clause: the `access` test ANDed with every row clause the rule
+ * carries — `ownerField`, `condition`, raw `using`. Total: no clause is
+ * dropped because another one is present, whatever the order of the checks.
+ */
+function baseUsing(rule: SecurityRule, site: Pick<PolicyConditionSite, "table">): PolicyExpression | null {
+    if (isRedactedSecurityRule(rule)) return conjoin(rule.access, [policy.raw(REDACTED_CLAUSE_SQL)]);
+    const terms: PolicyExpression[] = [...ownerTerm(rule)];
+    if (rule.condition != null) terms.push(policyConditionToExpression(rule.condition, { ...site, clause: "condition" }));
+    if (rule.using != null) terms.push(sqlToPolicy(rule.using));
+    return conjoin(rule.access, terms);
+}
+
+/**
+ * The `WITH CHECK` clause. `check` stands in for `condition` and `withCheck`
+ * for `using` (each defaults to its counterpart, as Postgres does); with
+ * neither, the clause is the `USING` clause. Like {@link baseUsing}, every
+ * clause present is ANDed under the `access` test.
+ */
 function baseWithCheck(rule: SecurityRule, site: Pick<PolicyConditionSite, "table">): PolicyExpression | null {
-    if (isRedactedSecurityRule(rule)) return gated(rule.access, policy.raw(REDACTED_CLAUSE_SQL));
-    if (rule.check != null) return gated(rule.access, policyConditionToExpression(rule.check, { ...site, clause: "check" }));
-    if (rule.withCheck != null) return sqlToPolicy(rule.withCheck);
-    // No explicit WITH CHECK → fall back to the USING condition, matching
-    // PostgreSQL's own default behavior.
-    return baseUsing(rule, site);
+    if (isRedactedSecurityRule(rule)) return conjoin(rule.access, [policy.raw(REDACTED_CLAUSE_SQL)]);
+    if (rule.check == null && rule.withCheck == null) return baseUsing(rule, site);
+    const terms: PolicyExpression[] = [...ownerTerm(rule)];
+    if (rule.check != null) terms.push(policyConditionToExpression(rule.check, { ...site, clause: "check" }));
+    else if (rule.condition != null) terms.push(policyConditionToExpression(rule.condition, { ...site, clause: "condition" }));
+    if (rule.withCheck != null) terms.push(sqlToPolicy(rule.withCheck));
+    else if (rule.using != null) terms.push(sqlToPolicy(rule.using));
+    return conjoin(rule.access, terms);
 }
 
 /**

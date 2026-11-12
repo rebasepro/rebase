@@ -1040,6 +1040,7 @@ export const pt: RebaseTranslations = {
     studio_rls_rule_edit_in_code: "Esta regra está escrita numa forma que este editor não consegue alterar sem a reescrever. Edite-a no ficheiro de origem da coleção.",
     studio_rls_rule_who_public: "Quem: qualquer pessoa",
     studio_rls_rule_who_authenticated: "Quem: utilizadores com sessão iniciada",
+    studio_rls_rule_who_registered: "Quem: utilizadores com conta (sem convidados)",
     studio_rls_rule_rows: "Linhas: {{condition}}",
     studio_rls_rule_writes: "Escritas: {{condition}}",
     studio_rls_rule_redacted: "Definida no servidor",

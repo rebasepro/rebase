@@ -377,7 +377,11 @@ export function CollectionRLSTab() {
                                         <Chip size="small" className="bg-surface-raised text-text-secondary border-none">Roles: {Array.isArray(rule.roles) ? rule.roles.join(", ") : rule.roles}</Chip>
                                         {rule.access && (
                                             <Chip size="small" className="bg-surface-raised text-text-secondary border-none">
-                                                {rule.access === "authenticated" ? t("studio_rls_rule_who_authenticated") : t("studio_rls_rule_who_public")}
+                                                {rule.access === "authenticated"
+                                                    ? t("studio_rls_rule_who_authenticated")
+                                                    : rule.access === "registered"
+                                                        ? t("studio_rls_rule_who_registered")
+                                                        : t("studio_rls_rule_who_public")}
                                             </Chip>
                                         )}
                                         {form !== "redacted" && rule.condition != null && (
