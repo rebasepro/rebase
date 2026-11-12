@@ -124,12 +124,13 @@ export async function readUiConfigFile(file: string): Promise<UiPreferences> {
         throw new ApiError(500, "UI_CONFIG_FILE_INVALID",
             `${UI_CONFIG_FILE} is not valid JSON. Fix or delete it; the panel rewrites it on the next save.`);
     }
-    const tables: UiPreferences["tables"] = {};
+    // A Map, not assignment into `{}`: a slug of `__proto__` would set the prototype.
+    const tables = new Map<string, UiTablePreferences>();
     const listed = isRecord(parsed) && isRecord(parsed.tables) ? parsed.tables : {};
     for (const [slug, preferences] of Object.entries(listed)) {
-        if (isUiTablePreferences(preferences)) tables[slug] = preferences;
+        if (isUiTablePreferences(preferences)) tables.set(slug, preferences);
     }
-    return { tables };
+    return { tables: Object.fromEntries(tables) };
 }
 
 /** Write the file whole, through a temporary file, so a reader never sees half of it. */

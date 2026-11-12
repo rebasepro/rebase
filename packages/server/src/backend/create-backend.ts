@@ -103,6 +103,7 @@ import { loadOpenApiGenerator, mountOpenApiDocs, type OpenApiGenerator } from ".
 import { createHealthCheck } from "../init/health";
 import { createShutdown } from "../init/shutdown";
 import { createLiveSchemaRoutes, readAccountIdentity } from "../api/live-schema-routes";
+import { uiConfigBounds } from "../ui-config/ui-config-bounds";
 import { deprecatedAlias } from "../api/mount";
 import {
     commitPathsFor,
@@ -2510,6 +2511,12 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             : undefined;
         const uiConfigRouter = new Hono<HonoEnv>();
         applyAdminGate(uiConfigRouter, "UI preferences", undefined);
+        // Writes only for served tables (a user's: the tables they are
+        // described), bodies capped, prototype keys refused — before the routes.
+        uiConfigRouter.use("/:scope/:slug", uiConfigBounds({
+            tables: () => tableRegistry.list(),
+            persons: config.schemaTables?.persons ?? "granted"
+        }));
         uiConfigRouter.route("/", createUiConfigRoutes({ store: uiPreferencesStore, workspaceFile }));
         uiConfigSurface = uiConfigRouter;
     }

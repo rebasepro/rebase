@@ -24,6 +24,8 @@ import { isSQLAdmin, isUiTablePreferences, mergeUiTablePreferences } from "@reba
 import { revokeInternalTableSql } from "@rebasepro/common";
 import { createDdlBootstrapper, provisioningExec, type SqlExec } from "../boot/ddl-bootstrap";
 import { logger } from "../utils/logger";
+import { ApiError } from "../api/errors";
+import { UI_PREFERENCES_MAX_BYTES } from "./ui-config-bounds";
 
 const TABLE = "rebase.ui_preferences";
 
@@ -142,24 +144,33 @@ export function createUiPreferencesStore(
                 `SELECT table_slug, preferences FROM ${TABLE} WHERE scope = $1 AND owner = $2 ORDER BY table_slug`,
                 [owner.scope, ownerKey(owner)]
             );
-            const tables: UiPreferences["tables"] = {};
+            // A Map, not assignment into `{}`: a stored slug of `__proto__`
+            // would set the object's prototype instead of a key.
+            const tables = new Map<string, UiTablePreferences>();
             for (const row of rows) {
                 if (typeof row.table_slug !== "string") continue;
                 const preferences = storedPreferences(row.preferences, `${owner.scope} ${row.table_slug}`);
-                if (preferences) tables[row.table_slug] = preferences;
+                if (preferences) tables.set(row.table_slug, preferences);
             }
-            return { tables };
+            return { tables: Object.fromEntries(tables) };
         },
 
         async save(owner, slug, delta, { updatedBy, replace }) {
             const key = ownerKey(owner);
             const next = replace ? delta : mergeUiTablePreferences(await read(key, owner.scope, slug), delta);
+            const serialized = JSON.stringify(next);
+            // The body is capped at the route; a merge could still grow a row
+            // past it one write at a time.
+            if (Buffer.byteLength(serialized, "utf8") > UI_PREFERENCES_MAX_BYTES) {
+                throw new ApiError(413, "UI_PREFERENCES_TOO_LARGE",
+                    `"${slug}"'s preferences would take more than ${UI_PREFERENCES_MAX_BYTES / 1024} KB. Reset them, or save fewer.`);
+            }
             await exec(
                 `INSERT INTO ${TABLE} (scope, owner, table_slug, preferences, updated_by, updated_at)
                  VALUES ($1, $2, $3, $4::jsonb, $5, now())
                  ON CONFLICT (scope, owner, table_slug)
                  DO UPDATE SET preferences = EXCLUDED.preferences, updated_by = EXCLUDED.updated_by, updated_at = now()`,
-                [owner.scope, key, slug, JSON.stringify(next), updatedBy]
+                [owner.scope, key, slug, serialized, updatedBy]
             );
             return next;
         },
