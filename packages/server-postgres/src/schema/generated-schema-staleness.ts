@@ -5,10 +5,10 @@ import { generateForeignKeyName, legacyForeignKeyName } from "@rebasepro/utils";
 /**
  * Notice a generated Drizzle schema that a *library upgrade* invalidated.
  *
- * `rebase dev` already watches `config/collections` and warns when a collection
- * file changes. That covers drift the developer caused. It cannot cover this one,
+ * `rebase dev` already watches `backend/schema` and warns when a table file
+ * changes. That covers drift the developer caused. It cannot cover this one,
  * because nothing the developer owns changed: 0.13 derives `category_id` where
- * 0.12 derived `categorie_id`, from the same unedited collection. The watcher
+ * 0.12 derived `categorie_id`, from the same unedited table. The watcher
  * never fires, and `backend/src/schema.generated.ts` quietly stops describing the
  * schema the runtime expects.
  *

@@ -26,9 +26,9 @@ import { ADMIN_POLICY_ROLE_SQL, ADMIN_REQUEST_ROLE_SQL } from "../schema/rls-boo
  *  - **User context** — a request authenticated (or anonymous) via
  *    `driver.withAuth(user)`. Runs as the restricted `rebase_user` role: a
  *    non-owner, NOSUPERUSER, NOBYPASSRLS role, so Postgres RLS binds *every*
- *    statement (SELECT, INSERT, UPDATE, DELETE). The collection's
- *    `securityRules` are the whole authorization model; app-layer callbacks
- *    are validation/side-effects, not a security boundary.
+ *    statement (SELECT, INSERT, UPDATE, DELETE). The table's `rls` rules
+ *    are the whole authorization model; app-layer hooks are
+ *    validation/side-effects, not a security boundary.
  *
  *  - **Server context** — the base (owner) connection: auth flows, migrations,
  *    and raw `rebase.sql`. As table owner it bypasses RLS. This is the trusted

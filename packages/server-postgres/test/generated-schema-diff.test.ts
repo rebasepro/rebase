@@ -306,8 +306,8 @@ describe("warnOnGeneratedSchemaDrift", () => {
         const [summary, ...details] = warnings;
         expect(summary.message).toContain("Run `rebase db push` to apply them");
         expect(summary.message).toContain("`rebase db generate` for a migration");
-        // Regenerating is offered only for collections that changed, and only first.
-        expect(summary.message).toContain("If the collections changed since schema.generated.ts was written, run `rebase schema generate` first.");
+        // Regenerating is offered only for tables that changed, and only first.
+        expect(summary.message).toContain("If backend/schema changed since schema.generated.ts was written, run `rebase schema generate` first.");
         expect(details).toHaveLength(1);
         expect(details[0].context).toMatchObject({ fix: "rebase db push" });
     });

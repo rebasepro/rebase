@@ -92,8 +92,8 @@ export interface PostgresRlsConfig {
     adminPolicies?: AdminPoliciesMode;
     /**
      * `false` drops the injected server-or-admin baseline from every
-     * collection, as `disableDefaultPolicies` does for one. Default `true`.
-     * A collection's own `disableDefaultPolicies` still decides for it.
+     * table, as `defaultPolicies: false` does for one. Default `true`.
+     * A table's own `defaultPolicies: false` still decides for it.
      */
     defaultPolicies?: boolean;
     /**
