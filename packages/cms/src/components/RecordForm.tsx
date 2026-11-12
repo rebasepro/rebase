@@ -16,6 +16,11 @@ import { CollectionsProvider } from "./CollectionsProvider";
 import { PanelNotFound } from "./PanelNotFound";
 import { collectionPropOf, type ScopedRecordPanelProps } from "./collection_prop";
 
+import type { TableDescriptor } from "@rebasepro/types";
+
+/** A collection handed over as a value is shown on its own: no served table beside it. */
+const NO_TABLES: readonly TableDescriptor[] = [];
+
 /**
  * Props for {@link RecordForm}.
  *
@@ -34,9 +39,10 @@ export type RecordPanelCollection<M extends Record<string, unknown> = Record<str
     /**
      * The collection the record belongs to: its name (`"orders"`), registered
      * with `<RebaseCMS>` or a {@link CollectionsProvider} above, or the
-     * collection as a value — a `defineCollection` config or a resolved
-     * collection. Handed over as a value where no CMS navigation is mounted
-     * above, the panel brings its own {@link CollectionsProvider} for it.
+     * collection as a value — a `defineFirestoreCollection`, or a table's
+     * collection you built (`collectionFromTable`). Handed over as a value
+     * where no CMS navigation is mounted above, the panel brings its own
+     * {@link CollectionsProvider} for it, holding that collection alone.
      */
     collection: AdminCollection<M> | string;
     /**
@@ -163,7 +169,7 @@ export function RecordForm<M extends Record<string, unknown> = Record<string, un
     if (!inScope && collection === undefined) return <PanelNotFound className={props.className}/>;
     if (needsOwnScope) {
         return (
-            <CollectionsProvider collections={ownCollections}>
+            <CollectionsProvider externalCollections={ownCollections} tables={NO_TABLES}>
                 <RecordFormInScope key={recordKey} {...props}/>
             </CollectionsProvider>
         );

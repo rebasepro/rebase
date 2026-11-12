@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useEffect, useCallback, useContext, Suspense } from "react";
+import React, { useMemo, useRef, useEffect, useCallback, useContext, useState, Suspense } from "react";
 import {
     useRebaseRegistry,
     useRebaseContext,
@@ -15,7 +15,6 @@ import {
     CustomizationControllerContext,
     RebaseDataContext,
     useRebaseEmbedHost,
-    useTableDescriptors,
     useTranslation
 } from "@rebasepro/app";
 import { buildRoutedRebaseData, resolveDataSource } from "@rebasepro/common";
@@ -27,7 +26,7 @@ import type { CollectionRegistryController } from "@rebasepro/types";
 import type { UrlController, NavigationStateController } from "@rebasepro/cms-types";
 
 const EMPTY_PLUGINS: RebasePlugin[] = [];
-const EMPTY_COLLECTIONS: AdminCollection[] = [];
+const NO_COLLECTIONS: AdminCollection[] = [];
 const NO_CUSTOMIZATIONS: readonly TableCustomization[] = [];
 const NO_EXTERNAL_COLLECTIONS: readonly AdminCollection[] = [];
 
@@ -35,7 +34,7 @@ import { useBuildNavigationStateController } from "../hooks/navigation/useBuildN
 import { useBuildUrlController } from "../hooks/navigation/useBuildUrlController";
 import { useBuildCollectionRegistryController } from "../hooks/navigation/useBuildCollectionRegistryController";
 import { composeCollectionsInput } from "../hooks/navigation/compose_collections_input";
-import { registeredCollection } from "../hooks/navigation/registered_collection";
+import { usePanelTables } from "../hooks/navigation/usePanelTables";
 
 import { CollectionRegistryContext } from "../hooks/navigation/contexts/CollectionRegistryContext";
 import { UrlContext } from "../hooks/navigation/contexts/UrlContext";
@@ -104,16 +103,19 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
         return collectionEditorConfig;
     }, [collectionEditorConfig]);
 
-    // ── The collections: served tables, external, declared in code ─────
-    // Every table the server serves the signed-in user, projected and
-    // customized, beside the collections whose rows live elsewhere
-    // (Firestore) and those the app still declares in code. Only with a
+    // ── The collections: served tables and external ones ──────────────
+    // Every table the server serves the signed-in user (or the ones handed
+    // to <RebaseCMS tables>), projected and customized, beside the
+    // collections whose rows live elsewhere (Firestore). Only with a
     // <RebaseCMS> registered: a Studio alone shows no collections.
-    const cmsCollections = registry.cmsConfig?.collections ?? EMPTY_COLLECTIONS;
     const tableCustomizations = registry.cmsConfig?.tableCustomizations ?? NO_CUSTOMIZATIONS;
     const externalCollections = registry.cmsConfig?.externalCollections ?? NO_EXTERNAL_COLLECTIONS;
-    const descriptors = useTableDescriptors({ enabled: registry.cmsConfig !== null });
+    const descriptors = usePanelTables(registry.cmsConfig?.tables, registry.cmsConfig !== null);
     const servedTables = descriptors.tables;
+
+    // What the composition last produced, for the collection editor, which
+    // lists and edits the collections the panel shows.
+    const [composedCollections, setComposedCollections] = useState<AdminCollection[]>(NO_COLLECTIONS);
 
     // In an embedding (an MCP App view, `embed_host.ts`), the collections are
     // the app's own — custom fields, previews, views and actions included —
@@ -122,14 +124,17 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
 
     // ── Build the navigation controllers ──────────────────────────────
     const collectionsBuilder = useMemo(() => {
-        const composed = composeCollectionsInput(cmsCollections, {
+        const composed = composeCollectionsInput({
             tables: servedTables,
             tableCustomizations,
             externalCollections
         });
-        if (!narrow) return composed;
-        return async (params: Parameters<typeof composed>[0]) => narrow(await composed(params));
-    }, [cmsCollections, servedTables, tableCustomizations, externalCollections, narrow]);
+        return async (params: Parameters<typeof composed>[0]) => {
+            const collections = await composed(params);
+            setComposedCollections(collections);
+            return narrow ? narrow(collections) : collections;
+        };
+    }, [servedTables, tableCustomizations, externalCollections, narrow]);
 
     const dataSources = useDataSources();
     const collectionRegistryController = useBuildCollectionRegistryController({ userConfigPersistence, dataSources: dataSources.registry });
@@ -193,10 +198,6 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
     // ── Build config controller internally when collection editor is enabled ──
     const rebaseClient = useRebaseClient();
     const authController = useAuthController();
-    const resolvedCollections = useMemo(
-        () => Array.isArray(cmsCollections) ? cmsCollections.map(registeredCollection) : EMPTY_COLLECTIONS,
-        [cmsCollections]
-    );
 
     // ── Dev-only data-source sanity check ─────────────────────────────
     // Warn about data sources declared with a direct/custom transport that
@@ -231,7 +232,7 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
     // controller that does not report them leaves the backend to answer.
     const internalConfigController = useLocalCollectionsConfigController(
         rebaseClient,
-        resolvedCollections,
+        composedCollections,
         collectionEditorEnabled ? {
             readOnly: collectionEditorOptions?.readOnly,
             getAuthToken: collectionEditorOptions?.getAuthToken ?? authController?.getAuthToken,

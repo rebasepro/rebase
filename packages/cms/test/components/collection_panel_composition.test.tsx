@@ -23,6 +23,7 @@ import {
     CollectionToolbar
 } from "@rebasepro/cms";
 import { fakeStorageSource } from "../helpers/fakes";
+import { NO_TABLES } from "../helpers/tables";
 
 if (typeof globalThis.IntersectionObserver === "undefined") {
     class NoopIntersectionObserver {
@@ -519,7 +520,7 @@ describe("a panel's deprecated props", () => {
         resetDeprecationWarningsForTests();
         const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
         const reads = jest.spyOn(driver, "fetchCollection");
-        render(<Page><CollectionsProvider collections={[tasks]}>
+        render(<Page><CollectionsProvider externalCollections={[tasks]} tables={NO_TABLES}>
             <CollectionPanel path={"tasks"} viewMode={"list"} sort={["priority", "desc"]}/>
             <CollectionPanel path={"tasks"} viewMode={"list"} sort={["priority", "desc"]}/>
         </CollectionsProvider></Page>);
@@ -535,7 +536,7 @@ describe("a panel's deprecated props", () => {
 
 describe("a panel named by its collection", () => {
     it("takes the name of a collection the scope registers", async () => {
-        render(<Page><CollectionsProvider collections={[tasks]}><CollectionPanel collection={"tasks"} viewMode={"list"}/></CollectionsProvider></Page>);
+        render(<Page><CollectionsProvider externalCollections={[tasks]} tables={NO_TABLES}><CollectionPanel collection={"tasks"} viewMode={"list"}/></CollectionsProvider></Page>);
         expect(await screen.findByText("Write the plan")).toBeTruthy();
     });
 });

@@ -1,4 +1,5 @@
-import type { AdminCollection, PanelCollection } from "@rebasepro/cms-types";
+import type { AdminCollection } from "@rebasepro/cms-types";
+import type { PanelCollection } from "./compose_collections";
 
 /**
  * A collection as the registry holds it.

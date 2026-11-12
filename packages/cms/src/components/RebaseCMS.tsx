@@ -13,8 +13,8 @@ import type { RebaseCMSConfig } from "@rebasepro/cms-types";
  *   modes, field components and actions for the served tables.
  * - `externalCollections` — collections whose rows live elsewhere
  *   (`defineFirestoreCollection`), side by side with the tables.
- * - `collections` — collections declared in code, as before the tables were
- *   served; one with the slug of a served table wins over it.
+ * - `tables` — for embedding and tests only: the tables to render instead of
+ *   the ones the server serves.
  *
  * When `collectionEditor` is provided, the built-in visual schema editor
  * is auto-wired as a native feature (slots, provider, Studio view) without
@@ -30,9 +30,9 @@ import type { RebaseCMSConfig } from "@rebasepro/cms-types";
  * ```
  */
 export function RebaseCMS({
-    collections,
     tableCustomizations,
     externalCollections,
+    tables,
     views,
     homePage,
     entityViews,
@@ -51,9 +51,9 @@ export function RebaseCMS({
 
     useLayoutEffect(() => {
         dispatch.registerAdmin({
-            collections,
             tableCustomizations,
             externalCollections,
+            tables,
             views,
             homePage,
             entityViews,
@@ -64,7 +64,7 @@ export function RebaseCMS({
             basePath
         });
         return () => dispatch.unregisterAdmin();
-    }, [dispatch, collections, tableCustomizations, externalCollections, views, homePage, entityViews, collectionViews, entityActions, collectionEditor, navigationGroupMappings, basePath]);
+    }, [dispatch, tableCustomizations, externalCollections, tables, views, homePage, entityViews, collectionViews, entityActions, collectionEditor, navigationGroupMappings, basePath]);
 
     return null;
 }

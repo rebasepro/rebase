@@ -13,6 +13,11 @@ import { PanelNotFound } from "./PanelNotFound";
 import { collectionPropOf, type ScopedRecordPanelProps } from "./collection_prop";
 import type { RecordPanelCollection } from "./RecordForm";
 
+import type { TableDescriptor } from "@rebasepro/types";
+
+/** A collection handed over as a value is shown on its own: no served table beside it. */
+const NO_TABLES: readonly TableDescriptor[] = [];
+
 /**
  * Props for {@link RecordDetail}.
  *
@@ -94,7 +99,7 @@ export function RecordDetail<M extends Record<string, unknown> = Record<string, 
     if (!inScope && collection === undefined) return <PanelNotFound className={props.className}/>;
     if (needsOwnScope) {
         return (
-            <CollectionsProvider collections={ownCollections}>
+            <CollectionsProvider externalCollections={ownCollections} tables={NO_TABLES}>
                 <RecordDetailInScope key={recordKey} {...props}/>
             </CollectionsProvider>
         );

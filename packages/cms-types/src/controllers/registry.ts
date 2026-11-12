@@ -1,13 +1,13 @@
 import { ReactNode } from "react";
 
-import type { CollectionConfigsBuilder, AppViewsBuilder } from "../types/builders";
+import type { AppViewsBuilder } from "../types/builders";
 import type { EntityCustomView } from "../types/entity_views";
 import type { CollectionCustomView } from "../types/collection_views";
 import type { EntityAction } from "../types/entity_actions";
 import type { AppView, NavigationGroupMapping } from "./navigation";
-import type { AdminCollection, AdminPostgresCollection } from "../admin_collection";
+import type { AdminCollection } from "../admin_collection";
 import type { TableCustomization } from "../table_customization";
-import type { Properties } from "@rebasepro/types";
+import type { TableDescriptor } from "@rebasepro/types";
 
 /**
  * Options to enable the built-in collection editor.
@@ -26,40 +26,11 @@ export interface CollectionEditorOptions {
 }
 
 /**
- * A Postgres table's collection as the panel registers it: what a
- * `TableDescriptor` projects to, after `customizeTable`.
- *
- * The flat Postgres collection, with one difference: its properties may
- * include a `reference` — what `fields.x.referenceTo` makes of a column that
- * holds another collection's ids — which the backend's `PostgresProperties`
- * does not admit, while the registry, the row codec and every view handle
- * one.
- *
- * @group Tables
+ * What `<RebaseCMS>` registers. The panel has two inputs: the tables the
+ * server serves (`GET /api/schema/tables`), with `tableCustomizations` folded
+ * in, and `externalCollections`, whose rows live elsewhere.
  */
-export type AdminTableCollection<M extends Record<string, unknown> = Record<string, unknown>> =
-    Omit<AdminPostgresCollection<M>, "properties"> & { properties: Properties };
-
-/**
- * Anything `<RebaseCMS>` and `CollectionsProvider` register: a collection of
- * the panel's view model, or a table's.
- *
- * @group Tables
- */
-export type PanelCollection = AdminCollection | AdminTableCollection;
-
-export interface RebaseCMSConfig<EC extends AdminCollection = AdminCollection> {
-    /**
-     * Collections declared in code, the way projects did before their tables
-     * were served (`config/collections`, `virtual:rebase-collections`).
-     *
-     * Still honoured beside the served tables: when one of these and a served
-     * table have the same slug, this one is shown and the table's projection is
-     * ignored (with a warning in development), so a project keeps exactly what
-     * it had until it moves to `tableCustomizations`.
-     */
-    collections?: (EC | AdminTableCollection)[] | CollectionConfigsBuilder<EC>;
-
+export interface RebaseCMSConfig {
     /**
      * Presentation for the tables the server serves, one `customizeTable(...)`
      * result per table: labels, icons, view modes, field components, actions.
@@ -94,6 +65,22 @@ export interface RebaseCMSConfig<EC extends AdminCollection = AdminCollection> {
      * ```
      */
     externalCollections?: readonly AdminCollection[];
+
+    /**
+     * For embedding and tests: the tables to render instead of the ones the
+     * server serves. Given, the panel asks the server for none and projects
+     * these, with `tableCustomizations` folded in, exactly as it would the
+     * served ones — build them with `compileTables` from `@rebasepro/common`.
+     *
+     * An app talking to its own backend leaves this out.
+     *
+     * @example
+     * ```tsx
+     * const tables = compileTables([posts, authors]);
+     * <RebaseCMS tables={tables} tableCustomizations={[postsCms]}/>
+     * ```
+     */
+    tables?: readonly TableDescriptor[];
 
     /**
      * Custom top-level views added to the main navigation.

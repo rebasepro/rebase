@@ -24,6 +24,7 @@ import { CollectionPanel, CollectionsProvider, EntityFormPanel, RecordForm, Form
 import { resetDeprecationWarningsForTests } from "@rebasepro/common";
 import { clearFetchCache } from "../../../app/src/hooks/data/useFetch";
 import { fakeStorageSource } from "../helpers/fakes";
+import { NO_TABLES } from "../helpers/tables";
 
 if (typeof globalThis.ResizeObserver === "undefined") {
     class NoopResizeObserver {
@@ -161,7 +162,7 @@ describe("a collection's table in a page of the host app", () => {
     it("gives the rows of every scope on the page their address", async () => {
         render(
             <Page>
-                <CollectionsProvider collections={[posts, authors]}>
+                <CollectionsProvider externalCollections={[posts, authors]} tables={NO_TABLES}>
                     <CollectionPanel collection={"authors"}/>
                 </CollectionsProvider>
                 <CollectionPanel collection={posts}/>
@@ -190,7 +191,7 @@ describe("a collection's table in a page of the host app", () => {
         };
         render(
             <Page dataDriver={filtering}>
-                <CollectionsProvider collections={[posts]}>
+                <CollectionsProvider externalCollections={[posts]} tables={NO_TABLES}>
                     <CollectionPanel collection={"posts"} collectionOverrides={{ fixedFilter: { title: ["==", "Second post"] } }}/>
                 </CollectionsProvider>
             </Page>
@@ -225,7 +226,7 @@ describe("one record's form in a page of the host app", () => {
     it("takes the collection by name, from the scope that registers it, and saves through it", async () => {
         const onSaved = jest.fn();
         render(<Page>
-            <CollectionsProvider collections={[posts]}>
+            <CollectionsProvider externalCollections={[posts]} tables={NO_TABLES}>
                 <RecordForm collection={"posts"} id={"p1"} onSaved={onSaved}/>
             </CollectionsProvider>
         </Page>);
@@ -247,7 +248,7 @@ describe("one record's form in a page of the host app", () => {
         // one for an id that exists, and Save would have created it again.
         const statuses: string[] = [];
         render(<Page>
-            <CollectionsProvider collections={[posts]}>
+            <CollectionsProvider externalCollections={[posts]} tables={NO_TABLES}>
                 <RecordForm collection={"posts"} id={"p1"}
                     formProps={{ onFormContextReady: (context) => { statuses.push(String(context.status)); } }}/>
             </CollectionsProvider>
@@ -368,7 +369,7 @@ describe("one record's form in a page of the host app", () => {
         rows["posts/p1/comments"] = [{ id: "c1", body: "Nice post" }];
         render(
             <Page>
-                <CollectionsProvider collections={[postsWithComments]}>
+                <CollectionsProvider externalCollections={[postsWithComments]} tables={NO_TABLES}>
                     <RecordForm collection={comments} path={"posts/p1/comments"} id={"c1"}/>
                 </CollectionsProvider>
             </Page>
@@ -484,7 +485,7 @@ describe("one record's form, composed", () => {
         const onSaved = jest.fn();
         render(
             <Page>
-                <CollectionsProvider collections={[posts]}>
+                <CollectionsProvider externalCollections={[posts]} tables={NO_TABLES}>
                     <RecordForm collection={posts} id={"p1"} onSaved={onSaved}
                         collectionOverrides={{
                             properties: { ...posts.properties, title: { type: "string", name: "Headline" } }

@@ -1,16 +1,14 @@
 /**
  * What `<RebaseCMS>` registers: the tables the server serves, projected and
- * customized, beside the collections whose rows live elsewhere (Firestore),
- * beside the collections an app still declares in code.
+ * customized, beside the collections whose rows live elsewhere (Firestore).
  */
-import type {
-    AdminCollection,
-    PanelCollection,
-    TableCustomization
-} from "@rebasepro/cms-types";
+import type { AdminCollection, TableCustomization } from "@rebasepro/cms-types";
 import type { TableDescriptor } from "@rebasepro/types";
 import { collectionsFromTables } from "../../tables/project_table";
-import { applyTableCustomizations } from "../../tables/apply_customization";
+import { applyTableCustomizations, type TableCollection } from "../../tables/apply_customization";
+
+/** What the composition produces: a served table's collection, or an external one. */
+export type PanelCollection = TableCollection | AdminCollection;
 
 /** What {@link composeCollections} combines. */
 export interface CollectionSources {
@@ -20,21 +18,6 @@ export interface CollectionSources {
     tableCustomizations: readonly TableCustomization[];
     /** `<RebaseCMS externalCollections>`. */
     externalCollections: readonly AdminCollection[];
-    /** `<RebaseCMS collections>`: collections declared in code. */
-    declared: readonly PanelCollection[];
-}
-
-const warned = new Set<string>();
-
-function warnOnce(key: string, message: string): void {
-    if (process.env.NODE_ENV === "production" || warned.has(key)) return;
-    warned.add(key);
-    console.warn(`[rebase] ${message}`);
-}
-
-/** Forget which warnings were shown. For tests. */
-export function resetCompositionWarnings(): void {
-    warned.clear();
 }
 
 function describe(collection: PanelCollection): string {
@@ -43,21 +26,17 @@ function describe(collection: PanelCollection): string {
 }
 
 /**
- * The collections the panel registers, in navigation order: those declared in
- * code, then the served tables none of them claims, then the external ones.
+ * The collections the panel registers, in navigation order: the served tables,
+ * then the external ones.
  *
  * - **Tables**: every served table projected (`collectionsFromTables`), with
  *   its `customizeTable` folded in (`applyTableCustomizations`).
- * - **Declared in code wins over a table.** A collection in `collections`
- *   with the slug of a served table is kept and the table's projection is
- *   dropped, with a development warning — an app that has not moved its
- *   collections to `tableCustomizations` sees exactly what it saw before.
  * - **External collections never share a slug.** One with the slug of a
- *   served table, of a declared collection or of another external collection
- *   throws, naming both: a slug is a URL, a saved layout and a reference
- *   target, and two collections cannot answer to one.
+ *   served table or of another external collection throws, naming both: a
+ *   slug is a URL, a saved layout and a reference target, and two collections
+ *   cannot answer to one.
  */
-export function composeCollections({ tables, tableCustomizations, externalCollections, declared }: CollectionSources): PanelCollection[] {
+export function composeCollections({ tables, tableCustomizations, externalCollections }: CollectionSources): PanelCollection[] {
     const projected = tables.length > 0 || tableCustomizations.length > 0
         ? applyTableCustomizations(collectionsFromTables(tables), tableCustomizations).map((collection, index) =>
             // The projected rules are already the effective ones. A table that
@@ -69,7 +48,6 @@ export function composeCollections({ tables, tableCustomizations, externalCollec
                 : collection)
         : [];
 
-    const declaredSlugs = new Map(declared.map(collection => [collection.slug, collection]));
     const tableSlugs = new Map(projected.map(collection => [collection.slug, collection]));
 
     const external = new Map<string, AdminCollection>();
@@ -79,13 +57,6 @@ export function composeCollections({ tables, tableCustomizations, externalCollec
             throw new Error(
                 `externalCollections: ${describe(collection)} has the slug of the table ${describe(table)} the server serves. ` +
                 "Give the external collection another slug: a slug names one collection only."
-            );
-        }
-        const inCode = declaredSlugs.get(collection.slug);
-        if (inCode) {
-            throw new Error(
-                `externalCollections: ${describe(collection)} has the slug of ${describe(inCode)} in <RebaseCMS collections>. ` +
-                "Give one of them another slug: a slug names one collection only."
             );
         }
         const twin = external.get(collection.slug);
@@ -98,16 +69,5 @@ export function composeCollections({ tables, tableCustomizations, externalCollec
         external.set(collection.slug, collection);
     }
 
-    const servedAlone: PanelCollection[] = [];
-    for (const table of projected) {
-        if (declaredSlugs.has(table.slug)) {
-            warnOnce(`declared:${table.slug}`,
-                `The table "${table.slug}" the server serves is also declared in <RebaseCMS collections>; the declared collection is shown and the table's projection is ignored. ` +
-                `Move its presentation to customizeTable("${table.slug}", …) in tableCustomizations and drop it from collections.`);
-            continue;
-        }
-        servedAlone.push(table);
-    }
-
-    return [...declared, ...servedAlone, ...external.values()];
+    return [...projected, ...external.values()];
 }

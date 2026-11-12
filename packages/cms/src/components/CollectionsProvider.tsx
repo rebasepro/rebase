@@ -11,13 +11,14 @@ import {
     useUserConfigurationPersistence
 } from "@rebasepro/app";
 import { buildRoutedRebaseData, CollectionRegistry, resolveDataSource } from "@rebasepro/common";
-import { resolveAdminCollection } from "@rebasepro/cms-types";
-import type { AppView, PanelCollection, RebasePlugin, UrlController } from "@rebasepro/cms-types";
+import type { AdminCollection, AppView, RebasePlugin, TableCustomization, UrlController } from "@rebasepro/cms-types";
+import type { TableDescriptor } from "@rebasepro/types";
 
 import { useBuildCollectionRegistryController } from "../hooks/navigation/useBuildCollectionRegistryController";
 import { useBuildUrlController } from "../hooks/navigation/useBuildUrlController";
 import { useBuildNavigationStateController } from "../hooks/navigation/useBuildNavigationStateController";
-import { registeredCollection } from "../hooks/navigation/registered_collection";
+import { composeCollectionsInput } from "../hooks/navigation/compose_collections_input";
+import { usePanelTables } from "../hooks/navigation/usePanelTables";
 import { CollectionRegistryContext } from "../hooks/navigation/contexts/CollectionRegistryContext";
 import { UrlContext } from "../hooks/navigation/contexts/UrlContext";
 import { NavigationStateContext } from "../hooks/navigation/contexts/NavigationStateContext";
@@ -39,26 +40,40 @@ function holdsLeadingCollection(registry: CollectionRegistry, path: string): boo
     return false;
 }
 const NO_VIEWS: AppView[] = [];
+const NO_CUSTOMIZATIONS: readonly TableCustomization[] = [];
+const NO_EXTERNAL_COLLECTIONS: readonly AdminCollection[] = [];
 
 /**
  * @group Components
  */
 export interface CollectionsProviderProps {
     /**
-     * The collections this scope can show and edit — a table's collection
-     * (`collectionFromTable`, customized with `applyTableCustomization`), a
-     * `defineFirestoreCollection`, or a collection declared in code. Keep the
-     * array stable (a module constant, or `useMemo`): a new array is a new set
-     * of collections.
+     * Presentation for the tables the server serves, one `customizeTable(...)`
+     * result per table — as on `<RebaseCMS>`. Every served table is known to
+     * this scope without one.
      */
-    collections: PanelCollection[];
+    tableCustomizations?: readonly TableCustomization[];
+    /**
+     * Collections whose rows live outside the Rebase backend
+     * (`defineFirestoreCollection`), known to this scope beside the tables —
+     * as on `<RebaseCMS>`. Keep the array stable (a module constant, or
+     * `useMemo`): a new array is a new set of collections.
+     */
+    externalCollections?: readonly AdminCollection[];
+    /**
+     * For embedding and tests: the tables to render instead of the ones the
+     * server serves — as on `<RebaseCMS>`. Given, the server is asked for
+     * none.
+     */
+    tables?: readonly TableDescriptor[];
     children: React.ReactNode;
 }
 
 /**
  * Everything a collection view or a record form needs to work in a page of
  * your own app, without `<RebaseCMS>`, `<RebaseNavigation>` or
- * `<RebaseShell>`: a registry of the collections you hand it, the record side
+ * `<RebaseShell>`: a registry of the tables the server serves (with your
+ * `tableCustomizations`) and of your `externalCollections`, the record side
  * panel and dialogs (rendered here), and the navigation guard.
  *
  * It needs `<Rebase>` above it and a React Router router — any router, at any
@@ -74,7 +89,7 @@ export interface CollectionsProviderProps {
  * ```tsx
  * <Rebase client={client} authController={authController}>
  *     <BrowserRouter>
- *         <CollectionsProvider collections={[postsCollection, authorsCollection]}>
+ *         <CollectionsProvider tableCustomizations={[postsCms]}>
  *             <CollectionPanel collection="posts"/>
  *             <CollectionPanel collection="authors"/>
  *         </CollectionsProvider>
@@ -84,7 +99,12 @@ export interface CollectionsProviderProps {
  *
  * @group Components
  */
-export function CollectionsProvider({ collections, children }: CollectionsProviderProps) {
+export function CollectionsProvider({
+    tableCustomizations = NO_CUSTOMIZATIONS,
+    externalCollections = NO_EXTERNAL_COLLECTIONS,
+    tables: givenTables,
+    children
+}: CollectionsProviderProps) {
     const context = useRebaseContext();
     const adminModeController = useAdminModeController();
     const userConfigPersistence = useUserConfigurationPersistence();
@@ -135,10 +155,19 @@ export function CollectionsProvider({ collections, children }: CollectionsProvid
         routesMounted: false
     }), [builtUrlController]);
 
-    const resolvedCollections = useMemo(() => collections.map(collection => resolveAdminCollection(registeredCollection(collection))), [collections]);
+    // The same two inputs as <RebaseCMS>: the tables, customized, and the
+    // external collections.
+    const descriptors = usePanelTables(givenTables, true);
+    const servedTables = descriptors.tables;
+    const collectionsBuilder = useMemo(
+        () => composeCollectionsInput({ tables: servedTables, tableCustomizations, externalCollections }),
+        [servedTables, tableCustomizations, externalCollections]);
     const navigationStateController = useBuildNavigationStateController({
         plugins: customizationController.plugins ?? EMPTY_PLUGINS,
-        collections: resolvedCollections,
+        collections: collectionsBuilder,
+        // Until the tables arrive, a panel shows its loading state rather
+        // than "collection not found".
+        collectionsPending: descriptors.status === "loading",
         views: NO_VIEWS,
         authController: context.authController!,
         // The collection and view builders get the rows the server sends.

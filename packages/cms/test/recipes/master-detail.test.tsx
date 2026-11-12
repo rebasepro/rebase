@@ -7,6 +7,7 @@ import type { AdminCollection } from "@rebasepro/cms-types";
 import { CollectionsProvider } from "@rebasepro/cms";
 import { db, InRebase } from "./recipe_harness";
 import { CustomersMasterDetail } from "../../recipes/master-detail";
+import { NO_TABLES } from "../helpers/tables";
 
 // jsdom measures nothing: give the table a laptop-sized viewport.
 jest.mock("react-use-measure", () => {
@@ -44,7 +45,7 @@ function containerWidth(width: number) {
 function renderPage() {
     return render(
         <InRebase>
-            <CollectionsProvider collections={[customers]}><CustomersMasterDetail/></CollectionsProvider>
+            <CollectionsProvider externalCollections={[customers]} tables={NO_TABLES}><CustomersMasterDetail/></CollectionsProvider>
         </InRebase>
     );
 }

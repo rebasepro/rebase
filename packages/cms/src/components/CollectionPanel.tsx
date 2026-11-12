@@ -22,6 +22,11 @@ import {
 } from "./CollectionViewBinding/CollectionToolbar";
 import { CollectionAddButton } from "./CollectionViewBinding/CollectionAddButton";
 
+import type { TableDescriptor } from "@rebasepro/types";
+
+/** A collection handed over as a value is shown on its own: no served table beside it. */
+const NO_TABLES: readonly TableDescriptor[] = [];
+
 /**
  * Props for the {@link CollectionPanel} component.
  *
@@ -40,10 +45,11 @@ export type CollectionPanelProps = CollectionPanelOptions & ({
     /**
      * The collection to display: its name (`"orders"`), registered with
      * `<RebaseCMS>` or a {@link CollectionsProvider} above, or the collection
-     * as a value — a `defineCollection` config or a resolved collection.
-     * Handed over as a value where no CMS navigation is mounted above, the
-     * panel brings its own {@link CollectionsProvider} for it, so it works
-     * anywhere under `<Rebase>` and a router.
+     * as a value — a `defineFirestoreCollection`, or a table's collection you
+     * built (`collectionFromTable`). Handed over as a value where no CMS
+     * navigation is mounted above, the panel brings its own
+     * {@link CollectionsProvider} for it, holding that collection alone, so
+     * it works anywhere under `<Rebase>` and a router.
      */
     collection: AdminCollection | string;
     /**
@@ -328,7 +334,7 @@ export function CollectionPanel(rawProps: CollectionPanelProps) {
     if (!inScope && collection === undefined) return <CollectionNotFound className={props.className} path={path}/>;
     if (needsOwnScope) {
         return (
-            <CollectionsProvider collections={ownCollections}>
+            <CollectionsProvider externalCollections={ownCollections} tables={NO_TABLES}>
                 <CollectionPanelInScope {...props}/>
             </CollectionsProvider>
         );

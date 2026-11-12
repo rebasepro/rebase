@@ -87,7 +87,7 @@ export function FieldValue({ collection: path, field: fieldProp, value: rawValue
         [rawValue, fieldProp, field, path, property, collection, collectionRegistry]);
 
     if (!inScope) {
-        throw new Error(`<FieldValue collection="${path}">: no collections are registered above it. Render it inside <RebaseCMS>, or wrap your page in a <CollectionsProvider collections={[…]}>.`);
+        throw new Error(`<FieldValue collection="${path}">: no collections are registered above it. Render it inside <RebaseCMS>, or wrap your page in a <CollectionsProvider>.`);
     }
     if (!collection) {
         if (!settled) return null;

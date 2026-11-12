@@ -7,7 +7,7 @@
  *
  * ```tsx
  * import { savedAppsView } from "@rebasepro/cms";
- * <RebaseCMS collections={collections} views={[savedAppsView]} />
+ * <RebaseCMS tableCustomizations={tableCustomizations} views={[savedAppsView]} />
  * ```
  */
 import React, { useEffect, useMemo, useState } from "react";

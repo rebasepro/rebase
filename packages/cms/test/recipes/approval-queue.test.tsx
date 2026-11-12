@@ -7,6 +7,7 @@ import type { AdminCollection } from "@rebasepro/cms-types";
 import { CollectionsProvider } from "@rebasepro/cms";
 import { db, InRebase } from "./recipe_harness";
 import { ApprovalQueue } from "../../recipes/approval-queue";
+import { NO_TABLES } from "../helpers/tables";
 
 // jsdom measures nothing: give the table a laptop-sized viewport.
 jest.mock("react-use-measure", () => {
@@ -36,7 +37,7 @@ function commentsIn(viewMode: "table" | "cards"): AdminCollection {
 function renderQueue(viewMode: "table" | "cards" = "table") {
     return render(
         <InRebase>
-            <CollectionsProvider collections={[commentsIn(viewMode)]}><ApprovalQueue/></CollectionsProvider>
+            <CollectionsProvider externalCollections={[commentsIn(viewMode)]} tables={NO_TABLES}><ApprovalQueue/></CollectionsProvider>
         </InRebase>
     );
 }

@@ -7,6 +7,7 @@ import { CollectionsProvider } from "@rebasepro/cms";
 import type { AdminCollection } from "@rebasepro/cms-types";
 import { db, InRebase } from "./recipe_harness";
 import { OrdersDashboard } from "../../recipes/orders-dashboard";
+import { NO_TABLES } from "../helpers/tables";
 
 const orders: AdminCollection = {
     slug: "orders",
@@ -33,7 +34,7 @@ function bar(label: string): HTMLElement {
 }
 
 function renderDashboard() {
-    return render(<InRebase><CollectionsProvider collections={[orders]}><OrdersDashboard/></CollectionsProvider></InRebase>);
+    return render(<InRebase><CollectionsProvider externalCollections={[orders]} tables={NO_TABLES}><OrdersDashboard/></CollectionsProvider></InRebase>);
 }
 
 describe("recipe: orders dashboard", () => {

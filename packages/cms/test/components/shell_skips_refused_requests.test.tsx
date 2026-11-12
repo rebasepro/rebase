@@ -6,7 +6,8 @@ import { describe, expect, it, afterEach } from "@jest/globals";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import type { AuthChangeEvent, RebaseClient, RebaseSession, StorageSourceDefinition } from "@rebasepro/types";
-import type { AdminCollection } from "@rebasepro/cms-types";
+import { col, defineTable } from "@rebasepro/types";
+import { compileTables } from "@rebasepro/common";
 import { Rebase, useAuthController, useRebaseAuthController } from "@rebasepro/app";
 
 import { RebaseCMS } from "../../src/components/RebaseCMS";
@@ -35,11 +36,10 @@ import { fakeFetch, jsonResponse } from "../helpers/http";
 const API = "https://api.example.com/api";
 const REFUSED = ["/storage/sources", "/admin/schema/status", "/admin/schema-editor/status"];
 
-const posts: AdminCollection = {
-    slug: "posts",
-    name: "Posts",
-    properties: { title: { type: "string", name: "Title" } }
-};
+const tables = compileTables([defineTable("posts", {
+    columns: { id: col.uuid().primaryKey().defaultRandom(), title: col.text() },
+    rls: "admin-only"
+})]);
 
 interface Backend {
     /** `held` from `GET /auth/scopes`. */
@@ -144,7 +144,7 @@ function Shell({ rebaseClient }: { rebaseClient: RebaseClient }) {
     const authController = useRebaseAuthController({ client: rebaseClient });
     return (
         <Rebase client={rebaseClient} authController={authController}>
-            <RebaseCMS collections={[posts]} collectionEditor={true}/>
+            <RebaseCMS tables={tables} collectionEditor={true}/>
             <RebaseNavigation>
                 <Settled/>
             </RebaseNavigation>
@@ -169,7 +169,7 @@ async function mountShell(backend: Backend) {
 function ShellWithItsOwnController({ rebaseClient }: { rebaseClient: RebaseClient }) {
     return (
         <Rebase client={rebaseClient}>
-            <RebaseCMS collections={[posts]} collectionEditor={true}/>
+            <RebaseCMS tables={tables} collectionEditor={true}/>
             <RebaseNavigation>{null}</RebaseNavigation>
         </Rebase>
     );

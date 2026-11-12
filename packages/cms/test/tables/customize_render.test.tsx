@@ -11,12 +11,12 @@ import React from "react";
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { BrowserRouter } from "react-router";
-import type { DataDriver, PostgresProperties } from "@rebasepro/types";
+import type { DataDriver } from "@rebasepro/types";
 import { col, defineTable } from "@rebasepro/types";
-import type { AdminPostgresCollection, FieldProps } from "@rebasepro/cms-types";
+import { compileTables } from "@rebasepro/common";
+import type { FieldProps } from "@rebasepro/cms-types";
 import { Rebase } from "@rebasepro/app";
-import { applyTableCustomization, CollectionPanel, CollectionsProvider, customizeTable, RecordForm, updateRecord } from "@rebasepro/cms";
-import type { TableCollection } from "@rebasepro/cms";
+import { CollectionPanel, CollectionsProvider, customizeTable, RecordForm, updateRecord } from "@rebasepro/cms";
 import { clearFetchCache } from "../../../app/src/hooks/data/useFetch";
 import { fakeStorageSource } from "../helpers/fakes";
 
@@ -51,20 +51,8 @@ const posts = defineTable("posts", {
     rls: "admin-only"
 });
 
-/** What the projector writes for `posts`. */
-const projected: AdminPostgresCollection = {
-    slug: "posts",
-    name: "Posts",
-    singularName: "Post",
-    table: "posts",
-    properties: {
-        id: { type: "string", name: "Id", isId: "uuid" },
-        title: { type: "string", name: "Title" },
-        content: { type: "string", name: "Content" },
-        status: { type: "string", name: "Status", enum: [{ id: "draft", label: "Draft" }, { id: "published", label: "Published" }] },
-        publishDate: { type: "date", name: "Publish Date", mode: "date_time" }
-    }
-};
+/** What the server would serve for `posts`. */
+const tables = compileTables([posts]);
 
 /** The custom editor, imported by value: it shows the value and edits it. */
 function CustomMarkdownEditor({ value, setValue }: FieldProps): React.ReactElement {
@@ -90,20 +78,6 @@ const postsCms = customizeTable<typeof posts>("posts", {
             updateRecord(context, "posts", id, { status: "published", publishDate: "2026-11-12T10:00:00.000Z" }, "Published")
     }]
 });
-
-/**
- * The customized collection as the registry types it today. A `referenceTo`
- * column would make it a reference the legacy `PostgresProperties` does not
- * admit; this table has none, and that is checked rather than asserted.
- */
-function registrable(collection: TableCollection): AdminPostgresCollection {
-    const properties: PostgresProperties = {};
-    for (const [key, property] of Object.entries(collection.properties)) {
-        if (property.type === "reference") throw new Error(`"${key}" is a reference`);
-        properties[key] = property;
-    }
-    return { ...collection, properties };
-}
 
 type Row = Record<string, unknown>;
 let rows: Row[];
@@ -136,12 +110,11 @@ const authController = {
 };
 
 function renderIn(children: React.ReactNode) {
-    const collection = registrable(applyTableCustomization(projected, postsCms));
     return render(
         <Rebase authController={authController} storageSource={fakeStorageSource()}
             dataSources={[{ key: "(default)", engine: "postgres", driver }]}>
             <BrowserRouter>
-                <CollectionsProvider collections={[collection]}>{children}</CollectionsProvider>
+                <CollectionsProvider tables={tables} tableCustomizations={[postsCms]}>{children}</CollectionsProvider>
             </BrowserRouter>
         </Rebase>
     );

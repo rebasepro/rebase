@@ -24,7 +24,7 @@ of it resolves too: Node has supported `require(esm)` since 22.12.
 
 | Export | Description |
 |---|---|
-| `RebaseCMS` | Declares the CMS into the registry: `collections`, `views`, `homePage`, `entityViews`, `collectionViews`, `entityActions`, `collectionEditor`, `navigationGroupMappings`, `basePath`. Renders nothing; it sits inside `<Rebase>` |
+| `RebaseCMS` | Declares the CMS into the registry: `tableCustomizations`, `externalCollections`, `tables` (embedding and tests), `views`, `homePage`, `entityViews`, `collectionViews`, `entityActions`, `collectionEditor`, `navigationGroupMappings`, `basePath`. Renders nothing; it sits inside `<Rebase>` |
 | `RebaseShell` | Composes `RebaseAuthGate`, `RebaseNavigation`, `RebaseRouteDefs` and `RebaseLayout` with sensible defaults |
 | `RebaseAuthGate` | Auth-gated wrapper — shows login or the CMS based on session state |
 | `RebaseNavigation` | Renders the sidebar navigation from resolved collections/views |
@@ -38,7 +38,7 @@ of it resolves too: Node has supported `require(esm)` since 22.12.
 | `AdminModeSyncer` | Syncs the admin mode (`"cms"` \| `"studio"`) with the current route |
 | `CollectionPanel` | Standalone collection browser panel — by slug, or with the collection as a value (`collection={postsCollection}`), anywhere under `<Rebase>` and a router |
 | `RecordForm` | One record's form, loaded by `id` (or new without one) and saved through `<Rebase>`'s data layer, with `onSaved` and `onClose` |
-| `CollectionsProvider` | The minimal scope for those two in a page of your own app: a registry of the collections you pass, and the side panels records open in. No `RebaseCMS`, `RebaseNavigation` or `RebaseShell` needed; any React Router router |
+| `CollectionsProvider` | The minimal scope for those two in a page of your own app: a registry of the served tables (with your `tableCustomizations`) and your `externalCollections`, and the side panels records open in. No `RebaseCMS`, `RebaseNavigation` or `RebaseShell` needed; any React Router router |
 
 ### Entity & Collection Views
 
@@ -130,7 +130,7 @@ function App() {
     return (
         <Rebase client={client} authController={authController}>
             <RebaseAuth />
-            <RebaseCMS collections={[/* your collection configs */]} />
+            <RebaseCMS tableCustomizations={[/* customizeTable(...) results */]} />
             <RebaseShell title="Rebase" />
         </Rebase>
     );

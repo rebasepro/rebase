@@ -44,7 +44,6 @@ import { customizeTable, RebaseCMS, RebaseShell } from "@rebasepro/cms";
 import { clearFetchCache } from "../../../app/src/hooks/data/useFetch";
 import { fakeStorageSource } from "../helpers/fakes";
 import { fakeFetch, jsonResponse } from "../helpers/http";
-import { resetCompositionWarnings } from "../../src/hooks/navigation/compose_collections";
 
 if (typeof globalThis.ResizeObserver === "undefined") {
     class NoopResizeObserver {
@@ -278,7 +277,6 @@ beforeEach(() => {
     jest.mocked(schema.tables).mockClear();
     clearFetchCache();
     window.localStorage.clear();
-    resetCompositionWarnings();
 });
 
 afterEach(() => {

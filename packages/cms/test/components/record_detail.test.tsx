@@ -16,6 +16,7 @@ import { Rebase } from "@rebasepro/app";
 import { CollectionsProvider, RecordDetail } from "@rebasepro/cms";
 import { clearFetchCache } from "../../../app/src/hooks/data/useFetch";
 import { fakeStorageSource } from "../helpers/fakes";
+import { NO_TABLES } from "../helpers/tables";
 
 if (typeof globalThis.ResizeObserver === "undefined") {
     class NoopResizeObserver {
@@ -149,7 +150,7 @@ describe("RecordDetail", () => {
 
     it("applies its overrides to a collection the scope registers", async () => {
         render(<Page>
-            <CollectionsProvider collections={[invoices]}>
+            <CollectionsProvider externalCollections={[invoices]} tables={NO_TABLES}>
                 <RecordDetail collection={invoices} id={"i1"}
                     collectionOverrides={{ properties: { ...invoices.properties, number: { type: "string", name: "Reference" } } }}/>
             </CollectionsProvider>
@@ -161,7 +162,7 @@ describe("RecordDetail", () => {
 
     it("takes the collection by name, from the scope that registers it", async () => {
         render(<Page>
-            <CollectionsProvider collections={[invoices]}>
+            <CollectionsProvider externalCollections={[invoices]} tables={NO_TABLES}>
                 <RecordDetail collection={"invoices"} id={"i1"} fields={["number", "notes"]}/>
             </CollectionsProvider>
         </Page>);
@@ -180,7 +181,7 @@ describe("RecordDetail", () => {
         const observer = new MutationObserver(() => frames.push(document.body.textContent?.includes("Entity not found") ?? false));
         observer.observe(document.body, { childList: true, subtree: true, characterData: true });
         render(<Page>
-            <CollectionsProvider collections={[invoices]}>
+            <CollectionsProvider externalCollections={[invoices]} tables={NO_TABLES}>
                 <RecordDetail collection={"invoices"} id={"i1"}/>
             </CollectionsProvider>
         </Page>);

@@ -36,8 +36,7 @@ const notes = defineTable("notes", {
 const composed = composeCollections({
     tables: compileTables([users, posts, notes]),
     tableCustomizations: [],
-    externalCollections: [],
-    declared: []
+    externalCollections: []
 });
 const bySlug = (slug: string) => {
     const found = composed.find(collection => collection.slug === slug);
