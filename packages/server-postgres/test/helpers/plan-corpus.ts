@@ -11,19 +11,17 @@
  *
  * The corpus is legacy collection sets on purpose: the goldens were recorded
  * from them on `main`, and the table path is proven against the same goldens
- * by lifting each set (`plan-equivalence.test.ts`). The runtime no longer reads
- * `config/collections` (it reads `backend/schema`), so a collection directory
- * is read here by {@link readCollectionDirectory} — the deleted runtime
- * loader's semantics, kept for these frozen inputs only: every non-index module
- * in directory order, its default export, and the index's
+ * by lifting each set (`plan-equivalence.test.ts`). Every set read from disk
+ * is a FROZEN copy under `test/fixtures/plan-corpus-legacy/` (the control
+ * plane's under `saas/test/plan-corpus-legacy/`) — never the live project,
+ * which moves to the table model under the goldens' feet. See
+ * `plan-corpus-legacy/legacy-model.ts` for what was copied from where. A
+ * collection directory is read by {@link readCollectionDirectory} — the
+ * deleted runtime loader's semantics, kept for these frozen inputs only: every
+ * non-index module in directory order, its default export, and the index's
  * `defaultSecurityRules` applied to each collection with no rules of its own.
- * The generated real-schema collections are written by
- * `generateCollectionFile` and read back the same way, and the docs sample is
- * evaluated by the docs gate's own evaluator in a child process.
  */
-import { spawnSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 
 import { pathToFileURL } from "node:url";
@@ -41,18 +39,9 @@ import {
     toStableJson,
     withPinnedPlannerWorld
 } from "../../src/schema/render-outputs";
-import {
-    buildEnumMap,
-    compositeKeySkipReason,
-    generateCollectionFile,
-    generateIndexContent
-} from "../../src/schema/introspect-db-logic";
-import { isUsableFileName } from "../../src/schema/introspect-db-queries";
-import { classifyTables } from "../../src/schema/introspect-db-structure";
-import { parseCheckConstraints } from "../../src/schema/introspect-db-constraints";
 import { everything, refused, companies, companyTranslations, linkIntoComposite } from "../fixtures/property-matrix-collections";
 import { POLICY_SHAPE_COLLECTIONS } from "../fixtures/policy-shapes";
-import { loadRealSchema, type RealSchemaName } from "./schema-metadata";
+import type { RealSchemaName } from "./schema-metadata";
 import { FIXTURE, FIXTURE_DATABASE_EXTENSIONS } from "../../../../tooling/scripts/derived-names-fixture";
 
 /** The monorepo root. */
@@ -68,6 +57,11 @@ export const PLAN_GOLDEN_DIR = path.resolve(__dirname, "..", "fixtures", "plan-g
  */
 export const SAAS_ROOT = path.join(REPO_ROOT, "saas");
 export const SAAS_PLAN_GOLDEN_DIR = path.join(SAAS_ROOT, "test", "plan-golden");
+
+/** The frozen legacy inputs of every set read from disk. */
+export const PLAN_CORPUS_LEGACY_DIR = path.resolve(__dirname, "..", "fixtures", "plan-corpus-legacy");
+/** The control plane's frozen input, in its own repository. */
+export const SAAS_PLAN_CORPUS_LEGACY_DIR = path.join(SAAS_ROOT, "test", "plan-corpus-legacy");
 
 /** What a set is planned with — the inputs besides the collections. */
 export interface PlanCorpusOptions {
@@ -182,51 +176,8 @@ export const PLAN_REFUSALS: PlanRefusal[] = [
 
 // ── Sets read from disk ──────────────────────────────────────────────────────
 
-/** A scratch directory, removed by {@link PlanCorpus.dispose}. */
-const scratchDirectories: string[] = [];
-const makeScratch = (label: string): string => {
-    const dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), `plan-golden-${label}-`)));
-    scratchDirectories.push(dir);
-    return dir;
-};
-
-function copyDirectory(from: string, to: string): void {
-    fs.mkdirSync(to, { recursive: true });
-    for (const entry of fs.readdirSync(from, { withFileTypes: true })) {
-        if (entry.name === "node_modules" || entry.name === "dist") continue;
-        const source = path.join(from, entry.name);
-        const target = path.join(to, entry.name);
-        if (entry.isDirectory()) copyDirectory(source, target);
-        else fs.copyFileSync(source, target);
-    }
-}
-
-/** The presets `rebase init` offers (`TemplatePreset`). */
+/** The presets `rebase init` offered (`TemplatePreset`), each frozen laid out the way `applyPreset` left it. */
 export const CLI_TEMPLATE_PRESETS = ["blog", "ecommerce", "blank"] as const;
-
-/** Files the blog preset owns; other presets replace them. Mirrors `applyPreset`. */
-const BLOG_PRESET_FILES = ["posts.ts", "authors.ts", "tags.ts", "index.ts"];
-
-/**
- * The scaffold's `config/collections` for one preset, laid out the way
- * `applyPreset` leaves it (and `tooling/scripts/check-templates.mjs` checks it).
- */
-async function loadCliTemplate(preset: (typeof CLI_TEMPLATE_PRESETS)[number]): Promise<CollectionConfig[]> {
-    const templateConfig = path.join(REPO_ROOT, "packages", "cli", "templates", "template", "config");
-    const config = path.join(makeScratch(`template-${preset}`), "config");
-    copyDirectory(templateConfig, config);
-    const collections = path.join(config, "collections");
-    const presets = path.join(collections, "presets");
-    if (preset !== "blog") {
-        for (const file of BLOG_PRESET_FILES) fs.rmSync(path.join(collections, file), { force: true });
-        const presetDir = path.join(presets, preset);
-        for (const file of fs.readdirSync(presetDir).filter(name => name.endsWith(".ts"))) {
-            fs.copyFileSync(path.join(presetDir, file), path.join(collections, file));
-        }
-    }
-    fs.rmSync(presets, { recursive: true, force: true });
-    return readCollectionDirectory(collections);
-}
 
 /** A module of a collection directory: not the index, a test, a declaration file or a dotfile. */
 const isCollectionModule = (file: string): boolean =>
@@ -269,103 +220,18 @@ async function readCollectionDirectory(dir: string): Promise<CollectionConfig[]>
     return collections;
 }
 
-/** Every database captured under `test/fixtures/real-schemas`. */
+/**
+ * Every database captured under `test/fixtures/real-schemas`. Each set is the
+ * collections `rebase schema introspect` generated from the capture (junctions
+ * folded, unround-trippable composite keys and unusable file names skipped,
+ * the `@rebasepro/cms-types` builder, no data inference), frozen.
+ */
 export const REAL_SCHEMAS: RealSchemaName[] = ["chinook", "constraint-shapes", "musicbrainz", "northwind", "openstreetmap", "pagila"];
 
-/**
- * What `rebase schema introspect` writes for a captured database, read back the
- * way every consumer reads a collections directory.
- *
- * The same steps as the command (`introspect-db.ts`): junction tables folded
- * into relations, composite-keyed tables that cannot round-trip skipped, names
- * unusable as file names skipped, one file per table and the `index.ts` — with
- * the `@rebasepro/cms-types` builder a scaffolded project resolves, and no data
- * inference (there is no database to sample).
- */
-async function loadGeneratedRealSchema(name: RealSchemaName): Promise<CollectionConfig[]> {
-    const { metadata, tables } = loadRealSchema(name);
-    const enumMap = buildEnumMap(metadata.enumValues);
-    const classifications = classifyTables(metadata, tables);
-    const checkFacts = parseCheckConstraints(metadata.checks);
-    const joinTables = new Set(
-        Array.from(classifications.values()).filter(c => c.role === "junction").map(c => c.table)
-    );
-    const compositeKeyed = new Set(
-        Array.from(tables.entries())
-            .filter(([table, meta]) => !joinTables.has(table) && compositeKeySkipReason(meta, metadata.fks) !== undefined)
-            .map(([table]) => table)
-    );
-    const outDir = path.join(makeScratch(`real-${name}`), "collections");
-    fs.mkdirSync(outDir, { recursive: true });
-    const generated: string[] = [];
-    for (const [table, meta] of tables) {
-        if (joinTables.has(table) || compositeKeyed.has(table) || !isUsableFileName(table)) continue;
-        const source = generateCollectionFile(table, meta, metadata.fks, joinTables, tables, enumMap, undefined, {
-            metadata,
-            classifications,
-            checkFacts,
-            builder: "admin-types",
-            notes: [],
-            skippedTables: compositeKeyed
-        });
-        fs.writeFileSync(path.join(outDir, `${table}.ts`), source, "utf-8");
-        generated.push(table);
-    }
-    fs.writeFileSync(path.join(outDir, "index.ts"), generateIndexContent(generated), "utf-8");
-    return readCollectionDirectory(outDir);
-}
+/** A frozen set's collections directory. */
+const legacyCollections = (...segments: string[]): string => path.join(PLAN_CORPUS_LEGACY_DIR, ...segments, "collections");
 
-/**
- * The collection the Schema-as-Code page generates its samples from, evaluated
- * by the docs gate's own evaluator (`docs-verify/collection-snippets.mjs`, as
- * `check-schema-sample.mjs` calls it).
- *
- * In a child process because the evaluator is an ES module jest cannot load.
- * The sample is plain data, and the child refuses to hand back anything JSON
- * would not carry faithfully — a function, a `Date`, `undefined` — so the
- * round trip cannot quietly change what is planned.
- */
-function loadDocsSchemaSample(): CollectionConfig[] {
-    const evaluator = path.join(REPO_ROOT, "tooling", "scripts", "docs-verify", "collection-snippets.mjs");
-    const page = "website/src/content/docs/docs/architecture/schema-as-code.md";
-    const script = `
-        import fs from "node:fs";
-        const { collectionSnippets } = await import(${JSON.stringify(`file://${evaluator}`)});
-        const root = ${JSON.stringify(REPO_ROOT)};
-        const page = ${JSON.stringify(page)};
-        const text = fs.readFileSync(root + "/" + page, "utf8");
-        const marker = /<!--\\s*schema-sample:\\s*collection\\s*-->\\s*\\n\`\`\`[a-zA-Z]*[^\\n]*\\n/.exec(text);
-        if (!marker) throw new Error("no schema-sample: collection block in " + page);
-        const start = marker.index + marker[0].length;
-        const body = text.slice(start, text.indexOf("\\n\`\`\`", start - 1) + 1).trim();
-        const { results } = await collectionSnippets(root, { globs: [page] });
-        const sample = results.find(r => r.snippet.code.trim() === body);
-        if (!sample || sample.error || sample.collections.length === 0) {
-            throw new Error("the schema-sample collection did not evaluate: " + (sample?.error?.message ?? "no result"));
-        }
-        const faithful = function (key, value) {
-            const raw = this[key];
-            if (typeof raw === "function" || raw instanceof Date || raw === undefined && key !== "") {
-                throw new Error("the docs sample carries a value JSON cannot hold, at " + JSON.stringify(key));
-            }
-            return value;
-        };
-        process.stdout.write(JSON.stringify(sample.collections, faithful));
-    `;
-    const result = spawnSync(process.execPath, ["--input-type=module", "-e", script], {
-        cwd: REPO_ROOT,
-        encoding: "utf8",
-        env: { ...process.env, NODE_OPTIONS: "" }
-    });
-    if (result.status !== 0) {
-        throw new Error(`Evaluating the docs schema sample failed:\n${result.stderr}`);
-    }
-    const parsed: unknown = JSON.parse(result.stdout);
-    if (!Array.isArray(parsed)) throw new Error("The docs schema sample evaluated to something other than a list.");
-    return asCollections(parsed);
-}
-
-/** The loaded corpus, and the scratch directories its loaders wrote. */
+/** The loaded corpus. */
 export interface PlanCorpus {
     sets: PlanCorpusSet[];
     /** Sets that could not be loaded here, with why — reported, never silently dropped. */
@@ -390,20 +256,20 @@ export async function loadPlanCorpus(): Promise<PlanCorpus> {
         { id: "policy-shapes", collections: POLICY_SHAPE_COLLECTIONS, options: {} },
         {
             id: "app",
-            collections: await readCollectionDirectory(path.join(REPO_ROOT, "app", "config", "collections")),
+            collections: await readCollectionDirectory(legacyCollections("app")),
             options: {}
         }
     ];
     for (const preset of CLI_TEMPLATE_PRESETS) {
-        sets.push({ id: `cli-template.${preset}`, collections: await loadCliTemplate(preset), options: {} });
+        sets.push({ id: `cli-template.${preset}`, collections: await readCollectionDirectory(legacyCollections("cli-template", preset)), options: {} });
     }
     for (const name of REAL_SCHEMAS) {
-        sets.push({ id: `real-schema.${name}`, collections: await loadGeneratedRealSchema(name), options: {} });
+        sets.push({ id: `real-schema.${name}`, collections: await readCollectionDirectory(legacyCollections("real-schema", name)), options: {} });
     }
-    sets.push({ id: "docs.schema-as-code", collections: loadDocsSchemaSample(), options: {} });
+    sets.push({ id: "docs.schema-as-code", collections: await readCollectionDirectory(legacyCollections("docs", "schema-as-code")), options: {} });
 
     const skipped: { id: string; reason: string }[] = [];
-    const saasCollections = path.join(SAAS_ROOT, "config", "collections");
+    const saasCollections = path.join(SAAS_PLAN_CORPUS_LEGACY_DIR, "saas", "collections");
     if (fs.existsSync(saasCollections)) {
         sets.push({
             id: "saas",
@@ -418,8 +284,8 @@ export async function loadPlanCorpus(): Promise<PlanCorpus> {
     return {
         sets,
         skipped,
-        dispose: () => {
-            for (const dir of scratchDirectories.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
-        }
+        // Nothing to clean up any more: every set is read in place. Kept so the
+        // suites' `afterAll(() => corpus.dispose())` stays valid.
+        dispose: () => undefined
     };
 }
