@@ -36,6 +36,22 @@ async function closedPort(): Promise<number> {
     return address.port;
 }
 
+/**
+ * A one-table `schema` directory under `dir`. The builders are imported by
+ * path, from source: the directory is outside the workspace, and the module
+ * is loaded both in this process and by a spawned driver.
+ */
+function writeTasksSchema(dir: string): string {
+    const schema = path.join(dir, "schema");
+    fs.mkdirSync(schema);
+    const builders = JSON.stringify(path.join(pkgRoot, "..", "types", "src", "index.ts"));
+    fs.writeFileSync(path.join(schema, "tasks.ts"),
+        `import { col, defineTable } from ${builders};\n` +
+        "export const tasks = defineTable(\"tasks\", { columns: { id: col.uuid().primaryKey().defaultRandom() }, rls: \"admin-only\" });\n");
+    fs.writeFileSync(path.join(schema, "index.ts"), "export { tasks } from \"./tasks\";\n");
+    return schema;
+}
+
 class Exited extends Error {
     constructor(readonly code: number | undefined) {
         super(`process.exit(${code})`);
@@ -122,12 +138,8 @@ describe("db commands with the database down", () => {
     });
 
     it("rebase db push says it once too", async () => {
-        const collections = path.join(workDir, "collections");
-        fs.mkdirSync(collections);
-        fs.writeFileSync(path.join(collections, "package.json"), JSON.stringify({ type: "module" }));
-        fs.writeFileSync(path.join(collections, "tasks.js"),
-            "export default { name: \"Tasks\", slug: \"tasks\", table: \"tasks\", properties: { id: { name: \"ID\", type: \"string\", isId: \"uuid\" } } };\n");
-        const { code, stderr: written } = await run(["db", "push", "--collections", collections, "--yes"]);
+        const schema = writeTasksSchema(workDir);
+        const { code, stderr: written } = await run(["db", "push", "--schema-dir", schema, "--yes"]);
         expect(code).toBe(1);
         expect(written).toContain(`Cannot connect to PostgreSQL at 127.0.0.1:${port}`);
         expect(written).not.toMatch(/Failed to bootstrap the RLS helper functions/);
@@ -140,13 +152,9 @@ describe("db commands with the database down", () => {
      * threw, and the console printed what it threw.
      */
     it("rebase console --eval names it once: no empty error line, no second copy", async () => {
-        const collections = path.join(workDir, "collections");
-        fs.mkdirSync(collections);
-        fs.writeFileSync(path.join(collections, "package.json"), JSON.stringify({ type: "module" }));
-        fs.writeFileSync(path.join(collections, "tasks.js"),
-            "export default { name: \"Tasks\", slug: \"tasks\", table: \"tasks\", properties: { id: { name: \"ID\", type: \"string\", isId: \"uuid\" } } };\n");
+        const schema = writeTasksSchema(workDir);
         const env = { ...process.env, DATABASE_URL: process.env.DATABASE_URL ?? "", LOG_LEVEL: "info" };
-        const console = await execa(tsxBin, [path.join(pkgRoot, "src", "cli.ts"), "console", "--eval", "1", "--collections", collections],
+        const console = await execa(tsxBin, [path.join(pkgRoot, "src", "cli.ts"), "console", "--eval", "1", "--schema-dir", schema],
             { cwd: workDir, env, reject: false, stdin: "ignore", all: true });
         expect(console.exitCode).toBe(1);
         expect(console.stdout).toBe("");

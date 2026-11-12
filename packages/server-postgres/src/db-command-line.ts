@@ -36,7 +36,10 @@ const LINE_CHECKS: Record<DriverDbSubcommand, (args: string[]) => void> = {
         assertNoCollectionsFlag(args);
         assertKnownFlags("db", "generate", args);
     },
-    migrate: args => assertKnownFlags("db", "migrate", args),
+    migrate: (args) => {
+        assertNoCollectionsFlag(args);
+        assertKnownFlags("db", "migrate", args);
+    },
     // The action's own table; an action the table does not list is the
     // dispatch's to answer, in its own words.
     branch: (args) => {

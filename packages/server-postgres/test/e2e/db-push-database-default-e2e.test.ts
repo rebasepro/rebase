@@ -29,19 +29,17 @@ const __dirname = path.dirname(__filename);
 const pkgRoot = path.resolve(__dirname, "../..");
 const monorepoRoot = path.resolve(pkgRoot, "../..");
 
-const ITEMS = `
-const items = {
-    name: "Items",
-    slug: "items",
-    table: "items",
-    properties: {
-        id:    { name: "ID", type: "string", isId: "uuid" },
-        title: { name: "Title", type: "string" },
-        code:  { name: "Code", type: "string", validation: { required: true }, databaseDefault: true },
-        seqno: { name: "Seq", type: "number", databaseDefault: true }
-    }
-};
-export default items;
+const ITEMS = `import { col, defineTable } from "@rebasepro/types";
+
+export const items = defineTable("items", {
+    columns: {
+        id: col.uuid().primaryKey().defaultRandom(),
+        title: col.text(),
+        code: col.text().notNull().dbDefault(),
+        seqno: col.numeric().dbDefault()
+    },
+    rls: "admin-only"
+});
 `;
 
 function cleanEnv(connectionString: string): Record<string, string> {
@@ -50,6 +48,9 @@ function cleanEnv(connectionString: string): Record<string, string> {
         if (/^(npm_|PNPM_|pnpm_|NPM_)/i.test(key)) delete env[key];
     }
     env.DATABASE_URL = connectionString;
+    // The schema module imports `@rebasepro/types` from outside the workspace;
+    // the typecheck config maps every `@rebasepro/*` onto source.
+    env.TSX_TSCONFIG_PATH = path.join(monorepoRoot, "tsconfig.typecheck.json");
     return env;
 }
 
@@ -59,7 +60,7 @@ describe("db push and databaseDefault: true", () => {
     let connectionString: string;
     let db: pg.Client;
     let workDir: string;
-    let collectionsDir: string;
+    let schemaDir: string;
 
     beforeAll(async () => {
         const server = process.env.REBASE_E2E_PG_URL;
@@ -82,13 +83,11 @@ describe("db push and databaseDefault: true", () => {
 
         const base = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-push-dbdefault-"));
         workDir = path.join(base, "backend");
-        collectionsDir = path.join(base, "config", "collections");
-        fs.mkdirSync(workDir, { recursive: true });
-        fs.mkdirSync(collectionsDir, { recursive: true });
+        schemaDir = path.join(workDir, "schema");
+        fs.mkdirSync(schemaDir, { recursive: true });
         fs.writeFileSync(path.join(workDir, "package.json"), JSON.stringify({ name: "e2e-push-dbdefault", type: "module" }));
-        fs.writeFileSync(path.join(collectionsDir, "package.json"), JSON.stringify({ type: "module" }));
-        fs.writeFileSync(path.join(collectionsDir, "items.js"), ITEMS);
-        fs.writeFileSync(path.join(collectionsDir, "index.js"), `import items from "./items.js";\nexport default [items];\n`);
+        fs.writeFileSync(path.join(schemaDir, "items.ts"), ITEMS);
+        fs.writeFileSync(path.join(schemaDir, "index.ts"), `export { items } from "./items";\n`);
     }, 90_000);
 
     afterAll(async () => {
@@ -106,7 +105,7 @@ describe("db push and databaseDefault: true", () => {
     function runPush(extra: string[] = []) {
         return execa(
             path.join(monorepoRoot, "node_modules", ".bin", "tsx"),
-            [path.join(pkgRoot, "src", "cli.ts"), "db", "push", "--collections", collectionsDir, ...extra],
+            [path.join(pkgRoot, "src", "cli.ts"), "db", "push", "--schema-dir", schemaDir, ...extra],
             { cwd: workDir, env: cleanEnv(connectionString), reject: false, stdin: "ignore", all: true }
         );
     }

@@ -92,12 +92,14 @@ export function assertSchemaDirExists(typed: string | null): void {
  * The driver commands that read the schema directory — the ones `--schema-dir`
  * belongs to, and the ones that used to take `--collections`. Keyed as the
  * driver's argv starts: domain, then subcommand (or the bare domain for the
- * single-word commands). Mirrors the CLI's own list (`packages/cli`
- * `schema-dir.ts`), which decides when to pass the flag.
+ * single-word commands). The CLI keeps its own list (`packages/cli`
+ * `schema-dir.ts`) of when to pass the flag; `db migrate` reads the schema
+ * too (it stamps the policies it applied).
  */
 export const COMMANDS_READING_SCHEMA = new Set([
     "db push",
     "db generate",
+    "db migrate",
     "schema generate",
     "schema stale",
     "doctor",

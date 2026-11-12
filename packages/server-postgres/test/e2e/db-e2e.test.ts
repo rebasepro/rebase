@@ -5,7 +5,10 @@
  *   Clean Postgres → db:generate → db:migrate → verify tables + auth bootstrap
  *
  * Scenario 2 — Incremental migration:
- *   Add a second collection → db:generate → db:migrate → verify new + old tables
+ *   Add a second table → db:generate → db:migrate → verify new + old tables
+ *
+ * The project is laid out as a scaffold is: the driver runs in `backend/` and
+ * reads `backend/schema` — by default, or named with `--schema-dir`.
  *
  * Requires Docker to be running. The test spins up a temporary Postgres
  * container and tears it down afterwards.
@@ -27,46 +30,37 @@ const monorepoRoot = path.resolve(pkgRoot, "../..");            // repo root
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-/** Minimal collection definition used by the tests. */
-function tasksCollectionJs(): string {
-    return `
-const tasksCollection = {
-    name: "Tasks",
-    singularName: "Task",
-    slug: "tasks",
-    table: "tasks",
-    admin: { icon: "CheckCircle", group: "Core" },
-    properties: {
-        id:    { name: "ID",    type: "string", isId: "uuid", validation: { required: true } },
-        title: { name: "Title", type: "string", validation: { required: true } },
-        done:  { name: "Done",  type: "boolean" }
-    }
-};
-export default tasksCollection;
+/** Minimal table definitions used by the tests, one column per line (scenario 3 edits them by line). */
+function tasksTableTs(): string {
+    return `import { col, defineTable } from "@rebasepro/types";
+
+export const tasks = defineTable("tasks", {
+    columns: {
+        id: col.uuid().primaryKey().defaultRandom(),
+        title: col.text().notNull(),
+        done: col.boolean()
+    },
+    rls: "admin-only"
+});
 `;
 }
 
-function notesCollectionJs(): string {
-    return `
-const notesCollection = {
-    name: "Notes",
-    singularName: "Note",
-    slug: "notes",
-    table: "notes",
-    admin: { icon: "Notebook", group: "Core" },
-    properties: {
-        id:      { name: "ID",      type: "string", isId: "uuid", validation: { required: true } },
-        content: { name: "Content", type: "string" }
-    }
-};
-export default notesCollection;
+function notesTableTs(): string {
+    return `import { col, defineTable } from "@rebasepro/types";
+
+export const notes = defineTable("notes", {
+    columns: {
+        id: col.uuid().primaryKey().defaultRandom(),
+        content: col.text()
+    },
+    rls: "admin-only"
+});
 `;
 }
 
-function collectionsIndex(names: string[]): string {
-    const imports = names.map(n => `import ${n}Collection from "./${n}.js";`).join("\n");
-    const exports = names.map(n => `${n}Collection`).join(", ");
-    return `${imports}\nexport default [${exports}];\n`;
+/** `backend/schema/index.ts`: the index is what is served and protected. */
+function schemaIndex(names: string[]): string {
+    return names.map(n => `export { ${n} } from "./${n}";`).join("\n") + "\n";
 }
 
 function cleanEnv(connectionString: string): Record<string, string> {
@@ -76,6 +70,10 @@ function cleanEnv(connectionString: string): Record<string, string> {
         if (/^(npm_|PNPM_|pnpm_|NPM_)/i.test(key)) delete env[key];
     }
     env.DATABASE_URL = connectionString;
+    // The schema modules import `@rebasepro/types` from a directory outside the
+    // workspace; the typecheck config maps every `@rebasepro/*` onto source, so
+    // the driver and the modules share one copy of the builders.
+    env.TSX_TSCONFIG_PATH = path.join(monorepoRoot, "tsconfig.typecheck.json");
     return env;
 }
 
@@ -94,7 +92,7 @@ describe("Database migration E2E", () => {
     let container: PgContainer;
     let dbClient: pg.Client;
     let workDir: string;          // temp directory acting as the "backend" cwd
-    let collectionsDir: string;   // temp directory for collection definitions
+    let schemaDir: string;        // workDir/schema — the driver's default schema directory
     let env: Record<string, string>;
 
     beforeAll(async () => {
@@ -119,25 +117,17 @@ describe("Database migration E2E", () => {
         }
 
         // 3. Create temp working directory structure:
-        //      workDir/                  ← acts like app/backend
-        //      workDir/../config/collections/  ← collection definitions
+        //      workDir/          ← acts like app/backend
+        //      workDir/schema/   ← the table definitions (backend/schema)
         const base = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-db-e2e-"));
         workDir = path.join(base, "backend");
-        collectionsDir = path.join(base, "config", "collections");
-        fs.mkdirSync(workDir, { recursive: true });
-        fs.mkdirSync(collectionsDir, { recursive: true });
+        schemaDir = path.join(workDir, "schema");
+        fs.mkdirSync(schemaDir, { recursive: true });
 
         // Create a minimal package.json so tsx can resolve modules
         fs.writeFileSync(
             path.join(workDir, "package.json"),
             JSON.stringify({ name: "e2e-test-backend", type: "module" }),
-            "utf-8"
-        );
-
-        // Collections dir also needs type:module for .js ESM imports
-        fs.writeFileSync(
-            path.join(collectionsDir, "package.json"),
-            JSON.stringify({ type: "module" }),
             "utf-8"
         );
 
@@ -160,13 +150,13 @@ describe("Database migration E2E", () => {
     it("should generate and apply the initial migration on an empty database", async () => {
         const cliScript = resolveCliScript();
 
-        // Write a single collection
-        fs.writeFileSync(path.join(collectionsDir, "tasks.js"), tasksCollectionJs());
-        fs.writeFileSync(path.join(collectionsDir, "index.js"), collectionsIndex(["tasks"]));
+        // Write a single table
+        fs.writeFileSync(path.join(schemaDir, "tasks.ts"), tasksTableTs());
+        fs.writeFileSync(path.join(schemaDir, "index.ts"), schemaIndex(["tasks"]));
 
-        // ── db:generate ──
+        // ── db:generate ── (no --schema-dir: `schema` from backend/ is the default)
         console.log("[e2e] Running db generate…");
-        await tsx(cliScript, "db", "generate", "--collections", collectionsDir, "init");
+        await tsx(cliScript, "db", "generate", "init");
 
         // Verify migration file was created
         const migrationsDir = path.join(workDir, "drizzle", "migrations");
@@ -184,7 +174,7 @@ describe("Database migration E2E", () => {
         console.log("[e2e] Running db migrate…");
         await tsx(cliScript, "db", "migrate");
 
-        // Verify collection table was created
+        // Verify the table was created
         const tablesAfterMigrate = await dbClient.query(`
             SELECT table_schema, table_name
             FROM information_schema.tables
@@ -244,16 +234,13 @@ describe("Database migration E2E", () => {
     it("should generate and apply an incremental migration preserving existing data", async () => {
         const cliScript = resolveCliScript();
 
-        // Add a second collection
-        fs.writeFileSync(path.join(collectionsDir, "notes.js"), notesCollectionJs());
-        fs.writeFileSync(
-            path.join(collectionsDir, "index.js"),
-            collectionsIndex(["tasks", "notes"])
-        );
+        // Add a second table
+        fs.writeFileSync(path.join(schemaDir, "notes.ts"), notesTableTs());
+        fs.writeFileSync(path.join(schemaDir, "index.ts"), schemaIndex(["tasks", "notes"]));
 
-        // ── db:generate (incremental) ──
+        // ── db:generate (incremental) ── named explicitly this time
         console.log("[e2e] Running incremental db generate…");
-        await tsx(cliScript, "db", "generate", "--collections", collectionsDir, "add_notes");
+        await tsx(cliScript, "db", "generate", "--schema-dir", schemaDir, "add_notes");
 
         // Verify a SECOND migration file was created
         const migrationsDir = path.join(workDir, "drizzle", "migrations");
@@ -304,9 +291,9 @@ describe("Database migration E2E", () => {
             "SELECT 1 FROM information_schema.columns WHERE table_name = 'tasks' AND column_name = 'done'"
         )).rows.length === 1;
 
-        // `done` is removed from the collection.
-        fs.writeFileSync(path.join(collectionsDir, "tasks.js"), tasksCollectionJs().replace(/\n\s*done:.*\n/, "\n"));
-        const generated = await run("db", "generate", "--collections", collectionsDir, "drop_done");
+        // `done` is removed from the table.
+        fs.writeFileSync(path.join(schemaDir, "tasks.ts"), tasksTableTs().replace(/,\n\s*done:.*\n/, "\n"));
+        const generated = await run("db", "generate", "--schema-dir", schemaDir, "drop_done");
         expect(generated.exitCode).toBe(0);
         expect(generated.all).toContain("destructive change(s) that will DESTROY data when applied");
         expect(generated.all).toMatch(/DROP COLUMN.*"done"/);
@@ -339,11 +326,11 @@ describe("Database migration E2E", () => {
             "SELECT version FROM rebase.atlas_schema_revisions ORDER BY version"
         )).rows.map((row: { version: string }) => row.version);
 
-        fs.writeFileSync(path.join(collectionsDir, "tasks.js"), tasksCollectionJs()
-            .replace(/\n\s*done:.*\n/, "\n        priority: { name: \"Priority\", type: \"number\" }\n"));
-        // What boot does with a new property: the column, before any migration.
+        fs.writeFileSync(path.join(schemaDir, "tasks.ts"), tasksTableTs()
+            .replace(/\n\s*done:.*\n/, "\n        priority: col.numeric()\n"));
+        // What boot does with a new column: the column, before any migration.
         await dbClient.query("ALTER TABLE tasks ADD COLUMN priority numeric");
-        const generated = await run("db", "generate", "--collections", collectionsDir, "add_priority");
+        const generated = await run("db", "generate", "add_priority");
         expect(generated.exitCode).toBe(0);
         const migrations = fs.readdirSync(path.join(workDir, "drizzle", "migrations")).filter(f => f.endsWith(".sql")).sort();
         const version = /^(\d+)/.exec(migrations.at(-1) ?? "")?.[1] ?? "";
@@ -402,13 +389,11 @@ describe("Database migration E2E", () => {
         try {
             const base = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-db-e2e-booted-"));
             const backend = path.join(base, "backend");
-            const collections = path.join(base, "config", "collections");
-            fs.mkdirSync(backend, { recursive: true });
-            fs.mkdirSync(collections, { recursive: true });
+            const tables = path.join(backend, "schema");
+            fs.mkdirSync(tables, { recursive: true });
             fs.writeFileSync(path.join(backend, "package.json"), JSON.stringify({ name: "e2e-booted-backend", type: "module" }));
-            fs.writeFileSync(path.join(collections, "package.json"), JSON.stringify({ type: "module" }));
-            fs.writeFileSync(path.join(collections, "tasks.js"), tasksCollectionJs());
-            fs.writeFileSync(path.join(collections, "index.js"), collectionsIndex(["tasks"]));
+            fs.writeFileSync(path.join(tables, "tasks.ts"), tasksTableTs());
+            fs.writeFileSync(path.join(tables, "index.ts"), schemaIndex(["tasks"]));
             const run = (...args: string[]) => execa(tsxBin, [cliScript, ...args], {
                 cwd: backend, env: cleanEnv(bootedUrl), all: true, reject: false
             });
@@ -417,9 +402,9 @@ describe("Database migration E2E", () => {
             )).rows.map((row: { table_schema: string }) => row.table_schema);
 
             // What boot does: the tables, before any migration exists.
-            const pushed = await run("db", "push", "--collections", collections);
+            const pushed = await run("db", "push", "--schema-dir", tables);
             expect(pushed.exitCode).toBe(0);
-            const generated = await run("db", "generate", "--collections", collections, "init");
+            const generated = await run("db", "generate", "--schema-dir", tables, "init");
             expect(generated.exitCode).toBe(0);
             const migrations = fs.readdirSync(path.join(backend, "drizzle", "migrations")).filter(f => f.endsWith(".sql"));
             const version = /^(\d+)/.exec(migrations[0] ?? "")?.[1] ?? "";

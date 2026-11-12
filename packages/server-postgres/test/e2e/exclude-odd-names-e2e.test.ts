@@ -1,6 +1,6 @@
 /**
  * `rebase db push` leaves a hand-written index alone whatever its name holds,
- * and a table no collection backs too.
+ * and a table no declared table backs too.
  *
  * Every `--exclude` used to pass the name to Atlas as it stood, and Atlas reads
  * it as a glob split on `.`:
@@ -29,17 +29,16 @@ const monorepoRoot = path.resolve(pkgRoot, "../..");
 const cliScript = path.join(pkgRoot, "src", "cli.ts");
 const tsxBin = path.join(monorepoRoot, "node_modules", ".bin", "tsx");
 
-const TASKS_JS = `
-export default {
-    name: "Tasks",
-    slug: "tasks",
-    table: "tasks",
-    properties: {
-        id:    { name: "ID", type: "string", isId: "uuid" },
-        title: { name: "Title", type: "string" },
-        note:  { name: "Note", type: "string" }
-    }
-};
+const TASKS_TS = `import { col, defineTable } from "@rebasepro/types";
+
+export const tasks = defineTable("tasks", {
+    columns: {
+        id: col.uuid().primaryKey().defaultRandom(),
+        title: col.text(),
+        note: col.text()
+    },
+    rls: "admin-only"
+});
 `;
 
 function cleanEnv(connectionString: string): Record<string, string> {
@@ -48,6 +47,9 @@ function cleanEnv(connectionString: string): Record<string, string> {
         if (/^(npm_|PNPM_|pnpm_|NPM_)/i.test(key)) delete env[key];
     }
     env.DATABASE_URL = connectionString;
+    // The schema module imports `@rebasepro/types` from outside the workspace;
+    // the typecheck config maps every `@rebasepro/*` onto source.
+    env.TSX_TSCONFIG_PATH = path.join(monorepoRoot, "tsconfig.typecheck.json");
     return env;
 }
 
@@ -55,10 +57,9 @@ describe("db push keeps objects it does not own, whatever their names hold", () 
     let container: PgContainer;
     let admin: pg.Client;
     let backend: string;
-    let collections: string;
 
     const push = () =>
-        execa(tsxBin, [cliScript, "db", "push", "--collections", collections], {
+        execa(tsxBin, [cliScript, "db", "push"], {
             cwd: backend, env: cleanEnv(container.connectionString), reject: false, stdin: "ignore", all: true
         });
 
@@ -85,13 +86,12 @@ describe("db push keeps objects it does not own, whatever their names hold", () 
 
         const base = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-exclude-odd-names-"));
         backend = path.join(base, "backend");
-        collections = path.join(base, "config", "collections");
-        fs.mkdirSync(backend, { recursive: true });
-        fs.mkdirSync(collections, { recursive: true });
+        // The driver's default schema directory: `schema`, from backend/.
+        const schema = path.join(backend, "schema");
+        fs.mkdirSync(schema, { recursive: true });
         fs.writeFileSync(path.join(backend, "package.json"), JSON.stringify({ name: "exclude-odd-names-backend", type: "module" }));
-        fs.writeFileSync(path.join(collections, "package.json"), JSON.stringify({ type: "module" }));
-        fs.writeFileSync(path.join(collections, "tasks.js"), TASKS_JS);
-        fs.writeFileSync(path.join(collections, "index.js"), `import tasks from "./tasks.js";\nexport default [tasks];\n`);
+        fs.writeFileSync(path.join(schema, "tasks.ts"), TASKS_TS);
+        fs.writeFileSync(path.join(schema, "index.ts"), `export { tasks } from "./tasks";\n`);
 
         const created = await push();
         expect(created.exitCode, created.all).toBe(0);

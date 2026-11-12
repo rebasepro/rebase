@@ -2,7 +2,7 @@
  * `rebase console` — the driver's half.
  *
  * Loads the project's tables (`backend/schema`) the way `rebase db push` does,
- * opens the database with
+ * and the global table hooks `backend/hooks.ts` exports, opens the database with
  * {@link openRebase}, and either evaluates one piece of code
  * (`--eval`) or starts a Node REPL with `rebase` and `collections` in scope.
  * The `rebase` CLI resolves the database first (the managed one included) and
@@ -19,9 +19,10 @@ import readline from "node:readline";
 import repl from "node:repl";
 import { PassThrough } from "node:stream";
 import tty from "node:tty";
+import { pathToFileURL } from "node:url";
 import { inspect } from "node:util";
-import { setLogOutput } from "@rebasepro/server";
-import type { CollectionConfig } from "@rebasepro/types";
+import { globalHooksAsCallbacks, setLogOutput } from "@rebasepro/server";
+import type { CollectionCallbacks, CollectionConfig, TableDescriptor, TableHooks } from "@rebasepro/types";
 import { RELAYED_FLAGS } from "./cli-flags";
 import { DEFAULT_SCHEMA_DIR } from "./cli-schema-dir";
 import { diagnoseDbError } from "./cli-errors";
@@ -166,6 +167,60 @@ export function describeOpenFailure(error: unknown, databaseUrl: string, managed
     return diagnoseDbError(error, databaseUrl) ?? describeFailure(error);
 }
 
+/** The names a table hook can have; anything else on a `hooks` export is not one. */
+const TABLE_HOOK_NAMES = ["beforeQuery", "afterRead", "beforeSave", "afterSave", "afterSaveError", "beforeDelete", "afterDelete"] as const;
+
+/** Whether a module's `hooks` export is table hooks: an object whose every key is a hook name holding a function. */
+function isTableHooks(value: unknown): value is TableHooks {
+    if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+    return Object.entries(value).every(([key, hook]) =>
+        (TABLE_HOOK_NAMES as readonly string[]).includes(key) && (hook === undefined || typeof hook === "function"));
+}
+
+/**
+ * The project's global table hooks: the `hooks` its `backend/hooks.ts`
+ * exports, which the server runs for every table ahead of each table's own.
+ *
+ * `backend/` is the schema directory's parent. No module there means no global
+ * hooks, as it does for the server.
+ *
+ * One that is there and cannot be imported — an import that needs an
+ * environment variable the console was not given, say — does not stop the
+ * console, which can still read and write. It says so, once, and runs without
+ * them: writes from this session then skip the global tier, and the reader
+ * knows it.
+ *
+ * @param schemaDir the schema directory, absolute.
+ * @param descriptors the tables' descriptors: what a hook receives as `table`.
+ */
+export async function loadProjectHooks(
+    schemaDir: string,
+    descriptors: readonly TableDescriptor[]
+): Promise<CollectionCallbacks | undefined> {
+    const backendDir = path.dirname(schemaDir);
+    // `.js` first, as the server's own loader reads a built module.
+    const modulePath = [".js", ".mjs", ".ts", ".mts"]
+        .map(ext => path.join(backendDir, `hooks${ext}`))
+        .find(candidate => fs.existsSync(candidate));
+    if (!modulePath) return undefined;
+
+    let mod: Record<string, unknown>;
+    try {
+        mod = await import(pathToFileURL(modulePath).href);
+    } catch (error) {
+        const reason = (error instanceof Error ? error.message : String(error)).split("\n")[0];
+        outError(`⚠ Global hooks are off in this session: ${modulePath} could not be loaded (${reason}). Each table's own hooks still run.`);
+        return undefined;
+    }
+    if (mod.hooks === undefined) return undefined;
+    if (!isTableHooks(mod.hooks)) {
+        outError(`⚠ Global hooks are off in this session: the \`hooks\` ${modulePath} exports is not an object of table hooks (${TABLE_HOOK_NAMES.join(", ")}).`);
+        return undefined;
+    }
+    const bySlug = new Map(descriptors.map(descriptor => [descriptor.slug, descriptor]));
+    return globalHooksAsCallbacks(mod.hooks, slug => bySlug.get(slug));
+}
+
 /** Open the project, run `--eval` or the REPL, and close it again. Resolves with the exit code. */
 async function openAndRun(
     options: { databaseUrl: string; schemaDir?: string; eval?: string; history?: string },
@@ -174,9 +229,12 @@ async function openAndRun(
     const { databaseUrl } = options;
     // The tables the way every other driver command reads them: a schema that
     // does not compile stops the console too, rather than opening it over a
-    // subset of the tables. Writes run each table's own hooks.
-    const { loadTables } = await import("./schema/load-tables");
-    const collections = await loadTables(path.resolve(options.schemaDir || DEFAULT_SCHEMA_DIR));
+    // subset of the tables.
+    const { loadTableSchema } = await import("./schema/load-tables");
+    const schemaDir = path.resolve(options.schemaDir || DEFAULT_SCHEMA_DIR);
+    const { collections, descriptors } = await loadTableSchema(schemaDir);
+    // Writes from the console run the same hook tiers as a server write.
+    const callbacks = await loadProjectHooks(schemaDir, descriptors);
 
     const ceiling = poolMaxCeiling();
     let rebase: OpenedRebase;
@@ -184,6 +242,7 @@ async function openAndRun(
         rebase = await openRebase({
             databaseUrl,
             collections,
+            ...(callbacks ? { callbacks } : {}),
             ...(ceiling !== null ? { pool: { max: ceiling } } : {})
         });
     } catch (error) {

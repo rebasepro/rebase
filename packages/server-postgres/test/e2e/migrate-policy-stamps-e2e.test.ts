@@ -23,7 +23,7 @@ import pg from "pg";
 import { fileURLToPath } from "url";
 import { execa } from "execa";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
-import { loadCollectionsFromDirectory } from "@rebasepro/server";
+import { loadTables } from "../../src/schema/load-tables.js";
 import { ensureCollectionPolicies } from "../../src/schema/ensure-collection-policies.js";
 import { pinSearchPath } from "../../src/connection.js";
 
@@ -33,31 +33,38 @@ const monorepoRoot = path.resolve(pkgRoot, "../..");
 const cliScript = path.join(pkgRoot, "src", "cli.ts");
 const tsxBin = path.join(monorepoRoot, "node_modules", ".bin", "tsx");
 
-const COLLECTIONS: Record<string, string> = {
-    "posts.js": `
-import tags from "./tags.js";
-export default {
-    name: "Posts", slug: "posts", table: "posts",
+const TABLES: Record<string, string> = {
+    "posts.ts": `import { col, defineTable, rel } from "@rebasepro/types";
+import { tags } from "./tags";
+
+export const posts = defineTable("posts", {
+    columns: {
+        id: col.uuid().primaryKey().defaultRandom(),
+        title: col.text()
+    },
+    relations: {
+        tags: rel.manyToMany(() => tags)
+    },
     // The scaffold's rules: reads for everyone, writes for admins.
-    securityRules: [
+    rls: [
         { operation: "select", access: "public" },
         { operations: ["insert", "update", "delete"], roles: ["admin"] }
-    ],
-    properties: {
-        id: { name: "ID", type: "string", isId: "uuid" },
-        title: { name: "Title", type: "string" },
-        tags: { name: "Tags", type: "relation", relation: { kind: "manyToMany", target: () => tags } }
-    }
-};`,
-    "tags.js": `
-export default {
-    name: "Tags", slug: "tags", table: "tags",
-    securityRules: [{ operation: "select", access: "public" }],
-    properties: {
-        id: { name: "ID", type: "string", isId: "uuid" },
-        name: { name: "Name", type: "string" }
-    }
-};`
+    ]
+});
+`,
+    "tags.ts": `import { col, defineTable } from "@rebasepro/types";
+
+export const tags = defineTable("tags", {
+    columns: {
+        id: col.uuid().primaryKey().defaultRandom(),
+        name: col.text()
+    },
+    rls: [
+        { operation: "select", access: "public" }
+    ]
+});
+`,
+    "index.ts": `export { posts } from "./posts";\nexport { tags } from "./tags";\n`
 };
 
 function cleanEnv(connectionString: string): Record<string, string> {
@@ -66,24 +73,26 @@ function cleanEnv(connectionString: string): Record<string, string> {
         if (/^(npm_|PNPM_|pnpm_|NPM_)/i.test(key)) delete env[key];
     }
     env.DATABASE_URL = connectionString;
+    // The schema modules import `@rebasepro/types` from outside the workspace;
+    // the typecheck config maps every `@rebasepro/*` onto source.
+    env.TSX_TSCONFIG_PATH = path.join(monorepoRoot, "tsconfig.typecheck.json");
     return env;
 }
 
 describe("db migrate stamps the policies it applies", () => {
     let container: PgContainer;
     let backend: string;
-    let collectionsDir: string;
+    let schemaDir: string;
 
     beforeAll(async () => {
         container = await startPgContainer();
         const base = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-migrate-stamps-"));
         backend = path.join(base, "backend");
-        collectionsDir = path.join(base, "config", "collections");
-        fs.mkdirSync(backend, { recursive: true });
-        fs.mkdirSync(collectionsDir, { recursive: true });
+        // backend/schema: the directory `db generate` and `db migrate` read by default.
+        schemaDir = path.join(backend, "schema");
+        fs.mkdirSync(schemaDir, { recursive: true });
         fs.writeFileSync(path.join(backend, "package.json"), JSON.stringify({ name: "stamps-backend", type: "module" }));
-        fs.writeFileSync(path.join(collectionsDir, "package.json"), JSON.stringify({ type: "module" }));
-        for (const [file, source] of Object.entries(COLLECTIONS)) fs.writeFileSync(path.join(collectionsDir, file), source);
+        for (const [file, source] of Object.entries(TABLES)) fs.writeFileSync(path.join(schemaDir, file), source);
     }, 120_000);
 
     afterAll(async () => {
@@ -98,7 +107,7 @@ describe("db migrate stamps the policies it applies", () => {
         const client = new pg.Client({ connectionString: pinSearchPath(container.connectionString) });
         await client.connect();
         try {
-            const collections = await loadCollectionsFromDirectory(collectionsDir);
+            const collections = await loadTables(schemaDir);
             return await ensureCollectionPolicies(client, collections);
         } finally {
             await client.end();
@@ -106,7 +115,7 @@ describe("db migrate stamps the policies it applies", () => {
     }
 
     it("the first boot after a migrate re-applies nothing", async () => {
-        const generated = await cli(["db", "generate", "--collections", collectionsDir, "init"]);
+        const generated = await cli(["db", "generate", "init"]);
         expect(generated.exitCode, generated.all).toBe(0);
         const migrated = await cli(["db", "migrate"]);
         expect(migrated.exitCode, migrated.all).toBe(0);

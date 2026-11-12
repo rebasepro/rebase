@@ -25,12 +25,34 @@ import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
 import type { CollectionConfig } from "@rebasepro/types";
+import { collectionsToTableDefs, printIndexModule, printTableModule, printTableSource } from "@rebasepro/common";
 import { logger } from "@rebasepro/server";
 
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { createPostgresBootstrapper, createPostgresDatabaseConnection, openRebase, type OpenedRebase } from "../../src/index.js";
 import { consoleCommand } from "../../src/cli-console.js";
 import { HistoryService } from "../../src/history/HistoryService.js";
+
+/**
+ * A project's `backend/schema` directory holding `collections`, lifted into
+ * `defineTable` and printed as a project writes it — under a fresh `backend/`,
+ * so a `hooks.ts` can sit beside it. The builders are imported by path, from
+ * source: the directory is outside the workspace, and is loaded both in this
+ * process and by a spawned driver.
+ */
+function writeSchemaDir(collections: CollectionConfig[]): string {
+    const backend = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "rebase-console-")), "backend");
+    const schema = path.join(backend, "schema");
+    fs.mkdirSync(schema, { recursive: true });
+    const specifier = path.resolve(fileURLToPath(new URL("../../../types/src/index.ts", import.meta.url)));
+    const lifted = collectionsToTableDefs(collections);
+    const exported = lifted.tables.map(table => {
+        fs.writeFileSync(path.join(schema, `${table.name}.ts`), printTableModule(table, { specifier }));
+        return { identifier: printTableSource(table, { specifier }).identifier, importPath: `./${table.name}` };
+    });
+    fs.writeFileSync(path.join(schema, "index.ts"), printIndexModule(exported, lifted.defaultRls !== undefined ? { defaultRls: lifted.defaultRls } : {}));
+    return schema;
+}
 
 const notesCollection: CollectionConfig = {
     name: "Notes",
@@ -425,27 +447,23 @@ describe("openRebase (E2E)", () => {
         });
 
         describe("rebase console --eval (the driver's half)", () => {
-            let collectionsDir: string;
-            /** A project whose one collection keeps history. */
+            let schemaDir: string;
+            /** A project whose one table keeps history. */
             let auditedDir: string;
 
             beforeAll(() => {
-                // A project's collections directory, loaded by the loader `db push` uses.
-                collectionsDir = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-console-"));
-                fs.writeFileSync(path.join(collectionsDir, "package.json"), JSON.stringify({ type: "module" }));
-                fs.writeFileSync(path.join(collectionsDir, "notes.js"), `export default ${JSON.stringify(notesCollection)};\n`);
-                auditedDir = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-console-"));
-                fs.writeFileSync(path.join(auditedDir, "package.json"), JSON.stringify({ type: "module" }));
-                fs.writeFileSync(path.join(auditedDir, "ledger.js"), `export default ${JSON.stringify(ledgerCollection)};\n`);
+                // A project's backend/schema, loaded by the loader `db push` uses.
+                schemaDir = writeSchemaDir([notesCollection]);
+                auditedDir = writeSchemaDir([ledgerCollection]);
             });
 
             afterAll(() => {
-                fs.rmSync(collectionsDir, { recursive: true, force: true });
-                fs.rmSync(auditedDir, { recursive: true, force: true });
+                fs.rmSync(path.dirname(path.dirname(schemaDir)), { recursive: true, force: true });
+                fs.rmSync(path.dirname(path.dirname(auditedDir)), { recursive: true, force: true });
             });
 
             /** One `rebase console --eval`, as the driver runs it: exit code and both streams. */
-            async function evalInConsole(code: string, dir = collectionsDir): Promise<{ code: number; stdout: string; stderr: string }> {
+            async function evalInConsole(code: string, dir = schemaDir): Promise<{ code: number; stdout: string; stderr: string }> {
                 const stdout: string[] = [];
                 const stderr: string[] = [];
                 const log = vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => { stdout.push(args.join(" ")); });
@@ -453,7 +471,7 @@ describe("openRebase (E2E)", () => {
                 vi.stubEnv("DATABASE_URL", urlFor(container, "app"));
                 vi.stubEnv("LOG_LEVEL", "error");
                 try {
-                    const exit = await consoleCommand(["console", "--eval", code, "--collections", dir]);
+                    const exit = await consoleCommand(["console", "--eval", code, "--schema-dir", dir]);
                     return { code: exit, stdout: stdout.join("\n"), stderr: stderr.join("\n") };
                 } finally {
                     vi.unstubAllEnvs();
@@ -478,7 +496,7 @@ describe("openRebase (E2E)", () => {
                 expect(JSON.parse(result.stdout)).toEqual(["ada's"]);
             });
 
-            it("has the project's collections and sql in scope", async () => {
+            it("has the project's tables (as `collections`) and sql in scope", async () => {
                 expect(JSON.parse((await evalInConsole("collections.map(c => c.slug)")).stdout)).toEqual(["notes"]);
                 const counted = await evalInConsole("rebase.sql('SELECT count(*)::int AS n FROM public.notes WHERE owner_id = $1', { params: ['ada'] })");
                 expect(JSON.parse(counted.stdout)).toEqual([{ n: 1 }]);
@@ -497,7 +515,7 @@ describe("openRebase (E2E)", () => {
                 expect(result.stderr).not.toContain("s3cret-token");
             });
 
-            it("records history for a write to an audited collection, as the service", async () => {
+            it("records history for a write to an audited table, as the service", async () => {
                 const result = await evalInConsole(
                     "const row = await rebase.dataAsAdmin.ledger.create({ ownerId: 'bob', amount: 4 });\nreturn row.id;",
                     auditedDir
@@ -510,17 +528,13 @@ describe("openRebase (E2E)", () => {
                 expect(rows).toEqual([{ action: "create", updated_by: "service" }]);
             });
 
-            describe("the project's global callbacks, from config/index", () => {
-                /** A project's config package: `collections/` and an `index.js` beside it. */
-                function configPackage(index: string): string {
-                    const root = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-console-config-"));
-                    const config = path.join(root, "config");
-                    fs.mkdirSync(path.join(config, "collections"), { recursive: true });
-                    fs.writeFileSync(path.join(config, "package.json"), JSON.stringify({ type: "module" }));
-                    fs.writeFileSync(path.join(config, "collections", "notes.js"), `export default ${JSON.stringify(notesCollection)};\n`);
-                    fs.writeFileSync(path.join(config, "index.js"), index);
-                    made.push(root);
-                    return path.join(config, "collections");
+            describe("the project's global hooks, from backend/hooks.ts", () => {
+                /** A project with `backend/schema` and a `backend/hooks.ts` beside it. */
+                function projectWithHooks(hooks: string): string {
+                    const dir = writeSchemaDir([notesCollection]);
+                    fs.writeFileSync(path.join(path.dirname(dir), "hooks.ts"), hooks);
+                    made.push(path.dirname(path.dirname(dir)));
+                    return dir;
                 }
                 const made: string[] = [];
 
@@ -532,8 +546,8 @@ describe("openRebase (E2E)", () => {
                 it("runs them on a console write, as the server does", async () => {
                     // A global `beforeSave` that stamps every write ran on every
                     // server write and on no console write.
-                    const dir = configPackage(
-                        "export const callbacks = { beforeSave: ({ values }) => ({ ...values, title: `[global] ${values.title}` }) };\n"
+                    const dir = projectWithHooks(
+                        "export const hooks = { beforeSave: ({ values }) => ({ ...values, title: `[global] ${values.title}` }) };\n"
                     );
                     const result = await evalInConsole(
                         "(await rebase.dataAsAdmin.notes.create({ ownerId: 'console-cb', title: 'stamped?' })).title",
@@ -541,21 +555,21 @@ describe("openRebase (E2E)", () => {
                     );
                     expect(result).toMatchObject({ code: 0 });
                     expect(JSON.parse(result.stdout)).toBe("[global] stamped?");
-                    expect(result.stderr).not.toContain("Global callbacks are off");
+                    expect(result.stderr).not.toContain("Global hooks are off");
                 });
 
-                it("says so in one line and carries on without them when config/index cannot be imported", async () => {
-                    const dir = configPackage("throw new Error(\"STRIPE_SECRET_KEY is not set\");\nexport const callbacks = {};\n");
+                it("says so in one line and carries on without them when backend/hooks.ts cannot be imported", async () => {
+                    const dir = projectWithHooks("throw new Error(\"STRIPE_SECRET_KEY is not set\");\nexport const hooks = {};\n");
                     const result = await evalInConsole(
                         "(await rebase.dataAsAdmin.notes.create({ ownerId: 'console-cb', title: 'plain' })).title",
                         dir
                     );
                     expect(result).toMatchObject({ code: 0 });
                     expect(JSON.parse(result.stdout)).toBe("plain");
-                    const said = result.stderr.split("\n").filter(line => line.includes("Global callbacks are off"));
+                    const said = result.stderr.split("\n").filter(line => line.includes("Global hooks are off"));
                     expect(said).toHaveLength(1);
                     expect(said[0]).toContain("STRIPE_SECRET_KEY is not set");
-                    expect(said[0]).toContain(path.join(path.dirname(dir), "index.js"));
+                    expect(said[0]).toContain(path.join(path.dirname(dir), "hooks.ts"));
                 });
             });
 
@@ -578,7 +592,7 @@ describe("openRebase (E2E)", () => {
                 vi.stubEnv("DATABASE_URL", urlFor(container, "app"));
                 vi.stubEnv("LOG_LEVEL", "error");
                 try {
-                    const exit = await consoleCommand(["console", "--collections", collectionsDir], { input, output });
+                    const exit = await consoleCommand(["console", "--schema-dir", schemaDir], { input, output });
                     expect(exit).toBe(0);
                 } finally {
                     vi.unstubAllEnvs();
@@ -609,7 +623,7 @@ describe("openRebase (E2E)", () => {
                 vi.stubEnv("DATABASE_URL", urlFor(container, "app"));
                 vi.stubEnv("LOG_LEVEL", "error");
                 try {
-                    const exit = await consoleCommand(["console", "--collections", collectionsDir], { input, output });
+                    const exit = await consoleCommand(["console", "--schema-dir", schemaDir], { input, output });
                     expect(exit).toBe(0);
                 } finally {
                     vi.unstubAllEnvs();
@@ -656,7 +670,7 @@ describe("openRebase (E2E)", () => {
                         // not at all in a clean install.
                         const child = spawn(
                             process.execPath,
-                            [createRequire(import.meta.url).resolve("tsx/cli"), path.join(packageRoot, "src/cli.ts"), "console", "--collections", collectionsDir, ...args],
+                            [createRequire(import.meta.url).resolve("tsx/cli"), path.join(packageRoot, "src/cli.ts"), "console", "--schema-dir", schemaDir, ...args],
                             { cwd: projectDir, env, stdio: ["pipe", "pipe", "pipe"] }
                         );
                         let stdout = "";

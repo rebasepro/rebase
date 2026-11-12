@@ -23,42 +23,43 @@ import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.
 import { closeAppClients, withAppClient } from "../../src/cli-helpers";
 import { pinSearchPath } from "../../src/connection";
 import { ensureCollectionPolicies } from "../../src/schema/ensure-collection-policies";
-import { loadCollectionsFromDirectory } from "@rebasepro/server";
+import { loadTables } from "../../src/schema/load-tables";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const pkgRoot = path.resolve(__dirname, "../..");
 const monorepoRoot = path.resolve(pkgRoot, "../..");
 
-const AUTHORS_JS = `
-const authorsCollection = {
-    name: "Authors",
-    slug: "authors",
-    table: "authors",
-    securityRules: [{ operation: "select", access: "public" }],
-    properties: {
-        id:   { name: "ID",   type: "string", isId: "uuid" },
-        name: { name: "Name", type: "string" }
-    }
-};
-export default authorsCollection;
+const AUTHORS_TS = `import { col, defineTable } from "@rebasepro/types";
+
+export const authors = defineTable("authors", {
+    columns: {
+        id: col.uuid().primaryKey().defaultRandom(),
+        name: col.text()
+    },
+    rls: [
+        { operation: "select", access: "public" }
+    ]
+});
 `;
 
-const POSTS_JS = `
-import authorsCollection from "./authors.js";
-const postsCollection = {
-    name: "Posts",
-    slug: "posts",
-    table: "posts",
-    securityRules: [{ operation: "all", ownerField: "owner_id" }],
-    properties: {
-        id:       { name: "ID",    type: "string", isId: "uuid" },
-        title:    { name: "Title", type: "string" },
-        owner_id: { name: "Owner", type: "string" },
-        author:   { name: "Author", type: "relation", relation: { kind: "belongsTo", target: () => authorsCollection } }
-    }
-};
-export default postsCollection;
+const POSTS_TS = `import { col, defineTable, rel } from "@rebasepro/types";
+import { authors } from "./authors";
+
+export const posts = defineTable("posts", {
+    columns: {
+        id: col.uuid().primaryKey().defaultRandom(),
+        title: col.text(),
+        owner_id: col.text(),
+        authorId: col.uuid()
+    },
+    relations: {
+        author: rel.belongsTo(() => authors)
+    },
+    rls: [
+        { operation: "all", ownerField: "owner_id" }
+    ]
+});
 `;
 
 /** Appends every process the driver spawns to `$SPAWN_LOG`, one JSON argv per line. */
@@ -82,7 +83,7 @@ describe("db push overhead E2E", () => {
     let admin: pg.Client;
     let base: string;
     let workDir: string;
-    let collectionsDir: string;
+    let schemaDir: string;
     let spawnLog: string;
     let preload: string;
     const cliScript = path.join(pkgRoot, "src", "cli.ts");
@@ -97,13 +98,12 @@ describe("db push overhead E2E", () => {
 
         base = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-push-overhead-"));
         workDir = path.join(base, "backend");
-        collectionsDir = path.join(base, "config", "collections");
-        fs.mkdirSync(workDir, { recursive: true });
-        fs.mkdirSync(collectionsDir, { recursive: true });
+        schemaDir = path.join(workDir, "schema");
+        fs.mkdirSync(schemaDir, { recursive: true });
         fs.writeFileSync(path.join(workDir, "package.json"), JSON.stringify({ name: "e2e-push-overhead", type: "module" }));
-        fs.writeFileSync(path.join(collectionsDir, "package.json"), JSON.stringify({ type: "module" }));
-        fs.writeFileSync(path.join(collectionsDir, "authors.js"), AUTHORS_JS);
-        fs.writeFileSync(path.join(collectionsDir, "posts.js"), POSTS_JS);
+        fs.writeFileSync(path.join(schemaDir, "authors.ts"), AUTHORS_TS);
+        fs.writeFileSync(path.join(schemaDir, "posts.ts"), POSTS_TS);
+        fs.writeFileSync(path.join(schemaDir, "index.ts"), `export { authors } from "./authors";\nexport { posts } from "./posts";\n`);
         spawnLog = path.join(base, "spawns.log");
         preload = path.join(base, "record-spawns.cjs");
         fs.writeFileSync(preload, RECORD_SPAWNS);
@@ -140,7 +140,7 @@ describe("db push overhead E2E", () => {
         fs.writeFileSync(spawnLog, "");
         const before = (await authorizedConnections()).length;
         const tsxBin = path.join(monorepoRoot, "node_modules", ".bin", "tsx");
-        const result = await execa(tsxBin, [cliScript, "db", "push", "--collections", collectionsDir, ...extra], {
+        const result = await execa(tsxBin, [cliScript, "db", "push", ...extra], {
             cwd: workDir, env: env(), reject: false, stdin: "ignore", all: true
         });
         // The log is written as each backend starts; give the last one a moment.
@@ -190,7 +190,7 @@ describe("db push overhead E2E", () => {
         const boot = new pg.Client({ connectionString: pinSearchPath(container.connectionString) });
         await boot.connect();
         try {
-            const collections = await loadCollectionsFromDirectory(collectionsDir);
+            const collections = await loadTables(schemaDir);
             const outcome = await ensureCollectionPolicies(
                 { query: async <T>(text: string) => ({ rows: (await boot.query(text)).rows as T[] }) },
                 collections

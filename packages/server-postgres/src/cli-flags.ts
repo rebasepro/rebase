@@ -87,7 +87,10 @@ export const DRIVER_FLAG_SPECS: Record<string, arg.Spec> = {
     // `--refuse-destructive` is opt-in: it dry-runs the pending files and exits
     // 1, applying nothing, when one drops or narrows data — the gate `db push`
     // has always had, for the path that had none.
+    // `--schema-dir` too: after applying, migrate stamps the policies the
+    // migration created as the tables' rules make them, so it reads the schema.
     "db migrate": {
+        "--schema-dir": String,
         "--baseline": String,
         "--refuse-destructive": Boolean
     },
