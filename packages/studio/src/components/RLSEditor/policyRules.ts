@@ -17,7 +17,8 @@ import type {
     StructuredSecurityRule
 } from "@rebasepro/types";
 import { policyToSecurityRule } from "@rebasepro/common";
-import { getPolicyNamesForRule, getPolicyOperations } from "@rebasepro/utils";
+import { getPolicyOperations } from "@rebasepro/utils";
+import type { ListedPolicy } from "./policyListing";
 
 /**
  * The security-rule fields a {@link PostgresPolicy} describes, and the ones an
@@ -92,31 +93,26 @@ export type PolicyEdit =
 /**
  * Write an edit of one policy back to the declared rule it compiles from.
  *
- * The rule is found by the policy names it compiles to, not by `rule.name`:
- * an unnamed rule's policy is `<table>_<op>_<hash>`, and a rule over several
- * operations names each `<name>_<op>`. Matching on `name` missed both, saved
- * the rules unchanged and reported success.
+ * The rule is the one the server says the policy was compiled from (the
+ * served policy's `rule` index, carried on the listed row) — the server is the
+ * one compiler, so the editor never guesses it from names. A policy with no
+ * rule is Rebase's own (`generated`: the admin baseline, tenancy, a junction's
+ * derived policies) or exists only in the database.
  *
  * A rule over several operations is refused rather than split: taking one
  * operation out renames every policy the rule compiles to.
  *
- * @param declared  The collection's `securityRules`, as written.
- * @param effective Every rule the generator compiles for the table — the
- *                  declared ones plus what Rebase adds — to tell a generated
- *                  policy from one that exists only in the database.
+ * @param declared The table's declared rules (`rls.rules`), as written.
+ * @param original The listed policy the editor was opened with.
  */
 export function applyPolicyEdit(
     declared: readonly SecurityRule[],
-    effective: readonly SecurityRule[],
-    tableName: string,
-    original: PostgresPolicy,
+    original: ListedPolicy,
     edited: Partial<PostgresPolicy>
 ): PolicyEdit {
-    const compilesTo = (rule: SecurityRule) => getPolicyNamesForRule(rule, tableName).includes(original.policyname);
-
-    const index = declared.findIndex(compilesTo);
-    if (index === -1) {
-        return { ok: false, reason: effective.some(compilesTo) ? "generated" : "not_declared" };
+    const index = original.rule;
+    if (index === undefined || declared[index] === undefined) {
+        return { ok: false, reason: original.generated ? "generated" : "not_declared" };
     }
     const rule = declared[index];
     if (ruleForm(rule) === "redacted") return { ok: false, reason: "redacted" };

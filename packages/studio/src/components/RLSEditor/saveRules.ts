@@ -3,7 +3,14 @@ import type { StudioSchemaEditing } from "@rebasepro/app";
 import { saveSecurityRulesToCodebase } from "./saveSecurityRules";
 
 /**
- * Where a collection's security rules go when the RLS editor saves them.
+ * Where a table's security rules go when the RLS editor saves them — the one
+ * function every RLS-editor write to the source goes through.
+ *
+ * The wire format is still the collection editor's: the rules ride as
+ * `securityRules` in a partial `/schema-editor/collection/save` (or the CMS's
+ * `updateCollection` patch), addressed by the table's slug. When the schema
+ * editor's `TablePatch` lands (one operation that sets a table's `rls` to an
+ * `RlsPosture`), this function is the only thing to switch.
  *
  * There are two doors onto one file. The collection editor's save is planned,
  * shown as SQL, confirmed, and applied to the database. The RLS editor's save
@@ -25,16 +32,16 @@ import { saveSecurityRulesToCodebase } from "./saveSecurityRules";
 export async function saveRules(
     schemaEditing: StudioSchemaEditing,
     transport: { apiBase: string; getAuthToken?: () => Promise<string | null | undefined> },
-    collectionId: string,
+    slug: string,
     securityRules: unknown[]
 ): Promise<void> {
     if (schemaEditing.available) {
-        await schemaEditing.updateCollection(collectionId, { securityRules });
+        await schemaEditing.updateCollection(slug, { securityRules });
         return;
     }
     await saveSecurityRulesToCodebase({
         apiBase: transport.apiBase,
-        collectionId,
+        collectionId: slug,
         securityRules,
         getAuthToken: transport.getAuthToken
     });

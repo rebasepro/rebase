@@ -6,6 +6,11 @@ import { FakeResponse } from "./helpers/fakeResponse";
 import React from "react";
 import { describe, expect, it, jest, beforeEach } from "@jest/globals";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { col, defineTable } from "@rebasepro/types";
+import type { SecurityRule } from "@rebasepro/types";
+import type { TableDescriptorsState } from "@rebasepro/app";
+import { servedTables } from "./helpers/servedTables";
+import { readyTables } from "./helpers/tableDescriptors";
 
 /**
  * Saving a policy on a collection-mapped table POSTed the rules straight to
@@ -40,8 +45,21 @@ let hasCodebase = true;
  */
 let livePolicies: Record<string, unknown>[] = [];
 
-/** The mapped collection's declared `securityRules` — none unless a test says. */
-let declaredRules: Record<string, unknown>[] = [];
+/**
+ * `authors` is declared; nothing else is. Its slug is `writers` — what a save
+ * has to be filed under — a different word from the table on purpose, so a
+ * save addressed by table name shows. No rules unless a test says: the
+ * admin-only posture.
+ */
+function served(rules: SecurityRule[]): TableDescriptorsState {
+    const [first, ...rest] = rules;
+    return readyTables(servedTables([defineTable("writers", {
+        table: "authors",
+        columns: { id: col.serial().primaryKey(), authorId: col.text().column("author_id") },
+        rls: first ? [first, ...rest] : "admin-only"
+    })]));
+}
+let tables = served([]);
 
 /** Every snackbar the editor opened, so a refusal can be read back. */
 const snackbarOpen = jest.fn<(options: { type: string; message: string }) => void>();
@@ -81,17 +99,7 @@ jest.mock("@rebasepro/app", () => ({
     useTranslation: () => translation,
     useNavigationGroupLabel: () => (group: string) => group,
     useStudioSchemaEditing: () => ({ available: editorAvailable, updateCollection }),
-    useStudioCollectionRegistry: () => ({
-        // `authors` is mapped; nothing else is. `table` is the field the editor
-        // matches on, and the slug is what a save has to be filed under — a
-        // different word on purpose, so a save addressed by table name shows.
-        // (A Postgres collection has no `id`; this fixture used to give it one,
-        // which is how a save filed under the wrong key passed.)
-        collections: [{ slug: "writers",
-table: "authors",
-securityRules: declaredRules }],
-        getCollection: () => undefined
-    }),
+    useTableDescriptors: () => tables,
     useStudioCapabilities: () => ({ codebase: hasCodebase }),
     useApiBase: () => "http://api.test/api",
     useApiConfig: () => ({ getAuthToken: async () => "token" }),
@@ -113,7 +121,7 @@ beforeEach(() => {
     updateCollection.mockResolvedValue(undefined);
     executeSql.mockClear();
     livePolicies = [];
-    declaredRules = [];
+    tables = served([]);
     snackbarOpen.mockClear();
     editorAvailable = true;
     hasCodebase = true;
@@ -172,7 +180,7 @@ describe("cancelling the plan dialog", () => {
  * The two tests at the top call `saveRules` directly, so they pass whatever the
  * component decides — which is how W10-12 was reported fixed while the running
  * admin still applied policies straight to the database on a scaffold. The
- * condition that actually decides is `activeCollection && hasCodebase` in
+ * condition that actually decides is `savesToCodebase` (a declared table, and a codebase) in
  * `RLSEditor.tsx`, and only a rendered save reaches it.
  *
  * `authors` is a *mapped* table in both tests below; the only thing that differs
@@ -454,8 +462,7 @@ describe("editing a policy declared in code", () => {
     }
 
     it("edits the unnamed rule a generated policy name belongs to, keeping its condition", async () => {
-        const rule = { operation: "select", access: "public" };
-        declaredRules = [rule];
+        tables = served([{ operation: "select", access: "public" }]);
         const [generated] = getPolicyNamesForRule({ operation: "select", access: "public" }, "authors");
 
         await editAndSave(generated, "public_read");
@@ -469,7 +476,7 @@ describe("editing a policy declared in code", () => {
     });
 
     it("refuses one operation of a rule that covers several", async () => {
-        declaredRules = [{ name: "owner_access", operations: ["select", "update"], ownerField: "author_id" }];
+        tables = served([{ name: "owner_access", operations: ["select", "update"], ownerField: "authorId" }]);
 
         await editAndSave("owner_access_select", "owner_read");
 

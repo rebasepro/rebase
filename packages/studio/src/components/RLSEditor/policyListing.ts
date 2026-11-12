@@ -1,13 +1,6 @@
-import { isPostgresCollectionConfig } from "@rebasepro/types";
-import type { CollectionConfig, PostgresPolicy, SecurityOperation, SecurityRule } from "@rebasepro/types";
-import {
-    compileRulePolicies,
-    getEffectiveSecurityRulesOnce,
-    getInjectedSecurityRules,
-    getTableName,
-    type CompiledRulePolicy
-} from "@rebasepro/common";
-import { getPolicyNamesForRule, getPolicyNamesForRules, getPolicyOperations } from "@rebasepro/utils";
+import { isRedactedSecurityRule, REBASE_ADMIN_REQUEST_ROLE, REBASE_ADMIN_ROLE } from "@rebasepro/types";
+import type { PolicyDescriptor, PostgresPolicy, RlsDescriptor, SecurityOperation, SecurityRule } from "@rebasepro/types";
+import { getPolicyNamesForRule, getPolicyOperations } from "@rebasepro/utils";
 
 /** A part of a policy the database can hold differently from its declaration. */
 export type PolicyDriftField = "roles" | "command" | "mode" | "USING" | "WITH CHECK";
@@ -15,7 +8,7 @@ export type PolicyDriftField = "roles" | "command" | "mode" | "USING" | "WITH CH
 /** A row of the RLS editor's policy list. */
 export interface ListedPolicy extends PostgresPolicy {
     /**
-     * What the project's code compiles this policy to, when it declares one by
+     * What the server compiles this policy to, when the table declares one by
      * this name. For a policy the database also has, the row's own fields are
      * the database's and this is what they are compared against.
      */
@@ -24,10 +17,13 @@ export interface ListedPolicy extends PostgresPolicy {
     drift?: PolicyDriftField[];
     /**
      * Rebase adds this policy itself — the admin baseline, a tenancy or
-     * auth-write gate, a junction's derived policies — so no rule of the
-     * author's holds it, and the next server start re-creates it.
+     * auth-write gate, a junction's derived policies, an admin-request
+     * companion — so no rule of the author's holds it, and the next server
+     * start re-creates it.
      */
     generated?: boolean;
+    /** The index in the table's declared `rls.rules` of the rule this policy compiles from. */
+    rule?: number;
 }
 
 /**
@@ -79,23 +75,27 @@ const COMMANDS: Record<SecurityOperation, PostgresPolicy["cmd"]> = {
     all: "ALL"
 };
 
-/** A compiled policy, in the shape `pg_policies` describes one. */
-function asPostgresPolicy(compiled: CompiledRulePolicy, tableName: string): PostgresPolicy {
+function commandOf(operation: string): PostgresPolicy["cmd"] {
+    return operation in COMMANDS ? COMMANDS[operation as SecurityOperation] : "ALL";
+}
+
+/** A policy the server compiled, in the shape `pg_policies` describes one. */
+export function servedAsPostgresPolicy(served: PolicyDescriptor, tableName: string): PostgresPolicy {
     return {
-        policyname: compiled.name,
+        policyname: served.name,
         tablename: tableName,
-        permissive: compiled.mode === "restrictive" ? "RESTRICTIVE" : "PERMISSIVE",
-        cmd: COMMANDS[compiled.operation],
-        roles: compiled.roles,
-        qual: compiled.using,
-        with_check: compiled.withCheck
+        permissive: served.mode === "restrictive" ? "RESTRICTIVE" : "PERMISSIVE",
+        cmd: commandOf(served.operation),
+        roles: [...served.roles],
+        qual: served.using,
+        with_check: served.withCheck
     };
 }
 
 /**
- * The rule's own clauses, for a rule the compiler could not compile — an
- * `existsIn` naming a collection the registry does not hold, say. Only ever a
- * `code_only` row's content: nothing is compared against it.
+ * The rule's own clauses, for a declared rule the server compiled no policy
+ * from — an `existsIn` naming a table the backend does not hold, say. Only
+ * ever a `code_only` row's content: nothing is compared against it.
  */
 function uncompiledPolicy(rule: SecurityRule, operation: SecurityOperation, name: string, tableName: string): PostgresPolicy {
     return {
@@ -136,89 +136,97 @@ export function policyDrift(declared: PostgresPolicy, live: PostgresPolicy): Pol
 }
 
 /**
+ * What the server says a table's policies are: its declared rules and the
+ * policies it compiled from them, or — for a junction — the derived policies
+ * alone. `undefined` when the table is not one the server declares, or when it
+ * withheld the compiled policies from this caller (no `schema:read`).
+ */
+export interface DeclaredPolicies {
+    /** The declared rules, as written; empty for a junction. */
+    rules: readonly SecurityRule[];
+    /** Every policy the server compiles for the table. */
+    policies: readonly PolicyDescriptor[];
+}
+
+/** The {@link DeclaredPolicies} of a served table, when the server included its compiled policies. */
+export function declaredPoliciesOf(rls: RlsDescriptor): DeclaredPolicies | undefined {
+    return rls.policies ? { rules: rls.rules, policies: rls.policies } : undefined;
+}
+
+/**
  * The policies of one table: every policy the database has, as the database
- * has it, and every policy the code declares for the table that it does not.
+ * has it, and every policy the server compiles for the table that it does not.
  *
- * A policy in both keeps the database's fields — this list is what Postgres
- * enforces — and carries the declaration beside them, with where the two
- * differ.
+ * The server is the one compiler: what it serves in `rls.policies` (and
+ * `rls.junctions`) is exactly what `db push` and every server start write.
+ * This only compares it with `pg_policies`. A policy in both keeps the
+ * database's fields — this list is what Postgres enforces — and carries the
+ * declaration beside them, with where the two differ.
  *
- * @param live        The table's `pg_policies` rows.
- * @param collection  The collection the table belongs to, if any.
- * @param collections Every collection, to resolve the ones a rule refers to.
+ * @param live      The table's `pg_policies` rows.
+ * @param declared  What the server serves for the table, if anything.
  */
 export function listPolicies(
     live: readonly PostgresPolicy[],
-    collection: CollectionConfig | null,
-    tableName: string,
-    collections: readonly CollectionConfig[]
+    declared: DeclaredPolicies | undefined,
+    tableName: string
 ): ListedPolicy[] {
     const listed = new Map<string, ListedPolicy>();
     for (const policy of live) listed.set(policy.policyname, { ...policy, status: "live" });
-    if (!collection || !isPostgresCollectionConfig(collection)) return [...listed.values()];
+    if (!declared) return [...listed.values()];
 
-    const resolveCollection = (slug: string) =>
-        collections.find(c => c.slug === slug || getTableName(c) === slug);
-    const injectedNames = getPolicyNamesForRules(getInjectedSecurityRules(collection), tableName);
     const livePolicies = new Map(live.map(policy => [policy.policyname, policy]));
+    const compiledRules = new Set<number>();
 
-    // Once: a collection projected from a served table already carries them.
-    for (const rule of getEffectiveSecurityRulesOnce(collection)) {
-        const operations = getPolicyOperations(rule);
-        let compiled: CompiledRulePolicy[] | undefined;
-        try {
-            // What the project's own driver writes: it ships with this Studio.
-            compiled = compileRulePolicies(collection, rule, { resolveCollection, adminRole: true });
-        } catch {
-            compiled = undefined;
-        }
-
-        getPolicyNamesForRule(rule, tableName).forEach((name, index) => {
-            const existing = livePolicies.get(name);
-            const compiledPolicy = compiled?.[index];
-            // A policy the compiler put TO rebase_admin is written TO public by
-            // a server whose admin switch is not live — its documented
-            // fallback, not drift. Only that one form is accepted.
-            const fellBack = compiledPolicy?.adminTarget === true && existing !== undefined && sameRoles(existing.roles, ["public"]);
-            const declared = compiledPolicy
-                ? { ...asPostgresPolicy(compiledPolicy, tableName), ...(fellBack ? { roles: ["public"] } : {}) }
-                : undefined;
-            const generated = injectedNames.has(name);
-            if (existing) {
-                listed.set(name, {
-                    ...existing,
-                    status: "both",
-                    declared,
-                    drift: declared ? policyDrift(declared, existing) : undefined,
-                    generated
-                });
-            } else {
-                listed.set(name, {
-                    ...(declared ?? uncompiledPolicy(rule, operations[index] ?? "all", name, tableName)),
-                    status: "code_only",
-                    generated
-                });
-            }
-        });
-
+    for (const served of declared.policies) {
+        if (served.rule !== undefined) compiledRules.add(served.rule);
+        const existing = livePolicies.get(served.name);
         // The `TO rebase_admin_request USING (true)` companion a server writes
         // beside an admin-only policy where it made that role safe: Rebase's,
         // and compared like any declared policy when it is there. Not listed
         // when absent — a server that cannot make the role safe writes none.
-        let companions: CompiledRulePolicy[] = [];
-        try {
-            companions = compileRulePolicies(collection, rule, { resolveCollection, adminRole: true, adminRequestRole: true })
-                .filter(policy => policy.adminRequestTarget === true);
-        } catch {
-            companions = [];
-        }
-        for (const companion of companions) {
-            const existing = livePolicies.get(companion.name);
-            if (!existing) continue;
-            const declared = asPostgresPolicy(companion, tableName);
-            listed.set(companion.name, { ...existing, status: "both", declared, drift: policyDrift(declared, existing), generated: true });
+        if (served.roles.includes(REBASE_ADMIN_REQUEST_ROLE) && !existing) continue;
+        const compiled = servedAsPostgresPolicy(served, tableName);
+        // A policy compiled TO rebase_admin is written TO public by a server
+        // whose admin switch is not live — its documented fallback, not drift.
+        // Only that one form is accepted.
+        const fellBack = existing !== undefined && sameRoles(compiled.roles, [REBASE_ADMIN_ROLE]) && sameRoles(existing.roles, ["public"]);
+        const declaredPolicy = fellBack ? { ...compiled, roles: ["public"] } : compiled;
+        const rule = served.rule !== undefined ? { rule: served.rule } : {};
+        if (existing) {
+            listed.set(served.name, {
+                ...existing,
+                status: "both",
+                declared: declaredPolicy,
+                drift: policyDrift(declaredPolicy, existing),
+                generated: served.injected,
+                ...rule
+            });
+        } else {
+            listed.set(served.name, { ...declaredPolicy, status: "code_only", generated: served.injected, ...rule });
         }
     }
+
+    // A declared rule the server compiled nothing from still belongs in the
+    // list: the code declares it, and the database cannot have it.
+    declared.rules.forEach((rule, index) => {
+        if (compiledRules.has(index) || isRedactedSecurityRule(rule)) return;
+        const operations = getPolicyOperations(rule);
+        getPolicyNamesForRule(rule, tableName).forEach((name: string, position: number) => {
+            const existing = listed.get(name);
+            if (existing) {
+                // In the database under its name: nothing compiled to compare it with.
+                if (existing.status === "live") listed.set(name, { ...existing, status: "both", generated: false, rule: index });
+                return;
+            }
+            listed.set(name, {
+                ...uncompiledPolicy(rule, operations[position] ?? "all", name, tableName),
+                status: "code_only",
+                generated: false,
+                rule: index
+            });
+        });
+    });
 
     return [...listed.values()];
 }

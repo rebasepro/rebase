@@ -5,19 +5,24 @@ import { en } from "../../app/src/locales/en";
 import React from "react";
 import { describe, expect, it, jest, beforeEach } from "@jest/globals";
 import { render, screen } from "@testing-library/react";
+import { col, defineTable } from "@rebasepro/types";
+import type { AnyTableDef } from "@rebasepro/types";
+import type { TableDescriptorsState } from "@rebasepro/app";
+import { servedTables } from "./helpers/servedTables";
+import { NO_TABLES, readyTables } from "./helpers/tableDescriptors";
 
 /**
- * Which collection the RLS editor attributes a live table to.
+ * Which declared table the RLS editor attributes a live table to.
  *
  * It matched a table to any collection whose `id`, `path`, `table`, `slug` or
  * `collectionId` equalled the table's name, in any schema. So an unmapped
- * table named like another collection's slug — or a same-named table in
- * another schema — was taken for that collection: it listed the collection's
- * generated policies as missing from the table, and offered to import the
- * table's own policies into the collection.
+ * table named like another table's slug — or a same-named table in another
+ * schema — was taken for that table: it listed the declared generated
+ * policies as missing from the table, and offered to import the table's own
+ * policies into the declaration.
  *
- * A collection maps the table `db push` writes for it: `getTableName`, in the
- * schema it declares or `public`.
+ * A declared table maps the SQL table the server says it is, in the schema
+ * the server says.
  */
 
 /** The live tables, as `pg_tables` rows. */
@@ -26,7 +31,9 @@ let liveTables: { schemaname: string; tablename: string }[] = [];
 /** The live policies, as `pg_policies` rows. */
 let livePolicies: Record<string, unknown>[] = [];
 
-let collections: Record<string, unknown>[] = [];
+let tables: TableDescriptorsState = NO_TABLES;
+const declare = (...defs: AnyTableDef[]) => { tables = readyTables(servedTables(defs)); };
+const columns = { id: col.serial().primaryKey() };
 
 const executeSql = jest.fn<(sql: string) => Promise<unknown>>(async (sql: string) => {
     if (sql.includes("pg_tables")) return { rows: liveTables.map(t => ({ ...t, rowsecurity: true })) };
@@ -49,7 +56,7 @@ jest.mock("@rebasepro/app", () => ({
     useTranslation: () => translation,
     useNavigationGroupLabel: () => (group: string) => group,
     useStudioSchemaEditing: () => ({ available: true, updateCollection: jest.fn() }),
-    useStudioCollectionRegistry: () => ({ collections, getCollection: () => undefined }),
+    useTableDescriptors: () => tables,
     useStudioCapabilities: () => ({ codebase: true }),
     useApiBase: () => "http://api.test/api",
     useApiConfig: () => ({ getAuthToken: async () => "token" }),
@@ -66,7 +73,7 @@ beforeEach(() => {
     executeSql.mockClear();
     liveTables = [];
     livePolicies = [];
-    collections = [];
+    tables = NO_TABLES;
 });
 
 /** Load the editor on its one table, which holds one hand-written policy. */
@@ -96,30 +103,30 @@ function isAttributed(): boolean {
     return importOffered;
 }
 
-describe("the collection a live table belongs to", () => {
+describe("the declared table a live table belongs to", () => {
     it("is not the one whose slug is the table's name, when its table is another", async () => {
-        collections = [{ slug: "writers", table: "authors" }];
+        declare(defineTable("writers", { table: "authors", columns, rls: "admin-only" }));
         await loadTable("public", "writers");
 
         expect(isAttributed()).toBe(false);
     });
 
     it("is not one whose table is in another schema", async () => {
-        collections = [{ slug: "authors" }];
+        declare(defineTable("authors", { columns, rls: "admin-only" }));
         await loadTable("archive", "authors");
 
         expect(isAttributed()).toBe(false);
     });
 
-    it("is the one whose table it is, by the table `db push` derives from the slug", async () => {
-        collections = [{ slug: "blogPosts" }];
+    it("is the one whose SQL table it is, whatever its slug", async () => {
+        declare(defineTable("blogPosts", { table: "blog_posts", columns, rls: "admin-only" }));
         await loadTable("public", "blog_posts");
 
         expect(isAttributed()).toBe(true);
     });
 
     it("is the one that declares the table's schema", async () => {
-        collections = [{ slug: "authors", schema: "app" }];
+        declare(defineTable("authors", { schema: "app", columns, rls: "admin-only" }));
         await loadTable("app", "authors");
 
         expect(isAttributed()).toBe(true);

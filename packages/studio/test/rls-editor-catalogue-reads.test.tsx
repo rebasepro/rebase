@@ -5,6 +5,7 @@ import { en } from "../../app/src/locales/en";
 import React from "react";
 import { describe, expect, it, jest, beforeEach } from "@jest/globals";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { NO_TABLES } from "./helpers/tableDescriptors";
 
 /**
  * How often the RLS editor reads the catalogue.
@@ -39,7 +40,7 @@ jest.mock("@rebasepro/app", () => ({
     useTranslation: () => translation,
     useNavigationGroupLabel: () => (group: string) => group,
     useStudioSchemaEditing: () => ({ available: true, updateCollection: jest.fn() }),
-    useStudioCollectionRegistry: () => ({ collections: [], getCollection: () => undefined }),
+    useTableDescriptors: () => NO_TABLES,
     useStudioCapabilities: () => ({ codebase: true }),
     useApiBase: () => "http://api.test/api",
     useApiConfig: () => ({ getAuthToken: async () => "token" }),

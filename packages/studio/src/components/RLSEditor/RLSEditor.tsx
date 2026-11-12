@@ -1,5 +1,4 @@
-
-import { useStudioCollectionRegistry, useStudioCapabilities, useStudioSchemaEditing } from "@rebasepro/app";
+import { useStudioCapabilities, useStudioSchemaEditing, useTableDescriptors } from "@rebasepro/app";
 import { useApiBase, useApiConfig } from "@rebasepro/app";
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
@@ -27,34 +26,30 @@ import {
     Typography
 } from "@rebasepro/ui";
 import { useRebaseContext, useSnackbarController, ErrorView, useTranslation, ConfirmationDialog } from "@rebasepro/app";
-import { isPostgresCollectionConfig } from "@rebasepro/types";
-import { REBASE_INTERNAL_SCHEMAS, REBASE_INTERNAL_PREFIXES, JUNCTION_TABLES_SQL, getTableName } from "@rebasepro/common";
-import { adminRequestPolicyName, getPolicyNamesForRules } from "@rebasepro/utils";
-import { resolveJunctionSpecs, getJunctionSecurityRules, getEffectiveSecurityRulesOnce, policyToSecurityRule } from "@rebasepro/common";
+import { REBASE_INTERNAL_SCHEMAS, REBASE_INTERNAL_PREFIXES, JUNCTION_TABLES_SQL, policyToSecurityRule } from "@rebasepro/common";
+import { adminRequestPolicyName } from "@rebasepro/utils";
 import { PolicyEditor } from "./PolicyEditor";
 import { saveRules, isCancellation } from "./saveRules";
 import { applyPolicyEdit, type PolicyEditRefusal } from "./policyRules";
-import { listPolicies, readPolicyRoles, type ListedPolicy } from "./policyListing";
+import { declaredPoliciesOf, listPolicies, readPolicyRoles, type DeclaredPolicies, type ListedPolicy } from "./policyListing";
 import { quoteIdentifier } from "../../utils/sql_utils";
+import { schemaSourceProblem, SchemaSourceProblemAlert } from "../schema-source";
 
 type TableCategory = "collection" | "junction" | "internal" | "other";
 
 /**
- * Whether `collection` is the one `db push` writes `table` for: the table
- * `getTableName` derives, in the schema the collection declares or `public` —
- * the planner's own resolution.
+ * Whether `descriptor` is the table the server declares for a live table: the
+ * same SQL table in the same schema, as the server resolved both.
  *
- * This matched a table to any collection whose `id`, `path`, `table`, `slug`
- * or `collectionId` equalled its name, in any schema. So an unmapped table
- * named like another collection's slug, or a same-named table in another
- * schema, was taken for that collection: it listed the collection's policies
- * as missing from the table, and offered to import the table's own policies
- * into the collection. And a collection that leaves `table` to a slug that is
- * not already snake case mapped nothing.
+ * Matched once by name, a table was taken for any collection whose `id`,
+ * `path`, `table`, `slug` or `collectionId` equalled its name, in any schema.
+ * So an unmapped table named like another table's slug, or a same-named table
+ * in another schema, was taken for that table: it listed the declared
+ * policies as missing from the table, and offered to import the table's own
+ * policies into the declaration. A view is never a `pg_tables` row.
  */
-function mapsTable(collection: CollectionConfig, table: { schemaName: string; tableName: string }): boolean {
-    if (!isPostgresCollectionConfig(collection)) return false;
-    return getTableName(collection) === table.tableName && (collection.schema || "public") === table.schemaName;
+function mapsTable(descriptor: TableDescriptor, table: { schemaName: string; tableName: string }): boolean {
+    return descriptor.kind === "table" && descriptor.table === table.tableName && descriptor.schema === table.schemaName;
 }
 
 /** What the editor says when an edit has no declared rule to go back to. */
@@ -68,7 +63,7 @@ const POLICY_EDIT_REFUSALS: Record<PolicyEditRefusal, string> = {
 function classifyTableClient(
     tableName: string,
     schemaName: string,
-    junctionTableNames: Set<string>,
+    isJunction: boolean,
     isMappedToCollection: boolean
 ): TableCategory {
     // A table the project's own schema maps is the CUSTOMER'S, whatever schema
@@ -92,13 +87,13 @@ function classifyTableClient(
     ) {
         return "internal";
     }
-    if (junctionTableNames.has(tableName)) return "junction";
+    if (isJunction) return "junction";
     return "other";
 }
 
 // Re-exported for the components that used to import it from here.
 export type { PostgresPolicy } from "@rebasepro/types";
-import type { CollectionConfig, PostgresPolicy } from "@rebasepro/types";
+import type { JunctionPolicyDescriptor, PostgresPolicy, SecurityRule, TableDescriptor } from "@rebasepro/types";
 
 interface TableRLSStatus {
     schemaName: string;
@@ -186,7 +181,12 @@ function SidebarTableRow({ table, isSelected, onSelect, badge, dimmed, t }: {
 export const RLSEditor = ({ apiUrl = "" }: { apiUrl?: string }) => {
     const { databaseAdmin } = useRebaseContext();
     const snackbarController = useSnackbarController();
-    const collectionRegistry = useStudioCollectionRegistry();
+    // The tables the server declares, with the policies it compiles for each:
+    // the server is the one compiler, this editor only compares its answer
+    // with what Postgres holds.
+    const descriptors = useTableDescriptors();
+    const schemaProblem = schemaSourceProblem(descriptors);
+    const declaredTables = descriptors.tables;
     const { codebase: hasCodebase } = useStudioCapabilities();
     const apiConfig = useApiConfig();
     /* `apiUrl` is a bare origin; the routes live under the backend's
@@ -195,16 +195,23 @@ export const RLSEditor = ({ apiUrl = "" }: { apiUrl?: string }) => {
 
     const schemaEditing = useStudioSchemaEditing();
 
-    /** Through the plan/apply dialog when there is one — see `saveRules`. */
+    /**
+     * Through the plan/apply dialog when there is one — see `saveRules`. A
+     * save changes the source the served tables come from, so they are asked
+     * for again: the declared side of the list follows the edit.
+     */
+    const reloadDeclared = descriptors.reload;
     const saveSecurityRules = useCallback(
-        (collectionId: string, securityRules: unknown[]) =>
-            saveRules(
+        async (slug: string, securityRules: unknown[]) => {
+            await saveRules(
                 schemaEditing,
                 { apiBase, getAuthToken: apiConfig?.getAuthToken },
-                collectionId,
+                slug,
                 securityRules
-            ),
-        [apiBase, apiConfig, schemaEditing]);
+            );
+            reloadDeclared();
+        },
+        [apiBase, apiConfig, schemaEditing, reloadDeclared]);
 
     /** Closing the plan dialog is an answer, not a failure — see `saveRules`. */
     const reportSaveFailure = useCallback((e: unknown) => {
@@ -463,6 +470,28 @@ export const RLSEditor = ({ apiUrl = "" }: { apiUrl?: string }) => {
         return tables.find(t => `${t.schemaName}.${t.tableName}` === selectedTable) || null;
     }, [selectedTable, tables]);
 
+    /**
+     * Every junction the server derives, with its policies, by
+     * `schema.table`. A junction has no descriptor of its own: it is listed
+     * under each table that declares a relation through it.
+     */
+    const servedJunctions = useMemo(() => {
+        const junctions = new Map<string, JunctionPolicyDescriptor>();
+        for (const table of declaredTables) {
+            for (const junction of table.rls.junctions ?? []) {
+                junctions.set(`${junction.schema}.${junction.table}`, junction);
+            }
+            // Without the compiled policies (no `schema:read`) the relation
+            // still names its junction: it is still the platform's table.
+            for (const relation of table.relations) {
+                if (relation.kind !== "manyToMany") continue;
+                const key = `${table.schema}.${relation.through.table}`;
+                if (!junctions.has(key)) junctions.set(key, { table: relation.through.table, schema: table.schema, policies: [] });
+            }
+        }
+        return junctions;
+    }, [declaredTables]);
+
     /** Categorize tables into 4 buckets for the sidebar. */
     const categorizedTables = useMemo(() => {
         const groups: Record<TableCategory, TableRLSStatus[]> = {
@@ -473,48 +502,65 @@ export const RLSEditor = ({ apiUrl = "" }: { apiUrl?: string }) => {
         };
 
         tables.forEach(table => {
-            const isMapped = !!collectionRegistry.collections?.some(c => mapsTable(c, table));
-            const cat = classifyTableClient(table.tableName, table.schemaName, junctionTableNames, isMapped);
+            const isMapped = declaredTables.some(descriptor => mapsTable(descriptor, table));
+            const isJunction = junctionTableNames.has(table.tableName) || servedJunctions.has(`${table.schemaName}.${table.tableName}`);
+            const cat = classifyTableClient(table.tableName, table.schemaName, isJunction, isMapped);
             groups[cat].push(table);
         });
 
         return groups;
-    }, [tables, junctionTableNames, collectionRegistry.collections]);
+    }, [tables, junctionTableNames, servedJunctions, declaredTables]);
 
-    const activeCollection = useMemo(() => {
+    /** The table the server declares for the selected one, if any. */
+    const activeDescriptor = useMemo(() => {
         if (!activeTableData) return null;
-        return collectionRegistry.collections?.find(c => mapsTable(c, activeTableData)) || null;
-    }, [activeTableData, collectionRegistry.collections]);
-
-    /** The category of the currently selected table. */
-    const activeTableCategory = useMemo((): TableCategory | null => {
-        if (!activeTableData) return null;
-        const isMapped = !!activeCollection;
-        return classifyTableClient(activeTableData.tableName, activeTableData.schemaName, junctionTableNames, isMapped);
-    }, [activeTableData, activeCollection, junctionTableNames]);
+        return declaredTables.find(descriptor => mapsTable(descriptor, activeTableData)) ?? null;
+    }, [activeTableData, declaredTables]);
 
     /**
      * The junction a relation derives this table as, when it is one. Its
      * policies are Rebase's — derived from the endpoints' relations — and the
-     * server re-creates them on every start, like a collection's. `null` when
-     * the registry's collections carry no resolvable relations (serialized
-     * configs without relation closures).
+     * server re-creates them on every start, like a declared table's.
      */
-    const activeJunctionSpec = useMemo(() => {
-        if (!activeTableData || activeCollection) return null;
-        try {
-            const registryCollections = (collectionRegistry.collections ?? []) as Parameters<typeof resolveJunctionSpecs>[0];
-            return resolveJunctionSpecs(registryCollections).get(activeTableData.tableName) ?? null;
-        } catch {
-            return null;
-        }
-    }, [activeTableData, activeCollection, collectionRegistry.collections]);
+    const activeJunction = useMemo(() => {
+        if (!activeTableData || activeDescriptor) return null;
+        return servedJunctions.get(`${activeTableData.schemaName}.${activeTableData.tableName}`) ?? null;
+    }, [activeTableData, activeDescriptor, servedJunctions]);
+
+    /** The category of the currently selected table. */
+    const activeTableCategory = useMemo((): TableCategory | null => {
+        if (!activeTableData) return null;
+        const isJunction = Boolean(activeJunction) || junctionTableNames.has(activeTableData.tableName);
+        return classifyTableClient(activeTableData.tableName, activeTableData.schemaName, isJunction, Boolean(activeDescriptor));
+    }, [activeTableData, activeDescriptor, activeJunction, junctionTableNames]);
 
     /**
      * Whether the server re-asserts this table's RLS on every start: it switches
      * RLS back on and re-creates every policy the project declares for it.
      */
-    const activeTableManaged = Boolean(activeCollection || activeJunctionSpec);
+    const activeTableManaged = Boolean(activeDescriptor || activeJunction);
+
+    /**
+     * What the server says the selected table's policies are — `undefined`
+     * when it declares none, or withheld them from this caller.
+     */
+    const activeDeclared = useMemo((): DeclaredPolicies | undefined => {
+        if (activeDescriptor) return declaredPoliciesOf(activeDescriptor.rls);
+        // Only from the compiled answer: a junction listed from a relation
+        // alone (policies withheld) has nothing to compare against.
+        if (activeJunction && activeJunction.policies.length > 0) return { rules: [], policies: activeJunction.policies };
+        return undefined;
+    }, [activeDescriptor, activeJunction]);
+
+    /**
+     * The table is declared, but this caller is not shown what it compiles to
+     * (no `schema:read`): the list is what the database holds, and nothing is
+     * written to the declaration — its raw rules may be redacted.
+     */
+    const declaredWithheld = activeDescriptor !== null && activeDeclared === undefined;
+
+    /** A save to the declaration needs the declaration, and a codebase to write it into. */
+    const savesToCodebase = activeDescriptor !== null && hasCodebase;
 
     /**
      * What Postgres enforces on the selected table, and what the code declares
@@ -528,29 +574,9 @@ export const RLSEditor = ({ apiUrl = "" }: { apiUrl?: string }) => {
      */
     const mergedPolicies = useMemo((): ListedPolicy[] => {
         if (!activeTableData) return [];
-
-        const listed = listPolicies(
-            activeTableData.policies || [],
-            activeCollection,
-            activeTableData.tableName,
-            collectionRegistry.collections ?? []
-        );
-
-        // Junction tables have no collection, but their policies are generated
-        // too — derived from the endpoints' relations. Recognise them so they
-        // don't show as hand-written SQL ("DB Only").
-        if (activeJunctionSpec) {
-            const generatedNames = getPolicyNamesForRules(getJunctionSecurityRules(activeJunctionSpec), activeJunctionSpec.table);
-            for (const p of listed) {
-                if (generatedNames.has(p.policyname)) {
-                    p.status = "both";
-                    p.generated = true;
-                }
-            }
-        }
-
-        return listed.sort((a, b) => a.policyname.localeCompare(b.policyname));
-    }, [activeTableData, activeCollection, activeJunctionSpec, collectionRegistry.collections]);
+        return listPolicies(activeTableData.policies || [], activeDeclared, activeTableData.tableName)
+            .sort((a, b) => a.policyname.localeCompare(b.policyname));
+    }, [activeTableData, activeDeclared]);
 
     // Stats for the info tab
     const rlsStats = useMemo(() => {
@@ -864,26 +890,28 @@ totalPolicies };
                                      * live, so write it there — the same path unmapped
                                      * tables have always used.
                                      */
-                                    if (activeCollection && hasCodebase) {
-                                        // Collection-mapped table: save via schema-editor API.
+                                    if (savesToCodebase && activeDescriptor) {
+                                        // A declared table: save its rules to the source.
                                         // The editor edits a `PostgresPolicy`, whose `roles`
                                         // is the `TO` list — `policyToSecurityRule` files it
                                         // under `pgRoles`, never `roles`.
-                                        const existingRules = (isPostgresCollectionConfig(activeCollection) ? activeCollection.securityRules : undefined) || [];
-                                        let newRules;
+                                        if (declaredWithheld) {
+                                            snackbarController.open({ type: "error",
+                                                message: t("studio_rls_save_needs_schema_read", { table: activeTableData.tableName }) });
+                                            return;
+                                        }
+                                        // The rules as written. A table on the project's
+                                        // `defaultRls` serves those rules, and saving one
+                                        // edit writes them into the table as its own.
+                                        const existingRules: readonly SecurityRule[] = activeDescriptor.rls.rules;
+                                        let newRules: unknown[];
                                         if (editingPolicy === "new") {
                                             newRules = [...existingRules, policyToSecurityRule(newPolicy)];
                                         } else {
                                             // Back to the rule the policy compiles from, or
                                             // a refusal that says why there is none — never
                                             // the unchanged rules reported as saved.
-                                            const edit = applyPolicyEdit(
-                                                existingRules,
-                                                getEffectiveSecurityRulesOnce(activeCollection),
-                                                activeTableData.tableName,
-                                                editingPolicy,
-                                                newPolicy
-                                            );
+                                            const edit = applyPolicyEdit(existingRules, editingPolicy, newPolicy);
                                             if (!edit.ok) {
                                                 snackbarController.open({ type: "error",
                                                     message: t(POLICY_EDIT_REFUSALS[edit.reason], { policy: editingPolicy.policyname }) });
@@ -902,12 +930,11 @@ totalPolicies };
 
                                         try {
                                             await saveSecurityRules(
-                                                // The slug: `updateCollection` finds collections
-                                                // by it. A Postgres collection has no `id`, so
-                                                // this was the *table* name, which found nothing
-                                                // when it differed from the slug — and the save
+                                                // The slug: the schema editor finds tables by
+                                                // it. Addressed by the *table* name, a save
+                                                // found nothing when the two differed — and
                                                 // wrote a new file holding only these rules.
-                                                activeCollection.slug,
+                                                activeDescriptor.slug,
                                                 newRules
                                             );
 
@@ -992,12 +1019,23 @@ message: e instanceof Error ? e.message : String(e) });
                             <div className="flex-grow flex flex-col overflow-hidden">
                                 <div className="p-6 pt-4 flex-grow overflow-auto bg-surface-sheet">
                                     <div className="max-w-4xl mx-auto flex flex-col gap-6">
+                                    {/* Without the served tables the list is only what the
+                                        database holds: say why, rather than file every table
+                                        under "Other Tables" as if the project declared none. */}
+                                    {schemaProblem && <SchemaSourceProblemAlert problem={schemaProblem}/>}
+                                    {activeTableData && declaredWithheld && (
+                                        <Alert color="info">
+                                            <Typography variant="caption">
+                                                {t("studio_rls_declared_withheld", { table: activeTableData.tableName })}
+                                            </Typography>
+                                        </Alert>
+                                    )}
                                     {/* A table the server re-asserts on every start, where
                                         this editor writes straight to the database: what is
                                         changed here does not outlive the next start. Where
                                         saves go to the source instead, the source is what
                                         the next start applies. */}
-                                    {activeTableData && activeTableManaged && !(activeCollection && hasCodebase) && (
+                                    {activeTableData && activeTableManaged && !savesToCodebase && (
                                         <Alert color="info">
                                             <div className="flex items-start gap-2">
                                                 <RefreshCwIcon size={16} className="shrink-0 mt-0.5"/>
@@ -1081,7 +1119,7 @@ message: e instanceof Error ? e.message : String(e) });
                                                 color="neutral"
                                                 onClick={() => setEditingPolicy("new")}
                                                 className="shrink-0 whitespace-nowrap"
-                                                disabled={!activeCollection}
+                                                disabled={!activeDescriptor}
                                             >
                                                 {t("studio_rls_create_policy")}
                                             </Button>
@@ -1138,7 +1176,7 @@ message: e instanceof Error ? e.message : String(e) });
                                                         {/* Writes a collection source file, so it needs a
                                                             codebase on the other end. In the console the
                                                             endpoint is not mounted and the button 404'd. */}
-                                                        {policy.status === "live" && activeCollection && hasCodebase && (
+                                                        {policy.status === "live" && savesToCodebase && activeDescriptor && !declaredWithheld && (
                                                             <Button
                                                                 size="small"
                                                                 variant="outlined"
@@ -1152,12 +1190,11 @@ message: e instanceof Error ? e.message : String(e) });
                                                                     // a gate everybody passes.
                                                                     const rule = policyToSecurityRule(policy);
 
-                                                                    const existingRules = (isPostgresCollectionConfig(activeCollection) ? activeCollection.securityRules : undefined) || [];
-                                                                    const newRules = [...existingRules, rule];
+                                                                    const newRules: unknown[] = [...activeDescriptor.rls.rules, rule];
 
                                                                     try {
                                                                         await saveSecurityRules(
-                                                                            activeCollection.slug,
+                                                                            activeDescriptor.slug,
                                                                             newRules
                                                                         );
 
@@ -1215,7 +1252,7 @@ message: "Policy imported successfully" });
                                         </div>
                                     )}
 
-                                    {activeTableData && mergedPolicies.length === 0 && !activeTableData.rlsEnabled && activeCollection && (
+                                    {activeTableData && mergedPolicies.length === 0 && !activeTableData.rlsEnabled && activeDescriptor && (
                                         <div className="flex flex-col items-center justify-center py-12 text-center">
                                             <AlertTriangleIcon size={40} className="text-yellow-400 dark:text-yellow-600 mb-4"/>
                                             <Typography variant="subtitle2" className="text-text-secondary dark:text-text-secondary-dark mb-2">

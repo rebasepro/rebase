@@ -5,6 +5,11 @@ import { en } from "../../app/src/locales/en";
 import React from "react";
 import { describe, expect, it, jest, beforeEach } from "@jest/globals";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { col, defineTable } from "@rebasepro/types";
+import type { SecurityRule } from "@rebasepro/types";
+import type { TableDescriptorsState } from "@rebasepro/app";
+import { servedTables } from "./helpers/servedTables";
+import { readyTables } from "./helpers/tableDescriptors";
 
 /**
  * The RLS editor lists what the database enforces.
@@ -17,12 +22,28 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
  * all. Where the editor writes straight to the database (the hosted console),
  * opening such a policy and pressing Save recreated it without its condition: a
  * restrictive tenancy gate with no USING restricts nothing.
+ *
+ * What the code declares is what the server serves: the table's rules and the
+ * policies it compiles from them (`rls.policies`). The editor compiles nothing.
  */
 
 const updateCollection = jest.fn<(id: string, patch: Record<string, unknown>) => Promise<void>>();
 let hasCodebase = true;
 let livePolicies: Record<string, unknown>[] = [];
-let declaredRules: Record<string, unknown>[] = [];
+/**
+ * The server's `writers` table, stored in `authors`: a different word on
+ * purpose, so a save addressed by table name shows. Declaring no rules is the
+ * admin-only posture — the baseline alone.
+ */
+function served(rules: SecurityRule[]): TableDescriptorsState {
+    const [first, ...rest] = rules;
+    return readyTables(servedTables([defineTable("writers", {
+        table: "authors",
+        columns: { id: col.serial().primaryKey() },
+        rls: first ? [first, ...rest] : "admin-only"
+    })]));
+}
+let tables = served([]);
 const snackbarOpen = jest.fn<(options: { type: string; message: string }) => void>();
 
 const executeSql = jest.fn<(sql: string) => Promise<unknown>>(async (sql: string) => {
@@ -52,12 +73,7 @@ jest.mock("@rebasepro/app", () => ({
     useTranslation: () => translation,
     useNavigationGroupLabel: () => (group: string) => group,
     useStudioSchemaEditing: () => ({ available: true, updateCollection }),
-    useStudioCollectionRegistry: () => ({
-        collections: [{ slug: "writers",
-table: "authors",
-securityRules: declaredRules }],
-        getCollection: () => undefined
-    }),
+    useTableDescriptors: () => tables,
     useStudioCapabilities: () => ({ codebase: hasCodebase }),
     useApiBase: () => "http://api.test/api",
     useApiConfig: () => ({ getAuthToken: async () => "token" }),
@@ -121,7 +137,7 @@ beforeEach(() => {
     executeSql.mockClear();
     snackbarOpen.mockClear();
     livePolicies = [];
-    declaredRules = [];
+    tables = served([]);
     hasCodebase = true;
 });
 
@@ -233,7 +249,7 @@ describe("a table whose policies the deployment owns", () => {
 describe("saving a declared policy with nothing changed", () => {
 
     it("does not say it was saved", async () => {
-        declaredRules = [{ name: "public_read", operation: "select", using: "true" }];
+        tables = served([{ name: "public_read", operation: "select", using: "true" }]);
         render(<RLSEditor/>);
 
         fireEvent.click(within(await rowOf("public_read"))
@@ -247,7 +263,7 @@ describe("saving a declared policy with nothing changed", () => {
     });
 
     it("is still saved once something has changed", async () => {
-        declaredRules = [{ name: "public_read", operation: "select", using: "true" }];
+        tables = served([{ name: "public_read", operation: "select", using: "true" }]);
         render(<RLSEditor/>);
 
         fireEvent.click(within(await rowOf("public_read"))
