@@ -1,523 +1,385 @@
 ---
 title: Relations
 sidebar_label: Relations
-description: Define one-to-one, one-to-many, and many-to-many SQL relations between collections with foreign keys, junction tables, and multi-hop joins.
+description: "Link tables with rel.belongsTo, hasOne, hasMany, manyToMany and via: foreign keys bound or derived, junction tables with _pivot columns, delete rules, naming rules and multi-hop joins."
 ---
 
-## Overview
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
-Relations define how collections are connected at the database level. They enable Rebase to:
+A table's `relations` name the links it has to other tables. Each one is a
+`rel.*` call, and its key is the relation's name: what `include` asks for, what
+a nested path such as `/api/data/users/1/posts` reads, and what a write names to
+set the link.
 
-- Render **relation picker fields** in entity forms
-- Resolve **related entities** when displaying previews
-- Generate **foreign key constraints** in the Drizzle schema
-- Support **cascade delete/update** behaviors
+```ts
+// backend/schema/posts.ts
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { users } from "./users";
+import { tags } from "./tags";
 
-Relations can be defined either inline within the property, or explicitly in the `relations` array of a collection:
-
-### 1. Inline Relations (Recommended)
-
-Declare the link on the property, nested under `relation`. Pick the `kind` and
-the type offers exactly the fields that kind needs.
-
-```typescript
-import { defineCollection } from "@rebasepro/cms-types";
-const postsCollection = defineCollection({
-    slug: "posts",
-    name: "Posts",
-    table: "posts",
-    properties: {
-        title: { type: "string", name: "Title" },
-        content: { type: "string", name: "Content", admin: { multiline: true } },
-        author: {
-            type: "relation",
-            name: "Author",
-            relation: {
-                kind: "belongsTo",
-                target: () => usersCollection
-            }
-        }
-    }
-});
-```
-
-### 2. Explicit Relations Array
-
-For a link with no property of its own — nothing to name it by in the form or in
-a table column — declare it in `relations`:
-
-```typescript
-import { defineCollection } from "@rebasepro/cms-types";
-const usersCollection = defineCollection({
-    slug: "users",
-    name: "Users",
-    table: "users",
-    properties: {
-        name: { type: "string", name: "Name" }
+export const posts = defineTable("posts", {
+    columns: {
+        id:    col.uuid().primaryKey().defaultRandom(),
+        title: col.text().notNull(),
     },
-    relations: [
-        {
-            kind: "hasMany",
-            relationName: "posts",
-            target: () => postsCollection
-        }
-    ]
+    relations: {
+        author: rel.belongsTo(() => users, { notNull: true, onDelete: "restrict" }),
+        tags:   rel.manyToMany(() => tags, { pivot: { sortOrder: col.integer().default(0) } }),
+    },
+    rls: "admin-only",
 });
 ```
+
+The target is a thunk, `() => users`, so two tables can point at each other
+whatever order their modules load in. A relation may point at a table or a view.
+
+:::note[Coming from collections?]
+Relations are no longer properties. The foreign-key column of a `belongsTo` is
+derived from the relation, or bound to a column you declare. The upgrade guide
+for this release shows the mapping.
+:::
 
 ## The five kinds
 
-A relation is one of five kinds. The kind decides where the key lives, whether
-one row or many come back, and what a write through it may touch.
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
-| Kind | The key lives | Returns | Notes |
+| Kind | The key lives | Returns | Options |
 |---|---|---|---|
-| `belongsTo` | on **this** table | one | `localKey`, defaults to `<relationName>_id` |
-| `hasOne` | on the **target's** table | one | `foreignKeyOnTarget`, defaults to the singular of this collection plus `_id` (`users` → `user_id`) |
-| `hasMany` | on the **target's** table | many | children belong to this parent alone |
-| `manyToMany` | in a **junction table** | many | rows are shared; you own the link |
-| `via` | an explicit `joinPath` | either | writable when single-hop, read-only otherwise; state `cardinality` yourself |
+| `rel.belongsTo` | on **this** table | one row | `localKey`, `notNull`, `unique`, `onDelete`, `onUpdate`, `index`, `constraint` |
+| `rel.hasOne` | on the **target** table, unique | one row | `foreignKey`, `sourceKey` |
+| `rel.hasMany` | on the **target** table | many rows | `foreignKey`, `sourceKey`, `orderBy` |
+| `rel.manyToMany` | in a **junction table** | many rows | `through`, `sourceKey`, `targetKey`, `pivot`, `onDelete` |
+| `rel.via` | where `steps` say | one or many | `steps` (required), `cardinality` |
 
-Every field is optional except `kind` and `target` (and, on `via`, `cardinality`
-and `joinPath`) — the rest is derived.
+Every option is optional except `steps` on `rel.via`. The rest is derived, by
+the rules in [Names](#names).
 
-### belongsTo — the key is on this table
+## belongsTo — the key is on this table
 
-```typescript
-author: {
-    type: "relation",
-    name: "Author",
-    relation: { kind: "belongsTo", target: () => usersCollection }
-}
-// → posts.author_id
-```
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
-The column is
-indexed for you: Postgres indexes the key a foreign key points at, never the
-column holding it, so without one every `hasMany` include and nested listing
-from the other side scans this table. `index: false` keeps the constraint and
-drops the index — see [Foreign keys are indexed for you](/docs/backend/indexes#foreign-keys-are-indexed-for-you)
-for when that is worth it, and for when Rebase skips it on its own because
-another index already serves the column.
+`belongsTo` puts the foreign key on the declaring table. The key's SQL column is
+`localKey`, and `<relation name in the singular>_id` when that is omitted:
+`author` is `author_id`.
 
-### hasMany / hasOne — the key is on theirs
+The relation either **binds** to a column you declared, or **derives** one:
 
-```typescript
-relations: [
-    { kind: "hasMany", relationName: "posts", target: () => postsCollection }
-]
-// → reads posts.user_id
-```
+- **Bound.** When `columns` has a column whose SQL name is `localKey`, the
+  relation uses it. Its type must be the type of the target's key, and its
+  modifiers (`.notNull()`, `.unique()`) say what the link is.
+- **Derived.** Otherwise the relation adds the column after the declared ones,
+  with the type of the target's key. Its wire key is the camelCase of its column:
+  `author_id` is served as `authorId`. `notNull: true` and `unique: true` on the
+  relation apply to this derived column.
 
-`hasOne` is the same link with at most one row on the far side.
+```ts
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { users } from "./users";
 
-#### Joining on a natural key
+// Derived: an `author_id` column, served as `authorId`.
+export const notes = defineTable("notes", {
+    columns: { id: col.uuid().primaryKey().defaultRandom() },
+    relations: { author: rel.belongsTo(() => users, { notNull: true }) },
+    rls: "admin-only",
+});
 
-By default the target's foreign key holds the source row's **id**. When the two
-sides are joined on something else — an external identity id, a SKU, a tenant
-slug — name that column with `sourceKey`:
-
-```typescript
-relations: [
-    {
-        kind: "hasMany",
-        relationName: "applications",
-        target: () => applicationsCollection,
-        sourceKey: "auth_user_id",          // column on THIS table
-        foreignKeyOnTarget: "auth_user_id"  // column on the TARGET's table
-    }
-]
-// → reads applications.auth_user_id = talents.auth_user_id
-```
-
-`sourceKey` is the mirror of `localKey` on `belongsTo`: that one names the
-column this side reads *from*, this one names the column the other side points
-*at*. Without it a link like the above is not expressible as `hasMany` at all
-and has to drop to [`via`](#via--an-explicit-join-chain), which is read-only for
-a chain like this one.
-
-The column must be unique. A link that addresses more than one source row
-cannot say which one a related row belongs to, and Postgres will not accept a
-foreign key against a non-unique column either. Rebase checks this at read
-time and refuses rather than picking one.
-
-A parent whose `sourceKey` is `NULL` reaches no rows, and writing through the
-relation is an error — there is nothing for the related rows to point at.
-
-### manyToMany — through a junction
-
-```typescript
-tags: {
-    type: "relation",
-    name: "Tags",
-    relation: { kind: "manyToMany", target: () => tagsCollection }
-}
-// → junction `posts_tags` (both table names, sorted), columns post_id / tag_id
-```
-
-Both sides declare their own, and each writes `through` **from its own point of
-view** — `sourceColumn` always names *this* collection:
-
-```typescript
-// on posts
-{ kind: "manyToMany", relationName: "tags", target: () => tagsCollection,
-  through: { table: "posts_tags", sourceColumn: "post_id", targetColumn: "tag_id" } }
-
-// on tags
-{ kind: "manyToMany", relationName: "posts", target: () => postsCollection,
-  through: { table: "posts_tags", sourceColumn: "tag_id", targetColumn: "post_id" } }
-```
-
-### via — an explicit join chain
-
-For links the four shapes above cannot express: multi-hop paths, composite keys,
-or a join whose condition is not a plain foreign key.
-
-A **single-hop** chain is writable through a create or update, the way the kind
-it stands in for is written:
-
-- a **to-one** chain of **one step** — the target row holds the key, so
-  `{ badge: "b-1" }` points that row's column at this one, and `null` unlinks it,
-  as a `hasOne` write does;
-- a **to-many** chain of **two steps through one table** between the ends — that
-  table holds the links, so `{ tags: ["t-1", "t-2"] }` sets them as its rows, as a
-  `manyToMany` write does (a `via` carries no `_pivot`).
-
-Anything longer is **read-only**: Rebase will not infer how to write through an
-arbitrary chain. A create or update naming one is refused with
-`400 RELATION_NOT_WRITABLE`, and the admin form shows the field without a picker.
-A nested write (`PATCH users/1/permissions/3`) through any `via` is refused the
-same way.
-
-```typescript
-{
-    kind: "via",
-    relationName: "permissions",
-    target: () => permissionsCollection,
-    cardinality: "many",
-    joinPath: [
-        { table: "user_roles",       on: { from: "id",            to: "user_id" } },
-        { table: "role_permissions", on: { from: "role_id",       to: "role_id" } },
-        { table: "permissions",      on: { from: "permission_id", to: "id" } }
-    ]
-}
-```
-
-## Relation Properties
-
-To render a relation field in a form, add a property with `type: "relation"`:
-
-```typescript
-properties: {
-    author: {
-        type: "relation",
-        name: "Author",
-        relation: { kind: "belongsTo", target: () => usersCollection },
-        // Which control draws it is presentation, so it goes in the admin block:
-        // "select" (dropdown) or "dialog" (full picker).
-        admin: { widget: "select" }
-    }
-}
-```
-
-When rendering a preview (like in a table cell or a reference chip), Rebase handles hydration automatically.
-
-### To-one gets a picker, many gets a tab
-
-The cardinality decides the surface, and only one surface is used:
-
-- **`belongsTo` / `hasOne`** — one row, so the property is a foreign key the
-  author edits. It renders as the picker above.
-- **`hasMany` / `manyToMany`** — many rows, so the entity view lists them as a
-  **tab** of their own. The property is not rendered in the form: a collection's
-  children are a list, not a value the record holds, and selecting them from a
-  dropdown is not something the form can meaningfully offer.
-
-Declaring a many-relation as a property is still worth doing — it is what names
-the tab, and what gives the relation a column in the collection table, which the
-list fetch hydrates so the child rows show up as chips on the row. Only the form
-field is dropped.
-
-In the table, a relation with a property of its own gets **one** column: its own.
-Every tab also has a jump-to-tab button column, but for a property-declared
-relation that button repeated the same heading beside a column already showing
-the children, so it is dropped. Hide the relation's column
-(`admin: { hideFromCollection: true }`) and the button comes back, so the
-relation never falls out of the table entirely.
-
-Hiding the column does not stop the fetch. The collection's list read embeds
-every relation a property declares, hidden or not, so code that reads list
-rows — `additionalFields`, display resolvers, entity actions, collection
-actions through `tableController.rows`, plugin slots — finds the related rows
-there, nested under the relation's name as REST's `include` returns them, beside
-the foreign-key column. A `browserCallbacks.afterRead` is handed the same row. A relation declared only in the collection's `relations`
-array, with no property, is not embedded in the list; its rows load when its
-tab opens.
-
-If you want the inline picker anyway, ask for it:
-
-```typescript
-properties: {
-    tags: {
-        type: "relation",
-        name: "Tags",
-        relation: { kind: "manyToMany", target: () => tagsCollection },
-        admin: { renderInForm: true }   // off by default; the tab is the default treatment
-    }
-}
-```
-
-## Multi-Hop Joins
-
-For relationships that traverse multiple tables, use `kind: "via"` with a `joinPath`.
-A chain longer than one link is read-only: Rebase will not infer how to write
-through an arbitrary chain (see [via](#via--an-explicit-join-chain) for the
-single-hop chains it does write).
-
-```typescript
-// Users → Permissions through Roles
-relations: [
-    {
-        kind: "via",
-        relationName: "permissions",
-        target: () => permissionsCollection,
-        cardinality: "many",
-        joinPath: [
-            {
-                table: "user_roles",
-                on: { from: "id", to: "user_id" }
-            },
-            {
-                table: "roles",
-                on: { from: "role_id", to: "id" }
-            },
-            {
-                table: "role_permissions",
-                on: { from: "id", to: "role_id" }
-            },
-            {
-                table: "permissions",
-                on: { from: "permission_id", to: "id" }
-            }
-        ]
-    }
-]
-```
-
-### Composite Key Joins
-
-```typescript
-joinPath: [
-    {
-        table: "customers",
-        on: {
-            from: ["company_code", "region_id"],  // Multiple columns
-            to: ["code", "region_id"]
-        }
-    }
-]
-```
-
-### Matching either of two columns
-
-A list in `on` joins a row meeting **any one** condition — a link kept in `a` or `b`. It is **read-only**.
-
-```typescript
-joinPath: [{ table: "friendships", on: [{ from: "id", to: "a" }, { from: "id", to: "b" }] }]
-```
-
-Adding a second step to `people` (`on: [{ from: "a", to: "id" }, { from: "b", to: "id" }]`) also matches the parent's own column, so each person comes back as their own friend: list the friendship rows, or filter the person out.
-
-## Cascade Rules
-
-Control what happens when related entities are updated or deleted:
-
-```typescript
-relations: [
-    {
-        kind: "belongsTo",
-        relationName: "author",
-        target: () => usersCollection,
-        localKey: "author_id",
-        onDelete: "cascade",    // Delete posts when user is deleted
-        onUpdate: "cascade"     // Update FK when user ID changes
-    }
-]
-```
-
-| Action | Behavior |
-|--------|----------|
-| `"cascade"` | Propagate the change to related rows |
-| `"restrict"` | Prevent the operation if related rows exist |
-| `"no action"` | Same as restrict (defer to constraint check) |
-| `"set null"` | Set the FK column to NULL |
-| `"set default"` | Set the FK column to its default value |
-
-### What you get when you say nothing
-
-`onDelete` is optional, so most relations never name one. The default depends on
-whether the relation is required:
-
-| Relation | Default `onDelete` |
-|--------|----------|
-| `belongsTo`, optional | `"set null"` — the pointer is emptied |
-| `belongsTo`, `validation: { required: true }` | `"restrict"` — the parent delete fails |
-| `manyToMany` (junction rows) | `"cascade"` — the link goes, the target stays |
-
-A required relation is **not** a cascade. `required` says a child cannot exist
-without a parent; it does not say deleting the parent should destroy the child.
-Those are different claims, and only one of them removes rows you did not name.
-So the default fails the delete and names the constraint, and `"cascade"` is
-something you ask for:
-
-```typescript
-{
-    kind: "belongsTo",
-    relationName: "order",
-    target: () => ordersCollection,
-    // A line item is meaningless without its order — say so.
-    onDelete: "cascade"
-}
-```
-
-`onUpdate` has no default: with nothing set, Postgres applies `NO ACTION`. Set
-`"cascade"` when the target's key is something a person can edit — a slug, a SKU
-— so the pointers follow it.
-
-## Fetching Relations in the SDK
-
-When querying data through the Rebase typed SDK, relations are **not** included by default. Use the `include()` method to request related entities alongside the primary data.
-
-### Include specific relations
-
-```typescript
-const { data } = await client.data.articles
-    .include("author", "categories")
-    .find();
-```
-
-### Include all relations
-
-```typescript
-const { data } = await client.data.articles
-    .include("*")
-    .find();
-```
-
-### Using params syntax
-
-```typescript
-const { data } = await client.data.articles.find({
-    include: ["author", "categories"]
+// Bound: `authorId` is the column `author_id`, so the relation uses it.
+export const drafts = defineTable("drafts", {
+    columns: {
+        id:       col.uuid().primaryKey().defaultRandom(),
+        authorId: col.uuid().notNull(),
+    },
+    relations: { author: rel.belongsTo(() => users) },
+    rls: "admin-only",
 });
 ```
 
-### Response structure
+Binding keeps every physical column visible in `columns`, at the position you
+choose. Deriving is shorter. Both produce the same table.
 
-When included, the response contains both the **scalar foreign key** and the **hydrated relation object**:
+A relation and a column may not share a key: the relation's key is what
+`include` names, so the foreign-key column needs a key of its own (`authorId`,
+not `author`). Two relations may not use the same column.
+
+| Option | Default | What it does |
+|---|---|---|
+| `localKey` | `<singular name>_id` | The SQL column holding the key. |
+| `notNull` | `false` | The derived column is `NOT NULL`. On a bound column, write `.notNull()` on the column instead. |
+| `unique` | `false` | The derived column is `UNIQUE`, which makes the link one-to-one. On a bound column, write `.unique()`. |
+| `onDelete` | `restrict` when the column is `NOT NULL`, `set null` otherwise | What happens to this row when the target row is deleted. See [Delete and update rules](#delete-and-update-rules). |
+| `onUpdate` | none (Postgres applies `NO ACTION`) | What happens when the target's key changes. |
+| `index` | `true` | `false` skips the index on the foreign-key column. |
+| `constraint` | `true` | `false` stores the key without a `FOREIGN KEY` constraint. |
+
+The foreign-key column is indexed unless `index: false`: Postgres indexes the
+key a foreign key points at, never the column holding it, so without one every
+read from the other side scans this table. See
+[Foreign keys are indexed for you](/docs/backend/indexes#foreign-keys-are-indexed-for-you).
+
+## hasOne and hasMany — the key is on the target
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+`hasMany` reads rows of the target that point back at this one. `hasOne` is the
+same link with at most one row on the far side. Neither adds a column here: the
+target declares the `belongsTo` that holds the key.
+
+```ts
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { posts } from "./posts";
+import { profiles } from "./profiles";
+
+export const authors = defineTable("authors", {
+    columns: { id: col.uuid().primaryKey().defaultRandom(), name: col.text().notNull() },
+    relations: {
+        // reads posts.author_id
+        posts:   rel.hasMany(() => posts, { foreignKey: "author_id", orderBy: ["createdAt", "desc"] }),
+        // reads profiles.author_id, which is unique
+        profile: rel.hasOne(() => profiles, { foreignKey: "author_id" }),
+    },
+    rls: "admin-only",
+});
+```
+
+`foreignKey` is the SQL column on the target, and defaults to
+`<this table's slug in the singular>_id`: on `authors`, `author_id`. `orderBy`
+on `hasMany` is the order related rows come back in when the caller names none.
+
+### Joining on a natural key
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+By default the target's key holds this row's primary key. When the two sides are
+joined on something else (an external identity id, a SKU), `sourceKey` names
+the column on this table:
+
+```ts
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { applications } from "./applications";
+
+export const talents = defineTable("talents", {
+    columns: {
+        id:         col.uuid().primaryKey().defaultRandom(),
+        authUserId: col.text().notNull().unique(),
+    },
+    relations: {
+        // applications.auth_user_id = talents.auth_user_id
+        applications: rel.hasMany(() => applications, { sourceKey: "auth_user_id", foreignKey: "auth_user_id" }),
+    },
+    rls: "admin-only",
+});
+```
+
+The `sourceKey` column must be unique: a link that addresses several source
+rows cannot say which one a related row belongs to. A row whose `sourceKey` is
+`NULL` reaches no related rows, and writing through the relation is an error.
+
+## manyToMany — through a junction
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+`manyToMany` links rows through a junction table that Rebase creates, with
+row-level security of its own. Removing a link deletes the junction row, never
+the target.
+
+```ts
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { users } from "./users";
+
+export const projects = defineTable("projects", {
+    columns: { id: col.uuid().primaryKey().defaultRandom(), name: col.text().notNull() },
+    relations: {
+        members: rel.manyToMany(() => users, {
+            through: "project_members",
+            pivot: {
+                role:    col.enum(["owner", "editor", "viewer"]).notNull().default("viewer"),
+                addedAt: col.timestamptz().onCreateNow(),
+            },
+        }),
+    },
+    rls: "admin-only",
+});
+```
+
+| Option | Default | What it does |
+|---|---|---|
+| `through` | the two SQL table names, sorted, joined by `_` | The junction table. Always in the `public` schema. |
+| `sourceKey` | `<this table's slug in the singular>_id` | The junction column pointing at this table. |
+| `targetKey` | `<relation name in the singular>_id` | The junction column pointing at the target. |
+| `pivot` | none | Extra columns on the junction, built with `col.*`. |
+| `onDelete` | `cascade` | What happens to a link when either row is deleted. |
+
+Both sides of one link may declare it, each from its own point of view:
+`sourceKey` always names the declaring table's column. Two relations that
+resolve to the same junction table with different key columns are refused.
+
+### `_pivot`: the junction's own columns
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+`pivot` columns are read and written under `_pivot`. A read that includes the
+relation serves each related row with its link's columns:
+
+```json
+{ "id": "p1", "name": "Website", "members": [
+    { "id": "u7", "email": "ada@example.com", "_pivot": { "role": "owner", "addedAt": "2026-11-02T09:14:00Z" } }
+] }
+```
+
+A write sets the links as a list, and an element may carry the `_pivot` the link
+should hold:
+
+```json
+{ "members": [{ "id": "u7", "_pivot": { "role": "owner" } }, "u9"] }
+```
+
+Pivot columns take every column modifier except `.primaryKey()`: the junction's
+key is its two link columns.
+
+### `_count`: how many related rows
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+An include of a to-many relation (`hasMany`, `manyToMany`, a to-many `via`) can
+ask for the total alongside a limited page of rows, served under the row's
+`_count`. It is counted in the same statement, under the same filters and
+row-level security. See
+[Counting what a limit leaves out](/docs/sdk/relations#counting-what-a-limit-leaves-out).
+
+## via — an explicit join chain
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+`via` reads through joins you spell out: several hops, composite keys, or a
+condition that is not a plain foreign key.
+
+```ts
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { permissions } from "./permissions";
+
+export const members = defineTable("members", {
+    columns: { id: col.uuid().primaryKey().defaultRandom() },
+    relations: {
+        permissions: rel.via(() => permissions, {
+            steps: [
+                { table: "member_roles",     on: { from: "id",            to: "member_id" } },
+                { table: "role_permissions", on: { from: "role_id",       to: "role_id" } },
+                { table: "permissions",      on: { from: "permission_id", to: "id" } },
+            ],
+        }),
+    },
+    rls: "admin-only",
+});
+```
+
+Each step joins `table`, with `from` naming a column of the previous table (this
+one, for the first step) and `to` a column of `table`. A list of columns on both
+sides joins on a composite key: `on: { from: ["company_code", "region_id"], to:
+["code", "region_id"] }`. A list of conditions in `on` joins a row meeting any
+one of them, and is read-only.
+
+`cardinality` is `"many"` unless you write `"one"`. Two chains can be written
+through, the way the kind they stand in for is written:
+
+- a **to-one** chain of **one step**: the target row holds the key, as with
+  `hasOne`;
+- a **to-many** chain of **two steps through one table** between the ends: that
+  table holds the links, as with `manyToMany` (with no `_pivot`).
+
+Every other chain is read-only. A create or update naming it is refused with
+`400 RELATION_NOT_WRITABLE`, and so is a nested write through any `via`.
+
+## Delete and update rules
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+| Action | Behaviour |
+|---|---|
+| `"cascade"` | Delete or update the related rows too |
+| `"restrict"` | Refuse the delete while related rows exist |
+| `"no action"` | As `restrict`, checked at the end of the statement |
+| `"set null"` | Empty the foreign-key column |
+| `"set default"` | Set the foreign-key column to its default |
+
+When `onDelete` is not set, a nullable `belongsTo` empties the pointer
+(`set null`), a `NOT NULL` one refuses the delete (`restrict`), and a
+`manyToMany` link is deleted with either row (`cascade`). `NOT NULL` says a row
+cannot exist without its parent; it does not say deleting the parent should
+delete the row. Ask for `"cascade"` when that is what you mean: it is the one
+value that removes rows you did not name.
+
+## Names
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+Every name a relation uses is derived when you do not write it. The rules are
+the ones a deployed database already has, so they do not move between releases.
+
+| Name | Rule | `posts` with relation `author` → `users` |
+|---|---|---|
+| `belongsTo` column | `localKey`, else `<singular relation name>_id` | `author_id` |
+| `belongsTo` wire key | the camelCase of the column | `authorId` |
+| `hasOne` / `hasMany` column on the target | `foreignKey`, else `<singular slug of this table>_id` | `post_id` on the target |
+| junction table | `through`, else both SQL table names sorted, joined by `_` | `posts_tags` for `posts` ↔ `tags` |
+| junction column to this table | `sourceKey`, else `<singular slug of this table>_id` | `post_id` |
+| junction column to the target | `targetKey`, else `<singular relation name>_id` | `tag_id` for relation `tags` |
+
+A derived foreign key has the type of the key it points at. A key of type
+`serial` is pointed at by a plain `integer` of the same width, and an enum key by
+its own enum type.
+
+A `belongsTo` relation's name stands for its foreign-key column wherever a table
+names a column: in `indexes`, in `tenant`, and in a rule's `ownerField` or
+condition.
+
+## Reading and writing relations
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+Relations are not included in a read unless the caller asks:
 
 ```typescript
-const { data } = await client.data
-    .collection<{ id: string; authorId: string; author?: { name: string } }>("articles")
-    .include("author")
+const { data } = await client.data.posts
+    .include("author", "tags")
     .find();
-
-// The SDK returns flat rows — there is no `.values` wrapper. (`Entity`, with
-// `id`/`path`/`values`, is an admin-UI view model, not what the client hands back.)
-for (const article of data) {
-    // Scalar FK — always present
-    article.authorId;     // "uuid-1234"
-
-    // Hydrated relation — only present when included
-    article.author?.name;  // "Jane Doe"
-}
 ```
 
-> The relation names passed to `include()` must match the relation's name: the `relationName` of an entry in the collection's `relations` array, or the key of the property that declares it inline.
+A row then carries both the foreign key and the related row:
+`post.authorId` is always there, `post.author` only when included. The
+[typed SDK](/docs/sdk/relations/) covers includes in full: per-relation limits,
+filters, ordering and nesting.
 
-For the full query builder reference (filtering, sorting, pagination, real-time), see the [typed SDK documentation](/docs/sdk).
+A write sets a to-one link by its key (`{ author: "u7" }` or
+`{ authorId: "u7" }`) and a to-many link as a list of target ids or `{ id }`
+objects (`{ tags: ["t1", "t2"] }`). See [Writing data](/docs/sdk/writing/).
 
-## Relations in the admin panel
+In the CMS, every to-many relation becomes a tab under the record. See
+[Relations in the admin panel](/docs/collections/relations-in-the-admin-panel/).
 
-Every to-many relation (`hasMany`, `manyToMany`, or a to-many `via`) becomes a tab under a record in the admin panel, addressed by the relation's name. [Relations in the admin panel](/docs/collections/relations-in-the-admin-panel/) covers the paths, what a tab creates, links, unlinks or deletes, the same rules over REST, and what does not become a tab.
+## What is refused
 
-## Full Relation Interface
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
-`Relation` is a closed union — one member per kind, each carrying only the
-fields that kind has. There is no combination of fields that describes two
-different links, and no field you can set that the kind does not use.
+`rel.via()` without steps throws when the module loads. When the schema is
+compiled, a table is refused for:
 
-```typescript
-type Relation =
-    | BelongsToRelation
-    | HasOneRelation
-    | HasManyRelation
-    | ManyToManyRelation
-    | ViaRelation;
+- a relation whose target is not a table or view of the schema;
+- a relation and a column with the same key;
+- a bound column whose type is not the target key's type, or a `notNull` or
+  `unique` on the relation that the bound column does not carry;
+- two relations using one foreign-key column, or a derived column whose key or
+  SQL name another column already has;
+- a `belongsTo` pointing at a table with a composite key, a `hasOne` or
+  `hasMany` from one without a `sourceKey`, or a `manyToMany` with either side
+  composite: one column cannot reference several, so express it with
+  `rel.via()`;
+- two `manyToMany` relations resolving to one junction table with different key
+  columns.
 
-interface RelationBase {
-    relationName?: string;          // defaults to the property key, then the target's slug
-    target: () => CollectionConfig;
-    onUpdate?: OnAction;
-    onDelete?: OnAction;
-    overrides?: Partial<CollectionConfig>;   // applied when rendered as a tab
-}
-// `required` is not here. It is `validation: { required: true }` on the
-// property that declares the relation, the same key every other field uses.
+## Next steps
 
-interface BelongsToRelation extends RelationBase {
-    kind: "belongsTo";
-    localKey?: string;              // column on THIS table
-    index?: boolean;                // btree on localKey; defaults to true
-}
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
-interface HasOneRelation extends RelationBase {
-    kind: "hasOne";
-    foreignKeyOnTarget?: string;    // column on the TARGET's table
-    sourceKey?: string;             // column on THIS table; defaults to the primary key
-}
-
-interface HasManyRelation extends RelationBase {
-    kind: "hasMany";
-    foreignKeyOnTarget?: string;    // column on the TARGET's table
-    sourceKey?: string;             // column on THIS table; defaults to the primary key
-}
-
-interface ManyToManyRelation extends RelationBase {
-    kind: "manyToMany";
-    through?: {
-        table?: string;
-        sourceColumn?: string;
-        targetColumn?: string;
-        properties?: Properties;    // extra columns on the junction row, served under `_pivot`
-    };
-}
-
-interface ViaRelation extends RelationBase {
-    kind: "via";
-    cardinality: "one" | "many";    // a join chain cannot imply it
-    joinPath: JoinStep[];
-}
-```
-
-### The resolved form
-
-What you write above is the *authoring* shape. Internally Rebase works with
-`ResolvedRelation`: the same link with every default filled in and nothing
-optional, plus `cardinality`, `targetSlug`, and two flags — `writable` (false
-only for a multi-hop `via` or one with a step matching any of several conditions) and `shared` (true when the target rows belong to other parents
-too, so a removal unlinks rather than deletes).
-
-`sourceKey` is the one exception to "nothing optional": its default is the
-source's primary key, and resolving that needs the driver's schema, which
-resolution does not have. `undefined` there means "the primary key" and nothing
-else.
-
-You never write a `ResolvedRelation`. On a relation property, `relation` is
-yours and `resolvedRelation` is the filled-in one, stamped during
-normalization.
-
-## Next Steps
-
-- **[Security Rules](/docs/collections/security-rules)** — Row Level Security
-- **[Properties](/docs/collections/properties)** — Property types reference
+- [Row-level security](/docs/collections/security-rules/): who reaches the rows at either end
+- [Indexes](/docs/backend/indexes/): the foreign-key index and composite indexes over relations
+- [Typed SDK relations](/docs/sdk/relations/): `include`, per-relation limits, `_count`

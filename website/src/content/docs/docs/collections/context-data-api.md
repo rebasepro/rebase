@@ -1,31 +1,31 @@
 ---
 title: The context.data API
 sidebar_label: context.data API
-description: Read and write other collections from inside a callback with context.data — its methods, the privileges it runs with, transaction semantics, and the connection a callback holds.
+description: Read and write other tables from inside a table hook with context.data — its methods, the privileges it runs with, transaction semantics, and the connection a hook holds.
 ---
 
-Every callback receives a `context` object that includes `context.data` — a unified data access layer for performing **cross-collection operations** from within lifecycle hooks.
+Every [table hook](/docs/collections/callbacks/) receives a `context` object that includes `context.data`: the data layer for reading and writing **other tables** from inside the hook.
 
-## Accessing Collections
+## Accessing tables
 
-`context.data` uses a JavaScript Proxy, so you can access any collection by its slug as a property:
+`context.data` uses a JavaScript Proxy, so you can access any table by its slug as a property:
 
 ```typescript
 afterSave: async ({ values, id, context }) => {
-    // Dynamic property access — works for any collection slug
+    // Dynamic property access — works for any table slug
     const jobs = context.data.jobs;
     const users = context.data.users;
 
     // Alternatively, use the .collection() method for dynamic slugs
-    const collectionName = "jobs";
-    const accessor = context.data.collection(collectionName);
+    const slug = "jobs";
+    const accessor = context.data.collection(slug);
 }
 ```
 
-A property is the collection's accessor, the name the generated SDK gives it:
-`context.data.myNotes` is the `my-notes` collection, whatever table it is
-stored in. A name that is no collection's accessor is read as its snake_case,
-so `context.data.auditLog` is `audit_log`.
+A property is the table's accessor, the name the generated SDK gives it:
+`context.data.myNotes` is the table whose slug is `my-notes`, whatever SQL
+table it is stored in. A name that is no table's accessor is read as its
+snake_case, so `context.data.auditLog` is `audit_log`.
 
 Rows are untyped (`Record<string, unknown>`) until the project registers its
 generated `Database`; then every accessor is typed from it. See
@@ -33,18 +33,18 @@ generated `Database`; then every accessor is typed from it. See
 
 ## Available Methods
 
-Each collection accessor (`context.data.<slug>`) provides these methods:
+Each table accessor (`context.data.<slug>`) provides these methods:
 
 | Method | Signature | Description |
 |--------|-----------|-------------|
-| `.find()` | `find(params?: FindParams) → FindResult` | Query entities with filters, sorting, and pagination |
+| `.find()` | `find(params?: FindParams) → FindResult` | Query rows with filters, sorting, and pagination |
 | `.findById()` | `findById(id: string \| number) → Row \| undefined` | Fetch a single row by ID |
 | `.create()` | `create(data: Insert, id?: string \| number) → Row` | Create a new row, and return it as stored |
 | `.update()` | `update(id: string \| number, data: Update) → Row` | Update an existing row, and return it as stored |
 | `.delete()` | `delete(id: string \| number) → void` | Delete a record |
-| `.count()` | `count(params?: FindParams) → number` | Count matching entities |
+| `.count()` | `count(params?: FindParams) → number` | Count matching rows |
 | `.listen()` | `listen(params, onUpdate, onError?) → unsubscribe` | Real-time subscription (where supported) |
-| `.listenById()` | `listenById(id, onUpdate, onError?) → unsubscribe` | Listen to a single entity |
+| `.listenById()` | `listenById(id, onUpdate, onError?) → unsubscribe` | Listen to a single row |
 | `.trash` | `trash.find()`, `.count()`, `.restore(id)`, `.restoreMany(ids)`, `.purge(id)`, `.purgeMany(ids)` | The rows a [soft delete](/docs/collections/soft-delete#from-the-sdk) stamped |
 
 ## Querying with `.find()`
@@ -71,23 +71,23 @@ afterSave: async ({ values, context }) => {
 }
 ```
 
-## Creating Entities
+## Creating rows
 
 `.create()` and `.update()` take the values to write, with the signatures above.
-[Syncing Data Between Collections](/docs/collections/callbacks#syncing-data-between-collections) uses both:
+[Writing to other tables](/docs/collections/callbacks/#writing-to-other-tables) uses both:
 an approved submission creates a published job and is linked back to it.
 
 ## Security: which privileges `context.data` runs with
 
 :::important
-**`context.data` inherits the privileges of whatever triggered the callback.** It is not a fixed trust level.
+**`context.data` inherits the privileges of whatever triggered the hook.** It is not a fixed trust level.
 
-- Triggered by a **user request** (REST, realtime, an admin-panel edit) → **user-scoped**. The callback runs inside the RLS-bound transaction opened for that request, so policies apply to reads *and* writes. A callback cannot see a row its caller could not.
-- Triggered by **`rebase.dataAsAdmin` or a cron job** (the same singleton) → **admin-scoped**, not unscoped. That driver is scoped as `{ uid: "service", roles: ["admin"] }`, so the callback still runs on an RLS-bound transaction — your policies are evaluated, against that identity.
+- Triggered by a **user request** (REST, realtime, an edit in the CMS) → **user-scoped**. The hook runs inside the RLS-bound transaction opened for that request, so policies apply to reads *and* writes. A hook cannot see a row its caller could not.
+- Triggered by **`rebase.dataAsAdmin` or a cron job** (the same singleton) → **admin-scoped**, not unscoped. That driver is scoped as `{ uid: "service", roles: ["admin"] }`, so the hook still runs on an RLS-bound transaction — your policies are evaluated, against that identity.
 - Triggered by **the base driver** (built-in auth flows, migrations) → **unscoped**. It runs on the owner connection and bypasses RLS.
 :::
 
-This matters most in the direction that fails quietly. RLS *filters*, it does not raise — so a callback that reads a sibling row will find it when an admin task saves and may find nothing when an end user saves, with no error either way. Write callbacks that tolerate an empty result, or reach for the admin plane deliberately:
+This matters most in the direction that fails quietly. RLS *filters*, it does not raise — so a hook that reads a sibling row will find it when an admin task saves and may find nothing when an end user saves, with no error either way. Write hooks that tolerate an empty result, or reach for the admin plane deliberately:
 
 ```typescript
 afterSave: async ({ context }) => {
@@ -96,7 +96,7 @@ afterSave: async ({ context }) => {
 
     // Deliberately admin-scoped — for work the caller genuinely may not see,
     // such as an audit trail they must not be able to read or edit. Note this
-    // is an admin's reach, not a bypass: a collection whose only rule is
+    // is an admin's reach, not a bypass: a table whose only rule is
     // `policy.serverContext()` stays closed to it, since that compiles to
     // `rebase.uid() IS NULL` and this accessor's uid is `service`.
     // `dataAsAdmin` is always there server-side; its type allows for the
@@ -106,7 +106,7 @@ afterSave: async ({ context }) => {
 ```
 
 :::caution[`dataAsAdmin` is a second connection, not part of this write]
-On Postgres, `context.client.dataAsAdmin` inside a request's callback runs in a
+`context.client.dataAsAdmin` inside a request's hook runs in a
 transaction of its own, on another pooled connection, while the triggering
 write's transaction is still open. So it commits on its own, and stays if the
 write rolls back. It also cannot see the row being saved, which is not committed
@@ -116,18 +116,18 @@ yet, and must not write it:
   that references `articles`) fails its key check, and the caller's write fails
   with it.
 - An admin write to the row being saved, or to any row this write has locked,
-  waits for the write's lock while the write waits for the callback. Postgres
+  waits for the write's lock while the write waits for the hook. Postgres
   cannot see that as a deadlock, so the request hangs until `statement_timeout`
   (30 seconds by default) and then fails.
 
 For a record that has to reference the row, write it with `context.data`, which
 rides the write's transaction, or enqueue a [job](/docs/backend/jobs): a job
-enqueued from the callback commits with the write, and its handler runs after
+enqueued from the hook commits with the write, and its handler runs after
 the commit.
 :::
 
 :::caution[This page used to say the opposite]
-Earlier versions of this page stated that callbacks always bypass RLS and have "full database access regardless of the triggering user's permissions". That was wrong, and wrong in the unsafe direction — it invited callbacks written on the assumption that they could always see everything.
+Earlier versions of this page stated that hooks (then called callbacks) always bypass RLS and have "full database access regardless of the triggering user's permissions". That was wrong, and wrong in the unsafe direction — it invited hooks written on the assumption that they could always see everything.
 
 The behaviour above is verified end-to-end against Postgres by the `"scopes context.data to the caller when a callback runs on a user request"` case in `@rebasepro/server-postgres`' RLS-enforcement suite.
 :::
@@ -135,15 +135,15 @@ The behaviour above is verified end-to-end against Postgres by the `"scopes cont
 ## Transaction Semantics
 
 :::important
-**A callback's `context.data` writes are part of the write that triggered it.** On Postgres, `beforeSave`, the save and `afterSave` — or `beforeDelete`, the delete and `afterDelete` — run inside one transaction, each callback awaited before the commit, and `context.data` writes through that same transaction.
+**A hook's `context.data` writes are part of the write that triggered it.** `beforeSave`, the save and `afterSave` — or `beforeDelete`, the delete and `afterDelete` — run inside one transaction, each hook awaited before the commit, and `context.data` writes through that same transaction.
 :::
 
-So the triggering write and everything its callbacks wrote commit together or not at all:
+So the triggering write and everything its hooks wrote commit together or not at all:
 
-- A throw from `afterSave` or `afterDelete` rolls the triggering write back, along with every `context.data` write the callbacks made. The caller is answered **400 `CALLBACK_REJECTED`** with `details.stage` naming the hook — or with the error's own status when it carries one: a `RebaseApiError` you threw, a unique violation's 409.
+- A throw from `afterSave` or `afterDelete` rolls the triggering write back, along with every `context.data` write the hooks made. The caller is answered **400 `CALLBACK_REJECTED`** with `details.stage` naming the hook — or with the error's own status when it carries one: a `RebaseApiError` you threw, a unique violation's 409.
 - Realtime subscribers hear about the row only after the commit, so a write that rolled back is never announced.
-- A callback holds the transaction open while it runs, so a slow one is a lock held and a pooled connection tied up — `beforeSave` and `beforeDelete` as much as the `after` hooks. See [A callback holds a connection](#a-callback-holds-a-connection).
-- A `context.data` write runs the target collection's callbacks too, so an `afterSave` that updates its own row runs itself again. Writes nested more than 16 deep are refused with **500 `CALLBACK_RECURSION`**, naming the hook and the collection, and the whole write rolls back. Make such a write conditional, as the example below does.
+- A hook holds the transaction open while it runs, so a slow one is a lock held and a pooled connection tied up — `beforeSave` and `beforeDelete` as much as the `after` hooks. See [A hook holds a connection](#a-hook-holds-a-connection).
+- A `context.data` write runs the target table's hooks too, so an `afterSave` that updates its own row runs itself again. Writes nested more than 16 deep are refused with **500 `CALLBACK_RECURSION`**, naming the hook and the table, and the whole write rolls back. Make such a write conditional, as the example below does.
 
 Let a failure throw when the triggering write should not survive it. Catch it when it should, but only around a `context.data` **write**: a create, update or delete the database refuses (a unique or foreign key violation, a trigger) is undone on its own, and the rest commits.
 
@@ -151,7 +151,7 @@ Any other statement that fails on the write's transaction — a lookup, the read
 
 ```typescript
 afterSave: async ({ values, id, status, context }) => {
-    // The update below saves this collection again, which runs this callback
+    // The update below saves this table again, which runs this hook
     // again: act on creates only, or it never stops.
     if (status !== "new") return;
     try {
@@ -166,21 +166,19 @@ afterSave: async ({ values, id, status, context }) => {
 }
 ```
 
-Work that has to leave the database — an email, a webhook, a call to a third-party API — does not belong in the callback body. It would hold the transaction open for a network round trip, and nothing can take it back when the write rolls back. Enqueue a [job](/docs/backend/jobs) for it, or do it after the write returns: publish on a [realtime channel](/docs/backend/realtime), or use `waitUntil` in a [custom function](/docs/backend/custom-functions). [Hooks](/docs/backend/hooks#side-effects-that-must-not-hold-the-transaction) says which fits.
+Work that has to leave the database — an email, a webhook, a call to a third-party API — does not belong in the hook body. It would hold the transaction open for a network round trip, and nothing can take it back when the write rolls back. Enqueue a [job](/docs/backend/jobs) for it, or do it after the write returns: publish on a [realtime channel](/docs/backend/realtime), or use `waitUntil` in a [custom function](/docs/backend/custom-functions). [Hooks](/docs/backend/hooks#side-effects-that-must-not-hold-the-transaction) says which fits.
 
-On MongoDB none of this holds. That driver runs the same callbacks without a transaction, so the write is already stored when `afterSave` runs, and a throw there reports the failure without undoing it.
+## A hook holds a connection
 
-## A callback holds a connection
-
-On Postgres a write runs on one connection checked out of the database pool,
-and every callback runs on it: `beforeSave` and `beforeDelete` after the
+A write runs on one connection checked out of the database pool, and every
+hook runs on it: `beforeSave` and `beforeDelete` after the
 transaction has begun, `afterSave` and `afterDelete` before it commits. For as
-long as a callback runs — awaiting a lookup, a computation, anything — that
+long as a hook runs — awaiting a lookup, a computation, anything — that
 connection serves nothing else, and the locks the write has taken stay taken:
 in `afterSave`, the row just written; in a bulk or [`_batch`](/docs/backend/writes/#cross-collection-batches)
 write, every row the transaction wrote before it.
 
-The cost is the callback's own duration, and concurrent writes add it up:
+The cost is the hook's own duration, and concurrent writes add it up:
 
 - The pool holds 20 connections by default (`DB_POOL_MAX`). 25 saves at once
   whose `beforeSave` awaited 300 ms made an unrelated one-row read take 290 ms,
@@ -191,7 +189,7 @@ The cost is the callback's own duration, and concurrent writes add it up:
 
 So:
 
-- Keep anything slow out of callbacks. A call to another service belongs in a
+- Keep anything slow out of hooks. A call to another service belongs in a
   [job](/docs/backend/jobs), or after the write returns.
 - Look up what a hook needs before the write when you can — in the client, or
   in a [custom function](/docs/backend/custom-functions) that then writes.
@@ -201,5 +199,5 @@ So:
 - With
   `REBASE_METRICS=true`, `/metrics` reports `rebase_db_pool_wait_ms`: how long
   each query waited for a connection. A healthy pool keeps it near zero; a tail
-  that grows with traffic is requests queueing for connections that callbacks
+  that grows with traffic is requests queueing for connections that hooks
   hold. See [Metrics](/docs/deployment/self-hosting/#metrics).

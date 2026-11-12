@@ -1,33 +1,32 @@
 ---
 title: Field access
 sidebar_label: Field access
-description: Per-property read and write permissions by role. A caller the row's security rules let through still does not receive a field their roles cannot read.
+description: "Per-column read and write permissions by role with .access(), columns that never leave the server with .private(), and columns clients cannot write with .readOnly(). A caller the row's policies let through still does not receive a column their roles cannot read."
 ---
 
-## Overview
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
-[Security rules](/docs/collections/security-rules/) decide which **rows** a caller
-reaches. `access` decides which **fields of a reached row** they see and may set.
+[Row-level security](/docs/collections/security-rules/) decides which **rows** a
+caller reaches. Three column modifiers decide which **columns of a reached row**
+they see and may set:
 
-```typescript
-import { defineCollection } from "@rebasepro/cms-types";
+| Modifier | Read | Write |
+|---|---|---|
+| `.access({ read, write })` | the roles in `read`, when given | the roles in `write`, when given |
+| `.private()` | nobody, through the API | nobody, through the API |
+| `.readOnly()` | as the row | nobody, through the API |
 
-const staff = defineCollection({
-    slug: "staff",
-    name: "Staff",
-    table: "staff",
-    properties: {
-        id: { type: "number", isId: "increment" },
-        name: { type: "string" },
-        salary: {
-            type: "number",
-            // Read by HR (and admins). Set by nobody through the API.
-            access: { read: ["hr"], write: [] }
-        }
+```ts
+import { defineTable, col } from "@rebasepro/server/schema";
+
+export const staff = defineTable("staff", {
+    columns: {
+        id:     col.integer().primaryKey().identity(),
+        name:   col.text().notNull(),
+        // Read by HR (and admins). Set by nobody through the API.
+        salary: col.numeric(10, 2).access({ read: ["hr"], write: [] }),
     },
-    securityRules: [
-        { operation: "select", access: "public" }
-    ]
+    rls: [{ operation: "select", access: "public" }],
 });
 ```
 
@@ -37,12 +36,14 @@ one, and nobody sets it over HTTP.
 
 ## The rule
 
-`access` has two optional lists, and an omitted list is not an empty one — the
-difference is the whole feature.
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+`.access()` takes two optional lists, and an omitted list is not an empty one —
+the difference is the whole feature.
 
 | `read` / `write` | Means |
 |------------------|-------|
-| omitted | Delegate to the row. Everyone the collection's security rules let read (or write) the row gets the field. |
+| omitted | Delegate to the row. Everyone the table's `rls` lets read (or write) the row gets the column. |
 | `[]` | Nobody, through the API, at any privilege — not `admin`, not the service key, not an in-process read. |
 | `["hr"]` | A caller holding `hr`, **or** `admin`, **or** trusted server code with no request behind it. |
 
@@ -65,16 +66,22 @@ verifying a password — reads with no roles at all, and a role list does not
 apply to it. `[]` still does: that is a statement about the API surface rather
 than about who is calling.
 
-A callback's `context.data` is not that plane. Inside a request it reads with the
+A hook's `context.data` is not that plane. Inside a request it reads with the
 caller's roles, so the field rules apply to what it reads exactly as they apply
 to the request.
 
-## `excludeFromApi` is the same mechanism
+## `.private()` and `.readOnly()` are the same mechanism
 
-`excludeFromApi: true` is sugar for `access: { read: [], write: [] }`. There is
-one predicate behind both spellings, so everything on this page applies to the
-flag too. Write whichever reads better — but not both on one property, which is
-refused at boot.
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+`.private()` is `.access({ read: [], write: [] })`, with one difference: a
+private column is also left out of OpenAPI, the SDK types and the MCP tool
+schemas, so its name is not public either (see [Queries](#queries)). A column
+cannot be both `.private()` and declare `.access()`; the schema is refused.
+
+`.readOnly()` is `write: []`: nobody writes the column through the API, whatever
+their role, while defaults, triggers and server code still fill it. Reads are
+left to the row, or to `.access({ read })` when both are written.
 
 ## What a caller sees
 
@@ -100,7 +107,7 @@ It applies at every exit: list, single get, relation targets included with
 `?include=`, `_batch` results, realtime frames from `.listen()`, aggregate
 results and [history](#history) snapshots.
 
-A relation property's value is its related rows, so a relation you cannot read is
+A relation's value is its related rows, so a relation you cannot read is
 withheld whole. `?include=` leaves it out of the row, with its `_count`, from
 every door: REST, the SDK, `.listen()`, and nested includes one level down.
 Naming it anywhere else is refused like a field (see [Queries](#queries)).
@@ -138,13 +145,13 @@ Without this the value is readable one predicate at a time: twenty requests is a
 binary search over a salary.
 
 The error **names the field**. That is a decision, not an oversight: the
-published OpenAPI document lists every property of every collection — it is
+published OpenAPI document lists every column of every table — it is
 served off the app, not off the authenticated data router — so field names are
 already public. Hiding the name here would protect nothing and would answer a
 caller's genuine typo with "unknown field", sending them to look for a spelling
 mistake that is not there. **Field names are public; field values are not.**
 
-Except an `excludeFromApi` field's. OpenAPI, `list_collections` and the generated
+Except a `.private()` column's. OpenAPI, `list_collections` and the generated
 SDK leave it out, so its name is not public, and "not readable" would confirm it
 exists. A filter, `orderBy`, `fields`, `include`, aggregate `select` or
 `groupBy`, or `vector_search` naming one gets exactly the answer a misspelt name
@@ -161,7 +168,7 @@ a write that discards a field reports success for an edit that did not happen.
 | Code | When |
 |------|------|
 | `FIELD_NOT_WRITABLE` | `write` is a role list you do not satisfy. Your colleague may get a 200 for the same body. |
-| `VALIDATION_EXCLUDED_FIELDS` | `write` is `[]` (or `excludeFromApi`). Nobody may write it; the answer is the same for every caller. |
+| `VALIDATION_EXCLUDED_FIELDS` | `write` is `[]`, or the column is `.private()` or `.readOnly()`. Nobody may write it; the answer is the same for every caller. |
 
 Both carry `details.violations` keyed by the wire name you sent. Enforced on
 create, `PATCH`/`PUT`, `/bulk`, `_batch`, upserts, field operations
@@ -174,16 +181,19 @@ bound would tell you the value you are not allowed to see.
 
 ## Search
 
-The fallback search — a collection with no `search` block — matches `ILIKE` across
-your string properties, and it skips the ones the caller cannot read. Nothing
-leaks through it.
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
-A collection that **does** declare a [`search` block](/docs/backend/search) compiles
+The fallback search — a table with no `search` block — matches `ILIKE` across
+your text columns, and it skips the ones the caller cannot read. Nothing leaks
+through it.
+
+A table that **does** declare a [`search` block](/docs/backend/search) compiles
 to a single generated `tsvector` column shared by every caller. There is no
-per-role variant of it, so a restricted field named in `search.fields` would stay
-*matchable* to callers who can never see its value — recoverable a term at a
-time. Rebase refuses that combination at boot: remove the field from
-`search.fields`, or drop the read restriction.
+per-role variant of it, so a restricted column named in `search.fields` would
+stay *matchable* to callers who can never see its value — recoverable a term at
+a time. The schema is refused with that combination: remove the column from
+`search.fields`, or drop the read restriction. A `tenant` column cannot be read
+restricted either.
 
 ## History
 
@@ -197,23 +207,24 @@ Reverting is unaffected. The revert route reads the stored entry server-side, so
 caller can restore a version whose every field they cannot see — exactly as they
 can already overwrite a row without reading all of it.
 
-## What the admin panel shows
+## What the CMS shows
 
-Nothing to configure. The Studio reads through the same API, so a field the
-caller cannot read never arrives and the form does not draw it; a field they
+Nothing to configure. The CMS reads through the same API, so a column the
+caller cannot read never arrives and the form does not draw it; a column they
 cannot write is refused if something tries to send it. This is a server-side
-guarantee, unlike `admin.hideFromCollection`, which only stops the panel from
-*rendering* a field and leaves the value in the JSON.
+guarantee, unlike hiding a field in the CMS, which only stops it being
+*rendered* and leaves the value in the JSON.
 
 ## Generated types and OpenAPI
 
 The SDK's `Row`, `Insert` and `Update` types are one shape for every caller —
 there is no `Row` that is right for both a reader who holds `hr` and one who does
-not — so a **role** rule does not change them. A field closed to everybody
-(`[]`, or `excludeFromApi`) is absent from them, as it always was.
+not — so a **role** rule does not change them. A `.private()` column is absent
+from all three, and a `.readOnly()` one from `Insert` and `Update`. The
+[inferred types](/docs/schema/types/) follow the same rule.
 
 The OpenAPI document states the rule rather than pretending to be per-caller.
-Each restricted property carries `x-rebase-access`:
+Each restricted column carries `x-rebase-access`:
 
 ```json
 "salary": {
@@ -230,10 +241,10 @@ posts and never reads back appears in the request body and not in the row.
 
 ## In-process writes
 
-In-process writes — `context.data` in a callback, `rebase.dataAsAdmin` in a
-callback, a function or a cron job — do not pass through the write check. That
-is the same exemption `excludeFromApi` has always had, and it is what makes the
-rule enforceable at all: something has to be able to store the password hash.
+In-process writes — `context.data` in a hook, `rebase.dataAsAdmin` in a hook,
+a function or a cron job — do not pass through the write check. That is what
+makes the rule enforceable at all: something has to be able to store the
+password hash.
 
 Reads through `rebase.dataAsAdmin` hold the `admin` role, so a role rule does not
 hide anything from them. `[]` still does — including from `dataAsAdmin`. Use
@@ -241,14 +252,16 @@ hide anything from them. `[]` still does — including from `dataAsAdmin`. Use
 
 ## Validation
 
-These are refused at boot, before the server serves anything:
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
-- `access` and `excludeFromApi` on the same property — they are one mechanism, and
-  the flag wins, so the block beside it would be dead;
-- a bare string where a list belongs (`read: "admin"`), which reads as a non-empty
-  rule no caller satisfies and would hide the field from everybody;
+These are refused when the schema is compiled, before the server serves
+anything:
+
+- `.private()` and `.access()` on the same column: they are one mechanism;
 - a role that is not a non-empty string;
-- a restricted field named in the collection's `search.fields`.
+- a read-restricted column named in the table's `search.fields`, or used as its
+  `tenant` field;
+- a `.private()` primary key: the key is how every row is addressed.
 
 Role *names* are not checked against a set: roles are application data, created
 and deleted while the server runs. A typo in one is a field nobody can read, which
@@ -256,6 +269,6 @@ is the safe direction to fail.
 
 ## See also
 
-- [Security Rules (RLS)](/docs/collections/security-rules/) — which rows a caller reaches
-- [Properties](/docs/collections/properties/) — the full option table
+- [Row-level security](/docs/collections/security-rules/) — which rows a caller reaches
+- [Columns](/docs/schema/columns/) — every column modifier
 - [Error codes](/docs/backend/errors/) — `FIELD_NOT_READABLE`, `FIELD_NOT_WRITABLE`

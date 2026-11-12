@@ -1,18 +1,20 @@
 ---
 title: Tenancy
 sidebar_label: Tenancy
-description: Scope every row of a collection to a site, organization or workspace with one declaration, enforced by Postgres row-level security.
+description: Scope every row of a table to a site, organization or workspace with one tenant declaration, enforced by Postgres row-level security.
 ---
 
 ## What it does
 
-`tenant` on a collection names the property that holds the tenant a row
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+`tenant` on a table names the column that holds the tenant a row
 belongs to (a site, an organization, a workspace) and says where the caller's
 tenant comes from. From that one declaration Rebase generates:
 
 - **A restrictive RLS policy**, `<table>_tenant_scope`. Restrictive policies
   are ANDed with every other policy on the table, so tenancy narrows what the
-  collection's `securityRules` allow and never widens it. An
+  table's `rls` allows and never widens it. An
   `access: "public"` rule elsewhere in the file cannot take the boundary off.
 - **A `NOT NULL`, indexed column.** A row with no tenant would belong to nobody,
   and an unindexed tenant column would turn every read into a sequential scan.
@@ -27,27 +29,27 @@ run as the caller all see the same rows.
 
 ## One tenant per user: a claim
 
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
 When each user belongs to exactly one tenant, put it on their session token
 and name the claim:
 
-```typescript
-import { defineCollection } from "@rebasepro/cms-types";
+```ts
+import { defineTable, col } from "@rebasepro/server/schema";
 
-const postsCollection = defineCollection({
-    slug: "posts",
-    name: "Posts",
-    table: "posts",
-    properties: {
-        site: { type: "string", name: "Site", validation: { required: true } },
-        title: { type: "string", name: "Title" }
+export const posts = defineTable("posts", {
+    columns: {
+        id:     col.uuid().primaryKey().defaultRandom(),
+        siteId: col.uuid().notNull(),
+        title:  col.text().notNull(),
     },
-    tenant: { field: "site", from: { claim: "site_id" } }
+    tenant: { field: "siteId", from: { claim: "site_id" } },
+    rls: [{ operation: "all", access: "authenticated" }],
 });
-
-export default postsCollection;
 ```
 
-The policy compares the row's `site` with `rebase.jwt() ->> 'site_id'`. The
+The policy compares the row's `site_id` with the `site_id` claim, cast to the
+column's type. The
 claim comes from your identity provider, or from the `customizeAccessToken`
 auth hook (`auth.hooks`, see [Authentication](/docs/backend/authentication/);
 the managed runtime has no route for hooks, so this needs an ejected backend).
@@ -55,63 +57,61 @@ Reserved claims such as `uid`, `roles` and `aal` cannot name a tenant: they
 are written after custom claims so a hook cannot assert them, and a config
 that names one is refused.
 
-## Several tenants per user: a membership collection
+## Several tenants per user: a membership table
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 When people work across tenants (an editor on two sites, a consultant in three
-organizations), keep the memberships in a collection of their own:
+organizations), keep the memberships in a table of their own:
 
-```typescript
-// config/collections/site_members.ts
-import { defineCollection } from "@rebasepro/cms-types";
+```ts
+// backend/schema/site-members.ts
+import { defineTable, col } from "@rebasepro/server/schema";
 
 // One row per person per site they work on.
-const siteMembersCollection = defineCollection({
-    slug: "site_members",
-    name: "Site members",
-    table: "site_members",
-    properties: {
-        userId: { type: "string", name: "User ID", validation: { required: true } },
-        site: { type: "string", name: "Site", validation: { required: true } }
+export const siteMembers = defineTable("site_members", {
+    columns: {
+        id:     col.uuid().primaryKey().defaultRandom(),
+        userId: col.uuid().notNull(),
+        siteId: col.uuid().notNull(),
     },
     // Members read their own rows. Required: the tenancy policy reads this
     // table as the caller, so without it nobody but an admin sees a post.
-    securityRules: [{ operation: "select", ownerField: "userId" }]
+    rls: [{ operation: "select", ownerField: "userId" }],
 });
-
-export default siteMembersCollection;
 ```
 
-```typescript
-// config/collections/posts.ts
-import { defineCollection } from "@rebasepro/cms-types";
+```ts
+// backend/schema/posts.ts
+import { defineTable, col } from "@rebasepro/server/schema";
 
-const postsCollection = defineCollection({
-    slug: "posts",
-    name: "Posts",
-    table: "posts",
-    properties: {
-        site: { type: "string", name: "Site", validation: { required: true } },
-        title: { type: "string", name: "Title" }
+export const posts = defineTable("posts", {
+    columns: {
+        id:     col.uuid().primaryKey().defaultRandom(),
+        siteId: col.uuid().notNull(),
+        title:  col.text().notNull(),
     },
     tenant: {
-        field: "site",
-        from: { membership: { collection: "site_members", userField: "userId", tenantField: "site" } }
-    }
+        field: "siteId",
+        from: { membership: { collection: "site_members", userField: "userId", tenantField: "siteId" } },
+    },
+    rls: [{ operation: "all", access: "authenticated" }],
 });
-
-export default postsCollection;
 ```
+
+`membership.collection` is the slug of the membership table; `userField` and
+`tenantField` are column keys on it.
 
 The policy is a correlated `EXISTS` over `site_members`: "is the caller a
 member of this row's site?", answered in the same query. Nothing goes on the
 token, so adding or removing a membership takes effect on the next statement,
 with no need to sign in again.
 
-The membership collection must let callers read their own rows, because a
+The membership table must let callers read their own rows, because a
 policy is evaluated as the querying user and the membership table's own RLS
 applies inside it. Boot refuses a config where it does not, and the error names
-the rule to add. Boot also refuses a membership collection that does not exist,
-lacks either named property, or is not stored in the same Postgres database.
+the rule to add. Boot also refuses a membership table that does not exist, lacks either named
+column, or is not stored in the same Postgres database.
 
 ## Who it does not apply to
 
@@ -121,7 +121,7 @@ table. An empty array means no role bypasses it; the server's own trusted
 context (migrations, the auth flows) still does.
 
 ```typescript
-tenant: { field: "site", from: { claim: "site_id" }, bypassRoles: ["admin", "support"] }
+tenant: { field: "siteId", from: { claim: "site_id" }, bypassRoles: ["admin", "support"] }
 ```
 
 ## Writes
@@ -140,28 +140,31 @@ move (`42501`). A caller in a bypass role is exempt from all three.
 
 ## The field
 
-- A `string` or `number` property, or a `reference` / `belongsTo` relation to
-  the collection of tenants. For a relation, its foreign key is the column; no
-  second one is created.
-- It must be declared on the collection, and readable: boot refuses a `tenant`
-  whose field is missing, of another type, or hidden by `excludeFromApi` or
-  `access.read: []`.
-- Postgres only, and not on a view: row-level security is what enforces it.
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+- A text, `uuid`, enum or integer column (`numeric` too), or a `belongsTo`
+  relation to the table of tenants. For a relation, its foreign-key column is
+  the field; no second one is created.
+- It must be declared on the table, and readable: the schema is refused when the
+  field is missing, of another type, or restricted by `.private()` or
+  `.access({ read })`. The types check that the field names a column.
+- The column is made `NOT NULL` whatever it was declared, and indexed.
+- Not on a view: row-level security is what enforces it.
 
 ## What it does not cover
 
 - **Files.** Uploads are not rows. Scope them by path with
   [storage authorization](/docs/backend/storage-authorization/), for example a
   folder per site.
-- **Navigation.** Collections are shown or hidden per role, not per tenant. A
-  member of one site sees the same collections as everyone else, holding only
-  their site's rows.
+- **Navigation.** Tables are shown or hidden in the CMS per role, not per
+  tenant. A member of one site sees the same tables as everyone else, holding
+  only their site's rows.
 - **Separate infrastructure.** Every tenant shares one database and one server.
   Where tenants must not share infrastructure at all, give each its own
   deployment.
 
 ## Related
 
-- [Security Rules (RLS)](/docs/collections/security-rules/): the rules tenancy is ANDed with
+- [Row-level security](/docs/collections/security-rules/): the rules tenancy is ANDed with
 - [Field access](/docs/collections/field-access/): per-field read and write permissions
 - [Storage authorization](/docs/backend/storage-authorization/): who reads and writes which files

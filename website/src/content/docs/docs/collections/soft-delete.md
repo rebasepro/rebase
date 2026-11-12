@@ -1,10 +1,12 @@
 ---
 title: Soft delete
 sidebar_label: Soft delete
-description: Turn delete into a timestamp, hide stamped rows from every read, and restore them with an ordinary update.
+description: "softDelete on a table turns delete into a timestamp, hides stamped rows from every read, and restores them with an ordinary update."
 ---
 
 ## What it changes
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 With `softDelete` on, a delete **stamps a column instead of removing the row**,
 and every read filters the stamped rows out. Nothing else about the operation
@@ -12,38 +14,35 @@ moves: the same permission is required, `beforeDelete` can still veto it and
 `afterDelete` still fires. From the caller's point of view the row was deleted;
 how the table records that is this flag's business.
 
-```typescript
-import { defineCollection } from "@rebasepro/cms-types";
+```ts
+import { defineTable, col } from "@rebasepro/server/schema";
 
-const invoices = defineCollection({
-    slug: "invoices",
-    name: "Invoices",
-    table: "invoices",
+export const invoices = defineTable("invoices", {
+    columns: {
+        id:        col.uuid().primaryKey().defaultRandom(),
+        reference: col.text().notNull(),
+        deletedAt: col.timestamptz(),
+    },
     softDelete: true,
-    properties: {
-        reference: { name: "Reference", type: "string" },
-        deletedAt: { name: "Deleted at", type: "date", admin: { readOnly: true } }
-    }
+    rls: "admin-only",
 });
 ```
 
-`true` uses `deletedAt` (column `deleted_at`). The object form renames it:
-`softDelete: { field: "archivedAt" }`.
+`true` uses the `deletedAt` column (SQL `deleted_at`). The object form names
+another one: `softDelete: { field: "archivedAt" }`. The field is checked against
+the table's columns by the types.
 
 :::caution[The column is yours to declare]
-The flag says what a column *means*; it does not conjure one into existence.
-A collection that turns `softDelete` on without declaring that `date` property
-is refused at boot — deliberately early, because the alternative is the failure
-landing on somebody trying to remove a row.
+The flag says what a column *means*; it does not add one. A table that turns
+`softDelete` on without declaring that column, or with a column that is not a
+`timestamptz`, `date` or `time`, is refused when the schema is compiled — before
+anyone tries to remove a row.
 :::
-
-Postgres only, like [search](/docs/backend/search) and
-[indexes](/docs/backend/indexes).
 
 ## What a read sees
 
 Stamped rows are hidden by default from `find`, `findById`, `count`, the
-aggregates, the realtime refetch, and from this collection loaded through a
+aggregates, the realtime refetch, and from this table loaded through a
 relation. That default is the point: code written before the flag existed keeps
 working, and nobody has to remember to filter.
 
@@ -94,7 +93,7 @@ believes the data is gone.
 
 ## From the SDK
 
-The typed client reaches the trash through `trash` on each collection. It sends
+The typed client reaches the trash through `trash` on each table. It sends
 the requests above: `?deleted=only` on the reads, the update to `null` for a
 restore, and `?hard=true` for a purge.
 
@@ -110,16 +109,16 @@ await client.data.invoices.trash.purgeMany([8, 9]);
 ```
 
 `trash.find` and `trash.count` take the same parameters as `find` and `count`.
-A restore sets `deletedAt` unless you name the field: a collection declared
+A restore sets `deletedAt` unless you name the field: a table declared
 with `softDelete: { field: "archivedAt" }` restores with
 `trash.restore(7, { field: "archivedAt" })`. The client cannot read the field
 name from the server.
 
-Use `trash` on a collection that declares `softDelete`. On one that does not,
+Use `trash` on a table that declares `softDelete`. On one that does not,
 the server ignores `?deleted=`, so `trash.find` returns the live rows and
 `trash.purge` is an ordinary delete.
 
-Server code has the same `trash`: `context.data.invoices.trash` in a callback,
+Server code has the same `trash`: `context.data.invoices.trash` in a hook,
 and `rebase.data.invoices.trash` in a function or a cron. It reads and purges
 through the driver, with the caller's privileges, as the rest of
 [`context.data`](/docs/collections/context-data-api) does.
@@ -130,6 +129,6 @@ without it. A restored row joins the local database, and a purged one leaves it.
 
 ## Next Steps
 
-- **[Defining Collections](/docs/collections)** — where `softDelete` is declared
+- **[Tables](/docs/schema/)** — where `softDelete` is declared
 - **[REST API](/docs/backend/api)** — the delete and query endpoints these parameters belong to
-- **[Security Rules (RLS)](/docs/collections/security-rules)** — who may delete a row at all
+- **[Row-level security](/docs/collections/security-rules/)** — who may delete a row at all
