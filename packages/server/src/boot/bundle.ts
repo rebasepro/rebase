@@ -3,18 +3,17 @@ import path from "path";
 import { pathToFileURL } from "url";
 import {
     BUNDLE_FORMAT_VERSION,
+    LEGACY_LAYOUT_REMEDY,
     RUNTIME_CONTRACT_VERSION,
     isValidAppHost,
     reservedPrefixFor,
-    type CollectionConfig,
-    type CollectionCallbacks,
-    type DataSourceDefinition,
     type RebaseBundleManifest,
     type RebaseBundleStatic,
-    type StorageSourceDefinition
+    type TableHooks
 } from "@rebasepro/types";
 import type { StorageAuthorize } from "../storage/types";
 import { logger } from "../utils/logger";
+import { assertNoReplacedResourceConfig } from "./resource-adapters";
 
 /** Thrown when a bundle cannot be read, or claims a contract this runtime cannot honour. */
 export class BundleError extends Error {
@@ -28,8 +27,17 @@ export class BundleError extends Error {
 export interface LoadedBundle {
     dir: string;
     manifest: RebaseBundleManifest;
-    /** Absolute path to the compiled collections directory, when present. */
-    collectionsDir?: string;
+    /**
+     * Absolute path to the `backend/schema` directory (compiled, or the source
+     * one for `rebase dev`), when the bundle declares tables.
+     */
+    tablesDir?: string;
+    /** Absolute path to the `backend/resources` module, when there is one. */
+    resourcesModule?: string;
+    /** Absolute path to the `backend/storage` module (`storageAuthorize`), when there is one. */
+    storageModule?: string;
+    /** Absolute path to the `backend/hooks` module (global table `hooks`), when there is one. */
+    hooksModule?: string;
     functionsDir?: string;
     cronsDir?: string;
     /**
@@ -45,7 +53,7 @@ export interface LoadedBundle {
      * what `rebase dev` boots — rather than a built one.
      *
      * The difference matters to anything that would write a file back: the
-     * schema editor rewrites collection *source*, which exists on one of these
+     * schema editor rewrites schema *source*, which exists on one of these
      * paths and not the other. Read it from here rather than from
      * `manifest.runtime.builtAgainst === "source"`: the manifest is what a
      * build wrote down, and a bundle can carry any string a builder put there.
@@ -99,46 +107,31 @@ export function compareStaticApps(
  */
 export const MANIFEST_FILENAME = "manifest.json";
 
+/** The legacy entries a format-2 bundle names, which no format-3 bundle carries. */
+const LEGACY_ENTRY_KEYS = ["config", "collections", "usersCollection"] as const;
+
 /**
- * Bring a format-1 manifest up to the shape the rest of this runtime expects.
+ * Refuse a bundle built from the `config/collections` layout.
  *
- * Old bundles booting on a new runtime is the case the format version exists to
- * protect, so this is not a courtesy — it is the contract. A project built
- * before the rename ships `mode` and a single `entry.static` directory string,
- * and without this it would boot with no `kind` (so every gate keyed on
- * `kind === "backend"` would skip) and an `entry.static` the loader would try to
- * iterate as a list.
- *
- * In place, and only ever filling in what is absent, so a format-2 manifest
- * passes through untouched.
+ * Every bundle before format 3 was: its schema is `defineCollection` files in a
+ * config package, which this runtime does not read. Booting it would
+ * introspect the database instead of serving the declared tables — a
+ * different API, announced as healthy. There is no in-runtime adapter: the
+ * project's source is migrated once, with the codemod, and rebuilt.
  */
-function upgradeLegacyManifest(manifest: RebaseBundleManifest): void {
-    const legacy = manifest as RebaseBundleManifest & {
-        mode?: string;
-        entry?: { static?: unknown; admin?: unknown };
-    };
-
-    if (!legacy.kind) {
-        // `cms` and `baas` were both backends — the distinction between them is
-        // derived from `entry.config` now.
-        legacy.kind = legacy.mode === "static" ? "static" : "backend";
-    }
-
-    const entry = legacy.entry;
-    if (!entry) return;
-
-    if (typeof entry.static === "string") {
-        entry.static = [{ path: "/",
-dir: entry.static,
-spa: true }];
-    } else if (!entry.static && typeof entry.admin === "string") {
-        // A format-1 bundled admin panel was served at the root, exactly as a
-        // static app was — `staticDir ?? adminDir`, one or the other.
-        entry.static = [{ path: "/",
-dir: entry.admin,
-spa: true }];
-    }
-    delete entry.admin;
+function refuseLegacyLayout(manifest: RebaseBundleManifest, manifestPath: string): void {
+    const entry: object = manifest.entry ?? {};
+    const legacyKeys = LEGACY_ENTRY_KEYS.filter(key => key in entry);
+    if (manifest.bundleFormat >= BUNDLE_FORMAT_VERSION && legacyKeys.length === 0) return;
+    const what = manifest.bundleFormat < BUNDLE_FORMAT_VERSION
+        ? `${manifestPath} is bundle format ${manifest.bundleFormat}`
+        : `${manifestPath} names ${legacyKeys.map(key => `\`entry.${key}\``).join(", ")}`;
+    throw new BundleError(
+        `${what}: it was built from config/collections, which this runtime (bundle format ` +
+        `${BUNDLE_FORMAT_VERSION}, runtime contract v${RUNTIME_CONTRACT_VERSION}) no longer reads — tables come ` +
+        "from backend/schema (`defineTable`).",
+        `To migrate: ${LEGACY_LAYOUT_REMEDY}.`
+    );
 }
 
 /**
@@ -173,9 +166,7 @@ export function readBundleManifest(bundleDir: string): RebaseBundleManifest {
     }
 
     // Newer format on an older runtime: the layout may have fields this code
-    // does not know how to read, so refuse rather than half-load it. The reverse
-    // — an older bundle on a newer runtime — is the case that must keep working,
-    // and does.
+    // does not know how to read, so refuse rather than half-load it.
     if (manifest.bundleFormat > BUNDLE_FORMAT_VERSION) {
         throw new BundleError(
             `This bundle uses format ${manifest.bundleFormat}, but this runtime understands up to ${BUNDLE_FORMAT_VERSION}.`,
@@ -183,7 +174,9 @@ export function readBundleManifest(bundleDir: string): RebaseBundleManifest {
         );
     }
 
-    upgradeLegacyManifest(manifest);
+    // An older one is refused too, with the codemod: formats 1 and 2 carry
+    // collections, and format 3 is where tables begin.
+    refuseLegacyLayout(manifest, manifestPath);
 
     const contract = manifest.runtime?.contract;
     if (typeof contract === "number" && contract !== RUNTIME_CONTRACT_VERSION) {
@@ -231,6 +224,22 @@ export function resolveBundlePath(
     return resolved;
 }
 
+/** The extensions a project module is found under: compiled first, then source (`rebase dev` runs under tsx). */
+const MODULE_EXTENSIONS = [".js", ".mjs", ".ts", ".mts"] as const;
+
+/**
+ * The file a module path names: itself when it is a file, else the first of
+ * `<path>.js|.mjs|.ts|.mts` or `<path>/index.*` that exists.
+ */
+export function resolveModulePath(modulePath: string): string | undefined {
+    if (fs.existsSync(modulePath) && fs.statSync(modulePath).isFile()) return modulePath;
+    const candidates = [
+        ...MODULE_EXTENSIONS.map(ext => `${modulePath}${ext}`),
+        ...MODULE_EXTENSIONS.map(ext => path.join(modulePath, `index${ext}`))
+    ];
+    return candidates.find(candidate => fs.existsSync(candidate));
+}
+
 export function loadBundle(bundleDir: string): LoadedBundle {
     const dir = path.resolve(bundleDir);
 
@@ -257,19 +266,21 @@ export function loadBundle(bundleDir: string): LoadedBundle {
     };
 
     const entry = manifest.entry ?? {};
-
-    // Collections live under the config package unless stated otherwise.
-    const collectionsDir = entry.collections
-        ? resolveEntry(entry.collections, "collections")
-        : entry.config
-            ? resolveEntry(path.join(entry.config, "collections"), "collections")
-            : undefined;
+    const resolveModule = (module: string | undefined, label: string): string | undefined => {
+        if (!module) return undefined;
+        const found = resolveModulePath(resolveBundlePath(dir, module, label));
+        if (!found) logger.warn(`Bundle declares ${label} at "${module}", but no such module exists — skipping.`);
+        return found;
+    };
 
     return {
         dir,
         manifest,
         isSource: false,
-        collectionsDir,
+        tablesDir: resolveEntry(entry.tables, "tables"),
+        resourcesModule: resolveModule(entry.resources, "resources"),
+        storageModule: resolveModule(entry.storage, "storage"),
+        hooksModule: resolveModule(entry.hooks, "hooks"),
         functionsDir: resolveEntry(entry.functions, "functions"),
         cronsDir: resolveEntry(entry.crons, "crons"),
         staticApps: (entry.static ?? [])
@@ -386,14 +397,23 @@ export async function loadBundleSchema(bundle: LoadedBundle): Promise<BundleSche
  * produces the same {@link LoadedBundle} shape from source paths, so the one boot
  * path serves both.
  *
+ * Every path defaults to the project layout: `backend/schema` (the tables),
+ * `backend/resources`, `backend/storage` and `backend/hooks`.
+ *
  * The schema version is left empty deliberately: nothing has been built, so
- * there is no build-time answer, and the runtime computes one from the live
- * collections instead.
+ * there is no build-time answer, and the runtime computes one from the
+ * compiled tables instead.
  */
 export function createSourceBundle(options: {
     projectRoot: string;
-    config?: string;
-    collections?: string;
+    /** The schema directory. `backend/schema` when omitted. */
+    tables?: string;
+    /** The resources module. `backend/resources` when omitted. */
+    resources?: string;
+    /** The module exporting `storageAuthorize`. `backend/storage` when omitted. */
+    storage?: string;
+    /** The module exporting global table `hooks`. `backend/hooks` when omitted. */
+    hooks?: string;
     functions?: string;
     crons?: string;
     schema?: string;
@@ -405,30 +425,18 @@ export function createSourceBundle(options: {
         const full = path.resolve(dir, entry);
         return fs.existsSync(full) ? full : undefined;
     };
+    const resolveModule = (entry: string): string | undefined => resolveModulePath(path.resolve(dir, entry));
 
-    const configDir = options.config ?? "config";
-    const collectionsDir = options.collections
-        ?? (options.config !== undefined || fs.existsSync(path.join(dir, configDir))
-            ? path.join(configDir, "collections")
-            : undefined);
+    const tables = options.tables ?? "backend/schema";
+    const resources = options.resources ?? "backend/resources";
+    const storage = options.storage ?? "backend/storage";
+    const hooks = options.hooks ?? "backend/hooks";
 
-    // A manifest states what this project HAS, never what it might have.
-    //
-    // These used to be declared from the conventional layout whether or not the
-    // paths existed, and the runtime believed them: a `--headless` project — no
-    // collections directory, no generated schema, both absent by design — booted
-    // with two warnings telling its author the build was broken. "Declares a
-    // schema at backend/src/schema.generated.ts, but that file does not exist"
-    // is alarming, accurate about the manifest, and wrong about the project.
-    //
-    // `resolve` is the existence check the returned directories already used, so
-    // declaring through it is what makes the manifest and the loaded bundle
-    // agree. A project that is genuinely missing a file it should have still
-    // gets the warning, because then the path is real and empty rather than
-    // never declared.
-    const declaredCollections = resolve(collectionsDir) ? collectionsDir : undefined;
-    const declaredConfig = resolve(options.config ?? configDir) ? (options.config ?? configDir) : undefined;
-
+    // A manifest states what this project HAS, never what it might have: a
+    // `--headless`-style project with no schema directory, no generated schema
+    // or no hooks module boots without being told its build is broken. A
+    // project genuinely missing a file it should have still gets the warning,
+    // because then the path is real and empty rather than never declared.
     const manifest: RebaseBundleManifest = {
         bundleFormat: BUNDLE_FORMAT_VERSION,
         runtime: {
@@ -440,8 +448,10 @@ export function createSourceBundle(options: {
         app: options.app ?? "backend",
         kind: "backend",
         entry: {
-            config: declaredConfig,
-            collections: declaredCollections,
+            tables: resolve(tables) ? tables : undefined,
+            resources: resolveModule(resources) ? resources : undefined,
+            storage: resolveModule(storage) ? storage : undefined,
+            hooks: resolveModule(hooks) ? hooks : undefined,
             functions: resolve(options.functions) ? options.functions : undefined,
             crons: resolve(options.crons) ? options.crons : undefined,
             schema: resolve(options.schema) ? options.schema : undefined
@@ -457,7 +467,10 @@ createdAt: new Date().toISOString() }
         dir,
         manifest,
         isSource: true,
-        collectionsDir: resolve(collectionsDir),
+        tablesDir: resolve(tables),
+        resourcesModule: resolveModule(resources),
+        storageModule: resolveModule(storage),
+        hooksModule: resolveModule(hooks),
         functionsDir: resolve(options.functions),
         cronsDir: resolve(options.crons),
         staticApps: []
@@ -465,29 +478,17 @@ createdAt: new Date().toISOString() }
 }
 
 /**
- * Declarations a bundle's config package exports alongside its collections.
+ * What a project's backend modules export for the runtime, beside its tables.
  *
- * These describe *topology* — which databases and which buckets exist — so they
- * belong to the project rather than to the environment. The environment then
- * supplies credentials for each declared key. Splitting it this way is what lets
- * a deploy be validated before it runs: the set of things needing configuration
- * is known from the bundle, without reading anyone's secrets.
+ * `storageAuthorize` comes from `backend/storage`, the global table `hooks`
+ * from `backend/hooks`. Both are functions, so they can only come from the
+ * project's own code — no environment variable can express "this user may
+ * read this key".
  */
-export interface BundleConfigExports {
+export interface BundleProjectExports {
     /**
-     * Read only so that `assertNoReplacedResourceConfig` can refuse a bundle
-     * still carrying them. Databases and buckets are declared with `database()`
-     * and `bucket()` in `config/resources.ts`; nothing downstream consumes these
-     * two fields.
-     */
-    dataSources?: DataSourceDefinition[];
-    /** See `dataSources` — present only so boot can refuse it by name. */
-    storageSources?: StorageSourceDefinition[];
-    /**
-     * Per-object storage access control.
+     * Per-object storage access control, from `backend/storage`.
      *
-     * A function, so it can only come from the project's own code — there is no
-     * environment variable that could express "this user may read this key".
      * Without a way to supply it, a production deployment with a bucket would be
      * forced to choose between `STORAGE_PUBLIC_READ` (world-readable) and
      * `STORAGE_ALLOW_ANY_AUTHENTICATED` (every signed-in user can read, overwrite
@@ -495,104 +496,84 @@ export interface BundleConfigExports {
      * insecure choice on the developer's behalf.
      */
     storageAuthorize?: StorageAuthorize;
-    /** Lifecycle callbacks applied to every collection. */
-    callbacks?: CollectionCallbacks;
+    /** Global table hooks, from `backend/hooks`: run for every table. */
+    hooks?: TableHooks;
 }
 
 /**
- * Read the config package's `index` for declarations.
- *
- * Absent or empty mean the same thing: a single default database and a single
- * default bucket. That is the overwhelmingly common project, and it must not be
- * required to say so. A malformed export — `dataSources` that is not an array —
- * is reported and ignored rather than fatal: a typo in one optional declaration
- * should not take down a server whose collections are fine.
- *
- * A file that is THERE and cannot be imported is a different thing, and it is
- * fatal. Every declaration in it is gone, so the process comes up bound to a
- * different set of databases and buckets than the project declares, announcing
- * success. That is not a degraded start, it is a different deployment.
+ * Import one of the project's backend modules, fatally when it is there and
+ * cannot be imported: every declaration in it would be gone, and the process
+ * would come up with a different access model than the project declares,
+ * announcing success. That is not a degraded start, it is a different
+ * deployment.
  */
-export async function loadBundleConfigExports(bundle: LoadedBundle): Promise<BundleConfigExports> {
-    const configEntry = bundle.manifest.entry?.config;
-    if (!configEntry) return {};
-
-    const configDir = resolveBundlePath(bundle.dir, configEntry, "config");
-    // `.ts` for a source boot (`rebase dev` runs under tsx, which imports
-    // TypeScript directly); `.js` for a built bundle.
-    const indexPath = [".js", ".ts"]
-        .map(ext => path.join(configDir, `index${ext}`))
-        .find(candidate => fs.existsSync(candidate));
-    if (!indexPath) return {};
-
-    let mod: Record<string, unknown>;
+async function importProjectModule(file: string, declares: string): Promise<Record<string, unknown>> {
     try {
-        mod = await import(pathToFileURL(indexPath).href) as Record<string, unknown>;
+        return await import(pathToFileURL(file).href) as Record<string, unknown>;
     } catch (err) {
         // A `BundleError`, so the fatal path treats it as the configuration
-        // problem it is: the message below IS the answer, and a plain `Error`
-        // sends it down the "this is a bug" branch, where in development it is
-        // logged at `debug` and the author sees only the esbuild cause.
+        // problem it is: the message below IS the answer.
         throw new BundleError(
-            `Could not load ${indexPath}.\n\n` +
+            `Could not load ${file}.\n\n` +
             `${err instanceof Error ? err.message : String(err)}\n\n` +
-            "This file declares this project's data sources, storage sources and callbacks. " +
-            "Booting without it would bind the server to a different set of databases and " +
-            "buckets than the project declares, so this is fatal rather than a warning.",
+            `This module declares ${declares}. Booting without it would serve this project under a ` +
+            "different access model than it declares, so this is fatal rather than a warning.",
             undefined,
             { cause: err }
         );
     }
-
-    const readArray = <T>(name: string): T[] | undefined => {
-        const value = mod[name];
-        if (value === undefined) return undefined;
-        if (!Array.isArray(value)) {
-            logger.warn(`Config exports "${name}" but it is not an array — ignoring.`);
-            return undefined;
-        }
-        return value as T[];
-    };
-
-    const readFunction = <T>(name: string): T | undefined => {
-        const value = mod[name];
-        if (value === undefined) return undefined;
-        if (typeof value !== "function") {
-            logger.warn(`Config exports "${name}" but it is not a function — ignoring.`);
-            return undefined;
-        }
-        return value as T;
-    };
-
-    const callbacks = mod.callbacks;
-
-    warnOnUnreadConfigExports(mod, indexPath);
-
-    return {
-        dataSources: readArray<DataSourceDefinition>("dataSources"),
-        storageSources: readArray<StorageSourceDefinition>("storageSources"),
-        storageAuthorize: readFunction<StorageAuthorize>("storageAuthorize"),
-        callbacks: callbacks && typeof callbacks === "object"
-            ? callbacks as CollectionCallbacks
-            : undefined
-    };
 }
 
 /**
- * Everything the managed runtime reads out of `config/index.ts`.
+ * Read `storageAuthorize` from `backend/storage` and `hooks` from
+ * `backend/hooks`.
  *
- * `dataSources` and `storageSources` are deliberately absent: they are read out
- * of the module only so `assertNoReplacedResourceConfig` can refuse them by
- * name, and the topology they used to carry now lives in `config/resources.ts`.
- * Listing them here would make the docs gate that reads this set say they are
- * still a supported export.
+ * Absent modules are the ordinary case. A malformed export — `hooks` that is
+ * not an object — is reported and ignored; a module that fails to import is
+ * fatal (see `importProjectModule`).
+ */
+export async function loadBundleProjectExports(bundle: LoadedBundle): Promise<BundleProjectExports> {
+    const out: BundleProjectExports = {};
+    if (bundle.storageModule) {
+        const mod = await importProjectModule(bundle.storageModule, "this project's storage access control (`storageAuthorize`)");
+        // A module still exporting `dataSources` / `storageSources` is refused
+        // by name rather than booted with its declarations ignored.
+        assertNoReplacedResourceConfig(mod);
+        warnOnUnreadProjectExports(mod, bundle.storageModule);
+        const value = mod.storageAuthorize;
+        if (typeof value === "function") {
+            out.storageAuthorize = value as StorageAuthorize;
+        } else if (value !== undefined) {
+            logger.warn(`${bundle.storageModule} exports "storageAuthorize" but it is not a function — ignoring.`);
+        }
+    }
+    if (bundle.hooksModule) {
+        const mod = await importProjectModule(bundle.hooksModule, "this project's global table hooks (`hooks`)");
+        assertNoReplacedResourceConfig(mod);
+        warnOnUnreadProjectExports(mod, bundle.hooksModule);
+        const value = mod.hooks;
+        if (typeof value === "object" && value !== null) {
+            out.hooks = value as TableHooks;
+        } else if (value !== undefined) {
+            logger.warn(`${bundle.hooksModule} exports "hooks" but it is not an object of table hooks — ignoring.`);
+        }
+    }
+    return out;
+}
+
+/**
+ * Everything the managed runtime reads out of a project's backend modules:
+ * `storageAuthorize` (`backend/storage`) and `hooks` (`backend/hooks`).
+ *
+ * `dataSources` and `storageSources` are deliberately absent: a module
+ * exporting them is refused by name (`assertNoReplacedResourceConfig`), and the
+ * topology they used to carry lives in `backend/resources.ts`. Listing them
+ * here would make the docs gate that reads this set say they are still a
+ * supported export.
  */
 const READ_CONFIG_EXPORTS = new Set([
     "storageAuthorize",
-    "callbacks",
-    // Not read here, but a legitimate export of this module: the admin build and
-    // the collections loader take it from the directory beside it.
-    "collections",
+    "hooks",
     // Module machinery.
     "default",
     "__esModule"
@@ -603,12 +584,12 @@ const READ_CONFIG_EXPORTS = new Set([
  *
  * Every one of them is a function or a live handler — something no environment
  * variable can express — so on the managed runtime there is no route for them at
- * all. Exporting one from `config/index.ts` looks like it should work, does
+ * all. Exporting one from a backend module looks like it should work, does
  * nothing, and says nothing. Each maps to the honest alternative.
  */
 const NO_MANAGED_ROUTE: Record<string, string> = {
     jobs: "no managed route — enqueue from a custom function, or eject and pass `jobs` to initializeRebaseBackend",
-    storagePolicies: "no managed route — express the rule in `storageAuthorize`, which IS read from here",
+    storagePolicies: "no managed route — express the rule in `storageAuthorize`, which IS read from backend/storage",
     storageTriggers: "no managed route — react to the upload in a custom function, or eject",
     rateLimit: "no managed route — put the limit in front of the deployment, or eject",
     webhooks: "no managed route — send from a job or a custom function, or eject",
@@ -616,72 +597,24 @@ const NO_MANAGED_ROUTE: Record<string, string> = {
 };
 
 /**
- * Say so when the config package exports something nothing will read.
- *
- * A managed deployment configures the runtime through environment variables and
- * this one module. An export it does not recognise is not an error — the module
- * is the project's, and may hold helpers, types, anything — but the six names
- * below are `initializeRebaseBackend` options, and someone exporting one of
- * those has been told by a docs page to pass it *somewhere*. They put it in the
- * only file the runtime reads, it was dropped in silence, and the feature simply
- * did not happen.
+ * Say so when a backend module exports an `initializeRebaseBackend` option
+ * nothing will read.
  *
  * Warn, never throw: a project is free to export whatever it likes from its own
- * config module, and a boot that refuses over an unrecognised name would break
- * every project that keeps a shared constant there.
+ * modules, and a boot that refuses over an unrecognised name would break every
+ * project that keeps a shared constant there.
  */
-function warnOnUnreadConfigExports(mod: Record<string, unknown>, indexPath: string): void {
+function warnOnUnreadProjectExports(mod: Record<string, unknown>, file: string): void {
     const unread = Object.keys(mod).filter(name => !READ_CONFIG_EXPORTS.has(name));
     const known = unread.filter(name => name in NO_MANAGED_ROUTE);
     if (known.length === 0) return;
 
     logger.warn(
-        `⚠️ ${indexPath} exports ${known.map(name => `\`${name}\``).join(", ")}, and the managed ` +
+        `⚠️ ${file} exports ${known.map(name => `\`${name}\``).join(", ")}, and the managed ` +
         "runtime does not read " + (known.length === 1 ? "it" : "them") + ".\n" +
         known.map(name => `  • ${name}: ${NO_MANAGED_ROUTE[name]}`).join("\n") + "\n" +
-        "  The runtime reads only: " +
-        ["storageAuthorize", "callbacks"].map(n => `\`${n}\``).join(", ") +
-        ". Databases and buckets are declared in `config/resources.ts`; everything " +
-        "else is configured with environment variables, or by ejecting."
+        "  The runtime reads only `storageAuthorize` (backend/storage) and `hooks` (backend/hooks). " +
+        "Databases and buckets are declared in `backend/resources.ts`; everything else is configured " +
+        "with environment variables, or by ejecting."
     );
-}
-
-/**
- * Import the collection that backs authentication.
- *
- * Auth needs to know which table holds users. The bundle names the module; the
- * convention (`collections/users`) covers every project that did not rename it.
- * Returning `undefined` is valid — a `baas`-mode project has no config package,
- * and the auth bootstrapper falls back to its own default users table.
- */
-export async function loadUsersCollection(bundle: LoadedBundle): Promise<CollectionConfig | undefined> {
-    const entry = bundle.manifest.entry;
-    const configDir = entry?.config
-        ? resolveBundlePath(bundle.dir, entry.config, "config")
-        : undefined;
-
-    const candidates: string[] = [];
-    if (entry?.usersCollection) {
-        const declared = resolveBundlePath(bundle.dir, entry.usersCollection, "usersCollection");
-        candidates.push(declared, `${declared}.js`, `${declared}.ts`);
-    }
-    for (const dir of [configDir && path.join(configDir, "collections"), bundle.collectionsDir]) {
-        if (!dir) continue;
-        candidates.push(path.join(dir, "users.js"), path.join(dir, "users.ts"));
-    }
-
-    for (const candidate of candidates) {
-        if (!/\.(js|ts)$/.test(candidate) || !fs.existsSync(candidate)) continue;
-        try {
-            const mod = await import(pathToFileURL(candidate).href) as { default?: CollectionConfig };
-            if (mod.default) return mod.default;
-            logger.warn(`Users collection module ${candidate} has no default export — ignoring.`);
-        } catch (err) {
-            logger.warn(
-                `Failed to import users collection from ${candidate}: ${err instanceof Error ? err.message : String(err)}`
-            );
-        }
-    }
-
-    return undefined;
 }

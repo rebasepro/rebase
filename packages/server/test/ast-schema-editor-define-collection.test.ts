@@ -2,12 +2,37 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 
-import { nestAdminPropertyKeys } from "@rebasepro/types";
+import { ADMIN_COLLECTION_KEYS, ADMIN_PROPERTY_KEYS, nestAdminPropertyKeys } from "@rebasepro/types";
 
 import { AstSchemaEditor, nestAdminKeysDeep } from "../src/api/ast-schema-editor";
-import { findCollectionConfigProblems } from "../src/collections/validate-config";
-import { loadCollectionsFromDirectory } from "../src/collections/loader";
 import { CollectionRegistry, resolveCollectionRelations } from "@rebasepro/common";
+import { compileSchemaDefs } from "../src/schema/load-schema";
+import { tablesFromLegacyDirectory } from "./helpers/tables";
+
+/**
+ * Every presentation key written outside an `admin` block, anywhere in a
+ * property tree: what the boot validator refused while collections were the
+ * schema (`ui` is the pre-0.11 name of `admin`).
+ */
+function presentationOutsideAdmin(node: unknown, at = ""): string[] {
+    if (typeof node !== "object" || node === null) return [];
+    const found: string[] = [];
+    for (const [key, value] of Object.entries(node)) {
+        if (key === "admin") continue;
+        if (key === "ui" || (ADMIN_PROPERTY_KEYS as readonly string[]).includes(key)) found.push(`${at}${key}`);
+        if (key === "properties" && typeof value === "object" && value !== null) {
+            for (const [name, child] of Object.entries(value)) found.push(...presentationOutsideAdmin(child, `${at}${name}.`));
+        }
+        if (key === "of" || key === "oneOf") found.push(...presentationOutsideAdmin(value, `${at}${key}.`));
+    }
+    return found;
+}
+
+/** The same, for a whole collection: its own keys, then its properties'. */
+function collectionPresentationOutsideAdmin(collection: Record<string, unknown>): string[] {
+    const own = Object.keys(collection).filter(key => (ADMIN_COLLECTION_KEYS as readonly string[]).includes(key));
+    return [...own, ...presentationOutsideAdmin({ properties: collection.properties })];
+}
 import type { RelationProperty } from "@rebasepro/types";
 
 /**
@@ -186,17 +211,8 @@ export default productsCollection;
     });
 });
 
-describe("what the property editor writes, the boot validator accepts", () => {
-    const collection = (title: Record<string, unknown>) => ({
-        slug: "posts",
-        name: "Posts",
-        table: "posts",
-        properties: { title }
-    });
-
-    const errors = (property: Record<string, unknown>) =>
-        findCollectionConfigProblems([collection(property)], { unknownKeys: "warn" })
-            .filter(p => p.severity === "error");
+describe("what the property editor writes keeps presentation in the admin block", () => {
+    const errors = (property: Record<string, unknown>) => presentationOutsideAdmin(property);
 
     it("accepts a property presentation key inside the block", () => {
         // `nestAdminPropertyKeys` is what `saveProperty` runs the payload through.
@@ -204,8 +220,7 @@ describe("what the property editor writes, the boot validator accepts", () => {
     });
 
     it("still rejects the shapes the panel used to write", () => {
-        // `ui` was renamed to `admin` in 0.11, and the validator treats the old
-        // name as a removed key. The panel wrote `ui.readOnly` until this fix, so
+        // `ui` was renamed to `admin` in 0.11, and the old name is a removed key. The panel wrote `ui.readOnly` until this fix, so
         // ticking "Read only" left a project that would not boot.
         expect(errors({ name: "Title", type: "string", ui: { readOnly: true } })).not.toHaveLength(0);
         expect(errors({ name: "Title", type: "string", readOnly: true })).not.toHaveLength(0);
@@ -227,10 +242,9 @@ describe("what the property editor writes, the boot validator accepts", () => {
  * check. The two had drifted apart once already; nothing but running one against
  * the other keeps them together.
  */
-describe("what the collection editor writes, the boot validator accepts", () => {
+describe("what the collection editor writes keeps presentation in the admin block", () => {
     const errorsIn = (collection: Record<string, unknown>) =>
-        findCollectionConfigProblems([nestAdminKeysDeep(collection)], { unknownKeys: "warn" })
-            .filter(p => p.severity === "error");
+        collectionPresentationOutsideAdmin(nestAdminKeysDeep(collection));
 
     /** The shape of the panel's own "Products" template, before this fix. */
     const template = {
@@ -460,10 +474,14 @@ export default postsCollection;
      * the next boot threw in `resolveRelation`, for every collection in the
      * directory, because the loader imports all of them.
      *
-     * So these read the file back the way boot does: the real loader, which runs
-     * the boot validator, then the real registry, which resolves every relation.
+     * So these read the file back the way boot does: imported, lifted into
+     * table definitions and compiled — the boot validation — then lowered into
+     * the real registry, which resolves every relation.
      */
-    const boot = async () => new CollectionRegistry(await loadCollectionsFromDirectory(dir));
+    const boot = async () => {
+        const { tables, defaultRls } = await tablesFromLegacyDirectory(dir);
+        return new CollectionRegistry(compileSchemaDefs(tables, defaultRls).collections);
+    };
     const targetOf = (registry: CollectionRegistry, slug: string, property: string) =>
         (registry.get(slug)?.properties[property] as RelationProperty | undefined)?.resolvedRelation?.targetSlug;
 
@@ -527,9 +545,13 @@ export default postsCollection;
             table: "reviews",
             properties: {
                 body: { name: "Body", type: "string" },
-                post: { name: "Post", type: "relation", relation: { kind: "belongsTo", target: "posts" } }
+                post: { name: "Post", type: "relation", relation: { kind: "belongsTo", target: "posts" } },
+                // The column the collection-level relation reads: a schema
+                // with a `belongsTo` over a column nobody declares does not
+                // compile, so the editor's output is judged on one that does.
+                reviewer_id: { name: "Reviewer", type: "string" }
             },
-            relations: [{ relationName: "reviewer", kind: "belongsTo", target: "authors" }]
+            relations: [{ relationName: "reviewer", kind: "belongsTo", target: "authors", localKey: "reviewer_id" }]
         });
 
         const written = read("reviews");

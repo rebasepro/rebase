@@ -80,26 +80,10 @@ export {
     type CompiledSchema
 } from "./schema/load-schema";
 
-// The single definition of "the collections" — the runtime, the schema and
-// policy generators, and the doctor all load them through this, so what gets
-// served and what gets pushed can never drift apart.
-export {
-    loadCollectionsFromDirectory,
-    applyCollectionDefaults,
-    type CollectionDefaults
-} from "./collections/loader";
-
-// The strict parse the loader runs. Exported so the doctor and the CLI can
-// report the same problems without booting a server.
-export {
-    assertCollectionConfigs,
-    CollectionConfigError,
-    findCollectionConfigProblems,
-    unknownKeyPolicyFromEnv,
-    type ConfigProblem,
-    type UnknownKeyPolicy,
-    type ValidateCollectionConfigOptions
-} from "./collections/validate-config";
+// The descriptors' registry and the boot-time resolution of what a backend
+// serves, for code that builds a backend's parts by hand.
+export { TableRegistry } from "./schema/table-registry";
+export { resolveDeclaredTables, globalHooksAsCallbacks, type DeclaredTables } from "./schema/declared-tables";
 
 // =============================================================================
 // DB Abstractions (for database driver implementations)
@@ -192,7 +176,7 @@ export {
     // drives a credential through `verifyCredential` without booting — installs
     // the app's roles and scopes the way `initializeRebaseBackend` does.
     configureAccess,
-    accessModelFromCollections
+    accessModelFromAuthTable
 } from "./auth";
 export type {
     // Named by `RebaseAuthConfig.signingKeys`, so it has to be nameable.
@@ -525,12 +509,12 @@ export {
     BundleError,
     loadBundle,
     readBundleManifest,
-    loadBundleConfigExports,
+    loadBundleProjectExports,
     createSourceBundle,
     loadBundleSchema,
-    loadUsersCollection
+    resolveModulePath
 } from "./boot/bundle";
-export type { LoadedBundle, BundleConfigExports } from "./boot/bundle";
+export type { LoadedBundle, BundleProjectExports } from "./boot/bundle";
 export { overridableSecurityHeaders, DEFAULT_REFERRER_POLICY } from "./boot/security-headers";
 export { loadBootEnv, resolveCorsOrigin, isLocalhostOrigin, CORS_EXPOSED_HEADERS } from "./boot/env";
 export type { RebaseBootEnv, CorsOriginResolver } from "./boot/env";

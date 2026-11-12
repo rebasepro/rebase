@@ -1,4 +1,3 @@
-import type { CollectionConfig } from "@rebasepro/types";
 import type { LiveSchemaConfig, RebaseAuthConfig } from "../backend/options";
 import type { EmailConfig } from "../email";
 import { createDevEmailSink, registerDevEmailSink } from "../email/dev-sink";
@@ -106,8 +105,9 @@ export function resolveCaptchaOptions(
 }
 
 /**
- * Build the auth configuration from the environment and the bundle's users
- * collection.
+ * Build the auth configuration from the environment. (Which table users are
+ * stored in is not configuration: it is the one the bundle's schema defines
+ * with `defineAuthTable`.)
  *
  * OAuth providers are included only when both halves of a credential pair are
  * present. Google is the exception the template already made: a client id alone
@@ -132,12 +132,8 @@ const ENV_PAIR_PROVIDERS = [
     "spotify"
 ] as const satisfies readonly (keyof RebaseAuthConfig)[];
 
-export function resolveAuthOptions(
-    env: RebaseBootEnv,
-    usersCollection: CollectionConfig | undefined
-): RebaseAuthConfig {
+export function resolveAuthOptions(env: RebaseBootEnv): RebaseAuthConfig {
     const auth: RebaseAuthConfig = {
-        collection: usersCollection,
         jwtSecret: env.JWT_SECRET,
         // One key from the environment. A rotation window needs two at once,
         // which is more than an env var wants to express — configure

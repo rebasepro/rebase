@@ -1,14 +1,12 @@
 import { serializeCollections, deserializeCollections } from "../src/types/collection_contract";
-import { computeSchemaVersion } from "../src/types/schema_version";
 import type { CollectionConfig } from "../src/types/collections";
 
 /**
- * The admin block must not reach a client, and must not move the schema version.
+ * The admin block must not reach a client.
  *
- * Both properties are easy to break by accident and silent when broken: a leaked
- * block just makes the contract payload bigger, and a block inside the hash makes
- * every SDK in every repository report itself stale the next time somebody changes
- * an icon.
+ * Easy to break by accident and silent when broken: a leaked block just makes the
+ * contract payload bigger. (The schema version is computed from table
+ * descriptors, which carry no admin block at all — see schema_version.test.ts.)
  */
 
 const collection = (admin: Record<string, unknown> | undefined): CollectionConfig => ({
@@ -74,42 +72,5 @@ describe("the admin block and the wire", () => {
             serializeCollections([collection({ icon: "FileText" })]) as unknown[]
         );
         expect("admin" in (rehydrated as object)).toBe(false);
-    });
-});
-
-describe("the admin block and the schema version", () => {
-    it("does not change when only the admin block changes", () => {
-        const before = computeSchemaVersion([collection({ icon: "FileText" })]);
-        const after = computeSchemaVersion([
-            collection({
-                icon: "ShoppingCart",
-                listProperties: ["title"],
-                defaultViewMode: "kanban",
-                sideDialogWidth: 900
-            })
-        ]);
-        expect(after).toBe(before);
-    });
-
-    it("is identical whether the block is present or absent", () => {
-        expect(computeSchemaVersion([collection(undefined)]))
-            .toBe(computeSchemaVersion([collection({ icon: "FileText" })]));
-    });
-
-    it("still changes when a property changes", () => {
-        const base = computeSchemaVersion([collection({ icon: "FileText" })]);
-        const withNewProperty = computeSchemaVersion([
-            {
-                slug: "posts",
-                name: "Posts",
-                table: "posts",
-                properties: {
-                    title: { name: "Title", type: "string" },
-                    views: { name: "Views", type: "number" }
-                },
-                admin: { icon: "FileText" }
-            }
-        ]);
-        expect(withNewProperty).not.toBe(base);
     });
 });

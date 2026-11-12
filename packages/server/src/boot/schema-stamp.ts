@@ -52,7 +52,7 @@
  * supply. It starts working when the project's driver is next updated. See
  * `version-skew.ts` for the general shape of this problem.
  */
-import { computeSchemaVersion, type CollectionConfig } from "@rebasepro/types";
+import { computeSchemaVersion, LEGACY_SCHEMA_VERSION_PREFIX, type TableDescriptor } from "@rebasepro/types";
 
 import { logger } from "../utils/logger";
 
@@ -163,6 +163,16 @@ export function resolveSchemaMismatchPolicy(
  * learn a second description of the same fact.
  */
 export function describeMismatch(databaseVersion: string, processVersion: string): string {
+    if (databaseVersion.startsWith(LEGACY_SCHEMA_VERSION_PREFIX)) {
+        return (
+            `The database was stamped by a runtime before 0.31 (database ${databaseVersion}, this process ${processVersion}).\n` +
+            `  The schema model changed in 0.31: versions are computed from the compiled tables (backend/schema), ` +
+            `not from collections, so every database reports this once and it says nothing about drift.\n` +
+            `  Restamp it by provisioning once with this runtime — boot the process that owns the schema ` +
+            `(REBASE_ROLE=api, or the migration Job) with provisioning on, or run \`rebase db push\`. ` +
+            `With REBASE_REQUIRE_SCHEMA_MATCH=true, restamp before rolling the other processes.`
+        );
+    }
     return (
         `The database was last provisioned from a different set of collections than this process was built from ` +
         `(database ${databaseVersion}, this process ${processVersion}).\n` +
@@ -177,8 +187,8 @@ export function describeMismatch(databaseVersion: string, processVersion: string
 
 /** What {@link enforceSchemaStamp} needs to do its work. */
 export interface EnforceSchemaStampOptions {
-    /** The collections this process will serve. */
-    collections: CollectionConfig[];
+    /** The compiled descriptors of the tables this process will serve. */
+    tables: readonly TableDescriptor[];
     /** Reads the stamp. Absent when the driver cannot. */
     read?: () => Promise<string | null>;
     /** Writes the stamp. Only called when this process provisioned the schema. */
@@ -205,7 +215,7 @@ export interface EnforceSchemaStampOptions {
  * operator something through other channels.
  */
 export async function enforceSchemaStamp(options: EnforceSchemaStampOptions): Promise<SchemaStampVerdict> {
-    const { collections, read, stamp, provisioned, introspecting } = options;
+    const { tables, read, stamp, provisioned, introspecting } = options;
 
     if (introspecting) {
         return { status: "skipped", reason: "collections are derived from the database, so they cannot disagree with it" };
@@ -214,7 +224,7 @@ export async function enforceSchemaStamp(options: EnforceSchemaStampOptions): Pr
         return { status: "skipped", reason: "this driver does not record a collections schema version" };
     }
 
-    const processVersion = computeSchemaVersion(collections);
+    const processVersion = computeSchemaVersion(tables);
 
     if (provisioned) {
         if (!stamp) return { status: "skipped", reason: "this driver cannot record a collections schema version" };

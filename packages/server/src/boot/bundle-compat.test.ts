@@ -1,20 +1,17 @@
 /**
- * Old bundles keep booting on new runtimes.
+ * Which bundles this runtime boots.
  *
- * That is the entire reason the artifact and the engine are versioned
- * separately, so it is worth a test rather than an assumption. A format-1
- * bundle — `mode`, a single `entry.static` string, `entry.admin` — predates the
- * rename and is still sitting in every deployed project that has not been
- * rebuilt.
- *
- * The failure it guards is silent: with no `kind`, every gate keyed on
- * `kind === "backend"` skips, so migrate-on-boot stops running and the static
- * loader iterates a string as if it were a list.
+ * Format 3 / runtime contract 2 is where tables begin: the schema is
+ * `entry.tables` (a compiled `backend/schema`). Every earlier bundle carries
+ * `config/collections`, which this runtime does not read — booting one would
+ * introspect the database instead of serving the declared tables, a different
+ * API announced as healthy. So they are refused at boot, with the codemod to
+ * run.
  */
 import fs from "fs";
 import os from "os";
 import path from "path";
-import { BUNDLE_FORMAT_VERSION, RUNTIME_CONTRACT_VERSION } from "@rebasepro/types";
+import { BUNDLE_FORMAT_VERSION, LEGACY_LAYOUT_REMEDY, RUNTIME_CONTRACT_VERSION } from "@rebasepro/types";
 import { loadBundle, readBundleManifest, BundleError } from "./bundle";
 
 let scratch: string;
@@ -31,7 +28,7 @@ function writeBundle(manifest: Record<string, unknown>, files: string[] = []): s
 }
 
 const runtime = {
-    range: "^1",
+    range: "^2",
     builtAgainst: "1.0.0",
     contract: RUNTIME_CONTRACT_VERSION
 };
@@ -44,96 +41,32 @@ afterEach(() => {
     fs.rmSync(scratch, { recursive: true, force: true });
 });
 
-describe("a format-1 bundle on this runtime", () => {
-    it("reads `mode: cms` as a backend", () => {
+describe("a bundle built from config/collections", () => {
+    it.each([
+        ["a format-1 bundle (`mode: cms`)", { bundleFormat: 1, mode: "cms", entry: { config: "config" } }],
+        ["a format-1 bundle with no config (`mode: baas`)", { bundleFormat: 1, mode: "baas", entry: {} }],
+        ["a format-2 bundle", { bundleFormat: 2, kind: "backend", entry: { config: "config" } }],
+        ["a format-2 bundle with no collections", { bundleFormat: 2, kind: "backend", entry: {} }],
+        ["a format-3 bundle still naming entry.collections", { bundleFormat: BUNDLE_FORMAT_VERSION, kind: "backend", entry: { collections: "config/collections" } }],
+        ["a format-3 bundle still naming entry.usersCollection", { bundleFormat: BUNDLE_FORMAT_VERSION, kind: "backend", entry: { usersCollection: "config/collections/users.js" } }]
+    ])("refuses %s, naming the codemod", (_label, fields) => {
         const dir = writeBundle({
-            bundleFormat: 1,
-            runtime,
-            schemaVersion: "abc",
-            app: "backend",
-            mode: "cms",
-            entry: { config: "config" },
-            hooks: { native: false },
-            deps: { declared: {} }
+            runtime, schemaVersion: "", app: "backend", hooks: { native: false }, deps: { declared: {} }, ...fields
         });
 
-        expect(readBundleManifest(dir).kind).toBe("backend");
-    });
-
-    it("reads `mode: baas` as a backend too — the distinction is entry.config now", () => {
-        const dir = writeBundle({
-            bundleFormat: 1,
-            runtime,
-            schemaVersion: "",
-            app: "backend",
-            mode: "baas",
-            entry: {},
-            hooks: { native: false },
-            deps: { declared: {} }
-        });
-
-        const manifest = readBundleManifest(dir);
-        expect(manifest.kind).toBe("backend");
-        // And it must NOT look like a project with declared collections, or
-        // migrate-on-boot would push a schema into a database it only reads.
-        expect(manifest.entry?.config).toBeUndefined();
-    });
-
-    it("reads `mode: static` as a static bundle", () => {
-        const dir = writeBundle({
-            bundleFormat: 1,
-            runtime,
-            schemaVersion: "",
-            app: "web",
-            mode: "static",
-            entry: { static: "static" },
-            hooks: { native: false },
-            deps: { declared: {} }
-        }, ["static/index.html"]);
-
-        expect(readBundleManifest(dir).kind).toBe("static");
-    });
-
-    it("turns a single entry.static directory into a list mounted at the root", () => {
-        const dir = writeBundle({
-            bundleFormat: 1,
-            runtime,
-            schemaVersion: "",
-            app: "web",
-            mode: "static",
-            entry: { static: "static" },
-            hooks: { native: false },
-            deps: { declared: {} }
-        }, ["static/index.html"]);
-
-        const bundle = loadBundle(dir);
-        expect(bundle.staticApps).toHaveLength(1);
-        expect(bundle.staticApps[0]).toMatchObject({ path: "/",
-spa: true });
-        expect(bundle.staticApps[0].dir).toBe(path.join(dir, "static"));
-    });
-
-    it("serves a bundled admin panel from entry.admin, as `staticDir ?? adminDir` did", () => {
-        const dir = writeBundle({
-            bundleFormat: 1,
-            runtime,
-            schemaVersion: "abc",
-            app: "backend",
-            mode: "cms",
-            entry: { config: "config",
-admin: "admin" },
-            hooks: { native: false },
-            deps: { declared: {} }
-        }, ["admin/index.html"]);
-
-        const bundle = loadBundle(dir);
-        expect(bundle.staticApps).toHaveLength(1);
-        expect(bundle.staticApps[0].dir).toBe(path.join(dir, "admin"));
+        expect(() => readBundleManifest(dir)).toThrow(BundleError);
+        try {
+            readBundleManifest(dir);
+        } catch (error) {
+            if (!(error instanceof BundleError)) throw error;
+            expect(error.message).toMatch(/config\/collections/);
+            expect(error.hint).toContain(LEGACY_LAYOUT_REMEDY);
+        }
     });
 });
 
-describe("a format-2 bundle", () => {
-    it("passes through untouched", () => {
+describe("a format-3 bundle", () => {
+    it("passes through untouched, and resolves entry.tables and the backend modules", () => {
         const dir = writeBundle({
             bundleFormat: BUNDLE_FORMAT_VERSION,
             runtime,
@@ -141,7 +74,10 @@ describe("a format-2 bundle", () => {
             app: "backend",
             kind: "backend",
             entry: {
-                config: "config",
+                tables: "backend/schema",
+                resources: "backend/resources",
+                storage: "backend/storage.js",
+                hooks: "backend/hooks",
                 static: [
                     { path: "/admin", dir: "static/admin", spa: true },
                     { path: "/", dir: "static/site", spa: true }
@@ -149,10 +85,17 @@ describe("a format-2 bundle", () => {
             },
             hooks: { native: false },
             deps: { declared: {} }
-        }, ["static/admin/index.html", "static/site/index.html"]);
+        }, [
+            "backend/schema/index.js", "backend/resources.js", "backend/storage.js", "backend/hooks/index.js",
+            "static/admin/index.html", "static/site/index.html"
+        ]);
 
         const bundle = loadBundle(dir);
         expect(bundle.manifest.kind).toBe("backend");
+        expect(bundle.tablesDir).toBe(path.join(dir, "backend", "schema"));
+        expect(bundle.resourcesModule).toBe(path.join(dir, "backend", "resources.js"));
+        expect(bundle.storageModule).toBe(path.join(dir, "backend", "storage.js"));
+        expect(bundle.hooksModule).toBe(path.join(dir, "backend", "hooks", "index.js"));
         // Longest path first, so the root app's catch-all is registered last.
         expect(bundle.staticApps.map(a => a.path)).toEqual(["/admin", "/"]);
     });
@@ -216,7 +159,7 @@ describe("a same-format bundle carrying fields this runtime does not know", () =
         app: "backend",
         kind: "backend",
         entry: {
-            config: "config",
+            tables: "backend/schema",
             static: [{ path: "/", dir: "static/site", spa: true, preload: ["/app.js"] }],
             // A future entry kind this runtime has never heard of.
             workers: "workers"
@@ -226,7 +169,7 @@ describe("a same-format bundle carrying fields this runtime does not know", () =
         // Whole sections added by a later CLI.
         telemetry: { sampleRate: 0.1 },
         edge: { regions: ["fra1"] }
-    }, ["static/site/index.html"]);
+    }, ["static/site/index.html", "backend/schema/index.js"]);
 
     it("loads, ignoring what it does not recognise", () => {
         const bundle = loadBundle(futureBundle());
@@ -236,7 +179,7 @@ describe("a same-format bundle carrying fields this runtime does not know", () =
 
     it("still reads every field it does know", () => {
         const bundle = loadBundle(futureBundle());
-        expect(bundle.manifest.entry?.config).toBe("config");
+        expect(bundle.manifest.entry?.tables).toBe("backend/schema");
         expect(bundle.staticApps[0]).toMatchObject({ path: "/",
 spa: true });
     });
@@ -253,13 +196,13 @@ spa: true });
  *
  * Raising BUNDLE_FORMAT_VERSION means, in this order:
  *
- *   1. Teach `upgradeLegacyManifest` (boot/bundle.ts) to read the OLD shape.
- *      Old bundles booting on new runtimes is the reason the number exists, and
- *      it is the direction nothing else checks — a missing field simply reads as
- *      undefined and every gate keyed on it skips, silently.
+ *   1. Decide what this runtime does with the OLD shape: read it, or refuse
+ *      it by name with the way forward (format 3 refuses formats 1 and 2 —
+ *      they carry config/collections — with LEGACY_LAYOUT_REMEDY). Never let
+ *      a missing field read as undefined, where every gate keyed on it skips.
  *   2. Raise SUPPORTED_BUNDLE_FORMAT in the control plane
  *      (saas/backend/src/managed/bundle-manifest.ts) and teach
- *      `parseBundleManifest` to accept BOTH shapes.
+ *      `parseBundleManifest` the new shape.
  *   3. SHIP THE CONTROL PLANE FIRST. It rejects a format it does not know, so a
  *      CLI released ahead of it turns every deploy into MALFORMED_MANIFEST or
  *      BUNDLE_FORMAT_TOO_NEW, and the message blames the user's manifest.
@@ -267,22 +210,12 @@ spa: true });
  *
  * Raising RUNTIME_CONTRACT_VERSION additionally invalidates every project's
  * `rebase` range, so it is a major of the whole product, not a format tweak.
- *
- * **It stays at 1 until the product ships.** It was briefly raised to 2 when
- * resources moved from configuration to declaration — `RebaseBackendConfig`'s
- * `dataSources` and `.storageSources` are gone, and a runtime that refuses them
- * at boot is a breaking change by the letter of this number. That reasoning is
- * correct for a released product and does not apply to this one: there is no
- * population of v1 bundles to protect, so the major bought nothing and cost the
- * `rebase` range in every existing manifest, every template, and the reference
- * app.
- *
- * Pre-release, a breaking change is just a change. Break it, rebuild, move on.
- * The number starts counting when there are users on the other side of it.
+ * It went to 2 with tables (0.31): a contract-1 bundle carries collections,
+ * and there is no in-runtime adapter from collections to tables.
  */
 describe("the version constants", () => {
     it("are what every current consumer was written against", () => {
-        expect(BUNDLE_FORMAT_VERSION).toBe(2);
-        expect(RUNTIME_CONTRACT_VERSION).toBe(1);
+        expect(BUNDLE_FORMAT_VERSION).toBe(3);
+        expect(RUNTIME_CONTRACT_VERSION).toBe(2);
     });
 });

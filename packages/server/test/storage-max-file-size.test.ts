@@ -25,6 +25,7 @@ import { createStorageRoutes } from "../src/storage/routes";
 import { resolveStorageBackend } from "../src/boot/sources";
 import { initializeRebaseBackend } from "../src/init";
 import { DEFAULT_MAX_FILE_SIZE } from "../src/storage/types";
+import { tablesFrom } from "./helpers/tables";
 
 const b64 = (s: string) => Buffer.from(s).toString("base64");
 
@@ -166,7 +167,6 @@ describe("the upload body limit of a booted backend", () => {
         await initializeRebaseBackend({
             app,
             server: idleServer(),
-            collections: [],
             bootstrappers: [bootstrapper],
             auth: signedInEditor(),
             storage: {

@@ -1,5 +1,6 @@
 import { Hono } from "hono";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { CollectionConfig, TableDescriptor } from "@rebasepro/types";
+import { compileTables } from "@rebasepro/common";
 import { computeSchemaVersion, SCHEMA_VERSION_HEADER } from "@rebasepro/types";
 
 // `computeSchemaVersion` is the expensive call the route caches, and counting it
@@ -15,6 +16,7 @@ jest.mock("@rebasepro/types", () => {
 });
 import { createContractRoutes } from "../src/api/contract-routes";
 import type { HonoEnv } from "../src/api/types";
+import { tablesFrom } from "./helpers/tables";
 
 /**
  * The contract endpoint and its cheap sibling.
@@ -33,6 +35,15 @@ function collection(slug: string): CollectionConfig {
     };
 }
 
+/** The two registries the routes read, over the same tables: lowered collections and their descriptors. */
+function registries(collections: CollectionConfig[]): {
+    collectionRegistry: { getRawCollections(): CollectionConfig[] };
+    tableRegistry: { list(): readonly TableDescriptor[] };
+} {
+    const descriptors = compileTables(tablesFrom(collections).tables);
+    return { collectionRegistry: { getRawCollections: () => collections }, tableRegistry: { list: () => descriptors } };
+}
+
 function mount(config: Parameters<typeof createContractRoutes>[0]): Hono<HonoEnv> {
     const app = new Hono<HonoEnv>();
     app.route("/api/meta", createContractRoutes(config));
@@ -42,7 +53,7 @@ function mount(config: Parameters<typeof createContractRoutes>[0]): Hono<HonoEnv
 describe("contract routes", () => {
     it("serves the version recorded at build time", async () => {
         const app = mount({
-            collectionRegistry: { getRawCollections: () => [collection("posts")] },
+            ...registries([collection("posts")]),
             schemaVersion: "v1:deadbeefdeadbeef"
         });
 
@@ -54,21 +65,20 @@ describe("contract routes", () => {
         expect(response.headers.get(SCHEMA_VERSION_HEADER)).toBe("v1:deadbeefdeadbeef");
     });
 
-    it("computes the version from live collections when the build recorded none", async () => {
-        // Collections introspected from the
-        // database at boot, so the build genuinely could not know them. Quoting
-        // a build-time stamp there would publish the hash of an empty list as
-        // the identity of whatever the runtime actually found.
+    it("computes the version from the compiled tables when the build recorded none", async () => {
+        // A source boot (`rebase dev`) built nothing, so there is no recorded
+        // stamp to quote: the version is computed from the descriptors.
         const collections = [collection("posts"), collection("authors")];
+        const served = registries(collections);
         const app = mount({
-            collectionRegistry: { getRawCollections: () => collections },
+            ...served,
             schemaVersion: ""
         });
 
         const body = await (await app.request("/api/meta/schema-version")).json() as {
             schemaVersion: string;
         };
-        expect(body.schemaVersion).toBe(computeSchemaVersion(collections));
+        expect(body.schemaVersion).toBe(computeSchemaVersion(served.tableRegistry.list()));
         expect(body.schemaVersion).not.toBe(computeSchemaVersion([]));
     });
 
@@ -85,7 +95,7 @@ describe("contract routes", () => {
         hash.mockClear();
 
         const app = mount({
-            collectionRegistry: { getRawCollections: () => [collection("posts")] }
+            ...registries([collection("posts")])
         });
 
         const first = await (await app.request("/api/meta/schema-version")).json() as { schemaVersion: string };
@@ -104,7 +114,7 @@ describe("contract routes", () => {
         // no admin credential, so the fact was unreachable by exactly the
         // clients it exists for.
         const app = mount({
-            collectionRegistry: { getRawCollections: () => [collection("posts")] },
+            ...registries([collection("posts")]),
             schemaVersion: "v1:deadbeefdeadbeef",
             runtimeVersion: "0.17.3"
         });
@@ -130,7 +140,7 @@ describe("contract routes", () => {
         };
 
         const app = mount({
-            collectionRegistry: { getRawCollections: () => [withRules] },
+            ...registries([withRules]),
             schemaVersion: "v1:0000000000000000"
         });
 
@@ -143,7 +153,7 @@ describe("contract routes", () => {
 
     it("reports the collection slugs it serves", async () => {
         const app = mount({
-            collectionRegistry: { getRawCollections: () => [collection("posts"), collection("authors")] },
+            ...registries([collection("posts"), collection("authors")]),
             schemaVersion: "v1:0000000000000000"
         });
 

@@ -6,7 +6,6 @@ import { createIdempotencyStore } from "../api/rest/idempotency";
 import { resolveRateLimitStoreKind } from "../auth/resolve-rate-limit-store";
 import { createSqlRateLimitStore } from "../auth/sql-rate-limit-store";
 import { createCronStore } from "../cron/cron-store";
-import { loadCollectionsFromDirectory } from "../collections/loader";
 import { logger } from "../utils/logger";
 import { schemaRecoveryGuidance } from "./version-skew";
 
@@ -508,14 +507,4 @@ export function provisionTargetsFor(
             isDefault: false
         }));
     return [primary, ...others];
-}
-
-/** Load collections for provisioning when only a directory is known. */
-export async function collectionsForProvisioning(
-    declared: CollectionConfig[],
-    collectionsDir: string | undefined
-): Promise<CollectionConfig[]> {
-    if (declared.length > 0) return declared;
-    if (!collectionsDir) return [];
-    return loadCollectionsFromDirectory(collectionsDir);
 }

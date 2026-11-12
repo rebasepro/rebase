@@ -90,7 +90,7 @@ export { createApiKeyStore, createApiKeyRoutes, createPersonalKeyRoutes, isApiKe
 export type { ApiKey, ApiKeyKind, ApiKeyMasked, ApiKeyWithSecret, CreateApiKeyRequest, CreatePersonalKeyRequest, UpdateApiKeyRequest, ApiKeyStore, DataOperation, KeyTargets } from "./api-keys";
 
 // Scopes
-export { requireScope, requireScopeByMethod, hasScope, callerScopes, getAccessModel, configureAccess, accessModelFromCollections, AccessModelError } from "./access";
+export { requireScope, requireScopeByMethod, hasScope, callerScopes, getAccessModel, configureAccess, accessModelFromAuthTable, AccessModelError } from "./access";
 export type { KeyOwnerResolver } from "./access";
 
 // Auth Adapters

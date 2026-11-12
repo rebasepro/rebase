@@ -7,6 +7,7 @@ import { initializeRebaseBackend } from "../src/init";
 import type { HonoEnv } from "../src/api/types";
 import { fakeBootstrapper, fakeDataDriver, idleServer } from "./helpers/server-b-fakes";
 import { resolveOwnership } from "../src/init/surfaces";
+import { tablesFrom } from "./helpers/tables";
 
 /**
  * What a process *owns*, as distinct from what it serves.
@@ -86,7 +87,7 @@ async function boot(ownership?: { cronScheduler?: boolean; jobWorkers?: boolean 
     const backend = await initializeRebaseBackend({
         app: new Hono<HonoEnv>(),
         server: idleServer(),
-        collections: [collection("jobs")],
+        ...tablesFrom([collection("jobs")]),
         cronsDir: CRONS_DIR,
         cronPersistence: false,
         bootstrappers: [bootstrapperFor(sql)],

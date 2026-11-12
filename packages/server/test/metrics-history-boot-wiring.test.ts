@@ -12,6 +12,7 @@ import type { BackendBootstrapper } from "@rebasepro/types";
 import { initializeRebaseBackend } from "../src/init";
 import type { HonoEnv } from "../src/api/types";
 import { fakeBootstrapper, fakeDataDriver } from "./helpers/server-b-fakes";
+import { tablesFrom } from "./helpers/tables";
 
 const stopSampler = jest.fn();
 jest.mock("../src/metrics/history-recorder", () => ({
@@ -34,7 +35,6 @@ it("stops the metrics sampler on backend.shutdown()", async () => {
     const backend = await initializeRebaseBackend({
         app: new Hono<HonoEnv>(),
         server: createServer(),
-        collections: [],
         cronPersistence: false,
         bootstrappers: [bootstrapper()]
     });

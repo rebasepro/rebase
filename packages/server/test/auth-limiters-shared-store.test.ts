@@ -38,6 +38,7 @@ jest.mock("../src/utils/logger", () => ({
 }));
 
 import { initializeRebaseBackend } from "../src/init";
+import { tablesFrom } from "./helpers/tables";
 
 const bootstrapper: BackendBootstrapper = {
     type: "fake",
@@ -70,7 +71,6 @@ async function boot(): Promise<Hono<HonoEnv>> {
         app,
         // Never listened on: the backend only attaches its websocket to it.
         server: createServer(),
-        collections: [],
         cronPersistence: false,
         bootstrappers: [bootstrapper],
         auth: { requireAuth: false, jwtSecret: "auth-limiters-shared-store-secret-0123456789", emailOtp: true }

@@ -42,9 +42,11 @@ import {
     type AdminScope,
     type AuthConfigDocument,
     type CollectionCallbacks,
-    type RebaseServerClient
+    type RebaseServerClient,
+    type TableDescriptor,
+    type TableHooks
 } from "@rebasepro/types";
-import { createDataSourceRegistry, resolveDataSource, buildSdkData, buildRoutedRebaseData, createAccessorSlugResolver, getEffectiveSecurityRules, assertBeforeQueryIsPostgresOnly, warnOnTableDdl } from "@rebasepro/common";
+import { lowerHooks, createDataSourceRegistry, resolveDataSource, buildSdkData, buildRoutedRebaseData, createAccessorSlugResolver, getEffectiveSecurityRules, assertBeforeQueryIsPostgresOnly, warnOnTableDdl } from "@rebasepro/common";
 import { randomBytes } from "node:crypto";
 import type { Server } from "node:http";
 import nodePath from "node:path";
@@ -56,8 +58,8 @@ import { bodyLimit } from "hono/body-limit";
 import { createRebaseClient } from "@rebasepro/client";
 
 import { BackendCollectionRegistry } from "../collections/BackendCollectionRegistry";
-import { loadCollectionsFromDirectory } from "../collections/loader";
-import { assertCollectionConfigs } from "../collections/validate-config";
+import { TableRegistry } from "../schema/table-registry";
+import { globalHooksAsCallbacks, resolveDeclaredTables } from "../schema/declared-tables";
 import {
     collectionsStoredBy,
     logUnprovisionedCollections,
@@ -160,7 +162,7 @@ import { createApiKeyPreAuth, createFunctionScopeGuard, createTusScopeGuard, res
 import type { KeyTargets } from "../auth/api-keys/key-grant";
 import { createPlatformTokenPreAuth, platformTokensFromEnv } from "../auth/platform-token";
 import { createRequireAuth } from "../auth/middleware";
-import { accessModelFromCollections, callerScopes, keyOwnerResolverFor, requireScope, requireScopeByMethod, type AccessControl, type KeyOwnerResolver } from "../auth/access";
+import { accessModelFromAuthTable, callerScopes, keyOwnerResolverFor, requireScope, requireScopeByMethod, type AccessControl, type KeyOwnerResolver } from "../auth/access";
 import { createScopeRoutes } from "../auth/scope-routes";
 import { verifyCredentialAgainst, type VerifiedCredential } from "../auth/verify-credential";
 import { AUTH_CONFIG_LIMIT, createAuthLimiters, createDataRateLimiter, createDataRateLimitCheck, DEFAULT_FUNCTIONS_ANONYMOUS_LIMIT, type DataRateLimitConfig } from "../auth/rate-limiter";
@@ -377,19 +379,29 @@ export interface RebaseBackend {
     start(): void;
 
     /**
-     * Attach collection callbacks after the backend is built.
+     * Attach a table's hooks after the backend is built.
      *
-     * Use this instead of mutating `collectionRegistry.get(slug).callbacks`.
-     * Every registry normalizes its collections through `{ ...c }`, so the
-     * backend registry and each driver's registry hold **separate copies** of
-     * the same collection — assigning callbacks to one is invisible to the
-     * driver that actually invokes them, and the hooks silently never fire.
-     * This writes to all of them.
+     * Use this instead of mutating anything the registries hold. Every
+     * registry normalizes its collections through `{ ...c }`, so the backend
+     * registry and each driver's registry hold **separate copies** of the same
+     * table — assigning to one is invisible to the driver that actually
+     * invokes them, and the hooks silently never fire. This writes to all of
+     * them. Each hook receives the table's descriptor as `table`.
      *
-     * It REPLACES the callbacks the collection declared. To keep them, attach
-     * `composeCallbacks(declared, mine)`.
+     * It REPLACES the hooks the table declared. To keep them, attach a hooks
+     * object that calls them (`definition.config.hooks`) as well.
      */
-    setCollectionCallbacks(slug: string, callbacks: CollectionCallbacks): void;
+    setTableHooks(slug: string, hooks: TableHooks): void;
+
+    /**
+     * The compiled descriptors of the tables this backend declares, in
+     * definition order — what `GET /api/schema/tables` serves. Empty for a
+     * backend that introspects the database.
+     */
+    getTableDescriptors(): readonly TableDescriptor[];
+
+    /** The compiled descriptor of the table served at `/api/data/<slug>`, if it is declared. */
+    getTableDescriptor(slug: string): TableDescriptor | undefined;
 
     /**
      * Deep health check that verifies database connectivity.
@@ -649,22 +661,33 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     );
     collectionRegistry.setDataSources(dataSourceRegistry);
 
-    // Global lifecycle callbacks — applied to every collection, on all data paths.
-    if (config.callbacks) {
-        collectionRegistry.setGlobalCallbacks(config.callbacks);
+    // ─── Declared tables ─────────────────────────────────────────────────
+    //
+    // `defineTable` is the one front door. The definitions are compiled here —
+    // fail closed: a table with no usable `rls`, an `"inherit"` without
+    // `defaultRls`, a relation outside the set, all refuse the boot with one
+    // `SchemaDefinitionError` — and lowered into the collection objects the
+    // registry, the routes, realtime, MCP and the drivers read today. The
+    // descriptors are kept beside them, by slug, for everything built on the
+    // table model.
+    const declaredTables = await resolveDeclaredTables({
+        tables: config.tables,
+        defaultRls: config.defaultRls,
+        schemaDir: config.schemaDir
+    });
+    const tableRegistry = new TableRegistry();
+    tableRegistry.replaceAll(declaredTables.descriptors);
+    const describeTable = (slug: string): TableDescriptor | undefined => tableRegistry.get(slug);
+    if (declaredTables.source === "schemaDir") {
+        logger.info("Loaded the declared tables", { count: declaredTables.defs.length, dir: config.schemaDir });
     }
-    let activeCollections = config.collections || [];
-    // Collections handed in directly never touch the loader, so its strict parse
-    // has to be repeated here. Configs derived from the database schema below are
-    // machine-generated and are deliberately not checked.
-    if (activeCollections.length > 0) assertCollectionConfigs(activeCollections);
-    if (config.collectionsDir && activeCollections.length === 0) {
-        activeCollections = await loadCollectionsFromDirectory(config.collectionsDir);
-        logger.info("Auto-discovered collections", {
-            count: activeCollections.length,
-            dir: config.collectionsDir
-        });
+
+    // Global table hooks — applied to every table, on all data paths.
+    const globalCallbacks = config.hooks ? globalHooksAsCallbacks(config.hooks, describeTable) : undefined;
+    if (globalCallbacks) {
+        collectionRegistry.setGlobalCallbacks(globalCallbacks);
     }
+    let activeCollections: CollectionConfig[] = [...declaredTables.collections];
 
     // Before anything copies them. Every registry re-normalizes what it is
     // handed — `normalizeCollection` rebuilds each property as `{ ...property }`
@@ -685,23 +708,28 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     // what makes them served.
     //
     // Derived from what actually RESOLVED, not from what was configured: a
-    // `collectionsDir` pointing at nothing declares nothing, and treating that
+    // `schemaDir` pointing at nothing declares nothing, and treating that
     // as "declared" would serve an empty API and never look at the database.
     const introspectCollections = activeCollections.length === 0;
+    if (introspectCollections && config.hooks) {
+        throw new Error(
+            "Global table hooks (`hooks`, from backend/hooks.ts) were given, but this backend declares no tables " +
+            "and introspects the database instead. A hook receives the descriptor of the table it runs for, and an " +
+            "introspected table has none. Declare the tables in backend/schema, or remove the hooks."
+        );
+    }
     // Only the surprising branch is worth a line every boot. Serving what you
     // declared is what a developer already expects; deriving collections from
     // the database because nothing was declared is the state people debug for
     // an hour before finding out it happened.
     if (introspectCollections) {
-        logger.info("No collections declared — deriving them from the database schema");
+        logger.info("No tables declared — deriving them from the database schema");
     } else {
-        logger.debug("Serving declared collections");
+        logger.debug("Serving declared tables");
     }
 
-    // Directory-level `defaultSecurityRules` are applied by the collection
-    // loader, so the server and `db push` agree on what a collection's rules
-    // are. They cannot be set here: the generators that write the actual
-    // Postgres policies never see this config.
+    // `defaultRls` is resolved by the compiler, from the index that exports
+    // it, so the server and `db push` agree on what a table's rules are.
 
     const realtimeServices: Record<string, RealtimeProvider> = {};
     const delegates: Record<string, DataDriver> = {};
@@ -838,8 +866,8 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         });
         // Global callbacks were set on `collectionRegistry` above, and no driver
         // reads that one — see `handGlobalCallbacksTo`.
-        if (config.callbacks) {
-            handGlobalCallbacksTo(b.id || bootstrapper.type, driverResult, config.callbacks);
+        if (globalCallbacks) {
+            handGlobalCallbacksTo(b.id || bootstrapper.type, driverResult, globalCallbacks);
         }
         delegates[b.id || bootstrapper.type] = driverResult.driver;
         // Kept because a later step has to hand each bootstrapper back its own
@@ -855,8 +883,8 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             const driverName = b.id || bootstrapper.type;
             if (!driverResult.collections) {
                 throw new Error(
-                    `Driver "${driverName}" cannot derive collections from the database schema, ` +
-                    "and this project declared none. Declare collections, or use a driver that " +
+                    `Driver "${driverName}" cannot derive tables from the database schema, ` +
+                    "and this project declared none. Declare tables in backend/schema, or use a driver that " +
                     "implements introspection (e.g. @rebasepro/server-postgres)."
                 );
             }
@@ -958,14 +986,10 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     // The access model — the app's declared roles and scopes — before anything
     // that reads it: the registration guard refuses a default role holding an
     // admin-plane scope, and every scope check consults it. Built from the
-    // users collection's `auth` block; an explicitly configured auth
-    // collection takes precedence over one found among the collections.
-    const explicitAuthCollection = config.auth && !isAuthAdapter(config.auth) ? config.auth.collection : undefined;
-    const accessCollections = explicitAuthCollection ? [explicitAuthCollection, ...activeCollections] : activeCollections;
-    const accessModel = accessModelFromCollections(accessCollections);
-    const declaredAuth = accessCollections.find(collection => collection.auth === true
-        || (typeof collection.auth === "object" && collection.auth !== null && collection.auth.enabled === true))?.auth;
-    const personalKeysEnabled = typeof declaredAuth === "object" && declaredAuth !== null && declaredAuth.personalKeys === true;
+    // `auth` options of the table defined with `defineAuthTable`.
+    const authTable = declaredTables.authTable;
+    const accessModel = accessModelFromAuthTable(authTable?.options, authTable?.descriptor.slug);
+    const personalKeysEnabled = authTable?.options.personalKeys === true;
 
     // 2. Initialize Auth & History via the default driver's bootstrapper
     let authConfigResult: BootstrappedAuth | undefined = undefined;
@@ -1000,30 +1024,19 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             // ── RebaseAuthConfig — wrap in built-in adapter ──
             const safeAuthConfig = config.auth as RebaseAuthConfig;
 
-            // Auto-discover the auth collection from activeCollections if not explicitly set
-            if (!safeAuthConfig.collection) {
-                const foundAuthCollection = activeCollections.find(c => {
-                    const isAuth = c.auth;
-                    return isAuth === true || (isAuth && typeof isAuth === "object" && isAuth.enabled === true);
-                });
-                if (foundAuthCollection) {
-                    safeAuthConfig.collection = foundAuthCollection;
-                    logger.debug("Auto-discovered auth collection from collection definitions", { slug: foundAuthCollection.slug });
-                }
-            }
-
             // The built-in auth subsystem (users, sessions, repository) is
-            // bootstrapped on the DEFAULT driver. If the auth collection is
-            // routed to a non-default data source, login would read/write the
-            // default engine while the collection's data views hit another —
-            // a split-brain user store. Warn loudly.
-            if (safeAuthConfig.collection) {
-                const authDs = resolveDataSource(safeAuthConfig.collection, dataSourceRegistry);
+            // bootstrapped on the DEFAULT driver. If the auth table is routed
+            // to a non-default database, login would read/write the default
+            // one while the table's data views hit another — a split-brain
+            // user store. Warn loudly.
+            const authCollection = authTable?.collection;
+            if (authCollection) {
+                const authDs = resolveDataSource(authCollection, dataSourceRegistry);
                 if (authDs.key !== DEFAULT_DRIVER_ID) {
                     logger.warn(
-                        `[Auth] The auth collection "${safeAuthConfig.collection.slug}" is on data source ` +
-                        `"${authDs.key}", but the built-in auth system always uses the default data source. ` +
-                        `Move the auth collection to the default data source, or replace auth with an AuthAdapter ` +
+                        `[Auth] The auth table "${authCollection.slug}" is in database ` +
+                        `"${authDs.key}", but the built-in auth system always uses the default database. ` +
+                        `Move the auth table to the default database, or replace auth with an AuthAdapter ` +
                         `that manages users in "${authDs.key}".`
                     );
                 }
@@ -1031,7 +1044,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
 
             // The auth write path does not run the collection save pipeline, on
             // purpose — say so when the collection expects otherwise.
-            warnOnAuthCollectionDataCallbacks(safeAuthConfig.collection);
+            warnOnAuthCollectionDataCallbacks(authCollection);
 
             if (safeAuthConfig.jwtSecret) {
                 jwt = createJwtService({
@@ -1057,7 +1070,13 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
 
             if (defaultBootstrapper.initializeAuth) {
                 logger.debug("Bootstrapping authentication via driver protocol");
-                authConfigResult = await defaultBootstrapper.initializeAuth(config.auth, defaultDriverResult);
+                // The driver stores users in the auth table's lowered collection,
+                // exactly as it always has; the option the application no
+                // longer writes is supplied from `defineAuthTable` here.
+                authConfigResult = await defaultBootstrapper.initializeAuth(
+                    { ...safeAuthConfig, collection: authCollection },
+                    defaultDriverResult
+                );
 
                 // The built-in auth adapter is created after OAuth providers
                 // are resolved (below) so it only needs to be constructed once.
@@ -1143,8 +1162,11 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     // of the same job and reads it off the same object rather than resolving it
     // again. Two answers to that question is how the create path and the patch
     // path drifted apart elsewhere in this codebase.
+    // The descriptors of the tables the default database holds — the set this
+    // process provisions there, and so the set the stamp stands for.
+    const provisionableSlugs = new Set(provisionable.map(collection => collection.slug));
     await enforceSchemaStamp({
-        collections: provisionable,
+        tables: tableRegistry.list().filter(table => provisionableSlugs.has(table.slug)),
         // What this process *did*, not what its role permits. The difference is
         // the chart's default: with an external migration Job every pod runs
         // REBASE_MIGRATE_ON_BOOT=none, including the api, whose role still says
@@ -1397,7 +1419,8 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         authLimiters,
         rateLimitStore: sharedRateLimitStore,
         apiKeyStore,
-        collections: () => collectionRegistry.getRawCollections()
+        collections: () => collectionRegistry.getRawCollections(),
+        tables: () => tableRegistry.list()
     };
     /**
      * Every route group's first middleware: this backend's services on the
@@ -1549,7 +1572,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             }
 
             // Re-create the built-in adapter with all resolved OAuth providers
-            const reCollectionAuth = safeAuthConfig.collection ? safeAuthConfig.collection.auth : undefined;
+            const reCollectionAuth = authTable?.collection.auth;
             const collectionAuthConfig = (typeof reCollectionAuth === "object" && reCollectionAuth !== null) ? reCollectionAuth : undefined;
             // On unless the app turns it off, as the runtime has it. Left off
             // when unset, a backend booted here answered the refresh token in
@@ -1982,7 +2005,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     // The schema editor rewrites collection files, so it needs a collectionsDir
     // to write to and is off in baas mode (no files) and in production.
     const schemaEditorEnabled =
-        config.schemaEditor ?? (!!config.collectionsDir && !introspectCollections && process.env.NODE_ENV !== "production");
+        config.schemaEditor ?? (!!config.schemaDir && !introspectCollections && process.env.NODE_ENV !== "production");
 
     /**
      * Why the editor is off, in the words the person staring at a greyed-out
@@ -2005,9 +2028,9 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             message: "The schema editor is turned off for this server (`schemaEditor: false`). " +
                 LIVE_SCHEMA_REPOSITORY_HINT
         };
-        if (!config.collectionsDir) return {
+        if (!config.schemaDir) return {
             code: "SCHEMA_EDITOR_NO_COLLECTIONS_DIR",
-            message: "This server has no `collectionsDir`, so the schema editor has no collection files to write to."
+            message: "This server has no `schemaDir`, so the schema editor has no schema files to write to."
         };
         if (schemaEditorEnabled) return undefined;
         if (introspectCollections) return {
@@ -2028,8 +2051,8 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         };
     };
 
-    if (schemaEditorEnabled && !config.collectionsDir) {
-        logger.warn("schemaEditor is enabled but no collectionsDir is set — the schema editor has nowhere to write. Skipping.");
+    if (schemaEditorEnabled && !config.schemaDir) {
+        logger.warn("schemaEditor is enabled but no schemaDir is set — the schema editor has nowhere to write. Skipping.");
     }
 
     let schemaEditorOff = schemaEditorUnavailable();
@@ -2038,12 +2061,12 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     // source-only editor's routes and live schema editing's `/apply`.
     let schemaSourceEditor: SchemaSourceEditor | undefined;
 
-    if (!schemaEditorOff && config.collectionsDir) {
+    if (!schemaEditorOff && config.schemaDir) {
         // ts-morph is an optional peer dependency, so it can legitimately be
         // absent — run without the schema editor instead of failing startup.
         try {
             const editorModule = await import("../api/schema-editor-routes");
-            schemaSourceEditor = editorModule.createSchemaSourceEditor(config.collectionsDir);
+            schemaSourceEditor = editorModule.createSchemaSourceEditor(config.schemaDir);
             schemaEditorRoutes = editorModule.createSchemaEditorRoutes(schemaSourceEditor);
         } catch (err) {
             if ((err as { code?: string })?.code === "ERR_MODULE_NOT_FOUND") {
@@ -2148,7 +2171,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         // rewritten and committed back through the Git Data API instead of the
         // local working tree.
         const remoteRepo = config.liveSchema?.repository;
-        const canEditSchema = Boolean(config.collectionsDir) || Boolean(remoteRepo);
+        const canEditSchema = Boolean(config.schemaDir) || Boolean(remoteRepo);
 
         // The remote write path's one dependency. Loaded at boot rather than on
         // the first apply, so a server without `ts-morph` says so on `/status`
@@ -2179,7 +2202,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             unconfigured.all("/*", (c) => c.json({
                 error: {
                     code: "SCHEMA_EDITING_NO_COLLECTIONS_DIR",
-                    message: "Live schema editing needs `collectionsDir` — the directory holding " +
+                    message: "Live schema editing needs `schemaDir` — the directory holding " +
                         "this project's collection definitions — or `liveSchema.repository`, a " +
                         "repository to fetch them from. This server was started with neither, so " +
                         "there is nothing for it to edit."
@@ -2189,7 +2212,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         }
 
         if (canEditSchema) {
-            const collectionsDir = config.collectionsDir;
+            const collectionsDir = config.schemaDir;
             // Resolved once, at boot. A deployment either has a working tree or
             // it does not, and asking git on every request would spawn a
             // process for every plan the panel asks for.
@@ -2644,12 +2667,12 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         // `route("/")`, because a `use()` added after the routes never runs.
         //
         // `config.schemaVersion` is what the bundle recorded at build time and
-        // is what `/api/meta/contract` serves; a `baas` project has none, so the
-        // stamp is computed from the collections introspection found — the same
+        // is what `/api/meta/contract` serves; a source boot has none, so the
+        // stamp is computed from the compiled table descriptors — the same
         // input and the same function the contract route uses, so the two
         // cannot answer differently.
         dataRouter.use("/*", createSchemaDriftDetector(() =>
-            config.schemaVersion ?? computeSchemaVersion(collectionRegistry.getRawCollections())));
+            config.schemaVersion ?? computeSchemaVersion(tableRegistry.list())));
 
         // Secure by default: require auth when auth is configured.
         // Developers who intentionally want public data access (relying
@@ -3704,6 +3727,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
 
         contractRouter.route("/", createContractRoutes({
             collectionRegistry,
+            tableRegistry,
             schemaVersion: config.schemaVersion,
             runtimeVersion: config.runtimeVersion
         }));
@@ -3750,7 +3774,10 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         return targets;
     };
 
-    const setCollectionCallbacks = (slug: string, callbacks: CollectionCallbacks): void => {
+    const setTableHooks = (slug: string, hooks: TableHooks): void => {
+        // The one adapter from table hooks to the callbacks the registries
+        // and drivers run — the same lowering the declared hooks went through.
+        const callbacks: CollectionCallbacks = lowerHooks(hooks, slug, describeTable) ?? {};
         // The boot-time check on `beforeQuery` saw the collection's declared
         // callbacks, not these, so it is repeated here before anything is
         // assigned: a hook attached to a collection its engine cannot narrow is
@@ -3781,14 +3808,13 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         }
         if (replaced.size > 0) {
             logger.warn(
-                `[callbacks] Attaching callbacks to "${slug}" replaced ${[...replaced].map(n => `'${n}'`).join(", ")} ` +
-                "declared on the collection itself, which will no longer run. Callbacks are assigned, not merged. " +
-                "To keep the collection's own, attach `composeCallbacks(declared, mine)` from @rebasepro/server, " +
-                "where `declared` is the collection's `callbacks`."
+                `[hooks] Attaching hooks to "${slug}" replaced ${[...replaced].map(n => `'${n}'`).join(", ")} ` +
+                "declared on the table itself, which will no longer run. Hooks are assigned, not merged. " +
+                "To keep the table's own, attach a hooks object that also calls them (`definition.config.hooks`)."
             );
         }
         if (attached === 0) {
-            logger.warn(`[callbacks] Collection "${slug}" not found in any registry — callbacks not attached.`);
+            logger.warn(`[hooks] Table "${slug}" not found in any registry — hooks not attached.`);
         }
     };
 
@@ -4322,7 +4348,9 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         },
         attachRealtime,
         start,
-        setCollectionCallbacks,
+        setTableHooks,
+        getTableDescriptors: () => tableRegistry.list(),
+        getTableDescriptor: (slug: string) => tableRegistry.get(slug),
         healthCheck,
         shutdown
     };

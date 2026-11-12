@@ -35,6 +35,7 @@ child: jest.fn().mockReturnThis() }
 }));
 
 import { initializeRebaseBackend } from "../src/init";
+import { tablesFrom } from "./helpers/tables";
 
 const ORIGIN = "https://app.example.com";
 const COOKIE = "__rb_refresh";
@@ -78,7 +79,6 @@ authRepository: store.repo() };
         app,
         // Never listened on: the backend only attaches its websocket to it.
         server: createServer(),
-        collections: [],
         cronPersistence: false,
         bootstrappers: [bootstrapper],
         auth: { requireAuth: false,

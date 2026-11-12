@@ -16,6 +16,7 @@ import {
     PLATFORM_TOKEN_KEY_ENV,
     verifyPlatformToken
 } from "../src/auth/platform-token";
+import { tablesFrom } from "./helpers/tables";
 
 // The cron loader's native `import()` fails under jest's vm-modules once many
 // suites share the workers ("reading 'identifier'" in CI), and the job list
@@ -132,7 +133,7 @@ async function boot(env: { key?: string; audience?: string } = { key: platform.p
     const backend = await initializeRebaseBackend({
         app,
         server: idleServer(),
-        collections: [collection("jobs")],
+        ...tablesFrom([collection("jobs")]),
         cronsDir: CRONS_DIR,
         cronPersistence: false,
         bootstrappers: [bootstrapper],

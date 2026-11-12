@@ -12,6 +12,7 @@ import { fakeDataDriver } from "./helpers/server-a-fakes";
 
 import { initializeRebaseBackend } from "../src/init";
 import { generateAccessToken } from "../src/auth/jwt";
+import { tablesFrom } from "./helpers/tables";
 
 /**
  * Who may reach cron, logs and backups on a backend whose DATA is public.
@@ -114,7 +115,7 @@ async function boot(auth: RebaseAuthConfig | undefined): Promise<Boot> {
         app,
         // Never listened on: the backend only attaches its websocket to it.
         server: createServer(),
-        collections: [collection("jobs")],
+        ...tablesFrom([collection("jobs")]),
         cronsDir: CRONS_DIR,
         cronPersistence: false,
         bootstrappers: [bootstrapper],
@@ -280,7 +281,7 @@ describe("the contract and the private docs read admin live", () => {
         const backend = await initializeRebaseBackend({
             app,
             server: createServer(),
-            collections: [collection("jobs")],
+            ...tablesFrom([collection("jobs")]),
             cronsDir: CRONS_DIR,
             cronPersistence: false,
             bootstrappers: [liveBootstrapper],
@@ -353,7 +354,7 @@ describe("a backup download link, through the real admin gates", () => {
         const backend = await initializeRebaseBackend({
             app,
             server: createServer(),
-            collections: [collection("jobs")],
+            ...tablesFrom([collection("jobs")]),
             cronsDir: CRONS_DIR,
             cronPersistence: false,
             bootstrappers: [{

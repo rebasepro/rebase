@@ -1,9 +1,13 @@
-import type { CollectionConfig } from "@rebasepro/types";
+import type { CollectionConfig, TableHooks } from "@rebasepro/types";
 import {
+    col,
     computeSchemaVersion,
+    defineTable,
     deserializeCollections,
+    rel,
     serializeCollections
 } from "@rebasepro/types";
+import { compileTables } from "@rebasepro/common";
 
 /**
  * Serializing collections for the contract endpoint.
@@ -174,95 +178,39 @@ describe("collection contract serialization", () => {
     });
 });
 
-describe("schema version", () => {
-    it("is stable across input ordering and object key ordering", () => {
-        const a: CollectionConfig = { name: "A", slug: "a", properties: { id: { name: "ID", type: "string" } } };
-        const b: CollectionConfig = { slug: "b", properties: { id: { type: "string", name: "ID" } }, name: "B" };
+describe("schema version — computed from the compiled tables", () => {
+    const authors = defineTable("authors", {
+        columns: { id: col.integer().primaryKey().identity(), name: col.text() },
+        rls: "admin-only"
+    });
+    const others = defineTable("others", {
+        columns: { id: col.uuid().primaryKey().defaultRandom() },
+        rls: "admin-only"
+    });
+    const posts = (target: typeof authors | typeof others, hooks?: TableHooks) => defineTable("posts", {
+        columns: { id: col.uuid().primaryKey().defaultRandom(), title: col.text() },
+        relations: { author: rel.belongsTo(() => target) },
+        rls: "admin-only",
+        ...(hooks ? { hooks } : {})
+    });
+    const version = (...defs: Parameters<typeof compileTables>[0]) => computeSchemaVersion(compileTables(defs));
 
-        const first = computeSchemaVersion([a, b]);
-        const second = computeSchemaVersion([b, a]);
-
-        expect(first).toBe(second);
+    it("does not move when only a hook's code changes — hooks are presence flags", () => {
+        const one = version(authors, posts(authors, { beforeSave: ({ values }) => values }));
+        const two = version(authors, posts(authors, { beforeSave: ({ values }) => ({ ...values, title: "x" }) }));
+        expect(one).toBe(two);
     });
 
-    it("changes when a property changes", () => {
-        const before: CollectionConfig[] = [{
-            name: "A",
-            slug: "a",
-            properties: { id: { name: "ID", type: "string" } }
-        }];
-
-        const after: CollectionConfig[] = [{
-            name: "A",
-            slug: "a",
-            properties: { id: { name: "ID", type: "string" }, title: { name: "Title", type: "string" } }
-        }];
-
-        expect(computeSchemaVersion(before)).not.toBe(computeSchemaVersion(after));
-    });
-
-    it("ignores callbacks, so editing a hook does not invalidate every client SDK", () => {
-        const base: CollectionConfig = {
-            name: "A",
-            slug: "a",
-            properties: { id: { name: "ID", type: "string" } }
-        };
-
-        const withHook = { ...base, callbacks: { beforeSave: () => ({}) } };
-
-        expect(computeSchemaVersion([base]))
-            .toBe(computeSchemaVersion([withHook]));
-    });
-
-    it("ignores security rules, which never appear in a generated client", () => {
-        // These are also applied by the runtime at load time, so hashing them
-        // made a build-time stamp that could never match the server serving it.
-        const base: CollectionConfig = {
-            name: "A",
-            slug: "a",
-            properties: { id: { name: "ID", type: "string" } }
-        };
-        const withRules: CollectionConfig = {
-            ...base,
-            securityRules: [{ name: "a_all", operation: "all", using: "true" }]
-        };
-
-        expect(computeSchemaVersion([base]))
-            .toBe(computeSchemaVersion([withRules]));
-    });
-
-    it("ignores presentation-only settings", () => {
-        const base: CollectionConfig = {
-            name: "A",
-            slug: "a",
-            properties: { id: { name: "ID", type: "string" } }
-        };
-
-        // `admin` is declared by `@rebasepro/cms-types`, which the server does
-        // not load; a collection file that does carries it, and it must not count.
-        const presented = { ...base, admin: { icon: "Star", group: "Content" }, description: "hi" };
-
-        expect(computeSchemaVersion([base]))
-            .toBe(computeSchemaVersion([presented]));
+    it("moves when a hook is added", () => {
+        expect(version(authors, posts(authors, { afterRead: ({ values }) => values })))
+            .not.toBe(version(authors, posts(authors)));
     });
 
     it("still changes when a relation target changes", () => {
-        const authors = authorsCollection();
-        const others: CollectionConfig = { name: "Other", slug: "other", properties: {} };
-
-        const toAuthors = computeSchemaVersion([postsCollection(authors)]);
-        const toOther = computeSchemaVersion([postsCollection(others)]);
-
-        expect(toAuthors).not.toBe(toOther);
+        expect(version(authors, others, posts(authors))).not.toBe(version(authors, others, posts(others)));
     });
 
-    it("is prefixed so the algorithm can change later without ambiguity", () => {
-        const version = computeSchemaVersion([{
-            name: "A",
-            slug: "a",
-            properties: {}
-        }]);
-
-        expect(version).toMatch(/^v1:[0-9a-f]{16}$/);
+    it("is prefixed v2, so a stamp from the collection model can never match", () => {
+        expect(version(authors)).toMatch(/^v2:[0-9a-f]{16}$/);
     });
 });

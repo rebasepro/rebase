@@ -8,6 +8,14 @@ import { openApiDocument, schemaOf, type JsonSchema, type OpenApiDocument } from
 // package and must not become one for a test. The point of the suite is that
 // the two generators describe the same collection, so it has to run both.
 import { generateTypedefs } from "../../codegen/src/generate-types";
+import { compileTables } from "@rebasepro/common";
+import { tablesFrom } from "./helpers/tables";
+
+/** The SDK generator reads compiled descriptors: the same collections, lifted and compiled. */
+const descriptorsOf = (collections: CollectionConfig[]) => {
+    const { tables, defaultRls } = tablesFrom(collections);
+    return compileTables(tables, defaultRls ? { defaultRls } : {});
+};
 
 /**
  * `/api/docs` and `generated/sdk/database.types.ts` describe the same
@@ -102,7 +110,7 @@ function sdkRowKeys(typedefs: string, accessor: string): string[] {
 
 describe("the OpenAPI document and the generated SDK", () => {
     it("describe the same set of fields", () => {
-        const typedefs = generateTypedefs(collections);
+        const typedefs = generateTypedefs(descriptorsOf(collections));
 
         for (const [accessor, schemaName] of [["posts", "Post"], ["authors", "Author"], ["tags", "Tag"]] as const) {
             const documented = Object.keys(propertiesOf(spec, schemaName));
@@ -140,7 +148,7 @@ describe("the OpenAPI create and update bodies and the generated SDK", () => {
     // only, while the SDK's Insert typed the `manyToMany` membership the
     // server writes. The bodies and the SDK now name the same keys.
     it("name the same writable fields", () => {
-        const typedefs = generateTypedefs(collections);
+        const typedefs = generateTypedefs(descriptorsOf(collections));
         for (const [accessor, schemaName] of [["posts", "Post"], ["authors", "Author"], ["tags", "Tag"]] as const) {
             const input = Object.keys(propertiesOf(spec, `${schemaName}Input`));
             expect(new Set(input)).toEqual(new Set(sdkBlockKeys(typedefs, accessor, "Insert")));
@@ -218,7 +226,7 @@ describe("the scaffold every `rebase init` produces", () => {
     it("describes the same fields as the SDK it ships beside", async () => {
         const collections = await scaffold();
         const scaffoldSpec = openApiDocument(generateOpenApiSpec(collections));
-        const typedefs = generateTypedefs(collections);
+        const typedefs = generateTypedefs(descriptorsOf(collections));
 
         expect(new Set(Object.keys(propertiesOf(scaffoldSpec, "Post"))))
             .toEqual(new Set(sdkRowKeys(typedefs, "posts")));

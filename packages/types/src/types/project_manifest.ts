@@ -558,27 +558,6 @@ export interface RebaseBundleEntrypoints {
     /** Compiled Drizzle schema module. */
     schema?: string;
     /**
-     * Compiled config package directory (collections live under it).
-     *
-     * @deprecated — removed with the legacy loader. Format-2 only; a format-3
-     * bundle carries {@link RebaseBundleEntrypoints.tables} instead.
-     */
-    config?: string;
-    /**
-     * Compiled collections directory, when it differs from `<config>/collections`.
-     *
-     * @deprecated — removed with the legacy loader. Format-2 only; see
-     * {@link RebaseBundleEntrypoints.tables}.
-     */
-    collections?: string;
-    /**
-     * Module exporting the auth users collection (default export).
-     *
-     * @deprecated — removed with the legacy loader. The auth table is the one
-     * declared with `defineAuthTable` in {@link RebaseBundleEntrypoints.tables}.
-     */
-    usersCollection?: string;
-    /**
      * Built static apps to serve from this process, in declaration order.
      *
      * A list rather than a single directory because one process serves several
@@ -692,13 +671,13 @@ export interface RebaseBundleManifest {
         contract: number;
     };
     /**
-     * Hash of the compiled collection definitions.
+     * Hash of the compiled table descriptors (`computeSchemaVersion`).
      *
      * This is the contract stamp. A generated SDK records the value it was built
      * from, a client sends it back, and a mismatch is what lets the platform say
      * "this app was built against an older schema" instead of failing mysteriously
-     * at the first request. It covers collections only — a hook edit does not
-     * change a client's contract, so it must not invalidate every SDK.
+     * at the first request. It covers tables only — a hook's code does not
+     * change a client's contract, so editing it must not invalidate every SDK.
      */
     schemaVersion: string;
     /** Which app in `rebase.json` this bundle was built from. */
@@ -720,13 +699,6 @@ export interface RebaseBundleManifest {
     entry: RebaseBundleEntrypoints;
     /** Table slugs contained in the bundle, for quick inspection. */
     tables?: string[];
-    /**
-     * Collection slugs contained in the bundle, for quick inspection.
-     *
-     * @deprecated — removed with the legacy loader. Format-2 only; see
-     * {@link RebaseBundleManifest.tables}.
-     */
-    collections?: string[];
     /**
      * Every custom function in the bundle, named and classified.
      *

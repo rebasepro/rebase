@@ -6,6 +6,7 @@ import { initializeRebaseBackend } from "../src/init";
 import type { HonoEnv } from "../src/api/types";
 import { fakeBootstrapper, fakeDataDriver, idleServer } from "./helpers/server-b-fakes";
 import { database, resetDeclaredResources } from "@rebasepro/types";
+import { tablesFrom } from "./helpers/tables";
 
 /**
  * Which collections the published document describes.
@@ -51,7 +52,7 @@ async function boot(): Promise<Hono<HonoEnv>> {
     const backend = await initializeRebaseBackend({
         app,
         server: idleServer(),
-        collections: [collection("jobs"), collection("orders", { dataSource: "firestore" })],
+        ...tablesFrom([collection("jobs"), collection("orders", { dataSource: "firestore" })]),
         cronPersistence: false,
         bootstrappers: [bootstrapper],
         auth: { requireAuth: false, jwtSecret: "openapi-documented-collections-secret-123456" }

@@ -1,6 +1,6 @@
 import { describe, expect, it, jest } from "@jest/globals";
-import type { CollectionConfig } from "@rebasepro/types";
-import { computeSchemaVersion } from "@rebasepro/types";
+import { col, computeSchemaVersion, defineTable, type TableDescriptor } from "@rebasepro/types";
+import { compileTables } from "@rebasepro/common";
 
 import {
     decideSchemaStamp,
@@ -22,16 +22,15 @@ import {
  * this file asserts against a real `computeSchemaVersion` rather than a literal.
  */
 
-function collection(slug: string, extraProperty?: string): CollectionConfig {
-    return {
-        name: slug,
-        slug,
-        table: slug,
-        properties: {
-            id: { name: "ID", type: "string", isId: "uuid" },
-            ...(extraProperty ? { [extraProperty]: { name: extraProperty, type: "string" } } : {})
-        }
-    };
+function collection(slug: string, extraColumn?: string): TableDescriptor {
+    const [descriptor] = compileTables([defineTable(slug, {
+        columns: {
+            id: col.uuid().primaryKey().defaultRandom(),
+            ...(extraColumn ? { [extraColumn]: col.text() } : {})
+        },
+        rls: "admin-only"
+    })]);
+    return descriptor;
 }
 
 describe("decideSchemaStamp — the decision table", () => {
@@ -109,7 +108,7 @@ describe("enforceSchemaStamp — the provisioning process writes", () => {
         const stamp = jest.fn(async () => {});
         const collections = [collection("posts"), collection("authors")];
 
-        await enforceSchemaStamp({ collections, provisioned: true, stamp, read: async () => null });
+        await enforceSchemaStamp({ tables: collections, provisioned: true, stamp, read: async () => null });
 
         // The value written must be derived, not declared. This is the whole
         // point: comparing a manifest's own number to itself is a check that
@@ -121,7 +120,7 @@ describe("enforceSchemaStamp — the provisioning process writes", () => {
         const read = jest.fn(async () => "v1:something-else");
         const stamp = jest.fn(async () => {});
 
-        await enforceSchemaStamp({ collections: [collection("posts")], provisioned: true, stamp, read });
+        await enforceSchemaStamp({ tables: [collection("posts")], provisioned: true, stamp, read });
 
         expect(read).not.toHaveBeenCalled();
     });
@@ -132,7 +131,7 @@ describe("enforceSchemaStamp — the provisioning process writes", () => {
         const stamp = jest.fn(async () => { throw new Error("permission denied"); });
 
         await expect(enforceSchemaStamp({
-            collections: [collection("posts")], provisioned: true, stamp
+            tables: [collection("posts")], provisioned: true, stamp
         })).resolves.toMatchObject({ status: "match" });
     });
 });
@@ -143,7 +142,7 @@ describe("enforceSchemaStamp — every other process compares", () => {
     it("is quiet when the database agrees", async () => {
         const read = async () => computeSchemaVersion(collections);
 
-        await expect(enforceSchemaStamp({ collections, provisioned: false, read }))
+        await expect(enforceSchemaStamp({ tables: collections, provisioned: false, read }))
             .resolves.toMatchObject({ status: "match" });
     });
 
@@ -151,7 +150,7 @@ describe("enforceSchemaStamp — every other process compares", () => {
         const other = [collection("posts", "subtitle")];
         const read = async () => computeSchemaVersion(other);
 
-        await expect(enforceSchemaStamp({ collections, provisioned: false, read }))
+        await expect(enforceSchemaStamp({ tables: collections, provisioned: false, read }))
             .resolves.toMatchObject({ status: "mismatch" });
     });
 
@@ -159,7 +158,7 @@ describe("enforceSchemaStamp — every other process compares", () => {
         const other = [collection("posts", "subtitle")];
         const read = async () => computeSchemaVersion(other);
 
-        const failure = enforceSchemaStamp({ collections, provisioned: false, read, policy: "refuse" });
+        const failure = enforceSchemaStamp({ tables: collections, provisioned: false, read, policy: "refuse" });
 
         await expect(failure).rejects.toBeInstanceOf(SchemaVersionMismatchError);
         await expect(failure).rejects.toThrow(computeSchemaVersion(other));
@@ -169,25 +168,25 @@ describe("enforceSchemaStamp — every other process compares", () => {
         const other = [collection("posts", "subtitle")];
 
         await expect(enforceSchemaStamp({
-            collections, provisioned: false, read: async () => computeSchemaVersion(other)
+            tables: collections, provisioned: false, read: async () => computeSchemaVersion(other)
         })).resolves.toMatchObject({ status: "mismatch" });
     });
 
     it("survives a database it cannot read the stamp from", async () => {
         await expect(enforceSchemaStamp({
-            collections, provisioned: false, read: async () => { throw new Error("no such table"); }
+            tables: collections, provisioned: false, read: async () => { throw new Error("no such table"); }
         })).resolves.toMatchObject({ status: "skipped" });
     });
 
     it("does nothing at all on a driver with neither hook", async () => {
-        await expect(enforceSchemaStamp({ collections, provisioned: false }))
+        await expect(enforceSchemaStamp({ tables: collections, provisioned: false }))
             .resolves.toMatchObject({ status: "skipped" });
     });
 
     it("skips introspected collections before reading anything", async () => {
         const read = jest.fn(async () => "v1:whatever");
 
-        await enforceSchemaStamp({ collections, provisioned: false, read, introspecting: true });
+        await enforceSchemaStamp({ tables: collections, provisioned: false, read, introspecting: true });
 
         expect(read).not.toHaveBeenCalled();
     });
@@ -195,14 +194,33 @@ describe("enforceSchemaStamp — every other process compares", () => {
 
 describe("the message", () => {
     it("names both versions, the direction that is safe, and the way to escalate", async () => {
-        const message = describeMismatch("v1:database", "v1:process");
+        const message = describeMismatch("v2:database", "v2:process");
 
-        expect(message).toContain("v1:database");
-        expect(message).toContain("v1:process");
+        expect(message).toContain("v2:database");
+        expect(message).toContain("v2:process");
         // An operator reading one pod's log needs to know what to do, and the
         // rollout order IS the fix. Without it the message is an observation.
         expect(message).toMatch(/roll the process that owns the schema first/i);
         expect(message).toContain("REBASE_REQUIRE_SCHEMA_MATCH");
+    });
+
+    it("says once that a database stamped before 0.31 changed models, and how to restamp", async () => {
+        // A v1 stamp was computed from collections; it can never equal a
+        // descriptor version, so every database reports it once. Saying
+        // "drift" there would send an operator hunting a schema change that
+        // never happened.
+        const message = describeMismatch("v1:0123456789abcdef", "v2:process");
+
+        expect(message).toContain("v1:0123456789abcdef");
+        expect(message).toContain("v2:process");
+        expect(message).toMatch(/schema model changed in 0\.31/);
+        expect(message).toMatch(/rebase db push/);
+        expect(message).toContain("REBASE_REQUIRE_SCHEMA_MATCH");
+
+        const tables = [collection("posts")];
+        await expect(enforceSchemaStamp({
+            tables, provisioned: false, policy: "refuse", read: async () => "v1:0123456789abcdef"
+        })).rejects.toThrow(/schema model changed in 0\.31/);
     });
 
     it("says the same thing whether it warns or throws", async () => {
@@ -213,7 +231,7 @@ describe("the message", () => {
 
         try {
             await enforceSchemaStamp({
-                collections, provisioned: false, policy: "refuse",
+                tables: collections, provisioned: false, policy: "refuse",
                 read: async () => computeSchemaVersion(other)
             });
             throw new Error("expected a refusal");

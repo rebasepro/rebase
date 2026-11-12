@@ -79,7 +79,7 @@ describe("every shipped OAuth provider has an environment route", () => {
     });
 
     it.each(shippedProviders())("%s: the env pair reaches resolveAuthOptions", (provider) => {
-        const auth = resolveAuthOptions(env(envFor(provider)), undefined) as Record<string, unknown>;
+        const auth = resolveAuthOptions(env(envFor(provider))) as Record<string, unknown>;
 
         expect(auth[provider]).toBeDefined();
         expect((auth[provider] as { clientId: string }).clientId).toBeTruthy();
@@ -102,27 +102,26 @@ describe("every shipped OAuth provider has an environment route", () => {
         // id is what `enabledProviders` reports and what `/auth/:provider`
         // routes on, so a factory whose id drifted from its config key would
         // configure a provider nobody can reach.
-        const auth = resolveAuthOptions(env(envFor(provider)), undefined) as Record<string, unknown>;
+        const auth = resolveAuthOptions(env(envFor(provider))) as Record<string, unknown>;
         const built: unknown = factory(auth[provider]);
         expect(built).toMatchObject({ id: provider });
     });
 
     it("configures nothing when the environment is empty", () => {
-        const auth = resolveAuthOptions(env({}), undefined) as Record<string, unknown>;
+        const auth = resolveAuthOptions(env({})) as Record<string, unknown>;
         for (const provider of providers) expect(auth[provider]).toBeUndefined();
     });
 
     it("does not configure a provider from half a pair", () => {
         // A client id with no secret builds a provider that fails at the first
         // sign-in rather than at boot, which is the worse of the two.
-        const auth = resolveAuthOptions(env({ DISCORD_CLIENT_ID: "id-only" }), undefined);
+        const auth = resolveAuthOptions(env({ DISCORD_CLIENT_ID: "id-only" }));
         expect(auth.discord).toBeUndefined();
     });
 
     it("does not configure Apple from three of its four keys", () => {
         const auth = resolveAuthOptions(
-            env({ APPLE_CLIENT_ID: "com.example.service", APPLE_TEAM_ID: "T", APPLE_KEY_ID: "K" }),
-            undefined
+            env({ APPLE_CLIENT_ID: "com.example.service", APPLE_TEAM_ID: "T", APPLE_KEY_ID: "K" })
         );
         expect(auth.apple).toBeUndefined();
     });
@@ -134,8 +133,7 @@ describe("every shipped OAuth provider has an environment route", () => {
                 APPLE_TEAM_ID: "T",
                 APPLE_KEY_ID: "K",
                 APPLE_PRIVATE_KEY: "-----BEGIN PRIVATE KEY-----\nnot-a-real-key\n-----END PRIVATE KEY-----"
-            } as Partial<RebaseBootEnv>),
-            undefined
+            } as Partial<RebaseBootEnv>)
         );
         expect(auth.apple?.clientId).toBeUndefined();
         expect(auth.apple?.bundleIds).toEqual(["com.example.ios", "com.example.mac"]);

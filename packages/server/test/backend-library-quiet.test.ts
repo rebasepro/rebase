@@ -6,6 +6,7 @@ import type { RebaseBackendOptions } from "../src/backend/options";
 
 import { createRebaseBackend, initializeRebaseBackend, logger, type HonoEnv, type RebaseBackend } from "../src/index";
 import { _resetRebaseMock } from "../src/singleton";
+import { tablesFrom } from "./helpers/tables";
 
 /**
  * A backend built in a script says nothing on stdout; a backend that serves
@@ -81,7 +82,7 @@ const built: RebaseBackend[] = [];
 
 async function build(extra: Partial<RebaseBackendOptions> = {}): Promise<RebaseBackend> {
     const backend = await createRebaseBackend({
-        collections: [collection("widgets")],
+        ...tablesFrom([collection("widgets")]),
         bootstrappers: [bootstrapper()],
         cronPersistence: false,
         provision: false,
@@ -149,7 +150,7 @@ describe("a backend used from a script, never mounted", () => {
 
     it("writes what the build said when the build fails, so the failure has its context", async () => {
         await expect(createRebaseBackend({
-            collections: [collection("widgets")],
+            ...tablesFrom([collection("widgets")]),
             bootstrappers: [bootstrapper({ fail: true })],
             cronPersistence: false,
             provision: false
@@ -191,7 +192,7 @@ describe("a backend that serves", () => {
         const backend = await initializeRebaseBackend({
             app: new Hono<HonoEnv>(),
             server: createServer(),
-            collections: [collection("widgets")],
+            ...tablesFrom([collection("widgets")]),
             bootstrappers: [bootstrapper()],
             cronPersistence: false
         });

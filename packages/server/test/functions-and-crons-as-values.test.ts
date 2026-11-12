@@ -9,6 +9,7 @@ import { _resetRebaseMock } from "../src/singleton";
 import type { RebaseBackendConfig } from "../src/init";
 import type { HonoEnv } from "../src/api/types";
 import { requireImporter } from "./helpers/require-importer";
+import { tablesFrom } from "./helpers/tables";
 
 // A boot reads `functionsDir` / `cronsDir` through the runtime's own `import()`,
 // which jest's vm cannot do deterministically — see the same mock in
@@ -79,7 +80,7 @@ async function boot(extra: Partial<RebaseBackendConfig>) {
         app,
         // Never listened on: shutdown's close() finds it already stopped.
         server: createServer(),
-        collections: [collection("widgets")],
+        ...tablesFrom([collection("widgets")]),
         bootstrappers: [bootstrapper()],
         auth: { jwtSecret: "values-test-jwt-secret-0123456789abcdef", serviceKey: SERVICE_KEY },
         cronPersistence: false,

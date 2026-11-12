@@ -2,7 +2,8 @@ import { describe, expect, it } from "@jest/globals";
 
 import { reportBootFailure } from "../src/boot/boot";
 import { BundleError } from "../src/boot/bundle";
-import { CollectionConfigError } from "../src/collections/validate-config";
+import { SchemaDefinitionError } from "@rebasepro/common";
+import { SchemaLoadError } from "../src/schema/load-schema";
 import { logger } from "../src/utils/logger";
 
 /**
@@ -40,13 +41,15 @@ function capture(): { lines: Line[]; log: Parameters<typeof reportBootFailure>[1
 }
 
 describe("reportBootFailure", () => {
-    it("prints a collection-config error as its own message, once", () => {
+    it("prints a schema-definition error as its own message, once", () => {
         const { lines, log } = capture();
-        const message =
-            "1 problem(s) in the collection config.\n\n" +
-            "  • posts\n      2 collections declare `slug: \"posts\"`: dup.ts, posts.ts.\n";
+        const error = new SchemaDefinitionError([
+            { table: "posts", message: "has no primary key." },
+            { table: "drafts", message: "`rls: \"inherit\"` takes the project's `defaultRls`, and none was given." }
+        ]);
+        const message = error.message;
 
-        reportBootFailure(new CollectionConfigError(message), log);
+        reportBootFailure(error, log);
 
         const errors = lines.filter(l => l.level === "error");
         expect(errors).toHaveLength(1);
@@ -61,11 +64,11 @@ describe("reportBootFailure", () => {
     it("keeps the stack, at debug", () => {
         const { lines, log } = capture();
 
-        reportBootFailure(new CollectionConfigError("nope"), log);
+        reportBootFailure(new SchemaLoadError("nope", "/project/backend/schema/index.ts"), log);
 
         const debug = lines.filter(l => l.level === "debug");
         expect(debug).toHaveLength(1);
-        expect(debug[0].message).toContain("CollectionConfigError: nope");
+        expect(debug[0].message).toContain("SchemaLoadError: nope");
     });
 
     it("prints a BundleError's hint after its message", () => {

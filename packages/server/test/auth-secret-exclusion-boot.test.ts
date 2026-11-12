@@ -6,6 +6,7 @@ import type { HonoEnv } from "../src/api/types";
 import { fakeDataDriver } from "./helpers/server-a-fakes";
 
 import { initializeRebaseBackend } from "../src/init";
+import { tablesFrom } from "./helpers/tables";
 
 /**
  * WHEN the exclusion is applied, not just whether.
@@ -103,7 +104,7 @@ describe("auth secret exclusion at boot", () => {
         await initializeRebaseBackend({
             app: new Hono<HonoEnv>(),
             server: createServer(),
-            collections: [redeclaredUsersCollection()],
+            ...tablesFrom([redeclaredUsersCollection()]),
             bootstrappers: [capturingBootstrapper(seen)]
         });
 
@@ -123,7 +124,7 @@ describe("auth secret exclusion at boot", () => {
         await initializeRebaseBackend({
             app: new Hono<HonoEnv>(),
             server: createServer(),
-            collections: [redeclaredUsersCollection()],
+            ...tablesFrom([redeclaredUsersCollection()]),
             bootstrappers: [capturingBootstrapper([])]
         });
 

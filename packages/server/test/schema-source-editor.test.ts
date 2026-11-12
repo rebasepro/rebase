@@ -36,6 +36,7 @@ import { generateAccessToken } from "../src/auth/jwt";
 import { AstSchemaEditor } from "../src/api/ast-schema-editor";
 import { SchemaSourceEditor } from "../src/schema-edit/source-editor";
 import { writeLocalCollectionSource } from "../src/schema-edit/local-source";
+import { tablesFrom } from "./helpers/tables";
 
 const JWT_SECRET = "schema-source-editor-test-secret-1234567890";
 const BOOTS_A_BACKEND = 30_000;
@@ -116,8 +117,8 @@ async function boot(): Promise<Hono<HonoEnv>> {
     await initializeRebaseBackend({
         app,
         server: idleServer(),
-        collections: [collection("posts", "Posts"), collection("tags", "Tags")],
-        collectionsDir,
+        ...tablesFrom([collection("posts", "Posts"), collection("tags", "Tags")]),
+        schemaDir: collectionsDir,
         auth: { jwtSecret: JWT_SECRET },
         bootstrappers: [bootstrapper]
     });

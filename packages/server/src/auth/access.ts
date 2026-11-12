@@ -33,7 +33,7 @@ import {
     scopesForRoles,
     validateScopes,
     type AccessModel,
-    type CollectionConfig,
+    type AuthTableOptions,
     type RoleDefinition,
     type ScopeDefinition
 } from "@rebasepro/types";
@@ -166,8 +166,8 @@ export class AccessModelError extends Error {
 }
 
 /**
- * Build the access model from the users collection's `auth` block, refusing
- * anything that would read as a grant it is not.
+ * Build the access model from the `auth` options of the table defined with
+ * `defineAuthTable`, refusing anything that would read as a grant it is not.
  *
  * - `admin` may not be declared: it is built in and holds everything, and a
  *   declaration would either repeat that or quietly narrow it.
@@ -175,18 +175,20 @@ export class AccessModelError extends Error {
  *   built-in resources are Rebase's, and a reader of `logs:*` should not have
  *   to know which half is whose.
  * - A role may not list a data-plane scope: a person's data access is the
- *   collection's `securityRules`, so `data:write` on a role would grant nothing
- *   and look like it granted something.
+ *   table's `rls`, so `data:write` on a role would grant nothing and look like
+ *   it granted something.
+ *
+ * @param auth The auth table's options; absent when the project declares no
+ *   auth table, which serves the built-in roles only.
+ * @param table The auth table's name, for the messages.
  */
-export function accessModelFromCollections(collections: readonly CollectionConfig[]): AccessModel {
-    const authCollection = collections.find(collection => {
-        const auth = collection.auth;
-        return auth === true || (!!auth && typeof auth === "object" && auth.enabled === true);
-    });
-    const auth = authCollection && typeof authCollection.auth === "object" ? authCollection.auth : undefined;
+export function accessModelFromAuthTable(
+    auth: Pick<AuthTableOptions, "roles" | "scopes"> | undefined,
+    table = "users"
+): AccessModel {
     const declaredScopes: Record<string, ScopeDefinition> = { ...(auth?.scopes ?? {}) };
     const declaredRoles: Record<string, RoleDefinition> = { ...(auth?.roles ?? {}) };
-    const where = `the "${authCollection?.slug ?? "users"}" collection's auth block`;
+    const where = `the "${table}" auth table's \`auth\` options`;
 
     for (const [name, definition] of Object.entries(declaredScopes)) {
         const parsed = parseScope(name);
@@ -222,7 +224,7 @@ export function accessModelFromCollections(collections: readonly CollectionConfi
             throw new AccessModelError(
                 `auth.roles: "${role}" in ${where} lists ${dataPlane.join(", ")}. ` +
                 "Every signed-in person already holds the data plane; what they may do with rows is the " +
-                "collection's securityRules. List admin-plane and app scopes only.");
+                "table's `rls`. List admin-plane and app scopes only.");
         }
         const problems = validateScopes(definition.scopes, model);
         if (problems.length > 0) {

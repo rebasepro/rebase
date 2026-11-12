@@ -19,6 +19,7 @@ import { createRebaseBackend, errorHandler, type HonoEnv, type RebaseBackend } f
 import { _resetRebaseMock } from "../src/singleton";
 import { MemoryAuthStore } from "./helpers/memory-auth-store";
 import { fakeBootstrapper, fakeDataDriver, fakeRealtimeProvider } from "./helpers/server-b-fakes";
+import { tablesFrom } from "./helpers/tables";
 
 const widgets: CollectionConfig = {
     name: "widgets",
@@ -70,7 +71,7 @@ async function world() {
     const basePath = mkdtempSync(path.join(tmpdir(), "rebase-storage-db-down-"));
     dirs.push(basePath);
     const backend = await createRebaseBackend({
-        collections: [widgets],
+        ...tablesFrom([widgets]),
         bootstrappers: [bootstrapper],
         auth: { jwtSecret: "storage-database-unavailable-secret-0123456789" },
         storage: { type: "local", basePath },

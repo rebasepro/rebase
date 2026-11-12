@@ -9,6 +9,7 @@ import { initializeRebaseBackend } from "../src/init";
 import type { HonoEnv } from "../src/api/types";
 import { fakeBootstrapper, fakeDataDriver, idleServer } from "./helpers/server-b-fakes";
 import { STORAGE_ORPHANS_TASK } from "../src/storage/orphan-scans";
+import { tablesFrom } from "./helpers/tables";
 
 /**
  * The backend wires the orphan scan's `storage.orphans` handler onto its job
@@ -68,7 +69,7 @@ describe("the storage.orphans job handler", () => {
         const backend = await initializeRebaseBackend({
             app: new Hono<HonoEnv>(),
             server: idleServer(),
-            collections: [collection("posts")],
+            ...tablesFrom([collection("posts")]),
             cronPersistence: false,
             bootstrappers: [bootstrapperFor(calls)],
             storage: { type: "local", basePath: root },

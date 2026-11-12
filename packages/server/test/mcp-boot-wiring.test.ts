@@ -19,6 +19,7 @@ import type { ScopeIdentity } from "../src/auth/rls-scope";
 import { fakeBootstrapper, fakeDataDriver, idleServer } from "./helpers/server-b-fakes";
 import { generateMcpAccessToken } from "../src/auth/jwt";
 import { logger } from "../src/utils/logger";
+import { tablesFrom } from "./helpers/tables";
 
 const JWT_SECRET = "mcp-boot-wiring-test-secret-0123456789";
 const PUBLIC_URL = "https://talent.sustentalent.com";
@@ -81,7 +82,7 @@ async function boot(options: {
         await initializeRebaseBackend({
             app,
             server: idleServer(),
-            collections: options.collections ?? [COLLECTION],
+            ...tablesFrom(options.collections ?? [COLLECTION]),
             bootstrappers: [bootstrapperFor(options.driver ?? capableDriver(), options.authRepository)],
             auth: { jwtSecret: JWT_SECRET },
             cronPersistence: false,

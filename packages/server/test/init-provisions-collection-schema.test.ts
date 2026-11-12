@@ -5,6 +5,7 @@ import type { CollectionConfig, DatabaseAdapter, DatabaseAdapterInitConfig } fro
 import { initializeRebaseBackend, type RebaseBackendConfig } from "../src/init";
 import type { HonoEnv } from "../src/api/types";
 import { fakeDataDriver } from "./helpers/server-a-fakes";
+import { tablesFrom } from "./helpers/tables";
 
 /**
  * `initializeRebaseBackend` provisions the collection schema. Every caller.
@@ -65,7 +66,7 @@ async function boot(adapter: DatabaseAdapter, extra: Partial<RebaseBackendConfig
     await initializeRebaseBackend({
         app: new Hono<HonoEnv>(),
         server: createServer(),
-        collections: [collection("leads")],
+        ...tablesFrom([collection("leads")]),
         database: adapter,
         ...extra
     });
@@ -109,7 +110,7 @@ describe("initializeRebaseBackend provisions the collection schema", () => {
         // functions, and CREATE POLICY validates those exist — they are created
         // during auth initialization.
         const rec = recorder();
-        await boot(recordingAdapter(rec), { auth: { collection: collection("users"), jwtSecret: "x".repeat(40) } });
+        await boot(recordingAdapter(rec), { auth: { jwtSecret: "x".repeat(40) } });
 
         expect(rec.policyCalls).toBe(1);
         expect(rec.order.indexOf("ensureCollectionPolicies")).toBeGreaterThan(rec.order.indexOf("initializeAuth"));

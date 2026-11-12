@@ -70,7 +70,7 @@ describe("auth.refreshTokenReuse", () => {
     });
 
     it("is read from AUTH_REFRESH_TOKEN_REUSE", () => {
-        const auth = resolveAuthOptions({ NODE_ENV: "development", APP_NAME: "Rebase", AUTH_REFRESH_TOKEN_REUSE: "revoke-session" } as RebaseBootEnv, undefined);
+        const auth = resolveAuthOptions({ NODE_ENV: "development", APP_NAME: "Rebase", AUTH_REFRESH_TOKEN_REUSE: "revoke-session" } as RebaseBootEnv);
         expect(auth.refreshTokenReuse).toBe("revoke-session");
     });
 });

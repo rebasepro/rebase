@@ -7,6 +7,7 @@ import { initializeRebaseBackend, type RebaseBackendConfig } from "../src/init";
 import type { HonoEnv } from "../src/api/types";
 import { fakeDataDriver, fakeRealtimeProvider, idleServer } from "./helpers/server-b-fakes";
 import { ALL_RUNTIME_SURFACES, type RuntimeSurface } from "../src/init/surfaces";
+import { tablesFrom } from "./helpers/tables";
 
 /**
  * The function and cron loaders take an injectable `ModuleImporter` precisely so
@@ -157,8 +158,8 @@ async function boot(
     const backend = await initializeRebaseBackend({
         app,
         server: idleServer(),
-        collections: [collection("jobs")],
-        collectionsDir: path.join(__dirname, "fixtures"),
+        ...tablesFrom([collection("jobs")]),
+        schemaDir: path.join(__dirname, "fixtures"),
         cronsDir: CRONS_DIR,
         cronPersistence: false,
         functionsDir: FUNCTIONS_DIR,

@@ -10,6 +10,7 @@ import { initializeRebaseBackend, type RebaseBackendConfig } from "../src/init";
 import type { HonoEnv } from "../src/api/types";
 import { fakeDataDriver } from "./helpers/server-a-fakes";
 import { generateAccessToken } from "../src/auth/jwt";
+import { tablesFrom } from "./helpers/tables";
 
 /**
  * Live schema editing from a built bundle, opted into with a repository.
@@ -114,8 +115,8 @@ async function bootBundle(config: Partial<RebaseBackendConfig> = {}): Promise<Ho
     await initializeRebaseBackend({
         app,
         server: createServer(),
-        collections: SERVED.map(collection),
-        collectionsDir: compiledDir,
+        ...tablesFrom(SERVED.map(collection)),
+        schemaDir: compiledDir,
         schemaEditor: false,
         cronPersistence: false,
         auth: { jwtSecret: JWT_SECRET },

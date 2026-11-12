@@ -7,6 +7,7 @@ import type { BackendBootstrapper, CollectionConfig, DataDriver, InitializedDriv
 import { initializeRebaseBackend, type RebaseBackendConfig } from "../src/init";
 import type { HonoEnv } from "../src/api/types";
 import { fakeDataDriver } from "./helpers/server-a-fakes";
+import { tablesFrom } from "./helpers/tables";
 
 /**
  * Covers the `mode` contract:
@@ -112,7 +113,7 @@ describe("no declared collections — derived from the database", () => {
         // expressed now — declaring collections IS what makes them served, so
         // the flag and the data can no longer disagree.
         const { backend } = await boot({
-            collections: [collection("from_config")],
+            ...tablesFrom([collection("from_config")]),
             bootstrappers: [fakeBootstrapper([collection("from_database")])]
         });
 
@@ -126,7 +127,7 @@ describe("no declared collections — derived from the database", () => {
             boot({
                 bootstrappers: [fakeBootstrapper(undefined)]
             })
-        ).rejects.toThrow(/cannot derive collections from the database schema/);
+        ).rejects.toThrow(/cannot derive tables from the database schema/);
     });
 
     it("warns, but still boots, when the database has no tables yet", async () => {
@@ -145,7 +146,7 @@ describe("no declared collections — derived from the database", () => {
 describe("declared collections", () => {
     it("serves collections from config", async () => {
         const { app } = await boot({
-            collections: [collection("posts")],
+            ...tablesFrom([collection("posts")]),
             bootstrappers: [fakeBootstrapper(undefined)]
         });
 
@@ -164,7 +165,7 @@ describe("cron", () => {
         const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
 
         const { app } = await boot({
-            collections: [collection("posts")],
+            ...tablesFrom([collection("posts")]),
             cronsDir: path.join(__dirname, "fixtures"),
             cronPersistence: false,
             bootstrappers: [fakeBootstrapper(undefined)]

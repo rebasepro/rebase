@@ -1,8 +1,8 @@
 import fs from "fs";
 import os from "os";
 import path from "path";
-import { BUNDLE_FORMAT_VERSION, RUNTIME_CONTRACT_VERSION, type RebaseBundleEntrypoints } from "@rebasepro/types";
-import { BundleError, createSourceBundle, loadBundle, loadBundleConfigExports, readBundleManifest, type LoadedBundle } from "../src/boot/bundle";
+import { BUNDLE_FORMAT_VERSION, LEGACY_LAYOUT_REMEDY, RUNTIME_CONTRACT_VERSION, type RebaseBundleEntrypoints } from "@rebasepro/types";
+import { BundleError, createSourceBundle, loadBundle, loadBundleProjectExports, readBundleManifest, type LoadedBundle } from "../src/boot/bundle";
 import { warnOnUnusableBundleShape } from "../src/boot/boot";
 
 /**
@@ -28,10 +28,10 @@ function writeManifest(overrides: Record<string, unknown> = {}): void {
         path.join(scratch, "manifest.json"),
         JSON.stringify({
             bundleFormat: BUNDLE_FORMAT_VERSION,
-            runtime: { range: "^1", builtAgainst: "0.11.0", contract: RUNTIME_CONTRACT_VERSION },
-            schemaVersion: "v1:0000000000000000",
+            runtime: { range: "^2", builtAgainst: "0.31.0", contract: RUNTIME_CONTRACT_VERSION },
+            schemaVersion: "v2:0000000000000000",
             app: "backend",
-            mode: "cms",
+            kind: "backend",
             entry: {},
             hooks: { native: false },
             deps: { declared: {} },
@@ -42,13 +42,13 @@ function writeManifest(overrides: Record<string, unknown> = {}): void {
 }
 
 /** A loaded backend bundle in `scratch` whose manifest declares `entry`. */
-function loadedBundle(entry: RebaseBundleEntrypoints, collectionsDir?: string): LoadedBundle {
+function loadedBundle(entry: RebaseBundleEntrypoints, modules: Partial<Pick<LoadedBundle, "tablesDir" | "storageModule" | "hooksModule">> = {}): LoadedBundle {
     return {
         dir: scratch,
         manifest: {
             bundleFormat: BUNDLE_FORMAT_VERSION,
-            runtime: { range: "^1", builtAgainst: "0.11.0", contract: RUNTIME_CONTRACT_VERSION },
-            schemaVersion: "v1:0000000000000000",
+            runtime: { range: "^2", builtAgainst: "0.31.0", contract: RUNTIME_CONTRACT_VERSION },
+            schemaVersion: "v2:0000000000000000",
             app: "backend",
             kind: "backend",
             entry,
@@ -56,7 +56,7 @@ function loadedBundle(entry: RebaseBundleEntrypoints, collectionsDir?: string): 
             deps: { declared: {} },
             build: { cli: "0.11.0", node: "22", createdAt: new Date().toISOString() }
         },
-        collectionsDir,
+        ...modules,
         functionsDir: undefined,
         cronsDir: undefined,
         staticApps: [],
@@ -85,11 +85,17 @@ describe("readBundleManifest", () => {
         expect(() => readBundleManifest(scratch)).toThrow(/understands up to/);
     });
 
-    it("accepts an older bundle format, which is the whole point", () => {
-        // A bundle built months ago has to keep booting on a patched runtime —
-        // otherwise the runtime could never be upgraded underneath a project.
-        writeManifest({ bundleFormat: 1 });
-        expect(readBundleManifest(scratch).bundleFormat).toBe(1);
+    it("refuses an older bundle format with the codemod — it carries config/collections", () => {
+        // Formats 1 and 2 hold `defineCollection` files this runtime does not
+        // read; booting one would introspect instead of serving its tables.
+        writeManifest({ bundleFormat: 2, entry: { config: "config" } });
+        expect(() => readBundleManifest(scratch)).toThrow(BundleError);
+        try {
+            readBundleManifest(scratch);
+        } catch (error) {
+            if (!(error instanceof BundleError)) throw error;
+            expect(error.hint).toContain(LEGACY_LAYOUT_REMEDY);
+        }
     });
 
     it("refuses a bundle targeting a different runtime contract major", () => {
@@ -102,23 +108,28 @@ describe("readBundleManifest", () => {
 
 describe("loadBundle", () => {
     it("resolves declared entry directories to absolute paths", () => {
-        fs.mkdirSync(path.join(scratch, "config", "collections"), { recursive: true });
+        fs.mkdirSync(path.join(scratch, "backend", "schema"), { recursive: true });
         fs.mkdirSync(path.join(scratch, "backend", "functions"), { recursive: true });
-        writeManifest({ entry: { config: "config", functions: "backend/functions" } });
+        writeManifest({ entry: { tables: "backend/schema", functions: "backend/functions" } });
 
         const bundle = loadBundle(scratch);
 
-        expect(bundle.collectionsDir).toBe(path.join(scratch, "config", "collections"));
+        expect(bundle.tablesDir).toBe(path.join(scratch, "backend", "schema"));
         expect(bundle.functionsDir).toBe(path.join(scratch, "backend", "functions"));
     });
 
-    it("derives the collections directory from the config package", () => {
-        fs.mkdirSync(path.join(scratch, "config", "collections"), { recursive: true });
-        writeManifest({ entry: { config: "config" } });
+    it("resolves a module entry to the file that exists, compiled or source", () => {
+        fs.mkdirSync(path.join(scratch, "backend"), { recursive: true });
+        fs.writeFileSync(path.join(scratch, "backend", "storage.js"), "");
+        fs.writeFileSync(path.join(scratch, "backend", "hooks.ts"), "");
+        writeManifest({ entry: { storage: "backend/storage", hooks: "backend/hooks", resources: "backend/resources" } });
 
-        expect(loadBundle(scratch).collectionsDir).toBe(
-            path.join(scratch, "config", "collections")
-        );
+        const bundle = loadBundle(scratch);
+
+        expect(bundle.storageModule).toBe(path.join(scratch, "backend", "storage.js"));
+        expect(bundle.hooksModule).toBe(path.join(scratch, "backend", "hooks.ts"));
+        // Declared, missing: skipped with a warning, never a crash.
+        expect(bundle.resourcesModule).toBeUndefined();
     });
 
     it("drops a declared directory that does not exist instead of failing the boot", () => {
@@ -129,7 +140,7 @@ describe("loadBundle", () => {
     });
 
     it("refuses an entry that points outside the bundle", () => {
-        writeManifest({ entry: { config: "../../etc" } });
+        writeManifest({ entry: { tables: "../../etc" } });
         expect(() => loadBundle(scratch)).toThrow(/outside the bundle/);
     });
 
@@ -141,7 +152,7 @@ describe("loadBundle", () => {
         // `boot.ts` decides whether the schema editor may rewrite collection
         // files from this flag. A manifest is written by a builder and can say
         // anything; the flag says which of the two loaders produced the bundle.
-        writeManifest({ runtime: { range: "^1",
+        writeManifest({ runtime: { range: "^2",
 builtAgainst: "source",
 contract: RUNTIME_CONTRACT_VERSION } });
 
@@ -151,21 +162,18 @@ contract: RUNTIME_CONTRACT_VERSION } });
 
 describe("createSourceBundle declares only what the project has", () => {
     /**
-     * A `--headless` project has no `config/collections` and no generated
-     * schema, both by design. The manifest used to name them anyway, from the
-     * conventional layout, and the runtime believed it — so a correct project
-     * booted telling its author that a file "does not exist" and that no tables
-     * would be created. Two warnings, both about the manifest, neither about
-     * anything the author had done wrong.
+     * A project with no tables (it introspects) and no generated schema, both
+     * by design, must not boot telling its author a file "does not exist" and
+     * that no tables will be created.
      */
-    it("omits a collections directory that is not there", () => {
-        fs.mkdirSync(path.join(scratch, "config"), { recursive: true });
-        fs.writeFileSync(path.join(scratch, "config", "index.ts"), "export default {};");
-
+    it("omits a schema directory that is not there", () => {
         const bundle = createSourceBundle({ projectRoot: scratch });
 
-        expect(bundle.manifest.entry?.collections).toBeUndefined();
-        expect(bundle.collectionsDir).toBeUndefined();
+        expect(bundle.manifest.entry?.tables).toBeUndefined();
+        expect(bundle.tablesDir).toBeUndefined();
+        expect(bundle.manifest.entry?.hooks).toBeUndefined();
+        expect(bundle.manifest.entry?.storage).toBeUndefined();
+        expect(bundle.manifest.entry?.resources).toBeUndefined();
     });
 
     it("omits a schema file that is not there", () => {
@@ -176,107 +184,115 @@ describe("createSourceBundle declares only what the project has", () => {
         expect(bundle.manifest.entry?.schema).toBeUndefined();
     });
 
-    it("still declares what IS there", () => {
-        const collections = path.join(scratch, "config", "collections");
-        fs.mkdirSync(collections, { recursive: true });
-        fs.writeFileSync(path.join(collections, "posts.ts"), "export default {};");
-        const schemaDir = path.join(scratch, "backend", "src");
-        fs.mkdirSync(schemaDir, { recursive: true });
-        fs.writeFileSync(path.join(schemaDir, "schema.generated.ts"), "export const tables = {};");
+    it("still declares what IS there, at the backend/ defaults", () => {
+        const tables = path.join(scratch, "backend", "schema");
+        fs.mkdirSync(tables, { recursive: true });
+        fs.writeFileSync(path.join(tables, "index.ts"), "export {};");
+        fs.writeFileSync(path.join(scratch, "backend", "resources.ts"), "export {};");
+        fs.writeFileSync(path.join(scratch, "backend", "storage.ts"), "export {};");
+        fs.writeFileSync(path.join(scratch, "backend", "hooks.ts"), "export {};");
+        const generated = path.join(scratch, "backend", "src");
+        fs.mkdirSync(generated, { recursive: true });
+        fs.writeFileSync(path.join(generated, "schema.generated.ts"), "export const tables = {};");
 
         const bundle = createSourceBundle({
             projectRoot: scratch,
             schema: "backend/src/schema.generated.ts"
         });
 
-        expect(bundle.manifest.entry?.config).toBe("config");
-        expect(bundle.manifest.entry?.collections).toBe(path.join("config", "collections"));
-        expect(bundle.manifest.entry?.schema).toBe("backend/src/schema.generated.ts");
-        expect(bundle.collectionsDir).toBe(collections);
+        expect(bundle.manifest.entry).toMatchObject({
+            tables: "backend/schema",
+            resources: "backend/resources",
+            storage: "backend/storage",
+            hooks: "backend/hooks",
+            schema: "backend/src/schema.generated.ts"
+        });
+        expect(bundle.tablesDir).toBe(tables);
+        expect(bundle.resourcesModule).toBe(path.join(scratch, "backend", "resources.ts"));
+        expect(bundle.storageModule).toBe(path.join(scratch, "backend", "storage.ts"));
+        expect(bundle.hooksModule).toBe(path.join(scratch, "backend", "hooks.ts"));
     });
 
-    it("says it is source, which is what makes the collection editor writable", () => {
+    it("says it is source, which is what makes the schema editor writable", () => {
         // `rebase dev` boots through here. `boot.ts` passed `schemaEditor:
         // false` unconditionally on the ground that "a bundle holds compiled
-        // output" — true of the other loader, false of this one, and the
-        // result was "Update (Read-only)" on every scaffolded dev server.
+        // output" — true of the other loader, false of this one.
         expect(createSourceBundle({ projectRoot: scratch }).isSource).toBe(true);
     });
 });
 
 describe("warnOnUnusableBundleShape", () => {
-    const bundle = (entry: RebaseBundleEntrypoints, collectionsDir?: string) => loadedBundle(entry, collectionsDir);
-
-    it("says nothing about a project that declares no collections", () => {
-        // A `--headless` project has a config package — its index, its resources
-        // — and deliberately no collections directory. Keying this warning on
-        // `entry.config` made every headless boot report its own build as
-        // broken.
+    it("says nothing about a project that declares no tables", () => {
         const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
-        warnOnUnusableBundleShape(bundle({ config: "config" }));
+        warnOnUnusableBundleShape(loadedBundle({ hooks: "backend/hooks" }));
         expect(warn).not.toHaveBeenCalled();
         warn.mockRestore();
     });
 
-    it("still warns when a declared collections directory did not resolve", () => {
+    it("still warns when a declared tables directory did not resolve", () => {
         // The case it exists for: the build lost them. Distinguishable only
         // because the manifest declares what the project HAS.
         const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
-        warnOnUnusableBundleShape(bundle({ config: "config", collections: "config/collections" }));
+        warnOnUnusableBundleShape(loadedBundle({ tables: "backend/schema" }));
         expect(warn).toHaveBeenCalled();
         warn.mockRestore();
     });
 });
 
 /**
- * The managed runtime reads four names out of `config/index.ts`. Every docs page
- * that shows an `initializeRebaseBackend` option tempts a reader to export it
- * from the one file the runtime reads — and the export was dropped in silence,
- * so the feature simply did not happen and nothing said why.
+ * The managed runtime reads `storageAuthorize` from backend/storage and
+ * `hooks` from backend/hooks. Every docs page that shows an
+ * `initializeRebaseBackend` option tempts a reader to export it from one of
+ * them — and the export was dropped in silence.
  */
-describe("unread config exports", () => {
-    /** Write a config package whose index exports the given names. */
-    async function configExporting(names: string[]) {
-        const configDir = path.join(scratch, "config");
-        fs.mkdirSync(configDir, { recursive: true });
+describe("project module exports", () => {
+    /** Write backend/storage.js exporting the given names, and load it. */
+    async function storageExporting(names: string[], file = "storage.js") {
+        const dir = path.join(scratch, "backend");
+        fs.mkdirSync(dir, { recursive: true });
         // CommonJS, because jest resolves the runtime's dynamic `import()`
-        // through `require`. What matters to the code under test is the shape of
-        // the namespace object, which is the same either way.
-        const literal = (name: string) =>
-            name === "dataSources" || name === "storageSources" ? "[]" : "{}";
+        // through `require`. What matters is the shape of the namespace object.
+        const literal = (name: string) => name === "storageAuthorize" ? "() => true" : name === "hooks" ? "{ afterRead: (p) => p.values }" : "{}";
         fs.writeFileSync(
-            path.join(configDir, "index.js"),
+            path.join(dir, file),
             names.map(name => `exports.${name} = ${literal(name)};`).join("\n")
         );
         const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
-        await loadBundleConfigExports(loadedBundle({ config: "config" }));
+        const exported = await loadBundleProjectExports(loadedBundle({}, file.startsWith("hooks")
+            ? { hooksModule: path.join(dir, file) }
+            : { storageModule: path.join(dir, file) }));
         const messages = warn.mock.calls.map(call => String(call[0])).join("\n");
         warn.mockRestore();
-        return messages;
+        return { messages, exported };
     }
 
+    it("reads storageAuthorize from backend/storage and hooks from backend/hooks", async () => {
+        expect(typeof (await storageExporting(["storageAuthorize"])).exported.storageAuthorize).toBe("function");
+        expect(typeof (await storageExporting(["hooks"], "hooks.js")).exported.hooks?.afterRead).toBe("function");
+    });
+
     it("names an option with no managed route, and what to do instead", async () => {
-        const messages = await configExporting(["storagePolicies"]);
+        const { messages } = await storageExporting(["storagePolicies"]);
         expect(messages).toContain("storagePolicies");
         expect(messages).toContain("storageAuthorize");
     });
 
     it("lists every unread option in one message", async () => {
-        const messages = await configExporting(["jobs", "rateLimit", "webhooks"]);
+        const { messages } = await storageExporting(["jobs", "rateLimit", "webhooks"]);
         for (const name of ["jobs", "rateLimit", "webhooks"]) {
             expect(messages).toContain(name);
         }
     });
 
     it("says nothing about the exports it does read", async () => {
-        expect(await configExporting(["dataSources", "storageSources", "callbacks", "collections"]))
-            .toBe("");
+        expect((await storageExporting(["storageAuthorize"])).messages).toBe("");
+    });
+
+    it("refuses a module still exporting a replaced resource key, by name", async () => {
+        await expect(storageExporting(["dataSources"])).rejects.toThrow(/`dataSources` is no longer read/);
     });
 
     it("says nothing about a project's own helpers", async () => {
-        // The config module belongs to the project. A shared constant there is
-        // not a mistake, and a boot that complained about one would be noise on
-        // every start.
-        expect(await configExporting(["TAX_RATE", "formatMoney"])).toBe("");
+        expect((await storageExporting(["TAX_RATE", "formatMoney"])).messages).toBe("");
     });
 });

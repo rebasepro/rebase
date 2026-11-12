@@ -28,6 +28,7 @@ import * as os from "os";
 import * as path from "path";
 import * as fs from "fs";
 import { initializeRebaseBackend } from "../src/init";
+import { tablesFrom } from "./helpers/tables";
 
 const JWT_SECRET = "live-schema-mount-test-secret-1234567890";
 
@@ -75,10 +76,10 @@ async function boot(collectionsDir: string | undefined) {
     const backend = await initializeRebaseBackend({
         app,
         server: createServer(),
-        collections: [collection("posts")],
+        ...tablesFrom([collection("posts")]),
         cronPersistence: false,
         bootstrappers: [bootstrapper],
-        ...(collectionsDir ? { collectionsDir } : {}),
+        ...(collectionsDir ? { schemaDir: collectionsDir } : {}),
         auth: { requireAuth: false, jwtSecret: JWT_SECRET, serviceKey: SERVICE_KEY }
     });
     return {

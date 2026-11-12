@@ -2,14 +2,23 @@ import { describe, expect, it } from "@jest/globals";
 import fs from "fs";
 import path from "path";
 
-import { findCollectionConfigProblems } from "../src/collections/validate-config";
+import { compileTables } from "@rebasepro/common";
+import type { CollectionConfig } from "@rebasepro/types";
+import { tablesFrom } from "./helpers/tables";
+
+/** Lift the template's collections and compile them: what boot does with tables. */
+const compiles = (collections: unknown[]): void => {
+    const { tables, defaultRls } = tablesFrom(collections.filter((c): c is CollectionConfig => typeof c === "object" && c !== null));
+    compileTables(tables, defaultRls ? { defaultRls } : {});
+};
 
 /**
- * The framework's own templates, through the framework's own validator.
+ * The framework's own templates, through the framework's own compiler.
  *
- * A template is the first code every new project runs. If the boot-time strict
- * parse rejects one of them, the validator is wrong — an error here means the
- * key list has drifted from the types, not that the template has.
+ * A template is the first code every new project runs. Until the template
+ * slice rewrites them as `backend/schema`, they are lifted with the codemod's
+ * bridge and compiled exactly as boot compiles `defineTable` definitions: a
+ * template that does not compile is a scaffold that does not boot.
  *
  * `tooling/scripts/check-templates.mjs` already typechecks these, which catches the same
  * renames for a TypeScript project. It does not catch them for a JavaScript one,
@@ -40,7 +49,7 @@ describe("the shipped templates", () => {
         const loaded = await loadAll(templateRoot);
 
         expect(loaded.map(l => l.file)).toEqual(["authors.ts", "posts.ts", "tags.ts", "users.ts"]);
-        expect(findCollectionConfigProblems(loaded.map(l => l.collection))).toEqual([]);
+        expect(() => compiles(loaded.map(l => l.collection))).not.toThrow();
     });
 
     it("validates every preset clean", async () => {
@@ -52,7 +61,7 @@ describe("the shipped templates", () => {
 
         for (const preset of presets) {
             const loaded = await loadAll(path.join(presetsRoot, preset));
-            expect(findCollectionConfigProblems(loaded.map(l => l.collection))).toEqual([]);
+            expect(() => compiles(loaded.map(l => l.collection))).not.toThrow();
         }
     });
 });

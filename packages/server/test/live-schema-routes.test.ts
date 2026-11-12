@@ -26,7 +26,14 @@ import {
     type LiveSchemaRoutesConfig
 } from "../src/api/live-schema-routes";
 import type { SchemaEditRepository } from "../src/schema-edit/apply-schema-change";
-import { findCollectionConfigProblems } from "../src/collections/validate-config";
+import { compileTables } from "@rebasepro/common";
+import { tablesFrom } from "./helpers/tables";
+
+/** A planned collection set compiles as boot compiles tables: what the planner was handed is servable. */
+const compiles = (collections: CollectionConfig[]): void => {
+    const { tables, defaultRls } = tablesFrom(collections);
+    compileTables(tables, defaultRls ? { defaultRls } : {});
+};
 import { resolveCollectionRelations } from "@rebasepro/common";
 import { EMPTY_ACCESS_MODEL } from "@rebasepro/types";
 import { configureAccess } from "../src/auth/access";
@@ -848,7 +855,7 @@ describe("a collection with relations", () => {
 
         expect(res.status).toBe(200);
         expect(targetsOf(proposedPosts())).toEqual({ author: "authors", tags: "tags" });
-        expect(findCollectionConfigProblems(planned[0]).filter(p => p.severity === "error")).toEqual([]);
+        expect(() => compiles(planned[0])).not.toThrow();
     });
 
     it("applies it too — /apply plans the same proposed set", async () => {
@@ -886,7 +893,7 @@ describe("a collection with relations", () => {
             replies: "posts"
         });
         expect(resolveCollectionRelations(proposedPosts()).replies.target()).toBe(proposedPosts());
-        expect(findCollectionConfigProblems(planned[0]).filter(p => p.severity === "error")).toEqual([]);
+        expect(() => compiles(planned[0])).not.toThrow();
     });
 
     it("refuses a relation to a collection that does not exist, rather than a 500 from the planner", async () => {

@@ -5,7 +5,8 @@ import {
     computeSchemaVersion,
     serializeCollections,
     type CollectionConfig,
-    type RebaseProjectContract
+    type RebaseProjectContract,
+    type TableDescriptor
 } from "@rebasepro/types";
 import type { HonoEnv } from "./types";
 import { logger } from "../utils/logger";
@@ -28,6 +29,8 @@ import { logger } from "../utils/logger";
 
 export interface ContractRoutesConfig {
     collectionRegistry: { getRawCollections(): CollectionConfig[] };
+    /** The compiled descriptors the schema version is computed from. */
+    tableRegistry: { list(): readonly TableDescriptor[] };
     /**
      * The schema version recorded at build time.
      *
@@ -78,9 +81,9 @@ export function createContractRoutes(config: ContractRoutesConfig): Hono<HonoEnv
     // amplification anyone could aim at the server. Collections do not change
     // after boot, so once is enough.
     let cachedVersion: string | undefined;
-    const schemaVersionOf = (collections: CollectionConfig[]): string => {
+    const schemaVersionOf = (): string => {
         if (config.schemaVersion) return config.schemaVersion;
-        if (cachedVersion === undefined) cachedVersion = computeSchemaVersion(collections);
+        if (cachedVersion === undefined) cachedVersion = computeSchemaVersion(config.tableRegistry.list());
         return cachedVersion;
     };
 
@@ -91,7 +94,7 @@ export function createContractRoutes(config: ContractRoutesConfig): Hono<HonoEnv
         // In `baas` mode the collections are whatever introspection found at
         // boot, so the version has to be computed from them rather than taken
         // from a build that never saw them.
-        const schemaVersion = schemaVersionOf(collections);
+        const schemaVersion = schemaVersionOf();
 
         const contract: RebaseProjectContract = {
             schemaVersion,
@@ -129,7 +132,7 @@ export function createContractRoutes(config: ContractRoutesConfig): Hono<HonoEnv
      * compatibility; `version` names the release a human should quote.
      */
     router.get("/schema-version", (c) => {
-        const schemaVersion = schemaVersionOf(config.collectionRegistry.getRawCollections());
+        const schemaVersion = schemaVersionOf();
         c.header(SCHEMA_VERSION_HEADER, schemaVersion);
         return c.json({
             schemaVersion,

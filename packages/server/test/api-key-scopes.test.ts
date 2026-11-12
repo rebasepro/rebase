@@ -30,6 +30,7 @@ import type { CollectionConfig, DataDriver, RelationProperty } from "@rebasepro/
 import { createServer } from "node:http";
 import { fakeApiKeyStore, fakeAuthRepository, fakeUser, maskedApiKey } from "./helpers/server-a-g1-fakes";
 import { fakeDataDriver } from "./helpers/server-a-fakes";
+import { tablesFrom } from "./helpers/tables";
 
 const TEST_SECRET = "test-secret-key-for-api-key-fixes-testing-1234567890";
 const SERVICE_KEY = "service-key-for-api-key-fixes-tests-1234567890";
@@ -519,7 +520,6 @@ describe("storage upload body limit ordering", () => {
             app,
             // Never listened on: the backend only attaches its websocket to it.
             server: createServer(),
-            collections: [],
             bootstrappers: [{
                 type: "fake",
                 isDefault: true,

@@ -26,6 +26,7 @@ import {
     createUploadConstraintResolver,
     createUploadPathResolver
 } from "../src/storage/property-limits";
+import { tablesFrom } from "./helpers/tables";
 
 const posts: CollectionConfig = {
     slug: "posts",
@@ -202,6 +203,12 @@ describe("every upload door holds a file to the rule of the path it lands in", (
     });
 });
 
+/** `posts` as a table can declare it: every storage path a template. */
+const servedPosts: CollectionConfig = {
+    ...posts,
+    properties: Object.fromEntries(Object.entries(posts.properties).filter(([key]) => key !== "computed"))
+};
+
 describe("a booted backend", () => {
     it("holds uploads to the storage paths of the collections it serves", async () => {
         const { initializeRebaseBackend } = await import("../src/init");
@@ -213,7 +220,10 @@ describe("a booted backend", () => {
             await initializeRebaseBackend({
                 app,
                 server: idleServer(),
-                collections: [posts],
+                // Without the function-path property: the table model states a
+                // storage path as a template only (a function path is the
+                // browser's, in `customizeTable`), so it cannot be served.
+                ...tablesFrom([servedPosts]),
                 bootstrappers: [fakeBootstrapper()],
                 auth: signedInEditor(),
                 storage: { type: "local", basePath: root }

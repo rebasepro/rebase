@@ -9,6 +9,7 @@ import { initializeRebaseBackend, type RebaseBackendConfig } from "../src/init";
 import type { HonoEnv } from "../src/api/types";
 import { configureJwt, generateAccessToken } from "../src/auth/jwt";
 import { _resetRebaseMock } from "../src/singleton";
+import { tablesFrom } from "./helpers/tables";
 
 /**
  * The operational contract of the `/api/functions` mount, asserted through the
@@ -85,7 +86,7 @@ async function boot(extra: Partial<RebaseBackendConfig> = {}, mode: "resolves" |
     await initializeRebaseBackend({
         app,
         server: createServer(),
-        collections: [collection("widgets")],
+        ...tablesFrom([collection("widgets")]),
         functionsDir: EMPTY_FUNCTIONS_DIR,
         bootstrappers: [fakeBootstrapper(stubDriver(mode))],
         ...extra

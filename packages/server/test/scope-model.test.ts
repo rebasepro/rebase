@@ -5,7 +5,7 @@
  * and the access-model declarations boot refuses.
  */
 import { describe, it, expect } from "@jest/globals";
-import type { AuthCollectionConfig, RoleDefinition } from "@rebasepro/types";
+import type { AuthTableOptions, RoleDefinition } from "@rebasepro/types";
 import {
     ADMIN_SCOPES,
     DATA_PLANE_SCOPES,
@@ -20,11 +20,10 @@ import {
     summarizeRoles,
     summarizeScopes,
     validateScopes,
-    type AccessModel,
-    type CollectionConfig
+    type AccessModel
 } from "@rebasepro/types";
 import { scopesFromStoredPermissions, parseStoredPermissions } from "../src/auth/api-keys/legacy-permissions";
-import { accessModelFromCollections, AccessModelError } from "../src/auth/access";
+import { accessModelFromAuthTable, AccessModelError } from "../src/auth/access";
 import { httpMethodToOperation } from "../src/auth/api-keys/http-operation";
 
 const MODEL: AccessModel = {
@@ -191,26 +190,23 @@ describe("keys stored before scopes", () => {
 });
 
 describe("the access model boot accepts", () => {
-    const users = (auth: boolean | AuthCollectionConfig): CollectionConfig => ({ slug: "users", name: "Users", properties: {}, auth });
-
     it("is built-ins only when nothing is declared", () => {
-        expect(accessModelFromCollections([])).toEqual({ roles: {}, scopes: {} });
-        expect(accessModelFromCollections([users(true)])).toEqual({ roles: {}, scopes: {} });
+        expect(accessModelFromAuthTable(undefined)).toEqual({ roles: {}, scopes: {} });
+        expect(accessModelFromAuthTable({})).toEqual({ roles: {}, scopes: {} });
     });
 
-    it("reads roles and app scopes off the users collection", () => {
-        const model = accessModelFromCollections([users({
-            enabled: true,
+    it("reads roles and app scopes off the auth table's options", () => {
+        const model = accessModelFromAuthTable({
             roles: { support: { scopes: ["users:read", "project:deploy"] } },
             scopes: { "project:deploy": { label: "Deploy" } }
-        })]);
+        });
         expect(model.roles.support.scopes).toEqual(["users:read", "project:deploy"]);
         expect(Object.keys(model.scopes)).toEqual(["project:deploy"]);
     });
 
-    it.each<[string, Partial<AuthCollectionConfig>, RegExp]>([
+    it.each<[string, AuthTableOptions, RegExp]>([
         ["declares admin", { roles: { admin: { scopes: [] } } }, /built in/],
-        ["gives a role a data-plane scope", { roles: { editor: { scopes: ["data:write"] } } }, /securityRules/],
+        ["gives a role a data-plane scope", { roles: { editor: { scopes: ["data:write"] } } }, /`rls`/],
         ["gives a role an unknown scope", { roles: { editor: { scopes: ["logs:wipe"] } } }, /logs:wipe/],
         // Deliberately invalid: a role with no `scopes`, which the type requires and boot must refuse.
         ["gives a role no scopes list", { roles: { editor: {} as RoleDefinition } }, /scopes list/],
@@ -219,7 +215,8 @@ describe("the access model boot accepts", () => {
         ["names an app scope badly", { scopes: { "Deploy": { label: "x" } } }, /not a scope name/],
         ["leaves an app scope unlabelled", { scopes: { "project:deploy": { label: " " } } }, /needs a label/]
     ])("refuses a model that %s", (_label, auth, message) => {
-        expect(() => accessModelFromCollections([users({ enabled: true, ...auth })])).toThrow(AccessModelError);
-        expect(() => accessModelFromCollections([users({ enabled: true, ...auth })])).toThrow(message);
+        expect(() => accessModelFromAuthTable(auth, "members")).toThrow(AccessModelError);
+        expect(() => accessModelFromAuthTable(auth, "members")).toThrow(message);
+        expect(() => accessModelFromAuthTable(auth, "members")).toThrow(/"members" auth table/);
     });
 });

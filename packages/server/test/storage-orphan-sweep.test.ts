@@ -25,6 +25,7 @@ import {
 import { validateCronExpression } from "../src/cron/cron-scheduler";
 import type { HonoEnv } from "../src/api/types";
 import { fakeBootstrapper, fakeDataDriver, idleServer } from "./helpers/server-b-fakes";
+import { tablesFrom } from "./helpers/tables";
 
 const HOUR = 3_600_000;
 
@@ -173,7 +174,7 @@ describe("a backend whose bucket declares a sweep", () => {
         const backend = await initializeRebaseBackend({
             app: new Hono<HonoEnv>(),
             server: idleServer(),
-            collections: [collection("voice_cache")],
+            ...tablesFrom([collection("voice_cache")]),
             cronPersistence: false,
             bootstrappers: [bootstrapper],
             storage: { type: "local", basePath: root }

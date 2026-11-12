@@ -23,6 +23,7 @@ import { defineFunction, requireScope as functionRequireScope } from "../src/fun
 import { _resetRebaseMock } from "../src/singleton";
 import { MemoryAuthStore } from "./helpers/memory-auth-store";
 import { fakeBootstrapper, fakeDataDriver, fakeRealtimeProvider } from "./helpers/server-b-fakes";
+import { tablesFrom } from "./helpers/tables";
 
 type Guard = (scope: string, target?: string) => MiddlewareHandler<HonoEnv>;
 const GUARDS: [string, Guard][] = [
@@ -94,7 +95,7 @@ async function world(scopes: Record<string, { label: string }>) {
         app.post("/", functionRequireScope("project:deploy"), (c) => c.json({ ok: true }));
     });
     const backend = await createRebaseBackend({
-        collections: [collection("users", { enabled: true, scopes })],
+        ...tablesFrom([collection("users", { enabled: true, scopes })]),
         bootstrappers: [bootstrapper],
         auth: { jwtSecret: "require-scope-undeclared-secret-0123456789" },
         functions: { deploy },

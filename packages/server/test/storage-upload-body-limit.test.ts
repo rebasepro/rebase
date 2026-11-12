@@ -10,6 +10,7 @@ import type { HonoEnv } from "../src/api/types";
 import { fakeBootstrapper, idleServer } from "./helpers/server-b-fakes";
 import { RUNTIME_DEFAULT_MAX_BODY_SIZE } from "../src/deploy/pod-contract";
 import { DEFAULT_MAX_FILE_SIZE } from "../src/storage/types";
+import { tablesFrom } from "./helpers/tables";
 
 /**
  * Which body limit an upload meets.
@@ -60,7 +61,6 @@ async function boot(storage: { maxFileSize?: number } = {}) {
     await initializeRebaseBackend({
         app,
         server: idleServer(),
-        collections: [],
         bootstrappers: [bootstrapper],
         auth: signedIn,
         storage: { type: "local", basePath: tempDir, ...storage }
@@ -248,7 +248,6 @@ describe("a refusal names the limit that was configured", () => {
         await initializeRebaseBackend({
             app,
             server: idleServer(),
-            collections: [],
             bootstrappers: [bootstrapper],
             auth: signedIn,
             maxBodySize: config.maxBodySize,

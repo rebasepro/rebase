@@ -8,6 +8,7 @@ import { initializeRebaseBackend } from "../src/init";
 import { defineFunction } from "../src/functions/define-function";
 import { _resetRebaseMock } from "../src/singleton";
 import { SERVICE_IDENTITY } from "../src/auth/rls-scope";
+import { tablesFrom } from "./helpers/tables";
 
 /**
  * What `rebase.dataAsAdmin` actually is — pinned on the object a function
@@ -131,7 +132,7 @@ async function boot(rec: Recorder) {
     return await initializeRebaseBackend({
         app: new Hono<HonoEnv>(),
         server: createServer(),
-        collections: [collection("widgets")],
+        ...tablesFrom([collection("widgets")]),
         bootstrappers: [fakeBootstrapper(rec)]
     });
 }

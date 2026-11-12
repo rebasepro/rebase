@@ -25,6 +25,7 @@ import { configureUserPicking } from "../src/auth/user-picking";
 import { configureJwt, generateAccessToken } from "../src/auth/jwt";
 import type { AuthRepository, ListUsersOptions, UserData } from "../src/auth/interfaces";
 import { fakeBootstrapper, fakeDataDriver, idleServer, mockAuthRepository } from "./helpers/server-b-fakes";
+import { tablesFrom } from "./helpers/tables";
 
 const ROLES: Record<string, string[]> = {
     "admin-1": ["admin"],
@@ -295,7 +296,7 @@ describe("GET /api/admin/users/pick on a booted backend", () => {
         const backend = await initializeRebaseBackend({
             app: hono,
             server: idleServer(),
-            collections: [posts],
+            ...tablesFrom([posts]),
             cronPersistence: false,
             bootstrappers: [bootstrapper],
             auth: { jwtSecret: SECRET }

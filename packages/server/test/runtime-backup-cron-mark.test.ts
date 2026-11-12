@@ -8,6 +8,7 @@ import { BACKUP_CRON_MARK, isBackupCronDefinition } from "../src/backup/backup-s
 import { _resetRebaseMock } from "../src/singleton";
 import type { HonoEnv } from "../src/api/types";
 import { fakeBootstrapper, fakeDataDriver, idleServer } from "./helpers/server-b-fakes";
+import { tablesFrom } from "./helpers/tables";
 
 /**
  * The Backups panel finds the scheduled backup by a mark on its definition:
@@ -68,7 +69,7 @@ describe("the backup cron's mark", () => {
         const backend = await initializeRebaseBackend({
             app,
             server: idleServer(),
-            collections: [collection("widgets")],
+            ...tablesFrom([collection("widgets")]),
             bootstrappers: [bootstrapper()],
             auth: { jwtSecret: "backup-mark-test-jwt-secret-0123456789abcdef", serviceKey: "backup-mark-test-service-key-0123456789" },
             cronPersistence: false,

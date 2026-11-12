@@ -9,6 +9,7 @@ import { fakeDataDriver } from "./helpers/server-a-fakes";
 import { initializeRebaseBackend } from "../src/init";
 import { generateAccessToken } from "../src/auth/jwt";
 import { ApiError } from "../src/api/errors";
+import { tablesFrom } from "./helpers/tables";
 
 /**
  * `GET /api/admin/branches/:name/diff` and `POST …/merge` — Studio's review
@@ -100,7 +101,7 @@ async function boot(options: { canDiff?: boolean; roles?: Record<string, { scope
     const backend = await initializeRebaseBackend({
         app,
         server: createServer(),
-        collections: [jobs, ...users],
+        ...tablesFrom([jobs, ...users]),
         cronsDir: CRONS_DIR,
         cronPersistence: false,
         bootstrappers: [bootstrapper],

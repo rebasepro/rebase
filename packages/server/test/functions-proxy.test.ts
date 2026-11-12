@@ -11,6 +11,7 @@ import type { HonoEnv } from "../src/api/types";
 import { fakeDataDriver } from "./helpers/server-a-fakes";
 import { createRebaseBackend, type RebaseBackend } from "../src/backend/create-backend";
 import { generateAccessToken } from "../src/auth/jwt";
+import { tablesFrom } from "./helpers/tables";
 
 /**
  * The `api` role forwarding `/api/functions/*` to the process that serves them.
@@ -87,7 +88,7 @@ async function buildBackendInstance(over: Partial<RebaseBackendConfig>): Promise
     const backend = await initializeRebaseBackend({
         app,
         server: createServer(),
-        collections: [collection("jobs")],
+        ...tablesFrom([collection("jobs")]),
         bootstrappers: [bootstrapper],
         auth: { jwtSecret: JWT_SECRET, serviceKey: SERVICE_KEY },
         ...over
@@ -319,7 +320,7 @@ describe("the worker role forwarding its own function calls", () => {
     /** A worker, as `bootFromBundle` builds one for `REBASE_ROLE=worker`, with the deployment's service key. */
     async function worker(functionsUpstream?: string): Promise<RebaseBackend> {
         const backend = await createRebaseBackend({
-            collections: [collection("jobs")],
+            ...tablesFrom([collection("jobs")]),
             bootstrappers: [bootstrapper],
             auth: { jwtSecret: JWT_SECRET, serviceKey: SERVICE_KEY },
             surfaces: WORKER_SURFACES,

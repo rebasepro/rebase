@@ -13,11 +13,10 @@ import {
     type InitializedDriver,
     type StorageSourceDefinition
 } from "@rebasepro/types";
-import { createDataSourceRegistry, resolveDataSource } from "@rebasepro/common";
+import { createDataSourceRegistry, isSchemaDefinitionError, resolveDataSource } from "@rebasepro/common";
 import { loadBundleResourceGraph } from "./resource-loading.js";
 import { assertEveryKindBindable } from "./resource-resolvers.js";
 import {
-    assertNoReplacedResourceConfig,
     graphToDataSources,
     graphToStorageSources
 } from "./resource-adapters.js";
@@ -26,7 +25,6 @@ import { createRebaseBackend } from "../backend/create-backend";
 import { setDefaultBackend } from "../backend/default-backend";
 import type { RebaseBackendInstance } from "../init";
 import { installUnhandledRejectionHandler } from "../init/process-safety";
-import { loadCollectionsFromDirectory } from "../collections/loader";
 import type { HonoEnv } from "../api/types";
 import { installRootErrorHandler } from "../api/root-error-handler";
 import { describeCauseChain, logger, type Logger } from "../utils/logger";
@@ -45,13 +43,12 @@ import { resolveProvisionOnly } from "./provision-only";
 export { resolveProvisionOnly };
 import { FunctionSelectionError } from "../functions/selection";
 import { FilesFailedToLoadError } from "../utils/load-failure";
-import { CollectionConfigError } from "../collections/validate-config";
+import { isSchemaLoadError, loadBackendSchema } from "../schema/load-schema";
 import {
     BundleError,
     loadBundle,
-    loadBundleConfigExports,
+    loadBundleProjectExports,
     loadBundleSchema,
-    loadUsersCollection,
     type LoadedBundle
 } from "./bundle";
 import { resolveDataSources, resolveStorageSources, type EnvBag } from "./sources";
@@ -306,13 +303,21 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
     }
 
     // ── Declarations ─────────────────────────────────────────────────────────
-    const configExports = await loadBundleConfigExports(bundle);
+    // `storageAuthorize` (backend/storage) and global table `hooks`
+    // (backend/hooks). A module still exporting the replaced resource keys is
+    // refused inside, by name, rather than booted with its declarations
+    // ignored: a silent "your buckets are gone" would surface as 500s on the
+    // storage routes and nothing else.
+    const projectExports = await loadBundleProjectExports(bundle);
 
-    // A bundle built against the old shape is refused here rather than booted
-    // with its declarations ignored. This is the path a self-hosted container
-    // and a managed tenant both take, so a silent "your buckets are gone" would
-    // surface as 500s on the storage routes and nothing else.
-    assertNoReplacedResourceConfig(configExports as Record<string, unknown>);
+    // The tables, before any connection opens: a schema that does not compile
+    // (no `rls`, an `"inherit"` without `defaultRls`, an unexported table…)
+    // refuses the boot here, with every problem named. A built bundle's layout
+    // is vouched for by its format; a source boot is checked for a leftover
+    // config/collections.
+    const loadedSchema = bundle.tablesDir
+        ? await loadBackendSchema(bundle.tablesDir, bundle.isSource ? {} : { projectRoot: false })
+        : undefined;
 
     // One source of truth, evaluated. There is no merge left to do: the graph
     // is built from the declarations in the project's own code, and the
@@ -385,7 +390,6 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
     const server = createRuntimeHttpServer(getRequestListener(app.fetch));
 
     // ── Backend ──────────────────────────────────────────────────────────────
-    const usersCollection = await loadUsersCollection(bundle);
     const storage = resolveBootStorage(bundle, process.env, storageSourceDefs, isProduction);
 
     // ── Schema ───────────────────────────────────────────────────────────────
@@ -433,7 +437,11 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
         provisioningDriverResult: dataSources[0]
             ? ({ internals: dataSources[0].connection } as InitializedDriver)
             : undefined,
-        collectionsDir: bundle.collectionsDir,
+        // Served from the definitions loaded above; the directory is what the
+        // schema editor rewrites on a source boot.
+        tables: loadedSchema?.defs,
+        defaultRls: loadedSchema?.defaultRls,
+        schemaDir: bundle.tablesDir,
         functionsDir: bundle.functionsDir,
         cronsDir: bundle.cronsDir,
         requireFilesLoaded: env.REBASE_REQUIRE_FILES_LOADED,
@@ -445,13 +453,13 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
         storage,
         // Per-object access control comes from the project's own code — no
         // environment variable can express "this user may read this key".
-        storageAuthorize: configExports.storageAuthorize,
+        storageAuthorize: projectExports.storageAuthorize,
         storagePublicRead: env.STORAGE_PUBLIC_READ,
         storageRenditionCache: { enabled: env.STORAGE_RENDITION_CACHE },
         storageInsecureAllowAnyAuthenticated: env.STORAGE_ALLOW_ANY_AUTHENTICATED,
         storageDownloadTokenTtl: env.STORAGE_DOWNLOAD_TOKEN_TTL,
-        callbacks: configExports.callbacks,
-        auth: resolveAuthOptions(env, usersCollection),
+        hooks: projectExports.hooks,
+        auth: resolveAuthOptions(env),
         history: env.REBASE_HISTORY,
         rlsAudit,
         enableSwagger: resolveEnableSwagger(env),
@@ -463,7 +471,7 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
         // Published by the contract endpoint, so a client generated in another
         // repository can tell whether it is built against this schema.
         // Empty for a source boot: nothing was built, so the runtime computes a
-        // version from the live collections instead of quoting one.
+        // version from the compiled tables instead of quoting one.
         schemaVersion: bundle.manifest.schemaVersion || undefined,
         runtimeVersion: bundle.manifest.runtime?.builtAgainst,
         // The schema editor rewrites collection *source* files. A bundle holds
@@ -471,11 +479,11 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
         // and a running deployment is the last place that should be possible.
         //
         // But this same call also serves the *source* boot that `rebase dev`
-        // runs, where the collection files are right there, and `false` there
+        // runs, where the schema files are right there, and `false` there
         // greyed out "Edit collections" on every scaffold — with no reason
         // anywhere on screen, while the docs said the editor rewrites your
         // TypeScript. `undefined` is not "on": it hands the decision back to
-        // `createRebaseBackend`, which already weighs `collectionsDir`,
+        // `createRebaseBackend`, which already weighs `schemaDir`,
         // `baas` mode and `NODE_ENV`, and reports whichever of those said no.
         schemaEditor: bundle.isSource ? undefined : false,
         // The one way a bundle edits its schema: through a repository it names
@@ -982,7 +990,8 @@ function isConfigurationFailure(err: unknown): err is Error & { hint?: string } 
     return err instanceof BundleError
         || err instanceof RoleConfigurationError
         || err instanceof FunctionSelectionError
-        || err instanceof CollectionConfigError
+        || isSchemaDefinitionError(err)
+        || isSchemaLoadError(err)
         || err instanceof FilesFailedToLoadError;
 }
 
@@ -991,7 +1000,7 @@ function isConfigurationFailure(err: unknown): err is Error & { hint?: string } 
  *
  * Extracted from `runFromBundle` so it can be tested: the catch it came from
  * ends in `process.exit(1)`, and what a dying process printed on its way out is
- * exactly the thing nobody had a test for. `CollectionConfigError` spent a
+ * exactly the thing nobody had a test for. A schema error once spent a
  * release on the wrong side of this branch, so a multi-line validator message —
  * composed over several lines, naming both offending files — reached the author
  * as `{"error":{"name":"Error","message":"1 problem(s) …\n\n…","stack":"… at
@@ -1191,38 +1200,25 @@ function warnOnUploadsLeftInBundle(bundle: LoadedBundle, directory: string): voi
 /**
  * Warn about a bundle whose shape makes provisioning impossible.
  *
- * `createRebaseBackend` provisions the collection schema for every boot
- * path, and it decides from what actually resolved: a project with no
- * collections reads them from the database and creates nothing. That rule is
- * right, but from inside the runtime it cannot tell "this project declares no
- * collections" from "this build lost them" — and the second is a broken build
- * that silently serves an empty API.
+ * `createRebaseBackend` provisions the schema for every boot path, and it
+ * decides from what actually resolved: a project with no tables reads them
+ * from the database and creates nothing. That rule is right, but from inside
+ * the runtime it cannot tell "this project declares no tables" from "this
+ * build lost them" — and the second is a broken build that silently serves an
+ * empty API.
  *
- * Only the bundle knows the difference, so this is the one piece of the old
- * bundle-side provisioning worth keeping here. It warns; it never provisions.
+ * Only the bundle knows the difference: both bundle builders declare
+ * `entry.tables` only when the directory exists, so an absent entry means
+ * "declares none" and a declared-but-unresolved entry means "the build lost
+ * them". It warns; it never provisions.
  */
 export function warnOnUnusableBundleShape(bundle: LoadedBundle): void {
     if (bundle.manifest.kind !== "backend") return;
-
-    // Keyed on `entry.collections`, not `entry.config`.
-    //
-    // The header above says only the bundle can tell "this project declares no
-    // collections" from "this build lost them" — and keying on `entry.config`
-    // threw that information away, because a headless project has a config
-    // package (its `index.ts`, its resources) and deliberately no collections
-    // directory. Every `--headless` boot therefore warned that its build was
-    // broken, on a project that is correct.
-    //
-    // Both bundle builders now declare `entry.collections` only when the
-    // directory exists — `createSourceBundle` for `rebase dev`, `rebase build`
-    // for a packaged one — so an absent entry means "declares none" and a
-    // declared-but-unresolved entry means "the build lost them". Which is the
-    // distinction this warning was always trying to draw.
-    if (!bundle.manifest.entry?.collections) return;
-    if (bundle.collectionsDir) return;
+    if (!bundle.manifest.entry?.tables) return;
+    if (bundle.tablesDir) return;
     logger.warn(
-        `This bundle declares collections at "${bundle.manifest.entry.collections}", but that ` +
-            "directory did not resolve, so no collections were loaded and no tables will be created. " +
+        `This bundle declares tables at "${bundle.manifest.entry.tables}", but that ` +
+            "directory did not resolve, so no tables were loaded and none will be created. " +
             "Rebuild with `rebase build`."
     );
 }

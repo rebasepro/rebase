@@ -9,6 +9,7 @@ import { generateAccessToken } from "../src/auth/jwt";
 import { ApiError } from "../src/api/errors";
 import type { HonoEnv } from "../src/api/types";
 import { fakeBootstrapper, fakeDataDriver, idleServer } from "./helpers/server-b-fakes";
+import { tablesFrom } from "./helpers/tables";
 
 /**
  * `POST /api/admin/sql/csv` — the SQL console's "Download full result as CSV".
@@ -108,7 +109,7 @@ async function boot(options: { withCursor?: boolean } = {}): Promise<Hono<HonoEn
     const backend = await initializeRebaseBackend({
         app,
         server: idleServer(),
-        collections: [JOBS],
+        ...tablesFrom([JOBS]),
         cronsDir: CRONS_DIR,
         cronPersistence: false,
         bootstrappers: [bootstrapper],

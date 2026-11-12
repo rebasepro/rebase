@@ -27,6 +27,7 @@ import { CronScheduler } from "../src/cron/cron-scheduler";
 import { configureJwt, generateAccessToken } from "../src/auth/jwt";
 import { _resetRebaseMock } from "../src/singleton";
 import { inertRealtimeProvider } from "./helpers/server-a-g3-realtime";
+import { tablesFrom } from "./helpers/tables";
 
 /**
  * `createRebaseBackend` and the public pieces `initializeRebaseBackend` is made
@@ -135,7 +136,7 @@ const built: RebaseBackend[] = [];
 
 async function create(extra: Partial<RebaseBackendOptions> = {}, rec: Recorded = recorder()) {
     const backend = await createRebaseBackend({
-        collections: [collection("widgets")],
+        ...tablesFrom([collection("widgets")]),
         bootstrappers: [bootstrapper(rec)],
         auth: { jwtSecret: JWT_SECRET },
         functions: { whoami },
@@ -199,7 +200,7 @@ describe("one group, mounted alone, at a path of the application's choosing", ()
     it("data: routes each collection to its own data source under a parameterised mount", async () => {
         const rec = recorder();
         const backend = await createRebaseBackend({
-            collections: [collection("widgets"), collection("events", { dataSource: "analytics" })],
+            ...tablesFrom([collection("widgets"), collection("events", { dataSource: "analytics" })]),
             bootstrappers: [
                 bootstrapper(rec, { id: "(default)", isDefault: true, driver: scopingDriver("main") }),
                 bootstrapper(rec, { id: "analytics", isDefault: false, driver: scopingDriver("analytics") })

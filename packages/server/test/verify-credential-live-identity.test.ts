@@ -31,6 +31,7 @@ import { _resetRebaseMock } from "../src/singleton";
 import { MemoryAuthStore } from "./helpers/memory-auth-store";
 import { fakeBootstrapper, fakeDataDriver, fakeRealtimeProvider } from "./helpers/server-b-fakes";
 import type { ScopeIdentity } from "../src/auth/rls-scope";
+import { tablesFrom } from "./helpers/tables";
 
 const JWT_SECRET = "verify-credential-live-identity-secret-0123456789";
 const SERVICE_KEY = "verify-credential-service-key-0123456789abcdefgh";
@@ -71,7 +72,7 @@ afterEach(async () => {
 async function world() {
     const store = new MemoryAuthStore();
     const backend = await createRebaseBackend({
-        collections: [widgets],
+        ...tablesFrom([widgets]),
         bootstrappers: [bootstrapper(store)],
         auth: { jwtSecret: JWT_SECRET, serviceKey: SERVICE_KEY },
         cronPersistence: false,

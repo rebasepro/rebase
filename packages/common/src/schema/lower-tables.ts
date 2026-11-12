@@ -1396,8 +1396,13 @@ function tableFor(slug: string, describe: LowerTablesOptions["describe"], hook: 
 /**
  * Table hooks as legacy `callbacks`: the legacy runtime calls them with
  * `{ collection, row, … }`, the hooks take `{ table, values, … }`.
+ *
+ * Exported for the server, which adapts its global hooks (`backend/hooks.ts`)
+ * and `setTableHooks(slug, hooks)` through this same adapter.
+ *
+ * @group Schema
  */
-function lowerHooks(hooks: TableHooks | undefined, slug: string, describe: LowerTablesOptions["describe"]): CollectionCallbacks | undefined {
+export function lowerHooks(hooks: TableHooks | undefined, slug: string, describe: LowerTablesOptions["describe"]): CollectionCallbacks | undefined {
     if (!hooks) return undefined;
     const out: CollectionCallbacks = {};
     const { beforeQuery, afterRead, beforeSave, afterSave, afterSaveError, beforeDelete, afterDelete } = hooks;

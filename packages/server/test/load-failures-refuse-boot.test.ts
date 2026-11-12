@@ -17,6 +17,7 @@ import { fakeDataDriver } from "./helpers/server-a-fakes";
 import { _resetRebaseMock } from "../src/singleton";
 import { logger } from "../src/utils/logger";
 import { requireImporter } from "./helpers/require-importer";
+import { tablesFrom } from "./helpers/tables";
 
 // A boot reads `functionsDir` / `cronsDir` through the runtime's own `import()`,
 // which jest's vm cannot do deterministically — see the same mock in
@@ -85,7 +86,7 @@ describe("files that failed to load", () => {
         const backend = await initializeRebaseBackend({
             app: new Hono<HonoEnv>(),
             server: createServer(),
-            collections: [collection("widgets")],
+            ...tablesFrom([collection("widgets")]),
             bootstrappers: [bootstrapper()],
             auth: { jwtSecret: "load-test-jwt-secret-0123456789abcdef!", serviceKey: "load-test-service-key-0123456789abcdef!" },
             cronPersistence: false,

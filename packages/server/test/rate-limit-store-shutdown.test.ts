@@ -13,6 +13,7 @@ import type { BackendBootstrapper } from "@rebasepro/types";
 import { initializeRebaseBackend, type RebaseBackendConfig } from "../src/init";
 import type { HonoEnv } from "../src/api/types";
 import { fakeBootstrapper, fakeDataDriver } from "./helpers/server-b-fakes";
+import { tablesFrom } from "./helpers/tables";
 
 const dispose = jest.fn();
 jest.mock("../src/auth/sql-rate-limit-store", () => ({
@@ -45,7 +46,6 @@ async function boot(over: Partial<RebaseBackendConfig> = {}) {
     return initializeRebaseBackend({
         app: new Hono<HonoEnv>(),
         server: createServer(),
-        collections: [],
         cronPersistence: false,
         bootstrappers: [bootstrapper()],
         ...over

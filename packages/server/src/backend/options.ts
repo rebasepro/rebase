@@ -10,13 +10,15 @@
  * @module
  */
 import type {
-    AnyCollectionConfig,
+    AnyTableDef,
+    AnyViewDef,
     AuthAdapter,
     BackendBootstrapper,
-    CollectionCallbacks,
     DatabaseAdapter,
+    DefaultRls,
     HistoryConfig,
-    InitializedDriver
+    InitializedDriver,
+    TableHooks
 } from "@rebasepro/types";
 import type { CaptchaConfig } from "../auth/captcha";
 import type { JwtSigningKeyConfig } from "../auth/jwt-keys";
@@ -64,27 +66,6 @@ export interface LiveSchemaConfig extends SchemaEditPolicy {
 }
 
 export interface RebaseAuthConfig {
-    /**
-     * The collection that represents auth users.
-     *
-     * When provided, this collection's underlying database table is used
-     * for all auth operations (login, registration, password reset, etc.).
-     *
-     * Import the built-in default:
-     * ```ts
-     * import { defaultUsersCollection } from "@rebasepro/common";
-     * auth: { collection: defaultUsersCollection, jwtSecret: "..." }
-     * ```
-     *
-     * Or pass your own collection with the required auth fields
-     * (email, passwordHash, displayName, etc.).
-     */
-    /**
-     * Accepts a collection of any row type: `defineCollection` infers `M` from
-     * the properties, and `CollectionConfig` is invariant in `M`, so a bare
-     * `CollectionConfig` here rejects everything the builder returns.
-     */
-    collection?: AnyCollectionConfig;
     jwtSecret?: string;
     /**
      * Asymmetric keys for signing access tokens, newest first. Additive —
@@ -401,30 +382,44 @@ export interface ProvisionOptions {
 
 export interface RebaseBackendOptions {
     /**
-     * The collections this backend serves, as values. Wins over
-     * {@link collectionsDir} for what is served.
+     * The tables and views this backend serves: `defineTable`,
+     * `defineAuthTable` and `defineView` results. Wins over {@link schemaDir}
+     * for what is served.
      *
-     * Invariance again — see the note on `RebaseAuthConfig.collection`.
+     * Compiled at boot — every definition is checked and a problem in any of
+     * them (no `rls`, `"inherit"` without {@link defaultRls}, a relation to a
+     * table not in the list…) refuses the boot with one
+     * `SchemaDefinitionError`. Users are stored in the table defined with
+     * `defineAuthTable`; its `auth` options are the roles and scopes this
+     * backend serves.
+     *
+     * None, and no {@link schemaDir}: the driver introspects the database and
+     * serves the tables it finds (see {@link BaasOptions}).
      */
-    collections?: AnyCollectionConfig[];
+    tables?: (AnyTableDef | AnyViewDef)[];
     /**
-     * The directory holding this project's collection source files.
+     * What every `rls: "inherit"` table in {@link tables} takes — the
+     * `defaultRls` a `backend/schema/index.ts` exports. Ignored when the
+     * tables are loaded from {@link schemaDir}, whose index states its own.
+     */
+    defaultRls?: DefaultRls;
+    /**
+     * The project's `backend/schema` directory.
      *
-     * Two jobs, and only the first depends on {@link collections}:
+     * Two jobs, and only the first depends on {@link tables}:
      *
-     * 1. Without `collections`, it is where the served collections are loaded
-     *    from (`loadCollectionsFromDirectory`).
+     * 1. Without `tables`, the served tables are loaded from it
+     *    (`loadBackendSchema`): its index's exports and `defaultRls`.
      * 2. Always, it is the source the schema editor and live schema editing
      *    rewrite. The editor changes TypeScript files, not the values in this
-     *    process, so it needs to know where they are — collections passed as
-     *    values carry no path back to the file they came from. A backend given
-     *    `collections` and no directory serves them and reports the editor as
-     *    unavailable (`SCHEMA_EDITOR_NO_COLLECTIONS_DIR`), with the reason.
+     *    process, so it needs to know where they are. A backend given `tables`
+     *    and no directory serves them and reports the editor as unavailable,
+     *    with the reason.
      *
      * Passing both is therefore not ambiguous: the values are served, and the
      * directory is what an edit writes to.
      */
-    collectionsDir?: string;
+    schemaDir?: string;
 
     /**
      * What creating this backend may change in the database. Required, because
@@ -479,9 +474,9 @@ export interface RebaseBackendOptions {
     /**
      * Force the schema-editor routes on or off.
      *
-     * Defaults to enabled when `collectionsDir` is set, outside production, in
-     * `cms` mode. The editor rewrites collection files, so it needs a
-     * `collectionsDir` to write to.
+     * Defaults to enabled when `schemaDir` is set, outside production, in
+     * `cms` mode. The editor rewrites schema files, so it needs a
+     * `schemaDir` to write to.
      */
     schemaEditor?: boolean;
 
@@ -935,24 +930,26 @@ export interface RebaseBackendOptions {
         origin: string | string[] | ((origin: string) => boolean);
     };
     /**
-     * Global lifecycle callbacks applied to every collection.
+     * Global table hooks: run for every table, on every data path (REST,
+     * realtime, server-side `rebase.dataAsAdmin`) — what `backend/hooks.ts`
+     * exports as `hooks`.
      *
-     * Same type as per-collection `callbacks` — fires on **every** data path
-     * (REST API, WebSocket / realtime, server-side `rebase.dataAsAdmin`).
-     *
-     * Execution order: global callbacks → collection callbacks → property callbacks.
+     * Execution order: global hooks → the table's own hooks → column
+     * transforms. Each hook receives the descriptor of the table it runs for
+     * as `table`, so it needs declared tables: a backend that introspects the
+     * database refuses them at boot.
      *
      * @example
      * ```ts
-     * callbacks: {
-     *     afterRead({ row, collection }) {
-     *         console.log(`Read ${collection.slug}/${row.id}`);
-     *         return row;
+     * hooks: {
+     *     afterRead({ table, values }) {
+     *         console.log(`Read ${table.slug}/${values.id}`);
+     *         return values;
      *     }
      * }
      * ```
      */
-    callbacks?: CollectionCallbacks;
+    hooks?: TableHooks;
 
     /**
      * Declare that this application installs its own CORS middleware.
@@ -969,9 +966,9 @@ export interface RebaseBackendOptions {
      *
      * Published by the contract endpoint so a client generated elsewhere can
      * tell whether it is current. Leave unset and the runtime computes one from
-     * the live collections — correct, but it means the value moves whenever the
-     * collections do, which is exactly right for `baas` mode and slightly less
-     * useful for a built bundle that already knows its own answer.
+     * the compiled table descriptors — correct, but it means the value moves
+     * whenever the tables do, which is exactly right for development and
+     * slightly less useful for a built bundle that already knows its own answer.
      */
     schemaVersion?: string;
 

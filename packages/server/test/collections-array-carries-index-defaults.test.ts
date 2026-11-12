@@ -1,83 +1,65 @@
 /**
- * The same collections give a backend the same rules, whichever way they reach it.
+ * The same tables give a backend the same rules, whichever way they reach it.
  *
- * The scaffold's `config/collections/index.ts` declares `defaultSecurityRules`
- * — every signed-in user reads, only admins write — for the collections that
- * declare none. The directory loader applied them; nothing else did. So a
- * backend built from the array the same file exports,
- * `createRebaseBackend({ collections, provision: true })` as custom-server.md
- * has it, saw `posts`, `authors` and `tags` with no rules, provisioned them
- * locked, and dropped their twelve generated policies from the database —
- * for every server sharing it, `rebase dev` included — with nothing but
- * "Applied 12 RLS policy statement(s)" in the log.
+ * `backend/schema/index.ts` may export `defaultRls` — the rules every
+ * `rls: "inherit"` table takes. Under the collection model the directory
+ * loader applied the directory's defaults and nothing else did, so a backend
+ * built from the exported array (`createRebaseBackend({ collections })`) saw
+ * those collections with no rules, provisioned them locked, and dropped their
+ * generated policies from the database for every server sharing it.
  *
- * The array now carries the defaults on the collection objects themselves,
- * exactly as the loader leaves them.
+ * Now the compiler resolves `"inherit"`, for every door: a backend given the
+ * definitions and `defaultRls` as values provisions exactly what one pointed
+ * at the directory provisions — and a table that inherits without a
+ * `defaultRls` refuses the boot instead of being locked in silence.
  */
 import { afterAll, afterEach, describe, expect, it } from "@jest/globals";
-import { cpSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import type { BackendBootstrapper, CollectionConfig, DataDriver, InitializedDriver, SecurityRule } from "@rebasepro/types";
-import { createRebaseBackend, loadCollectionsFromDirectory, type RebaseBackend } from "../src/index";
+import type { BackendBootstrapper, CollectionConfig, DataDriver, InitializedDriver } from "@rebasepro/types";
+import { createRebaseBackend, loadBackendSchema, type RebaseBackend } from "../src/index";
 import { _resetRebaseMock } from "../src/singleton";
 import { inertRealtimeProvider } from "./helpers/server-a-g3-realtime";
 
-const templateRoot = path.resolve(__dirname, "../../cli/templates/template/config/collections");
+const DEFAULT_RLS = [
+    { operation: "select", access: "authenticated" },
+    { operations: ["insert", "update", "delete"], roles: ["admin"] }
+];
 
-/**
- * A fresh copy of the scaffold's collections directory.
- *
- * The directory loader applies the defaults to the very objects the collection
- * files export, so a module the loader has already been over would report the
- * loader's work rather than the index's. Each path under test gets its own
- * copy, and so its own module instances.
- */
-const copies: string[] = [];
-function freshTemplate(): string {
-    const dir = mkdtempSync(path.join(tmpdir(), "rebase-template-collections-"));
-    for (const file of readdirSync(templateRoot).filter(f => f.endsWith(".ts"))) {
-        cpSync(path.join(templateRoot, file), path.join(dir, file));
-    }
-    copies.push(dir);
+const roots: string[] = [];
+afterAll(() => {
+    while (roots.length) rmSync(roots.pop() ?? "", { recursive: true, force: true });
+});
+
+/** A fresh `backend/schema`: two inheriting tables, one with its own rules. */
+function schemaDir(): string {
+    const root = mkdtempSync(path.join(tmpdir(), "rebase-default-rls-"));
+    roots.push(root);
+    const dir = path.join(root, "backend", "schema");
+    mkdirSync(dir, { recursive: true });
+    const table = (name: string, rls: string) => `
+import { defineTable, col } from "@rebasepro/types";
+export const ${name} = defineTable("${name}", {
+    columns: { id: col.uuid().primaryKey().defaultRandom(), title: col.text() },
+    rls: ${rls}
+});
+`;
+    writeFileSync(path.join(dir, "authors.ts"), table("authors", `"inherit"`));
+    writeFileSync(path.join(dir, "tags.ts"), table("tags", `"inherit"`));
+    writeFileSync(path.join(dir, "posts.ts"), table("posts", `[{ operation: "select", access: "public", condition: { title: "x" } }]`));
+    writeFileSync(path.join(dir, "index.ts"), `
+export { authors } from "./authors";
+export { tags } from "./tags";
+export { posts } from "./posts";
+export const defaultRls = ${JSON.stringify(DEFAULT_RLS)};
+`);
     return dir;
 }
-afterAll(() => {
-    while (copies.length) rmSync(copies.pop()!, { recursive: true, force: true });
-});
 
 /** Each collection's rules, by slug, as plain data. */
 const rulesBySlug = (collections: readonly CollectionConfig[]): Record<string, unknown> =>
-    Object.fromEntries(collections.map(c => [c.slug, JSON.parse(JSON.stringify((c as { securityRules?: SecurityRule[] }).securityRules ?? null))]));
-
-interface IndexModule {
-    collections: CollectionConfig[];
-    defaultSecurityRules: SecurityRule[];
-}
-
-const importIndex = async (dir: string) => await import(path.join(dir, "index.ts")) as IndexModule;
-
-describe("the scaffold's collections array", () => {
-    it("carries defaultSecurityRules on every collection that declares no rules of its own", async () => {
-        const index = await importIndex(freshTemplate());
-        const fromIndex = rulesBySlug(index.collections);
-        const defaults = JSON.parse(JSON.stringify(index.defaultSecurityRules));
-        expect(defaults.length).toBeGreaterThan(0);
-        expect(fromIndex.authors).toEqual(defaults);
-        expect(fromIndex.tags).toEqual(defaults);
-        // Their own rules, untouched: `posts` keeps drafts out of public reads.
-        expect(fromIndex.users).not.toEqual(defaults);
-        expect(fromIndex.posts).not.toEqual(defaults);
-    });
-
-    it("gives every collection the rules the directory loader gives it", async () => {
-        const fromIndex = rulesBySlug((await importIndex(freshTemplate())).collections);
-        const fromDirectory = rulesBySlug(await loadCollectionsFromDirectory(freshTemplate()));
-        expect(fromIndex).toEqual(fromDirectory);
-    });
-});
-
-// ── Through a backend ────────────────────────────────────────────────────
+    Object.fromEntries(collections.map(c => [c.slug, JSON.parse(JSON.stringify("securityRules" in c ? c.securityRules ?? null : null))]));
 
 /** A driver with no rows, whose RLS scoping hands back another like it. */
 interface EmptyDriver extends DataDriver {
@@ -107,8 +89,8 @@ function recordingBootstrapper(provisioned: CollectionConfig[][]): BackendBootst
         async ensureCollectionSchema() {
             return { applied: 0 };
         },
-        async ensureCollectionPolicies(collections: unknown[]) {
-            provisioned.push(collections as CollectionConfig[]);
+        async ensureCollectionPolicies(collections: CollectionConfig[]) {
+            provisioned.push(collections);
             return { applied: 0 };
         }
     };
@@ -116,11 +98,11 @@ function recordingBootstrapper(provisioned: CollectionConfig[][]): BackendBootst
 
 const built: RebaseBackend[] = [];
 afterEach(async () => {
-    while (built.length) await built.pop()!.shutdown(0);
+    while (built.length) await built.pop()?.shutdown(0);
     _resetRebaseMock();
 });
 
-async function provisionedRules(source: { collections: CollectionConfig[] } | { collectionsDir: string }): Promise<Record<string, unknown>> {
+async function provisionedRules(source: Partial<Parameters<typeof createRebaseBackend>[0]>): Promise<Record<string, unknown>> {
     const provisioned: CollectionConfig[][] = [];
     const backend = await createRebaseBackend({
         ...source,
@@ -133,12 +115,23 @@ async function provisionedRules(source: { collections: CollectionConfig[] } | { 
     return rulesBySlug(provisioned[0]);
 }
 
-describe("a backend provisioning the scaffold's collections", () => {
-    it("provisions the same rules from the exported array as from the directory", async () => {
-        const index = await importIndex(freshTemplate());
-        const fromArray = await provisionedRules({ collections: index.collections });
-        const fromDirectory = await provisionedRules({ collectionsDir: freshTemplate() });
-        expect(fromArray).toEqual(fromDirectory);
-        expect(fromArray.authors).toEqual(JSON.parse(JSON.stringify(index.defaultSecurityRules)));
+describe("a backend provisioning tables that inherit defaultRls", () => {
+    it("provisions the same rules from the definitions as values as from the directory", async () => {
+        const dir = schemaDir();
+        const loaded = await loadBackendSchema(dir);
+        const fromValues = await provisionedRules({ tables: loaded.defs, defaultRls: loaded.defaultRls });
+        const fromDirectory = await provisionedRules({ schemaDir: dir });
+
+        expect(fromValues).toEqual(fromDirectory);
+        expect(fromValues.authors).toEqual(DEFAULT_RLS);
+        expect(fromValues.tags).toEqual(DEFAULT_RLS);
+        // Its own rules, untouched.
+        expect(fromValues.posts).not.toEqual(DEFAULT_RLS);
+    });
+
+    it("refuses the boot when the tables inherit and no defaultRls is given", async () => {
+        const loaded = await loadBackendSchema(schemaDir());
+
+        await expect(provisionedRules({ tables: loaded.defs })).rejects.toThrow(/defaultRls/);
     });
 });

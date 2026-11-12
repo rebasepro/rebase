@@ -12,6 +12,7 @@ import { configureJwt, generateAccessToken } from "../src/auth/jwt";
 import { createCustomAuthAdapter } from "../src/auth/custom-auth-adapter";
 import { logger } from "../src/utils/logger";
 import { resolveStorageSources } from "../src/boot/sources";
+import { tablesFrom } from "./helpers/tables";
 
 /**
  * What a deployment with no bucket does with an upload.
@@ -30,7 +31,6 @@ async function boot(storage?: RebaseBackendConfig["storage"], extra: Partial<Reb
     await initializeRebaseBackend({
         app,
         server: idleServer(),
-        collections: [],
         bootstrappers: [bootstrapper],
         ...(storage === undefined ? {} : { storage }),
         ...extra

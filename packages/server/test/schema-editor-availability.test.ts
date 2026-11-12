@@ -9,6 +9,7 @@ import { initializeRebaseBackend, type RebaseBackendConfig } from "../src/init";
 import type { HonoEnv } from "../src/api/types";
 import { fakeBootstrapper, fakeDataDriver, idleServer } from "./helpers/server-b-fakes";
 import { generateAccessToken } from "../src/auth/jwt";
+import { tablesFrom } from "./helpers/tables";
 
 /**
  * Who may reach the schema editor, and what it says when it cannot serve.
@@ -106,7 +107,7 @@ async function boot(config: Partial<RebaseBackendConfig> = {}): Promise<Hono<Hon
     await initializeRebaseBackend({
         app,
         server: idleServer(),
-        collections: [collection("posts")],
+        ...tablesFrom([collection("posts")]),
         auth: { jwtSecret: JWT_SECRET },
         bootstrappers: [reportingBootstrapper(undefined)],
         ...config
@@ -138,7 +139,7 @@ describe("the schema editor is admin-only", () => {
         // The regression this file exists for. `applyAdminGate` was called on
         // the populated router, so it never ran and this was a 200 — anyone who
         // could reach a dev server could rewrite its collection source.
-        const app = await boot({ collectionsDir });
+        const app = await boot({ schemaDir: collectionsDir });
 
         const before = fs.readFileSync(path.join(collectionsDir, "posts.ts"), "utf8");
         const res = await save(app);
@@ -148,7 +149,7 @@ describe("the schema editor is admin-only", () => {
     }, BOOTS_A_BACKEND);
 
     it("refuses a signed-in non-admin with 403", async () => {
-        const app = await boot({ collectionsDir });
+        const app = await boot({ schemaDir: collectionsDir });
 
         const res = await save(app, { headers: { authorization: `Bearer ${await generateAccessToken("editor-1", ["editor"])}` } });
 
@@ -156,13 +157,13 @@ describe("the schema editor is admin-only", () => {
     }, BOOTS_A_BACKEND);
 
     it("gates the status endpoint too — a non-admin gets no answer about it", async () => {
-        const app = await boot({ collectionsDir });
+        const app = await boot({ schemaDir: collectionsDir });
 
         expect((await app.request("/api/schema-editor/status")).status).toBe(401);
     }, BOOTS_A_BACKEND);
 
     it("lets an admin through to the editor", async () => {
-        const app = await boot({ collectionsDir });
+        const app = await boot({ schemaDir: collectionsDir });
 
         const res = await save(app, { headers: { authorization: `Bearer ${await adminToken()}` } });
 
@@ -173,7 +174,7 @@ describe("the schema editor is admin-only", () => {
 
 describe("when the editor can write, it says so", () => {
     it("reports enabled", async () => {
-        const app = await boot({ collectionsDir });
+        const app = await boot({ schemaDir: collectionsDir });
 
         expect(await status(app)).toEqual({ enabled: true });
     }, BOOTS_A_BACKEND);
@@ -192,7 +193,7 @@ describe("when the editor cannot write, it says why", () => {
     const cases: Array<[string, () => CaseConfig, string, RegExp]> = [
         [
             "in production, because a deploy rebuilds the files from the repository",
-            () => ({ collectionsDir, nodeEnv: "production" }),
+            () => ({ schemaDir: collectionsDir, nodeEnv: "production" }),
             "SCHEMA_EDITOR_PRODUCTION",
             /rebuilt from your repository/
         ],
@@ -201,22 +202,22 @@ describe("when the editor cannot write, it says why", () => {
             // A `collectionsDir` that holds nothing is what baas mode looks
             // like in practice: the driver is the only source of collections.
             () => ({
-                collectionsDir: path.join(collectionsDir, "empty"),
-                collections: undefined,
+                schemaDir: path.join(collectionsDir, "empty"),
+                tables: undefined,
                 bootstrappers: [reportingBootstrapper([collection("posts")])]
             }),
             "SCHEMA_EDITOR_BAAS_MODE",
             /introspected from the database/
         ],
         [
-            "with no collectionsDir, because there is nothing to write to",
+            "with no schemaDir, because there is nothing to write to",
             () => ({}),
             "SCHEMA_EDITOR_NO_COLLECTIONS_DIR",
-            /no `collectionsDir`/
+            /no `schemaDir`/
         ],
         [
             "when explicitly turned off",
-            () => ({ collectionsDir, schemaEditor: false }),
+            () => ({ schemaDir: collectionsDir, schemaEditor: false }),
             "SCHEMA_EDITOR_DISABLED",
             /turned off/
         ]
@@ -251,13 +252,13 @@ describe("when the editor cannot write, it says why", () => {
 
         const app = await boot({ schemaEditor: true });
 
-        expect(warn.mock.calls.flat().join(" ")).toMatch(/no collectionsDir/);
+        expect(warn.mock.calls.flat().join(" ")).toMatch(/no schemaDir/);
         expect((await status(app)).code).toBe("SCHEMA_EDITOR_NO_COLLECTIONS_DIR");
     }, BOOTS_A_BACKEND);
 
     it("leaves the collection file untouched", async () => {
         process.env.NODE_ENV = "production";
-        const app = await boot({ collectionsDir });
+        const app = await boot({ schemaDir: collectionsDir });
         const before = fs.readFileSync(path.join(collectionsDir, "posts.ts"), "utf8");
 
         await save(app, { headers: { authorization: `Bearer ${await adminToken()}` } });
@@ -314,7 +315,7 @@ describe("the two schema-editor statuses agree", () => {
 
     it("both say SCHEMA_EDITOR_DISABLED when the editor is turned off", async () => {
         const app = await boot({
-            collectionsDir,
+            schemaDir: collectionsDir,
             schemaEditor: false,
             bootstrappers: [planningBootstrapper()]
         });
@@ -332,7 +333,7 @@ describe("the two schema-editor statuses agree", () => {
     it("both name production when that is the reason", async () => {
         process.env.NODE_ENV = "production";
         const app = await boot({
-            collectionsDir,
+            schemaDir: collectionsDir,
             bootstrappers: [planningBootstrapper()]
         });
 

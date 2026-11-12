@@ -32,6 +32,7 @@ import { fakeDataDriver, fakeRealtimeProvider } from "./helpers/server-b-fakes";
 import { createRebaseBackend, logger, type HonoEnv, type RebaseBackend } from "../src/index";
 import { generateAccessToken, configureJwt } from "../src/auth/jwt";
 import { _resetRebaseMock } from "../src/singleton";
+import { tablesFrom } from "./helpers/tables";
 
 /** A scaffold-shaped project: a workspace root, its `backend` member, a lockfile. */
 function project(lockfile: string, options: { workspace?: "pnpm" | "package.json" | false } = {}): { root: string; backend: string } {
@@ -142,8 +143,8 @@ describe("the warning, on a server without ts-morph", () => {
         // `rebase dev` runs the backend in its member directory.
         process.chdir(backend);
         const instance = await createRebaseBackend({
-            collections: [POSTS],
-            collectionsDir,
+            ...tablesFrom([POSTS]),
+            schemaDir: collectionsDir,
             bootstrappers: [bootstrapper],
             auth: { jwtSecret: JWT_SECRET },
             cronPersistence: false,

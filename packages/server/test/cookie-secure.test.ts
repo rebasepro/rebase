@@ -115,32 +115,32 @@ describe("AUTH_COOKIE_SECURE", () => {
     });
 
     it("reaches the cookie config, so an env-only deployment can turn it off", () => {
-        const { cookieAuth } = resolveAuthOptions(env({ AUTH_COOKIE_SECURE: false }), undefined);
+        const { cookieAuth } = resolveAuthOptions(env({ AUTH_COOKIE_SECURE: false }));
         if (!cookieAuth) throw new Error("the runtime always sets cookieAuth");
         expect(cookieAuth.secure).toBe(false);
     });
 
     it("is on when the environment says nothing", () => {
-        const { cookieAuth } = resolveAuthOptions(env({ AUTH_COOKIE_SECURE: true }), undefined);
+        const { cookieAuth } = resolveAuthOptions(env({ AUTH_COOKIE_SECURE: true }));
         if (!cookieAuth) throw new Error("the runtime always sets cookieAuth");
         expect(cookieAuth.secure).toBe(true);
     });
 
     it("warns at boot when it is off — this is a credential in cleartext", () => {
-        resolveAuthOptions(env({ AUTH_COOKIE_SECURE: false }), undefined);
+        resolveAuthOptions(env({ AUTH_COOKIE_SECURE: false }));
 
         expect(warned()).toContain("AUTH_COOKIE_SECURE=false");
         expect(warned()).toContain("cleartext");
     });
 
     it("says nothing when it is on", () => {
-        resolveAuthOptions(env({ AUTH_COOKIE_SECURE: true }), undefined);
+        resolveAuthOptions(env({ AUTH_COOKIE_SECURE: true }));
 
         expect(warned()).not.toContain("AUTH_COOKIE_SECURE");
     });
 
     it("carries through to the header a browser sees", async () => {
-        const auth = resolveAuthOptions(env({ AUTH_COOKIE_SECURE: false }), undefined);
+        const auth = resolveAuthOptions(env({ AUTH_COOKIE_SECURE: false }));
         const app = new Hono<HonoEnv>();
         app.get("/x", c => {
             setRefreshCookie(c, "the-refresh-token", { ...auth.cookieAuth });

@@ -1,6 +1,7 @@
 import type { RebaseServerClient } from "@rebasepro/types";
 import { createRebaseBackend, type RebaseBackend } from "../src/backend/create-backend";
 import { fakeBootstrapper } from "./helpers/server-b-fakes";
+import { tablesFrom } from "./helpers/tables";
 
 /**
  * The singleton must survive being loaded twice into one process.
@@ -42,7 +43,6 @@ describe("the rebase singleton across duplicate module copies", () => {
     /** A real server client: the one a backend built from a fake driver hands out. */
     async function serverClient(): Promise<RebaseServerClient> {
         const backend = await createRebaseBackend({
-            collections: [],
             bootstrappers: [fakeBootstrapper()],
             cronPersistence: false,
             provision: false

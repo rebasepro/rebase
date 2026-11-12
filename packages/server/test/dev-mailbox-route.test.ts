@@ -30,6 +30,7 @@ import {
     activeDevEmailSink,
     clearActiveDevEmailSink
 } from "../src/email/dev-sink";
+import { tablesFrom } from "./helpers/tables";
 
 const JWT_SECRET = "dev-mailbox-route-test-secret-1234567890";
 const CRONS_DIR = path.join(__dirname, "fixtures", "crons");
@@ -84,7 +85,7 @@ async function boot(email?: EmailConfig): Promise<Hono<HonoEnv>> {
     const backend = await initializeRebaseBackend({
         app,
         server: createServer(),
-        collections: [collection("jobs")],
+        ...tablesFrom([collection("jobs")]),
         cronsDir: CRONS_DIR,
         cronPersistence: false,
         bootstrappers: [bootstrapper],

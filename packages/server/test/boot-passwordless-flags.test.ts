@@ -33,25 +33,25 @@ describe("resolveAuthOptions — passwordless flags", () => {
         // bypasses the zod schema that supplies the `false` default. What is
         // being pinned is that nothing here invents an `on` — and the router
         // tests below prove that off and absent mount the same nothing.
-        const auth = resolveAuthOptions(env({}), undefined);
+        const auth = resolveAuthOptions(env({}));
 
         expect(auth.magicLink).toBeFalsy();
         expect(auth.emailOtp).toBeFalsy();
     });
 
     it("turns on magic link from AUTH_MAGIC_LINK", () => {
-        expect(resolveAuthOptions(env({ AUTH_MAGIC_LINK: true }), undefined).magicLink).toBe(true);
+        expect(resolveAuthOptions(env({ AUTH_MAGIC_LINK: true })).magicLink).toBe(true);
     });
 
     it("turns on one-time codes from AUTH_EMAIL_OTP", () => {
-        expect(resolveAuthOptions(env({ AUTH_EMAIL_OTP: true }), undefined).emailOtp).toBe(true);
+        expect(resolveAuthOptions(env({ AUTH_EMAIL_OTP: true })).emailOtp).toBe(true);
     });
 
     it("keeps them independent — neither implies the other", () => {
-        const otpOnly = resolveAuthOptions(env({ AUTH_EMAIL_OTP: true }), undefined);
+        const otpOnly = resolveAuthOptions(env({ AUTH_EMAIL_OTP: true }));
         expect(otpOnly.magicLink).toBeFalsy();
 
-        const linkOnly = resolveAuthOptions(env({ AUTH_MAGIC_LINK: true }), undefined);
+        const linkOnly = resolveAuthOptions(env({ AUTH_MAGIC_LINK: true }));
         expect(linkOnly.emailOtp).toBeFalsy();
     });
 });

@@ -10,14 +10,16 @@
  *
  * `satisfies AdminCollection` on each file now catches a misplaced key at
  * compile time. This catches what a type cannot: what comes out the far side of
- * `nestAdminKeysDeep`, which is the object that actually reaches disk, judged by
- * the function the server runs at boot.
+ * `nestAdminKeysDeep`, which is the object that actually reaches disk, lifted
+ * into a table definition and compiled as boot compiles one.
  *
  * The templates are imported across the package boundary on purpose. A copy of
  * them here would be a copy that drifts, and drift is the whole defect.
  */
 import { nestAdminKeysDeep } from "../src/api/ast-schema-editor";
-import { findCollectionConfigProblems } from "../src/collections/validate-config";
+import { compileTables } from "@rebasepro/common";
+import type { CollectionConfig } from "@rebasepro/types";
+import { tablesFrom } from "./helpers/tables";
 
 import { productsCollectionTemplate } from "../../cms/src/collection_editor/ui/collection_editor/templates/products_template";
 import { blogCollectionTemplate } from "../../cms/src/collection_editor/ui/collection_editor/templates/blog_template";
@@ -39,10 +41,8 @@ describe("every collection template the panel offers boots", () => {
         // below mean something.
         expect(Object.keys(template.properties as Record<string, unknown>).length).toBeGreaterThan(3);
 
-        const saved = nestAdminKeysDeep(template);
-        // `unknownKeys: "error"` is the strictest setting a project can ask for,
-        // and a template is exactly the file nobody wants to see a warning on.
-        const problems = findCollectionConfigProblems([saved], { unknownKeys: "error" });
-        expect(problems).toEqual([]);
+        const saved: CollectionConfig = { ...nestAdminKeysDeep(template), slug: name, table: name };
+        const { tables, defaultRls } = tablesFrom([saved]);
+        expect(() => compileTables(tables, defaultRls ? { defaultRls } : {})).not.toThrow();
     });
 });
