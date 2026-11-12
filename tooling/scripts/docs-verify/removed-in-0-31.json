@@ -1,0 +1,23 @@
+{
+    "$comment": [
+        "Names 0.31 removed, which a changelog section or upgrade page for an EARLIER version may still use",
+        "(tooling/scripts/docs-verify/history.mjs). `generated` is written by removed-names.mjs from the",
+        "API-surface diff between `base` and the banked contracts/server.api.txt — do not hand-edit it.",
+        "`reviewed` lists removals that surface cannot see, each with its reason; edit it by hand, and keep",
+        "it short: every entry is a name history may use without the verifier asking."
+    ],
+    "release": "0.31",
+    "base": "v0.30.1",
+    "generated": {
+        "exports": {},
+        "members": {}
+    },
+    "reviewed": [
+        {
+            "package": "@rebasepro/client",
+            "name": "collection",
+            "export": false,
+            "reason": "The data layer's by-slug accessor, `client.data.collection(slug)` (and `rebase.data.collection(slug)` on the server), renamed `table(slug)` in 0.31. The data layer is a type alias, which the API surface records without members, so the diff cannot see it."
+        }
+    ]
+}

@@ -137,8 +137,9 @@ if (asJson) {
 
 if (only === "both" || only === "names") {
     console.log(`\n${YELLOW}━━━ Docs API names (all locales) ━━━${NC}`);
-    const { unknown, scanned, fences } = await checkApiNames(ROOT);
-    console.log(`${DIM}Scanned ${fences} code fences across ${scanned} files.${NC}`);
+    const { unknown, scanned, fences, historical } = await checkApiNames(ROOT);
+    console.log(`${DIM}Scanned ${fences} code fences across ${scanned} files` +
+        `${historical ? `; ${historical} import(s) in history pages name what a later release removed (docs-verify/history.mjs)` : ""}.${NC}`);
     if (!unknown.length) {
         console.log(`${GREEN}✓ No unknown SDK identifiers referenced.${NC}`);
     } else {
@@ -637,11 +638,12 @@ if (only === "both" || only === "snippets") {
     console.log(`\n${YELLOW}━━━ Docs snippet typecheck (en + skills) ━━━${NC}`);
     const {
         failures, snippetCount, skipped, files, stubbed, setupErrors, unresolved,
-        externalCount, overBudget, budget
+        externalCount, overBudget, budget, historical
     } = await typecheckSnippets(ROOT);
     console.log(
         `${DIM}Compiled ${snippetCount} snippets from ${files} files ` +
-            `(${skipped}/${budget} opted out via no-verify, ${externalCount} third-party module(s) stubbed).${NC}`
+            `(${skipped}/${budget} opted out via no-verify, ${externalCount} third-party module(s) stubbed` +
+            `${historical ? `, ${historical} diagnostic(s) in history pages about a name a later release removed` : ""}).${NC}`
     );
 
     // The opt-out ratchet, reported before the results: a fence nobody compiles

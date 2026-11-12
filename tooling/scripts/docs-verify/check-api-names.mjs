@@ -19,6 +19,7 @@ import { readFileSync, existsSync, globSync } from "node:fs";
 import path from "node:path";
 import { loadSdkExports, PACKAGE_ENTRIES } from "./sdk-exports.mjs";
 import { extractSnippets, AGENT_INSTRUCTION_GLOBS, PACKAGE_README_GLOBS } from "./extract.mjs";
+import { importIsHistorical, loadRemovedNames } from "./history.mjs";
 
 /** All locales, plus the skills — everything a reader might copy from. */
 const ALL_DOC_GLOBS = [
@@ -81,6 +82,10 @@ export async function checkApiNames(root) {
     const { byPackage, membersOf, missingEntries } = loadSdkExports(root);
     const { snippets, files } = extractSnippets(root, ALL_DOC_GLOBS);
     const exportMaps = buildExportMaps(root);
+    // A changelog section or upgrade page for an older version may import what
+    // that version exported and a later release removed — see history.mjs.
+    const removed = loadRemovedNames();
+    let historical = 0;
 
     const receiverMembers = new Map();
     for (const [name, { pkg, type }] of Object.entries(TYPED_RECEIVERS)) {
@@ -137,6 +142,7 @@ export async function checkApiNames(root) {
                 const name = raw.trim().replace(/^type\s+/, "").split(/\s+as\s+/)[0].trim();
                 if (!/^[A-Za-z_$][\w$]*$/.test(name)) continue;
                 if (exported.has(name)) continue;
+                if (importIsHistorical(root, s.file, at, m[2], name, removed)) { historical++; continue; }
                 const owner = findOwner(name);
                 record(
                     `${m[2]}#${name}`,
@@ -195,6 +201,7 @@ export async function checkApiNames(root) {
     return {
         unknown: [...unknown.values()].sort((a, b) => b.locations.length - a.locations.length),
         scanned: files,
-        fences: snippets.length
+        fences: snippets.length,
+        historical
     };
 }

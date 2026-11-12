@@ -30,6 +30,7 @@ import path from "node:path";
 import { createRequire } from "node:module";
 import { extractSnippets, NO_VERIFY_BUDGET } from "./extract.mjs";
 import { loadSdkExports } from "./sdk-exports.mjs";
+import { loadRemovedNames, nameIsHistorical } from "./history.mjs";
 
 const require = createRequire(import.meta.url);
 
@@ -659,9 +660,12 @@ export async function typecheckSnippets(root, opts = {}) {
 
     const failures = [];
     const stubbed = new Map();
+    const removed = loadRemovedNames();
+    /** Diagnostics in history (see history.mjs) that name an API its own version still had. */
+    let historical = 0;
     for (const p of prepared) {
         for (const n of p.stubbedNames) stubbed.set(n, (stubbed.get(n) || 0) + 1);
-        const diags = pass2.get(p.name);
+        let diags = pass2.get(p.name);
         if (diags === null) {
             failures.push({
                 snippet: p.snippet,
@@ -672,6 +676,12 @@ export async function typecheckSnippets(root, opts = {}) {
                 }]
             });
             continue;
+        }
+        if (diags?.length) {
+            const before = diags.length;
+            diags = diags.filter((d) => !namesInDiagnostic(ts, d).some((name) =>
+                nameIsHistorical(root, p.snippet.file, p.snippet.line, name, removed)));
+            historical += before - diags.length;
         }
         if (!diags?.length) continue;
         const messages = diags.map((d) => {
@@ -711,6 +721,26 @@ export async function typecheckSnippets(root, opts = {}) {
     return {
         failures, snippetCount: snippets.length, skipped, skippedFences, files, stubbed,
         setupErrors, unresolved, externalCount, overBudget, budget: NO_VERIFY_BUDGET,
-        MODULE_NOT_FOUND
+        MODULE_NOT_FOUND, historical
     };
+}
+
+/**
+ * The API names a diagnostic is about: every quoted identifier in its message
+ * (`Property 'x' does not exist`, `has no exported member 'X'`, `'collections'
+ * does not exist in type`), and the last segment of its span when the span is
+ * nothing but a name or a property chain (`rebase.data.collection` in a "not
+ * callable" error, which quotes no name). Never the text of a wider span: an
+ * argument that merely *contains* a removed name is not an error about it.
+ */
+export function namesInDiagnostic(ts, d) {
+    const text = ts.flattenDiagnosticMessageText(d.messageText, " ");
+    const names = [...text.matchAll(/'([A-Za-z_$][\w$]*)'/g)].map((m) => m[1]);
+    if (d.file && typeof d.start === "number" && typeof d.length === "number") {
+        const span = d.file.text.slice(d.start, d.start + d.length);
+        if (/^[A-Za-z_$][\w$]*(?:\s*\??\.\s*[A-Za-z_$][\w$]*)*$/.test(span)) {
+            names.push(span.split(".").pop().trim());
+        }
+    }
+    return names;
 }

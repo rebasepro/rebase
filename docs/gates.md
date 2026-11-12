@@ -121,7 +121,7 @@ this list, in this order.
 | `check:glued-code` | Prose glued to an inline tag — "or runrebase dev" — which Astro and JSX produce from a newline and no diff shows. | — |
 | `check:contributor-setup` | CONTRIBUTING, `app/.env.example` and the compose file agreeing about the local database. | — |
 | `check:gates-doc` | This file against `package.json`, and the naming rule above. | Add the row |
-| `verify:docs:strict` | Every documented snippet compiles against workspace source, in every locale. | — |
+| `verify:docs:strict` | Every documented snippet compiles against workspace source, in every locale. A changelog section or upgrade page for a version before a breaking release is held to the API of its version: it may use exactly the names that release removed, as listed in `docs-verify/removed-in-<release>.json` (generated from the banked API-surface diff). | `node tooling/scripts/docs-verify/removed-names.mjs --write` after banking the surface |
 | `check:derived-names` | The identifiers this framework writes into a customer's database — columns, constraints, policies, junction tables — which outlive every release after them. | `pnpm write:derived-names` |
 | `check:portable-core` | A ratchet on what the request path needs Node for. May shrink, may never grow. | `pnpm check:portable-core --write` |
 | `check:schema-fresh` | The checked-in `schema.generated.ts` still describes the schema this release derives. | `rebase db generate`, or `rebase dev` |

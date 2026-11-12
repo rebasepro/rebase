@@ -289,6 +289,25 @@ with one of ours, takes `<!-- docs-verify: own-type -->` on the line above it.
 That marker exempts it from the declared-type check only. `no-verify` does not
 exempt it: a fragment that spells out a real type wrongly is still wrong.
 
+## History keeps the names of its version
+
+A changelog section (`## [x.y.z]`, in `CHANGELOG.md` and its docs mirrors) and an
+upgrade page (`upgrading/<a>-<b>-to-<c>-<d>.mdx`, which documents `<c>.<d>`)
+describe the API of their version and stay as written. When a release removes a
+name, those fences are not opted out: they are checked against the API of their
+version, by way of `removed-in-<release>.json` — the names that release removed,
+generated from the banked API-surface diff (`removed-names.mjs --write`, after
+banking) plus a short `reviewed` list of removals the surface cannot see, each
+with its reason. A fence for a version before the release may import exactly
+those names (from the package that removed them), and a diagnostic about one of
+them is not a finding there (`history.mjs`). Any other unknown name still fails
+in history, and every fence from the release on is held to today's API.
+
+`node tooling/scripts/docs-verify/removed-names.mjs` fails when the list is
+stale against the banked surface (it needs the base tag, so it runs locally);
+`test/docs-history.test.mjs` holds the direction a shallow CI checkout can:
+nothing on the list is still exported.
+
 ## Where it blocks
 
 <!-- gates:start -->
