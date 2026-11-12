@@ -12,6 +12,7 @@
     "update backend/tsconfig.json",
     "update frontend/package.json",
     "update frontend/src/App.tsx",
+    "create frontend/src/cms/ui-config.json",
     "update frontend/src/virtual.d.ts",
     "update frontend/vite.config.ts",
     "update package.json",

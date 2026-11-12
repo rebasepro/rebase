@@ -13,7 +13,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import type { PlanContext } from "./plan-context";
-import { planFile, relativeToRoot } from "./plan-context";
+import { note, planFile, relativeToRoot } from "./plan-context";
 
 type JsonObject = Record<string, unknown>;
 
@@ -289,12 +289,43 @@ export function planMove(plan: PlanContext, from: string, to: string, role: stri
 const SCAFFOLD_COLLECTIONS_IMPORT = `import { collections } from "virtual:rebase-collections";`;
 const SCAFFOLD_COLLECTIONS_PROP = "collections={collections}";
 
-/** The frontend's wiring: `App.tsx`, `vite.config.ts`, `virtual.d.ts`. */
+/**
+ * The file the collection editor writes presentation to in development, as
+ * `rebase init` ships it (`templates/template/frontend/src/cms/ui-config.json`),
+ * and the two lines that mount it — the import and the `<RebaseCMS>` prop.
+ */
+export const UI_CONFIG_CONTENT = "{\n  \"tables\": {}\n}\n";
+const UI_CONFIG_IMPORT = "// How the collection editor laid out the tables in development (labels, columns, views).\nimport uiConfig from \"./cms/ui-config.json\";";
+const UI_CONFIG_PROP = "uiConfig={uiConfig}";
+
+/** The frontend's wiring: `App.tsx`, `vite.config.ts`, `virtual.d.ts`, `src/cms/ui-config.json`. */
 export function planFrontendWiring(plan: PlanContext, frontendDir: string, hasExternal: boolean): void {
     const names = hasExternal ? "tableCustomizations, externalCollections" : "tableCustomizations";
     const appFile = path.join(frontendDir, "src", "App.tsx");
-    const importLine = `import { ${names} } from "./cms";`;
-    const props = hasExternal ? ["tableCustomizations={tableCustomizations}", "externalCollections={externalCollections}"] : ["tableCustomizations={tableCustomizations}"];
+
+    // The collection editor's file: created empty, never overwritten. Without
+    // it mounted, what the editor saves in development is gone on reload and
+    // never ships.
+    const uiConfigFile = path.join(frontendDir, "src", "cms", "ui-config.json");
+    const appText = fs.existsSync(appFile) ? fs.readFileSync(appFile, "utf8") : "";
+    const mountsUiConfig = /\buiConfig\s*=/.test(appText);
+    if (!fs.existsSync(uiConfigFile) && !plan.files.has(uiConfigFile)) {
+        planFile(plan, uiConfigFile, UI_CONFIG_CONTENT, "ui-config.json (the collection editor's presentation file)");
+    }
+    const wireUiConfig = !mountsUiConfig;
+    const importLine = `import { ${names} } from "./cms";${wireUiConfig ? `\n${UI_CONFIG_IMPORT}` : ""}`;
+    const props = [
+        "tableCustomizations={tableCustomizations}",
+        ...(hasExternal ? ["externalCollections={externalCollections}"] : []),
+        ...(wireUiConfig ? [UI_CONFIG_PROP] : [])
+    ];
+    if (wireUiConfig) {
+        const tsconfig = path.join(frontendDir, "tsconfig.json");
+        const tsconfigText = fs.existsSync(tsconfig) ? fs.readFileSync(tsconfig, "utf8") : undefined;
+        if (tsconfigText !== undefined && !tsconfigText.includes("resolveJsonModule") && !tsconfigText.includes("\"extends\"")) {
+            note(plan, undefined, `${relativeToRoot(plan, tsconfig)} does not set \`resolveJsonModule\`; the type check needs it for \`import uiConfig from "./cms/ui-config.json"\` (Vite itself imports JSON as is).`);
+        }
+    }
     if (fs.existsSync(appFile)) {
         const text = fs.readFileSync(appFile, "utf8");
         const importCount = text.split(SCAFFOLD_COLLECTIONS_IMPORT).length - 1;
@@ -309,7 +340,8 @@ export function planFrontendWiring(plan: PlanContext, frontendDir: string, hasEx
         } else if (text.includes("virtual:rebase-collections") || /<RebaseCMS[\s\S]*?collections=/.test(text)) {
             plan.manualSteps.push({
                 title: "Mount the table customizations",
-                detail: "The admin panel no longer takes `collections`: it projects every table from the backend and layers the customizations over it. Replace the `virtual:rebase-collections` import and the `collections` prop of `<RebaseCMS>`.",
+                detail: "The admin panel no longer takes `collections`: it projects every table from the backend and layers the customizations over it. Replace the `virtual:rebase-collections` import and the `collections` prop of `<RebaseCMS>`." +
+                    (wireUiConfig ? " Pass `uiConfig` too: in development the collection editor saves presentation to src/cms/ui-config.json, and without the prop it is lost on reload and never ships." : ""),
                 snippet: `${importLine}\n\n<RebaseCMS\n    ${props.join("\n    ")}\n    {/* …the other props you pass */}\n/>`,
                 file: relativeToRoot(plan, appFile)
             });

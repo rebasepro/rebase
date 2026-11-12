@@ -1,12 +1,15 @@
 import { Rebase } from "@rebasepro/app";
 import { RebaseCMS, RebaseShell } from "@rebasepro/cms";
 import { tableCustomizations } from "./cms";
+// How the collection editor laid out the tables in development (labels, columns, views).
+import uiConfig from "./cms/ui-config.json";
 
 export function App() {
     return (
         <Rebase>
             <RebaseCMS
                 tableCustomizations={tableCustomizations}
+                uiConfig={uiConfig}
             />
             <RebaseShell title="Rebase"/>
         </Rebase>

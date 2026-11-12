@@ -1,6 +1,8 @@
 import { Rebase } from "@rebasepro/app";
 import { RebaseCMS, RebaseShell } from "@rebasepro/cms";
 import { tableCustomizations, externalCollections } from "./cms";
+// How the collection editor laid out the tables in development (labels, columns, views).
+import uiConfig from "./cms/ui-config.json";
 
 export function App() {
     return (
@@ -8,6 +10,7 @@ export function App() {
             <RebaseCMS
                 tableCustomizations={tableCustomizations}
                 externalCollections={externalCollections}
+                uiConfig={uiConfig}
             />
             <RebaseShell title="Rebase"/>
         </Rebase>

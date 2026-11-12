@@ -47,6 +47,7 @@
     "create frontend/src/cms/index.ts",
     "create frontend/src/cms/lib/actions.ts",
     "create frontend/src/cms/posts.tsx",
+    "create frontend/src/cms/ui-config.json",
     "create frontend/src/cms/users.tsx",
     "update frontend/src/virtual.d.ts",
     "update frontend/vite.config.ts",

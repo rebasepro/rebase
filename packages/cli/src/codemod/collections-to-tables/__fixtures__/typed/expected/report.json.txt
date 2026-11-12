@@ -38,6 +38,7 @@
     "create frontend/src/cms/lib/locales.ts",
     "create frontend/src/cms/open_tickets.tsx",
     "create frontend/src/cms/tickets.tsx",
+    "create frontend/src/cms/ui-config.json",
     "update frontend/src/virtual.d.ts",
     "update frontend/vite.config.ts",
     "update package.json",

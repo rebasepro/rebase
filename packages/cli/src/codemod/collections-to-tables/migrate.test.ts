@@ -235,6 +235,32 @@ describe("modes", () => {
         expect(fs.existsSync(path.join(dir, "backend", "schema"))).toBe(false);
     }, 120_000);
 
+    it("adds the uiConfig wiring to the printed mount step when App.tsx is not the scaffold's", async () => {
+        const dir = materialize("blog");
+        const app = path.join(dir, "frontend", "src", "App.tsx");
+        fs.writeFileSync(app, fs.readFileSync(app, "utf8").replace("<RebaseCMS", "<RebaseCMS\n                key=\"cms\"").replace("collections={collections}", "collections={[...collections]}"));
+        const report = await run(dir, { dryRun: true });
+        const step = report.manualSteps.find(entry => entry.title === "Mount the table customizations");
+        expect(step?.snippet).toContain(`import uiConfig from "./cms/ui-config.json";`);
+        expect(step?.snippet).toContain("uiConfig={uiConfig}");
+        expect(step?.detail).toContain("ui-config.json");
+        expect(report.files.find(file => file.path === "frontend/src/cms/ui-config.json")?.content).toBe(`{\n  "tables": {}\n}\n`);
+        expect(report.files.map(file => file.path)).not.toContain("frontend/src/App.tsx");
+    }, 120_000);
+
+    it("keeps a ui-config.json the project has, and does not wire uiConfig twice", async () => {
+        const dir = materialize("blog");
+        fs.mkdirSync(path.join(dir, "frontend", "src", "cms"), { recursive: true });
+        fs.writeFileSync(path.join(dir, "frontend", "src", "cms", "ui-config.json"), `{ "tables": { "posts": {} } }\n`);
+        const app = path.join(dir, "frontend", "src", "App.tsx");
+        fs.writeFileSync(app, fs.readFileSync(app, "utf8").replace("collections={collections}", "collections={collections}\n                uiConfig={uiConfig}"));
+        const report = await run(dir, { dryRun: true });
+        expect(report.files.map(file => file.path)).not.toContain("frontend/src/cms/ui-config.json");
+        const planned = report.files.find(file => file.path === "frontend/src/App.tsx")?.content ?? "";
+        expect(planned.match(/uiConfig=\{uiConfig\}/g)).toHaveLength(1);
+        expect(planned).not.toContain("./cms/ui-config.json");
+    }, 120_000);
+
     it("does not overwrite an output file that holds something else", async () => {
         const dir = materialize("blog");
         fs.mkdirSync(path.join(dir, "backend", "schema"), { recursive: true });

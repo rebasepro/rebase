@@ -29,6 +29,7 @@
     "update frontend/src/App.tsx",
     "create frontend/src/cms/index.ts",
     "create frontend/src/cms/notes.ts",
+    "create frontend/src/cms/ui-config.json",
     "create frontend/src/cms/visits.ts",
     "update frontend/src/virtual.d.ts",
     "update frontend/vite.config.ts",
