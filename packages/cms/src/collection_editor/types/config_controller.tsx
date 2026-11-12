@@ -36,6 +36,15 @@ export interface CollectionsConfigController {
 
     getCollection: (id: string) => AdminCollection;
 
+    /**
+     * How the schema editor reads a table's source: its file, and what in it
+     * is edited in code (a config spread from a variable, a column built by a
+     * helper, rules in a variable) — read-only in the editor, because the
+     * server refuses to write there. `undefined` when the backend does not
+     * say (live editing off, an older backend).
+     */
+    tableSource?: (slug: string) => TableSourceInfo | undefined;
+
     saveCollection: <M extends { [Key: string]: any }>(params: SaveCollectionParams<M>) => Promise<void>;
     updateCollection: <M extends { [Key: string]: any }>(params: UpdateCollectionParams<M>) => Promise<void>;
 
@@ -67,6 +76,20 @@ export interface CollectionsConfigController {
      * controllers write without asking anybody.
      */
     dialog?: React.ReactNode;
+}
+
+/**
+ * What the schema editor says about one table's source.
+ */
+export interface TableSourceInfo {
+    /** The file the table is defined in, as the server names it. */
+    file: string;
+    /** Why the whole table is read-only, when it is. */
+    editedInCode?: string;
+    /** Why a column or relation is read-only, by key. */
+    fields: Record<string, string>;
+    /** Why the rules cannot be written, when they cannot. */
+    rlsEditedInCode?: string;
 }
 
 export type UpdateCollectionParams<M extends Record<string, unknown> = Record<string, unknown>> = {

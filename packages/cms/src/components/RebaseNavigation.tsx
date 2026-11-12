@@ -239,7 +239,8 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
             authKey: authController?.user?.uid ?? null,
             mayReadSchema: reportsScopes(authController)
                 ? callerHoldsScope(authController, "schema:read")
-                : undefined
+                : undefined,
+            tables: servedTables
         } : { readOnly: true }
     );
 

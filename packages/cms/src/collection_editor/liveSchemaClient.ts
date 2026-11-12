@@ -7,18 +7,16 @@
  * try-and-see would be asking somebody to discover that their change is refused
  * by pressing a button on a live database.
  *
- * ## A change to an existing collection is a patch
+ * ## A change is a list of table edits
  *
- * What the person changed — the difference between the collection the editor
- * loaded and the one it is saving, from `diffCollections` in
- * `@rebasepro/types` — not the collection. The server applies it to the
- * collection as it is to plan the change, and writes only those keys into the
- * file. Posting the whole collection had the server write back the panel's
- * JSON, which had lost every handler, shared property and imported value.
- * A new collection is still sent whole.
+ * `{ patches: TablePatch[] }` — the operations `splitEdit` derives from what
+ * the person changed (add a column, replace one rule, …), never the whole
+ * table. The server applies them to `backend/schema/*.ts`, compiles the
+ * result, plans the DDL against it, and writes only what the operations name:
+ * comments, hooks and every other rule stay as written.
  */
 
-import type { CollectionPatch, SchemaChangeVerdict } from "@rebasepro/types";
+import type { SchemaChangeVerdict, TablePatch } from "@rebasepro/types";
 
 /** A constraint the change asks for that the statements will not carry. */
 export interface WithheldConstraint {
@@ -129,11 +127,23 @@ export type LiveSchemaUnavailable =
     | { reason: "unsupported"; message: string }
     | { reason: "no-repository"; message: string };
 
+/**
+ * One problem the server reports with an edit: the table, the column,
+ * relation or key when there is one, and what is wrong. What a
+ * `SCHEMA_EDIT_DOES_NOT_COMPILE` or `SCHEMA_EDIT_REFUSED` answer lists.
+ */
+export interface SchemaEditProblem {
+    table: string;
+    key?: string;
+    message: string;
+}
+
 export class LiveSchemaError extends Error {
     constructor(
         message: string,
         readonly code: string | undefined,
-        readonly changes?: LiveSchemaPlan["changes"]
+        readonly changes?: LiveSchemaPlan["changes"],
+        readonly problems?: readonly SchemaEditProblem[]
     ) {
         super(message);
         this.name = "LiveSchemaError";
@@ -152,21 +162,23 @@ export interface LiveSchemaClientOptions {
     fetchImpl?: typeof fetch;
 }
 
-export interface ProposedCollectionChange {
-    collectionId: string;
-    /** A new collection, whole. */
-    collection?: Record<string, unknown>;
-    /** What changed about an existing one. See the module comment. */
-    patch?: CollectionPatch;
-    /** Delete the collection's source — its file and its `index.ts` entry. The table stays. */
-    remove?: true;
+/**
+ * One schema change: the table it is about (for the dialog's title) and the
+ * operations, as the routes take them.
+ */
+export interface ProposedSchemaChange {
+    /** The slug of the table the change is about. */
+    table: string;
+    /** The edits, in the order they apply. See the module comment. */
+    patches: TablePatch[];
 }
 
 export function createLiveSchemaClient(options: LiveSchemaClientOptions) {
     const doFetch = options.fetchImpl ?? fetch;
     const base = options.baseUrl.replace(/\/$/, "");
 
-    const post = async <T>(path: string, body: ProposedCollectionChange & { sourceOnly?: boolean }): Promise<T> => {
+    const post = async <T>(path: string, change: ProposedSchemaChange & { sourceOnly?: boolean }): Promise<T> => {
+        const body = { patches: change.patches, ...(change.sourceOnly ? { sourceOnly: true } : {}) };
         const token = await options.getAuthToken?.();
         const headers: Record<string, string> = { "Content-Type": "application/json" };
         if (token) headers.Authorization = `Bearer ${token}`;
@@ -181,7 +193,7 @@ export function createLiveSchemaClient(options: LiveSchemaClientOptions) {
 
         // Parsed rather than assumed: the server answers a structured error, and
         // the code is what tells an expected refusal from a broken request.
-        let payload: { error?: { code?: string; message?: string; details?: { changes?: LiveSchemaPlan["changes"] } } } = {};
+        let payload: { error?: { code?: string; message?: string; details?: { changes?: LiveSchemaPlan["changes"]; problems?: SchemaEditProblem[] } } } = {};
         try {
             payload = await response.json() as typeof payload;
         } catch {
@@ -191,7 +203,8 @@ export function createLiveSchemaClient(options: LiveSchemaClientOptions) {
         throw new LiveSchemaError(
             payload.error?.message || `Schema request failed with ${response.status}`,
             payload.error?.code,
-            payload.error?.details?.changes
+            payload.error?.details?.changes,
+            payload.error?.details?.problems
         );
     };
 
@@ -251,13 +264,13 @@ export function createLiveSchemaClient(options: LiveSchemaClientOptions) {
         },
 
         /** What the change would do. No side effects. */
-        plan: (change: ProposedCollectionChange) => post<LiveSchemaPlan>("/plan", change),
+        plan: (change: ProposedSchemaChange) => post<LiveSchemaPlan>("/plan", change),
 
         /**
          * Commit the change, then apply it — or, with `sourceOnly`, commit it
          * and run nothing ("Edit source only").
          */
-        apply: (change: ProposedCollectionChange & { sourceOnly?: boolean }) => post<LiveSchemaResult>("/apply", change)
+        apply: (change: ProposedSchemaChange & { sourceOnly?: boolean }) => post<LiveSchemaResult>("/apply", change)
     };
 }
 

@@ -25,7 +25,7 @@ import {
     type LiveSchemaPlan,
     type LiveSchemaResult,
     type LiveSchemaStatus,
-    type ProposedCollectionChange
+    type ProposedSchemaChange
 } from "./liveSchemaClient";
 
 // Re-exported so the hook stays the one import a caller needs.
@@ -72,7 +72,7 @@ export interface UseLiveSchemaEditingOptions {
 const NOT_ASKED: LiveSchemaStatus = { enabled: false, canPlan: false, canApply: false };
 
 interface PendingChange {
-    change: ProposedCollectionChange;
+    change: ProposedSchemaChange;
     resolve: () => void;
     reject: (err: Error) => void;
 }
@@ -102,7 +102,7 @@ export interface LiveSchemaEditing {
      * closed the dialog, and with the underlying error if planning or applying
      * failed in a way they did not choose.
      */
-    reviewChange: (change: ProposedCollectionChange) => Promise<void>;
+    reviewChange: (change: ProposedSchemaChange) => Promise<void>;
     /** Render this once, high enough that a dialog over the editor is not clipped. */
     dialog: React.ReactNode;
 }
@@ -171,7 +171,7 @@ export function useLiveSchemaEditing(options: UseLiveSchemaEditingOptions): Live
      * and making them do it twice for a transient failure is the kind of thing
      * that teaches people to distrust the preview.
      */
-    const requestPlan = useCallback(async (change: ProposedCollectionChange) => {
+    const requestPlan = useCallback(async (change: ProposedSchemaChange) => {
         // Identifies the review a response belongs to. A plan that arrives after
         // its review was replaced must not be shown: the dialog would describe
         // the *previous* change while the reader believes it describes this one.
@@ -205,7 +205,7 @@ export function useLiveSchemaEditing(options: UseLiveSchemaEditingOptions): Live
         setApplying(false);
     }, []);
 
-    const reviewChange = useCallback((change: ProposedCollectionChange) => {
+    const reviewChange = useCallback((change: ProposedSchemaChange) => {
         return new Promise<void>((resolve, reject) => {
             // A second review while one is open — a double-clicked save —
             // replaces the pending one, and the one it replaces has to be
@@ -318,7 +318,7 @@ export function useLiveSchemaEditing(options: UseLiveSchemaEditingOptions): Live
             <Suspense fallback={null}>
                 <SchemaChangeDialog
                     open={open}
-                    collectionId={pending?.change.collectionId ?? ""}
+                    collectionId={pending?.change.table ?? ""}
                     plan={plan}
                     planError={planError}
                     result={result}

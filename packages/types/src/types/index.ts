@@ -38,4 +38,4 @@ export * from "./schema_version";
 export * from "./storage_authorize";
 export * from "./register";
 export * from "./mcp_app_modules";
-
+export * from "./ui_preferences";
