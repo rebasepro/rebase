@@ -3,10 +3,9 @@
  * process.
  *
  * An aggregate reads stored columns and never runs `afterRead`, so on a
- * collection a callback masks, `max(email)` or `groupBy=email` handed back
- * the very values the mask withholds. Such a collection now serves only a
- * plain `count()`; the collection beside it, with no callback, aggregates as
- * it always did.
+ * table an `afterRead` hook masks, `max(email)` or `groupBy=email` handed back
+ * the very values the mask withholds. Such a table now serves only a plain
+ * `count()`; the table beside it, with no hook, aggregates as it always did.
  *
  * Requires Docker.
  */
@@ -15,12 +14,11 @@ import pg from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { integer, pgTable, serial, varchar } from "drizzle-orm/pg-core";
 import { Hono } from "hono";
-import type { CollectionConfig, DataDriver } from "@rebasepro/types";
-import { buildSdkData } from "@rebasepro/common";
+import { col, defineTable } from "@rebasepro/types";
+import { buildSdkData, compileSchema, lowerTables } from "@rebasepro/common";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
-import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry.js";
-import { FixtureTableRegistry } from "../helpers/tables";
+import { buildTableRegistry } from "../../src/model/build-registry.js";
 import { RealtimeService } from "../../src/services/realtimeService.js";
 import { RestApiGenerator } from "../../../server/src/api/rest/api-generator.js";
 import { errorHandler } from "../../../server/src/api/errors.js";
@@ -38,26 +36,16 @@ const ordersTable = pgTable("orders", {
     total: integer("total")
 });
 
-const customers: CollectionConfig = {
-    name: "Customers", slug: "customers", table: "customers",
-    properties: {
-        id: { name: "ID", type: "number", isId: "increment" },
-        email: { name: "Email", type: "string" },
-        salary: { name: "Salary", type: "number" }
-    },
-    callbacks: {
-        afterRead: ({ row }: { row: Record<string, unknown> }) => ({ ...row, email: "***", salary: null })
-    }
-};
+const customers = defineTable("customers", {
+    columns: { id: col.serial().primaryKey(), email: col.varchar(), salary: col.integer() },
+    hooks: { afterRead: ({ values }) => ({ ...values, email: "***", salary: null }) },
+    rls: "admin-only"
+});
 
-const orders: CollectionConfig = {
-    name: "Orders", slug: "orders", table: "orders",
-    properties: {
-        id: { name: "ID", type: "number", isId: "increment" },
-        status: { name: "Status", type: "string" },
-        total: { name: "Total", type: "number" }
-    }
-};
+const orders = defineTable("orders", {
+    columns: { id: col.serial().primaryKey(), status: col.varchar(), total: col.integer() },
+    rls: "admin-only"
+});
 
 const ADMIN = testUser("admin-1", ["admin"]);
 
@@ -94,10 +82,13 @@ describe("aggregates on a collection afterRead masks (E2E)", () => {
 
         pool = new pg.Pool({ connectionString: container.connectionString });
         const db = drizzle(pool);
-        const registry = new FixtureTableRegistry();
-        registry.registerMultiple([customers, orders]);
-        registry.registerPgTable(customersTable, "customers");
-        registry.registerPgTable(ordersTable, "orders");
+        const compiled = compileSchema([customers, orders]);
+        const collections = lowerTables([customers, orders]);
+        const registry = buildTableRegistry({
+            compiledTables: compiled,
+            collections,
+            tables: { customers: customersTable, orders: ordersTable }
+        });
         const realtime = new RealtimeService(db, registry);
         driver = new PostgresBackendDriver(db, realtime, registry);
         realtime.setDataDriver(driver);
@@ -108,7 +99,7 @@ describe("aggregates on a collection afterRead masks (E2E)", () => {
             c.set("driver", await driver.withAuth(ADMIN));
             await next();
         });
-        app.route("/api/data", new RestApiGenerator([customers, orders], driver).generateRoutes());
+        app.route("/api/data", new RestApiGenerator({ descriptors: compiled.map(table => table.descriptor), collections }, driver).generateRoutes());
     }, 120_000);
 
     afterAll(async () => {
@@ -121,7 +112,7 @@ describe("aggregates on a collection afterRead masks (E2E)", () => {
         for (const query of ["select=sum(salary)", "select=max(email)", "select=count()&groupBy=email"]) {
             const { status, body } = await get(`customers/aggregate?${query}`);
             expect({ query, status, code: body.error?.code }).toEqual({ query, status: 400, code: "AGGREGATE_MASKED_BY_AFTER_READ" });
-            expect(body.error?.message).toContain("Aggregates other than count are refused on a collection whose rows an afterRead callback rewrites");
+            expect(body.error?.message).toContain("Aggregates other than count are refused on a table whose rows an afterRead hook rewrites");
             expect(JSON.stringify(body)).not.toContain("ada@example.com");
         }
     });

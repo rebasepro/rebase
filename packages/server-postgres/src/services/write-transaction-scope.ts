@@ -145,7 +145,7 @@ export class WriteTransactionScope implements AmbientTransaction {
     }
 
     /**
-     * Application code — a collection, global or property hook, a
+     * Application code — a global or table hook, a column `.transform()`, a
      * `beforeQuery` — is about to run on this transaction, so it may catch a
      * failed statement and leave the transaction aborted: the commit then has
      * to ask ({@link assertCommittable}).
