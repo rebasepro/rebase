@@ -158,3 +158,26 @@ test("a legacy name customizeTable refuses with a hint goes where the hint says"
     // hideFromCollection, previewProperties (field), propertiesOrder (field)…
     assert.ok(checked >= 5, `only ${checked} hints were comparable; the hint format changed?`);
 });
+
+test("every key customization.ts writes by name is a real option, not only the table's", () => {
+    // The routing table is not the only place a key is spelled: the planner
+    // writes a few itself (`target.enumLabels = …`, `options.form = …`). A key
+    // customizeTable stops accepting must fail here too, wherever it is written.
+    const file = "packages/cli/src/codemod/collections-to-tables/customization.ts";
+    const source = ts.createSourceFile(file, readFileSync(path.join(ROOT, file), "utf8"), ts.ScriptTarget.Latest, true);
+    const written = { target: new Set(), options: new Set() };
+    const visit = node => {
+        if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.EqualsToken && ts.isPropertyAccessExpression(node.left)) {
+            const receiver = node.left.expression;
+            const name = node.left.name.text;
+            if (ts.isIdentifier(receiver) && (receiver.text === "target" || receiver.text === "options")) written[receiver.text].add(name);
+            // `at(fields, [key]).overrides = …` writes a field option.
+            if (ts.isCallExpression(receiver) && receiver.expression.getText() === "at" && receiver.arguments[0]?.getText() === "fields") written.target.add(name);
+        }
+        ts.forEachChild(node, visit);
+    };
+    visit(source);
+    assert.ok(written.target.size > 0 && written.options.size > 0, "found no keys written by name: the planner's shape changed?");
+    for (const key of written.target) assert.ok(FIELD_KEYS.has(key), `customization.ts writes field option "${key}", which FIELD_CUSTOMIZATION_KEYS does not list`);
+    for (const key of written.options) assert.ok(TABLE_KEYS.has(key), `customization.ts writes table option "${key}", which TABLE_CUSTOMIZATION_KEYS does not list`);
+});
