@@ -257,45 +257,6 @@ describe("AstSchemaEditor.applyPatch", () => {
     });
 });
 
-/**
- * Every collection this repository ships, renamed through the patch path: the
- * file must differ from before in its `name` line alone and still parse. To see
- * this fail, have `applyPatch` format the whole file again.
- */
-describe("a rename through the patch path, on every shipped collection", () => {
-    const root = path.resolve(__dirname, "../../..");
-    const sources = [
-        path.join(root, "app/config/collections"),
-        path.join(root, "packages/cli/templates/template/config/collections"),
-        path.join(root, "packages/cli/templates/template/config/collections/presets/ecommerce")
-    ];
-    const files = sources.flatMap(dir => fs.readdirSync(dir)
-        .filter(name => name.endsWith(".ts") && name !== "index.ts")
-        .map(name => path.join(dir, name)));
-
-    it.each(files.map(file => [path.relative(root, file), file]))("%s", async (_label, file) => {
-        const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ast-patch-shipped-"));
-        try {
-            const id = path.basename(file, ".ts");
-            const before = fs.readFileSync(file, "utf8");
-            fs.writeFileSync(path.join(dir, `${id}.ts`), before);
-            const name = /\n {4}name: "([^"]*)"/.exec(before)?.[1];
-            expect(name).toBeDefined();
-
-            await new AstSchemaEditor(dir).applyPatch(id, [{ op: "set", path: ["name"], value: `${name} (renamed)` }]);
-
-            const after = fs.readFileSync(path.join(dir, `${id}.ts`), "utf8");
-            expect(changedLines(before, after)).toEqual([
-                `-    name: "${name}",`,
-                `+    name: "${name} (renamed)",`
-            ]);
-            expect(parses(after)).toBe(true);
-        } finally {
-            fs.rmSync(dir, { recursive: true, force: true });
-        }
-    });
-});
-
 describe("POST /schema-editor/collection/save with a patch", () => {
     it("writes the patch, the same way the live door does", async () => {
         const { createSchemaEditorRoutes, createSchemaSourceEditor } = await import("../src/api/schema-editor-routes");

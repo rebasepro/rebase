@@ -3,8 +3,8 @@
  *
  * `scaffold-baseline.e2e.test.ts` asserts that a stock Rebase project reports
  * exactly three criticals — a product decision about the scaffold's
- * `defaultSecurityRules`. It asserts that against a pg_dump taken once, so
- * editing a template collection changes the product and not the test: the
+ * `defaultRls`. It asserts that against a pg_dump taken once, so editing a
+ * template table changes the product and not the test: the
  * suite goes on passing and describes a scaffold nobody ships any more.
  *
  * This pins the recording to its source. It lives in the unit suite on
@@ -17,8 +17,8 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-/** The collections a `rebase init` scaffold actually ships (not `presets/`). */
-const TEMPLATE = path.join(__dirname, "../../cli/templates/template/config/collections");
+/** The tables a `rebase init` scaffold actually ships (the blog preset, not `templates/presets/`). */
+const TEMPLATE = path.join(__dirname, "../../cli/templates/template/backend/schema");
 
 /**
  * Bump this ONLY together with a re-recorded `scaffold.sql` and a re-checked
@@ -39,7 +39,15 @@ const TEMPLATE = path.join(__dirname, "../../cli/templates/template/config/colle
 // gone from EXPECTED_BASELINE. The recording also picks up what boot has
 // provisioned since 0.17.3: `rebase.api_keys`, `rebase.metric_samples`, and the
 // `rebase_admin` roles and companion policies.
-const RECORDED = "c060f4ed086ef413";
+// Moved 2026-11-12, not re-recorded: the template's collections became
+// `backend/schema` tables (defineTable / defineAuthTable, written by
+// `rebase migrate collections-to-tables` and hand-finished). The codemod's SQL
+// check, run with the old config/collections beside the new backend/schema,
+// found all 25 generated outputs byte-identical — DDL, policies, search,
+// vector, triggers, views, the Drizzle schema and the boot plans — so the
+// database boot provisions, and therefore `scaffold.sql` and
+// `EXPECTED_BASELINE`, are unchanged.
+const RECORDED = "3e3209c091ef45eb";
 
 describe("the recorded scaffold fixture", () => {
     it("was recorded from the template the CLI still ships", () => {

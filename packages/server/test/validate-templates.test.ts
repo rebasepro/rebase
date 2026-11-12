@@ -1,66 +1,71 @@
-import { describe, expect, it } from "@jest/globals";
+import { afterAll, describe, expect, it } from "@jest/globals";
 import fs from "fs";
+import os from "os";
 import path from "path";
 
-import { compileTables } from "@rebasepro/common";
-import { isFixtureCollection, tablesFrom } from "./helpers/tables";
-
-/** Lift the template's collections and compile them: what boot does with tables. */
-const compiles = (collections: unknown[]): void => {
-    const { tables, defaultRls } = tablesFrom(collections.filter(isFixtureCollection));
-    compileTables(tables, defaultRls ? { defaultRls } : {});
-};
+import { compileLoadedSchema, loadBackendSchema } from "../src/schema/load-schema";
 
 /**
- * The framework's own templates, through the framework's own compiler.
+ * The framework's own templates, through the framework's own loader and compiler.
  *
- * A template is the first code every new project runs. Until the template
- * slice rewrites them as `backend/schema`, they are lifted with the codemod's
- * bridge and compiled exactly as boot compiles `defineTable` definitions: a
- * template that does not compile is a scaffold that does not boot.
+ * A template is the first code every new project runs: each preset's
+ * `backend/schema` is read exactly as boot reads it (`loadBackendSchema`, which
+ * refuses a table the index does not export, a missing `rls`, an `"inherit"`
+ * with no `defaultRls`) and compiled as boot compiles it. A template that does
+ * not get through here is a scaffold that does not boot.
  *
- * `tooling/scripts/check-templates.mjs` already typechecks these, which catches the same
- * renames for a TypeScript project. It does not catch them for a JavaScript one,
- * or for a project whose installed `@rebasepro/types` is older than the code
- * reading its collections. That is what this covers.
+ * `tooling/scripts/check-templates.mjs` already typechecks these, which catches
+ * the same mistakes for a TypeScript project. It does not catch what only the
+ * compiler checks at runtime (an `rls` posture, a relation whose target is not
+ * exported), and it does not run in this package's suite.
  */
 
-const templateRoot = path.resolve(__dirname, "../../cli/templates/template/config/collections");
+const templates = path.resolve(__dirname, "../../cli/templates");
+const blogSchema = path.join(templates, "template", "backend", "schema");
 
-async function loadAll(dir: string): Promise<{ file: string; collection: unknown }[]> {
-    const files = fs.readdirSync(dir)
-        .filter(f => f.endsWith(".ts") && f !== "index.ts")
-        .sort();
-    const loaded: { file: string; collection: unknown }[] = [];
-    for (const file of files) {
-        const mod = await import(path.join(dir, file));
-        if (mod?.default) loaded.push({ file, collection: mod.default });
+/** `BLOG_PRESET_FILES` in commands/init.ts, the schema half: what another preset removes. */
+const BLOG_TABLES = ["posts.ts", "authors.ts", "tags.ts"];
+
+const scratch: string[] = [];
+afterAll(() => {
+    for (const dir of scratch) fs.rmSync(dir, { recursive: true, force: true });
+});
+
+/** A preset's `backend/schema` as `rebase init` lays it out: the blog's, minus its tables, with the preset's over it. */
+function presetSchema(preset: string): string {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), `rebase-template-${preset}-`));
+    scratch.push(root);
+    const dir = path.join(root, "backend", "schema");
+    fs.mkdirSync(dir, { recursive: true });
+    for (const file of fs.readdirSync(blogSchema)) {
+        if (!BLOG_TABLES.includes(file)) fs.copyFileSync(path.join(blogSchema, file), path.join(dir, file));
     }
-    return loaded;
+    const own = path.join(templates, "presets", preset, "backend", "schema");
+    for (const file of fs.readdirSync(own)) fs.copyFileSync(path.join(own, file), path.join(dir, file));
+    return dir;
+}
+
+async function slugsOf(dir: string): Promise<string[]> {
+    const compiled = compileLoadedSchema(await loadBackendSchema(dir));
+    return compiled.descriptors.map(descriptor => descriptor.slug).sort();
 }
 
 describe("the shipped templates", () => {
     it("has templates to check", () => {
-        expect(fs.existsSync(templateRoot)).toBe(true);
+        expect(fs.existsSync(path.join(blogSchema, "index.ts"))).toBe(true);
     });
 
-    it("validates the blog scaffold clean, warnings included", async () => {
-        const loaded = await loadAll(templateRoot);
-
-        expect(loaded.map(l => l.file)).toEqual(["authors.ts", "posts.ts", "tags.ts", "users.ts"]);
-        expect(() => compiles(loaded.map(l => l.collection))).not.toThrow();
+    it("loads and compiles the blog scaffold clean", async () => {
+        await expect(slugsOf(blogSchema)).resolves.toEqual(["authors", "posts", "tags", "users"]);
     });
 
-    it("validates every preset clean", async () => {
-        const presetsRoot = path.join(templateRoot, "presets");
-        const presets = fs.readdirSync(presetsRoot).filter(p =>
-            fs.statSync(path.join(presetsRoot, p)).isDirectory());
+    it("loads and compiles every preset clean", async () => {
+        const presets = fs.readdirSync(path.join(templates, "presets"))
+            .filter(name => fs.statSync(path.join(templates, "presets", name)).isDirectory())
+            .sort();
+        expect(presets).toEqual(["blank", "ecommerce"]);
 
-        expect(presets.length).toBeGreaterThan(0);
-
-        for (const preset of presets) {
-            const loaded = await loadAll(path.join(presetsRoot, preset));
-            expect(() => compiles(loaded.map(l => l.collection))).not.toThrow();
-        }
+        await expect(slugsOf(presetSchema("ecommerce"))).resolves.toEqual(["categories", "orders", "products", "users"]);
+        await expect(slugsOf(presetSchema("blank"))).resolves.toEqual(["users"]);
     });
 });

@@ -3,6 +3,7 @@ import path from "node:path";
 import type { CollectionConfig } from "@rebasepro/types";
 
 import { generateOpenApiSpec } from "../src/api/openapi-generator";
+import { compileLoadedSchema, loadBackendSchema } from "../src/schema/load-schema";
 import { openApiDocument, operationOf, schemaOf } from "./helpers/server-b-g1-openapi";
 
 /**
@@ -138,16 +139,16 @@ describe("relation properties", () => {
     });
 });
 
-describe("the scaffolded users collection", () => {
-    // The collection every `rebase init` project starts with, through the
-    // generator that publishes it. Loaded from the template itself so a rename
-    // there cannot quietly retire the test.
-    const templateUsers = path.resolve(
-        __dirname, "../../cli/templates/template/config/collections/users.ts"
-    );
+describe("the scaffolded users table", () => {
+    // The table every `rebase init` project starts with, through the generator
+    // that publishes it. Loaded from the template itself, the way boot loads it,
+    // so a rename there cannot quietly retire the test.
+    const templateSchema = path.resolve(__dirname, "../../cli/templates/template/backend/schema");
 
     it("keeps its password hash and verification token out of the document", async () => {
-        const users: CollectionConfig = (await import(templateUsers)).default;
+        const compiled = compileLoadedSchema(await loadBackendSchema(templateSchema));
+        const users = compiled.collections.find(collection => collection.slug === "users");
+        if (!users) throw new Error("the template's backend/schema exports no users table");
         const properties = users.properties;
 
         expect(properties.passwordHash?.excludeFromApi).toBe(true);

@@ -10,6 +10,7 @@ import { openApiDocument, schemaOf, type JsonSchema, type OpenApiDocument } from
 import { generateTypedefs } from "../../codegen/src/generate-types";
 import { compileTables } from "@rebasepro/common";
 import { tablesFrom } from "./helpers/tables";
+import { compileLoadedSchema, loadBackendSchema } from "../src/schema/load-schema";
 
 /** The SDK generator reads compiled descriptors: the same collections, lifted and compiled. */
 const descriptorsOf = (collections: CollectionConfig[]) => {
@@ -195,27 +196,31 @@ describe("a relation in the document", () => {
 });
 
 describe("the scaffold every `rebase init` produces", () => {
-    // The collections themselves, not a fixture shaped like them: `posts`
-    // declares both a `belongsTo` and a `manyToMany`, and its `id` is
-    // `isId: "increment"`. Loading them here turns the check the sweep ran
-    // against a booted scaffold — `jq '.components.schemas.Post.properties |
-    // keys'` — into an assertion that runs in CI.
-    const collectionsDir = path.resolve(__dirname, "../../cli/templates/template/config/collections");
+    // The tables themselves, not a fixture shaped like them: `posts` declares
+    // both a `belongsTo` and a `manyToMany`, and its `id` is an identity
+    // integer. Loaded from the template's backend/schema the way boot loads it,
+    // which turns the check the sweep ran against a booted scaffold — `jq
+    // '.components.schemas.Post.properties | keys'` — into an assertion in CI.
+    const schemaDir = path.resolve(__dirname, "../../cli/templates/template/backend/schema");
 
-    const scaffold = async (): Promise<CollectionConfig[]> => Promise.all(
-        ["posts", "authors", "tags"].map(async (name): Promise<CollectionConfig> =>
-            (await import(path.join(collectionsDir, `${name}.ts`))).default)
-    );
+    const scaffold = async () => {
+        const compiled = compileLoadedSchema(await loadBackendSchema(schemaDir));
+        const wanted = new Set(["posts", "authors", "tags"]);
+        return {
+            collections: compiled.collections.filter(collection => wanted.has(collection.slug)),
+            descriptors: compiled.descriptors.filter(descriptor => wanted.has(descriptor.slug))
+        };
+    };
 
     it("documents the post's author key, its author and its tags", async () => {
-        const scaffoldSpec = openApiDocument(generateOpenApiSpec(await scaffold()));
+        const scaffoldSpec = openApiDocument(generateOpenApiSpec((await scaffold()).collections));
         const documented = Object.keys(propertiesOf(scaffoldSpec, "Post"));
 
         expect(documented).toEqual(expect.arrayContaining(["authorId", "author", "tags"]));
     });
 
     it("gives the post's id one type in all three of its schemas", async () => {
-        const scaffoldSpec = openApiDocument(generateOpenApiSpec(await scaffold()));
+        const scaffoldSpec = openApiDocument(generateOpenApiSpec((await scaffold()).collections));
         const types = ["Post", "PostInput", "PostUpdate"].map(
             schema => propertiesOf(scaffoldSpec, schema).id?.type
         );
@@ -224,9 +229,9 @@ describe("the scaffold every `rebase init` produces", () => {
     });
 
     it("describes the same fields as the SDK it ships beside", async () => {
-        const collections = await scaffold();
+        const { collections, descriptors } = await scaffold();
         const scaffoldSpec = openApiDocument(generateOpenApiSpec(collections));
-        const typedefs = generateTypedefs(descriptorsOf(collections));
+        const typedefs = generateTypedefs(descriptors);
 
         expect(new Set(Object.keys(propertiesOf(scaffoldSpec, "Post"))))
             .toEqual(new Set(sdkRowKeys(typedefs, "posts")));
