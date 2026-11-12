@@ -85,6 +85,15 @@ const EXTRA_ENTRY_POINTS = [
         pkg: "@rebasepro/server/functions",
         dts: "packages/server/dist/functions/index.d.ts",
         mustHaveMembers: ["rebase"]
+    },
+    // What every `backend/schema/*.ts` imports: the table builders. A tenant's
+    // schema module is evaluated by the runtime image's copy of the server, so
+    // a builder or a `col.*` method removed here breaks a deployed project at
+    // boot exactly like a removed root export.
+    {
+        pkg: "@rebasepro/server/schema",
+        dts: "packages/server/dist/schema/index.d.ts",
+        mustHaveMembers: ["col", "rel"]
     }
 ];
 

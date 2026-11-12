@@ -9,8 +9,127 @@
     "release": "0.31",
     "base": "v0.30.1",
     "generated": {
-        "exports": {},
-        "members": {}
+        "exports": {
+            "@rebasepro/client": [
+                "CollectionClient",
+                "SDKCollectionClient"
+            ],
+            "@rebasepro/common": [
+                "toCollectionAccessor"
+            ],
+            "@rebasepro/server": [
+                "BundleConfigExports",
+                "CollectionConfigError",
+                "CollectionDefaults",
+                "ConfigProblem",
+                "UnknownKeyPolicy",
+                "ValidateCollectionConfigOptions",
+                "accessModelFromCollections",
+                "applyCollectionDefaults",
+                "assertCollectionConfigs",
+                "findCollectionConfigProblems",
+                "loadBundleConfigExports",
+                "loadCollectionsFromDirectory",
+                "loadUsersCollection",
+                "unknownKeyPolicyFromEnv"
+            ],
+            "@rebasepro/types": [
+                "CollectionAccessor",
+                "CollectionPatch",
+                "CollectionPatchOp",
+                "CollectionTrashAccessor",
+                "DocumentAdmin",
+                "MONGODB_CAPABILITIES",
+                "MongoDBCollectionConfig",
+                "MongoProperties",
+                "MongoProperty",
+                "RUNTIME_ONLY_COLLECTION_KEYS",
+                "SDKCollectionClient",
+                "applyCollectionPatch",
+                "collectionPatchProblems",
+                "diffCollections",
+                "diffJsonValues",
+                "isCollectionPatch",
+                "isDocumentAdmin",
+                "isMongoDBCollectionConfig",
+                "nestCollectionPatchPaths",
+                "runtimeOnlyKeyIn",
+                "toCollectionJson"
+            ]
+        },
+        "members": {
+            "@rebasepro/client": {
+                "CreateRebaseClientOptions": [
+                    "collections"
+                ],
+                "OfflineConfig": [
+                    "maxCachedQueriesPerCollection",
+                    "maxCachedRowsPerCollection"
+                ]
+            },
+            "@rebasepro/server": {
+                "ContractRoutesConfig": [
+                    "collectionRegistry",
+                    "schemaVersion"
+                ],
+                "LoadedBundle": [
+                    "collectionsDir"
+                ],
+                "RebaseAuthConfig": [
+                    "collection"
+                ],
+                "RebaseBackend": [
+                    "setCollectionCallbacks"
+                ],
+                "RebaseBackendConfig": [
+                    "callbacks",
+                    "collections",
+                    "collectionsDir"
+                ],
+                "RebaseBackendOptions": [
+                    "callbacks",
+                    "collections",
+                    "collectionsDir"
+                ],
+                "StorageAuthorizeData": [
+                    "collection"
+                ]
+            },
+            "@rebasepro/types": {
+                "DataSourceCapabilities": [
+                    "supportsDocumentAdmin"
+                ],
+                "DEFAULT_CAPABILITIES": [
+                    "supportsDocumentAdmin"
+                ],
+                "FIREBASE_CAPABILITIES": [
+                    "supportsDocumentAdmin"
+                ],
+                "POSTGRES_CAPABILITIES": [
+                    "supportsDocumentAdmin"
+                ],
+                "RebaseBackendAppConfig": [
+                    "config",
+                    "usersCollection"
+                ],
+                "RebaseBundleEntrypoints": [
+                    "collections",
+                    "config",
+                    "usersCollection"
+                ],
+                "RebaseBundleManifest": [
+                    "collections"
+                ],
+                "RebaseProjectContract": [
+                    "collectionSlugs",
+                    "collections",
+                    "generatedAt"
+                ],
+                "StorageAuthorizeData": [
+                    "collection"
+                ]
+            }
+        }
     },
     "reviewed": [
         {
