@@ -98,7 +98,6 @@ allowBuilds:
   # `@esbuild/<platform>` and spawns the same binary itself. The only cost is a
   # few milliseconds of startup per invocation.
   esbuild: false
-  mongodb-memory-server: true
   nx: true
   protobufjs: true
   puppeteer: true

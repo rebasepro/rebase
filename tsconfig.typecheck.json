@@ -128,12 +128,6 @@
       "@rebasepro/server/*": [
         "./packages/server/src/*"
       ],
-      "@rebasepro/server-mongo": [
-        "./packages/server-mongo/src"
-      ],
-      "@rebasepro/server-mongo/*": [
-        "./packages/server-mongo/src/*"
-      ],
       "@rebasepro/server-postgres": [
         "./packages/server-postgres/src"
       ],
@@ -212,7 +206,6 @@
     "packages/inference/src",
     "packages/codegen/src",
     "packages/server/src",
-    "packages/server-mongo/src",
     "packages/server-postgres/src",
     "packages/studio/src",
     "packages/types/src",

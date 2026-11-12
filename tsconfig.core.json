@@ -56,9 +56,6 @@
             "@rebasepro/mcp-apps": [
                 "./packages/mcp-apps/src"
             ],
-            "@rebasepro/server-mongo": [
-                "./packages/server-mongo/src"
-            ],
             "@rebasepro/inference": [
                 "./packages/inference/src"
             ],
@@ -86,7 +83,6 @@
         "packages/codegen/src",
         "packages/server/src",
         "packages/server-postgres/src",
-        "packages/server-mongo/src",
         "packages/inference/src",
         "packages/cli/src",
         "packages/mcp/src",

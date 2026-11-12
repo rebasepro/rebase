@@ -29,14 +29,6 @@
     // shape that had all been gone for months, passing every run.
     "packages/types/test",
     "packages/types/src",
-    // The driver's own fixtures. `buildSearchConditions` read `prop.dataType`,
-    // a field no property in `@rebasepro/types` has ever had, so search matched
-    // no field on any real collection and every query fell through to `$text` —
-    // which throws `IndexNotFound` without a text index. The fixtures were
-    // written with the same wrong key, so the test data agreed with the bug.
-    // They are real `CollectionConfig` properties now, and this line is what
-    // keeps them that way.
-    "packages/server-mongo/test",
     // The hook cast its returned object to `PostgresDataDriver`, which hid an
     // undeclared `name` and the fact that `admin` — and every capability on it
     // — is optional. The cast is gone; this earns the test the real `SaveProps`
@@ -98,8 +90,8 @@
     "packages/inference/test",
     // The collection registry, permissions and policy tests.
     // `collection_registry_property_gates.test.ts` declared its fixtures with
-    // `driver: "firestore"` / `driver: "mongodb"`. The field is `engine`; there
-    // is no `driver`. So every "Firestore" and "MongoDB" case in it was a
+    // `driver: "firestore"`. The field is `engine`; there is no `driver`. So
+    // every "Firestore" case in it was a
     // default-Postgres collection and no engine gate was ever crossed — for as
     // long as this line was missing, nothing could say so.
     // `src` joins `test` because some of these tests sit beside the code.
