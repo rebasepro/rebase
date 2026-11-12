@@ -2447,7 +2447,18 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
                         });
                     } : undefined,
                 // The database has the change: serve it without a restart.
-                onApplied: (schema) => editedTables.serve?.(schema)
+                onApplied: (schema) => editedTables.serve?.(schema),
+                getTables: () => tableRegistry.list(),
+                // A change to a table's `rls` is enforced in the same apply,
+                // through the boot policy applier — or reported deferred
+                // where this process may not write policies.
+                applyPolicies: (() => {
+                    const target = initializedTarget(provisionTarget);
+                    const ensure = target.bootstrapper.ensureCollectionPolicies;
+                    if (!ensure || !provision.tables || provisioningDisabled()) return undefined;
+                    return (collections: readonly CollectionConfig[]) => ensure.call(
+                        target.bootstrapper, [...collections], target.driverResult, (message: string) => logger.debug(`policies: ${message}`));
+                })()
             }));
 
             // Admin-only, so it lives under `/api/admin` — see

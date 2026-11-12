@@ -42,6 +42,7 @@ import {
     type SchemaChangePlan,
     type SchemaCommitPaths,
     type SchemaEditingAdmin,
+    type TableDescriptor,
     type TablePatch
 } from "@rebasepro/types";
 import { HonoEnv } from "./types";
@@ -53,6 +54,8 @@ import {
     DirtyWorkingTreeError,
     StatementFailedError,
     UnapplicableChangeError,
+    POLICIES_DEFERRED_MESSAGE,
+    type SchemaEditPolicyOutcome,
     type SchemaEditRepository
 } from "../schema-edit/apply-schema-change";
 import {
@@ -112,6 +115,23 @@ export interface LiveSchemaRoutesConfig {
      * database does not have the change.
      */
     onApplied?: (schema: EditedSchema) => void | Promise<void>;
+    /**
+     * The descriptors the running server serves — the `before` side of a
+     * table's `rls`, kept on the served tables when an apply's policies could
+     * not be written. Read at request time, like {@link getCollections}.
+     */
+    getTables?: () => readonly TableDescriptor[];
+    /**
+     * Write the RLS policies of these collections to the database: the boot
+     * policy applier (the driver's `ensureCollectionPolicies`), called after
+     * an apply that changed some table's `rls`, with every collection the
+     * default database stores (unchanged ones are no-ops: their policies are
+     * stamped). Absent when this backend may not or cannot write policies
+     * (`provision.tables` off, a driver without the capability): the apply
+     * then reports `policies: { status: "deferred" }` and the served tables
+     * keep the `rls` the database enforces.
+     */
+    applyPolicies?: (collections: readonly CollectionConfig[]) => Promise<{ applied: number }>;
     /**
      * Why {@link writeSource} is absent, when the caller knows.
      *
@@ -410,6 +430,91 @@ function filesCommittedBy(config: LiveSchemaRoutesConfig, source: PreviewedSourc
  * project that replays migrations needs this change recorded as one, or its
  * next environment is built without it.
  */
+/** Whether a lowered collection turns the injected admin baseline off (a Postgres collection's `disableDefaultPolicies`). */
+function disablesDefaultPolicies(collection: CollectionConfig): boolean {
+    const off: unknown = Reflect.get(collection, "disableDefaultPolicies");
+    return off === true;
+}
+
+/** What decides a table's policies, on a lowered collection. */
+function rlsIdentity(collection: CollectionConfig): string {
+    return JSON.stringify({ rules: collection.securityRules ?? [], off: disablesDefaultPolicies(collection) });
+}
+
+/**
+ * The slugs of the tables whose policies an edit changes: a table it adds,
+ * or one whose rules or `defaultPolicies` differ.
+ */
+export function rlsChangedSlugs(before: readonly CollectionConfig[], after: readonly CollectionConfig[]): string[] {
+    const previous = new Map(before.map(collection => [collection.slug, rlsIdentity(collection)]));
+    return after.filter(collection => previous.get(collection.slug) !== rlsIdentity(collection)).map(collection => collection.slug);
+}
+
+/** Whether the default database stores a collection: the one the apply's DDL ran on. */
+function onDefaultDatabase(collection: CollectionConfig): boolean {
+    return collection.dataSource === undefined || collection.dataSource === "(default)";
+}
+
+/**
+ * Write the changed tables' policies through `applyPolicies` (call site of
+ * the boot policy applier for a live apply), or say why they were not.
+ */
+async function applyChangedPolicies(
+    config: LiveSchemaRoutesConfig,
+    after: readonly CollectionConfig[],
+    changed: string[]
+): Promise<SchemaEditPolicyOutcome> {
+    if (!config.applyPolicies) return { status: "deferred", tables: changed, message: POLICIES_DEFERRED_MESSAGE };
+    try {
+        const { applied } = await config.applyPolicies(after.filter(onDefaultDatabase));
+        return { status: "applied", tables: changed, statements: applied };
+    } catch (err) {
+        const error = err instanceof Error ? err.message : String(err);
+        logger.warn("[schema-edit] The applied change's RLS policies could not be written; serving the previous rules.", { tables: changed, error });
+        return { status: "failed", tables: changed, message: POLICIES_DEFERRED_MESSAGE, error };
+    }
+}
+
+function policySummary(policies: SchemaEditPolicyOutcome): string {
+    if (policies.status === "applied") return `Applied the RLS policies of ${policies.tables.join(", ")}.`;
+    return policies.status === "failed"
+        ? `The RLS policies of ${policies.tables.join(", ")} could not be written (${policies.error}). ${policies.message}`
+        : policies.message;
+}
+
+/**
+ * The edited schema with the changed tables' `rls` as the database still
+ * enforces it: the previous descriptor's `rls` and collection's rules, or,
+ * for a table the edit created, closed (RLS is on, no policy grants a row).
+ */
+export function keepEnforcedRls(
+    schema: EditedSchema,
+    changed: readonly string[],
+    before: readonly CollectionConfig[],
+    beforeTables: readonly TableDescriptor[]
+): EditedSchema {
+    const changedSet = new Set(changed);
+    const previousCollection = new Map(before.map(collection => [collection.slug, collection]));
+    const previousTable = new Map(beforeTables.map(table => [table.slug, table]));
+    return {
+        ...schema,
+        descriptors: schema.descriptors.map(descriptor => {
+            if (!changedSet.has(descriptor.slug)) return descriptor;
+            const previous = previousTable.get(descriptor.slug);
+            return { ...descriptor, rls: previous ? previous.rls : { posture: "rules", rules: [], defaultPolicies: false } };
+        }),
+        collections: schema.collections.map(collection => {
+            if (!changedSet.has(collection.slug)) return collection;
+            const previous = previousCollection.get(collection.slug);
+            return {
+                ...collection,
+                securityRules: previous?.securityRules ?? [],
+                disableDefaultPolicies: previous ? disablesDefaultPolicies(previous) : true
+            };
+        })
+    };
+}
+
 function followUpFor(config: LiveSchemaRoutesConfig, statements: string[]): string[] {
     if (statements.length === 0) return [];
     if (!config.usesVersionedMigrations?.()) return [];
@@ -747,13 +852,30 @@ export function createLiveSchemaRoutes(config: LiveSchemaRoutesConfig): Hono<Hon
             // next restart. A source-only commit, or an apply whose statements
             // failed, leaves the database behind the source — the tables served
             // stay those the database holds.
-            if (!sourceOnly && result.applied) await config.onApplied?.(source.schema);
+            //
+            // A change to some table's `rls` is enforced in the same apply —
+            // the planner's DDL carries no policies — or, where it cannot be,
+            // the served tables keep the `rls` the database still enforces:
+            // the panel, the Studio and MCP never report a posture Postgres
+            // does not hold.
+            let policies: SchemaEditPolicyOutcome | undefined;
+            if (!sourceOnly && result.applied) {
+                const changed = rlsChangedSlugs(before, after);
+                let served = source.schema;
+                if (changed.length > 0) {
+                    policies = await applyChangedPolicies(config, after, changed);
+                    if (policies.status !== "applied") served = keepEnforcedRls(source.schema, changed, before, config.getTables?.() ?? []);
+                }
+                await config.onApplied?.(served);
+            }
+            const policyFollowUp = policies && policies.status !== "applied" ? [policies.message] : [];
             // Carried onto the result as well as the plan: whoever reads the
             // outcome may not be whoever read the preview.
             return c.json({
                 ...result,
+                ...(policies ? { policies, summary: `${result.summary} ${policySummary(policies)}` } : {}),
                 withheldConstraints: plan.withheldConstraints ?? [],
-                followUp: followUpFor(config, plan.statements)
+                followUp: [...policyFollowUp, ...followUpFor(config, plan.statements)]
             });
         });
     });

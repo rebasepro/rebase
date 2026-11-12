@@ -200,7 +200,37 @@ export interface SchemaEditResult {
     classified: ClassifiedSchemaChanges;
     /** What to tell the person who pressed the button. */
     summary: string;
+    /**
+     * What happened to the row-level security of the tables whose `rls` the
+     * change touched (rules, posture, `defaultPolicies`), when it touched
+     * any: set by the live apply route, which applies their policies in the
+     * same apply. See {@link SchemaEditPolicyOutcome}.
+     */
+    policies?: SchemaEditPolicyOutcome;
 }
+
+/**
+ * The policies of an apply's changed tables.
+ *
+ * - `applied` — their policies were written to the database in the same
+ *   apply; the served tables now carry the new `rls`, and Postgres enforces it.
+ * - `deferred` — this backend cannot write policies from here (provisioning
+ *   of tables off, or a driver without the capability): the rules are saved
+ *   to source and take effect on the next deploy, and the served tables keep
+ *   the `rls` the database still enforces (a new table is served closed, as
+ *   RLS with no policy is). `message` is what to show.
+ * - `failed` — writing them failed: as `deferred`, with the error.
+ *
+ * @group Schema
+ */
+export type SchemaEditPolicyOutcome =
+    | { status: "applied"; tables: string[]; statements: number }
+    | { status: "deferred"; tables: string[]; message: string }
+    | { status: "failed"; tables: string[]; message: string; error: string };
+
+/** What the Studio shows when an apply's rules could not be enforced yet. */
+export const POLICIES_DEFERRED_MESSAGE = "Rules saved to source; they take effect on the next deploy. " +
+    "Until then the database enforces the previous rules, and the tables are served as it enforces them.";
 
 /**
  * The plan says the change is not applicable.
