@@ -77,7 +77,7 @@ instead.
 | `.default(value)` | every field | The value written when the key is absent on create. |
 | `.describe(text)` | every field | What the value is, for OpenAPI and MCP. |
 | `.validate(rules)` | every field | The rules a column of the same kind takes: text rules on `json.string()`, numeric rules on `json.number()`, date bounds on `json.date()`, item counts on `json.array()`. See [Validation](/docs/schema/columns/#validation). |
-| `.transform({ beforeSave?, afterRead? })` | every field | Field-level hooks, run on the server. |
+| `.transform({ beforeSave?, afterRead? })` | every field | Field-level hooks, run on the server. `value` is `T \| undefined` unless `.required()` comes first. |
 | `.oneOf(values)` | `json.string()`, `json.number()` | A closed set of accepted values, typed as their union. |
 | `.onCreateNow()` | `json.date()` | The server writes the current time when the row is created. |
 | `.onUpdateNow()` | `json.date()` | The server writes the current time on every write. |

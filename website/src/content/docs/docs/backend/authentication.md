@@ -35,7 +35,6 @@ The `auth` block in `initializeRebaseBackend` controls all backend authenticatio
 const backend = await initializeRebaseBackend({
     // ...
     auth: {
-        collection: usersCollection,         // Your users collection definition
         jwtSecret: env.JWT_SECRET,           // Required — signing secret
         accessExpiresIn: "1h",               // Access token lifetime (default: 1h)
         refreshExpiresIn: "30d",             // Refresh token lifetime (default: 30d)
@@ -81,7 +80,6 @@ const backend = await initializeRebaseBackend({
 
 | Key | Type | Default | What it does |
 |-----|------|---------|--------------|
-| `collection` | `CollectionConfig` | — | The users collection. See [The users table](#the-users-table) |
 | `jwtSecret` | `string` | — | HS256 signing secret. Required in production |
 | `signingKeys` | `JwtSigningKeyConfig[]` | — | Asymmetric signing keys — see [Asymmetric Tokens and JWKS](/docs/backend/auth-endpoints/#asymmetric-tokens-and-jwks) |
 | `activeKid` | `string` | first key | Which of `signingKeys` mints new tokens |

@@ -82,8 +82,8 @@ the users table itself may also name every auth column, declared or not.
 | `onCreateUser` | Runs when an admin creates a user through the API: return the values to store and, optionally, a temporary password to show the admin. |
 | `onResetPassword` | Runs when an admin resets a user's password: return a temporary password, or send your own reset link. |
 
-`roles`, `scopes` and `personalKeys` are served with the table's descriptor;
-the two hooks stay on the server. [Roles and scopes](/docs/backend/roles-and-scopes/)
+`roles`, `scopes` and `personalKeys` are served with the table's descriptor.
+The two hooks stay on the server; the descriptor only says which of them exist. [Roles and scopes](/docs/backend/roles-and-scopes/)
 covers what each scope grants and how keys and tokens narrow it.
 
 ### `onCreateUser` and `onResetPassword`

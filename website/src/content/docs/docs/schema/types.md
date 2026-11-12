@@ -115,7 +115,9 @@ type PostRelation = RelationKeyOf<typeof posts>; // never, for a table without r
 A table's [hooks](/docs/collections/callbacks/) are typed from its columns
 without any annotation: `values` in `beforeSave` is a `Partial` of the insert
 type, `previousValues` and the rows of `afterRead` and the delete hooks are the
-row type. A column's `.transform()` receives that column's type as `value`.
+row type. A column's `.transform()` receives that column's type as `value`:
+`T | null`, or `T` when `.notNull()` is written before `.transform()`. A JSON
+field's `.transform()` receives `T | undefined`, or `T` after `.required()`.
 
 ## In a frontend
 

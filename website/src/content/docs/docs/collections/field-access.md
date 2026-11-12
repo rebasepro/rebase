@@ -16,6 +16,9 @@ they see and may set:
 | `.private()` | nobody, through the API | nobody, through the API |
 | `.readOnly()` | as the row | nobody, through the API |
 
+Relations take the same rules as options: `rel.*(target, { access: { read, write } })`
+and `rel.*(target, { private: true })`.
+
 ```ts
 import { defineTable, col } from "@rebasepro/server/schema";
 
@@ -254,11 +257,15 @@ hide anything from them. `[]` still does — including from `dataAsAdmin`. Use
 
 <span class="since-badge" data-since="0.31">Since 0.31</span>
 
+`.access()` on a column, and `access` on a relation, throw when the module
+loads unless `read` and `write` are lists of non-empty role names: a string
+where a list belongs (`read: "admin"`) is refused rather than read as
+something else.
+
 These are refused when the schema is compiled, before the server serves
 anything:
 
 - `.private()` and `.access()` on the same column: they are one mechanism;
-- a role that is not a non-empty string;
 - a read-restricted column named in the table's `search.fields`, or used as its
   `tenant` field;
 - a `.private()` primary key: the key is how every row is addressed.

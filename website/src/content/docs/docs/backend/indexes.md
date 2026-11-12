@@ -59,7 +59,7 @@ them in the meantime.
 | Field | Type | Description |
 |-------|------|-------------|
 | `columns` | `(string \| { column, direction?, nulls? })[]` | **Required.** The key columns, in order. 1–5 entries. |
-| `reason` | `string` | **Required.** Why this index exists, in one line. |
+| `reason` | `string` | Why this index exists, in one line. Strongly recommended. |
 | `using` | `"btree" \| "gin" \| "brin"` | Access method. Defaults to `btree`. |
 | `where` | `IndexPredicate` | Makes the index partial — it covers only the rows matching this. |
 | `unique` | `boolean` | btree only. A composite uniqueness guarantee. |
@@ -187,11 +187,11 @@ materialises the desired state in a bare scratch database to plan against, and
 `gin_trgm_ops` or `vector_cosine_ops` is refused at build time rather than
 emitted to fail later against a database you have never seen.
 
-### `reason` is required
+### `reason`
 
 <span class="since-badge" data-since="0.31">Since 0.31</span>
 
-It is the only required field with no SQL behind it.
+It is the one field with no SQL behind it, and it is optional — but write it.
 
 An index is the only thing a schema can declare that costs money forever
 and whose benefit is invisible from the config. The reason is what gets printed
@@ -200,8 +200,7 @@ position to decide whether to delete it. Without it nobody can decide, so nobody
 does, and the table accretes indexes for the life of the product.
 
 It is deliberately **not** part of the index's identity — rewording a
-justification never rebuilds an index. The types accept an index without one;
-the schema is refused when it is compiled.
+justification never rebuilds an index.
 
 ## What a declaration is called
 
@@ -407,7 +406,7 @@ this whole feature removes:
 - `direction` or `nulls` under `gin` or `brin`
 - an `in` list that repeats a value
 - two declarations that derive the same name — they are the same index, twice
-- an empty or missing `reason`
+- an empty `reason`
 
 ## Related
 

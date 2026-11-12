@@ -46,6 +46,7 @@ has the name.
 | `columns` | **Required.** The columns the query returns, as `col.*` builders. `.primaryKey()` marks the ones that identify a row. |
 | `materialized` | `true` stores the rows. See [Materialized views](#materialized-views). |
 | `roles` | Who may read a materialized view. `["admin"]` when omitted. Refused on a plain view. |
+| `table` | The SQL view name, when it differs from the name. |
 | `slug` | The name in the API. The view's name when omitted. |
 | `schema` | The Postgres schema. `public` when omitted. |
 | `database` | A non-default Postgres database. |

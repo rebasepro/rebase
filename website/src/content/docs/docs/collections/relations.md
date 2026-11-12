@@ -31,7 +31,9 @@ export const posts = defineTable("posts", {
 ```
 
 The target is a thunk, `() => users`, so two tables can point at each other
-whatever order their modules load in. A relation may point at a table or a view.
+whatever order their modules load in. Neither needs a type annotation: what the
+thunk returns is checked when the schema is compiled, and a relation whose
+target is not a table or view of the schema is refused there.
 
 :::note[Coming from collections?]
 Relations are no longer properties. The foreign-key column of a `belongsTo` is
@@ -53,6 +55,18 @@ for this release shows the mapping.
 
 Every option is optional except `steps` on `rel.via`. The rest is derived, by
 the rules in [Names](#names).
+
+Every kind also takes `access` and `private`, which decide who receives the
+relation's rows, the way they do for a column:
+
+- `access: { read?, write? }` lists the roles that may include or filter by the
+  relation and the roles that may set the link. An omitted list leaves that
+  direction to the row; an empty list closes it.
+- `private: true` keeps the relation on the server: it is not in the API, the
+  SDK or OpenAPI.
+
+See [Field access](/docs/collections/field-access/) for what a caller without
+access sees.
 
 ## belongsTo — the key is on this table
 

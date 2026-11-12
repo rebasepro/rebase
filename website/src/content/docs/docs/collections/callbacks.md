@@ -284,6 +284,10 @@ value to store, and `afterRead` returns the value to serve. They run on the
 server, for every caller, and receive `value`, the whole row as `values`, and
 the props every hook gets.
 
+`value` is typed truthfully: `T | null` on a nullable column, and `T` when
+`.notNull()` is written **before** `.transform()`. On a JSON field it is
+`T | undefined` unless `.required()` comes first.
+
 ```ts
 import { defineTable, col } from "@rebasepro/server/schema";
 
@@ -351,7 +355,58 @@ log — are exported as `hooks` from `backend/hooks.ts`, in the same
 its columns' `.transform()`. See [Global hooks](/docs/backend/hooks/).
 
 Hooks can also be attached after boot with `setTableHooks(slug, hooks)` on the
-backend. That **replaces** the hooks the table declared.
+backend. That **replaces** the hooks the table declared; to add to them, pass
+`composeTableHooks(declared, yours)`.
+
+## Combining hook sets
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+A table has one `hooks` object. When several concerns each want a hook — a slug
+generator, an audit trail, a tenant scope — write each as its own set and
+combine them with `composeTableHooks` from `@rebasepro/common`:
+
+```ts
+import { defineTable, col, type TableHooks } from "@rebasepro/server/schema";
+import { composeTableHooks } from "@rebasepro/common";
+
+const auditTrail: TableHooks = {
+    afterSave: async ({ table, id, status, context }) => {
+        await context.data.audit_log.create({ table: table.slug, rowId: String(id), action: status });
+    },
+};
+
+export const pages = defineTable("pages", {
+    columns: {
+        id:    col.uuid().primaryKey().defaultRandom(),
+        title: col.text().notNull(),
+        slug:  col.text(),
+    },
+    rls: "admin-only",
+    hooks: composeTableHooks(auditTrail, {
+        beforeSave: ({ values }) =>
+            typeof values.title === "string" && !values.slug
+                ? { ...values, slug: values.title.toLowerCase().replace(/\s+/g, "-") }
+                : values,
+    }),
+});
+```
+
+The sets run in the order given, and each hook combines the way the backend
+combines its global and table tiers:
+
+| Hook | Combined |
+|---|---|
+| `beforeSave` | Chained: each set sees the values the previous one returned, shallow-merged over what it was given |
+| `afterRead` | Chained: each set gets the row the previous one returned |
+| `beforeQuery` | ANDed: every set sees the caller's query, and a row must pass every narrowing |
+| `beforeDelete` | Any `false` vetoes the delete; every set still runs |
+| `afterSave`, `afterDelete` | Run in order, each awaited; a throw stops the rest |
+| `afterSaveError` | Run in order; a throw does not stop the next set, and the first error is rethrown at the end |
+
+A hook is in the result only if some set has it, and an `undefined` set is
+skipped. A set written apart from its table, like `auditTrail` above, is typed
+with the generic row, so read its values as `unknown` and check them.
 
 ## Testing a hook
 
