@@ -94,7 +94,8 @@ describe("rebase verify: CMS customizations", () => {
         const report = await verify();
         expect(report.findings).toEqual([]);
         expect(cmsStep(report)).toMatchObject({ status: "skipped", detail: "no frontend/src/cms" });
-    });
+    // The first run imports the server's schema loader cold.
+    }, 60_000);
 
     it("passes customizations that name real tables, columns and relations, without importing them", async () => {
         cms("posts.tsx", customization("posts", [
@@ -113,7 +114,7 @@ describe("rebase verify: CMS customizations", () => {
         expect(cmsFindings(report)).toEqual([]);
         expect(cmsStep(report)).toMatchObject({ status: "passed" });
         expect(cmsStep(report)?.detail).toContain("1 customization in frontend/src/cms");
-    });
+    }, 60_000);
 
     it("reports a customization for a slug no table declares, with its file, line and a guess", async () => {
         cms("posts.tsx", customization("post", "    icon: \"FileText\""));
