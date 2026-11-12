@@ -2063,19 +2063,6 @@ importers:
         specifier: ^7.0.2
         version: 7.0.2
 
-  saas/config:
-    dependencies:
-      '@rebasepro/cms-types':
-        specifier: workspace:*
-        version: link:../../packages/cms-types
-      '@rebasepro/types':
-        specifier: workspace:*
-        version: link:../../packages/types
-    devDependencies:
-      typescript:
-        specifier: ^7.0.2
-        version: 7.0.2
-
   saas/frontend:
     dependencies:
       '@rebasepro/app':
