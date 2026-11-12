@@ -4,6 +4,8 @@ sidebar_label: Typed server-side data
 description: "Register your generated Database type once, and context.data, rebase.dataAsAdmin and the rebase a function or cron receives are typed from it: rows, filters, sorts, includes and write inputs."
 ---
 
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
 The browser client is typed by passing your generated `Database` to
 `createRebaseClient<Database>()` (see [Typed SDK Generation](/docs/sdk#typed-sdk-generation)).
 The server-side data surfaces have no such call to pass it to:
@@ -93,6 +95,8 @@ the table hooks of that same schema, because typing a schema's hooks from the
 schema is a cycle TypeScript refuses.
 
 ## What it types
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 ```ts
 // backend/schema/orders.ts — a hook

@@ -20,6 +20,8 @@ So: never `await` an outbound HTTP request in a hook. Queue it.
 
 ## Slack Notification on New Order
 
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
 `WebhookDispatcher` is exported from `@rebasepro/server`. `enqueueEntityChange` returns
 immediately — the POST happens once the write commits, never for one that rolls back — and the
 dispatcher validates the destination, signs the payload, bounds every attempt with a deadline and
@@ -93,6 +95,8 @@ with `composeTableHooks` from `@rebasepro/common` and `declared` the table's own
 [Combining hook sets](/docs/collections/callbacks/#combining-hook-sets).
 
 ### Without a job queue
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 Leave out `jobQueue` — or run where the backend has no job queue — and the
 deliveries are queued in memory, in the process that made the change. That is simpler, and it is

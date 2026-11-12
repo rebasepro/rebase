@@ -6,6 +6,8 @@ description: Generate Drizzle ORM schemas from the tables in backend/schema, cre
 
 ## Overview
 
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
 Rebase uses a **schema-as-code** pipeline where the tables you declare with
 `defineTable` in `backend/schema/` are the single source of truth. The CLI
 transforms them through a deterministic pipeline:
@@ -48,6 +50,8 @@ The `db migrate` command applies pending migrations to your PostgreSQL database.
 ## Commands
 
 ### `rebase schema generate`
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 Generate a Drizzle ORM schema file from your tables:
 
@@ -92,6 +96,8 @@ or a CI step. It takes `--schema-dir` and `--output` as `rebase schema generate`
 does.
 
 ### `rebase schema reconcile`
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 Relax and drop what boot will not, after you have read the plan:
 
@@ -488,6 +494,8 @@ maps back to the slug.
 
 ## Development Workflow
 
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
 The fast-iteration workflow for development:
 
 ```bash
@@ -500,6 +508,8 @@ rebase db push
 ```
 
 ## Production Workflow
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 The safe, reviewable workflow for production:
 

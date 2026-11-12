@@ -29,6 +29,8 @@ without appearing here.
 
 ## Data
 
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
 Generated per table, so the paths carry your slugs rather than a fixed
 list. `:slug` is a table's slug (its name, unless `defineTable` sets `slug`).
 

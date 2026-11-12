@@ -7,6 +7,71 @@ description: Every released change to Rebase — new features, fixes, and the br
 
 ## [Unreleased]
 
+0.31 makes the backend Postgres-first: the tables you declare with `defineTable` in `backend/schema/` are the only thing the backend knows about your data, and the admin panel renders what the server serves. `rebase migrate collections-to-tables` moves a project and proves the generated SQL unchanged. Every Breaking entry has its section in [Upgrading 0.30 → 0.31](https://rebase.pro/docs/upgrading/0-30-to-0-31/).
+
+### Breaking
+
+#### Schema and server
+
+- **Tables in `backend/schema` replace `config/collections`.** The backend reads only the `defineTable`, `defineAuthTable` and `defineView` results `backend/schema/index.ts` exports; `rls` is required on every table (`"admin-only"`, `"inherit"` with `defaultRls`, or rules), and `disableDefaultPolicies` is `defaultPolicies: false`. The runtime and every CLI command refuse `config/collections`. Run `rebase migrate collections-to-tables`.
+- **There is no config package.** `config/resources.ts` → `backend/resources.ts`, `config/storage.ts` → `backend/storage.ts`, the `callbacks` export → `hooks` from `backend/hooks.ts`, `config/generated/` → `backend/generated/`; `rebase.json` `config` / `usersCollection` → `tables`.
+- **Boot options and hooks name tables.** `collections` / `collectionsDir` / `callbacks` / `auth.collection` → `tables` / `defaultRls` / `schemaDir` / `hooks`; `setCollectionCallbacks` → `setTableHooks`; hook props `collection` / `row` → `table` / `values`; `composeTableHooks` from `@rebasepro/common`.
+- **`<RebaseCMS collections>` is gone; the panel renders the served tables.** `tableCustomizations` and `externalCollections` (and `tables` for embedding); the Vite collections plugin and `virtual:rebase-collections` are removed.
+- **Bundle format 3, runtime contract 2; format-2 bundles are refused.** Rebuild after migrating.
+- **The schema version is computed from tables (`v2:`).** A `v1:` database restamps once; generated SDKs read as stale once.
+- **Error codes name tables.** `NO_COLLECTIONS` → `NO_TABLES`, `COLLECTION_READ_ONLY` → `TABLE_READ_ONLY`; SDK `UNKNOWN_COLLECTION` → `UNKNOWN_TABLE`, `INVALID_COLLECTION_PATH` → `INVALID_TABLE_PATH`.
+- **The SDK addresses a table: `data.table(slug)`.** `collections` → `tables` (`tablesDictionary`), generated `CollectionName` / `CollectionsDictionary` → `TableName` / `TablesDictionary`, batch `{ collection }` → `{ table }` (SDK and `POST /api/data/_batch`), `CollectionClient` family → `TableClient`, offline `…PerCollection` → `…PerTable`. `rebase migrate sdk-calls` rewrites call sites.
+- **CLI: `--schema-dir`, not `--collections`.** `--collections` / `-c` are refused; `schema introspect` writes `backend/schema` (`--output` removed); `REBASE_STRICT_COLLECTION_CONFIG` is no longer read.
+- **The schema editor edits `backend/schema` with `TablePatch`.** `schema-editor/collection/*` and `property/*` routes → `GET /tables`, `POST /preview`, `POST /apply`; live schema `/plan` and `/apply` take `{ patches }`; `REBASE_LIVE_SCHEMA_COLLECTIONS_PATH` → `REBASE_LIVE_SCHEMA_PATH`; `liveSchema.repository.collectionsPath` → `schemaPath`.
+- **A component slot is a component.** String paths and lazy thunks are refused; `ComponentRef`, `ComponentLike`, `LazyComponentRef`, `isLazyComponentRef`, `asComponentRef`, `asReactComponent`, `resolveComponentRef`, `useResolvedComponent` removed.
+- **Panel preferences are UI preferences.** `UserConfigurationPersistence` takes `getTablePreferences` / `saveTablePreferences`; `PartialCollectionConfig` removed; stored browser preferences reset once; `userSelect` → a `.userId()` column.
+- **MongoDB is retired.** `@rebasepro/server-mongo` and the Mongo model are removed; Postgres is the only server engine.
+- **Firestore collections live in the frontend.** `defineFirestoreCollection` from `@rebasepro/firebase` in `frontend/src/cms`; cross-source references are stored as ids, and a Firestore reference whose `path` is also a Postgres slug now targets the table.
+- **MCP tools are named for tables.** Remote and local: `list_tables`, `describe_table`, `query_table`, `show_table`, `count_rows`, `aggregate_rows`, `get_row`, `create_row`, `update_row`, `delete_row`; the `collection` argument → `table`; `rebase_schema_plan` takes `patches`; resources `rebase://tables/{name}`. The MCP Apps view payload is version 2 (caller-redacted table descriptors and per-table grants), and the `collection-table` view is removed.
+- **The rule vocabulary names tables.** `policy.existsIn({ collection })` → `{ table }`, `tenant.from.membership.collection` → `.table`; a bare `access: "authenticated"` now admits any signed-in caller (it compiled to deny-all).
+- **Studio reads the tables from the server.** It needs a 0.31 runtime (`GET /api/schema/tables`); the JS console's `context.collections` → `context.tables`.
+- **`rls-check --format agent`: `remediation.rebase.securityRules` → `remediation.rebase.rls`**, format version 2.
+- **`@rebasepro/plugin-review`: `reviewSecurityRules` → `reviewRls`**, and the config checks take table descriptors.
+- **`@rebasepro/codegen` reads descriptors.** `generateSDK(tables)` / `generateTypedefs(tables)` take `TableDescriptor[]`.
+- **The agent skill `rebase-collections` is renamed `rebase-tables`.** `rebase skills install` removes the old copy — including from installs made before the skills manifest existed — and keeps any directory of that name you wrote yourself.
+
+### Added
+
+- **`defineTable`, `defineAuthTable` and `defineView`, with the column, relation, JSON and policy builders** (`col`, `rel`, `json`, `policy`) from `@rebasepro/server/schema` (an entry that loads no server code), compiled by `compileTables` (`@rebasepro/common`) into `TableDescriptor`s; one `SchemaDefinitionError` names every problem.
+- **`GET /api/schema/tables` (+ `/:slug`)**: the tables, redacted per caller, with ETag; `schemaTables: { public: true }`; codes `SCHEMA_UNAVAILABLE`, `TABLE_NOT_FOUND`. `/api/meta/contract` serves `tables`.
+- **`rebase migrate collections-to-tables`** (`--dry-run`, `--check`, `--json`, `--force`, `--skip-sdk-calls`) with a byte-identical SQL check, and **`rebase migrate sdk-calls`**.
+- **`customizeTable`** and zero-config `<RebaseCMS />`; `frontend/src/cms/`.
+- **UI preferences**: `rebase.ui_preferences`, `/api/admin/ui-config`, `frontend/src/cms/ui-config.json`; codes `UI_PREFERENCES_NEED_A_PERSON`, `UI_PREFERENCES_UNSUPPORTED`, `UI_CONFIG_FILE_INVALID`.
+- **`TablePatch`** (`@rebasepro/types`); `SCHEMA_EDIT_DOES_NOT_COMPILE`; a live apply serves the change without a restart.
+- **`Register.tables`**: server-side data typed from `backend/schema` with no codegen; `DatabaseOf`.
+- **`backend.setTableHooks`, `getTableDescriptors()`, `routes.schema()`, `services.tables()`, `loadBackendSchema`.**
+- **`col.custom(sqlType)`**: a column of any Postgres type the builders do not name (`timestamp`, `inet`, `interval`, `tsvector`, `money`, ranges, PostGIS); `db generate`, `db push` and boot create it, and only the shape of a type name is accepted.
+- **`examples/hybrid`**: Postgres tables and a Firestore collection referencing each other, laid out as `rebase init` lays a project out.
+- **A migration reference in the agent skills** for `rebase migrate collections-to-tables` and `rebase migrate sdk-calls`.
+- **Docs: the upgrade guide `upgrading/0-30-to-0-31`.**
+
+### Changed
+
+- **A new project is scaffolded with `backend/schema` and `frontend/src/cms`.** `rebase init --headless` has no `backend/schema` (introspection).
+- **`schema introspect` writes `defineTable` files** (and `customizeTable` panel hints with `--data-inference`).
+- **The RLS editor compares the server-compiled policies with the database's own** (`pg_policies`); the schema visualizer, SQL and JS editors read served tables.
+- **A foreign key between integer widths is accepted.** A `belongsTo` column of `integer` pointing at a `bigint` key keeps its own width; every other type mismatch is still refused.
+- **The site-settings and per-user preferences recipes** (`packages/cms/recipes`) are a table plus a customization: `siteSettings` + `siteSettingsCms`, `userPreferences` + `userPreferencesCms`.
+- **The agent skills and the repository's agent instructions teach tables** (`AGENTS.md`, `.agent/workflows`).
+
+### Removed
+
+- **`@rebasepro/server-mongo`**, `MongoDBCollectionConfig` and the Mongo model.
+- **The Vite collections plugin** (`rebaseCollectionsPlugin`, `virtual:rebase-collections`).
+- **`loadCollectionsFromDirectory`, `findCollectionConfigProblems`, `assertCollectionConfigs`, `loadUsersCollection`** and the legacy manifest fields.
+- **Docs: `backend/mongodb`** (301 to `/docs/compatibility/`).
+
+### Fixed
+
+- **A Firestore reference to a Postgres row** was written as a pointer to a Firestore document that does not exist; references between data sources are stored as ids and routed by their driver.
+- **A bare `access: "authenticated"` rule** compiled to deny-all; it admits any signed-in caller.
+- **Introspection keeps a declared temporal precision.** A `timestamptz(3)` or `time(0)` column is generated as `col.custom()` of that type, so a push no longer widens it to Postgres's default precision.
+
 ## [0.30.1] - 2026-11-11
 
 ### Added

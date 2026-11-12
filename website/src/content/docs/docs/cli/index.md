@@ -24,6 +24,8 @@ Or run any command without installing it: `pnpm dlx @rebasepro/cli <command>`.
 
 ### `rebase init`
 
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
 Initialize a new Rebase project:
 
 ```bash
@@ -179,6 +181,8 @@ read from `backend/`.
 
 ### `rebase schema generate` / `rebase schema stale`
 
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
 ```bash
 rebase schema generate       # backend/schema → backend/src/schema.generated.ts
 rebase schema stale          # name what differs from the tables, exit 1 if anything does
@@ -211,6 +215,8 @@ command picks its database; `push`, `generate` and `migrate` are covered in
 depth on [Schema Generation](/docs/cli/schema/).
 
 ### `rebase console`
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 A Node REPL with the project's data open, or one snippet run with `-e`:
 

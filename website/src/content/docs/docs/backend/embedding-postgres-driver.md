@@ -14,6 +14,8 @@ npm install @rebasepro/server-postgres @rebasepro/types express pg drizzle-orm
 
 ## Opening the driver and the socket
 
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
 `openPostgresDriver`
 and `postgresDriverConfigFromEnv` are exported.
 

@@ -86,6 +86,8 @@ reach a table's rows that goes around them.
 
 ### Narrowing a read with `beforeQuery`
 
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
 `afterRead` sees rows that have already been fetched, so it can redact a value
 but cannot stop the row being read. `beforeQuery` runs earlier: it is handed the
 parsed query and returns conditions to **AND** into it.

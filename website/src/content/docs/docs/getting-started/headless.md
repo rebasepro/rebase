@@ -100,6 +100,8 @@ the managed runtime does not read it from any file or from the environment. Only
 
 ### Generating table files instead
 
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
 If you would rather have the tables written down as TypeScript — for types, for
 hooks, for review — introspect them:
 
@@ -155,6 +157,8 @@ const { data: posts } = await rebase.data.table("posts").find({
   to describe until the section above has run
 
 ## `404 NO_TABLES`
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 If every data request answers with this:
 

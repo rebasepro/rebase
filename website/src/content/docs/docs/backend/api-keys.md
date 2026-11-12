@@ -176,6 +176,8 @@ administrator the same way.
 
 ## Personal keys
 
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
 A personal key acts **as its owner**: their uid, and their roles as they are at
 each request. Owner-style rules match it, so it reads exactly what its owner
 would, narrowed by its scopes. It suits a person's own scripts, a CLI on their

@@ -23,6 +23,8 @@ Rebase includes a complete backend authentication system:
 
 ## Configuration
 
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
 :::note[Where this goes]
 **Managed runtime:** environment — `JWT_SECRET`, `AUTH_*`, `SMTP_*`, `CAPTCHA_*` and the provider `*_CLIENT_ID` / `*_CLIENT_SECRET` pairs, one for each of the twelve providers ([the spellings](#the-environment-spellings); Apple's is four keys, not a pair). The users table is the [`defineAuthTable`](#the-users-table) exported from `backend/schema/index.ts`.
 **No managed route:** `auth.hooks`. They are functions; eject to pass them.

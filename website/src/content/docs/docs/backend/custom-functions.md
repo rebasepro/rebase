@@ -409,6 +409,8 @@ It is `getSql(c)` with a different identity: the restricted request role, the ad
 
 ### 4. `rebase.sql()` — owner SQL, and the one Node-only accessor
 
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
 If you genuinely need an unconditional bypass, `rebase.sql()` is it: raw SQL on the owner connection, no policies, every row. It is the most privileged thing in a function's context — more so than the accessor with "admin" in its name.
 
 It is not for making tables. A table is [declared](/docs/schema/) with `defineTable` in `backend/schema/` and created by boot; one made with `CREATE TABLE` in a function has no validation, hooks, row-level security posture, admin view or SDK type. `rebase.sql()` runs such a statement, and logs a warning naming the table to declare instead.

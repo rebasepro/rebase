@@ -66,6 +66,8 @@ two backends in one process, call the steps yourself. See
 
 ## Where each option lives
 
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
 That call is the **ejected** shape — the one you write yourself after `rebase
 eject`, or in a custom server. A scaffolded project does not have it: the
 published runtime boots the project, and each option arrives as an environment
@@ -104,6 +106,8 @@ Both paths reach the same `RebaseBackendConfig`. This is the whole map.
 
 ### Options with no managed route
 
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
 These have no environment variable and no module export. They are reachable
 only from a hand-written `initializeRebaseBackend` call — `rebase eject`, or a
 [custom server](/docs/backend/custom-server/):
@@ -138,6 +142,8 @@ After initialization, these routes are mounted:
 ---
 
 ## The Initialization Lifecycle
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 When you invoke `initializeRebaseBackend()`, the framework triggers a sequential, 5-stage boot sequence:
 
@@ -208,6 +214,8 @@ no `/livez` until you add one.
 ---
 
 ## Configuration Reference
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 ```typescript
 interface RebaseBackendConfig {

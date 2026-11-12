@@ -6,6 +6,8 @@ description: How Rebase uses the TypeScript tables in backend/schema as the sing
 
 ## The Core Idea
 
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
 In Rebase, the **tables you declare with `defineTable` in `backend/schema/` are the single source of truth**. From them, Rebase generates:
 
 - **PostgreSQL tables** via Drizzle ORM schema generation
@@ -21,6 +23,8 @@ This means your schema is:
 - **Portable** — the same definition is read by the backend, the CLI, the SDK generator and, as types, the frontend
 
 ## Visual Editing with AST Manipulation
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 Rebase also provides a **visual schema editor** in Studio. When someone uses it to add a column:
 
@@ -38,6 +42,8 @@ what the editor refuses.
 This "UI as Code Generator" approach means visual edits produce the same clean TypeScript a developer would write by hand.
 
 ## Schema Generation Pipeline
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 Your tables are read once and emitted twice — as a Drizzle schema the
 running server queries through, and as SQL that describes the database you meant
@@ -82,6 +88,8 @@ in your repository to fall behind. The migrations are what you commit. See
 [Schema Generation](/docs/cli/schema) for every flag.
 
 ### Example
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 Given this table:
 
@@ -174,6 +182,8 @@ When Rebase updates the database schema, it maps the tables you declare to datab
 5. **Index Ownership by Name**: Indexes are the one object that lives *on* a mapped table, so table filtering cannot protect them — and a push used to plan `DROP INDEX` for any index missing from the desired state, which meant every hand-written one. Rebase now names the indexes it generates `<table>_<columns>_ix_<7 hex>` (`_ux_` when unique), a shape no other namer here produces, and excludes everything else from the diff by name. An index you wrote by hand, or that came in through introspection, is never touched; a declaration you delete still drops, which is the intent. See **[Indexes](/docs/backend/indexes)**.
 
 ## Next Steps
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 - **[Tables](/docs/schema/)** — Every `defineTable` option
 - **[Columns](/docs/schema/columns/)** — Detailed column type mappings

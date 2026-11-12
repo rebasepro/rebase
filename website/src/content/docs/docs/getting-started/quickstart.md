@@ -109,6 +109,8 @@ docker compose up -d db
 
 ## Introspect an Existing Database (Optional)
 
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
 If you are connecting to an existing database with pre-existing tables, you can introspect it to generate a `defineTable` file for each one:
 
 ```bash
@@ -161,6 +163,8 @@ export { products } from "./products";
 
 ## Create the Table
 
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
 Save the file. That is the whole step: `rebase dev` regenerates
 `backend/src/schema.generated.ts` and the SDK types in `generated/sdk/` from your
 tables, restarts the backend, and boot creates the new table and its row-level
@@ -199,6 +203,8 @@ It runs on the
 managed database as on your own.
 
 ## Database Commands Reference
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 | Command | Description |
 |---------|-------------|

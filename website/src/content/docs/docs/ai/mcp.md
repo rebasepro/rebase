@@ -265,6 +265,8 @@ key-scoping guidance in full.
 
 ### Putting a table out of reach entirely
 
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
 The reason an admin credential reads everything is the baseline policy Rebase
 injects into each table, granting the trusted server context and the
 `admin` role. A table can opt out of that baseline and take full
@@ -298,6 +300,8 @@ only once `rebase schema generate` and a migration have applied the policies. Se
 [Row-level security](/docs/collections/security-rules).
 
 ## The loopback gate
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 `rebase_project_add` accepts any `baseUrl`, and the CLI tools connect with
 whatever `DATABASE_URL` the project declares. The same tool list that edits a
@@ -535,6 +539,8 @@ Each one, with what it needs and whether the gate refuses it against a non-local
 target, is in the [MCP tool reference](/docs/ai/mcp-tool-reference).
 
 ## Resources
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 Beyond tools, the server exposes MCP resources so a client can pull project
 context without spending a tool call:

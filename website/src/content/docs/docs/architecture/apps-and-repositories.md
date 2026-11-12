@@ -6,6 +6,8 @@ description: A project is a backend plus the apps that talk to it, which can eac
 
 ## Projects and apps
 
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
 A **project** is the backend: the database, auth, storage, realtime and
 functions. An **app** is something that talks to it.
 

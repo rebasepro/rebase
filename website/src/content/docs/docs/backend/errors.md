@@ -81,6 +81,8 @@ the ID you got. Read the response header.
 
 ## Authentication and accounts
 
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
 | Code | Status | Means | Do |
 | --- | --- | --- | --- |
 | `AAL2_REQUIRED` | 403 | The route needs a second factor and the session has only one. | Complete the MFA challenge, then retry. |
@@ -377,6 +379,8 @@ so a panel can grey the feature out instead of showing an error.
 | `SQL_EXPORT_UNSUPPORTED` | 501 | `POST /api/admin/sql/csv` cannot stream a result here: the in-process development database (PGlite) has one connection, and a cursor held across a download would hold every other query behind it; or the data source has no SQL cursor. | Point `DATABASE_URL` at a Postgres of your own (`rebase dev --docker` starts one), or add a `LIMIT` and export the rows on screen. |
 
 ### Schema reconcile
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 [`rebase schema reconcile`](/docs/cli/schema/#rebase-schema-reconcile) plans
 through `POST /api/admin/schema/reconcile/plan` and applies through

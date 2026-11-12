@@ -21,6 +21,8 @@ for the backend.
 
 ## Decision Table
 
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
 | I want to… | Mechanism | Scope | Reference |
 |---|---|---|---|
 | Replace the app bar | `components` (`Shell.AppBar`) | app | [Component Overrides](/docs/frontend/component-overrides) |
@@ -53,6 +55,8 @@ colour is invisible in one of the two themes. See
 ## Mechanisms in Detail
 
 ### Plugins
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 **Scope:** app.
 
@@ -105,6 +109,8 @@ Two modes: **Eject** (full replacement) or **Wrap** (augment the original).
 
 ### Entity Views
 
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
 **Scope:** entity (adds tabs).
 
 Custom views that appear as tabs in the entity detail page. Defined per table in `customizeTable`, or registered once on `<Rebase entityViews>` (or `<RebaseCMS entityViews>`) and named by `key` in a table's `entityViews`.
@@ -112,6 +118,8 @@ Custom views that appear as tabs in the entity detail page. Defined per table in
 → [Entity Views](/docs/frontend/entity-views)
 
 ### Entity Actions
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 **Scope:** entity.
 
@@ -130,6 +138,8 @@ Toolbar-level React components that receive `CollectionActionsProps` (selected e
 → [Entity Actions — Collection Actions](/docs/frontend/entity-actions#collection-actions)
 
 ### Custom view modes
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 **Scope:** collection (adds a view mode).
 
 A map, a calendar, a gallery, a timeline — another rendering of *the same rows*,
@@ -219,6 +229,8 @@ is another rendering of one collection's query. If your component ignores
 box and its record count, would be describing a query it does not render.
 
 ### `formView`
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 **Scope:** collection.
 
 Replaces the entire default entity form with a custom component, set with
@@ -263,6 +275,8 @@ panel shows, this is the wrong page. The server has its own ladder:
 → [Rebase doesn't do X](/docs/backend/extending)
 
 ## Precedence Summary
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 - **A table's `components` applies over global `components`** inside its collection. A collection replacement replaces both; a collection `wrap: true` override wraps the global override when there is one. See [Component Overrides](/docs/frontend/component-overrides#when-both-scopes-override-a-component).
 - **Collection `Actions` and `collection.actions` slot are additive** — `Actions` render first, then slot contributions.

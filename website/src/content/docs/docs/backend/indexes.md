@@ -410,6 +410,8 @@ this whole feature removes:
 
 ## Related
 
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
 - [Search](/docs/backend/search) — ranked full-text, which builds its own GIN
   index over a generated `tsvector`
 - [Vector search](/docs/sdk/aggregates-and-search#vector-search) — the ANN index over an

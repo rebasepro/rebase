@@ -53,6 +53,8 @@ export function ColorPickerField({ value, setValue, error, showError, minimalist
 
 ### FieldProps
 
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
 | Prop | Type | Description |
 |------|------|-------------|
 | `value` | `T` | Current field value |

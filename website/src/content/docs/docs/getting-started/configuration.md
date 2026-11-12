@@ -426,6 +426,8 @@ The environment is not valid:
 
 ## Backend Config Object
 
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
 The `RebaseBackendConfig` passed to `initializeRebaseBackend()` provides programmatic control:
 
 ```typescript

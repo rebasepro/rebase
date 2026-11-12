@@ -39,6 +39,8 @@ should show Rebase's sign-in first.
 
 ## What a panel shows
 
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
 A panel draws the table as the admin does — from the descriptor the server
 serves, with any `customizeTable` you registered. These props narrow it to what
 your page needs; none of them changes the table's own page in the admin.

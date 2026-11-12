@@ -13,6 +13,8 @@ unless you opt out.
 
 ## Schema & database (13)
 
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
 Spawn the Rebase CLI in the active project directory.
 
 | Tool | Required | Description |
@@ -32,6 +34,8 @@ Spawn the Rebase CLI in the active project directory.
 | `rebase_db_branch_switch` | — | Point this checkout at a branch, or back at the main database (admins only) |
 
 ## Schema planning (1)
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 Asks the backend what a change would do, over `POST /api/admin/schema/plan`. No
 CLI, and nothing written to disk — it works on the managed development database,

@@ -4,6 +4,8 @@ sidebar_label: AI Instruction Files
 description: Every scaffolded Rebase project ships ai-instructions.md plus pointer files for Claude, Cursor, Windsurf, Copilot and AGENTS.md that carry the five rules assistants break most — one source of truth, many filenames.
 ---
 
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
 Every assistant wants its rules in a different file. Claude Code reads
 `CLAUDE.md`, Cursor reads `.cursorrules`, Windsurf reads `.windsurfrules`,
 Copilot reads `.github/copilot-instructions.md`, and the cross-vendor convention
@@ -80,6 +82,8 @@ whatever the last project on that machine persisted. See
 
 ## Why a pointer rather than a copy
 
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
 The pointer files hold almost nothing. A file that names the real one keeps the
 conventions in one place, and it has properties a copy does not:
 
@@ -103,6 +107,8 @@ The pattern is worth keeping if you fork the scaffold, and worth adopting in
 repos that are not Rebase projects at all.
 
 ## What `ai-instructions.md` starts with
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 The scaffolded file is deliberately short — it points at
 [`rebase skills install`](/docs/ai/skills) for depth, then states the rules that

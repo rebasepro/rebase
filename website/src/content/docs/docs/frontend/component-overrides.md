@@ -106,6 +106,8 @@ module loads, with what to write instead.
 
 ### When both scopes override a component
 
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
 The two scopes compose. The app-level override (`<Rebase components>`) is applied to the built-in component first, and the table's (`components` in `customizeTable`) is applied to the result:
 
 | App level | Collection level | What renders inside that collection |

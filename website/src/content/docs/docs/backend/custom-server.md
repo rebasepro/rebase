@@ -72,6 +72,8 @@ See `.env.example` in the scaffolded app for the full list of supported variable
 
 ## One step under `initializeRebaseBackend`
 
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
 `initializeRebaseBackend` is these calls, and nothing else:
 
 ```typescript
@@ -254,6 +256,8 @@ schema off for any backend in the process. `initializeRebaseBackend` passes
 `false` when `REBASE_PROVISION=false`.
 
 ## Mounting only the groups you want
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 `backend.routes` holds the route groups. Each one is a Hono sub-app you can
 mount on its own, at any path:

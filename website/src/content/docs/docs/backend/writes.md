@@ -218,6 +218,8 @@ would take every "new this week" query with it.
 
 #### Not on the auth table
 
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
 The auth table (the one declared with `defineAuthTable`) refuses an upsert on every
 door — `?on_conflict=`, `/bulk` with `upsert: true`, a `_batch` `upsert`
 operation, the SDK's `upsert()` and the realtime socket — with a `400`

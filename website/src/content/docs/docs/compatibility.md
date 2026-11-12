@@ -38,6 +38,8 @@ publication.
 
 ## Readiness by subsystem
 
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
 **Last revised 14 September 2026, against 0.21.0.** Re-read it at each minor; a
 rating that has not moved in three releases is either settled or forgotten, and
 this note is here so the difference gets checked.
@@ -138,6 +140,8 @@ this project accepts. Named `rebase` rather than `runtime` deliberately, because
 `runtime` already means *who owns the process* (`managed` | `custom`) on an app.
 
 ### 2 — `BUNDLE_FORMAT_VERSION` (currently 3)
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 The on-disk layout of a built bundle. A runtime refuses a bundle whose format is
 newer than its own, and reads an older one where the layout allows it, which is
@@ -263,6 +267,8 @@ Two more identifying signals, neither of which gates anything on its own:
 
 ### 6 — Derived database identifiers
 
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
 Every name this framework works out for itself rather than being told: a foreign
 key column, a foreign key constraint, a junction table and its two key columns, an
 enum type, a policy name, a `camelCase` column key's `snake_case` column. Since
@@ -334,6 +340,8 @@ the same tables through different code, and a project pushed once and booted
 later must not end up with two schemas.
 
 ## What is *not* frozen
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 Said plainly, so nobody infers a promise that was never made:
 

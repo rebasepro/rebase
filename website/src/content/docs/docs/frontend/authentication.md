@@ -82,6 +82,8 @@ The login view handles:
 
 ## Roles Model
 
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
 Roles are stored as a `text[]` array column on the users table. You state the
 roles a user may hold as a closed set on that column, in the table declared
 with [`defineAuthTable`](/docs/schema/auth-table/):

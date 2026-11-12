@@ -149,6 +149,8 @@ directory — useful for a separate frontend repo that talks to a Rebase backend
 
 ## The 24 skills
 
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
 | Skill | Covers |
 |---|---|
 | `rebase-basics` | Core principles, workflow and maintenance — the entry point the others assume |

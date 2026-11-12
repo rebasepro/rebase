@@ -83,6 +83,8 @@ host you end up connecting to is not the one you wrote.
 
 ## `SchemaDefinitionError` — the schema does not compile
 
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
 Boot, `rebase db generate`, `db push`, `generate-sdk` and `doctor` compile the
 tables `backend/schema/index.ts` exports before anything else, and stop when any
 table does not compile — no `rls`, `"inherit"` with no `defaultRls`, a relation
@@ -91,6 +93,8 @@ leaves out — naming every table, key and problem at once. Fix each one;
 `rebase verify` reports the same list without starting anything.
 
 ## `config/collections` is refused
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 A project from before 0.31 keeps its data model in `config/collections`, which
 nothing reads any more: the runtime, every CLI command and a format-2 bundle
@@ -115,6 +119,8 @@ error), the config is already right and what is missing is the library on the
 server or a role allowed to run `CREATE EXTENSION vector;`.
 
 ## The database refused the statement
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 ```
 DB_PERMISSION_DENIED — Permission denied by the database on "notes"
@@ -199,6 +205,8 @@ Pass `--port` to pin one, or stop the other process. In production there is no
 retry: the configured port is the port, and `EADDRINUSE` is fatal.
 
 ## The backend crashed and `rebase dev` kept running
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 A backend that throws on boot does not stop the watcher — it prints the stack and
 waits for a file change. When the backend has not announced itself within

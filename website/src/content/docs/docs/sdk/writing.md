@@ -93,6 +93,8 @@ the two cannot be combined (`INVALID_CONFLICT_RULE`).
 
 #### Not on the auth table
 
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
 `upsert()` on the auth table (the one declared with `defineAuthTable`) is refused
 with a 400 (`INVALID_CONFLICT_TARGET`), and so is `createMany` with `upsert`
 there. Creating a user and changing one follow different rules — a create

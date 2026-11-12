@@ -347,6 +347,9 @@ a reference at a Firestore collection by that collection's slug. See
 `query_table`, `get_document` → `get_row`, `create_document` → `create_row`,
 `update_document` → `update_row`, `delete_document` → `delete_row`;
 `rebase_schema_plan` takes `patches`; resources are `rebase://tables/{name}`.
+The MCP Apps view payload is version 2: caller-redacted table descriptors
+and per-table grants, with blocks and seeds naming `table`. The
+`collection-table` view is removed.
 
 **What to do:** rename. See [MCP tool reference](/docs/ai/mcp-tool-reference/)
 and [Remote MCP](/docs/ai/remote-mcp/).
@@ -408,3 +411,18 @@ take `TableDescriptor[]` — what `compileTables` returns and
 `GET /api/schema/tables` serves — instead of collections.
 
 **What to do:** compile your definitions first, or use `rebase generate-sdk`.
+
+## 128. The agent skill `rebase-collections` is `rebase-tables`
+
+**Who this hits:** a project with the agent skills installed, and prompts or
+instruction files that name the skill.
+
+**What changed:** the skill that teaches the data model is `rebase-tables`:
+authoring tables, columns, relations, `rls`, hooks, and the CMS layer on top.
+`rebase skills install` removes the old `rebase-collections` copy, including
+from installs made before the skills manifest existed, and keeps any directory
+of that name you wrote yourself.
+
+**What to do:** run `rebase skills install` after upgrading. The steps
+`rebase migrate collections-to-tables` prints say so too. Rename the skill in
+any instruction file that names it. See [Agent Skills](/docs/ai/skills/).

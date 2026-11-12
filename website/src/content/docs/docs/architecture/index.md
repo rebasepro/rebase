@@ -81,6 +81,8 @@ Like drivers, storage backends are registered in a registry. You can have multip
 
 ## Package Map
 
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
 | Package | Role | Used By |
 |---------|------|---------|
 | `@rebasepro/types` | The table builders (`defineTable`, `col`, `rel`), the descriptors, and the interfaces every package shares | Everything |

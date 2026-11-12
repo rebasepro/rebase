@@ -108,6 +108,8 @@ first admin](#your-first-admin).
 
 ### The schema
 
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
 The runtime creates missing tables at boot, **including the ones `backend/schema` declares** —
 `REBASE_MIGRATE_ON_BOOT` defaults to `ensure`, which is additive across the whole
 schema and applies row-level security with it. A first `docker compose up`

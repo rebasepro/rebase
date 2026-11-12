@@ -6,6 +6,8 @@ description: How a Rebase project separates into a project bundle and a versione
 
 ## The two halves of a deployment
 
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
 A Rebase deployment is two things, not one:
 
 - **The bundle** — your project. Compiled tables, hooks, functions and cron
@@ -99,6 +101,8 @@ bundle so there is no second install; a deployment installs the bundle's own
 `package.json` instead.
 
 ## Compatibility
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 Two version numbers govern whether a bundle and a runtime can work together, and
 they are deliberately not the package version.

@@ -238,6 +238,8 @@ hand-written row type has no relations in it to check against, and the server's
 
 ### Relation Names
 
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
 The names you pass to `include()` are the keys of the table's `relations`:
 
 ```ts

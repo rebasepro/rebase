@@ -4,6 +4,8 @@ sidebar_label: Customizing the Admin
 description: How to customize the Rebase admin — building blocks, hooks and places, with tested recipes for singletons, per-user settings, bulk actions, calendar views, dashboards and custom login screens.
 ---
 
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
 The admin is built from parts you can use yourself. To customize it you write
 an ordinary React component and put it in a place. That is the whole model:
 
@@ -34,6 +36,8 @@ import only public packages: copy one into your project as-is.
 The `README.md` beside them is the full reference of building blocks, hooks and places.
 
 ## Example: a singleton
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 A singleton is not a special kind of table. It is an ordinary table whose page
 always opens the same row. `RecordForm` given an id edits that record, and
@@ -92,6 +96,8 @@ validates only what it shows — see
 [Panels in a page of your own](/docs/frontend/panels).
 
 ## Places
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 | To add… | Put a component in |
 |---|---|

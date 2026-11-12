@@ -64,6 +64,8 @@ export function ArticlePreview({ row, modifiedValues }: EntityCustomViewParams) 
 
 ### EntityCustomViewParams
 
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
 | Prop | Type | Description |
 |------|------|-------------|
 | `row` | `Record<string, unknown>` | The saved record as the server sends the row: dates as ISO strings, a belongsTo as its foreign-key column, `id` only where the table has that column. Absent while a new one is being created |
