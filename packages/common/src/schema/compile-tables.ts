@@ -721,6 +721,10 @@ function compileOne(
         if (def.auth.roles !== undefined) authDescriptor.roles = def.auth.roles;
         if (def.auth.scopes !== undefined) authDescriptor.scopes = def.auth.scopes;
         if (def.auth.personalKeys !== undefined) authDescriptor.personalKeys = def.auth.personalKeys;
+        const authHooks: { onCreateUser?: true; onResetPassword?: true } = {};
+        if (typeof def.auth.onCreateUser === "function") authHooks.onCreateUser = true;
+        if (typeof def.auth.onResetPassword === "function") authHooks.onResetPassword = true;
+        if (Object.keys(authHooks).length > 0) authDescriptor.hooks = authHooks;
         descriptor.auth = authDescriptor;
     }
 

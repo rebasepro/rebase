@@ -443,6 +443,18 @@ describe("printTableSource / printTableModule", () => {
         expect(printTableSource(table, { sources: { auth: { onResetPassword: "async () => ({})" } } }).code).toContain("auth: { onResetPassword: async () => ({}) }");
     });
 
+    it("prints a descriptor's user-lifecycle hook flags from their source, and refuses them without", () => {
+        const table = defineAuthTable("members", {
+            columns: { id: col.uuid().primaryKey() },
+            rls: "admin-only",
+            auth: { personalKeys: true, onCreateUser: async () => ({}), onResetPassword: async () => ({}) }
+        });
+        const [descriptor] = compileTables([table]);
+        expect(() => printTableSource(descriptor)).toThrow(/members\.auth\.onCreateUser/);
+        const sources = { auth: { onCreateUser: "inviteUser", onResetPassword: "sendReset" } };
+        expect(printTableSource(descriptor, { sources }).code).toContain("auth: { personalKeys: true, onCreateUser: inviteUser, onResetPassword: sendReset }");
+    });
+
     it("refuses a hook without its source, and takes the whole `hooks` expression as one string", () => {
         expect(() => printTableSource(posts, { sources: { transforms: FIXTURE_TRANSFORMS.posts } })).toThrow(/posts\.hooks\.beforeSave/);
         const code = printTableSource(posts, { sources: { transforms: FIXTURE_TRANSFORMS.posts, hooks: "postHooks" } }).code;

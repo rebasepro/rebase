@@ -541,22 +541,32 @@ function checkKnownKeys(config: object, known: ReadonlySet<string>, path: string
     }
 }
 
-function authDoc(auth: object, state: TableState, sources: TableSources["auth"]): Doc | undefined {
+function authDoc(auth: object, state: TableState, sources: TableSources["auth"], declaredHooks: readonly AuthHookName[] = []): Doc | undefined {
     const entries: [string, Doc][] = [];
+    const hookDoc = (key: AuthHookName): Doc => {
+        const source = sources?.[key];
+        if (source === undefined) {
+            throw new TablePrintError(`${state.label}.auth.${key}`, `it is a function, which cannot be printed from its value. Pass its source text as \`sources.auth.${key}\`.`);
+        }
+        return text(source);
+    };
     for (const [key, value] of Object.entries(auth)) {
         if (value === undefined) continue;
         if (typeof value === "function") {
-            const source = key === "onCreateUser" ? sources?.onCreateUser : key === "onResetPassword" ? sources?.onResetPassword : undefined;
-            if (source === undefined) {
-                throw new TablePrintError(`${state.label}.auth.${key}`, `it is a function, which cannot be printed from its value. Pass its source text as \`sources.auth.${key}\`.`);
+            if (key !== "onCreateUser" && key !== "onResetPassword") {
+                throw new TablePrintError(`${state.label}.auth.${key}`, "it is a function, and only `onCreateUser` and `onResetPassword` are.");
             }
-            entries.push([key, text(source)]);
+            entries.push([key, hookDoc(key)]);
         } else {
             entries.push([key, valueDoc(value, `${state.label}.auth.${key}`)]);
         }
     }
+    for (const key of declaredHooks) entries.push([key, hookDoc(key)]);
     return entries.length > 0 ? object(entries) : undefined;
 }
+
+/** A user-lifecycle hook of `defineAuthTable`'s `auth`. */
+type AuthHookName = "onCreateUser" | "onResetPassword";
 
 function newState(name: string, identifier: string, options: PrintTableOptions, isSelf: TableState["isSelf"]): TableState {
     return {
@@ -693,7 +703,10 @@ function descriptorDoc(descriptor: TableDescriptor, state: TableState, options: 
     put("strictWrites", descriptor.strictWrites);
     put("metadata", descriptor.metadata);
     if (descriptor.auth !== undefined) {
-        const doc = authDoc(descriptor.auth, state, options.sources?.auth);
+        // The hook flags stand for code that never left the server: printed from `sources.auth`.
+        const { hooks: authHooks, ...authOptions } = descriptor.auth;
+        const declared = (["onCreateUser", "onResetPassword"] as const).filter(name => authHooks?.[name] === true);
+        const doc = authDoc(authOptions, state, options.sources?.auth, declared);
         if (doc) entries.push(["auth", doc]);
     }
     return call(auth ? "defineAuthTable" : "defineTable", [text(printString(descriptor.name)), object(entries, true)]);

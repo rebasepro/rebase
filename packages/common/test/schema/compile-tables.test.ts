@@ -567,6 +567,24 @@ describe("compileTables — table options", () => {
         expect(u.columns.find(c => c.key === "email")?.private).toBeUndefined();
     });
 
+    it("says which user-lifecycle hooks the auth table declares, never their code", () => {
+        const members = defineAuthTable("members", {
+            columns: { id: col.uuid().primaryKey() },
+            rls: "admin-only",
+            auth: { onCreateUser: async () => ({}) }
+        });
+        const both = defineAuthTable("people", {
+            columns: { id: col.uuid().primaryKey() },
+            rls: "admin-only",
+            auth: { onCreateUser: async () => ({}), onResetPassword: async () => ({}) }
+        });
+        expect(compileTables([members])[0].auth).toEqual({ hooks: { onCreateUser: true } });
+        expect(compileTables([both])[0].auth).toEqual({ hooks: { onCreateUser: true, onResetPassword: true } });
+        expect(JSON.parse(JSON.stringify(compileTables([both])[0].auth))).toEqual({ hooks: { onCreateUser: true, onResetPassword: true } });
+        // None declared: no `hooks` key.
+        expect(byName("users").auth).not.toHaveProperty("hooks");
+    });
+
     it("makes a secret private by its SQL column too, and only on the auth table", () => {
         const store = defineAuthTable("accounts", {
             columns: { id: col.uuid().primaryKey(), token: col.text().column("email_verification_token") },

@@ -293,6 +293,12 @@ export interface AuthTableDescriptor {
     scopes?: Record<string, ScopeDefinition>;
     /** Whether users may create personal API keys. */
     personalKeys?: boolean;
+    /**
+     * Which user-lifecycle hooks `defineAuthTable`'s `auth` declares. Their
+     * code never leaves the server; a client reads this to know, for example,
+     * that creating a user sends an invitation.
+     */
+    hooks?: { onCreateUser?: true; onResetPassword?: true };
 }
 
 /**
