@@ -22,7 +22,8 @@ function sameDeps(a: readonly unknown[] | undefined, b: readonly unknown[] | und
     return a !== undefined && b !== undefined && a.length === b.length && a.every((dep, i) => Object.is(dep, b[i]));
 }
 
-function useMemo<T>(factory: () => T, deps?: readonly unknown[]): T {
+/** `useMemo`, kept in the slot of its call order. */
+function memoize<T>(factory: () => T, deps?: readonly unknown[]): T {
     const index = cursor++;
     const slot = slots[index];
     if (slot && sameDeps(slot.deps, deps)) return slot.value as T;
@@ -32,9 +33,9 @@ function useMemo<T>(factory: () => T, deps?: readonly unknown[]): T {
 }
 
 jest.mock("react", () => ({
-    useMemo,
-    useCallback: <T>(callback: T, deps?: readonly unknown[]): T => useMemo(() => callback, deps),
-    useRef: <T>(initial: T): { current: T } => useMemo(() => ({ current: initial }), []),
+    useMemo: memoize,
+    useCallback: <T>(callback: T, deps?: readonly unknown[]): T => memoize(() => callback, deps),
+    useRef: <T>(initial: T): { current: T } => memoize(() => ({ current: initial }), []),
     useEffect: () => undefined
 }));
 
