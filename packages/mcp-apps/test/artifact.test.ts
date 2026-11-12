@@ -34,8 +34,8 @@ describe("ArtifactBridge", () => {
             structuredContent: { count: 3 }
         }));
         const bridge = new ArtifactBridge(mcp, "Rebase", () => "light");
-        const result = await bridge.callTool("query", { project: "shop", collection: "orders", count: true });
-        expect(mcp.calls).toEqual([["Rebase", "query", { project: "shop", collection: "orders", count: true }, { cache: false }]]);
+        const result = await bridge.callTool("query", { project: "shop", table: "orders", count: true });
+        expect(mcp.calls).toEqual([["Rebase", "query", { project: "shop", table: "orders", count: true }, { cache: false }]]);
         expect(result).toEqual({ content: [{ type: "text", text: "{\"count\":3}" }, { type: "image" }], structuredContent: { count: 3 } });
     });
 
@@ -121,12 +121,12 @@ describe("readPageApp", () => {
         return doc;
     }
 
-    it("reads the app's connector, project, title, collections and code", () => {
-        const doc = page('{"project":"shop","title":"Desk","collections":["orders",3],"connector":"Rebase EU"}', "export default function A() { return null; }");
+    it("reads the app's connector, project, title, tables and code", () => {
+        const doc = page('{"project":"shop","title":"Desk","tables":["orders",3],"connector":"Rebase EU"}', "export default function A() { return null; }");
         expect(readPageApp(doc)).toEqual({
             project: "shop",
             title: "Desk",
-            collections: ["orders"],
+            tables: ["orders"],
             connector: "Rebase EU",
             code: "export default function A() { return null; }"
         });
@@ -134,8 +134,10 @@ describe("readPageApp", () => {
 
     it("says which block is missing or malformed", () => {
         expect(readPageApp(page(undefined, "x"))).toContain("no #rebase-app block");
-        expect(readPageApp(page('{"collections":["a"]}', " "))).toContain("no #rebase-app-code block");
+        expect(readPageApp(page('{"tables":["a"]}', " "))).toContain("no #rebase-app-code block");
         expect(readPageApp(page("{nope", "x"))).toBe("The #rebase-app block is not valid JSON.");
-        expect(readPageApp(page('{"collections":[]}', "x"))).toBe("The #rebase-app block names no collections.");
+        expect(readPageApp(page('{"tables":[]}', "x"))).toContain("The #rebase-app block names no tables");
+        // The key of before the rename names nothing.
+        expect(readPageApp(page('{"collections":["orders"]}', "x"))).toContain("names no tables");
     });
 });

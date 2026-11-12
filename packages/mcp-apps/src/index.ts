@@ -19,19 +19,10 @@ export interface McpAppView {
 
 export const MCP_APPS: readonly McpAppView[] = [
     {
-        // The URI show_collection, show_record and show_app name (`MCP_APP_URI` in the server).
+        // The URI show_table, show_record and show_app name (`MCP_APP_URI` in the server).
         uri: "ui://rebase/app.html",
         name: "Rebase",
-        description: "A project's collections, records and counts, in the Rebase admin panel's own views, where the connection may read and change them.",
-        html: appHtml
-    },
-    {
-        // What show_collection named before (`COLLECTION_TABLE_URI`): the same
-        // document, for a host still holding a tool listing from then. It
-        // draws the old table for a result that carries only its columns.
-        uri: "ui://rebase/collection-table.html",
-        name: "Collection table",
-        description: "Rows of a Rebase collection, in the admin panel's collection view.",
+        description: "A project's tables, rows and counts, in the Rebase admin panel's own views, where the connection may read and change them.",
         html: appHtml
     }
 ];

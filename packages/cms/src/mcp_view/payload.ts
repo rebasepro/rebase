@@ -2,15 +2,17 @@
  * The screen a show_* tool asked for, read from its result
  * (`McpViewPayload` in the server's `mcp/mcp-view.ts`).
  *
- * A result with no payload is one from a server that only knew the table
- * (show_collection before 0.29): the view draws that table.
+ * The payload carries the descriptors of the tables the screen draws, as the
+ * server serves this caller (columns they may not read and raw policy SQL
+ * already left out), and what the connection was granted on each. The view
+ * renders them as the admin panel renders the tables `GET /api/schema/tables`
+ * serves: projected, with the project's `customizeTable` customizations where
+ * the view was built from the project's frontend.
  */
 import {
     ALL_WHERE_FILTER_OPS,
-    deserializeCollections,
-    getCollectionDataPath,
-    type CollectionConfig,
     type FilterValues,
+    type TableDescriptor,
     type WhereFilterOp
 } from "@rebasepro/types";
 import type { AdminCollection } from "@rebasepro/cms-types";
@@ -19,10 +21,12 @@ import { DEFAULT_ACTIONS, textOf, type SeedPage, type ToolAction, type ViewActio
 
 export type ViewMode = "table" | "list" | "cards" | "kanban";
 
-export interface CollectionBlock {
+/** Rows of one table, in the admin panel's collection view (show_table). */
+export interface TableBlock {
     key: string;
-    type: "collection";
-    collection: string;
+    type: "table";
+    /** The table's slug, as the tools take it. */
+    table: string;
     view?: ViewMode;
     where?: Record<string, unknown>;
     orderBy?: unknown;
@@ -30,43 +34,58 @@ export interface CollectionBlock {
     limit?: number;
 }
 
+/** One row's form, or a new row's (show_record). */
 export interface RecordBlock {
     key: string;
     type: "record";
-    collection: string;
+    table: string;
     id?: string;
     values?: Record<string, unknown>;
 }
 
-/** An app the model wrote: compiled CommonJS, and the collections it reads. */
+/** An app the model wrote: compiled CommonJS, and the tables it reads. */
 export interface AppBlock {
     key: string;
     type: "app";
     code: string;
-    collections: string[];
+    tables: string[];
 }
 
-export type Block = CollectionBlock | RecordBlock | AppBlock;
+export type Block = TableBlock | RecordBlock | AppBlock;
+
+/** What the connection's scopes allow on one table. */
+export interface TableGrant {
+    read: boolean;
+    write: boolean;
+    delete: boolean;
+}
 
 export interface Screen {
     title?: string;
     blocks: Block[];
-    collections: AdminCollection[];
+    /** The descriptors the screen draws, as the server serves this caller. */
+    tables: TableDescriptor[];
+    /** What the connection was granted on each table in {@link tables}, by slug. */
+    grants: Record<string, TableGrant>;
     viewer: { uid: string; roles: string[] };
     actions: ViewActions;
-    /** The page show_collection read for the model: what the collection block reads first. */
+    /** The page show_table read for the model: what the table block reads first. */
     firstPage?: SeedPage;
-    /** The pages show_app read ahead of the app's first render, one per collection it names. */
+    /** The pages show_app read ahead of the app's first render, one per table it names. */
     seeds?: SeedPage[];
 }
 
 export type Parsed =
     | { kind: "screen"; screen: Screen }
-    /** A result from before the admin panel's views: the table's own columns. */
-    | { kind: "table" }
     | { kind: "error"; message: string };
 
-const PAYLOAD_VERSION = 1;
+/**
+ * The payload version this view draws: `MCP_VIEW_PAYLOAD_VERSION` in the
+ * server's `mcp/mcp-view.ts`, bumped together. A host fetches the view for
+ * the listing it holds (its address carries the document's hash), so a
+ * mismatch is a host holding a stale document.
+ */
+export const PAYLOAD_VERSION = 2;
 
 export function parseResult(result: ToolResult): Parsed {
     if (result.isError) return { kind: "error", message: textOf(result) ?? "The view could not be opened." };
@@ -75,22 +94,21 @@ export function parseResult(result: ToolResult): Parsed {
         return { kind: "error", message: "This view needs the tool's structured result, and the host did not pass it." };
     }
     const view = content.view;
-    if (!isRecord(view)) {
-        return Array.isArray(content.columns)
-            ? { kind: "table" }
-            : { kind: "error", message: "The result carries nothing this view can draw." };
-    }
+    if (!isRecord(view)) return { kind: "error", message: "The result carries nothing this view can draw." };
     if (view.version !== PAYLOAD_VERSION) {
-        return { kind: "error", message: "This view is older than the server that answered; it cannot draw this screen." };
+        return {
+            kind: "error",
+            message: typeof view.version === "number" && view.version > PAYLOAD_VERSION
+                ? "This view is older than the server that answered; it cannot draw this screen."
+                : "This view is newer than the server that answered; it cannot draw this screen."
+        };
     }
-    const collections = Array.isArray(view.collections)
-        ? deserializeCollections(view.collections) as AdminCollection[]
-        : [];
+    const tables = Array.isArray(view.tables) ? view.tables.filter(isTableDescriptor) : [];
     const blocks = Array.isArray(view.blocks) ? view.blocks.filter(isBlock) : [];
     if (blocks.length === 0) return { kind: "error", message: "The screen has no blocks." };
     const viewer = isRecord(view.viewer) ? view.viewer : {};
     // When the server read the rows the result carries: they are that old
-    // however late the host draws it. A server from before the stamp sends none.
+    // however late the host draws it.
     const readAt = typeof view.readAt === "number" && Number.isFinite(view.readAt) ? view.readAt : undefined;
     const stamped = (page: SeedPage): SeedPage => readAt === undefined ? page : { ...page, readAt };
     const firstPage = firstPageOf(blocks[0], content);
@@ -100,7 +118,8 @@ export function parseResult(result: ToolResult): Parsed {
         screen: {
             ...(typeof view.title === "string" && { title: view.title }),
             blocks,
-            collections,
+            tables,
+            grants: grantsOf(view.grants, tables),
             viewer: {
                 uid: typeof viewer.uid === "string" ? viewer.uid : "",
                 roles: Array.isArray(viewer.roles) ? viewer.roles.filter((role): role is string => typeof role === "string") : []
@@ -112,17 +131,41 @@ export function parseResult(result: ToolResult): Parsed {
     };
 }
 
+/** A descriptor as the wire carries it: checked for the fields the projector reads first. */
+function isTableDescriptor(value: unknown): value is TableDescriptor {
+    return isRecord(value)
+        && typeof value.slug === "string"
+        && typeof value.table === "string"
+        && Array.isArray(value.columns)
+        && Array.isArray(value.relations)
+        && Array.isArray(value.primaryKey)
+        && isRecord(value.rls);
+}
+
+/** Each table's grant as sent; a table the server sent none for is read-only. */
+function grantsOf(raw: unknown, tables: readonly TableDescriptor[]): Record<string, TableGrant> {
+    const sent = isRecord(raw) ? raw : {};
+    return Object.fromEntries(tables.map(table => {
+        const grant = sent[table.slug];
+        return [table.slug, {
+            read: !isRecord(grant) || grant.read !== false,
+            write: isRecord(grant) && grant.write === true,
+            delete: isRecord(grant) && grant.delete === true
+        }];
+    }));
+}
+
 /**
- * The rows a show_collection result carries beside its screen — the page the
+ * The rows a show_table result carries beside its screen — the page the
  * server read for the model — and the arguments that read them: the block's,
  * with the window the server says it read.
  */
 function firstPageOf(block: Block, content: Record<string, unknown>): SeedPage | undefined {
-    if (block.type !== "collection" || !Array.isArray(content.data)) return undefined;
+    if (block.type !== "table" || !Array.isArray(content.data)) return undefined;
     const meta = isRecord(content.meta) ? content.meta : {};
     const limit = typeof meta.limit === "number" ? meta.limit : block.limit;
     return {
-        collection: block.collection,
+        collection: block.table,
         args: {
             ...(block.where && { where: block.where }),
             ...(block.orderBy !== undefined && { orderBy: block.orderBy }),
@@ -136,9 +179,9 @@ function firstPageOf(block: Block, content: Record<string, unknown>): SeedPage |
 
 /** One page show_app read ahead, as the server sent it; nothing for one malformed. */
 function seedOf(value: unknown): SeedPage[] {
-    if (!isRecord(value) || typeof value.collection !== "string" || !isRecord(value.args) || !Array.isArray(value.rows)) return [];
+    if (!isRecord(value) || typeof value.table !== "string" || !isRecord(value.args) || !Array.isArray(value.rows)) return [];
     return [{
-        collection: value.collection,
+        collection: value.table,
         args: value.args,
         rows: value.rows.filter(isRecord),
         ...(typeof value.total === "number" && { total: value.total })
@@ -147,8 +190,8 @@ function seedOf(value: unknown): SeedPage[] {
 
 function isBlock(value: unknown): value is Block {
     if (!isRecord(value) || typeof value.key !== "string") return false;
-    if (value.type === "app") return typeof value.code === "string" && Array.isArray(value.collections);
-    return typeof value.collection === "string" && (value.type === "collection" || value.type === "record");
+    if (value.type === "app") return typeof value.code === "string" && Array.isArray(value.tables);
+    return typeof value.table === "string" && (value.type === "table" || value.type === "record");
 }
 
 /**
@@ -171,10 +214,9 @@ export function actionsOf(raw: unknown): ViewActions {
     };
 }
 
-/** The collection a block names: by the name the tools take, which is its data path, or by slug. */
+/** The collection a table's slug names: the table's view in the admin panel has the same slug. */
 export function findCollection(collections: readonly AdminCollection[], name: string): AdminCollection | undefined {
-    return collections.find(collection => getCollectionDataPath(collection as CollectionConfig) === name)
-        ?? collections.find(collection => collection.slug === name);
+    return collections.find(collection => collection.slug === name);
 }
 
 /**

@@ -90,7 +90,7 @@ describe("the tool call that opened the view", () => {
     it("reaches a handler set after it arrived", async () => {
         const bridge = new McpAppBridge(host);
         await connected(bridge);
-        deliver({ jsonrpc: "2.0", method: "ui/notifications/tool-input", params: { arguments: { collection: "posts" } } });
+        deliver({ jsonrpc: "2.0", method: "ui/notifications/tool-input", params: { arguments: { table: "posts" } } });
         deliver({
             jsonrpc: "2.0", method: "ui/notifications/tool-result",
             params: { content: [{ type: "text", text: "rows" }], structuredContent: { data: [] } }
@@ -101,7 +101,7 @@ describe("the tool call that opened the view", () => {
         bridge.ontoolinput = args => inputs.push(args);
         bridge.ontoolresult = result => results.push(result);
 
-        expect(inputs).toEqual([{ collection: "posts" }]);
+        expect(inputs).toEqual([{ table: "posts" }]);
         expect(results).toEqual([{ content: [{ type: "text", text: "rows" }], structuredContent: { data: [] }, isError: false }]);
     });
 
@@ -121,15 +121,15 @@ describe("calls through the host", () => {
         const bridge = new McpAppBridge(host);
         await connected(bridge);
 
-        const saving = bridge.callTool("update_document", { collection: "posts", id: "p1", data: { title: "x" } });
+        const saving = bridge.callTool("update_row", { table: "posts", id: "p1", data: { title: "x" } });
         expect(sent.at(-1)).toEqual(expect.objectContaining({
             method: "tools/call",
-            params: { name: "update_document", arguments: { collection: "posts", id: "p1", data: { title: "x" } } }
+            params: { name: "update_row", arguments: { table: "posts", id: "p1", data: { title: "x" } } }
         }));
         answer({ content: [{ type: "text", text: "refused by policy" }], isError: true });
         await expect(saving).resolves.toEqual({ content: [{ type: "text", text: "refused by policy" }], structuredContent: undefined, isError: true });
 
-        const failing = bridge.callTool("query_collection", { collection: "posts" });
+        const failing = bridge.callTool("query_table", { table: "posts" });
         const request = sent.at(-1);
         deliver({ jsonrpc: "2.0", id: request?.id, error: { code: -32601, message: "no such tool" } });
         await expect(failing).rejects.toThrow("no such tool");

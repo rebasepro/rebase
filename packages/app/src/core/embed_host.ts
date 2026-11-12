@@ -12,9 +12,10 @@
  *
  *  - `<Rebase>` takes its data driver, its auth and its storage from the host,
  *    and leaves its own `client` alone;
- *  - `<RebaseCMS>` sets up everything its props declare — collections,
- *    custom views, entity views — and draws the host's screen in place of its
- *    routes and navigation;
+ *  - `<RebaseCMS>` renders the host's tables in place of the ones its client
+ *    would fetch, sets up everything its props declare — table
+ *    customizations, custom views, entity views — and draws the host's screen
+ *    in place of its routes and navigation;
  *  - the login screen, Studio and the shell draw nothing.
  *
  * Everything the developer customised therefore works in the embedding,
@@ -30,7 +31,7 @@
 import type { ReactNode } from "react";
 import { useSyncExternalStore } from "react";
 import type { AdminCollection, AuthController } from "@rebasepro/cms-types";
-import type { DataDriver, StorageSource } from "@rebasepro/types";
+import type { DataDriver, StorageSource, TableDescriptor } from "@rebasepro/types";
 
 /** @internal */
 export interface RebaseEmbedHost {
@@ -50,11 +51,18 @@ export interface RebaseEmbedHost {
     /** Light or dark, as the embedding is. */
     mode: "light" | "dark";
     /**
+     * The tables the app renders, in place of the ones its client would ask
+     * the server for (the embedding has no network of its own): the
+     * descriptors the host received, already redacted for this person. The
+     * panel projects them and applies the app's `tableCustomizations`, as on
+     * the app's own page. Tables handed to `<RebaseCMS tables>` still win.
+     */
+    tables?: readonly TableDescriptor[];
+    /**
      * The app's collections as the embedding may show them to this person —
-     * the fields they never receive taken out, the ones they cannot set made
-     * read-only, what their connection was not granted closed. Applied by
-     * `<RebaseCMS>` to the collections it registers, so every view and form
-     * the app draws is drawn from the narrowed config, with its components.
+     * what their connection was not granted closed. Applied to the
+     * collections `<RebaseCMS>` composes, so every view and form the app
+     * draws is drawn from the narrowed config, with its components.
      */
     narrowCollections: (collections: AdminCollection[]) => AdminCollection[];
     /**

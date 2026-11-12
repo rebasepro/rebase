@@ -69,13 +69,13 @@ describe("SavedAppFrame", () => {
         await fromFrame({ jsonrpc: "2.0", method: "ui/notifications/initialized", params: {} });
         expect(posted[1]).toEqual({ jsonrpc: "2.0", method: "ui/notifications/tool-result", params: OPENED });
 
-        await fromFrame({ jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "query_collection", arguments: { collection: "orders" } } });
-        expect(callTool).toHaveBeenLastCalledWith("query_collection", { collection: "orders" });
+        await fromFrame({ jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "query_table", arguments: { table: "orders" } } });
+        expect(callTool).toHaveBeenLastCalledWith("query_table", { table: "orders" });
         expect(posted[2]).toEqual({ jsonrpc: "2.0", id: 2, result: { structuredContent: { data: [{ id: "o1" }] } } });
 
         // The same message from this page's own window is not the frame's.
-        await fromFrame({ jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "delete_document", arguments: {} } }, window);
-        expect(callTool).not.toHaveBeenCalledWith("delete_document", expect.anything());
+        await fromFrame({ jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "delete_row", arguments: {} } }, window);
+        expect(callTool).not.toHaveBeenCalledWith("delete_row", expect.anything());
         expect(posted).toHaveLength(3);
     });
 });

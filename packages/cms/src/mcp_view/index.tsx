@@ -1,13 +1,19 @@
 /**
  * `@rebasepro/cms/mcp-view`: a project's admin app, inside an MCP App view.
  *
- * A client like Claude shows what the show_* tools open (a collection, a
+ * A client like Claude shows what the show_* tools open (a table's rows, a
  * record, an app the model wrote) in a sandboxed frame next to the
  * conversation. This is what runs in that frame: it speaks the host's
  * protocol, reads and writes through the server's tools as the person, and
  * draws with the admin panel's own components — inside the project's own
- * admin app, so its custom views, entity views, fields, previews, actions,
- * plugins and slots are the ones drawn.
+ * admin app, so its `customizeTable` customizations, custom views, entity
+ * views, fields, previews, actions, plugins and slots are the ones drawn.
+ *
+ * The tables are the descriptors the tool result carries, redacted by the
+ * server for this person: `<RebaseCMS>` renders them in place of the ones
+ * its client would fetch, projected and customized exactly as on the
+ * project's own page. With no customizations (the generic view, or a project
+ * that has none) they render with the CMS's zero-config defaults.
  *
  * ```ts
  * // the project's view entry (the Vite plugin generates it)
@@ -18,8 +24,8 @@
  * The app mounts as it does on its own page; `<Rebase>`, `<RebaseCMS>`,
  * `<RebaseStudio>` and `<RebaseShell>` find the embed host this sets
  * (`setRebaseEmbedHost` in `@rebasepro/app`) and stand in what the frame
- * cannot give them: data through the tools, the person already signed in,
- * no routes, no network.
+ * cannot give them: data through the tools, the tables from the result, the
+ * person already signed in, no routes, no network.
  *
  * @module
  */
@@ -27,37 +33,31 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import { getTitlePropertyKeyForValues, looksLikeIdentifierValue, setRebaseEmbedHost, type RebaseEmbedHost } from "@rebasepro/app";
 import type { AdminCollection, AuthController } from "@rebasepro/cms-types";
-import type { SecurityRule, User } from "@rebasepro/types";
+import type { SecurityOperation, SecurityRule, User } from "@rebasepro/types";
 import { Alert } from "@rebasepro/ui";
 import { McpAppBridge, type HostContext, type ToolResult, type ViewBridge } from "./bridge";
 import { createToolDriver, describeChanges, describeRefusal, needsConfirmation, type ToolDriver, type ViewChange, type WriteFailure, type WriteIntent } from "./tool_driver";
-import { findCollection, parseResult, type Screen } from "./payload";
+import { findCollection, parseResult, type Screen, type TableGrant } from "./payload";
+import { collectionsFromTables } from "../tables";
 import { describeAppError, type AppError } from "./code_app";
 import { McpScreen, type PendingPlan } from "./screen";
 import { VIEW_STORAGE_SOURCE } from "./storage_source";
 import { createViewStore } from "./store";
 
 export { APPS_PROTOCOL_VERSION, McpAppBridge, isRecord } from "./bridge";
-import { isRecord } from "./bridge";
 export type { HostContext, ToolResult, DisplayMode, ViewBridge } from "./bridge";
 export { createToolDriver, DEFAULT_ACTIONS, SaveCancelledError, describeChanges, describeFailedWrite, describeRefusal, needsConfirmation } from "./tool_driver";
 export type { CallTool, SeedPage, ToolDriver, ViewActions, WritePlan, WriteIntent, ViewChange, WriteFailure } from "./tool_driver";
 export { parseResult, actionsOf, filterOf } from "./payload";
-export type { Screen, Block } from "./payload";
+export type { Screen, Block, TableGrant } from "./payload";
 
 export interface McpViewOptions {
     /**
      * Mount the app, once the host is set: import the project's entry (which
      * renders its app as it would on its page), or render a default one into
-     * `#root`. Given the screen the tool opened, for an app with no
-     * collections of its own.
+     * `#root`. Given the screen the tool opened.
      */
     mountApp: (screen: Screen) => void | Promise<unknown>;
-    /**
-     * Draw a result from a server that predates the admin panel's views
-     * (show_collection's columns only): the old table, where the view has it.
-     */
-    mountTable?: (bridge: ViewBridge, container: HTMLElement) => void;
     /** Name and version the view gives the host. */
     appInfo?: { name: string; version: string };
     /** The channel to the host; a new one on this window's parent by default. */
@@ -77,12 +77,6 @@ export function startMcpView(options: McpViewOptions): ViewBridge {
         if (started) return;
         started = true;
         const parsed = parseResult(result);
-        if (parsed.kind === "table") {
-            const container = document.getElementById("root");
-            if (container && options.mountTable) options.mountTable(bridge, container);
-            else showError("This view cannot draw this result.");
-            return;
-        }
         if (parsed.kind === "error") {
             showError(parsed.message);
             return;
@@ -110,14 +104,23 @@ function embedHost(bridge: ViewBridge, screen: Screen): RebaseEmbedHost {
     bridge.watchHostContext(next => context.set(next));
 
     const told = modelContext(bridge);
+    // The tables as the panel draws them — projected and customized, then
+    // narrowed — once `<RebaseCMS>` has composed them; until then, and for a
+    // table the app left out, as the CMS projects the descriptor. What a write
+    // is sent by (a date-only column as its day, a belongsTo under its key) and
+    // what a row is called.
+    const projected: AdminCollection[] = collectionsFromTables(screen.tables);
+    let drawn: readonly AdminCollection[] = [];
+    const collectionOf = (name: string): AdminCollection | undefined =>
+        findCollection(drawn, name) ?? findCollection(projected, name);
     const tools: ToolDriver = createToolDriver({
         callTool: (name, args) => bridge.callTool(name, args),
         actions: screen.actions,
         ...(screen.firstPage && { seed: screen.firstPage }),
         ...(screen.seeds && { seeds: screen.seeds }),
-        // A collection by whichever name it was read or written under: its
-        // data path (the tools' name, the model's) or its slug (the admin's).
-        collection: name => findCollection(screen.collections, name),
+        // A table's collection by its slug: the name the tools, the model and
+        // the admin panel all use.
+        collection: collectionOf,
         confirm: plan => new Promise<boolean>(resolve => pending.set({
             plan,
             answer: confirmed => {
@@ -129,7 +132,7 @@ function embedHost(bridge: ViewBridge, screen: Screen): RebaseEmbedHost {
             if (!needsConfirmation(intent)) saved.set(intent);
         },
         onChange: told.changes,
-        rowLabel: (name, id, row) => rowTitle(findCollection(screen.collections, name), id, row),
+        rowLabel: (name, id, row) => rowTitle(collectionOf(name), id, row),
         onWriteFailed: failure => {
             refused.set(failure);
             told.writeFailed(failure);
@@ -146,7 +149,11 @@ function embedHost(bridge: ViewBridge, screen: Screen): RebaseEmbedHost {
         authController: viewerAuth(screen.viewer),
         storageSource: VIEW_STORAGE_SOURCE,
         mode: bridge.hostContext.theme === "dark" ? "dark" : "light",
-        narrowCollections: collections => narrowCollections(collections, screen.collections),
+        tables: screen.tables,
+        narrowCollections: collections => {
+            drawn = narrowCollections(collections, screen.grants);
+            return [...drawn];
+        },
         renderCms: () => (
             <McpScreen
                 bridge={bridge}
@@ -171,57 +178,43 @@ function embedHost(bridge: ViewBridge, screen: Screen): RebaseEmbedHost {
 }
 
 /**
- * The app's collections as this person may see them here: the project's own
- * configs — with their components — narrowed as the server narrowed the ones
- * it sent (`McpViewPayload` in the server's `mcp/mcp-view.ts`). A field the
- * server left out is left out; one it made read-only is read-only; its
- * security rules (the project's, and the one closing what the connection was
- * not granted) are the ones checked. A collection the server sent nothing
- * for is shown with every change closed: this screen did not ask for it.
+ * The app's collections as this person may see them here. They were composed
+ * from the descriptors the server sent — so a column the person may not read
+ * is not in them, and the CMS reads a column's write rule as it does on the
+ * project's page — with the project's own customizations and components. What
+ * remains is the connection: an operation its scopes were not granted on a
+ * table (`data:write`, `data:delete`) is closed by a restrictive rule, which
+ * is what the admin panel asks before it offers Add, Save or Delete. A
+ * collection the server sent no grant for (one the app declares beside the
+ * tables) is shown with every change closed: this screen did not ask for it.
  *
- * Where the app has no collections of its own (the view without a project),
- * the server's configs are the collections.
+ * None of it is the boundary — every save is the server's write tool, which
+ * checks the scopes, the column rules and RLS again — it keeps the view from
+ * offering what would be refused.
  */
-export function narrowCollections(own: AdminCollection[], sent: readonly AdminCollection[]): AdminCollection[] {
-    if (own.length === 0) return [...sent];
-    const bySlug = new Map(sent.map(collection => [collection.slug, collection]));
-    return own.map((collection): AdminCollection => {
-        const narrowed = bySlug.get(collection.slug);
-        if (!narrowed) {
-            return { ...collection, securityRules: [...(collection.securityRules ?? []), CLOSED] };
-        }
-        const copy = { ...collection };
-        return Object.assign(copy, {
-            properties: narrowProperties(collection.properties, narrowed.properties),
-            securityRules: narrowed.securityRules ?? collection.securityRules
-        });
+export function narrowCollections(collections: readonly AdminCollection[], grants: Readonly<Record<string, TableGrant>>): AdminCollection[] {
+    return collections.map((collection): AdminCollection => {
+        const grant = grants[collection.slug];
+        const closed: SecurityOperation[] = [
+            ...(grant?.write ? [] : ["insert", "update"] as const),
+            ...(grant?.delete ? [] : ["delete"] as const)
+        ];
+        if (closed.length === 0) return collection;
+        // A condition the evaluator decides (false) for everybody: a role no
+        // account holds. The `roles` shortcut alone is a condition the
+        // client-side evaluator leaves undecided, which the UI reads as allowed.
+        const rule: SecurityRule = {
+            name: grant ? "mcp_connection_scope" : "mcp_view_not_opened",
+            mode: "restrictive",
+            operations: closed,
+            condition: { kind: "rolesOverlap", roles: [NOT_GRANTED] }
+        };
+        return { ...collection, securityRules: [...(collection.securityRules ?? []), rule] };
     });
 }
 
-/** The fields the server sent, with its read-only marks; the project's own config for each. */
-function narrowProperties<P extends Record<string, unknown>>(own: P, sent: Record<string, unknown>): P {
-    const narrowed = { ...own };
-    for (const key of Object.keys(narrowed)) {
-        const sentProperty = sent[key];
-        if (!sentProperty) {
-            delete narrowed[key];
-            continue;
-        }
-        const property = narrowed[key];
-        if (isRecord(sentProperty) && isRecord(sentProperty.admin) && sentProperty.admin.readOnly === true && isRecord(property)) {
-            Object.assign(narrowed, { [key]: { ...property, admin: { ...(isRecord(property.admin) ? property.admin : {}), readOnly: true } } });
-        }
-    }
-    return narrowed;
-}
-
-/** A restrictive rule no account passes, closing every change. */
-const CLOSED: SecurityRule = {
-    name: "mcp_view_not_opened",
-    mode: "restrictive",
-    operations: ["insert", "update", "delete"],
-    roles: ["__mcp_view_not_opened__"]
-};
+/** A role no account holds: the condition of a rule meant never to pass. */
+const NOT_GRANTED = "__mcp_connection_not_granted__";
 
 /**
  * The person the server drew the screen for, as the admin panel asks about

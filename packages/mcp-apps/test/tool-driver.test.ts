@@ -19,13 +19,13 @@
  *   driver asks nothing of its own.
  * - The flat data layer an app's hooks read: the same tools, and aggregates
  *   through the aggregate tool, in REST's `select` grammar.
- * - The page a show_collection result carries is the first read's, when
+ * - The page a show_table result carries is the first read's, when
  *   the read asks for exactly it; any other read, or one after a write, goes
  *   to the server.
  */
 import { describe, expect, it, vi } from "vitest";
-import { EntityRelation, type CollectionConfig, type FetchCollectionProps } from "@rebasepro/types";
-import { buildRebaseData, wrapAsSdkData } from "@rebasepro/common";
+import { EntityRelation, col, defineTable, rel, type CollectionConfig, type FetchCollectionProps } from "@rebasepro/types";
+import { buildRebaseData, compileTables, wrapAsSdkData } from "@rebasepro/common";
 import type { ToolResult } from "@rebasepro/cms/mcp-view";
 import {
     DEFAULT_ACTIONS,
@@ -66,6 +66,17 @@ const orders: CollectionConfig = {
 function ok(structuredContent: unknown): ToolResult {
     return { structuredContent, content: [{ type: "text", text: JSON.stringify(structuredContent) }] };
 }
+
+/** The tables a show_* payload carries, as the server serves them: descriptors. */
+const CUSTOMERS_TABLE = defineTable("customers", {
+    columns: { id: col.text().primaryKey(), name: col.text() },
+    rls: [{ operation: "all", access: "authenticated" }]
+});
+const ORDERS_TABLE = defineTable("orders", {
+    columns: { id: col.text().primaryKey(), status: col.text(), customerId: col.text().column("customer_id") },
+    relations: { customer: rel.belongsTo(() => CUSTOMERS_TABLE, { localKey: "customer_id" }) },
+    rls: [{ operation: "all", access: "authenticated" }]
+});
 
 const PLAN = ok({ status: "confirmation_required", confirm: "token-1", plan: { summary: "Change status on row o1 of orders in shop." } });
 
@@ -119,9 +130,9 @@ describe("reading", () => {
 
         expect(rows).toEqual([{ id: "o1", customerId: "c1" }]);
         expect(calls).toEqual([{
-            name: "query_collection",
+            name: "query_table",
             args: {
-                collection: "orders",
+                table: "orders",
                 where: { customerId: ["==", "c1"], status: ["in", ["paid", "sent"]] },
                 orderBy: [["customerId", "desc"]],
                 searchString: "ada",
@@ -133,50 +144,50 @@ describe("reading", () => {
     });
 
     it("reads a row once however often it is drawn, until its collection is written", async () => {
-        const { driver, calls } = driverWith((name, args) => name === "get_document"
+        const { driver, calls } = driverWith((name, args) => name === "get_row"
             ? ok({ id: args.id, name: "Ada" })
             : ok({ id: "c1", name: "Ada L." }));
 
         await Promise.all([1, 2, 3].map(() => driver.fetchOne({ path: "customers", id: "c1" })));
-        expect(calls.filter(call => call.name === "get_document")).toHaveLength(1);
+        expect(calls.filter(call => call.name === "get_row")).toHaveLength(1);
 
         await driver.save({ path: "customers", id: "c1", values: { name: "Ada L." }, status: "existing" });
         await driver.fetchOne({ path: "customers", id: "c1" });
-        expect(calls.filter(call => call.name === "get_document")).toHaveLength(2);
+        expect(calls.filter(call => call.name === "get_row")).toHaveLength(2);
     });
 
     it("opens a row a page listed with no call of its own", async () => {
-        const { driver, flat, calls } = driverWith((name, args) => name === "get_document"
+        const { driver, flat, calls } = driverWith((name, args) => name === "get_row"
             ? ok({ id: args.id, name: "from get" })
-            : name === "count_documents" ? ok({ count: 2 })
+            : name === "count_rows" ? ok({ count: 2 })
                 : ok({ data: [{ id: "c1", name: "Ada" }, { id: "c2", name: "Grace" }], meta: {} }));
 
         await driver.fetchCollection({ path: "customers", collection: customers });
         expect(await driver.fetchOne({ path: "customers", id: "c2" })).toEqual({ id: "c2", name: "Grace" });
         expect(await flat.table("customers").findById("c1")).toEqual({ id: "c1", name: "Ada" });
-        expect(calls.map(call => call.name)).toEqual(["query_collection"]);
+        expect(calls.map(call => call.name)).toEqual(["query_table"]);
 
         // An app's own page fills it too.
         await flat.table("orders").find({ limit: 5 });
         await flat.table("orders").findById("c1");
-        expect(calls.filter(call => call.name === "get_document")).toHaveLength(0);
+        expect(calls.filter(call => call.name === "get_row")).toHaveLength(0);
     });
 
     it("reads a listed row again once its collection is written", async () => {
-        const { driver, calls } = driverWith((name, args) => name === "get_document"
+        const { driver, calls } = driverWith((name, args) => name === "get_row"
             ? ok({ id: args.id, name: "Ada L." })
-            : name === "query_collection" ? ok({ data: [{ id: "c1", name: "Ada" }], meta: {} }) : ok({ id: "c1" }));
+            : name === "query_table" ? ok({ data: [{ id: "c1", name: "Ada" }], meta: {} }) : ok({ id: "c1" }));
 
         await driver.fetchCollection({ path: "customers", collection: customers });
         await driver.save({ path: "customers", id: "c1", values: { name: "Ada L." }, status: "existing" });
         expect(await driver.fetchOne({ path: "customers", id: "c1" })).toEqual({ id: "c1", name: "Ada L." });
-        expect(calls.filter(call => call.name === "get_document")).toHaveLength(1);
+        expect(calls.filter(call => call.name === "get_row")).toHaveLength(1);
     });
 
     it("reads a row again once it is 30 seconds old: the model may have changed it with its own tools", async () => {
         vi.useFakeTimers();
         try {
-            const { driver, calls } = driverWith((name, args) => name === "get_document"
+            const { driver, calls } = driverWith((name, args) => name === "get_row"
                 ? ok({ id: args.id, name: "Ada L." })
                 : ok({ data: [{ id: "c1", name: "Ada" }], meta: {} }));
 
@@ -184,14 +195,14 @@ describe("reading", () => {
             vi.advanceTimersByTime(29_000);
             // Within it, the listed row the person clicks opens with no call.
             expect(await driver.fetchOne({ path: "customers", id: "c1" })).toEqual({ id: "c1", name: "Ada" });
-            expect(calls.filter(call => call.name === "get_document")).toHaveLength(0);
+            expect(calls.filter(call => call.name === "get_row")).toHaveLength(0);
 
             vi.advanceTimersByTime(2_000);
             expect(await driver.fetchOne({ path: "customers", id: "c1" })).toEqual({ id: "c1", name: "Ada L." });
-            expect(calls.filter(call => call.name === "get_document")).toHaveLength(1);
+            expect(calls.filter(call => call.name === "get_row")).toHaveLength(1);
             // And that read is shared, in its turn.
             await Promise.all([1, 2].map(() => driver.fetchOne({ path: "customers", id: "c1" })));
-            expect(calls.filter(call => call.name === "get_document")).toHaveLength(1);
+            expect(calls.filter(call => call.name === "get_row")).toHaveLength(1);
         } finally {
             vi.useRealTimers();
         }
@@ -208,7 +219,7 @@ describe("reading", () => {
 
         await driver.fetchCollection({ path: "authors", collection: authors });
         expect(await driver.fetchOne({ path: "authors", id: "ada" })).toEqual({ handle: "ada", name: "Ada" });
-        expect(calls.map(call => call.name)).toEqual(["query_collection"]);
+        expect(calls.map(call => call.name)).toEqual(["query_table"]);
     });
 
     it("answers no row for one the server says is not there", async () => {
@@ -248,8 +259,8 @@ describe("rows read by key: a table's relation previews", () => {
 
         expect(read.map(row => row?.name)).toEqual(drawn.map(id => `Customer ${id}`));
         expect(calls).toEqual([{
-            name: "query_collection",
-            args: { collection: "customers", where: { id: ["in", ["c1", "c2", "c3", "c4", "c5"]] }, limit: 5 }
+            name: "query_table",
+            args: { table: "customers", where: { id: ["in", ["c1", "c2", "c3", "c4", "c5"]] }, limit: 5 }
         }]);
     });
 
@@ -293,7 +304,7 @@ describe("rows read by key: a table's relation previews", () => {
 
         expect(calls).toEqual([{
             name: "query",
-            args: { project: "shop", collection: "customers", where: { id: ["in", ["c1", "c2", "c3", "c4", "c5"]] }, limit: 5 }
+            args: { project: "shop", table: "customers", where: { id: ["in", ["c1", "c2", "c3", "c4", "c5"]] }, limit: 5 }
         }]);
     });
 
@@ -362,7 +373,7 @@ describe("rows read by key: a table's relation previews", () => {
         const { driver, calls } = driverWith((name, args) => ok({ id: args.id }), { collection: () => lines });
 
         await Promise.all(["o1:1", "o1:2"].map(id => driver.fetchOne({ path: "lines", id })));
-        expect(calls.map(call => call.name)).toEqual(["get_document", "get_document"]);
+        expect(calls.map(call => call.name)).toEqual(["get_row", "get_row"]);
     });
 });
 
@@ -378,8 +389,8 @@ describe("writing", () => {
         });
 
         expect(calls[0]).toEqual({
-            name: "create_document",
-            args: { collection: "orders", data: { customerId: "c2", placed: "2026-11-07T10:00:00.000Z" } }
+            name: "create_row",
+            args: { table: "orders", data: { customerId: "c2", placed: "2026-11-07T10:00:00.000Z" } }
         });
     });
 
@@ -396,7 +407,7 @@ describe("writing", () => {
             status: "existing"
         });
 
-        expect(calls[0].args).toEqual({ collection: "public.orders", id: "o1", data: { due: "2026-11-08", customerId: "c2" } });
+        expect(calls[0].args).toEqual({ table: "public.orders", id: "o1", data: { due: "2026-11-08", customerId: "c2" } });
     });
 
     it("runs a planned write only once the person confirms it, with the plan's token", async () => {
@@ -415,8 +426,8 @@ describe("writing", () => {
             write: { action: "update", collection: "orders", id: "o1", values: { status: "sent" }, gesture: false }
         }]);
         expect(calls.map(call => call.args)).toEqual([
-            { collection: "orders", id: "o1", data: { status: "sent" } },
-            { collection: "orders", id: "o1", data: { status: "sent" }, confirm: "token-1" }
+            { table: "orders", id: "o1", data: { status: "sent" } },
+            { table: "orders", id: "o1", data: { status: "sent" }, confirm: "token-1" }
         ]);
     });
 
@@ -465,7 +476,7 @@ describe("a write the person's own click made", () => {
             await driver.save({ path: "orders", id: "o1", values: { status: "sent" }, status: "existing" });
 
             expect(asked).toEqual([]);
-            expect(calls.at(-1)?.args).toEqual({ collection: "orders", id: "o1", data: { status: "sent" }, confirm: "token-1" });
+            expect(calls.at(-1)?.args).toEqual({ table: "orders", id: "o1", data: { status: "sent" }, confirm: "token-1" });
             expect(written).toEqual([expect.objectContaining({ action: "update", id: "o1", values: { status: "sent" }, gesture: true })]);
             expect(needsConfirmation(written[0])).toBe(false);
         } finally {
@@ -478,7 +489,7 @@ describe("a write the person's own click made", () => {
         try {
             const asked: string[] = [];
             // The delete tool plans; the create tool does not, so the row hooks ask first.
-            const { driver, flat } = driverWith((name, args) => name === "delete_document" && !args.confirm ? PLAN : ok({ id: "o1" }), {
+            const { driver, flat } = driverWith((name, args) => name === "delete_row" && !args.confirm ? PLAN : ok({ id: "o1" }), {
                 confirm: async plan => {
                     asked.push(plan.write?.action ?? "");
                     return true;
@@ -551,7 +562,7 @@ describe("the row hooks' writes", () => {
             "Create a row in orders.",
             "Delete row o2 of orders."
         ]);
-        expect(calls.map(call => call.name)).toEqual(["create_document", "delete_document"]);
+        expect(calls.map(call => call.name)).toEqual(["create_row", "delete_row"]);
         expect(describeChanges(changes.at(-1) ?? [])).toContain("created row o9 of orders; deleted row o2 of orders");
     });
 
@@ -580,7 +591,7 @@ describe("the row hooks' writes", () => {
     });
 
     it("drop the rows read of a collection the app changed, by whatever name it used", async () => {
-        const { driver, flat, calls } = driverWith((name, args) => name === "update_document"
+        const { driver, flat, calls } = driverWith((name, args) => name === "update_row"
             ? ok({ id: "o1" })
             : ok({ data: [{ id: "o1", status: args.where ? "sent" : "pending" }], meta: {} }), {
             collection: name => name === "orders" || name === "public.orders" ? orders : undefined
@@ -589,7 +600,7 @@ describe("the row hooks' writes", () => {
 
         await flat.table("public.orders").update("o1", { status: "sent" });
         expect(await driver.fetchOne({ path: "orders", id: "o1" })).toEqual({ id: "o1", status: "sent" });
-        expect(calls.filter(call => call.name === "query_collection" && call.args.where)).toHaveLength(1);
+        expect(calls.filter(call => call.name === "query_table" && call.args.where)).toHaveLength(1);
     });
 });
 
@@ -610,9 +621,9 @@ describe("aggregates", () => {
 
         expect([...result]).toEqual([{ status: "paid", sum_total: 410, count: 3 }, { status: "sent", sum_total: 90, count: 1 }]);
         expect(calls).toEqual([{
-            name: "aggregate_documents",
+            name: "aggregate_rows",
             args: {
-                collection: "orders",
+                table: "orders",
                 select: ["sum(total)", "count()"],
                 groupBy: ["status"],
                 where: { placed: [">=", "2026-11-01"] },
@@ -628,7 +639,7 @@ describe("aggregates", () => {
         const { flat, calls } = driverWith(() => ok({ data: [{ count: 7 }] }), { actions });
 
         expect([...await flat.table("orders").aggregate({ select: [{ fn: "count" }] })]).toEqual([{ count: 7 }]);
-        expect(calls).toEqual([{ name: "query", args: { project: "shop", collection: "orders", select: ["count()"] } }]);
+        expect(calls).toEqual([{ name: "query", args: { project: "shop", table: "orders", select: ["count()"] } }]);
     });
 
     it("refuse an or()/and() group the tools cannot express, rather than aggregate wider", async () => {
@@ -667,47 +678,48 @@ describe("the pages a show_app result reads ahead", () => {
     });
 
     it("answers each once, and no filtered read or count", async () => {
-        const { driver, calls } = driverWith(name => name === "count_documents" ? ok({ count: 7 }) : ok({ data: [] }), { seeds });
+        const { driver, calls } = driverWith(name => name === "count_rows" ? ok({ count: 7 }) : ok({ data: [] }), { seeds });
         await driver.fetchCollection({ path: "orders", limit: 20 });
         await driver.fetchCollection({ path: "orders", limit: 20 });
         expect(await driver.count!({ path: "orders", filter: { status: ["==", "paid"] } })).toBe(7);
         await driver.count!({ path: "orders" });
         expect(await driver.count!({ path: "orders" })).toBe(7);
-        expect(calls.map(call => call.name)).toEqual(["query_collection", "count_documents", "count_documents"]);
+        expect(calls.map(call => call.name)).toEqual(["query_table", "count_rows", "count_rows"]);
     });
 
     it("are not served, page or count, once the server's read is 30 seconds old", async () => {
         const stale = seeds.map(page => ({ ...page, readAt: Date.now() - 60_000 }));
-        const { driver, calls } = driverWith(name => name === "count_documents" ? ok({ count: 5 }) : ok({ data: [] }), { seeds: stale });
+        const { driver, calls } = driverWith(name => name === "count_rows" ? ok({ count: 5 }) : ok({ data: [] }), { seeds: stale });
         expect(await driver.count!({ path: "orders" })).toBe(5);
         await driver.fetchCollection({ path: "customers", limit: 20 });
-        expect(calls.map(call => call.name)).toEqual(["count_documents", "query_collection"]);
+        expect(calls.map(call => call.name)).toEqual(["count_rows", "query_table"]);
     });
 
     it("are all dropped by a write", async () => {
-        const { driver, calls } = driverWith(name => name === "update_document" ? ok({ id: "o1" }) : ok({ data: [], count: 3 }), { seeds });
+        const { driver, calls } = driverWith(name => name === "update_row" ? ok({ id: "o1" }) : ok({ data: [], count: 3 }), { seeds });
         await driver.save({ path: "orders", id: "o1", values: { status: "sent" }, status: "existing" });
         await driver.fetchCollection({ path: "customers", limit: 20 });
         await driver.count!({ path: "orders" });
-        expect(calls.map(call => call.name)).toEqual(["update_document", "query_collection", "count_documents"]);
+        expect(calls.map(call => call.name)).toEqual(["update_row", "query_table", "count_rows"]);
     });
 
     it("are read from a show_app result, a malformed one left out", () => {
         const parsed = parseResult(ok({
-            collections: ["orders"],
+            tables: ["orders"],
             view: {
-                version: 1,
-                blocks: [{ key: "app", type: "app", code: "module.exports = {}", collections: ["orders"] }],
-                collections: [],
+                version: 2,
+                blocks: [{ key: "app", type: "app", code: "module.exports = {}", tables: ["orders"] }],
+                tables: [],
+                grants: {},
                 viewer: { uid: "u1", roles: [] },
-                seeds: [seeds[0], { collection: "broken" }]
+                seeds: [{ table: "orders", args: { limit: 20 }, rows: seeds[0].rows, total: 2 }, { table: "broken" }]
             }
         }));
         expect(parsed.kind === "screen" && parsed.screen.seeds).toEqual([seeds[0]]);
     });
 });
 
-describe("the page a show_collection result carries", () => {
+describe("the page a show_table result carries", () => {
     const seed: SeedPage = {
         collection: "orders",
         args: { where: { status: ["==", "paid"] }, orderBy: "placed:desc", limit: 50 },
@@ -726,7 +738,7 @@ describe("the page a show_collection result carries", () => {
 
         // Once: the next read is the server's.
         await driver.fetchCollection(read);
-        expect(calls.map(call => call.name)).toEqual(["query_collection"]);
+        expect(calls.map(call => call.name)).toEqual(["query_table"]);
     });
 
     it("is not a read that asks for anything else", async () => {
@@ -734,7 +746,7 @@ describe("the page a show_collection result carries", () => {
         await driver.fetchCollection({ ...read, limit: 25 });
         await driver.fetchCollection({ ...read, searchString: "ada" });
         await driver.fetchCollection({ ...read, filter: { status: ["==", "sent"] } });
-        expect(calls.map(call => call.name)).toEqual(["query_collection", "query_collection", "query_collection"]);
+        expect(calls.map(call => call.name)).toEqual(["query_table", "query_table", "query_table"]);
         // And not one, even matching, after those.
         await driver.fetchCollection(read);
         expect(calls).toHaveLength(3);
@@ -747,7 +759,7 @@ describe("the page a show_collection result carries", () => {
 
         const full = driverWith(() => ok({ data: [] }), { seed: { ...seed, args: { ...seed.args, limit: 1 } } });
         await full.driver.fetchCollection({ ...read, limit: 2 });
-        expect(full.calls.map(call => call.name)).toEqual(["query_collection"]);
+        expect(full.calls.map(call => call.name)).toEqual(["query_table"]);
     });
 
     it("is not served once it is 30 seconds old", async () => {
@@ -756,7 +768,7 @@ describe("the page a show_collection result carries", () => {
             const { driver, calls } = driverWith(() => ok({ data: [] }), { seed });
             vi.advanceTimersByTime(31_000);
             await driver.fetchCollection(read);
-            expect(calls.map(call => call.name)).toEqual(["query_collection"]);
+            expect(calls.map(call => call.name)).toEqual(["query_table"]);
         } finally {
             vi.useRealTimers();
         }
@@ -769,7 +781,7 @@ describe("the page a show_collection result carries", () => {
         // Its rows are as old: a row it carried opens by a read of its own.
         await driver.fetchOne({ path: "orders", id: "o1" });
         expect(await driver.fetchCollection(read)).toEqual([{ id: "o1", status: "sent" }]);
-        expect(calls.map(call => call.name)).toEqual(["get_document", "query_collection"]);
+        expect(calls.map(call => call.name)).toEqual(["get_row", "query_table"]);
 
         const fresh = driverWith(() => ok({ data: [] }), { seed: { ...seed, readAt: Date.now() - 5_000 } });
         expect(await fresh.driver.fetchCollection(read)).toEqual(seed.rows);
@@ -781,12 +793,13 @@ describe("the page a show_collection result carries", () => {
         const parsed = parseResult(ok({
             data: [{ id: "o1" }],
             view: {
-                version: 1,
+                version: 2,
                 readAt,
-                blocks: [{ key: "app", type: "collection", collection: "orders" }],
-                collections: [],
+                blocks: [{ key: "rows", type: "table", table: "orders" }],
+                tables: [],
+                grants: {},
                 viewer: { uid: "u1", roles: [] },
-                seeds: [{ collection: "orders", args: {}, rows: [] }]
+                seeds: [{ table: "orders", args: {}, rows: [] }]
             }
         }));
         expect(parsed.kind === "screen" && parsed.screen.firstPage?.readAt).toBe(readAt);
@@ -794,20 +807,21 @@ describe("the page a show_collection result carries", () => {
     });
 
     it("is dropped by a write", async () => {
-        const { driver, calls } = driverWith(name => name === "update_document" ? ok({ id: "o1" }) : ok({ data: [] }), { seed });
+        const { driver, calls } = driverWith(name => name === "update_row" ? ok({ id: "o1" }) : ok({ data: [] }), { seed });
         await driver.save({ path: "orders", id: "o1", values: { status: "sent" }, status: "existing" });
         await driver.fetchCollection(read);
-        expect(calls.map(call => call.name)).toEqual(["update_document", "query_collection"]);
+        expect(calls.map(call => call.name)).toEqual(["update_row", "query_table"]);
     });
 
-    it("is read from a show_collection result, with the window the server read", () => {
+    it("is read from a show_table result, with the window the server read", () => {
         const parsed = parseResult(ok({
             data: [{ id: "o1" }],
             meta: { limit: 50, offset: 0, hasMore: false },
             view: {
-                version: 1,
-                blocks: [{ key: "rows", type: "collection", collection: "orders", where: { status: ["==", "paid"] }, orderBy: "placed:desc" }],
-                collections: [{ slug: "orders", name: "Orders", properties: {} }],
+                version: 2,
+                blocks: [{ key: "rows", type: "table", table: "orders", where: { status: ["==", "paid"] }, orderBy: "placed:desc" }],
+                tables: [],
+                grants: {},
                 viewer: { uid: "u1", roles: [] }
             }
         }));
@@ -834,8 +848,8 @@ describe("the tools a result names", () => {
         await driver.save({ path: "orders", id: "o1", values: { status: "paid" }, status: "existing" });
 
         expect(calls).toEqual([
-            { name: "query", args: { project: "shop", count: true, collection: "orders", where: { status: ["==", "paid"] } } },
-            { name: "write", args: { project: "shop", action: "update", collection: "orders", id: "o1", data: { status: "paid" } } }
+            { name: "query", args: { project: "shop", count: true, table: "orders", where: { status: ["==", "paid"] } } },
+            { name: "write", args: { project: "shop", action: "update", table: "orders", id: "o1", data: { status: "paid" } } }
         ]);
     });
 
@@ -847,30 +861,35 @@ describe("the tools a result names", () => {
 });
 
 describe("reading a show_* result", () => {
-    it("draws the old table for a result that carries only its columns", () => {
-        expect(parseResult(ok({ collection: "orders", columns: [], data: [] }))).toEqual({ kind: "table" });
+    it("draws nothing from a result with no view: the table of before is gone", () => {
+        expect(parseResult(ok({ collection: "orders", columns: [], data: [] })).kind).toBe("error");
     });
 
     it("refuses a payload of a version it does not know, rather than misdraw it", () => {
-        const parsed = parseResult(ok({ view: { version: 2, blocks: [] } }));
-        expect(parsed.kind).toBe("error");
+        const newer = parseResult(ok({ view: { version: 3, blocks: [] } }));
+        expect(newer).toEqual({ kind: "error", message: expect.stringContaining("older than the server") });
+        // The serialized collections of version 1 are not read as tables.
+        const older = parseResult(ok({ view: { version: 1, blocks: [{ key: "rows", type: "collection", collection: "orders" }], collections: [] } }));
+        expect(older).toEqual({ kind: "error", message: expect.stringContaining("newer than the server") });
     });
 
-    it("rebuilds the collections, their relations pointing at each other", () => {
+    it("reads the descriptors and the grants, a table the server granted nothing read-only", () => {
+        const [customers, orders] = compileTables([CUSTOMERS_TABLE, ORDERS_TABLE]);
         const parsed = parseResult(ok({
             view: {
-                version: 1,
-                blocks: [{ key: "rows", type: "collection", collection: "orders" }],
-                collections: [
-                    { slug: "customers", name: "Customers", properties: {} },
-                    { slug: "orders", name: "Orders", properties: { customer: { type: "relation", relation: { kind: "belongsTo", target: { __collectionRef: "customers" } } } } }
-                ],
+                version: 2,
+                blocks: [{ key: "rows", type: "table", table: "orders" }],
+                tables: [customers, orders, { slug: "broken" }],
+                grants: { orders: { read: true, write: true, delete: false } },
                 viewer: { uid: "u1", roles: ["admin"] }
             }
         }));
         if (parsed.kind !== "screen") throw new Error(`parsed as ${parsed.kind}`);
-        const property = parsed.screen.collections[1].properties.customer;
-        expect(property.type === "relation" && property.relation?.target().slug).toBe("customers");
+        expect(parsed.screen.tables.map(table => table.slug)).toEqual(["customers", "orders"]);
+        expect(parsed.screen.grants).toEqual({
+            customers: { read: true, write: false, delete: false },
+            orders: { read: true, write: true, delete: false }
+        });
         expect(parsed.screen.viewer).toEqual({ uid: "u1", roles: ["admin"] });
     });
 
@@ -892,17 +911,17 @@ describe("what the driver sends, and refuses to", () => {
     });
 
     it("counts the trash as the trash, and aggregates it too", async () => {
-        const { driver, calls } = driverWith(name => name === "count_documents" ? ok({ count: 2 }) : ok({ data: [] }));
+        const { driver, calls } = driverWith(name => name === "count_rows" ? ok({ count: 2 }) : ok({ data: [] }));
         await driver.count!({ path: "orders", withDeleted: "only" });
         await driver.restFetchService!.aggregate!("orders", { aggregates: [{ fn: "count", alias: "count" }], withDeleted: "only" });
         expect(calls.map(call => call.args.deleted)).toEqual(["only", "only"]);
     });
 
     it("does not open a row from a page that listed deleted ones: get answers none for those", async () => {
-        const { driver, calls } = driverWith((name, args) => name === "get_document" ? ok({ id: args.id }) : page);
+        const { driver, calls } = driverWith((name, args) => name === "get_row" ? ok({ id: args.id }) : page);
         await driver.fetchCollection({ path: "orders", withDeleted: true });
         await driver.fetchOne({ path: "orders", id: "o1" });
-        expect(calls.map(call => call.name)).toEqual(["query_collection", "get_document"]);
+        expect(calls.map(call => call.name)).toEqual(["query_table", "get_row"]);
     });
 
     it("caps an aggregate's limit at the read tools' ceiling", async () => {
@@ -939,7 +958,7 @@ describe("what the driver sends, and refuses to", () => {
     it("sends a create's own id, and answers the row it sent where the server answers none", async () => {
         const { driver, calls } = driverWith(() => ({ content: [{ type: "text", text: "Saved." }] }));
         const row = await driver.save({ path: "orders", id: "o7", values: { status: "new" }, status: "new" });
-        expect(calls[0].args).toEqual({ collection: "orders", data: { status: "new" }, id: "o7" });
+        expect(calls[0].args).toEqual({ table: "orders", data: { status: "new" }, id: "o7" });
         expect(row).toEqual({ status: "new" });
     });
 
@@ -974,7 +993,7 @@ describe("the seeded page, matched by what it holds", () => {
     it("is served only to a read of its own collection", async () => {
         const { driver, calls } = driverWith(() => ok({ data: [] }), { seed: { collection: "orders", args: { limit: 50 }, rows } });
         await driver.fetchCollection({ path: "customers", limit: 50 });
-        expect(calls.map(call => call.args.collection)).toEqual(["customers"]);
+        expect(calls.map(call => call.args.table)).toEqual(["customers"]);
     });
 
     it("is the same read whatever order the filter's fields come in, and a sort with no direction is ascending", async () => {
@@ -997,17 +1016,17 @@ describe("the seeded page, matched by what it holds", () => {
 
 describe("counts asked twice at once", () => {
     it("are one call, and a write lets the next one go out afresh", async () => {
-        const { driver, calls } = driverWith(name => name === "update_document" ? ok({ id: "o1" }) : ok({ count: 4 }));
+        const { driver, calls } = driverWith(name => name === "update_row" ? ok({ id: "o1" }) : ok({ count: 4 }));
         const [a, b] = await Promise.all([
             driver.count!({ path: "orders", filter: { status: ["==", "paid"] } }),
             driver.count!({ path: "orders", filter: { status: ["==", "paid"] } })
         ]);
         expect([a, b]).toEqual([4, 4]);
-        expect(calls.filter(call => call.name === "count_documents")).toHaveLength(1);
+        expect(calls.filter(call => call.name === "count_rows")).toHaveLength(1);
 
         await driver.save({ path: "orders", id: "o1", values: { status: "sent" }, status: "existing" });
         await driver.count!({ path: "orders", filter: { status: ["==", "paid"] } });
-        expect(calls.filter(call => call.name === "count_documents")).toHaveLength(2);
+        expect(calls.filter(call => call.name === "count_rows")).toHaveLength(2);
     });
 
     it("are not shared across different filters", async () => {
@@ -1016,7 +1035,7 @@ describe("counts asked twice at once", () => {
             driver.count!({ path: "orders", filter: { status: ["==", "paid"] } }),
             driver.count!({ path: "orders", filter: { status: ["==", "sent"] } })
         ]);
-        expect(calls.filter(call => call.name === "count_documents")).toHaveLength(2);
+        expect(calls.filter(call => call.name === "count_rows")).toHaveLength(2);
     });
 });
 
@@ -1026,7 +1045,7 @@ describe("a write through the row hooks", () => {
 
     it("is confirmed by the row's title where the view has read the row", async () => {
         const plans: WritePlan[] = [];
-        const { driver, flat } = driverWith(name => name === "update_document" ? ok({ id: "o1" }) : ok({ data: [{ id: "o1", number: "ORD-41" }] }),
+        const { driver, flat } = driverWith(name => name === "update_row" ? ok({ id: "o1" }) : ok({ data: [{ id: "o1", number: "ORD-41" }] }),
             { rowLabel, confirm: async plan => { plans.push(plan); return true; } });
         await driver.fetchCollection({ path: "orders", limit: 10 });
         await flat.table("orders").update("o1", { status: "sent" });
@@ -1035,7 +1054,7 @@ describe("a write through the row hooks", () => {
 
     it("refused by the server, is told with the row's title and the server's words, and still rejects", async () => {
         const failures: WriteFailure[] = [];
-        const { driver, flat } = driverWith(name => name === "update_document"
+        const { driver, flat } = driverWith(name => name === "update_row"
             ? { isError: true, content: [{ type: "text", text: "a row-level security policy rejected the write." }] }
             : ok({ data: [{ id: "o1", number: "ORD-41" }] }), { rowLabel, onWriteFailed: failure => failures.push(failure) });
         await driver.fetchCollection({ path: "orders", limit: 10 });

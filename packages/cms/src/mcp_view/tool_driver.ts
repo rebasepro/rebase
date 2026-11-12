@@ -80,13 +80,13 @@ export interface ViewActions {
 }
 
 export const DEFAULT_ACTIONS: ViewActions = {
-    page: { tool: "query_collection", arguments: {} },
-    get: { tool: "get_document", arguments: {} },
-    count: { tool: "count_documents", arguments: {} },
-    create: { tool: "create_document", arguments: {} },
-    update: { tool: "update_document", arguments: {} },
-    delete: { tool: "delete_document", arguments: {} },
-    aggregate: { tool: "aggregate_documents", arguments: {} }
+    page: { tool: "query_table", arguments: {} },
+    get: { tool: "get_row", arguments: {} },
+    count: { tool: "count_rows", arguments: {} },
+    create: { tool: "create_row", arguments: {} },
+    update: { tool: "update_row", arguments: {} },
+    delete: { tool: "delete_row", arguments: {} },
+    aggregate: { tool: "aggregate_rows", arguments: {} }
 };
 
 /** What a write's first call answered instead of running: what it will do, for the person to confirm. */
@@ -166,7 +166,7 @@ export type CallTool = (name: string, args: Record<string, unknown>) => Promise<
 
 /**
  * A page a result already carries: the rows the server read — for the model
- * (show_collection), or ahead of an app's first render (show_app) — and the
+ * (show_table), or ahead of an app's first render (show_app) — and the
  * arguments it read them with.
  */
 export interface SeedPage {
@@ -403,7 +403,7 @@ export function createToolDriver(options: ToolDriverOptions): ToolDriver {
             if (!props.withDeleted) remember(collection, seeded.rows, props.collection, seeded.at);
             return seeded.rows;
         }
-        const page = await call(actions.page, { collection, ...args });
+        const page = await call(actions.page, { table: collection, ...args });
         if (!isRecord(page) || !Array.isArray(page.data)) throw new Error("The read returned no rows.");
         const found = page.data.filter(isRecord);
         if (!props.withDeleted) remember(collection, found, props.collection);
@@ -429,7 +429,7 @@ export function createToolDriver(options: ToolDriverOptions): ToolDriver {
                 // exactly; past 2^53 (a bigint) as its digits, which round to
                 // another row as a number.
                 const values = chunk.map(id => key.type === "number" ? numericKeyPart(id) ?? id : id);
-                call(actions.page, { collection, where: { [key.fieldName]: ["in", values] }, limit: chunk.length })
+                call(actions.page, { table: collection, where: { [key.fieldName]: ["in", values] }, limit: chunk.length })
                     .then(page => {
                         if (!isRecord(page) || !Array.isArray(page.data)) throw new Error("The read returned no rows.");
                         const byId = new Map(page.data.filter(isRecord).map(row => [String(row[key.fieldName]), row]));
@@ -458,7 +458,7 @@ export function createToolDriver(options: ToolDriverOptions): ToolDriver {
 
     /** A row of a collection with no single key column to put an `in` on, or none known: by the get tool. */
     const readById = (collection: string, id: string): Promise<Row | undefined> =>
-        call(actions.get, { collection, id })
+        call(actions.get, { table: collection, id })
             .then(row => isRecord(row) ? row : undefined)
             .catch((error: unknown) => {
                 // One answer for "absent" and "not visible to you", by design.
@@ -517,7 +517,7 @@ export function createToolDriver(options: ToolDriverOptions): ToolDriver {
             refuseUnsupported(options);
             const where = options.filter ? wireFilter(options.filter, undefined) : undefined;
             const answer = await call(actions.aggregate, {
-                collection: collectionArg(path),
+                table: collectionArg(path),
                 select: options.aggregates.map(aggregate => aggregate.fn === "percentile"
                     ? `${aggregate.fn}(${aggregate.field ?? ""},${aggregate.p})`
                     : `${aggregate.fn}(${aggregate.field ?? ""})`),
@@ -556,8 +556,8 @@ export function createToolDriver(options: ToolDriverOptions): ToolDriver {
             gesture
         };
         const saved = creating
-            ? await write(action, { collection, data, ...(props.id !== undefined && { id: String(props.id) }) }, intent)
-            : await write(action, { collection, id: String(props.id), data }, intent);
+            ? await write(action, { table: collection, data, ...(props.id !== undefined && { id: String(props.id) }) }, intent)
+            : await write(action, { table: collection, id: String(props.id), data }, intent);
         const row = isRecord(saved) ? saved : { ...data };
         const id = String(row.id ?? props.id ?? "");
         const label = options.rowLabel?.(collection, id, row);
@@ -573,7 +573,7 @@ export function createToolDriver(options: ToolDriverOptions): ToolDriver {
         const cached = await cachedRow(collection, id);
         const label = options.rowLabel?.(collection, id, cached);
         const intent: WriteIntent = { action: "delete", collection, id, ...(label && { title: label }), ...(cached && { previous: cached }), gesture };
-        await write(actions.delete, { collection, id }, intent);
+        await write(actions.delete, { table: collection, id }, intent);
         changed({ action: "deleted", collection, id, ...(label && { label }) });
         options.onWritten?.(intent);
     };
@@ -604,7 +604,7 @@ export function createToolDriver(options: ToolDriverOptions): ToolDriver {
             const key = `${canonical(collection)}|${readKey(args)}`;
             const inFlight = counting.get(key);
             if (inFlight) return inFlight;
-            const counted: Promise<number> = call(actions.count, { collection, ...args }).then((answer) => {
+            const counted: Promise<number> = call(actions.count, { table: collection, ...args }).then((answer) => {
                 if (isRecord(answer) && typeof answer.count === "number") return answer.count;
                 throw new Error("The count returned no number.");
             }).finally(() => {

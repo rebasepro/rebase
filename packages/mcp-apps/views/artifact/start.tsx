@@ -7,7 +7,7 @@
  *
  * ```html
  * <script type="application/json" id="rebase-app">
- *   {"connector": "Rebase", "project": "shop", "title": "Order desk", "collections": ["orders"]}
+ *   {"connector": "Rebase", "project": "shop", "title": "Order desk", "tables": ["orders"]}
  * </script>
  * <script type="text/plain" id="rebase-app-code">
  *   export default function OrderDesk() { … }   // the same TSX show_app takes
@@ -18,7 +18,7 @@
  *
  * It calls show_app with that code through the connector, and draws the
  * answer with the inline view's own runtime: the server compiles the app and
- * sends the collections, the viewer and the tools to use, exactly as for the
+ * sends the tables, the viewer and the tools to use, exactly as for the
  * view in the conversation. Writes go through the same plan the person
  * confirms there.
  *
@@ -37,8 +37,8 @@ export interface ArtifactAppConfig {
     /** The project, by id or name, on the hosted connector. */
     project?: string;
     title?: string;
-    /** The collections the app reads, as show_app takes them. */
-    collections: string[];
+    /** The tables the app reads, as show_app takes them. */
+    tables: string[];
     /** One TSX module, default-exporting a React component, as show_app takes it. */
     code: string;
 }
@@ -67,7 +67,7 @@ export async function startArtifactApp(config: ArtifactAppConfig): Promise<void>
         const result = await bridge.callTool("show_app", {
             ...(config.project && { project: config.project }),
             ...(config.title && { title: config.title }),
-            collections: config.collections,
+            tables: config.tables,
             code: config.code
         });
         status.clear();
@@ -81,7 +81,7 @@ export async function startArtifactApp(config: ArtifactAppConfig): Promise<void>
 export function readPageApp(doc: Document = document): ArtifactAppConfig | string {
     const configText = doc.getElementById("rebase-app")?.textContent;
     const code = doc.getElementById("rebase-app-code")?.textContent;
-    if (!configText) return "This page has no #rebase-app block naming the app's collections.";
+    if (!configText) return "This page has no #rebase-app block naming the app's tables.";
     if (!code || code.trim() === "") return "This page has no #rebase-app-code block with the app's code.";
     let parsed: unknown;
     try {
@@ -91,11 +91,11 @@ export function readPageApp(doc: Document = document): ArtifactAppConfig | strin
     }
     if (typeof parsed !== "object" || parsed === null) return "The #rebase-app block must be an object.";
     const record: Record<string, unknown> = { ...parsed };
-    const collections = Array.isArray(record.collections) ? record.collections.filter((name): name is string => typeof name === "string") : [];
-    if (collections.length === 0) return "The #rebase-app block names no collections.";
+    const tables = Array.isArray(record.tables) ? record.tables.filter((name): name is string => typeof name === "string") : [];
+    if (tables.length === 0) return "The #rebase-app block names no tables (\"tables\": [\"orders\"]).";
     const text = (value: unknown) => typeof value === "string" && value !== "" ? value : undefined;
     return {
-        collections,
+        tables,
         code,
         ...(text(record.connector) && { connector: text(record.connector) }),
         ...(text(record.project) && { project: text(record.project) }),

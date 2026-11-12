@@ -17,7 +17,7 @@ import { useCollectionRegistryController } from "../hooks/navigation/contexts/Co
 import type { HostContext, ViewBridge } from "./bridge";
 import { describeFailedWrite, type WriteFailure, type WriteIntent, type WritePlan } from "./tool_driver";
 import { SavedNotice, WriteConfirmDialog } from "./write_review";
-import { filterOf, orderOf, type AppBlock, type CollectionBlock, type RecordBlock, type Screen } from "./payload";
+import { filterOf, orderOf, type AppBlock, type RecordBlock, type Screen, type TableBlock } from "./payload";
 import { AppErrorBoundary, loadApp, type AppError } from "./code_app";
 import { AppCollections } from "./app_modules";
 import { createViewStore, useViewStore, type ViewStore } from "./store";
@@ -89,7 +89,7 @@ export function McpScreen({ bridge, screen, hostContext, pendingPlan, writeFailu
     }, [bridge]);
 
     const collectionOf = (name: string): AdminCollection | undefined => registry.getCollection(name);
-    const heading = screen.title ?? (block.type === "app" ? undefined : blockTitle(block, collectionOf(block.collection)));
+    const heading = screen.title ?? (block.type === "app" ? undefined : blockTitle(block, collectionOf(block.table)));
 
     let body: React.ReactNode;
     if (!registry.initialised && !registry.collections?.length) {
@@ -97,11 +97,11 @@ export function McpScreen({ bridge, screen, hostContext, pendingPlan, writeFailu
     } else if (block.type === "app") {
         body = <AppView block={block} onError={onAppError}/>;
     } else {
-        const collection = collectionOf(block.collection);
+        const collection = collectionOf(block.table);
         body = !collection
-            ? <Alert color="error" size="small">The collection &quot;{block.collection}&quot; is not in this view.</Alert>
-            : block.type === "collection"
-                ? <CollectionView block={block} collection={collection}/>
+            ? <Alert color="error" size="small">The table &quot;{block.table}&quot; is not in this view.</Alert>
+            : block.type === "table"
+                ? <TableView block={block} collection={collection}/>
                 : <RecordView block={block} collection={collection}/>;
     }
 
@@ -141,22 +141,22 @@ export function McpScreen({ bridge, screen, hostContext, pendingPlan, writeFailu
     );
 }
 
-function blockTitle(block: CollectionBlock | RecordBlock, collection: AdminCollection | undefined): string {
+function blockTitle(block: TableBlock | RecordBlock, collection: AdminCollection | undefined): string {
     if (block.type === "record") {
-        const name = collection?.singularName ?? collection?.name ?? block.collection;
+        const name = collection?.singularName ?? collection?.name ?? block.table;
         return block.id === undefined ? `New ${name.toLowerCase()}` : name;
     }
-    return collection?.name ?? block.collection;
+    return collection?.name ?? block.table;
 }
 
 /**
- * show_collection: the admin panel's collection view, where a row opens its
+ * show_table: the admin panel's collection view of the table, where a row opens its
  * form over the screen. It sizes to its rows, up to what the screen leaves
  * it — inline, the screen's height cap; full screen, the window — and then
  * scrolls inside.
  */
-function CollectionView({ block, collection }: {
-    block: CollectionBlock;
+function TableView({ block, collection }: {
+    block: TableBlock;
     collection: AdminCollection;
 }) {
     const overrides = useMemo<Partial<AdminCollection>>(() => {
@@ -202,7 +202,7 @@ function RecordView({ block, collection }: { block: RecordBlock; collection: Adm
 }
 
 /**
- * show_app: the app the model wrote, held to the collections it was opened
+ * show_app: the app the model wrote, held to the tables it was opened
  * with, and its failure shown in its place.
  */
 function AppView({ block, onError }: {
@@ -225,7 +225,7 @@ function AppView({ block, onError }: {
     const { Component } = loaded;
     return (
         <AppErrorBoundary lineOffset={loaded.lineOffset} onError={onError} fallback={failure}>
-            <AppCollections names={block.collections}>
+            <AppCollections names={block.tables}>
                 <Component/>
             </AppCollections>
         </AppErrorBoundary>

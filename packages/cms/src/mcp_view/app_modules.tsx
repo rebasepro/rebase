@@ -6,14 +6,14 @@
  * made of.
  *
  * One thing differs from the packages: an app was opened with a list of
- * collections (show_app's `collections`), and every export that names one
+ * tables (show_app's `tables`), and every export that names one
  * holds the app to it, with an error that says which it may use. The rows an
  * app reads and writes go through the tool driver, as the person, under their
  * RLS and their connection's scopes: that is what bounds an app, which can do
  * nothing the model could not with the same tools. `useRowWrites` asks them
  * before each write (`confirmingDriver` in `tool_driver.ts`), a courtesy
  * against an app writing without a click; the admin's own controls in it — a
- * form's Save, a delete — behave as on a show_collection screen. A form whose
+ * form's Save, a delete — behave as on a show_table screen. A form whose
  * overrides make it save itself is not handed to an app: it would write on
  * mount, unasked.
  */
@@ -64,8 +64,8 @@ function useCollectionCheck(): (name: string | undefined) => void {
         const collection = registry.getCollection(name);
         if (collection && (allowed.includes(collection.slug)
             || allowed.includes(getCollectionDataPath(collection)))) return;
-        throw new Error(`"${name}" is not one of this app's collections (${allowed.join(", ")}). `
-            + "List it in show_app's `collections`.");
+        throw new Error(`"${name}" is not one of this app's tables (${allowed.join(", ")}). `
+            + "List it in show_app's `tables`.");
     }, [allowed, registry]);
 }
 
