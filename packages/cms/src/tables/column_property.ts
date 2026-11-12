@@ -231,7 +231,7 @@ interface ValueFacts {
     oneOf?: readonly (string | number)[];
     storage?: ColumnStorage;
     json?: JsonShape;
-    semantic?: "geopoint";
+    semantic?: ColumnDescriptor["semantic"];
     vectorIndex?: ColumnDescriptor["vectorIndex"];
     element?: ColumnElementDescriptor;
 }
@@ -260,7 +260,8 @@ function valueProperty(
                 enum: oneOf ? enumValuesFrom(oneOf) : undefined,
                 storage: storage ? storageConfigFrom(storage) : undefined,
                 email: validate?.email ? true : undefined,
-                url: validate?.url ? true : undefined
+                url: validate?.url ? true : undefined,
+                userSelect: facts.semantic === "user" ? true : undefined
             });
         }
         case "enum":
@@ -311,7 +312,7 @@ function arrayProperty(of: ColumnType, facts: ValueFacts): ArrayProperty {
     // `col.storage().multiple()` states its storage on the column; an array of
     // storage items states it on the element. Either way each item is a file.
     const itemStorage = element?.storage ?? facts.storage;
-    const item = valueProperty(of, { validate: element?.validate, oneOf: element?.oneOf, storage: itemStorage });
+    const item = valueProperty(of, { validate: element?.validate, oneOf: element?.oneOf, storage: itemStorage, semantic: element?.semantic });
     return compact<ArrayProperty>({
         type: "array",
         columnType: arrayColumnType(of),
@@ -378,6 +379,7 @@ export function jsonNodeProperty(node: JsonShape): PostgresProperty {
                 storage: node.storage ? storageConfigFrom(node.storage) : undefined,
                 email: node.validate?.email ? true : undefined,
                 url: node.validate?.url ? true : undefined,
+                userSelect: node.semantic === "user" ? true : undefined,
                 defaultValue: nodeDefault(node.default, isString)
             });
         case "number":

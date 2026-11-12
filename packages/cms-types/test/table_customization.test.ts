@@ -218,7 +218,7 @@ const typedOptions: TableCustomizationOptions<Posts> = {
         publishDate: { mode: "date", timezone: "Europe/Madrid", clearable: true },
         heroImage: { storage: { path: ({ propertyKey }) => `posts/${propertyKey}/`, previewUrl: name => `https://cdn/${name}` } },
         firestoreDocId: { referenceTo: "fs_events" },
-        orgId: { userSelect: true },
+        orgId: { previewAsTag: true },
         seo: {
             spreadChildren: true,
             fieldOrder: ["title", "canonical"],
@@ -227,6 +227,9 @@ const typedOptions: TableCustomizationOptions<Posts> = {
         content: { oneOf: { text: { markdown: true } }, of: { expanded: true } }
     }
 };
+
+// @ts-expect-error a user picker is `.userId()` on the column in the schema, not a customization
+const userSelectField: TableCustomizationOptions<Posts> = { fields: { orgId: { userSelect: true } } };
 
 // @ts-expect-error `multiline` is a text option; `views` is a number
 const multilineOnNumber: TableCustomizationOptions<Posts> = { fields: { views: { multiline: true } } };
@@ -326,6 +329,8 @@ describe("customizeTable's keys, as data", () => {
     it("lists every field key once, and the component slots among them", () => {
         expect(new Set(FIELD_CUSTOMIZATION_KEYS).size).toBe(FIELD_CUSTOMIZATION_KEYS.length);
         for (const key of FIELD_COMPONENT_KEYS) expect(FIELD_CUSTOMIZATION_KEYS).toContain(key);
+        // A user picker is a schema fact (`.userId()`), never a customization.
+        expect(new Set<string>(FIELD_CUSTOMIZATION_KEYS).has("userSelect")).toBe(false);
     });
 
     it("recognises a customization by its brand", () => {

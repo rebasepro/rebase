@@ -383,8 +383,6 @@ export interface TextFieldOptions {
     clearable?: boolean;
     /** How a URL in the value is previewed: a media type, or `true` for a link. */
     urlPreview?: PreviewType | boolean;
-    /** Picked from the project's users; the value is the user's id. */
-    userSelect?: boolean;
     /**
      * The column holds the key of a record in another collection — possibly on
      * another data source, such as a Firestore collection declared with
@@ -557,7 +555,7 @@ type EnumOptionsOf<V> =
  */
 export type NestedFieldCustomization<V = unknown> =
     FieldOptions &
-    Omit<TextFieldOptions, "referenceTo" | "userSelect"> &
+    Omit<TextFieldOptions, "referenceTo"> &
     NumberFieldOptions &
     DateFieldOptions &
     StorageFieldOptions &
@@ -1111,7 +1109,6 @@ export const FIELD_CUSTOMIZATION_KEYS = [
     "storage",
     "timezone",
     "urlPreview",
-    "userSelect",
     "widget"
 ] as const satisfies readonly (keyof AnyFieldCustomization)[];
 

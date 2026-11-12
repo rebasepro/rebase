@@ -26,6 +26,8 @@ describe("widget per column type", () => {
         ["char", { kind: "char", length: 2 }, {}, "text_field"],
         ["text with validate.email", { kind: "text" }, { validate: { email: true } }, "email"],
         ["uuid", { kind: "uuid" }, {}, "text_field"],
+        ["text .userId()", { kind: "text" }, { semantic: "user" }, "user_select"],
+        ["uuid .userId()", { kind: "uuid" }, { semantic: "user" }, "user_select"],
         ["other (inet)", { kind: "other", sqlType: "inet" }, {}, "text_field"],
         ["enum", { kind: "enum", values: ["a", "b"] }, {}, "select"],
         ["text .oneOf()", { kind: "text" }, { oneOf: ["x", "y"] }, "select"],
@@ -64,6 +66,15 @@ describe("what each type states", () => {
         expect(project(column("a", { kind: "text" }))).toMatchObject({ type: "string", columnType: "text" });
         expect(project(column("a", { kind: "varchar", length: 160 }))).toMatchObject({ columnType: "varchar", validation: { max: 160 } });
         expect(project(column("a", { kind: "uuid" }))).toMatchObject({ type: "string", columnType: "uuid" });
+    });
+
+    it("a user's id is the user picker, on the column, on each array item and inside a JSON document", () => {
+        expect(project(column("owner", { kind: "uuid" }, { semantic: "user" }))).toMatchObject({ type: "string", columnType: "uuid", userSelect: true });
+        expect(project(column("owner", { kind: "text" }))).not.toHaveProperty("userSelect");
+        expect(project(column("watchers", { kind: "array", of: { kind: "text" } }, { element: { semantic: "user" } })))
+            .toMatchObject({ type: "array", of: { type: "string", userSelect: true } });
+        expect(project(column("doc", { kind: "jsonb" }, { json: { kind: "object", fields: { approver: { kind: "string", semantic: "user" } } } })))
+            .toMatchObject({ type: "map", properties: { approver: { type: "string", userSelect: true } } });
     });
 
     it("validate.url is the URL input", () => {

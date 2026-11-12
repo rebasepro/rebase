@@ -154,6 +154,12 @@ describe("customizeTable", () => {
                 .toThrow(/fields\.title: unknown option:\n {2}- `hideFromCollection` — it is `hidden` now/);
         });
 
+        it("`userSelect`, which is `.userId()` on the column now", () => {
+            const fields: Record<string, unknown> = { authorId: { userSelect: true } };
+            expect(() => untypedCustomizeTable("posts", { fields }))
+                .toThrow(/fields\.authorId: unknown option:\n {2}- `userSelect` — it is `\.userId\(\)` on the column in `backend\/schema`/);
+        });
+
         it("a component given as a string path", () => {
             const fields: Record<string, unknown> = { content: { Field: "../components/CustomMarkdownEditor" } };
             expect(() => untypedCustomizeTable("posts", { fields }))

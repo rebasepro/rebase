@@ -44,7 +44,8 @@ const RENAMED_FIELD_KEYS: Readonly<Record<string, string>> = {
     validation: "`.validate({ … })` / `.notNull()` on the column",
     storagePath: "`storage.path`",
     type: "the column's builder on `defineTable`",
-    relation: "`relations` on `defineTable`"
+    relation: "`relations` on `defineTable`",
+    userSelect: "`.userId()` on the column in `backend/schema` (who may pick users is a schema fact the server reads)"
 };
 
 const TABLE_KEYS: ReadonlySet<string> = new Set(TABLE_CUSTOMIZATION_KEYS);

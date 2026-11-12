@@ -263,7 +263,7 @@ const COMMON_FIELD_KEYS: ReadonlySet<string> = new Set([
 
 /** The further options each kind of view-model property takes. */
 const FIELD_KEYS_BY_TYPE: Readonly<Record<Property["type"], readonly string[]>> = {
-    string: ["multiline", "markdown", "previewAsTag", "clearable", "urlPreview", "userSelect", "enumLabels", "enumOrder", "storage"],
+    string: ["multiline", "markdown", "previewAsTag", "clearable", "urlPreview", "enumLabels", "enumOrder", "storage"],
     number: ["clearable", "format", "enumLabels", "enumOrder"],
     boolean: [],
     date: ["clearable", "mode", "timezone"],
@@ -506,7 +506,6 @@ function applyTyped(property: Property, field: AnyFieldCustomization, where: str
             set(admin, "urlPreview", field.urlPreview);
             const out = { ...property, admin };
             set(out, "enum", mergeEnum(property.enum, field, where));
-            set(out, "userSelect", field.userSelect);
             set(out, "storage", mergeStorage(property.storage, field.storage, where));
             return out;
         }
