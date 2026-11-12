@@ -17,7 +17,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
-import { integer, pgTable, serial, text, uuid } from "drizzle-orm/pg-core";
+import { integer, pgTable, serial, text, uuid, vector } from "drizzle-orm/pg-core";
 import { col, defineAuthTable, defineTable, rel, type DataDriver, type User } from "@rebasepro/types";
 import { compileSchema, lowerTables } from "@rebasepro/common";
 
@@ -25,6 +25,8 @@ import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { buildTableRegistry } from "../src/model/build-registry";
 import { RealtimeService } from "../src/services/realtimeService";
 import { assertReadRequestReadable } from "../src/services/read-field-access";
+import { withFieldViewer } from "../src/services/field-viewer";
+import { DrizzleConditionBuilder } from "../src/utils/drizzle-conditions";
 import { testUser } from "./helpers/spg-b-fixtures";
 import { pgliteNodePg } from "./helpers/spg-b-pglite-node-pg";
 
@@ -302,3 +304,45 @@ describe("the socket's read check (`assertReadRequestReadable`)", () => {
         expect(() => assertReadRequestReadable({}, { slug: "nowhere" }, { roles: ["admin"] }, registry())).toThrow(/nowhere/);
     });
 });
+
+describe("a private vector column", () => {
+    const docs = defineTable("docs", {
+        columns: {
+            id: col.serial().primaryKey(),
+            embedding: col.vector({ dimensions: 3 }),
+            fingerprint: col.vector({ dimensions: 3 }).private()
+        },
+        rls: "admin-only"
+    });
+    const docsPg = pgTable("docs", {
+        id: serial("id").primaryKey(),
+        embedding: vector("embedding", { dimensions: 3 }),
+        fingerprint: vector("fingerprint", { dimensions: 3 })
+    });
+    const table = compileSchema([docs])[0].descriptor;
+    const search = (property: string) => () =>
+        DrizzleConditionBuilder.buildVectorSearchConditions(docsPg, { property, vector: [1, 2, 3] }, table);
+
+    it("is answered to an API caller as a column the table does not have, and listed nowhere", () => {
+        const hidden = refusalOf(() => withFieldViewer({ roles: ["admin"] }, search("fingerprint")));
+        const typo = refusalOf(() => withFieldViewer({ roles: ["admin"] }, search("nope")));
+        expect(hidden.code).toBe("UNKNOWN_VECTOR_PROPERTY");
+        expect(hidden.message.split("fingerprint").join("nope")).toBe(typo.message);
+        expect(typo.message).toContain("embedding");
+        expect(typo.message).not.toContain("fingerprint");
+    });
+
+    it("is ranked by on the trusted server plane", () => {
+        expect(search("fingerprint")().distanceSelect).toBeDefined();
+    });
+});
+
+function refusalOf(read: () => unknown): { code?: string; message: string } {
+    try {
+        read();
+    } catch (error) {
+        const { code, message } = error as { code?: string; message: string };
+        return { code, message };
+    }
+    throw new Error("not refused");
+}

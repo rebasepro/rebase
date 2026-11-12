@@ -60,6 +60,9 @@ import type { AuthAdapter, CollectionConfig, SaveProps } from "@rebasepro/types"
 import { createPostgresWebSocket, type SocketDataDriver } from "../src/websocket";
 import { fakeAuthAdapter, fakeDataDriver, fakeSocketRealtime } from "./helpers/spg-c-socket";
 import { registryOf } from "./helpers/spg-c-registry";
+import { col, defineTable, rel } from "@rebasepro/types";
+import { compileSchema, lowerTables } from "@rebasepro/common";
+import { buildTableRegistry } from "../src/model/build-registry";
 
 /**
  * A write arriving over the socket used to skip the checks the REST routes run.
@@ -452,6 +455,78 @@ describe("a socket write through a parent's relation", () => {
         const getTable = registry.getTable.bind(registry);
         jest.spyOn(registry, "getTable").mockImplementation(slug => slug === "members" ? undefined : getTable(slug));
         const { send, last } = await connect(["hr", "editor"]);
+        await send({ type: "SAVE", requestId: "y", payload: { path: "bands/7/members", status: "new", values: { name: "x" } } });
+        expect(last()).toMatchObject({ type: "ERROR", payload: { error: { code: "FIELD_NOT_WRITABLE" } } });
+        expect(writes).toEqual([]);
+    });
+});
+
+/**
+ * The same door over tables authored with `defineTable`: the relation's own
+ * `access.write` decides a write through it, and a hop the check cannot
+ * resolve is refused rather than handed to the driver unjudged.
+ */
+describe("a socket write through a parent's relation, declared with defineTable", () => {
+    const bandsT = defineTable("bands", {
+        columns: { id: col.serial().primaryKey(), name: col.text() },
+        relations: { members: rel.hasMany(() => membersT, { foreignKey: "band_id" }) },
+        rls: "admin-only"
+    });
+    const membersT = defineTable("members", {
+        columns: { id: col.serial().primaryKey(), name: col.text(), bandId: col.integer().column("band_id") },
+        relations: { band: rel.belongsTo(() => bandsT, { localKey: "band_id", access: { write: ["hr"] } }) },
+        rls: "admin-only"
+    });
+
+    let writes: unknown[];
+    let tables: ReturnType<typeof buildTableRegistry>;
+    const adapter = fakeAuthAdapter({
+        verifyToken: async (token: string) => ({ uid: `u-${token}`, email: "", roles: token.split(","), isAdmin: false })
+    });
+
+    const connect = async (roles: string[]) => {
+        type Handler = (data: string) => unknown;
+        const handlers: Record<string, Handler> = {};
+        const ws = {
+            send: jest.fn<(data: string) => void>(),
+            on: (event: string, cb: Handler) => { handlers[event] = cb; },
+            readyState: 1,
+            close: jest.fn()
+        };
+        mockWssInstance.on.mock.calls.find((c: unknown[]) => c[0] === "connection")[1](ws, { url: "/", headers: {} });
+        const send = (msg: unknown) => handlers.message(JSON.stringify(msg));
+        await send({ type: "AUTHENTICATE", requestId: "auth", payload: { token: roles.join(",") } });
+        const last = () => JSON.parse(ws.send.mock.calls[ws.send.mock.calls.length - 1][0]);
+        return { send, last };
+    };
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+        mockWssInstance = null;
+        writes = [];
+        tables = buildTableRegistry({ compiledTables: compileSchema([bandsT, membersT]), collections: lowerTables([bandsT, membersT]), tables: {} });
+        const driver: SocketDataDriver = {
+            ...fakeDataDriver(),
+            registry: tables,
+            save: async (props) => { writes.push(props); return {}; }
+        };
+        createPostgresWebSocket({} as Server, fakeSocketRealtime(), driver, undefined, adapter);
+    });
+
+    it("refuses a create that sets the parent's key a caller may not write, and lets one holding the role", async () => {
+        const viewer = await connect(["viewer"]);
+        await viewer.send({ type: "SAVE", requestId: "s", payload: { path: "bands/7/members", status: "new", values: { name: "x" } } });
+        expect(viewer.last()).toMatchObject({ type: "ERROR", payload: { error: { code: "FIELD_NOT_WRITABLE" } } });
+        expect(writes).toEqual([]);
+        const hr = await connect(["hr"]);
+        await hr.send({ type: "SAVE", requestId: "t", payload: { path: "bands/7/members", status: "new", values: { name: "x" } } });
+        expect(writes).toHaveLength(1);
+    });
+
+    it("refuses a write through a hop whose target table is not served", async () => {
+        const getTable = tables.getTable.bind(tables);
+        jest.spyOn(tables, "getTable").mockImplementation(slug => slug === "members" ? undefined : getTable(slug));
+        const { send, last } = await connect(["hr"]);
         await send({ type: "SAVE", requestId: "y", payload: { path: "bands/7/members", status: "new", values: { name: "x" } } });
         expect(last()).toMatchObject({ type: "ERROR", payload: { error: { code: "FIELD_NOT_WRITABLE" } } });
         expect(writes).toEqual([]);
