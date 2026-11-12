@@ -1174,6 +1174,10 @@ export interface RebaseTranslations {
     studio_rls_rule_rows?: string;
     studio_rls_rule_writes?: string;
     studio_rls_rule_redacted?: string;
+    /** Title of the confirmation before a table's inherited rules are replaced by its own */
+    schema_rules_detach_title?: string;
+    /** Body of that confirmation; {{table}} is the table slug */
+    schema_rules_detach_body?: string;
     studio_rls_delete?: string;
     studio_rls_confirm_delete_title?: string;
     studio_rls_confirm_delete_body?: string;

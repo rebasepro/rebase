@@ -1038,6 +1038,8 @@ export const de: RebaseTranslations = {
     studio_rls_rule_rows: "Zeilen: {{condition}}",
     studio_rls_rule_writes: "Schreibvorgänge: {{condition}}",
     studio_rls_rule_redacted: "Auf dem Server definiert",
+    schema_rules_detach_title: "Dieser Tabelle eigene Regeln geben?",
+    schema_rules_detach_body: "Die Regeln von \"{{table}}\" kommen aus defaultRls. Beim Speichern werden sie in das eigene rls der Tabelle geschrieben, und eine Änderung an defaultRls erreicht sie danach nicht mehr. Abbrechen behält \"inherit\": Es wird nichts geschrieben.",
     studio_rls_delete: "Delete",
     studio_rls_confirm_delete_title: "Richtlinie löschen",
     studio_rls_confirm_delete_body: "Möchten Sie diese Richtlinie wirklich löschen? Dieser Vorgang kann nicht rückgängig gemacht werden.",

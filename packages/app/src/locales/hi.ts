@@ -1038,6 +1038,8 @@ export const hi: RebaseTranslations = {
     studio_rls_rule_rows: "पंक्तियाँ: {{condition}}",
     studio_rls_rule_writes: "लेखन: {{condition}}",
     studio_rls_rule_redacted: "सर्वर पर परिभाषित",
+    schema_rules_detach_title: "इस टेबल को उसके अपने नियम दें?",
+    schema_rules_detach_body: "\"{{table}}\" के नियम defaultRls से आते हैं। सहेजने पर वे टेबल के अपने rls में लिखे जाते हैं, और उसके बाद defaultRls में बदलाव इस तक नहीं पहुँचता। \"inherit\" रखने के लिए रद्द करें: कुछ भी नहीं लिखा जाता।",
     studio_rls_delete: "Delete",
     studio_rls_confirm_delete_title: "नीति हटाएँ",
     studio_rls_confirm_delete_body: "क्या आप वाकई यह नीति हटाना चाहते हैं? यह क्रिया पूर्ववत नहीं की जा सकती।",

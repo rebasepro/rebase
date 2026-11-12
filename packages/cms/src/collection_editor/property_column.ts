@@ -229,7 +229,10 @@ function columnTypeOf(key: string, property: Property, base: ColumnType | undefi
         // The same choice: keep the exact type, with the editor's enum values.
         if (base.kind === "enum" && property.type === "string") {
             const values = enumIds(property.enum)?.map(String) ?? [...base.values];
-            return { ...base, values };
+            // The same values in another order is how they are offered, not
+            // the type: the order stays as written.
+            const sameSet = values.length === base.values.length && values.every(value => base.values.includes(value));
+            return sameSet ? base : { ...base, values };
         }
         if (base.kind === "numeric" && property.type === "number") {
             return compact({ kind: "numeric", precision: property.precision, scale: property.scale });
@@ -593,7 +596,18 @@ export function relationTargetSlug(relation: Relation, fallback?: string): strin
 export function wireRelationFromRelation(
     name: string,
     relation: Relation,
-    options: { base?: WireRelation; required?: boolean; access?: Property["access"] } = {}
+    options: {
+        base?: WireRelation;
+        /** The relation's field is required in the form. */
+        required?: boolean;
+        /**
+         * The foreign key is the relation's own (no column declares it), so
+         * its nullability is the relation's `notNull`. A foreign key a column
+         * declares states its nullability on that column.
+         */
+        ownsForeignKey?: boolean;
+        access?: Property["access"];
+    } = {}
 ): WireRelation {
     const { base } = options;
     const target = relationTargetSlug(relation, base?.target);
@@ -610,7 +624,7 @@ export function wireRelationFromRelation(
                 kind: "belongsTo" as const,
                 target,
                 localKey: relation.localKey ?? from?.localKey,
-                notNull: options.required ? true : from?.notNull && options.required === undefined ? true : undefined,
+                notNull: options.ownsForeignKey === false ? from?.notNull : options.required ? true : undefined,
                 onDelete: relation.onDelete,
                 onUpdate: relation.onUpdate,
                 index: relation.index === false ? false : relation.index === true ? undefined : from?.index,

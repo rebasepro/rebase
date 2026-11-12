@@ -21,7 +21,10 @@ import {
 } from "../../src/collection_editor/liveSchemaClient";
 import { fakeFetch, jsonResponse, textResponse } from "../helpers/http";
 
-const CHANGE = { collectionId: "posts", collection: { name: "Posts", properties: {} } };
+const CHANGE = {
+    table: "posts",
+    patches: [{ op: "addColumn" as const, table: "posts", key: "subtitle", column: { type: { kind: "text" as const } } }]
+};
 
 function stub(response: {
     ok?: boolean;
@@ -55,7 +58,8 @@ describe("requests", () => {
 
         expect(plan.applicable).toBe(true);
         expect(s.calls[0].url).toBe("https://api.example.com/api/schema/plan");
-        expect(JSON.parse(s.calls[0].init.body as string)).toEqual(CHANGE);
+        // The routes take `{ patches }`; the table name is the dialog's.
+        expect(JSON.parse(String(s.calls[0].init.body))).toEqual({ patches: CHANGE.patches });
     });
 
     it("posts to /apply and returns the result", async () => {
@@ -116,6 +120,27 @@ describe("a refused change", () => {
         expect(err.code).toBe("SCHEMA_CHANGE_UNAPPLICABLE");
         expect(err.changes).toHaveLength(1);
         expect(err.changes![0].remedy).toContain("migration");
+    });
+
+    it("carries the problems of an edit that does not compile, so a UI can list them by field", async () => {
+        const err = await client(stub({
+            status: 400,
+            body: {
+                error: {
+                    code: "SCHEMA_EDIT_DOES_NOT_COMPILE",
+                    message: "The edited schema does not compile.",
+                    details: { problems: [{ table: "posts", key: "subtitle", message: "a varchar needs a length" }] }
+                }
+            }
+        })).plan(CHANGE).catch(e => e as LiveSchemaError);
+        expect(err.code).toBe("SCHEMA_EDIT_DOES_NOT_COMPILE");
+        expect(err.problems).toEqual([{ table: "posts", key: "subtitle", message: "a varchar needs a length" }]);
+    });
+
+    it("sends sourceOnly beside the patches when asked to commit without running", async () => {
+        const s = stub({ body: { applied: false, committed: { sha: "abc", branch: "main", files: [] }, statements: [], summary: "done" } });
+        await client(s).apply({ ...CHANGE, sourceOnly: true });
+        expect(JSON.parse(String(s.calls[0].init.body))).toEqual({ patches: CHANGE.patches, sourceOnly: true });
     });
 
     it("is NOT reported as the feature being unavailable", async () => {

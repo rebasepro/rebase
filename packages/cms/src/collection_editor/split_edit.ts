@@ -391,10 +391,16 @@ function wireOf(key: string, property: Property, served: Map<string, WireColumnD
     }
 }
 
-function wireRelationOf(name: string, entry: { relation: Relation; property?: Property }, served: Map<string, WireRelation>): WireRelation {
+function wireRelationOf(
+    name: string,
+    entry: { relation: Relation; property?: Property },
+    served: Map<string, WireRelation>,
+    declaredForeignKeys: ReadonlySet<string> = new Set()
+): WireRelation {
     try {
         return wireRelationFromRelation(name, entry.relation, {
             base: served.get(name),
+            ownsForeignKey: !declaredForeignKeys.has(name),
             required: entry.relation.kind === "belongsTo" && entry.property ? entry.property.validation?.required === true : undefined,
             access: entry.property?.access
         });
@@ -547,8 +553,14 @@ export function splitEdit({ before, after, table }: SplitEditInput): SplitEdit {
     for (const column of table?.columns ?? []) {
         if (!column.derived && !column.private) servedColumns.set(column.key, wireColumnOfDescriptor(column));
     }
+    // The belongsTo relations whose foreign key a column declares.
+    const declaredForeignKeys = new Set<string>();
     for (const relation of table?.relations ?? []) {
-        if (table) servedRelations.set(relation.name, wireRelationOfDescriptor(relation, table));
+        if (!table) continue;
+        servedRelations.set(relation.name, wireRelationOfDescriptor(relation, table));
+        if (relation.kind === "belongsTo" && table.columns.some(c => c.key === relation.localField && !c.derived)) {
+            declaredForeignKeys.add(relation.name);
+        }
     }
 
     const schema: TablePatch[] = [];
@@ -575,12 +587,12 @@ export function splitEdit({ before, after, table }: SplitEditInput): SplitEdit {
     const afterRelations = relationsOf(after);
     for (const [name, entry] of afterRelations) {
         const previous = beforeRelations.get(name);
-        const next = wireRelationOf(name, entry, servedRelations);
+        const next = wireRelationOf(name, entry, servedRelations, declaredForeignKeys);
         if (!previous) {
             schema.push({ op: "addRelation", table: slug, name, relation: next });
             continue;
         }
-        if (!sameValue(wireRelationOf(name, previous, servedRelations), next)) {
+        if (!sameValue(wireRelationOf(name, previous, servedRelations, declaredForeignKeys), next)) {
             schema.push({ op: "changeRelation", table: slug, name, relation: next });
         }
     }

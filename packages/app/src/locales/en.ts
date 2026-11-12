@@ -1046,6 +1046,8 @@ export const en: RebaseTranslations = {
     studio_rls_rule_rows: "Rows: {{condition}}",
     studio_rls_rule_writes: "Writes: {{condition}}",
     studio_rls_rule_redacted: "Defined on the server",
+    schema_rules_detach_title: "Give this table its own rules?",
+    schema_rules_detach_body: "The rules of \"{{table}}\" come from defaultRls. Saving writes them into the table's own rls, and from then on a change to defaultRls no longer reaches it. Cancel to keep \"inherit\": nothing is written.",
     studio_rls_delete: "Delete",
     studio_rls_confirm_delete_title: "Delete Policy",
     studio_rls_confirm_delete_body: "Are you sure you want to delete this policy? This action cannot be undone.",

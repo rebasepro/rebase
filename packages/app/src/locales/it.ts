@@ -1038,6 +1038,8 @@ export const it: RebaseTranslations = {
     studio_rls_rule_rows: "Righe: {{condition}}",
     studio_rls_rule_writes: "Scritture: {{condition}}",
     studio_rls_rule_redacted: "Definita sul server",
+    schema_rules_detach_title: "Dare a questa tabella regole proprie?",
+    schema_rules_detach_body: "Le regole di \"{{table}}\" vengono da defaultRls. Salvando vengono scritte nel rls proprio della tabella e da allora una modifica a defaultRls non la raggiunge più. Annulla per mantenere \"inherit\": non viene scritto nulla.",
     studio_rls_delete: "Delete",
     studio_rls_confirm_delete_title: "Elimina criterio",
     studio_rls_confirm_delete_body: "Vuoi davvero eliminare questo criterio? L'operazione non può essere annullata.",

@@ -1038,6 +1038,8 @@ export const fr: RebaseTranslations = {
     studio_rls_rule_rows: "Lignes : {{condition}}",
     studio_rls_rule_writes: "Écritures : {{condition}}",
     studio_rls_rule_redacted: "Définie sur le serveur",
+    schema_rules_detach_title: "Donner à cette table ses propres règles ?",
+    schema_rules_detach_body: "Les règles de \"{{table}}\" viennent de defaultRls. L'enregistrement les écrit dans le rls propre de la table, et une modification de defaultRls ne l'atteint plus ensuite. Annulez pour garder \"inherit\" : rien n'est écrit.",
     studio_rls_delete: "Delete",
     studio_rls_confirm_delete_title: "Supprimer la politique",
     studio_rls_confirm_delete_body: "Voulez-vous vraiment supprimer cette politique ? Cette action est irréversible.",

@@ -6,25 +6,27 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { Formex, useCreateFormex, type FormexController } from "@rebasepro/forms";
 import { resolveRelation } from "@rebasepro/common";
 import type { CollectionConfig, Property, Relation } from "@rebasepro/types";
+import { tablePatchProblems } from "@rebasepro/types";
 
-import { findCollectionConfigProblems } from "../../../server/src/collections/validate-config";
+import { wireRelationFromRelation } from "../../src/collection_editor/property_column";
 import { updatePropertyFromWidget } from "../../src/collection_editor/ui/collection_editor/utils/update_property_for_widget";
 
 /**
- * A relation property created in the property form, checked against boot.
+ * A relation property created in the property form, checked against what the
+ * schema editor accepts.
  *
- * The form wrote three shapes the boot validator refuses, and the panel
- * reported success for each: a top-level `relationName: ""` (the key moved
+ * The form wrote three shapes the server refused, and the panel reported
+ * success for each: a top-level `relationName: ""` (the key moved
  * inside `relation` in 0.11), a relation with no `kind` at all (the select
  * *displayed* "Belongs to" and wrote nothing until it was changed), and, after
  * a kind switch, the old kind's link field left behind — `through` on a
  * `belongsTo`, `localKey` on a `hasMany`. Each one stops every collection in
  * the directory from loading.
  *
- * So the assertion is the boot validator itself, run on what the form holds,
- * and the real `resolveRelation` — the two things a saved collection meets at
- * the next boot. The target is made a thunk first, because that is what the
- * editor writes a picked slug as.
+ * So the assertion is what a save sends: the relation as the `addRelation`
+ * operation the editor writes, checked by the server's own operation checker
+ * (`tablePatchProblems`), and the real `resolveRelation`. The target is made a
+ * thunk first, because that is what the editor writes a picked slug as.
  */
 
 jest.mock("../../src/collection_editor/_cms_internals", () => ({
@@ -111,10 +113,17 @@ function saved(property: PropertyValues) {
     return { posts, relation };
 }
 
+const RELATION_KINDS = ["belongsTo", "hasOne", "hasMany", "manyToMany", "via"];
+const isRelation = (value: unknown): value is Relation =>
+    isRecord(value) && typeof value.kind === "string" && RELATION_KINDS.includes(value.kind) && typeof value.target === "function";
+
+/** What the schema editor would refuse about the relation as the editor sends it. */
 function bootErrors(property: PropertyValues) {
-    return findCollectionConfigProblems([saved(property).posts, authors])
-        .filter(p => p.severity === "error")
-        .map(p => `${p.path}: ${p.message}`);
+    const { relation } = saved(property);
+    if (!isRelation(relation)) return ["relation: the form holds no relation kind"];
+    const wire = wireRelationFromRelation("author", relation);
+    return tablePatchProblems([{ op: "addRelation", table: "posts", name: "author", relation: wire }])
+        .map(p => `${p.key ?? ""}: ${p.message}`);
 }
 
 function resolved(property: PropertyValues) {
