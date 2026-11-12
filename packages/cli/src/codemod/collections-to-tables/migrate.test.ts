@@ -17,7 +17,6 @@ import os from "node:os";
 import path from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 
-import { defaultLabel, defaultSingularLabel } from "./labels";
 import { enumLabelsOf, noteKeySegments } from "./customization";
 import { Journal } from "./journal";
 import { migrateCollectionsToTables } from "./migrate";
@@ -237,17 +236,6 @@ describe("modes", () => {
 });
 
 describe("pieces", () => {
-    it("derives the labels the zero-config CMS derives", () => {
-        expect(defaultLabel("first_name")).toBe("First Name");
-        expect(defaultLabel("firstName")).toBe("First Name");
-        expect(defaultLabel("author_id")).toBe("Author ID");
-        expect(defaultLabel("__order")).toBe("Order");
-        expect(defaultLabel("order_items")).toBe("Order Items");
-        expect(defaultSingularLabel("Order Items")).toBe("Order Item");
-        expect(defaultSingularLabel("Status")).toBe("Status");
-        expect(defaultSingularLabel("Address")).toBe("Address");
-    });
-
     it("keeps only the enum labels and colours that are not derived", () => {
         expect(enumLabelsOf([{ id: "draft", label: "Draft" }, { id: "needs_review", label: "Needs Review" }])).toBeUndefined();
         expect(enumLabelsOf([{ id: "draft", label: "Draft", color: "grayLight" }, { id: "published", label: "Live" }]))

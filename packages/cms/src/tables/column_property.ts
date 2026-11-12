@@ -33,7 +33,7 @@ import type {
     VectorProperty
 } from "@rebasepro/types";
 import { CHIP_COLORS, CHIP_SEED_KEYS, getColorSchemeForSeed } from "@rebasepro/ui";
-import { labelFromIdentifier } from "./labels";
+import { enumValueLabel, labelFromIdentifier } from "@rebasepro/utils";
 
 /**
  * What a column's projection needs to know about the table around it.
@@ -67,7 +67,7 @@ export function enumValueColor(value: string | number): EnumValueConfig["color"]
 export function enumValuesFrom(values: readonly (string | number)[]): EnumValueConfig[] {
     return values.map(value => ({
         id: value,
-        label: typeof value === "string" ? labelFromIdentifier(value) : String(value),
+        label: enumValueLabel(value),
         color: enumValueColor(value)
     }));
 }

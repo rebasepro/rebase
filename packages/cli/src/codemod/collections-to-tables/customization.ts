@@ -19,11 +19,11 @@ import path from "node:path";
 import type { Node, Statement } from "ts-morph";
 import type { LiftNote } from "@rebasepro/common";
 import { ADMIN_COLLECTION_KEYS, ADMIN_PROPERTY_KEYS, type EnumValues } from "@rebasepro/types";
+import { enumValueLabel, labelFromIdentifier, singularLabel } from "@rebasepro/utils";
 
 import type { Member, PathSegment } from "./ast";
 import { collectReferences, nodeAtPath, nodeText, postDeclarationAssignments, resolveObject, toPosix, unwrap } from "./ast";
 import { memberFunctionText } from "./hooks";
-import { defaultEnumLabel, defaultLabel, defaultSingularLabel } from "./labels";
 import { importLines } from "./modules";
 import type { CollectionEntry, PlanContext } from "./plan-context";
 import { note, planFile, refuse, relativeToRoot } from "./plan-context";
@@ -265,7 +265,7 @@ export function enumLabelsOf(values: EnumValues): Record<string, unknown> | unde
     const out: Record<string, unknown> = {};
     for (const entry of entries) {
         const label = entry.label ?? String(entry.id);
-        const derived = defaultEnumLabel(entry.id);
+        const derived = enumValueLabel(entry.id);
         const extra: Record<string, unknown> = {};
         if (entry.color !== undefined) extra.color = entry.color;
         if (entry.disabled !== undefined) extra.disabled = entry.disabled;
@@ -396,7 +396,7 @@ function applyFieldNote(plan: PlanContext, builder: Builder, item: LiftNote, fie
     const target = at(fields, field);
     switch (item.field) {
         case "name":
-            if (typeof item.value === "string" && item.value !== defaultLabel(lastKey(key))) target.name = item.value;
+            if (typeof item.value === "string" && item.value !== labelFromIdentifier(lastKey(key))) target.name = item.value;
             return;
         case "admin":
             if (isPlainObject(item.value)) fieldAdmin(plan, builder, item.value, literal, target, label);
@@ -437,13 +437,13 @@ function applyFieldNote(plan: PlanContext, builder: Builder, item: LiftNote, fie
 /** Apply one collection-level note. */
 function applyCollectionNote(plan: PlanContext, builder: Builder, item: LiftNote): void {
     const options = builder.options;
-    const derivedName = defaultLabel(builder.name.table);
+    const derivedName = labelFromIdentifier(builder.name.table);
     switch (item.field) {
         case "name":
             if (typeof item.value === "string" && item.value !== derivedName) options.name = item.value;
             return;
         case "singularName":
-            if (typeof item.value === "string" && item.value !== defaultSingularLabel(derivedName)) options.singularName = item.value;
+            if (typeof item.value === "string" && item.value !== singularLabel(derivedName)) options.singularName = item.value;
             return;
         case "icon":
             options.icon = printable(plan, builder, item.value, ["icon"], "icon");

@@ -17,7 +17,8 @@ import type {
     RelationProperty,
     TableDescriptor
 } from "@rebasepro/types";
-import { labelFromIdentifier } from "./labels";
+import { labelFromIdentifier } from "@rebasepro/utils";
+
 import { propertyFromColumn } from "./column_property";
 
 /**

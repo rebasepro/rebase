@@ -1,6 +1,6 @@
 export { collectionFromTable, collectionsFromTables } from "./project_table";
 export type { ProjectedCollection, TableProjectionContext } from "./project_table";
-export { labelFromIdentifier, singularLabel, tableLabels } from "./labels";
+export { tableLabels } from "./labels";
 export { enumValueColor, enumValuesFrom, jsonNodeProperty, propertyFromColumn, storageConfigFrom } from "./column_property";
 export type { ColumnProjectionContext } from "./column_property";
 export { projectRelations } from "./relations";
