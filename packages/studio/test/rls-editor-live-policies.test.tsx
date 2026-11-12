@@ -6,7 +6,7 @@ import React from "react";
 import { describe, expect, it, jest, beforeEach } from "@jest/globals";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { col, defineTable } from "@rebasepro/types";
-import type { SecurityRule } from "@rebasepro/types";
+import type { SecurityRule, TablePatch } from "@rebasepro/types";
 import type { TableDescriptorsState } from "@rebasepro/app";
 import { servedTables } from "./helpers/servedTables";
 import { readyTables } from "./helpers/tableDescriptors";
@@ -27,7 +27,7 @@ import { readyTables } from "./helpers/tableDescriptors";
  * policies it compiles from them (`rls.policies`). The editor compiles nothing.
  */
 
-const updateCollection = jest.fn<(id: string, patch: Record<string, unknown>) => Promise<void>>();
+const applyTablePatches = jest.fn<(table: string, patches: TablePatch[]) => Promise<void>>();
 let hasCodebase = true;
 let livePolicies: Record<string, unknown>[] = [];
 /**
@@ -72,7 +72,7 @@ const translation = {
 jest.mock("@rebasepro/app", () => ({
     useTranslation: () => translation,
     useNavigationGroupLabel: () => (group: string) => group,
-    useStudioSchemaEditing: () => ({ available: true, updateCollection }),
+    useStudioSchemaEditing: () => ({ available: true, applyTablePatches }),
     useTableDescriptors: () => tables,
     useStudioCapabilities: () => ({ codebase: hasCodebase }),
     useApiBase: () => "http://api.test/api",
@@ -132,8 +132,8 @@ function policyDdl(): string[] {
 }
 
 beforeEach(() => {
-    updateCollection.mockReset();
-    updateCollection.mockResolvedValue(undefined);
+    applyTablePatches.mockReset();
+    applyTablePatches.mockResolvedValue(undefined);
     executeSql.mockClear();
     snackbarOpen.mockClear();
     livePolicies = [];
@@ -259,7 +259,7 @@ describe("saving a declared policy with nothing changed", () => {
         await waitFor(() => expect(snackbarOpen).toHaveBeenCalled());
         expect(snackbarOpen.mock.calls.map(([o]) => o.type)).not.toContain("success");
         expect(snackbarOpen.mock.calls[0][0].message).toBe(label("studio_rls_nothing_changed"));
-        expect(updateCollection).not.toHaveBeenCalled();
+        expect(applyTablePatches).not.toHaveBeenCalled();
     });
 
     it("is still saved once something has changed", async () => {
@@ -271,6 +271,6 @@ describe("saving a declared policy with nothing changed", () => {
         fireEvent.change(await screen.findByLabelText(label("studio_policy_name")), { target: { value: "everyone_reads" } });
         fireEvent.click(screen.getByRole("button", { name: label("studio_policy_save") }));
 
-        await waitFor(() => expect(updateCollection).toHaveBeenCalled());
+        await waitFor(() => expect(applyTablePatches).toHaveBeenCalled());
     });
 });

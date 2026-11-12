@@ -2,6 +2,7 @@
  * @jest-environment jsdom
  */
 import { en } from "../../app/src/locales/en";
+import type { TablePatch } from "@rebasepro/types";
 import React from "react";
 import { describe, expect, it, jest, beforeEach } from "@jest/globals";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
@@ -30,7 +31,7 @@ const posts = defineTable("posts", {
 
 let tables: TableDescriptorsState = readyTables(servedTables([posts, tags]));
 let livePolicies: Record<string, unknown>[] = [];
-const updateCollection = jest.fn<(id: string, patch: Record<string, unknown>) => Promise<void>>();
+const applyTablePatches = jest.fn<(table: string, patches: TablePatch[]) => Promise<void>>();
 const snackbarOpen = jest.fn<(options: { type: string; message: string }) => void>();
 
 const executeSql = jest.fn<(sql: string) => Promise<unknown>>(async (sql: string) => {
@@ -55,7 +56,7 @@ const translation = {
 jest.mock("@rebasepro/app", () => ({
     useTranslation: () => translation,
     useNavigationGroupLabel: () => (group: string) => group,
-    useStudioSchemaEditing: () => ({ available: true, updateCollection }),
+    useStudioSchemaEditing: () => ({ available: true, applyTablePatches }),
     useTableDescriptors: () => tables,
     useStudioCapabilities: () => ({ codebase: true }),
     useApiBase: () => "http://api.test/api",
@@ -102,8 +103,8 @@ function selectTable(table: string): void {
 beforeEach(() => {
     tables = readyTables(servedTables([posts, tags]));
     livePolicies = [];
-    updateCollection.mockReset();
-    updateCollection.mockResolvedValue(undefined);
+    applyTablePatches.mockReset();
+    applyTablePatches.mockResolvedValue(undefined);
     snackbarOpen.mockClear();
     executeSql.mockClear();
 });
@@ -164,8 +165,9 @@ describe("the policies the server serves", () => {
         fireEvent.change(await screen.findByLabelText(label("studio_policy_name")), { target: { value: "everyone_reads" } });
         fireEvent.click(screen.getByRole("button", { name: label("studio_policy_save") }));
 
-        await waitFor(() => expect(updateCollection).toHaveBeenCalled());
-        expect(updateCollection.mock.calls[0]).toEqual(["posts", { securityRules: [{ name: "everyone_reads", operation: "select", using: "true" }] }]);
+        await waitFor(() => expect(applyTablePatches).toHaveBeenCalled());
+        // One rule replaced, at the index the server served it at.
+        expect(applyTablePatches.mock.calls[0]).toEqual(["posts", [{ op: "replaceRule", table: "posts", index: 0, rule: { name: "everyone_reads", operation: "select", using: "true" } }]]);
     });
 });
 
@@ -200,7 +202,7 @@ describe("a caller the server withholds the compiled policies from", () => {
             type: "error",
             message: label("studio_rls_save_needs_schema_read").replace("{{table}}", "posts")
         });
-        expect(updateCollection).not.toHaveBeenCalled();
+        expect(applyTablePatches).not.toHaveBeenCalled();
         expect(executeSql.mock.calls.some(([sql]) => /CREATE\s+POLICY/i.test(String(sql)))).toBe(false);
     });
 });
