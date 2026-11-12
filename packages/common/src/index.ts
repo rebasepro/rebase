@@ -15,3 +15,4 @@ export * from "./data/filter-dialect";
 export * from "./data/sort-dialect";
 export * from "./table-classification";
 export * from "./schema";
+export * from "./table";
