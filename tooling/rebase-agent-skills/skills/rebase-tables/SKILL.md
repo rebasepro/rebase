@@ -219,7 +219,7 @@ can be declared once and shared between tables.
 After the dot a column reads like Drizzle's `pg-core`: the same builder names,
 an optional SQL column name first, then Drizzle's config object, then the chain
 (`col.varchar({ length: 32 })`, `col.timestamp({ withTimezone: true })`,
-`col.text().array()`, `.default(sql\`now()\`)`). A Drizzle spelling Rebase does
+`col.text().array()`, `` .default(sql`now()`) ``). A Drizzle spelling Rebase does
 not accept fails to compile with a message that says what to write instead.
 Two differences matter:
 
@@ -279,8 +279,8 @@ export const products = defineTable("products", {
 | `.notNull()` | every column | `NOT NULL`; required on create unless it has a default. Columns are **nullable** otherwise, as in SQL. |
 | `.primaryKey()` | every column | part of the primary key (several make a composite key, in declaration order) |
 | `.unique()` | every column | single-column `UNIQUE`; a duplicate is a `409` |
-| `.default(value)` / `.default(sql\`expr\`)` / `.dbDefault()` | every column | a default; the column may be left out of a create (`sql` is imported beside `col`) |
-| `.generatedAlwaysAs(sql\`expr\`)` | every column | `GENERATED ALWAYS AS (expr) STORED`; never writable |
+| `.default(value)` / `` .default(sql`expr`) `` / `.dbDefault()` | every column | a default; the column may be left out of a create (`sql` is imported beside `col`) |
+| `` .generatedAlwaysAs(sql`expr`) `` | every column | `GENERATED ALWAYS AS (expr) STORED`; never writable |
 | `.$type<T>()` | every column | types the value for TypeScript only, as in Drizzle |
 | `.readOnly()` | every column | client writes refused; server code and the database still fill it |
 | `.private()` | every column | never on the wire, in the SDK or OpenAPI; server code and hooks see it |

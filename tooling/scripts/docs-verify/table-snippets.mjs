@@ -70,7 +70,7 @@ const compiler = await import(path.join(ROOT, "packages/common/src/schema/index.
 const cms = await import(path.join(ROOT, "packages/cms/src/tables/customize_table.ts"));
 
 /** The builder names a schema file imports, and where they come from. */
-const BUILDER_NAMES = ["defineTable", "defineAuthTable", "defineView", "col", "rel", "json", "policy", "isTableDef", "isAuthTableDef", "isViewDef"];
+const BUILDER_NAMES = ["defineTable", "defineAuthTable", "defineView", "col", "rel", "json", "pgEnum", "sql", "policy", "isTableDef", "isAuthTableDef", "isViewDef"];
 
 /** The packages a schema fence imports the builders from. */
 const SCHEMA_PACKAGES = new Set(["@rebasepro/server/schema", "@rebasepro/server", "@rebasepro/types", "@rebasepro/common"]);
