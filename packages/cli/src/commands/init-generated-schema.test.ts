@@ -30,6 +30,7 @@ import path from "path";
 import { execFileSync } from "child_process";
 import { compileLoadedSchema, loadBackendSchema } from "@rebasepro/server";
 import { generateSchema } from "@rebasepro/server-postgres";
+import { sortTablesBySlug } from "@rebasepro/common";
 import { createRebaseApp, shippedSchemaPath, type TemplatePreset } from "./init";
 
 const PRESETS: TemplatePreset[] = ["blog", "ecommerce", "blank"];
@@ -43,9 +44,8 @@ const PRESETS: TemplatePreset[] = ["blog", "ecommerce", "blank"];
  * the index's exports.
  */
 async function generatedSchemaFor(schemaDir: string): Promise<string> {
-    const collections = [...compileLoadedSchema(await loadBackendSchema(schemaDir)).collections];
-    collections.sort((a, b) => a.slug.localeCompare(b.slug));
-    return String(generateSchema(collections));
+    const { tables } = compileLoadedSchema(await loadBackendSchema(schemaDir));
+    return String(generateSchema(sortTablesBySlug(tables)));
 }
 
 function git(cwd: string, args: string[]): string {
