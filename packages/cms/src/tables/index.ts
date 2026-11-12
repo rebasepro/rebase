@@ -5,7 +5,7 @@ export { enumValueColor, enumValuesFrom, jsonNodeProperty, propertyFromColumn, s
 export type { ColumnProjectionContext } from "./column_property";
 export { projectRelations } from "./relations";
 export type { ProjectedRelation, TargetResolver } from "./relations";
-export { REDACTED_SQL, securityRulesFromRls } from "./rls";
+export { securityRulesFromRls } from "./rls";
 export { defaultDisplay, TITLE_KEYS } from "./display_defaults";
 export { customizeTable } from "./customize_table";
 export { applyTableCustomization, applyTableCustomizations } from "./apply_customization";

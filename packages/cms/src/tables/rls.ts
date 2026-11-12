@@ -13,51 +13,42 @@ import type {
     CollectionTenantConfig,
     PostgresCollectionConfig,
     PostgresProperties,
+    RedactedSecurityRule,
     SecurityRule,
     TableDescriptor
 } from "@rebasepro/types";
-import { policy } from "@rebasepro/types";
+import { isRedactedSecurityRule, policy } from "@rebasepro/types";
 import { getEffectiveSecurityRules } from "@rebasepro/common";
 
 /**
- * What a raw-SQL clause the server withheld is replaced with. It parses to a
- * `raw` policy node, which the client evaluator answers "unknown" for — the
- * answer any raw clause gets, so a withheld clause hides nothing a visible one
- * would have shown.
+ * A rule as the evaluator should read it.
+ *
+ * The server sends a `RedactedSecurityRule` (`redacted: true`) in place of a
+ * rule whose SQL it does not show this caller; the evaluator answers it
+ * "unknown", as it answers any raw rule, so it is kept as it is. A rule whose
+ * `using` / `withCheck` arrived as something other than SQL text is malformed
+ * wire data, and is read as that same marker — its targeting kept, nothing
+ * else that could change its meaning — rather than trusted to mean anything.
  */
-export const REDACTED_SQL = "/* withheld by the server */";
-
-/**
- * A raw clause that arrived as something other than SQL text (the server's
- * marker for a clause it does not show this caller), replaced with
- * {@link REDACTED_SQL}. Absent clauses stay absent: an absent `using` means
- * "no row may be read", and inventing one would grant.
- */
-function withRedactedClauses(rule: SecurityRule): SecurityRule {
-    const redacted = (key: "using" | "withCheck"): boolean => {
+function asEvaluated(rule: SecurityRule): SecurityRule {
+    if (isRedactedSecurityRule(rule)) return rule;
+    const malformed = (key: "using" | "withCheck"): boolean => {
         if (!Object.prototype.hasOwnProperty.call(rule, key)) return false;
         const value: unknown = Reflect.get(rule, key);
         return value !== undefined && typeof value !== "string";
     };
-    const using = redacted("using");
-    const withCheck = redacted("withCheck");
-    if (!using && !withCheck) return rule;
-    // A rule carrying raw SQL is a raw rule: rebuilt as one, with the
-    // targeting fields kept and nothing else that could change its meaning.
-    const target = {
+    if (!malformed("using") && !malformed("withCheck")) return rule;
+    const marker: RedactedSecurityRule = {
+        redacted: true,
         ...(rule.name !== undefined ? { name: rule.name } : {}),
         ...(rule.operation !== undefined ? { operation: rule.operation } : {}),
         ...(rule.operations !== undefined ? { operations: rule.operations } : {}),
         ...(rule.mode !== undefined ? { mode: rule.mode } : {}),
         ...(rule.roles !== undefined ? { roles: rule.roles } : {}),
-        ...(rule.pgRoles !== undefined ? { pgRoles: rule.pgRoles } : {})
+        ...(rule.pgRoles !== undefined ? { pgRoles: rule.pgRoles } : {}),
+        ...(rule.access !== undefined ? { access: rule.access } : {})
     };
-    const keptCheck = typeof rule.withCheck === "string" ? rule.withCheck : undefined;
-    const check = withCheck ? REDACTED_SQL : keptCheck;
-    if (using) return { ...target, using: REDACTED_SQL, ...(check !== undefined ? { withCheck: check } : {}) };
-    const keptUsing = typeof rule.using === "string" ? rule.using : undefined;
-    if (keptUsing !== undefined) return { ...target, using: keptUsing, withCheck: REDACTED_SQL };
-    return { ...target, withCheck: REDACTED_SQL };
+    return marker;
 }
 
 /** The facts `getEffectiveSecurityRules` reads besides the rules themselves. */
@@ -103,7 +94,8 @@ function viewRules(table: TableDescriptor): SecurityRule[] {
  * - On top of either, as in Postgres: the auth table's self-read and its
  *   restrictive admin write gate, and the tenant table's restrictive tenancy
  *   rule.
- * - Raw clauses the server withheld evaluate as "unknown", like any raw clause.
+ * - Rules the server withheld (`redacted: true`) evaluate as "unknown", like
+ *   any raw rule.
  * - Should all of that come to nothing (a posture the compiler refuses, such as
  *   `admin-only` without the baseline), the result is one rule that grants
  *   nothing — never an empty list, which the panel reads as open.
@@ -112,7 +104,7 @@ export function securityRulesFromRls(table: TableDescriptor, basis: RlsProjectio
     if (table.kind === "view") return viewRules(table);
     if (table.rls.posture === "view") return [closedRule(table)];
 
-    const declared = table.rls.posture === "admin-only" ? [] : table.rls.rules.map(withRedactedClauses);
+    const declared = table.rls.posture === "admin-only" ? [] : table.rls.rules.map(asEvaluated);
     const tenant: CollectionTenantConfig | undefined = table.tenant
         ? {
             field: table.tenant.field,

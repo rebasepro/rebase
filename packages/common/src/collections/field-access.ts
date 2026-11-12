@@ -92,6 +92,15 @@ export function canReadField(property: Property | undefined, viewer: FieldViewer
     return access ? satisfies(access.read, viewer) : true;
 }
 
+/**
+ * May this caller receive a value whose read rule is `access`? The same
+ * predicate {@link canReadField} applies to a property, for a rule that is not
+ * on one: a column's or a relation's `access` in a table descriptor.
+ */
+export function canReadWithAccess(access: { read?: readonly string[] } | undefined, viewer: FieldViewer | undefined): boolean {
+    return satisfies(access?.read, viewer);
+}
+
 /** May this caller set this field's value? */
 export function canWriteField(property: Property | undefined, viewer: FieldViewer | undefined): boolean {
     const access = effectiveAccess(property);

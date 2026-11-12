@@ -77,7 +77,8 @@ export type SecurityRule =
     | StructuredSecurityRule
     | RawSQLSecurityRule
     | RawSQLCheckOnlySecurityRule
-    | RolesOnlySecurityRule;
+    | RolesOnlySecurityRule
+    | RedactedSecurityRule;
 
 /**
  * Shared fields for all SecurityRule variants.
@@ -510,4 +511,52 @@ export interface RolesOnlySecurityRule extends SecurityRuleBase {
     withCheck?: never;
     condition?: never;
     check?: never;
+}
+/**
+ * A rule whose SQL the server did not show this caller.
+ *
+ * `GET /api/schema/tables` serves a table's `rls.rules` to every caller who may
+ * read the table's description, because the panel decides which controls to
+ * offer from them. Raw SQL — a `using` / `withCheck` string, or a
+ * `policy.raw(…)` node anywhere inside a `condition` / `check` — is served
+ * only to administrators and `schema:read` holders: it is a description of
+ * the authorization model, not of the data. Everyone else receives this
+ * marker in the rule's place. It keeps what decides whom the rule concerns
+ * (`operation` / `operations`, `mode`, `roles`, `access`) and says nothing
+ * about which rows.
+ *
+ * Read-only: it is never authored. A table whose `rls` carries one is refused
+ * when it is compiled, and no policy is ever generated from one.
+ *
+ * The client-side evaluator treats it exactly as it treats a raw rule it
+ * cannot evaluate: *unknown*, never *allowed*. Panel gating (which resolves
+ * unknown optimistically) offers the action and lets Postgres decide;
+ * enforcement callers (which resolve unknown as deny) refuse.
+ *
+ * @example
+ * // What a non-admin is served for `{ operation: "update", roles: ["editor"], using: "owner_id = rebase.uid()" }`
+ * { operation: "update", roles: ["editor"], redacted: true }
+ *
+ * @group Models
+ */
+export interface RedactedSecurityRule extends SecurityRuleBase {
+    /** The rule's clauses were withheld from this caller. */
+    redacted: true;
+    /** Who the rule admits, when the rule said so — see {@link SecurityRuleAccess}. */
+    access?: SecurityRuleAccess;
+    ownerField?: never;
+    using?: never;
+    withCheck?: never;
+    condition?: never;
+    check?: never;
+}
+
+/**
+ * Whether a rule is the {@link RedactedSecurityRule} marker the server sends
+ * in place of a rule whose SQL it withheld.
+ *
+ * @group Models
+ */
+export function isRedactedSecurityRule(rule: SecurityRule): rule is RedactedSecurityRule {
+    return "redacted" in rule && rule.redacted === true;
 }

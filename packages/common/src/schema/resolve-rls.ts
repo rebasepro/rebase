@@ -77,6 +77,14 @@ export function resolveRls(
             if (typeof rule !== "object" || rule === null) {
                 return { ok: false, message: "every entry of `rls` must be a security rule object." };
             }
+            if ("redacted" in rule) {
+                return {
+                    ok: false,
+                    message:
+                        "an entry of `rls` carries `redacted`, the marker `GET /api/schema/tables` serves in place of a " +
+                        "rule whose SQL it withheld. It describes a policy and cannot become one: write the rule itself."
+                };
+            }
             rules.push(rule);
         }
         return { ok: true, rls: { posture: "rules", rules, defaultPolicies: defaultPolicies !== false } };

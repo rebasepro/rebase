@@ -1,4 +1,4 @@
-import { PolicyExpression, SecurityRule, SecurityRuleAccess, policy } from "@rebasepro/types";
+import { PolicyExpression, SecurityRule, SecurityRuleAccess, isRedactedSecurityRule, policy } from "@rebasepro/types";
 import { sqlToPolicy } from "./sqlToPolicy";
 import { policyConditionToExpression, type PolicyConditionSite } from "./policyCondition";
 
@@ -27,6 +27,12 @@ export interface RuleConditions {
  * definition of what a rule means. In particular, application `roles` are folded
  * into the expression here (AND'd with the base condition, matching how Postgres
  * generates the clause) rather than being handled separately by each consumer.
+ *
+ * A {@link RedactedSecurityRule} (the marker the server sends for a rule whose
+ * SQL it withheld) desugars to a raw node for both clauses — still gated by
+ * its `access` and `roles` — so the evaluator answers it "unknown", exactly as
+ * it answers a raw rule. No policy is ever compiled from one:
+ * `compileRulePolicies` refuses it before it gets here.
  */
 export function securityRuleToConditions(rule: SecurityRule, site: Pick<PolicyConditionSite, "table"> = {}): RuleConditions {
     return {
@@ -43,7 +49,11 @@ function gated(access: SecurityRuleAccess | undefined, condition: PolicyExpressi
     return access === "authenticated" ? policy.and(policy.authenticated(), condition) : condition;
 }
 
+/** What a withheld clause desugars to: SQL nobody here can evaluate. */
+const REDACTED_CLAUSE_SQL = "/* withheld by the server */";
+
 function baseUsing(rule: SecurityRule, site: Pick<PolicyConditionSite, "table">): PolicyExpression | null {
+    if (isRedactedSecurityRule(rule)) return gated(rule.access, policy.raw(REDACTED_CLAUSE_SQL));
     // A legacy rule never carries `access` beside a condition, so for it this
     // is the condition itself — the same object, compiled as it always was.
     if (rule.condition != null) return gated(rule.access, policyConditionToExpression(rule.condition, { ...site, clause: "condition" }));
@@ -56,6 +66,7 @@ function baseUsing(rule: SecurityRule, site: Pick<PolicyConditionSite, "table">)
 }
 
 function baseWithCheck(rule: SecurityRule, site: Pick<PolicyConditionSite, "table">): PolicyExpression | null {
+    if (isRedactedSecurityRule(rule)) return gated(rule.access, policy.raw(REDACTED_CLAUSE_SQL));
     if (rule.check != null) return gated(rule.access, policyConditionToExpression(rule.check, { ...site, clause: "check" }));
     if (rule.withCheck != null) return sqlToPolicy(rule.withCheck);
     // No explicit WITH CHECK → fall back to the USING condition, matching

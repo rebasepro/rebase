@@ -1,4 +1,4 @@
-import { declaredRlsPolicyShape, DEFAULT_DATA_SOURCE_KEY, REBASE_ADMIN_REQUEST_ROLE, REBASE_ADMIN_ROLE, RLS_IS_REQUEST_ROLE_SQL, type CollectionConfig, type PolicyExpression, type SecurityOperation, type SecurityRule } from "@rebasepro/types";
+import { declaredRlsPolicyShape, isRedactedSecurityRule, DEFAULT_DATA_SOURCE_KEY, REBASE_ADMIN_REQUEST_ROLE, REBASE_ADMIN_ROLE, RLS_IS_REQUEST_ROLE_SQL, type CollectionConfig, type PolicyExpression, type SecurityOperation, type SecurityRule } from "@rebasepro/types";
 import { adminRequestPolicyName, getPolicyNamesForRule } from "@rebasepro/utils";
 import { findRelation, getTableName, resolveCollectionRelations } from "../relations";
 import { securityRuleToConditions } from "./securityRuleToConditions";
@@ -79,6 +79,14 @@ export function compileRulePolicies(
 ): CompiledRulePolicy[] {
     const ops = rule.operations && rule.operations.length > 0 ? rule.operations : [rule.operation ?? "all"];
     const tableName = getTableName(collection);
+    if (isRedactedSecurityRule(rule)) {
+        // The marker stands for SQL this process was not shown. A policy
+        // compiled from it would grant or deny by a guess.
+        throw new Error(
+            `A rule on "${tableName}" is the \`redacted: true\` marker \`GET /api/schema/tables\` serves in place of ` +
+            "a rule whose SQL it withheld. It describes a policy; it cannot become one. Write the rule itself."
+        );
+    }
     assertShorthandColumns(collection, rule, tableName);
     const policyNames = getPolicyNamesForRule(rule, tableName);
     const { usingExpr, withCheckExpr } = securityRuleToConditions(rule, { table: tableName });

@@ -9,7 +9,7 @@
 import { describe, expect, it } from "@jest/globals";
 import type { Entity, SecurityOperation, TableDescriptor, User } from "@rebasepro/types";
 import { checkOperation, canReadCollection } from "@rebasepro/common";
-import { collectionFromTable, REDACTED_SQL } from "../../src/tables";
+import { collectionFromTable } from "../../src/tables";
 import { anonymous, column, posts, rules, signedIn, table, tags, users, uuidId } from "./fixtures";
 
 const OPERATIONS: SecurityOperation[] = ["select", "insert", "update", "delete"];
@@ -128,37 +128,42 @@ describe("raw SQL", () => {
         expect(can(t, member).update).toBe(true);
     });
 
-    it("a clause the server withheld evaluates exactly as a raw clause does", () => {
-        const withheld = (marker: unknown): TableDescriptor => {
-            const rule = { operation: "update" as const, using: "x" };
-            Reflect.set(rule, "using", marker);
-            return notes(rules([rule], false));
-        };
+    it("the server's redacted marker evaluates exactly as a raw rule does: unknown, never allowed", () => {
+        const t = notes(rules([{ operation: "update", redacted: true }], false));
+        const collection = collectionFromTable(t, { tables: [t] });
+        expect(collection.securityRules).toEqual([{ operation: "update", redacted: true }]);
+        expect(can(t, member).update).toBe(true);
+        expect(can(t, anonymous).update).toBe(true);
+        expect(can(t, member).delete).toBe(false);
+        // Enforcement resolves unknown as deny.
+        expect(checkOperation(collection, member, null, "update", { onUnknown: "deny" })).toBe(false);
+    });
+
+    it("a redacted marker keeps its roles and access: they still decide", () => {
+        const t = notes(rules([
+            { operation: "insert", roles: ["editor"], redacted: true },
+            { operation: "select", access: "authenticated", redacted: true }
+        ], false));
+        expect(can(t, editor).insert).toBe(true);
+        expect(can(t, member).insert).toBe(false);
+        expect(can(t, member).select).toBe(true);
+        expect(can(t, anonymous).select).toBe(false);
+    });
+
+    it("a clause that arrived as something other than SQL is read as the marker", () => {
         for (const marker of [{ raw: true }, true, null, 0]) {
-            const t = withheld(marker);
+            const rule = { operation: "update" as const, roles: ["editor"], using: "x" };
+            Reflect.set(rule, "using", marker);
+            const t = notes(rules([rule], false));
             const collection = collectionFromTable(t, { tables: [t] });
-            expect(collection.securityRules).toEqual([{ operation: "update", using: REDACTED_SQL }]);
-            expect(can(t, member).update).toBe(true);
-            expect(can(t, anonymous).update).toBe(true);
-            expect(can(t, member).delete).toBe(false);
+            expect(collection.securityRules).toEqual([{ operation: "update", roles: ["editor"], redacted: true }]);
+            expect(can(t, editor).update).toBe(true);
+            expect(can(t, member).update).toBe(false);
         }
     });
 
-    it("a withheld WITH CHECK keeps the rule's USING and its targeting", () => {
-        const rule = { operation: "insert" as const, roles: ["editor"], withCheck: "x" };
-        Reflect.set(rule, "withCheck", { raw: true });
-        const t = notes(rules([rule], false));
-        expect(collectionFromTable(t, { tables: [t] }).securityRules).toEqual([
-            { operation: "insert", roles: ["editor"], withCheck: REDACTED_SQL }
-        ]);
-        expect(can(t, editor).insert).toBe(true);
-        expect(can(t, member).insert).toBe(false);
-    });
-
-    it("a withheld clause never turns a restrictive rule into a grant", () => {
-        const restrictive = { operation: "update" as const, mode: "restrictive" as const, using: "x" };
-        Reflect.set(restrictive, "using", { raw: true });
-        const t = notes(rules([restrictive], false));
+    it("a redacted rule never turns a restrictive rule into a grant", () => {
+        const t = notes(rules([{ operation: "update", mode: "restrictive", redacted: true }], false));
         // Only a restrictive rule: nothing grants, so nothing is offered.
         expect(can(t, admin).update).toBe(false);
     });
