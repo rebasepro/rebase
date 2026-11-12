@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { integer, pgTable, PgDialect, primaryKey, serial, varchar } from "drizzle-orm/pg-core";
 import type { CollectionConfig, FilterValues } from "@rebasepro/types";
 import { ApiError } from "@rebasepro/server";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { DrizzleConditionBuilder } from "../src/utils/drizzle-conditions";
 
 /**
@@ -102,7 +103,7 @@ const categoriesCollection: CollectionConfig = {
 };
 
 const createRegistry = () => {
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
     const tables = {
         posts: postsTable,
         tags: tagsTable,
@@ -110,13 +111,13 @@ const createRegistry = () => {
         comments: commentsTable,
         categories: categoriesTable
     };
-    for (const [name, table] of Object.entries(tables)) registry.registerTable(table, name);
+    for (const [name, table] of Object.entries(tables)) registry.registerPgTable(table, name);
     return registry;
 };
 
 describe("filtering by a relation with no column on this row", () => {
 
-    let registry: PostgresCollectionRegistry;
+    let registry: PostgresTableRegistry;
 
     beforeEach(() => {
         registry = createRegistry();

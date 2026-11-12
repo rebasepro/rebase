@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 import { logger } from "@rebasepro/server";
-import { revokeInternalTableAccess } from "@rebasepro/common";
-import type { CollectionConfig } from "@rebasepro/types";
+import { isIntegerFamilyType, keyColumns, revokeInternalTableAccess } from "@rebasepro/common";
+import type { TableDescriptor } from "@rebasepro/types";
 import { AUTH_USERS_COLUMNS, authUsersColumnSql } from "../schema/auth-users-columns";
 import { RLS_BOOTSTRAP_STATEMENTS, rlsRuntimeIsCurrent } from "../schema/rls-bootstrap-sql";
 import { internalTablesGrantedToUserRole } from "../security/rls-enforcement";
@@ -99,13 +99,30 @@ $rebase_drop_hash_index$`.trim();
 }
 
 /**
+ * The SQL type every auth table's `uid` foreign key is declared with, from the
+ * users table's key column: `UUID` for a uuid key, `INTEGER` for the integer
+ * family (serials and identities included), `TEXT` for anything else.
+ *
+ * Read from the key column's type. It used to be read from `isId` on a
+ * property named `id` — `"uuid"` or `"increment"` — so a key declared any
+ * other way (an integer the caller gives, a key not named `id`) was typed
+ * `TEXT` and every `uid` foreign key with it.
+ */
+export function authUidSqlType(table: TableDescriptor | undefined): "UUID" | "INTEGER" | "TEXT" {
+    const key = table ? keyColumns(table)[0] : undefined;
+    if (!key) return "TEXT";
+    if (key.type.kind === "uuid") return "UUID";
+    return isIntegerFamilyType(key.type) ? "INTEGER" : "TEXT";
+}
+
+/**
  * Auto-create auth tables if they don't exist.
  *
- * @param db         — Drizzle database instance
- * @param collection — The collection that represents auth users.
- *                     When omitted, a default `rebase.users` table is created.
+ * @param db    — Drizzle database instance
+ * @param table — The descriptor of the table defined with `defineAuthTable`.
+ *                When omitted, a default `rebase.users` table is created.
  */
-export async function ensureAuthTablesExist(db: PgSqlDatabase, collection?: CollectionConfig): Promise<void> {
+export async function ensureAuthTablesExist(db: PgSqlDatabase, table?: TableDescriptor): Promise<void> {
     logger.debug("🔍 Checking auth tables...");
 
     // Before anything else, and deliberately outside the catch below: refuse to
@@ -113,47 +130,16 @@ export async function ensureAuthTablesExist(db: PgSqlDatabase, collection?: Coll
     // migrated. Everything past this point is best-effort by design, which is
     // exactly the wrong posture for an incompatibility that would otherwise
     // surface as a fully booted server failing every login.
-    await assertAuthSchemaCompatible(db, resolveAuthSchema(collection));
+    await assertAuthSchemaCompatible(db, resolveAuthSchema(table));
 
     try {
-        // Resolve dynamic user table name and ID type from the collection
-        let usersTableName = '"rebase"."users"';
-        let userIdType = "TEXT";
-        let usersSchema = "rebase";
-        let resolvedTable = "users";
-        if (collection) {
-            resolvedTable = ("table" in collection && typeof collection.table === "string")
-                ? collection.table
-                : collection.slug;
-            usersSchema = ("schema" in collection && typeof collection.schema === "string")
-                ? collection.schema
-                : "public";
-            usersTableName = usersSchema === "public"
-                ? `"${resolvedTable}"`
-                : `"${usersSchema}"."${resolvedTable}"`;
-
-            // Derive ID column type from collection properties.
-            //
-            // `"increment"`, not `"autoincrement"`. The latter was tested for
-            // here and exists nowhere in the type system — the union is
-            // `boolean | "manual" | "increment" | string` — so the INTEGER branch
-            // was unreachable and an integer-keyed auth collection fell through
-            // to TEXT. Introspection below hid it whenever the table already
-            // existed; on a database where it did not, this created
-            // `id TEXT DEFAULT gen_random_uuid()::text` for a collection that
-            // declares a number, and every `uid` foreign key was typed to match
-            // the wrong thing.
-            const idProp = collection.properties?.id;
-            if (idProp) {
-                const isId = ("isId" in idProp) ? (idProp as Record<string, unknown>).isId : undefined;
-                if (isId === "uuid") {
-                    userIdType = "UUID";
-                } else if (isId === "increment") {
-                    userIdType = "INTEGER";
-                }
-                // Otherwise keep TEXT as default
-            }
-        }
+        // The users table's name and key type, from its descriptor.
+        const resolvedTable = table ? table.table : "users";
+        const usersSchema = table ? table.schema : "rebase";
+        const usersTableName = usersSchema === "public"
+            ? `"${resolvedTable}"`
+            : `"${usersSchema}"."${resolvedTable}"`;
+        let userIdType: string = authUidSqlType(table);
 
         // Introspect the database to find the actual type of usersTableName's ID column if the table exists
         try {

@@ -1,16 +1,17 @@
 import { PgTable, AnyPgColumn, getTableConfig } from "drizzle-orm/pg-core";
 import { and, eq, getTableColumns, type SQL } from "drizzle-orm";
-import { CollectionConfig, Property, ResolvedHasMany, ResolvedHasOne } from "@rebasepro/types";
-import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
-import { fieldKeyForColumn, getTableName, resolveCollectionRelations } from "@rebasepro/common";
-import { ApiError, logger } from "@rebasepro/server";
+import { CollectionConfig, ResolvedHasMany, ResolvedHasOne } from "@rebasepro/types";
+import { PostgresTableRegistry } from "../model/PostgresTableRegistry";
+import type { RuntimeTable } from "../model/runtime-table";
+import { fieldKeyForColumn, getTableName, keyAddressInfoOf } from "@rebasepro/common";
+import { ApiError } from "@rebasepro/server";
 
 // Row identity is derived on both sides of the wire — the driver parses an
 // incoming address into key columns, the admin derives one from a served row —
 // so the implementation lives in `common` and both agree by construction.
 export { buildCompositeId, parseIdValues, isAddressableId, COMPOSITE_ID_SEPARATOR } from "@rebasepro/common";
 export type { PrimaryKeyInfo } from "@rebasepro/common";
-import { buildCompositeId, COMPOSITE_ID_SEPARATOR, getDeclaredPrimaryKeys, isAddressableId, parseIdValues } from "@rebasepro/common";
+import { buildCompositeId, COMPOSITE_ID_SEPARATOR, isAddressableId, parseIdValues } from "@rebasepro/common";
 import type { PrimaryKeyInfo } from "@rebasepro/common";
 
 /**
@@ -18,7 +19,7 @@ import type { PrimaryKeyInfo } from "@rebasepro/common";
  * These are used by FetchService, PersistService, and RelationService.
  *
  * All functions that need collection/table lookups require an explicit
- * `PostgresCollectionRegistry` instance — there is no global singleton.
+ * `PostgresTableRegistry` instance — there is no global singleton.
  */
 
 /**
@@ -47,10 +48,9 @@ export function getColumnMeta(col: AnyPgColumn): DrizzleColumnMeta {
 /**
  * Whether an address could name a row in this table, judged by the columns.
  *
- * {@link getPrimaryKeys} lets a config's `isId: "uuid"` win over the schema, so
- * its `isUUID` is a claim rather than a fact — right for deriving addresses,
- * wrong for refusing a query. Here the Drizzle column type decides, because it
- * is what Postgres will enforce: a `uuid` column meets `/c/products/new` with
+ * The descriptor's key type is the declaration — right for deriving
+ * addresses, a claim when it comes to refusing a query. Here the Drizzle
+ * column type decides, because it is what Postgres will enforce: a `uuid` column meets `/c/products/new` with
  * `22P02`, which aborts the surrounding transaction and turns every later
  * statement into an unrelated-looking `25P02`.
  */
@@ -128,7 +128,7 @@ function columnFieldName(table: PgTable, column: AnyPgColumn): string {
     return column.name;
 }
 
-export function getCollectionByPath(collectionPath: string, registry: PostgresCollectionRegistry): CollectionConfig {
+export function getCollectionByPath(collectionPath: string, registry: PostgresTableRegistry): CollectionConfig {
     const collection = registry.getCollectionByPath(collectionPath);
     if (!collection) {
         const registered = registry.getCollections().map(c => c.slug).join(", ");
@@ -271,9 +271,9 @@ export function relationMisconfigured(label: string, detail: string): ApiError {
     );
 }
 
-export function getTableForCollection(collection: CollectionConfig, registry: PostgresCollectionRegistry): PgTable<any> {
+export function getTableForCollection(collection: CollectionConfig, registry: PostgresTableRegistry): PgTable<any> {
     const tableName = getTableName(collection);
-    const table = registry.getTable(tableName);
+    const table = registry.getPgTable(tableName);
     if (!table) {
         throw new Error(`Table not found for '${collection.slug}' (table: ${tableName})`);
     }
@@ -281,118 +281,103 @@ export function getTableForCollection(collection: CollectionConfig, registry: Po
 }
 
 /**
- * The key columns a collection's rows are addressed by.
+ * The key columns a table's rows are addressed by, in key order, in the shape
+ * the address helpers read (`buildCompositeId`, `parseIdValues`).
  *
- * Three tiers, in order: properties marked `isId`, the primary keys of the
- * registered table, and finally a column literally named `id`. Only the first is
- * visible to the browser, which is why a key known only to the table is reported
- * at boot — see {@link warnOnKeysTheAdminCannotResolve}.
+ * The descriptor's answer (`RuntimeTable.keys`, from `.primaryKey()` and the
+ * column types): a compiled table always states its key, so nothing is
+ * inferred — the declared `isId` tier always won over the catalogue, and the
+ * declaration still does. The catalogue is consulted where it is the truth:
+ * {@link idCanAddressTable} judges an address against the column Postgres
+ * will compare it with.
  *
- * The second tier reads the table the registry holds, which is built from
- * `information_schema` — the database's own primary key, not a generated file's
- * claim about it. Composite keys are declared as a table constraint rather than
- * on each column (that is the only legal way to say it), so both shapes are
- * asked for.
+ * Only a table introspected from a database whose table declares no primary
+ * key has no keys in its descriptor. Its address is then read from the
+ * catalogue as it always was: the columns marked primary, the columns of a
+ * composite constraint, or a column literally named `id`. Returns `[]` when
+ * none of those exists — "this table has no address", which a caller that
+ * needs one turns into its own error ({@link requireTableKeys}).
  *
- * Returns `[]` when nothing resolves, rather than throwing. It used to open by
- * resolving the table, which throws when there is none — so the `isId` tier,
- * which needs no table at all, was unreachable for exactly the collections
- * most likely to have no table registered. Every caller that wanted "no keys"
- * to mean "no keys" had to spell that out in a try/catch.
- *
- * Callers that cannot proceed without a key must say so themselves, naming the
- * collection: an empty array here means "this collection has no address", which
- * is a different answer in a notification (broadcast a wildcard) than in a save
- * (fail).
+ * @param pg The catalogue table a keyless table's address is read from; the
+ *   runtime table's own by default.
  */
-export function getPrimaryKeys(collection: CollectionConfig, registry: PostgresCollectionRegistry): PrimaryKeyInfo[] {
-    // Explicitly declared `isId` properties win, and need no table.
-    if (collection.properties) {
-        const idProps = Object.entries(collection.properties)
-            .filter(([_, prop]) => "isId" in (prop as object) && Boolean((prop as { isId?: unknown }).isId))
-            .map(([key, prop]) => ({
-                fieldName: key,
-                type: prop.type === "number" ? "number" as const : "string" as const,
-                isUUID: (prop as { isId?: unknown }).isId === "uuid"
-            }));
+export function tableKeys(table: RuntimeTable, pg: PgTable | undefined = table.pg): PrimaryKeyInfo[] {
+    if (table.keys.length > 0) return table.keys.map(keyAddressInfoOf);
+    return pg ? catalogueKeys(pg) : [];
+}
 
-        if (idProps.length > 0) {
-            return idProps;
-        }
-    }
+/**
+ * The key columns of the table a lowered collection was lowered from: the
+ * lookup for a call site that still holds the collection. Reads the runtime
+ * table ({@link tableKeys}); throws when the driver serves no table of that
+ * slug.
+ */
+export function getPrimaryKeys(collection: CollectionConfig, registry: PostgresTableRegistry): PrimaryKeyInfo[] {
+    const table = registry.requireTable(collection.slug);
+    return tableKeys(table, registry.getPgTable(table.descriptor.table) ?? table.pg);
+}
 
-    // The remaining tiers read the drizzle schema, so they need the table. A
-    // collection without one — another engine's, or simply unregistered — has
-    // nothing more to offer.
-    const table = registry.getTable(getTableName(collection));
-    if (!table) return [];
+/** One catalogue column as a key part: what its drizzle type says the value is. */
+function keyInfoOfColumn(fieldName: string, column: AnyPgColumn): PrimaryKeyInfo {
+    const meta = getColumnMeta(column);
+    const info: PrimaryKeyInfo = {
+        fieldName,
+        type: column.dataType === "number" || meta.columnType === "PgSerial" || meta.columnType === "PgInteger" ? "number" : "string",
+        isUUID: meta.columnType === "PgUUID"
+    };
+    if (meta.columnType === "PgDateString" || meta.columnType === "PgDate") info.isDay = true;
+    return info;
+}
 
-    // Otherwise infer from Drizzle schema
+/**
+ * The key of a catalogue table whose descriptor states none: an introspected
+ * keyless table. The columns marked primary, else the columns of a composite
+ * primary-key constraint, else a column named `id`.
+ */
+function catalogueKeys(table: PgTable): PrimaryKeyInfo[] {
     const keys: PrimaryKeyInfo[] = [];
-    for (const [key, colRaw] of Object.entries(table)) {
-        const col = colRaw as AnyPgColumn;
-        if (col && typeof col === "object" && "primary" in col && col.primary) {
-            const meta = getColumnMeta(col);
-            const type = col.dataType === "number" || meta.columnType === "PgSerial" || meta.columnType === "PgInteger" ? "number" : "string";
-            const isUUID = meta.columnType === "PgUUID";
-            keys.push({ fieldName: key,
-type,
-isUUID });
-        }
+    for (const [key, column] of Object.entries(getTableColumns(table))) {
+        if (column.primary) keys.push(keyInfoOfColumn(key, column));
     }
-
-    // A composite key is not a flag on each column — Postgres has one
-    // constraint naming several, and that is how the table declares it too. The
-    // generated module happened to mark each member `primaryKey()` individually,
-    // which is not valid DDL but did leave `col.primary` set; reading the
-    // constraint is what keeps a two-column key resolvable now that the table
-    // describes it honestly.
     if (keys.length === 0) {
-        for (const column of compositePrimaryKeyColumns(table)) {
-            const meta = getColumnMeta(column);
-            keys.push({
-                fieldName: columnFieldName(table, column),
-                type: column.dataType === "number" || meta.columnType === "PgSerial" || meta.columnType === "PgInteger" ? "number" : "string",
-                isUUID: meta.columnType === "PgUUID"
-            });
-        }
+        for (const column of compositePrimaryKeyColumns(table)) keys.push(keyInfoOfColumn(columnFieldName(table, column), column));
     }
-
-    // A collection that declares no primary key gets the implicit `id` column,
-    // which is what the schema generators emit for it — so read it back the
-    // same way rather than reporting the table as keyless.
-    if (keys.length === 0 && "id" in table) {
-        const idCol = table["id" as keyof typeof table] as AnyPgColumn;
-        const idMeta = getColumnMeta(idCol);
-        const type = idCol.dataType === "number" || idMeta.columnType === "PgSerial" || idMeta.columnType === "PgInteger" ? "number" : "string";
-        const isUUID = idMeta.columnType === "PgUUID";
-        keys.push({ fieldName: "id",
-type,
-isUUID });
+    if (keys.length === 0) {
+        const id = columnAtKey(table, "id");
+        if (id) keys.push(keyInfoOfColumn("id", id));
     }
-
     return keys;
 }
 
 /**
- * The key columns, for callers that cannot do their job without one.
+ * The key columns, for callers that cannot do their job without one: throws,
+ * naming the table, when it has none.
+ */
+export function requireTableKeys(table: RuntimeTable, pg: PgTable | undefined = table.pg): PrimaryKeyInfo[] {
+    const keys = tableKeys(table, pg);
+    if (keys.length === 0) {
+        throw new Error(
+            `The table '${table.slug}' has no primary key, so its rows cannot be addressed. ` +
+            "Declare one with `.primaryKey()`; a table introspected from the database needs a primary key there."
+        );
+    }
+    return keys;
+}
+
+/**
+ * {@link requireTableKeys} for a call site that still holds the lowered
+ * collection.
  *
  * {@link getPrimaryKeys} answers "what keys, if any" and returns `[]` for a
- * collection with no address. Most of this driver, though, is building a WHERE
+ * table with no address. Most of this driver, though, is building a WHERE
  * clause and has no meaning without a key — for those, an empty array is not an
  * answer, and indexing `[0]` into it produces `Cannot read properties of
  * undefined` three frames from where the real problem is. This says what is
  * wrong and which collection it is wrong about.
  */
-export function requirePrimaryKeys(collection: CollectionConfig, registry: PostgresCollectionRegistry): PrimaryKeyInfo[] {
-    const keys = getPrimaryKeys(collection, registry);
-    if (keys.length === 0) {
-        throw new Error(
-            `Collection '${collection.slug}' has no primary key, so its rows cannot be addressed. ` +
-            `Mark the key property with \`isId\` in its config, or register a table whose schema declares one.`
-        );
-    }
-    return keys;
+export function requirePrimaryKeys(collection: CollectionConfig, registry: PostgresTableRegistry): PrimaryKeyInfo[] {
+    const table = registry.requireTable(collection.slug);
+    return requireTableKeys(table, registry.getPgTable(table.descriptor.table) ?? table.pg);
 }
 
 /**
@@ -410,7 +395,7 @@ export function primaryKeyColumns(
     collectionPath: string
 ): AnyPgColumn[] {
     if (primaryKeys.length === 0) {
-        throw new Error(`Collection '${collectionPath}' has no primary key, so its rows cannot be addressed.`);
+        throw new Error(`The table '${collectionPath}' has no primary key, so its rows cannot be addressed.`);
     }
     return primaryKeys.map(info => {
         const column = table[info.fieldName as keyof typeof table] as AnyPgColumn | undefined;
@@ -480,7 +465,7 @@ export function columnNamed(table: PgTable, name: string): AnyPgColumn | undefin
 export function sourceKeyField(
     relation: ResolvedHasOne | ResolvedHasMany,
     sourceCollection: CollectionConfig,
-    registry: PostgresCollectionRegistry
+    registry: PostgresTableRegistry
 ): string {
     // A **field**, as the name says: callers index the Drizzle table and the
     // rows it returns with what comes back from here, and both are keyed by the
@@ -504,169 +489,12 @@ export function sourceKeyField(
 export function joinsOnNaturalKey(
     relation: ResolvedHasOne | ResolvedHasMany,
     sourceCollection: CollectionConfig,
-    registry: PostgresCollectionRegistry
+    registry: PostgresTableRegistry
 ): boolean {
     if (!relation.sourceKey) return false;
     // Compared as fields, because the right-hand side is one.
     return fieldKeyForColumn(sourceCollection, relation.sourceKey)
         !== requirePrimaryKeys(sourceCollection, registry)[0].fieldName;
-}
-
-/**
- * Collections whose key the *browser* cannot resolve, and what it will do
- * instead.
- *
- * The two sides resolve keys from different evidence. This driver reads, in
- * order: properties marked `isId`, the primary keys of the Drizzle schema, then
- * a column literally named `id`. The admin shares the `CollectionConfig` — it
- * compiles the same collection files into its bundle — but never the Drizzle
- * schema, so the middle tier is invisible to it.
- *
- * Nothing can normalize this at runtime: the server does not serve the admin
- * its collections, so a key resolved here cannot be handed over there. The
- * config files are the only thing both sides read, so the fix is an edit to
- * them, and the most this can do is say exactly which edit.
- *
- * Two shapes, and the second is the dangerous one:
- *
- * - No `isId`, no `id` property → the admin resolves no address, warns in the
- *   console, and rows cannot be opened or linked.
- * - No `isId`, but an `id` property that is *not* the key → the admin addresses
- *   rows by `id` while this driver reads the address as the real key. Nothing
- *   errors: the addresses look right and route wrong.
- */
-export function findUnresolvableKeyCollections(
-    collections: CollectionConfig[],
-    registry: PostgresCollectionRegistry
-): { collection: CollectionConfig; keys: PrimaryKeyInfo[]; shadowedByIdProperty: boolean }[] {
-    const findings: { collection: CollectionConfig; keys: PrimaryKeyInfo[]; shadowedByIdProperty: boolean }[] = [];
-
-    for (const collection of collections) {
-        // Declared `isId` is the tier both sides share: if it is there, they agree.
-        if (getDeclaredPrimaryKeys(collection).length > 0) continue;
-
-        // No registered table resolves to no keys, and a collection this cannot
-        // resolve a key for is one it has nothing to say about.
-        const keys = getPrimaryKeys(collection, registry);
-        if (keys.length === 0) continue;
-
-        // A single key named `id` is the last tier on both sides: they agree
-        // without anything being declared.
-        if (keys.length === 1 && keys[0].fieldName === "id") continue;
-
-        findings.push({
-            collection,
-            keys,
-            shadowedByIdProperty: Boolean(collection.properties?.id)
-        });
-    }
-
-    return findings;
-}
-
-/**
- * The `isId` to suggest for one key column, written as it goes in the config.
- *
- * `true` means the application supplies the value; `"increment"` and `"uuid"`
- * mean the database generates it, so the admin withholds the field when a row
- * is created. Suggesting a generating strategy for a column the database does
- * not generate is therefore worse than suggesting none: the form sends no
- * value, and the insert fails on a NULL key.
- *
- * The tables this server reads carry each column's type and whether it is part
- * of the key, not its default, so a generating strategy is suggested only where
- * the key's shape makes it near-certain — a lone `uuid` or integer column that
- * points at nothing — and `true` everywhere else:
- *
- * - a column of a **composite** key holds part of the row's identity, which is
- *   the caller's to give (`company_translation (id, locale)` is the id of a
- *   company and a locale, neither of which this table invents);
- * - a **foreign-key** column holds its parent's key;
- * - a `text` or `varchar` column has no generating strategy at all.
- */
-function suggestedIdStrategy(key: PrimaryKeyInfo, keys: PrimaryKeyInfo[], collection: CollectionConfig): string {
-    if (keys.length > 1) return "true";
-
-    const foreignKeyFields = new Set<string>();
-    for (const relation of Object.values(resolveCollectionRelations(collection))) {
-        if (relation.kind === "belongsTo") foreignKeyFields.add(fieldKeyForColumn(collection, relation.localKey));
-    }
-    for (const [name, property] of Object.entries(collection.properties ?? {})) {
-        if ((property as Property).type === "reference") foreignKeyFields.add(name);
-    }
-    if (foreignKeyFields.has(key.fieldName)) return "true";
-
-    if (key.isUUID) return "\"uuid\"";
-    if (key.type === "number") return "\"increment\"";
-    return "true";
-}
-
-/**
- * Report the collections from {@link findUnresolvableKeyCollections} at boot,
- * with the edit that fixes each one.
- *
- * Grouped by failure, not by collection: the shadowed case is a routing bug and
- * the silent case is a missing feature, and they deserve different urgency.
- */
-export function warnOnKeysTheAdminCannotResolve(
-    collections: CollectionConfig[],
-    registry: PostgresCollectionRegistry
-): void {
-    const findings = findUnresolvableKeyCollections(collections, registry);
-    if (findings.length === 0) return;
-
-    const edit = (f: { collection: CollectionConfig; keys: PrimaryKeyInfo[] }): string => {
-        // `isId` is declared on string, number and reference properties only.
-        // A key column declared as anything else cannot be marked as it is, and
-        // marking the other columns alone would make them the whole key.
-        const unmarkable = f.keys.flatMap(key => {
-            const type = (f.collection.properties?.[key.fieldName] as Property | undefined)?.type;
-            return type !== undefined && type !== "string" && type !== "number" && type !== "reference"
-                ? [`\`${key.fieldName}\` (a \`${type}\` property)`]
-                : [];
-        });
-        if (unmarkable.length > 0) {
-            return `${f.collection.slug}: its key includes ${unmarkable.join(" and ")}, which cannot carry ` +
-                "`isId`. Declare that column as a `string` property, then mark every key column " +
-                `(${f.keys.map(key => `\`${key.fieldName}\``).join(", ")}) with \`isId: true\``;
-        }
-        const marks = f.keys.map(key => ({
-            field: `\`${key.fieldName}\``,
-            strategy: `\`isId: ${suggestedIdStrategy(key, f.keys, f.collection)}\``
-        }));
-        const same = marks.every(mark => mark.strategy === marks[0].strategy);
-        const what = same
-            ? `${marks.map(mark => mark.field).join(" and ")} with ${marks[0].strategy}`
-            : marks.map(mark => `${mark.field} with ${mark.strategy}`).join(" and ");
-        // Several columns are one key, and the admin addresses a row by all of
-        // them — saying how is what makes a link like `/1:::en_US` readable.
-        const composite = f.keys.length > 1
-            ? ` — one composite key, whose rows are addressed as \`${f.keys.map(key => `<${key.fieldName}>`).join(COMPOSITE_ID_SEPARATOR)}\``
-            : "";
-        return `${f.collection.slug}: mark ${what}${composite}`;
-    };
-
-    const shadowed = findings.filter(f => f.shadowedByIdProperty);
-    const silent = findings.filter(f => !f.shadowedByIdProperty);
-
-    if (shadowed.length > 0) {
-        logger.warn(
-            `⚠️ These collections declare no \`isId\`, and their key is only in the drizzle schema — but they ` +
-            `do have a property called \`id\`. The admin has no way to know \`id\` is not the key, so it will ` +
-            `address rows by it while this server reads the address as the real key: the links look right and ` +
-            `route wrong. Nothing will error.\n\n` +
-            shadowed.map(f => `  • ${edit(f)}`).join("\n") + "\n"
-        );
-    }
-
-    if (silent.length > 0) {
-        logger.warn(
-            `⚠️ These collections declare no \`isId\`, and their key is only in the drizzle schema, which the ` +
-            `admin never sees. It will resolve no address for their rows, so detail links, caching and ` +
-            `relations will not work for them:\n\n` +
-            silent.map(f => `  • ${edit(f)}`).join("\n") + "\n"
-        );
-    }
 }
 
 /**
@@ -681,7 +509,7 @@ export function warnOnKeysTheAdminCannotResolve(
 export function deriveRowAddress(
     row: Record<string, unknown>,
     collection: CollectionConfig,
-    registry: PostgresCollectionRegistry,
+    registry: PostgresTableRegistry,
     /** The collection's keys, when the caller already has them — a batch derives one address per row. */
     primaryKeys: PrimaryKeyInfo[] = getPrimaryKeys(collection, registry)
 ): string {

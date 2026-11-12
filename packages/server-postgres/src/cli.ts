@@ -1408,16 +1408,13 @@ async function ensureAuthTables(databaseUrl: string, schemaDir: string): Promise
     try {
         const { drizzle } = await import("drizzle-orm/node-postgres");
         const { ensureAuthTablesExist } = await import("./auth/ensure-tables");
-        const { loadTables } = await import("./schema/load-tables");
+        const { loadTableSchema } = await import("./schema/load-tables");
 
-        const collections = await loadTables(schemaDir);
-        // The auth table (`defineAuthTable`) is lowered with `auth: true`.
-        const authCollection = collections.find((c) => {
-            const a = c.auth;
-            return a === true || (typeof a === "object" && a !== null && a.enabled === true);
-        });
+        // The table defined with `defineAuthTable`: its descriptor carries `auth`.
+        const { descriptors } = await loadTableSchema(schemaDir);
+        const authTable = descriptors.find((descriptor) => descriptor.auth !== undefined);
 
-        await withAppClient(databaseUrl, client => ensureAuthTablesExist(drizzle(client), authCollection));
+        await withAppClient(databaseUrl, client => ensureAuthTablesExist(drizzle(client), authTable));
     } catch (err) {
         outWarn(chalk.yellow(`  ⚠️  Failed to ensure framework auth tables: ${err instanceof Error ? err.message : String(err)}`));
     }

@@ -16,7 +16,8 @@ import type { CollectionConfig } from "@rebasepro/types";
 import { ApiError } from "@rebasepro/server";
 
 import { FetchService } from "../src/services/FetchService";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { unusedDb } from "./helpers/spg-c-db";
 
 const docsTable = pgTable("docs", {
@@ -37,9 +38,9 @@ const docs: CollectionConfig = {
 };
 
 function service(): FetchService {
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
     registry.registerMultiple([docs]);
-    registry.registerTable(docsTable, "docs");
+    registry.registerPgTable(docsTable, "docs");
     // No database: the refusal has to come before anything is asked of one.
     return new FetchService(unusedDb(), registry);
 }

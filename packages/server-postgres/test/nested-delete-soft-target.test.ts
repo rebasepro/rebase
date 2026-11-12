@@ -16,7 +16,8 @@ import { integer, pgTable, primaryKey, serial, timestamp, varchar } from "drizzl
 import type { CollectionConfig } from "@rebasepro/types";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { RealtimeService } from "../src/services/realtimeService";
 import { HistoryService } from "../src/history/HistoryService";
 import { pgliteNodePg } from "./helpers/spg-b-pglite-node-pg";
@@ -90,14 +91,14 @@ let db: PGlite;
 let recorded: { tableName: string; id: string; action: string }[];
 
 function driverOver(pglite: PGlite): PostgresBackendDriver {
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
     registry.registerMultiple([posts(), tags(), labels(), comments()]);
-    registry.registerTable(postsTable, "posts");
-    registry.registerTable(tagsTable, "tags");
-    registry.registerTable(labelsTable, "labels");
-    registry.registerTable(commentsTable, "comments");
-    registry.registerTable(postsTagsTable, "posts_tags");
-    registry.registerTable(postsLabelsTable, "posts_labels");
+    registry.registerPgTable(postsTable, "posts");
+    registry.registerPgTable(tagsTable, "tags");
+    registry.registerPgTable(labelsTable, "labels");
+    registry.registerPgTable(commentsTable, "comments");
+    registry.registerPgTable(postsTagsTable, "posts_tags");
+    registry.registerPgTable(postsLabelsTable, "posts_labels");
     const orm = pgliteNodePg(pglite, {
         schema: { posts: postsTable, tags: tagsTable, labels: labelsTable, comments: commentsTable, posts_tags: postsTagsTable, posts_labels: postsLabelsTable }
     });

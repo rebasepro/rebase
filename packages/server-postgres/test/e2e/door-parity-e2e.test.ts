@@ -33,7 +33,7 @@ import { col, defineTable, rel, type DataDriver, type SDKTableClient } from "@re
 import { compileTables, lowerTables } from "@rebasepro/common";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
-import { PostgresCollectionRegistry } from "../../src/collections/PostgresCollectionRegistry.js";
+import { FixtureTableRegistry } from "../helpers/tables.js";
 import { RealtimeService } from "../../src/services/realtimeService.js";
 import { HistoryService } from "../../src/history/HistoryService.js";
 import { ensureHistoryTableExists } from "../../src/history/ensure-history-table.js";
@@ -409,10 +409,10 @@ describe("door parity: one operation, one answer (E2E)", () => {
         const db = drizzle(pool);
         const historyTable = await ensureHistoryTableExists(db);
 
-        const registry = new PostgresCollectionRegistry();
+        const registry = new FixtureTableRegistry();
         registry.registerMultiple(COLLECTIONS);
-        registry.registerTable(peopleTable, "people");
-        registry.registerTable(docsTable, "docs");
+        registry.registerPgTable(peopleTable, "people");
+        registry.registerPgTable(docsTable, "docs");
         realtime = new RealtimeService(db, registry);
         driver = new PostgresBackendDriver(
             db, realtime, registry,

@@ -34,7 +34,8 @@ import WebSocket, { WebSocketServer } from "ws";
 import type { CollectionConfig } from "@rebasepro/types";
 import { createPostgresWebSocket } from "../src/websocket";
 import { RealtimeService } from "../src/services/realtimeService";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { MAX_PROCESS_BUFFERED_BYTES, MAX_SOCKET_BUFFERED_BYTES, processSendBudget, reapSilentSockets } from "../src/services/socket-liveness";
 import { fakeDataDriver, fakeCallContextDriver } from "./helpers/spg-c-socket";
 import { recordingDb } from "./helpers/spg-c-db";
@@ -80,7 +81,7 @@ beforeEach(async () => {
     onServer = [];
     clients = [];
     const { db } = recordingDb();
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
     registry.registerMultiple([posts]);
     service = new RealtimeService(db, registry);
     service.setDataDriver(fakeCallContextDriver());

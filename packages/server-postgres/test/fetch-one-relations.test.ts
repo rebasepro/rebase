@@ -19,7 +19,8 @@ import { relations } from "drizzle-orm";
 import type { CollectionConfig, User } from "@rebasepro/types";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { RealtimeService } from "../src/services/realtimeService";
 import { testUser } from "./helpers/spg-b-fixtures";
 import { pgliteNodePg } from "./helpers/spg-b-pglite-node-pg";
@@ -88,10 +89,10 @@ let db: PGlite;
 
 /** `withSchema: false` leaves `db.query` empty, which is the path a fetch fell back to. */
 function driverOver(pglite: PGlite, user?: User, options: { withSchema: boolean } = { withSchema: true }): PostgresBackendDriver {
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
     registry.registerMultiple([owners(), docs()]);
-    registry.registerTable(ownersTable, "owners");
-    registry.registerTable(docsTable, "docs");
+    registry.registerPgTable(ownersTable, "owners");
+    registry.registerPgTable(docsTable, "docs");
     registry.registerRelations({ ownersRelations, docsRelations });
     const orm = options.withSchema
         ? pgliteNodePg(pglite, { schema: { owners: ownersTable, docs: docsTable, ownersRelations, docsRelations } })

@@ -18,7 +18,8 @@ import { CollectionConfig } from "@rebasepro/types";
 import { resolveCollectionRelations } from "@rebasepro/common";
 import { toFlatRow, toRestRow, stripUnreadable, canReadRelation } from "../src/services/row-pipeline";
 import { withFieldViewer, currentFieldViewer } from "../src/services/field-viewer";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 
 const staff: CollectionConfig = {
     name: "Staff",
@@ -51,10 +52,9 @@ const posts: CollectionConfig = {
     ]
 };
 
-function makeRegistry(): PostgresCollectionRegistry {
-    const registry = new PostgresCollectionRegistry();
-    registry.registerCollection?.(staff);
-    registry.registerCollection?.(posts);
+function makeRegistry(): PostgresTableRegistry {
+    const registry = new FixtureTableRegistry();
+    registry.registerMultiple([staff, posts]);
     return registry;
 }
 

@@ -19,7 +19,8 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import pg from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
-import { PostgresCollectionRegistry } from "../../src/collections/PostgresCollectionRegistry.js";
+import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry.js";
+import { FixtureTableRegistry } from "../helpers/tables";
 import { RealtimeService } from "../../src/services/realtimeService.js";
 import { PostgresChannelBus } from "../../src/services/channel-bus/PostgresChannelBus.js";
 
@@ -43,7 +44,7 @@ describe("A retained channel on two instances (E2E)", () => {
         const pool = new pg.Pool({ connectionString: container.connectionString });
         pools.push(pool);
         const db = drizzle(pool);
-        const service = new RealtimeService(db, new PostgresCollectionRegistry());
+        const service = new RealtimeService(db, new FixtureTableRegistry());
         await service.configureChannelHistory([{ match: "doc:*", limit: 1000 }], { provision: true });
         await service.configureChannelBus(new PostgresChannelBus(db, container.connectionString));
         services.push(service);

@@ -1,7 +1,8 @@
 import { CollectionConfig } from "@rebasepro/types";
 import { HistoryService } from "../src/history/HistoryService";
 import { historyUnavailableReason } from "../src/history/ensure-history-table";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { RealtimeService } from "../src/services/realtimeService";
 import { recordingDb } from "./helpers/spg-b-recording-db";
@@ -116,7 +117,7 @@ describe("history is not lossy", () => {
     });
 
     describe("PostgresBackendDriver", () => {
-        const registry = new PostgresCollectionRegistry();
+        const registry = new FixtureTableRegistry();
         const posts: CollectionConfig = {
             slug: "posts",
             name: "Posts",
@@ -127,6 +128,7 @@ describe("history is not lossy", () => {
                 title: { type: "string" }
             }
         };
+        registry.registerMultiple([posts]);
 
         const stand = (recordHistory: jest.Mock) => {
             const { db } = recordingDb();

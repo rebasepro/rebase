@@ -7,13 +7,13 @@ import { ANONYMOUS_USER_ID, FetchCollectionProps, ListenCollectionProps, ListenO
 import { Pool } from "pg";
 import { sql as drizzleSql } from "drizzle-orm";
 import { RealtimeProvider, CollectionSubscriptionConfig, SingleSubscriptionConfig, DrizzleClient, type PgSqlDatabase } from "../interfaces";
-import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../model/PostgresTableRegistry";
 import { buildPropertyCallbacks, deserializeFilter, getTableName, normalizeDriverOrderBy, OrderBySpecError, parseOrderBySpecStrict, requireCallbackCollection, UnknownFilterOperatorError } from "@rebasepro/common";
 import { applyAuthContext } from "../security/rls-enforcement";
 import type { RequestIdentity } from "../security/rls-settings";
 import { withFieldViewer } from "./field-viewer";
 import { buildJunctionLinkMap, type JunctionLink } from "./cdc/junction-tables";
-import { collectionKeyColumns } from "./cdc/identity-columns";
+import { tableKeyColumns } from "./cdc/identity-columns";
 import { ApiError, logger, rawQueryLoggingEnabled, rowETag } from "@rebasepro/server";
 import { assertReadRequestReadable } from "./read-field-access";
 import { sanitizeErrorForClient } from "../utils/pg-error-utils";
@@ -804,7 +804,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
      */
     private static readonly CDC_DEDUP_WINDOW_MS = RealtimeService.REFETCH_DEBOUNCE_MS;
 
-    constructor(private db: PgSqlDatabase<any>, private registry: PostgresCollectionRegistry) {
+    constructor(private db: PgSqlDatabase<any>, private registry: PostgresTableRegistry) {
         super();
         this.maxConcurrentRefetches = refetchConcurrencyFor(db);
         // No call-context provider, deliberately. This service is the
@@ -1597,7 +1597,8 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                 assertReadRequestReadable(
                     { ...request, filter, orderBy },
                     collection,
-                    { roles: authContext?.roles ?? ["anon"] }
+                    { roles: authContext?.roles ?? ["anon"] },
+                    this.registry
                 );
             } catch (e) {
                 if (!(e instanceof ApiError)) throw e;
@@ -1698,7 +1699,8 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                 assertReadRequestReadable(
                     { include: request.include },
                     collection,
-                    { roles: authContext?.roles ?? ["anon"] }
+                    { roles: authContext?.roles ?? ["anon"] },
+                    this.registry
                 );
             } catch (e) {
                 if (!(e instanceof ApiError)) throw e;
@@ -1828,7 +1830,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
                 const collection = this.registry.getCollectionByPath(subscription.path);
                 try {
                     if (collection) {
-                        assertReadRequestReadable(judged, collection, { roles: authContext.roles ?? ["anon"] });
+                        assertReadRequestReadable(judged, collection, { roles: authContext.roles ?? ["anon"] }, this.registry);
                     }
                 } catch (e) {
                     if (!(e instanceof ApiError)) throw e;
@@ -2359,7 +2361,7 @@ roles: ["anon"] };
         } catch {
             collection = undefined;
         }
-        const etag = await rowETag(loadsRelations ? tagged : row, collection);
+        const etag = await rowETag(loadsRelations ? tagged : row, collection && this.registry.getTable(collection.slug)?.descriptor);
         return { row, ...(etag && { etag }) };
     }
 
@@ -4148,7 +4150,7 @@ lastSeen: Date.now() });
      */
     private cdcRowByKeyFields(collection: CollectionConfig, row: Record<string, unknown>): Record<string, unknown> {
         const keyed: Record<string, unknown> = { ...row };
-        for (const { fieldName, columnName } of collectionKeyColumns(collection, this.registry)) {
+        for (const { fieldName, columnName } of tableKeyColumns(this.registry.requireTable(collection.slug))) {
             if (fieldName in row) continue;
             if (columnName in row) keyed[fieldName] = row[columnName];
         }

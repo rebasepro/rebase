@@ -3,7 +3,7 @@ import { canReadField, effectiveAccess, resolveCollectionRelations, findRelation
 import { currentFieldViewer } from "./field-viewer";
 import { normalizeDbValues } from "../data-transformer";
 import { deriveRowAddress } from "./collection-helpers";
-import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../model/PostgresTableRegistry";
 
 /**
  * Turning a drizzle result into a row we serve.
@@ -311,7 +311,7 @@ function renderTarget(
     targetRow: Record<string, unknown>,
     targetCollection: CollectionConfig,
     style: RelationStyle,
-    registry: PostgresCollectionRegistry
+    registry: PostgresTableRegistry
 ): unknown {
     if (style === "inline") {
         // The target's columns, and only those: its address is the consumer's
@@ -350,7 +350,7 @@ function renderTarget(
 export function relationTargetAddress(
     targetRow: Record<string, unknown>,
     targetCollection: CollectionConfig,
-    registry: PostgresCollectionRegistry
+    registry: PostgresTableRegistry
 ): string {
     const address = deriveRowAddress(targetRow, targetCollection, registry);
     if (address) return address;
@@ -367,7 +367,7 @@ export function relationTargetAddress(
 export function toFlatRow(
     row: Record<string, unknown>,
     collection: CollectionConfig,
-    registry: PostgresCollectionRegistry
+    registry: PostgresTableRegistry
 ): Record<string, unknown> {
     const resolvedRelations = resolveCollectionRelations(collection);
     const normalized = normalizeDbValues(row, collection) as Record<string, unknown>;
@@ -413,7 +413,7 @@ export function toFlatRow(
 export function toRestRow(
     row: Record<string, unknown>,
     collection: CollectionConfig,
-    registry: PostgresCollectionRegistry
+    registry: PostgresTableRegistry
 ): Record<string, unknown> {
     const { steps } = restRowPlan(collection);
     const flat: Record<string, unknown> = {};

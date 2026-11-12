@@ -1,7 +1,8 @@
 import { CollectionConfig } from "@rebasepro/types";
 import { pgTable, text } from "drizzle-orm/pg-core";
 import { RealtimeService } from "../src/services/realtimeService";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { fakeDataDriver, fakeRealtimeSocket, type FakeRealtimeSocket } from "./helpers/spg-c-socket";
 import { recordingDb } from "./helpers/spg-c-db";
 
@@ -58,7 +59,7 @@ isId: true },
     };
 
     let service: RealtimeService;
-    let registry: PostgresCollectionRegistry;
+    let registry: PostgresTableRegistry;
     let ws: MockWebSocket;
     /** One deferred per `fetchCollectionWithAuth` call, in call order. */
     let collectionFetches: Deferred<Record<string, unknown>[]>[];
@@ -101,10 +102,10 @@ isId: true },
 
         const { db } = recordingDb();
 
-        registry = new PostgresCollectionRegistry();
+        registry = new FixtureTableRegistry();
         jest.spyOn(registry, "getCollectionByPath").mockImplementation(path =>
             path.startsWith("notes") ? notesCollection : undefined);
-        jest.spyOn(registry, "getTable").mockImplementation(name =>
+        jest.spyOn(registry, "getPgTable").mockImplementation(name =>
             name === "notes" ? notesTable : undefined);
 
         service = new RealtimeService(db, registry);

@@ -3,7 +3,8 @@ import { SQL, StringChunk } from "drizzle-orm";
 import { integer, PgColumn, pgTable, serial, varchar } from "drizzle-orm/pg-core";
 import { CollectionConfig } from "@rebasepro/types";
 import { FetchService } from "../src/services/FetchService";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { recordingDb } from "./helpers/spg-b-recording-db";
 
 /**
@@ -63,7 +64,7 @@ describe("orderBy on an owning relation resolves through localKey", () => {
         ]
     };
 
-    const service = new FetchService(recordingDb().db, new PostgresCollectionRegistry());
+    const service = new FetchService(recordingDb().db, new FixtureTableRegistry());
     const resolve = (orderBy: string, collection?: CollectionConfig): PgColumn | undefined => {
         const column = callPrivate(service, "resolveOrderByField", postsTable, orderBy, collection);
         return column instanceof PgColumn ? column : undefined;
@@ -105,7 +106,7 @@ describe("orderBy on an owning relation resolves through localKey", () => {
         // `resolveOrderKeys` resolves the collection's relations, so this one
         // needs a registry that knows `posts` — unlike the direct
         // `resolveOrderByField` calls above, which are handed the collection.
-        const registry = new PostgresCollectionRegistry();
+        const registry = new FixtureTableRegistry();
         registry.registerMultiple([postsCollection]);
         const sortService = new FetchService(recordingDb().db, registry);
 

@@ -20,7 +20,8 @@ import type { AggregateParams, AggregateRow, CollectionConfig, DataDriver, SDKTa
 import { buildSdkData } from "@rebasepro/common";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
-import { PostgresCollectionRegistry } from "../../src/collections/PostgresCollectionRegistry.js";
+import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry.js";
+import { FixtureTableRegistry } from "../helpers/tables";
 import { RealtimeService } from "../../src/services/realtimeService.js";
 import { RestApiGenerator } from "../../../server/src/api/rest/api-generator.js";
 import { errorHandler } from "../../../server/src/api/errors.js";
@@ -90,9 +91,9 @@ describe("aggregate orderBy, over HTTP and in process (E2E)", () => {
 
         pool = new pg.Pool({ connectionString: container.connectionString });
         const db = drizzle(pool);
-        const registry = new PostgresCollectionRegistry();
+        const registry = new FixtureTableRegistry();
         registry.registerMultiple([orders]);
-        registry.registerTable(ordersTable, "orders");
+        registry.registerPgTable(ordersTable, "orders");
         const realtime = new RealtimeService(db, registry);
         driver = new PostgresBackendDriver(db, realtime, registry);
         realtime.setDataDriver(driver);

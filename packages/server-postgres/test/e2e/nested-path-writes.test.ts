@@ -24,7 +24,8 @@ import { pgTable, varchar } from "drizzle-orm/pg-core";
 import type { CollectionConfig } from "@rebasepro/types";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
-import { PostgresCollectionRegistry } from "../../src/collections/PostgresCollectionRegistry.js";
+import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry.js";
+import { FixtureTableRegistry } from "../helpers/tables";
 import { RealtimeService } from "../../src/services/realtimeService.js";
 
 // ─── Model ──────────────────────────────────────────────────────────────────
@@ -173,14 +174,14 @@ const postsCollection: CollectionConfig = {
     ]
 };
 
-function buildRegistry(): PostgresCollectionRegistry {
-    const registry = new PostgresCollectionRegistry();
+function buildRegistry(): PostgresTableRegistry {
+    const registry = new FixtureTableRegistry();
     registry.registerMultiple([authorsCollection, postsCollection, tagsCollection, bylinesCollection]);
-    registry.registerTable(authorsTable, "authors");
-    registry.registerTable(postsTable, "posts");
-    registry.registerTable(tagsTable, "tags");
-    registry.registerTable(postsTagsTable, "posts_tags");
-    registry.registerTable(bylinesTable, "bylines");
+    registry.registerPgTable(authorsTable, "authors");
+    registry.registerPgTable(postsTable, "posts");
+    registry.registerPgTable(tagsTable, "tags");
+    registry.registerPgTable(postsTagsTable, "posts_tags");
+    registry.registerPgTable(bylinesTable, "bylines");
     return registry;
 }
 

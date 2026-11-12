@@ -1,6 +1,7 @@
 import { describe, it, expect, jest } from "@jest/globals";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { RealtimeService } from "../src/services/realtimeService";
 import { unusedDb } from "./helpers/spg-c-db";
 
@@ -13,7 +14,7 @@ import { unusedDb } from "./helpers/spg-c-db";
  */
 function driverWith(cdcActive: boolean) {
     const db = unusedDb();
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
     const realtime = new RealtimeService(db, registry);
     jest.spyOn(realtime, "isCdcActive").mockReturnValue(cdcActive);
     const notifyUpdate = jest.spyOn(realtime, "notifyUpdate").mockResolvedValue(undefined);

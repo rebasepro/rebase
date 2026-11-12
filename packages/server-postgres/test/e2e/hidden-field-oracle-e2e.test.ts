@@ -27,7 +27,7 @@ import { col, defineTable, rel } from "@rebasepro/types";
 import { compileTables, lowerTables } from "@rebasepro/common";
 import { startPgContainer, stopPgContainer, PGVECTOR_IMAGE, type PgContainer } from "./pg-setup.js";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
-import { PostgresCollectionRegistry } from "../../src/collections/PostgresCollectionRegistry.js";
+import { FixtureTableRegistry } from "../helpers/tables.js";
 import { RealtimeService } from "../../src/services/realtimeService.js";
 import { RestApiGenerator } from "../../../server/src/api/rest/api-generator.js";
 import { errorHandler } from "../../../server/src/api/errors.js";
@@ -168,11 +168,11 @@ describe("a private column answers as a field that does not exist (E2E)", () => 
 
         pool = new pg.Pool({ connectionString: container.connectionString });
         const db = drizzle(pool);
-        const registry = new PostgresCollectionRegistry();
+        const registry = new FixtureTableRegistry();
         registry.registerMultiple(ALL);
-        registry.registerTable(authorsTable, "authors");
-        registry.registerTable(notesTable, "notes");
-        registry.registerTable(postsTable, "posts");
+        registry.registerPgTable(authorsTable, "authors");
+        registry.registerPgTable(notesTable, "notes");
+        registry.registerPgTable(postsTable, "posts");
         const realtime = new RealtimeService(db, registry);
         driver = new PostgresBackendDriver(db, realtime, registry);
         realtime.setDataDriver(driver);

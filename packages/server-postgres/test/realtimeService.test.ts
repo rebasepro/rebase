@@ -1,5 +1,6 @@
 import { RealtimeService } from "../src/services/realtimeService";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { CollectionConfig, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT } from "@rebasepro/types";
 import { fakeRealtimeSocket, type FakeRealtimeSocket, fakeDataDriver } from "./helpers/spg-c-socket";
 import { recordingDb, type RecordedStatement } from "./helpers/spg-c-db";
@@ -41,7 +42,7 @@ const mockPostsCollection: CollectionConfig = {
 describe("RealtimeService", () => {
     let realtimeService: RealtimeService;
     let statements: RecordedStatement[];
-    let registry: PostgresCollectionRegistry;
+    let registry: PostgresTableRegistry;
 
     beforeEach(() => {
         jest.useFakeTimers();
@@ -49,7 +50,7 @@ describe("RealtimeService", () => {
         const recording = recordingDb();
         statements = recording.statements;
 
-        registry = new PostgresCollectionRegistry();
+        registry = new FixtureTableRegistry();
         jest.spyOn(registry, "getCollectionByPath").mockReturnValue(mockPostsCollection);
 
         const mockDriver = fakeDataDriver();

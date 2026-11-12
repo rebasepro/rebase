@@ -2,7 +2,8 @@ import type { CollectionConfig } from "@rebasepro/types";
 import { RelationService } from "../src/services/RelationService";
 import { FetchService } from "../src/services/FetchService";
 import { toRestRow } from "../src/services/row-pipeline";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { recordingDb, shapedRows } from "./helpers/spg-c-db";
 import { textTable } from "./helpers/spg-c-tables";
 
@@ -27,7 +28,7 @@ import { textTable } from "./helpers/spg-c-tables";
  * points come out of it identical, with an `include` and without one.
  */
 describe("read-shape parity across the entry points", () => {
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
 
     const postsTable = textTable("posts", ["id", "title", "published_at", "author_id"]);
     const authorsTable = textTable("authors", ["id", "name", "joined_at"]);
@@ -67,7 +68,7 @@ describe("read-shape parity across the entry points", () => {
             if (path === "authors") return authorsCollection;
             return undefined;
         });
-        jest.spyOn(registry, "getTable").mockImplementation(name => {
+        jest.spyOn(registry, "getPgTable").mockImplementation(name => {
             if (name === "posts") return postsTable;
             if (name === "authors") return authorsTable;
             return undefined;

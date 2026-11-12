@@ -1,6 +1,7 @@
 import { CollectionConfig } from "@rebasepro/types";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { RealtimeService } from "../src/services/realtimeService";
 import { HistoryService } from "../src/history/HistoryService";
 import { unusedDb } from "./helpers/spg-c-db";
@@ -20,7 +21,7 @@ import { textTable } from "./helpers/spg-c-tables";
  * catches an `id` column being stripped out of the values callbacks receive.
  */
 describe("PostgresBackendDriver.save — the address is derived", () => {
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
 
 
     const productsCollection: CollectionConfig = {
@@ -86,7 +87,7 @@ isId: true },
             if (path.startsWith("memberships")) return membershipsCollection;
             return undefined;
         });
-        jest.spyOn(registry, "getTable").mockImplementation(name => {
+        jest.spyOn(registry, "getPgTable").mockImplementation(name => {
             if (name === "products") return textTable("products", ["id", "name"]);
             if (name === "sku_items") return textTable("sku_items", ["sku", "label"]);
             if (name === "memberships") return textTable("memberships", ["tenant_id", "user_id", "role"]);

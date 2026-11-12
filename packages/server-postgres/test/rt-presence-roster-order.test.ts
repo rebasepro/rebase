@@ -20,7 +20,8 @@ import { drizzle } from "drizzle-orm/pglite";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 import { RealtimeService } from "../src/services/realtimeService";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import type { ChannelBus, ChannelBusHandler } from "../src/services/channel-bus";
 import { fakeRealtimeSocket } from "./helpers/spg-c-socket";
 import { PgDialect } from "drizzle-orm/pg-core";
@@ -60,7 +61,7 @@ describe("the shared presence roster", () => {
         }) as typeof handle.execute;
         // PGlite's drizzle database stands in for node-postgres's: the service names NodePgDatabase,
         // whose `$client` is a pg pool, and no typed bridge between the two exists.
-        service = new RealtimeService(handle as unknown as NodePgDatabase<Record<string, unknown>>, new PostgresCollectionRegistry());
+        service = new RealtimeService(handle as unknown as NodePgDatabase<Record<string, unknown>>, new FixtureTableRegistry());
         await service.configureChannelBus(new SilentBus());
     }, 60_000);
 

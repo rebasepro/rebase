@@ -28,7 +28,8 @@ import { pgTable, varchar } from "drizzle-orm/pg-core";
 import type { CollectionCallbacks, CollectionConfig, StringProperty } from "@rebasepro/types";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
-import { PostgresCollectionRegistry } from "../../src/collections/PostgresCollectionRegistry.js";
+import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry.js";
+import { FixtureTableRegistry } from "../helpers/tables";
 import { RealtimeService } from "../../src/services/realtimeService.js";
 import { HistoryService } from "../../src/history/HistoryService.js";
 import { ensureHistoryTableExists } from "../../src/history/ensure-history-table.js";
@@ -109,14 +110,14 @@ describe("a write's hand-offs share its transaction (E2E)", () => {
         const historyTable = await ensureHistoryTableExists(db);
         expect(historyTable.inTransaction).toBe(true);
 
-        const registry = new PostgresCollectionRegistry();
+        const registry = new FixtureTableRegistry();
         const prop = (name: string): StringProperty => ({ name, type: "string" });
         registry.registerMultiple([
             { slug: "widgets", name: "W", table: "widgets", properties: { id: { ...prop("ID"), isId: true }, name: prop("N") }, callbacks: widgetCallbacks },
             { slug: "notes", name: "N", table: "notes", history: true, properties: { id: { ...prop("ID"), isId: true }, body: prop("B") } }
         ]);
-        registry.registerTable(widgetsTable, "widgets");
-        registry.registerTable(notesTable, "notes");
+        registry.registerPgTable(widgetsTable, "widgets");
+        registry.registerPgTable(notesTable, "notes");
 
         driver = new PostgresBackendDriver(
             db, new RealtimeService(db, registry), registry,

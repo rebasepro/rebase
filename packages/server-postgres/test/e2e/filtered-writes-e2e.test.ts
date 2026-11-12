@@ -24,6 +24,7 @@ import type { CollectionConfig } from "@rebasepro/types";
 
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { createPostgresBootstrapper, createPostgresDatabaseConnection, openRebase, type OpenedRebase } from "../../src/index.js";
+import { tablesFromCollections } from "../helpers/tables.js";
 
 const scores: CollectionConfig = {
     name: "Scores",
@@ -87,7 +88,7 @@ async function provision(url: string): Promise<void> {
     const conn = createPostgresDatabaseConnection(url);
     try {
         const bootstrapper = createPostgresBootstrapper({ connectionString: url, connection: conn.db });
-        const driverResult = await bootstrapper.initializeDriver({ collections: [scores, notes], realtime: { subscribe: false, provision: false } });
+        const driverResult = await bootstrapper.initializeDriver({ collections: [scores, notes], tables: tablesFromCollections([scores, notes]).tables, realtime: { subscribe: false, provision: false } });
         await bootstrapper.ensureCollectionSchema!([scores, notes], driverResult);
         await bootstrapper.ensureRlsRuntime!(driverResult);
         await bootstrapper.ensureCollectionPolicies!([scores, notes], driverResult);
@@ -110,7 +111,7 @@ describe("filtered writes and conflict rules (E2E)", () => {
             vi.spyOn(console, "debug").mockImplementation(() => undefined)
         );
         await provision(container.connectionString);
-        rebase = await openRebase({ databaseUrl: container.connectionString, collections: [scores, notes], pool: { max: 2 } });
+        rebase = await openRebase({ databaseUrl: container.connectionString, collections: [scores, notes], tables: tablesFromCollections([scores, notes]).tables, pool: { max: 2 } });
         await rebase.sql(`INSERT INTO public.scores (day, sid, owner_id, hype, rev) VALUES
             ('d1', 'a', 'ada', 10, 1), ('d1', 'b', 'ada', 20, 1), ('d1', 'c', 'bob', 30, 1), ('d2', 'a', 'ada', 40, 1)`);
     }, 180_000);

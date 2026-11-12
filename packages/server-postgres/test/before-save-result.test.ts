@@ -19,7 +19,8 @@ import { jsonb, pgTable, serial, varchar } from "drizzle-orm/pg-core";
 import type { CollectionCallbacks, CollectionConfig } from "@rebasepro/types";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { RealtimeService } from "../src/services/realtimeService";
 
 const ordersTable = pgTable("orders", {
@@ -77,9 +78,9 @@ function orders(options: { callbacks?: CollectionCallbacks; propertyHook?: boole
 let db: PGlite;
 
 function driverOver(pglite: PGlite, collection: CollectionConfig): PostgresBackendDriver {
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
     registry.registerMultiple([collection]);
-    registry.registerTable(ordersTable, "orders");
+    registry.registerPgTable(ordersTable, "orders");
     const orm = drizzle(pglite, { schema: { orders: ordersTable } });
     return new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry);
 }

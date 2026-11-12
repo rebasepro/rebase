@@ -28,7 +28,8 @@ jest.mock("../src/services/dataService", () => ({
 
 import type { CollectionConfig, CollectionUpdateMeta } from "@rebasepro/types";
 import { RealtimeService, parseRealtimeTuning, DEFAULT_RECOUNT_MIN_ROWS } from "../src/services/realtimeService";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { fakeCallContextDriver, fakeRealtimeSocket, type FakeRealtimeSocket } from "./helpers/spg-c-socket";
 import { recordingDb } from "./helpers/spg-c-db";
 
@@ -68,7 +69,7 @@ beforeEach(async () => {
     fetchCollectionForRest.mockImplementation(async () => [{ id: 1, title: `Row ${++version}` }]);
     count.mockReset();
     const { db } = recordingDb();
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
     registry.registerMultiple([posts]);
     service = new RealtimeService(db, registry);
     service.setDataDriver(fakeCallContextDriver());

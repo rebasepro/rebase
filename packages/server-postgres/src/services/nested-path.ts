@@ -4,7 +4,7 @@ import { namesHiddenFromCaller } from "./field-viewer";
 import { ApiError } from "@rebasepro/server";
 
 import { getCollectionByPath } from "./collection-helpers";
-import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../model/PostgresTableRegistry";
 
 /**
  * The last hop of a nested collection path, e.g. `authors/1/posts`.
@@ -54,7 +54,7 @@ export function splitPathSegments(path: string): string[] {
  */
 export function resolveNestedPath(
     path: string,
-    registry: PostgresCollectionRegistry
+    registry: PostgresTableRegistry
 ): NestedPathHop | undefined {
     if (!isNestedPath(path)) return undefined;
 

@@ -2,7 +2,8 @@ import type { CollectionConfig, ManyToManyRelation, ResolvedRelation } from "@re
 import { resolveCollectionRelations } from "@rebasepro/common";
 import { pgTable, text } from "drizzle-orm/pg-core";
 import { RelationWriteService } from "../src/services/RelationWriteService";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { recordingDb } from "./helpers/spg-b-recording-db";
 
 /**
@@ -32,10 +33,10 @@ describe("junction writes diff rather than replace", () => {
     const tagsTable = pgTable("tags", { id: text("id").primaryKey(), name: text("name") });
     const postsTagsTable = pgTable("posts_tags", { post_id: text("post_id"), tag_id: text("tag_id") });
 
-    const registry = new PostgresCollectionRegistry();
-    registry.registerTable(postsTable, "posts");
-    registry.registerTable(tagsTable, "tags");
-    registry.registerTable(postsTagsTable, "posts_tags");
+    const registry = new FixtureTableRegistry();
+    registry.registerPgTable(postsTable, "posts");
+    registry.registerPgTable(tagsTable, "tags");
+    registry.registerPgTable(postsTagsTable, "posts_tags");
 
     const tagsCollection: CollectionConfig = {
         slug: "tags",
@@ -64,6 +65,7 @@ describe("junction writes diff rather than replace", () => {
         },
         relations: [tagsRelation]
     };
+    registry.registerMultiple([postsCollection, tagsCollection]);
 
     /** `postsCollection`'s one relation — or `relation` in its place — resolved. */
     const resolvedTagsRelation = (relation: ManyToManyRelation = tagsRelation): ResolvedRelation => {

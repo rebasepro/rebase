@@ -3,7 +3,8 @@ import { integer, pgTable, serial, varchar, vector } from "drizzle-orm/pg-core";
 import type { CollectionConfig } from "@rebasepro/types";
 
 import { FetchService } from "../src/services/FetchService";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { recordingDb } from "./helpers/spg-b-recording-db";
 
 /**
@@ -84,9 +85,9 @@ function vectorDb(rows: unknown[][] = []) {
 }
 
 function registryFor() {
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
     registry.registerMultiple([authorsCollection, postsCollection]);
-    registry.registerTable(postsTable, "posts");
+    registry.registerPgTable(postsTable, "posts");
     return registry;
 }
 

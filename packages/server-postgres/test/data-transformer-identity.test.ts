@@ -3,7 +3,8 @@ import { getTableColumns } from "drizzle-orm";
 import { pgTable, text, type PgTable } from "drizzle-orm/pg-core";
 import { drizzle } from "drizzle-orm/pg-proxy";
 import { parseDataFromServer } from "../src/data-transformer";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 
 /**
  * Reading an inverse relation means finding the rows that point *back* at this
@@ -15,7 +16,7 @@ import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectio
  * addressed by its first column alone would name every row that shares it.
  */
 describe("parseDataFromServer — inverse relations are addressed by key columns", () => {
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
 
     const tables: Record<string, PgTable> = {
         events: pgTable("events", { sku: text("sku"), id: text("id") }),
@@ -104,7 +105,7 @@ isId: true },
 
     beforeEach(() => {
         jest.restoreAllMocks();
-        jest.spyOn(registry, "getTable").mockImplementation(name => {
+        jest.spyOn(registry, "getPgTable").mockImplementation(name => {
             return tables[name];
         });
         jest.spyOn(registry, "getCollectionByPath").mockImplementation(path => {

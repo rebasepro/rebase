@@ -1,7 +1,8 @@
 import { DataService } from "../src/services/dataService";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { CollectionConfig } from "@rebasepro/types";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 
 /**
  * A query chain that resolves to `rows` however it is continued.
@@ -57,7 +58,7 @@ function setPayloads(mock: jest.Mock): unknown[] {
     return mock.mock.calls.map(([payload]) => payload);
 }
 
-const collectionRegistry = new PostgresCollectionRegistry();
+const collectionRegistry = new FixtureTableRegistry();
 
 describe("DataService - Relation Types Tests", () => {
     let dataService: DataService;
@@ -209,7 +210,7 @@ relationName: "user" }
             return undefined;
         });
 
-        jest.spyOn(collectionRegistry, "getTable").mockImplementation(tableName => {
+        jest.spyOn(collectionRegistry, "getPgTable").mockImplementation(tableName => {
             if (tableName === "customers") return mockCustomersTable as any;
             if (tableName === "orders") return mockOrdersTable as any;
             if (tableName === "products") return mockProductsTable as any;
@@ -378,10 +379,10 @@ __type: "relation" }
             expect(tableNames(db.insert as jest.Mock)).toEqual(["orders", "order_items"]);
             expect(db.values).toHaveBeenNthCalledWith(1, { total: 300 });
             expect(db.values).toHaveBeenNthCalledWith(2, [
-                { order_id: "4",
-product_id: "1" },
-                { order_id: "4",
-product_id: "2" }
+                { order_id: 4,
+product_id: 1 },
+                { order_id: 4,
+product_id: 2 }
             ]);
         });
     });
@@ -655,7 +656,7 @@ to: "user_profiles.user_id" } }
 
             it("should handle one-to-one owning relation via joinPath on write", async () => {
                 jest.spyOn(collectionRegistry, "getCollectionByPath").mockReturnValue(postsWithAuthorViaJoinPath);
-                jest.spyOn(collectionRegistry, "getTable").mockImplementation(tableName => {
+                jest.spyOn(collectionRegistry, "getPgTable").mockImplementation(tableName => {
                     if (tableName === "posts") return mockPostsTable as any;
                     if (tableName === "authors") return mockAuthorsTable as any;
                     if (tableName === "user_profiles") return mockUserProfilesTable as any;
@@ -711,7 +712,7 @@ authorId: 7 }]);
 
             it("applies joinPath updates BEFORE main UPDATE on existing entities to prevent stale data corruption", async () => {
                 jest.spyOn(collectionRegistry, "getCollectionByPath").mockReturnValue(postsWithAuthorViaJoinPath);
-                jest.spyOn(collectionRegistry, "getTable").mockImplementation(tableName => {
+                jest.spyOn(collectionRegistry, "getPgTable").mockImplementation(tableName => {
                     if (tableName === "posts") return mockPostsTable as any;
                     if (tableName === "authors") return mockAuthorsTable as any;
                     if (tableName === "user_profiles") return mockUserProfilesTable as any;
@@ -782,7 +783,7 @@ name: "John Doe" }]);
                 // Clear-then-set, in that order: a profile that used to point
                 // at this customer has to let go before the named one takes
                 // over, or a to-one relation ends up with two holders.
-                expect(setPayloads(db.set as jest.Mock)).toEqual([{ userId: null }, { userId: "1" }]);
+                expect(setPayloads(db.set as jest.Mock)).toEqual([{ userId: null }, { userId: 1 }]);
             });
         });
 
@@ -815,7 +816,7 @@ to: "user_profiles.user_id" } }
 
             it("should handle one-to-one inverse relation via joinPath on write", async () => {
                 jest.spyOn(collectionRegistry, "getCollectionByPath").mockReturnValue(authorsWithProfileViaJoinPath);
-                jest.spyOn(collectionRegistry, "getTable").mockImplementation(tableName => {
+                jest.spyOn(collectionRegistry, "getPgTable").mockImplementation(tableName => {
                     if (tableName === "authors") return mockAuthorsTable as any;
                     if (tableName === "customers") return mockCustomersTable as any;
                     if (tableName === "user_profiles") return mockUserProfilesTable as any;
@@ -925,10 +926,10 @@ total: 500 }]);
                 expect(db.set).toHaveBeenCalledWith({ total: 500 });
                 expect(tableNames(db.insert as jest.Mock)).toEqual(["order_items"]);
                 expect(db.values).toHaveBeenCalledWith([
-                    { order_id: "1",
-product_id: "1" },
-                    { order_id: "1",
-product_id: "2" }
+                    { order_id: 1,
+product_id: 1 },
+                    { order_id: 1,
+product_id: 2 }
                 ]);
                 // Nothing is linked in this mock, so both products are new and
                 // there is nothing to remove: the writer diffs against the
@@ -981,7 +982,7 @@ to: "tags.id" } }
                     if (path.startsWith("tags")) return postsWithTagsViaJoinPath.relations![0].target();
                     return undefined;
                 });
-                jest.spyOn(collectionRegistry, "getTable").mockImplementation(tableName => {
+                jest.spyOn(collectionRegistry, "getPgTable").mockImplementation(tableName => {
                     if (tableName === "posts") return mockPostsTable as any;
                     if (tableName === "post_tags") return mockPostTagsTable as any;
                     if (tableName === "tags") return mockTagsTable as any;
@@ -1046,7 +1047,7 @@ name: "Big Customer" }]);
                 // at this customer and silently stays in the collection.
                 expect(setPayloads(db.set as jest.Mock)).toEqual([
                     { customerId: null },
-                    { customerId: "1" }
+                    { customerId: 1 }
                 ]);
             });
         });
@@ -1088,7 +1089,7 @@ to: "orders.id" } }
                     if (path.startsWith("orders")) return ordersCollection;
                     return undefined;
                 });
-                jest.spyOn(collectionRegistry, "getTable").mockImplementation(tableName => {
+                jest.spyOn(collectionRegistry, "getPgTable").mockImplementation(tableName => {
                     if (tableName === "products") return mockProductsTable as any;
                     if (tableName === "orders") return mockOrdersTable as any;
                     if (tableName === "order_items") return mockOrderItemsTable as any;
@@ -1164,7 +1165,7 @@ to: "posts.id" } }
                     if (path.startsWith("posts")) return tagsWithPostsViaJoinPath.relations![0].target();
                     return undefined;
                 });
-                jest.spyOn(collectionRegistry, "getTable").mockImplementation(tableName => {
+                jest.spyOn(collectionRegistry, "getPgTable").mockImplementation(tableName => {
                     if (tableName === "tags") return mockTagsTable as any;
                     if (tableName === "post_tags") return mockPostTagsTable as any;
                     if (tableName === "posts") return mockPostsTable as any;

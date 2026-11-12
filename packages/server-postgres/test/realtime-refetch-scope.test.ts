@@ -21,7 +21,8 @@ import { rebase } from "@rebasepro/server";
 
 import { runInBackendScope } from "../../server/src/backend/scope";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { RealtimeService } from "../src/services/realtimeService";
 import { testUser } from "./helpers/spg-c-user";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
@@ -65,9 +66,9 @@ beforeEach(async () => {
     db = new PGlite();
     await db.waitReady;
     await db.exec("CREATE TABLE widgets (id varchar PRIMARY KEY, name varchar); INSERT INTO widgets VALUES ('w1', 'one');");
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
     registry.registerMultiple([widgets]);
-    registry.registerTable(widgetsTable, "widgets");
+    registry.registerPgTable(widgetsTable, "widgets");
     const orm = drizzle(db, { schema: { widgets: widgetsTable } });
     realtime = new RealtimeService(orm, registry);
     const base = new PostgresBackendDriver(orm, realtime, registry);

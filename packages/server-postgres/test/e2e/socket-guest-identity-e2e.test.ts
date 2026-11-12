@@ -29,7 +29,8 @@ import type { AuthAdapter, CollectionConfig } from "@rebasepro/types";
 import { configureJwt, generateAccessToken } from "../../../server/src/auth/jwt";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
-import { PostgresCollectionRegistry } from "../../src/collections/PostgresCollectionRegistry.js";
+import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry.js";
+import { FixtureTableRegistry } from "../helpers/tables";
 import { RealtimeService } from "../../src/services/realtimeService.js";
 import { createPostgresWebSocket } from "../../src/websocket.js";
 import { ensureAppRole, REBASE_USER_ROLE } from "../../src/security/rls-enforcement.js";
@@ -183,10 +184,10 @@ describe("a guest is a guest over the Postgres socket (E2E)", () => {
 
         pool = new pg.Pool({ connectionString: container.connectionString });
         const db = drizzle(pool);
-        const registry = new PostgresCollectionRegistry();
+        const registry = new FixtureTableRegistry();
         registry.registerMultiple([briefingsCollection, lobbyCollection]);
-        registry.registerTable(briefingsTable, "briefings");
-        registry.registerTable(lobbyTable, "lobby");
+        registry.registerPgTable(briefingsTable, "briefings");
+        registry.registerPgTable(lobbyTable, "lobby");
         realtime = new RealtimeService(db, registry);
         const driver = new PostgresBackendDriver(db, realtime, registry);
         realtime.setDataDriver(driver);

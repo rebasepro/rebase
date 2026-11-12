@@ -19,7 +19,8 @@ import type { CollectionConfig } from "@rebasepro/types";
 import { ApiError } from "@rebasepro/server";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { RealtimeService } from "../src/services/realtimeService";
 
 const orgsTable = pgTable("orgs", { id: serial("id").primaryKey(), name: varchar("name") });
@@ -39,11 +40,11 @@ const orgs: CollectionConfig = {
 let db: PGlite;
 
 function driverOver(pglite: PGlite): PostgresBackendDriver {
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
     registry.registerMultiple([orgs]);
-    registry.registerTable(orgsTable, "orgs");
-    registry.registerTable(projectsTable, "projects");
-    registry.registerTable(notesTable, "notes");
+    registry.registerPgTable(orgsTable, "orgs");
+    registry.registerPgTable(projectsTable, "projects");
+    registry.registerPgTable(notesTable, "notes");
     const orm = drizzle(pglite, { schema: { orgs: orgsTable, projects: projectsTable, notes: notesTable } });
     return new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry);
 }

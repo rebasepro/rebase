@@ -30,7 +30,8 @@ import { WebSocket as NodeWebSocket } from "ws";
 import type { CollectionConfig } from "@rebasepro/types";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
-import { PostgresCollectionRegistry } from "../../src/collections/PostgresCollectionRegistry.js";
+import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry.js";
+import { FixtureTableRegistry } from "../helpers/tables";
 import { RealtimeService } from "../../src/services/realtimeService.js";
 import { createPostgresWebSocket } from "../../src/websocket.js";
 
@@ -152,10 +153,10 @@ describe("the socket answers a callback veto as CALLBACK_REJECTED (E2E)", () => 
         pool = new pg.Pool({ connectionString: container.connectionString });
         const db = drizzle(pool);
 
-        const registry = new PostgresCollectionRegistry();
+        const registry = new FixtureTableRegistry();
         registry.registerMultiple([contractsCollection, ghostsCollection]);
-        registry.registerTable(contractsTable, "contracts");
-        registry.registerTable(ghostsTable, "ghosts");
+        registry.registerPgTable(contractsTable, "contracts");
+        registry.registerPgTable(ghostsTable, "ghosts");
 
         realtime = new RealtimeService(db, registry);
         const driver = new PostgresBackendDriver(db, realtime, registry);

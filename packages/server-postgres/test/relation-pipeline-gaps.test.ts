@@ -20,7 +20,8 @@
  */
 import { RelationService } from "../src/services/RelationService";
 import { RelationWriteService } from "../src/services/RelationWriteService";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { CollectionConfig, Relation, RelationProperty } from "@rebasepro/types";
 import { resolveCollectionRelations, resolveRelation } from "@rebasepro/common";
 import { integer, pgTable, text } from "drizzle-orm/pg-core";
@@ -167,10 +168,10 @@ function createMockDb(resolveResults: () => unknown[]) {
 // ═══════════════════════════════════════════════════════════════════════
 
 describe("batchFetchRelatedEntities: ID type coercion (single cardinality)", () => {
-    let registry: PostgresCollectionRegistry;
+    let registry: PostgresTableRegistry;
 
     beforeEach(() => {
-        registry = new PostgresCollectionRegistry();
+        registry = new FixtureTableRegistry();
 
         jest.spyOn(registry, "getCollectionByPath").mockImplementation(path => {
             if (path?.startsWith("posts")) return postsCollection;
@@ -180,7 +181,7 @@ describe("batchFetchRelatedEntities: ID type coercion (single cardinality)", () 
             return undefined;
         });
 
-        jest.spyOn(registry, "getTable").mockImplementation(tableName => {
+        jest.spyOn(registry, "getPgTable").mockImplementation(tableName => {
             if (tableName === "posts") return mockPostsTable;
             if (tableName === "tags") return mockTagsTable;
             if (tableName === "posts_tags") return mockPostsTagsTable;
@@ -296,10 +297,10 @@ authorId: "999" }
 // ═══════════════════════════════════════════════════════════════════════
 
 describe("updateRelationsUsingJoins: M2M through junction writes", () => {
-    let registry: PostgresCollectionRegistry;
+    let registry: PostgresTableRegistry;
 
     beforeEach(() => {
-        registry = new PostgresCollectionRegistry();
+        registry = new FixtureTableRegistry();
 
         jest.spyOn(registry, "getCollectionByPath").mockImplementation(path => {
             if (path?.startsWith("tags_inv")) return tagsWithInversePosts;
@@ -308,7 +309,7 @@ describe("updateRelationsUsingJoins: M2M through junction writes", () => {
             return undefined;
         });
 
-        jest.spyOn(registry, "getTable").mockImplementation(tableName => {
+        jest.spyOn(registry, "getPgTable").mockImplementation(tableName => {
             if (tableName === "posts") return mockPostsTable;
             if (tableName === "tags") return mockTagsTable;
             if (tableName === "posts_tags") return mockPostsTagsTable;
@@ -590,7 +591,7 @@ to: "id" } }
 // ═══════════════════════════════════════════════════════════════════════
 
 describe("batchFetchRelatedEntities: owning direction (FK-based)", () => {
-    let registry: PostgresCollectionRegistry;
+    let registry: PostgresTableRegistry;
 
     // Mock collections simulating tasks → clients owning relation
     const mockClientsTable = pgTable("clients", { id: text("id"), name: text("name"), email: text("email") });
@@ -616,7 +617,8 @@ isId: "uuid" },
             id: { type: "string",
 isId: "uuid" },
             clientId: { type: "string",
-columnName: "client_id" },
+columnName: "client_id",
+columnType: "uuid" },
             title: { type: "string" },
             client: {
                 type: "relation",
@@ -624,7 +626,7 @@ columnName: "client_id" },
                     kind: "belongsTo",
                     target: () => clientsCollection,
                     relationName: "client",
-                    localKey: "clientId",
+                    localKey: "client_id",
                 }
             }
         }
@@ -662,7 +664,7 @@ columnName: "client_id" },
     }
 
     beforeEach(() => {
-        registry = new PostgresCollectionRegistry();
+        registry = new FixtureTableRegistry();
 
         jest.spyOn(registry, "getCollectionByPath").mockImplementation(path => {
             if (path?.startsWith("tasks")) return tasksCollection;
@@ -670,7 +672,7 @@ columnName: "client_id" },
             return undefined;
         });
 
-        jest.spyOn(registry, "getTable").mockImplementation(tableName => {
+        jest.spyOn(registry, "getPgTable").mockImplementation(tableName => {
             if (tableName === "tasks") return mockTasksTable;
             if (tableName === "clients") return mockClientsTable;
             return undefined;

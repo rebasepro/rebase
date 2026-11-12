@@ -29,7 +29,7 @@ import { createPostgresBootstrapper } from "../../src/PostgresBootstrapper.js";
 import { createPostgresDatabaseConnection } from "../../src/connection.js";
 import type { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
 import type { HistoryService } from "../../src/history/HistoryService.js";
-import type { PostgresCollectionRegistry } from "../../src/collections/PostgresCollectionRegistry.js";
+import type { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry.js";
 import { testUser } from "./test-user.js";
 
 // What a project's generated schema hands the registry; the table itself is
@@ -93,8 +93,8 @@ describe("first boot on an empty database (E2E)", () => {
             await bootstrapper.finalizeSecurityPosture!(driverResult);
             const history = await bootstrapper.initializeHistory!(true, driverResult);
 
-            const internals = driverResult.internals as { driver: PostgresBackendDriver; registry: PostgresCollectionRegistry };
-            internals.registry.registerTable(ordersTable, "orders");
+            const internals = driverResult.internals as { driver: PostgresBackendDriver; registry: PostgresTableRegistry };
+            internals.registry.registerPgTable(ordersTable, "orders");
             driver = internals.driver;
             driver.historyService = history?.historyService as HistoryService;
         } finally {

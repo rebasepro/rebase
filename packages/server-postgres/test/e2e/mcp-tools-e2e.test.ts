@@ -23,7 +23,7 @@ import { col, defineTable, rel } from "@rebasepro/types";
 import { compileTables, lowerTables } from "@rebasepro/common";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
-import { PostgresCollectionRegistry } from "../../src/collections/PostgresCollectionRegistry.js";
+import { FixtureTableRegistry } from "../helpers/tables.js";
 import { RealtimeService } from "../../src/services/realtimeService.js";
 import { RestApiGenerator } from "../../../server/src/api/rest/api-generator.js";
 import { errorHandler } from "../../../server/src/api/errors.js";
@@ -181,11 +181,11 @@ describe("remote MCP tools on the real driver (E2E)", () => {
 
         pool = new pg.Pool({ connectionString: container.connectionString });
         const db = drizzle(pool);
-        const registry = new PostgresCollectionRegistry();
+        const registry = new FixtureTableRegistry();
         registry.registerMultiple(COLLECTIONS);
-        registry.registerTable(authorsTable, "authors");
-        registry.registerTable(postsTable, "posts");
-        registry.registerTable(readersTable, "readers");
+        registry.registerPgTable(authorsTable, "authors");
+        registry.registerPgTable(postsTable, "posts");
+        registry.registerPgTable(readersTable, "readers");
         const realtime = new RealtimeService(db, registry);
         driver = new PostgresBackendDriver(db, realtime, registry);
         realtime.setDataDriver(driver);

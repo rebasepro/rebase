@@ -4,10 +4,10 @@ import { SQL_RESULT_BYTE_BUDGET, SqlResultTooLargeError } from "./services/sql-s
 import { effectiveSqlRole, sqlRoleRanAs } from "./PostgresBackendDriver";
 import { assertReadRequestReadable } from "./services/read-field-access";
 import { isNestedPath, resolveNestedPath } from "./services/nested-path";
-import type { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegistry";
+import type { PostgresTableRegistry } from "./model/PostgresTableRegistry";
 import type { CollectionConfig, DataDriver, DeleteProps, FetchCollectionProps, FetchOneProps, SaveProps, TableMetadata, BranchInfo, AuthAdapter, DataRateLimitCaller, RealtimeProvider, RealtimeSocketOptions, WebSocketMessage } from "@rebasepro/types";
 import type { SqlScriptResult } from "@rebasepro/types";
-import { deserializeFilter, redactSqlLiterals, UnknownFilterOperatorError } from "@rebasepro/common";
+import { deserializeFilter, redactSqlLiterals, relationOf, UnknownFilterOperatorError } from "@rebasepro/common";
 import { budgetSendBuffers, reapSilentSockets, terminateIfBacklogged } from "./services/socket-liveness";
 import { DEFAULT_HEARTBEAT_INTERVAL_MS, helloFrame, requestedOptIns, startHeartbeats, type SocketOptIn } from "./socket-opt-ins";
 import { ANONYMOUS_USER_ID, hasAdminRole, isSQLAdmin, isSchemaAdmin, resolveClientListLimit, ListLimitError, scopeGrants, scopesForRoles, type AccessModel, type AdminScope } from "@rebasepro/types";
@@ -17,7 +17,7 @@ import { WebSocketServer, WebSocket, type RawData } from "ws";
 import type { Server, IncomingMessage } from "http";
 import type { Duplex } from "stream";
 import { inspect } from "util";
-import { extractUserFromToken, AccessTokenPayload, safeCompare, resolveRequireAuth, assertWriteRequestValid, assertFieldOpsValid, assertNoFieldOpsOnCreate, declaredErrorAnswer, RUNTIME_DEFAULT_MAX_BODY_SIZE, ApiError, resolveConflictTarget, assertNestedWriteAllowed, assertNoUserUpsert, assertUserCreationBodyValid, createUserThroughAuthCollection, type NestedWriteKind } from "@rebasepro/server";
+import { extractUserFromToken, AccessTokenPayload, safeCompare, resolveRequireAuth, assertWriteRequestValid, assertFieldOpsValid, assertNoFieldOpsOnCreate, declaredErrorAnswer, RUNTIME_DEFAULT_MAX_BODY_SIZE, ApiError, resolveConflictTarget, assertNestedWriteAllowed, assertNoUserUpsert, assertUserCreationBodyValid, createUserThroughAuthTable, isAuthTable, type NestedWriteKind, type ServedTable } from "@rebasepro/server";
 import { logger, getAccessModel, decideImpersonation, isDatabaseUnreachable, DATABASE_UNAVAILABLE_MESSAGE, type ImpersonationCredential } from "@rebasepro/server";
 
 /**
@@ -436,7 +436,7 @@ export const PUBLIC_TYPES = new Set([
  * server does not have, with the answer REST gives (`NOT_FOUND`).
  */
 function assertKnownCollection(
-    registry: Pick<PostgresCollectionRegistry, "getCollectionByPath"> | undefined,
+    registry: Pick<PostgresTableRegistry, "getCollectionByPath"> | undefined,
     path: unknown
 ): void {
     if (!registry || typeof path !== "string") return;
@@ -592,7 +592,7 @@ function withDecodedFilter(request: FetchCollectionProps): FetchCollectionProps 
  * test hand in a typed fake instead of casting a partial object to the class.
  */
 export type SocketDataDriver = DataDriver & {
-    readonly registry?: PostgresCollectionRegistry;
+    readonly registry?: PostgresTableRegistry;
     withAuth?(user: User): Promise<DataDriver>;
 };
 
@@ -1403,14 +1403,15 @@ roles: verifiedUser.roles }
                 const assertWriteRequest = (path: string | undefined, values: unknown, status?: SaveProps["status"]): void => {
                     if (!path || !values || typeof values !== "object") return;
                     const collection = driver.registry?.getCollectionByPath(path);
-                    if (!collection) return;
+                    const table = collection && driver.registry?.getTable(collection.slug)?.descriptor;
+                    if (!table) return;
                     // The session's roles, and `["anon"]` for a socket that
                     // never authenticated — the same list `getScopedDelegate`
                     // below scopes such a socket's driver with. Never
                     // `undefined`: that means the trusted server plane, which
                     // satisfies every role list, and a socket is not it.
                     const session = clientSessions.get(clientId);
-                    assertWriteRequestValid(values as Record<string, unknown>, collection, {
+                    assertWriteRequestValid(values as Record<string, unknown>, table, {
                         viewer: { roles: session?.user?.roles ?? ["anon"] },
                         // `required` holds on a create, as on `POST`.
                         status
@@ -1423,7 +1424,7 @@ roles: verifiedUser.roles }
                     // from inside the transaction — so the socket runs it too,
                     // or the same payload is refused at one boundary and
                     // accepted at the other.
-                    assertFieldOpsValid(values as Record<string, unknown>, collection);
+                    assertFieldOpsValid(values as Record<string, unknown>, table);
                 };
 
                 /**
@@ -1450,11 +1451,11 @@ roles: verifiedUser.roles }
                         // its own message.
                         return;
                     }
-                    if (!collection) return;
+                    if (!collection || !driver.registry) return;
                     const session = clientSessions.get(clientId);
                     assertReadRequestReadable(request, collection, {
                         roles: session?.user?.roles ?? ["anon"]
-                    });
+                    }, driver.registry);
                 };
 
                 /**
@@ -1475,12 +1476,17 @@ roles: verifiedUser.roles }
                         return;
                     }
                     if (!hop) return;
+                    const registry = driver.registry;
+                    const parent = registry.getTable(hop.parentCollection.slug)?.descriptor;
+                    const relation = parent && relationOf(parent, hop.relation.relationName);
+                    const target = relation && registry.getTable(relation.target)?.descriptor;
+                    if (!parent || !relation || !target) return;
                     const session = clientSessions.get(clientId);
-                    assertNestedWriteAllowed(hop, kind, path, { roles: session?.user?.roles ?? ["anon"] });
+                    assertNestedWriteAllowed({ parent, relation, target }, kind, path, { roles: session?.user?.roles ?? ["anon"] });
                 };
 
-                /** The auth collection at `path`, or `undefined` for any other. */
-                const authCollectionAt = (path: unknown): CollectionConfig | undefined => {
+                /** The auth table at `path`, or `undefined` for any other. */
+                const authCollectionAt = (path: unknown): ServedTable | undefined => {
                     if (typeof path !== "string") return undefined;
                     let collection;
                     try {
@@ -1488,9 +1494,8 @@ roles: verifiedUser.roles }
                     } catch {
                         return undefined;
                     }
-                    const auth = collection?.auth;
-                    const isAuthCollection = auth === true || (!!auth && typeof auth === "object" && auth.enabled === true);
-                    return isAuthCollection ? collection : undefined;
+                    const table = collection && driver.registry?.getTable(collection.slug)?.descriptor;
+                    return collection && table && isAuthTable(table) ? { table, driverCollection: collection } : undefined;
                 };
                 /**
                  * The auth collection's rows are the users, so a write to one
@@ -1520,8 +1525,9 @@ roles: verifiedUser.roles }
                         );
                     }
                     const collection = driver.registry?.getCollectionByPath(request.path);
-                    const onConflict = collection
-                        ? resolveConflictTarget(request.onConflict, collection, { where: "`onConflict`" })
+                    const table = collection && driver.registry?.getTable(collection.slug)?.descriptor;
+                    const onConflict = table
+                        ? resolveConflictTarget(request.onConflict, table, { where: "`onConflict`" })
                         : undefined;
                     return { upsert: true, ...(onConflict && { onConflict }) };
                 };
@@ -1632,7 +1638,7 @@ colors: true }));
                         // there is refused, as over HTTP: it may be a create or
                         // an update, and each has its own rules.
                         const upsertedUsers = request.upsert === true ? authCollectionAt(request.path) : undefined;
-                        if (upsertedUsers) assertNoUserUpsert(authAdapter, upsertedUsers);
+                        if (upsertedUsers) assertNoUserUpsert(authAdapter, upsertedUsers.table);
                         const usersCollection = request.status !== "existing" && request.upsert !== true && authAdapter?.prepareUserCreation
                             ? authCollectionAt(request.path)
                             : undefined;
@@ -1640,7 +1646,7 @@ colors: true }));
                         if (usersCollection) {
                             const body = (request.values ?? {}) as Record<string, unknown>;
                             assertUserCreationBodyValid(authAdapter, usersCollection, body, caller);
-                            assertNoFieldOpsOnCreate(body, "A create", usersCollection);
+                            assertNoFieldOpsOnCreate(body, "A create", usersCollection.table);
                         } else {
                             assertWriteRequest(request.path, request.values as Record<string, unknown>, request.status);
                         }
@@ -1671,7 +1677,7 @@ colors: true }));
                         // does: the row, and whether an invitation went out or
                         // the temporary password that did not.
                         const created = usersCollection
-                            ? await createUserThroughAuthCollection(authAdapter, usersCollection, (values ?? {}) as Record<string, unknown>, caller, write)
+                            ? await createUserThroughAuthTable(authAdapter, usersCollection, (values ?? {}) as Record<string, unknown>, caller, write)
                             : undefined;
                         const row = created ? { ...created.row, ...created.delivery } : await write(values);
                         wsDebug("💾 [WebSocket Server] SAVE_ENTITY result:", inspect(row, { depth: null,

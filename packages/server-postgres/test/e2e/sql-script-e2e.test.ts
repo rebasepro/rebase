@@ -20,7 +20,8 @@ import pg from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
-import { PostgresCollectionRegistry } from "../../src/collections/PostgresCollectionRegistry.js";
+import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry.js";
+import { FixtureTableRegistry } from "../helpers/tables";
 import { RealtimeService } from "../../src/services/realtimeService.js";
 import { SqlResultTooLargeError } from "../../src/services/sql-script.js";
 
@@ -32,7 +33,7 @@ beforeAll(async () => {
     container = await startPgContainer();
     pool = new pg.Pool({ connectionString: container.connectionString, max: 3 });
     const db = drizzle(pool);
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
     driver = new PostgresBackendDriver(db, new RealtimeService(db, registry), registry);
     await pool.query(`
         CREATE TABLE authors (id int PRIMARY KEY, name text, mentor_id int);
@@ -390,7 +391,7 @@ describe("openSqlCursor", () => {
         const timed = new pg.Pool({ connectionString: container.connectionString, max: 1, statement_timeout: 300 });
         try {
             const timedDb = drizzle(timed);
-            const registry = new PostgresCollectionRegistry();
+            const registry = new FixtureTableRegistry();
             const timedDriver = new PostgresBackendDriver(timedDb, new RealtimeService(timedDb, registry), registry);
 
             await expect(timedDriver.openSqlCursor("SELECT pg_sleep(2)"))

@@ -27,7 +27,8 @@ import type { CollectionConfig, RelationKind } from "@rebasepro/types";
 import { getCopyValues } from "@rebasepro/common";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
-import { PostgresCollectionRegistry } from "../../src/collections/PostgresCollectionRegistry.js";
+import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry.js";
+import { FixtureTableRegistry } from "../helpers/tables";
 import { RealtimeService } from "../../src/services/realtimeService.js";
 
 // ─── Model ──────────────────────────────────────────────────────────────────
@@ -188,20 +189,20 @@ describe("Duplicating a record (every relation kind)", () => {
 
         pool = new pg.Pool({ connectionString: container.connectionString });
         const db = drizzle(pool);
-        const registry = new PostgresCollectionRegistry();
+        const registry = new FixtureTableRegistry();
         registry.registerMultiple([
             authorsCollection, editorsCollection, postsCollection, profilesCollection,
             tagsCollection, badgesCollection, awardsCollection
         ]);
-        registry.registerTable(authorsTable, "authors");
-        registry.registerTable(editorsTable, "editors");
-        registry.registerTable(postsTable, "posts");
-        registry.registerTable(profilesTable, "profiles");
-        registry.registerTable(tagsTable, "tags");
-        registry.registerTable(authorsTagsTable, "authors_tags");
-        registry.registerTable(badgesTable, "badges");
-        registry.registerTable(awardsTable, "awards");
-        registry.registerTable(authorsAwardsTable, "authors_awards");
+        registry.registerPgTable(authorsTable, "authors");
+        registry.registerPgTable(editorsTable, "editors");
+        registry.registerPgTable(postsTable, "posts");
+        registry.registerPgTable(profilesTable, "profiles");
+        registry.registerPgTable(tagsTable, "tags");
+        registry.registerPgTable(authorsTagsTable, "authors_tags");
+        registry.registerPgTable(badgesTable, "badges");
+        registry.registerPgTable(awardsTable, "awards");
+        registry.registerPgTable(authorsAwardsTable, "authors_awards");
         const realtime = new RealtimeService(db, registry);
         driver = new PostgresBackendDriver(db, realtime, registry);
         realtime.setDataDriver(driver);

@@ -1,7 +1,8 @@
 import { describe, expect, it } from "@jest/globals";
 import type { CollectionConfig } from "@rebasepro/types";
 import { PersistService } from "../src/services/PersistService";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { assertWritableThrough, type NestedPathHop } from "../src/services/nested-path";
 import { resolveCollectionRelations } from "@rebasepro/common";
 import { unusedDb } from "./helpers/spg-c-db";
@@ -77,7 +78,7 @@ const users: CollectionConfig = {
 };
 
 function service(): PersistService {
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
     registry.registerMultiple([users, tags, badges]);
     return new PersistService(unusedDb(), registry);
 }

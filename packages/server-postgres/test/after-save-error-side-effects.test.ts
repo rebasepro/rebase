@@ -21,7 +21,8 @@ import { pgTable, varchar } from "drizzle-orm/pg-core";
 import type { CollectionCallbacks, CollectionConfig, DataDriver } from "@rebasepro/types";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { RealtimeService } from "../src/services/realtimeService";
 import { createJobQueue, createJobStore } from "../../server/src/jobs";
 import { testUser } from "./helpers/spg-a-driver";
@@ -51,9 +52,9 @@ beforeEach(async () => {
         "CREATE TABLE widgets (id varchar PRIMARY KEY, name varchar UNIQUE);" +
         "INSERT INTO widgets VALUES ('w1', 'taken');"
     );
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
     registry.registerMultiple([widgets]);
-    registry.registerTable(widgetsTable, "widgets");
+    registry.registerPgTable(widgetsTable, "widgets");
     const orm = drizzle(db, { schema: { widgets: widgetsTable } });
     const base = new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry);
     const store = createJobStore(base)!;

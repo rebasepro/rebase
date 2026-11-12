@@ -310,13 +310,13 @@ describe.each(snapshots)("upgrading a project left by $name", (snapshot) => {
          * hand-written fixture produces, because a fixture author writes both
          * sides and writes them agreeing.
          */
-        const staleRegistry = (): PostgresCollectionRegistry => {
-            const registry = new PostgresCollectionRegistry();
+        const staleRegistry = (): PostgresTableRegistry => {
+            const registry = new FixtureTableRegistry();
             registry.registerMultiple(collections);
             for (const [table, columns] of Object.entries(snapshot.generatedSchema)) {
                 const bare = table.includes(".") ? table.split(".")[1] : table;
                 const shape = Object.fromEntries(columns.map(column => [column, text(column)]));
-                registry.registerTable(pgTable(bare, shape), bare);
+                registry.registerPgTable(pgTable(bare, shape), bare);
             }
             return registry;
         };

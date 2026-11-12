@@ -22,7 +22,8 @@ import type { CollectionConfig, OrderByTuple } from "@rebasepro/types";
 import { cursorToStartAfter, decodeCursor } from "@rebasepro/common";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { RealtimeService } from "../src/services/realtimeService";
 
 const membersTable = pgTable("members", {
@@ -56,9 +57,9 @@ const members: CollectionConfig = {
 let db: PGlite;
 
 function driverOver(pglite: PGlite): PostgresBackendDriver {
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
     registry.registerMultiple([members]);
-    registry.registerTable(membersTable, "members");
+    registry.registerPgTable(membersTable, "members");
     const orm = drizzle(pglite, { schema: { members: membersTable } });
     return new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry);
 }

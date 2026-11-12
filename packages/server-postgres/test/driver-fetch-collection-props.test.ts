@@ -19,7 +19,8 @@ import { relations } from "drizzle-orm";
 import type { CollectionConfig } from "@rebasepro/types";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { RealtimeService } from "../src/services/realtimeService";
 
 const ownersTable = pgTable("owners", { id: serial("id").primaryKey(), name: varchar("name") });
@@ -63,10 +64,10 @@ function docs(): CollectionConfig {
 let db: PGlite;
 
 function driverOver(pglite: PGlite): PostgresBackendDriver {
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
     registry.registerMultiple([owners(), docs()]);
-    registry.registerTable(ownersTable, "owners");
-    registry.registerTable(docsTable, "docs");
+    registry.registerPgTable(ownersTable, "owners");
+    registry.registerPgTable(docsTable, "docs");
     registry.registerRelations?.(ownersRelations, "owners");
     registry.registerRelations?.(docsRelations, "docs");
     const orm = drizzle(pglite, { schema: { owners: ownersTable, docs: docsTable, ownersRelations, docsRelations } });

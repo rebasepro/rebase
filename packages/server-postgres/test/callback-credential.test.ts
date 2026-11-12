@@ -20,7 +20,8 @@ import { pgTable, serial, varchar } from "drizzle-orm/pg-core";
 import type { CallerCredential, CollectionConfig, RebaseCallContext, User } from "@rebasepro/types";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { RealtimeService } from "../src/services/realtimeService";
 
 const notesTable = pgTable("notes", {
@@ -81,9 +82,9 @@ function person(credential?: CallerCredential): User {
 let db: PGlite;
 
 async function authed(user: User) {
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
     registry.registerMultiple([notesCollection()]);
-    registry.registerTable(notesTable, "notes");
+    registry.registerPgTable(notesTable, "notes");
     const orm = drizzle(db, { schema: { notes: notesTable } });
     const base = new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry);
     return base.withAuth(user);

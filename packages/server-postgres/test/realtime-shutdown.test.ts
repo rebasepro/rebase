@@ -16,11 +16,12 @@ import { recordingDb } from "./helpers/spg-c-db";
 import { WebSocket, WebSocketServer } from "ws";
 import { createShutdown } from "../../server/src/init/shutdown";
 import { RealtimeService } from "../src/services/realtimeService";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 
 function realtimeServer(): { server: Server; service: RealtimeService } {
     const { db } = recordingDb();
-    const service = new RealtimeService(db, new PostgresCollectionRegistry());
+    const service = new RealtimeService(db, new FixtureTableRegistry());
     const server = createServer((_req, res) => res.end("ok"));
     const wss = new WebSocketServer({ server });
     let n = 0;

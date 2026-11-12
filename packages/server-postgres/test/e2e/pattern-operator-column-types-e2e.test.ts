@@ -27,7 +27,8 @@ import { customType, integer, pgEnum, pgTable, text, varchar } from "drizzle-orm
 import type { CollectionConfig, FilterValues } from "@rebasepro/types";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
-import { PostgresCollectionRegistry } from "../../src/collections/PostgresCollectionRegistry.js";
+import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry.js";
+import { FixtureTableRegistry } from "../helpers/tables";
 import { RealtimeService } from "../../src/services/realtimeService.js";
 
 const citext = customType<{ data: string }>({ dataType: () => "citext" });
@@ -93,10 +94,10 @@ describe("pattern operators on columns that are not plain text", () => {
 
     function driverFor(postsTable: typeof generatedPosts | typeof catalogueBuiltPosts): PostgresBackendDriver {
         const db = drizzle(pool);
-        const registry = new PostgresCollectionRegistry();
+        const registry = new FixtureTableRegistry();
         registry.registerMultiple([authors, posts]);
-        registry.registerTable(authorsTable, "authors");
-        registry.registerTable(postsTable, "posts");
+        registry.registerPgTable(authorsTable, "authors");
+        registry.registerPgTable(postsTable, "posts");
         const realtime = new RealtimeService(db, registry);
         const driver = new PostgresBackendDriver(db, realtime, registry);
         realtime.setDataDriver(driver);

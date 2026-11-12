@@ -1,10 +1,11 @@
 import { DataService } from "../src/services/dataService";
 import { integer, pgTable, text } from "drizzle-orm/pg-core";
 import { CollectionConfig } from "@rebasepro/types";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { recordingDb, shapedRows } from "./helpers/spg-c-db";
 
-const collectionRegistry = new PostgresCollectionRegistry();
+const collectionRegistry = new FixtureTableRegistry();
 
 /**
  * The admin renders a relation cell straight from the `data` payload the server
@@ -80,7 +81,7 @@ name: `Customer ${100 + i}` }));
             return undefined;
         });
 
-        jest.spyOn(collectionRegistry, "getTable").mockImplementation(tableName => {
+        jest.spyOn(collectionRegistry, "getPgTable").mockImplementation(tableName => {
             if (tableName === "customers") return mockCustomersTable;
             if (tableName === "user_profiles") return mockUserProfilesTable;
             return undefined;

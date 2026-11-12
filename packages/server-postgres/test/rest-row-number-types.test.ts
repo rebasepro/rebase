@@ -1,6 +1,7 @@
 import { CollectionConfig } from "@rebasepro/types";
 import { toRestRow } from "../src/services/row-pipeline";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 
 /**
  * A `number` property is served as a number.
@@ -12,7 +13,7 @@ import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectio
  * first refresh, and the published OpenAPI spec said `type: number` throughout.
  */
 describe("REST row — declared number properties keep their declared type", () => {
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
 
     const categoriesCollection: CollectionConfig = {
         slug: "categories",

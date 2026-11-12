@@ -28,7 +28,8 @@ import { doublePrecision, integer, jsonb, pgTable, serial, text, varchar } from 
 import type { CollectionConfig } from "@rebasepro/types";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { RealtimeService } from "../src/services/realtimeService";
 import { pgliteNodePg } from "./helpers/spg-b-pglite-node-pg";
 
@@ -74,9 +75,9 @@ beforeEach(async () => {
         "CREATE TABLE products (id serial PRIMARY KEY, name varchar, stock integer, rating double precision, " +
         "tags text[], labels jsonb);"
     );
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
     registry.registerMultiple([products]);
-    registry.registerTable(productsTable, "products");
+    registry.registerPgTable(productsTable, "products");
     statements = [];
     const orm = pgliteNodePg(db, {
         schema: { products: productsTable },

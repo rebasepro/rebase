@@ -13,7 +13,8 @@
  */
 import { CollectionConfig } from "@rebasepro/types";
 import { toFlatRow, toRestRow } from "../src/services/row-pipeline";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 
 const usersCollection: CollectionConfig = {
     name: "Users",
@@ -36,9 +37,9 @@ const usersCollection: CollectionConfig = {
     }
 };
 
-function makeRegistry(): PostgresCollectionRegistry {
-    const registry = new PostgresCollectionRegistry();
-    registry.registerCollection?.(usersCollection);
+function makeRegistry(): PostgresTableRegistry {
+    const registry = new FixtureTableRegistry();
+    registry.registerMultiple([usersCollection]);
     return registry;
 }
 

@@ -2,7 +2,8 @@ import { pgTable, text } from "drizzle-orm/pg-core";
 import type { CollectionConfig } from "@rebasepro/types";
 import { recordingDb, shapedRows, type RecordedStatement } from "./helpers/spg-c-db";
 import { DataService } from "../src/services/dataService";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 
 /**
  * A re-runnable import writes its rows with `status: "new"` plus `upsert` — the
@@ -13,7 +14,7 @@ import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectio
  * `createdAt` on every product it touched, and nothing in the response said so.
  */
 describe("upsert and on_create timestamps", () => {
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
 
     const productsTable = pgTable("products", {
         sku: text("sku").primaryKey(),
@@ -58,7 +59,7 @@ autoValue: "on_update" }
     beforeEach(() => {
         jest.spyOn(registry, "getCollectionByPath").mockReturnValue(products);
         jest.spyOn(registry, "getCollections").mockReturnValue([products]);
-        jest.spyOn(registry, "getTable").mockReturnValue(productsTable);
+        jest.spyOn(registry, "getPgTable").mockReturnValue(productsTable);
 
         // Reads find the product; the upsert answers with its key.
         const recording = recordingDb((statement) => shapedRows(statement, [{ sku: "SKU-1", title: "Widget" }]));

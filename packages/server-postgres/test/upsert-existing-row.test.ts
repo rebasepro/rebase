@@ -21,7 +21,8 @@ import { boolean, pgTable, serial, timestamp, varchar } from "drizzle-orm/pg-cor
 import type { CollectionConfig, User } from "@rebasepro/types";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { RealtimeService } from "../src/services/realtimeService";
 import { unusedDb } from "./helpers/spg-c-db";
 import { HistoryService } from "../src/history/HistoryService";
@@ -82,9 +83,9 @@ const BOB_A: User = {
 let db: PGlite;
 
 function driverOver(pglite: PGlite, user?: User): PostgresBackendDriver {
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
     registry.registerMultiple([docsCollection()]);
-    registry.registerTable(docsTable, "docs");
+    registry.registerPgTable(docsTable, "docs");
     const orm = drizzle(pglite, { schema: { docs: docsTable } });
     // A real history service whose writes are recorded here instead of stored.
     const history = new HistoryService(unusedDb());

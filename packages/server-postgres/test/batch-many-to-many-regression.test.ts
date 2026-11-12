@@ -24,7 +24,8 @@
  */
 import { Table } from "drizzle-orm";
 import { RelationService } from "../src/services/RelationService";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { CollectionConfig, ResolvedRelation } from "@rebasepro/types";
 import { findRelation, resolveCollectionRelations } from "@rebasepro/common";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
@@ -229,7 +230,7 @@ function resolved(collection: CollectionConfig, relationName: string): ResolvedR
 }
 
 describe("batchFetchRelatedEntitiesMany: M2M through junction table regression", () => {
-    let registry: PostgresCollectionRegistry;
+    let registry: PostgresTableRegistry;
 
     function createMockDb(resolveResults: () => unknown[]) {
         let queryRecorder = {
@@ -272,7 +273,7 @@ describe("batchFetchRelatedEntitiesMany: M2M through junction table regression",
     }
 
     beforeEach(() => {
-        registry = new PostgresCollectionRegistry();
+        registry = new FixtureTableRegistry();
 
         jest.spyOn(registry, "getCollectionByPath").mockImplementation(path => {
             if (path?.startsWith("posts")) return postsCollection;
@@ -283,7 +284,7 @@ describe("batchFetchRelatedEntitiesMany: M2M through junction table regression",
             return undefined;
         });
 
-        jest.spyOn(registry, "getTable").mockImplementation(tableName => {
+        jest.spyOn(registry, "getPgTable").mockImplementation(tableName => {
             if (tableName === "posts") return mockPostsTable as any;
             if (tableName === "tags") return mockTagsTable as any;
             if (tableName === "posts_tags") return mockPostsTagsTable as any;
@@ -562,7 +563,7 @@ title: "Post Z" } }
             // that does not exist was indistinguishable from a correct answer.
             // `assertRelationsResolve` fails boot on this; if one gets past it,
             // saying so beats inventing an emptiness.
-            jest.spyOn(registry, "getTable").mockImplementation(tableName => {
+            jest.spyOn(registry, "getPgTable").mockImplementation(tableName => {
                 if (tableName === "posts_tags") return undefined;
                 if (tableName === "posts") return mockPostsTable as any;
                 if (tableName === "tags") return mockTagsTable as any;

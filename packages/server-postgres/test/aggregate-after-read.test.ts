@@ -15,7 +15,8 @@ import { ApiError } from "@rebasepro/server";
 
 import { AuthenticatedPostgresBackendDriver, PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { FetchService } from "../src/services/FetchService";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import type { DrizzleClient } from "../src/interfaces";
 import { spiedDrizzle, transactionalDrizzle } from "./helpers/spg-a-db";
 import { quietRealtime, testUser } from "./helpers/spg-a-driver";
@@ -45,9 +46,9 @@ const propertyMasked: CollectionConfig = {
     }
 };
 
-function registry(globalAfterRead = false): PostgresCollectionRegistry {
+function registry(globalAfterRead = false): PostgresTableRegistry {
     const collections = [plain, masked, propertyMasked];
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
     jest.spyOn(registry, "getCollectionByPath").mockImplementation((path) => collections.find(c => c.slug === path));
     jest.spyOn(registry, "getCollections").mockReturnValue(collections);
     jest.spyOn(registry, "getGlobalCallbacks").mockReturnValue(globalAfterRead ? { afterRead: mask } : undefined);
@@ -55,7 +56,7 @@ function registry(globalAfterRead = false): PostgresCollectionRegistry {
 }
 
 /** A driver over a database these reads never reach: the fetch service's aggregate is stubbed. */
-function driverOver(registry: PostgresCollectionRegistry, db: DrizzleClient = spiedDrizzle().db): PostgresBackendDriver {
+function driverOver(registry: PostgresTableRegistry, db: DrizzleClient = spiedDrizzle().db): PostgresBackendDriver {
     return new PostgresBackendDriver(db, quietRealtime(spiedDrizzle().db, registry), registry);
 }
 

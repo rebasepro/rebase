@@ -5,7 +5,8 @@ import { PgDialect, integer, pgTable, text, vector } from "drizzle-orm/pg-core";
 import { FetchService } from "../src/services/FetchService";
 import { RelationService, relatedRowOrder } from "../src/services/RelationService";
 import { DrizzleConditionBuilder } from "../src/utils/drizzle-conditions";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { textTable } from "./helpers/spg-c-tables";
 
 /**
@@ -17,7 +18,7 @@ import { textTable } from "./helpers/spg-c-tables";
  * multi-key sorts.
  */
 describe("the read query language", () => {
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
 
     // `embedding` is a vector column, so the distinct-versus-score guard has a
     // real per-row score to conflict with; everything else is text.
@@ -67,7 +68,7 @@ describe("the read query language", () => {
             if (path === "authors") return authorsCollection;
             return undefined;
         });
-        jest.spyOn(registry, "getTable").mockImplementation(name => {
+        jest.spyOn(registry, "getPgTable").mockImplementation(name => {
             if (name === "posts") return tables.posts;
             if (name === "comments") return tables.comments;
             if (name === "authors") return tables.authors;

@@ -64,7 +64,8 @@ import { WebSocket } from "ws";
 import type { CollectionConfig } from "@rebasepro/types";
 import { PgNotifyListener } from "../src/services/pg-notify-listener";
 import { RealtimeService } from "../src/services/realtimeService";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { recordingDb } from "./helpers/spg-b-recording-db";
 
@@ -132,7 +133,7 @@ describe("RealtimeService after its LISTEN connection comes back", () => {
     beforeEach(async () => {
         // On a real pg client, not the listener's stand-in above, so the listener's clients are the only ones counted.
         const { db } = recordingDb(() => [], { Client: jest.requireActual<typeof import("pg")>("pg").Client });
-        const registry = new PostgresCollectionRegistry();
+        const registry = new FixtureTableRegistry();
         registry.registerMultiple([posts]);
         service = new RealtimeService(db, registry);
         const driver = new PostgresBackendDriver(db, service, registry);

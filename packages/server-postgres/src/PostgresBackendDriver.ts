@@ -56,10 +56,11 @@ import { sql as drizzleSql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Client, DatabaseError, Pool, type PoolClient } from "pg";
 import { sqlRows, applyDefaultValuesOnCreate, buildPropertyCallbacks, hasFieldAccessRules, buildSdkData, callbackRefusal, createAccessorSlugResolver, classifyTable, getTableName, detectJunctionTables, getTenantConfig, requireCallbackClient, requireCallbackCollection, resolveCollectionRelations, resolveTenantWrite, restoresSoftDeletedRow, tenantBypassRoles, toCallbackError, updateDateAutoValues, updateUserAutoValues } from "@rebasepro/common";
-import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "./model/PostgresTableRegistry";
 import { deriveRowAddress, getPrimaryKeys, parseIdValues } from "./services/collection-helpers";
 import { isJunctionBackedRelation, isNestedPath, resolveNestedPath, splitPathSegments } from "./services/nested-path";
 import { resolveSoftDelete, rowInTrashError } from "./services/soft-delete";
+import type { RuntimeTable } from "./model/runtime-table";
 import { currentWriteScope, runInWriteScope, WriteTransactionScope } from "./services/write-transaction-scope";
 import { currentWriteDepth, inWriteFrame, type WriteFrame } from "./services/write-depth";
 import { HistoryService } from "./history/HistoryService";
@@ -239,15 +240,15 @@ function insertOnlyKeysOf(
  * live row.
  */
 function assertUpdateDoesNotSoftDelete(
-    collection: CollectionConfig | undefined,
+    table: RuntimeTable | undefined,
     values: Record<string, unknown> | undefined,
     path: string
 ): void {
-    const softDelete = resolveSoftDelete(collection);
+    const softDelete = resolveSoftDelete(table);
     if (!softDelete) return;
     const value = values?.[softDelete.field];
     if (value === undefined || value === null) return;
-    const slug = collection?.slug ?? path;
+    const slug = table?.slug ?? path;
     const message = `'${softDelete.field}' on '${slug}' records a delete, so an update may only clear it ` +
         "(null restores the row). Delete the row to set it.";
     throw ApiError.badRequest(message, "FIELD_NOT_WRITABLE", {
@@ -277,7 +278,7 @@ function isPresentKey(id: string | number | undefined | null): id is string | nu
  */
 function assertKeyUnchanged(
     collection: CollectionConfig | undefined,
-    registry: PostgresCollectionRegistry,
+    registry: PostgresTableRegistry,
     id: string | number,
     values: Record<string, unknown> | undefined,
     path: string
@@ -539,7 +540,7 @@ export class PostgresBackendDriver implements DataDriver {
     constructor(
         public db: DrizzleClient,
         realtimeService: RealtimeService,
-        public readonly registry: PostgresCollectionRegistry,
+        public readonly registry: PostgresTableRegistry,
         user?: User,
         public poolManager?: DatabasePoolManager,
         historyService?: HistoryService
@@ -779,6 +780,15 @@ export class PostgresBackendDriver implements DataDriver {
      * that is attached after construction. The type now leaves `data` off, and
      * a driver that was never given a client refuses by name, at the read.
      */
+    /**
+     * The runtime table a resolved collection was lowered from — for the call
+     * sites that still hold the collection. Throws when the driver serves no
+     * table of that slug.
+     */
+    private tableOf(collection: { slug: string } | undefined): RuntimeTable | undefined {
+        return collection ? this.registry.requireTable(collection.slug) : undefined;
+    }
+
     private buildCallContext(): RebaseCallContext {
         const client = this.client;
         return {
@@ -1416,7 +1426,7 @@ export class PostgresBackendDriver implements DataDriver {
             filter[field] = ["==", value];
         }
 
-        const softDelete = resolveSoftDelete(collection);
+        const softDelete = resolveSoftDelete(this.tableOf(collection));
         const [row] = await withFieldViewer(undefined, () => this.dataService.fetchCollectionForRest(path, {
             filter,
             limit: 1,
@@ -1559,7 +1569,7 @@ export class PostgresBackendDriver implements DataDriver {
             || collection.history
             || getTenantConfig(collection)
             || hasFieldAccessRules(collection)
-            || resolveSoftDelete(collection)
+            || resolveSoftDelete(this.tableOf(collection))
             || isNestedPath(path)
         );
     }
@@ -1642,7 +1652,7 @@ export class PostgresBackendDriver implements DataDriver {
         // statement's own conflict branch below.
         const assertUpdateShape = () => {
             if (status !== "existing") return;
-            assertUpdateDoesNotSoftDelete(resolvedCollection as CollectionConfig | undefined, values, path);
+            assertUpdateDoesNotSoftDelete(this.tableOf(resolvedCollection as CollectionConfig | undefined), values, path);
             if (isPresentKey(id)) {
                 assertKeyUnchanged(resolvedCollection as CollectionConfig | undefined, this.registry, id, values as Record<string, unknown>, path);
             }
@@ -1895,7 +1905,7 @@ export class PostgresBackendDriver implements DataDriver {
         // A stamped soft-delete field may create a row already trashed, and
         // may not trash a stored one: that is a delete (see
         // `assertUpdateDoesNotSoftDelete`).
-        const softDeleteField = resolveSoftDelete(resolvedCollection as CollectionConfig | undefined)?.field;
+        const softDeleteField = resolveSoftDelete(this.tableOf(resolvedCollection as CollectionConfig | undefined))?.field;
         if (insertOnlyKeys && softDeleteField
             && updatedValues[softDeleteField] !== undefined && updatedValues[softDeleteField] !== null) {
             insertOnlyKeys.push(softDeleteField);
@@ -2309,7 +2319,7 @@ export class PostgresBackendDriver implements DataDriver {
         // What `saveInFrame` does to a new row with no hooks to run: the
         // declared defaults, then the stamps, and for an upsert the keys its
         // conflict-update must leave alone.
-        const softDeleteField = resolveSoftDelete(resolved)?.field;
+        const softDeleteField = resolveSoftDelete(this.tableOf(resolved))?.field;
         const prepared = rows.map(values => {
             const withDefaults = resolved.properties
                 ? applyDefaultValuesOnCreate<M>(values, resolved.properties) as Partial<EntityValues<M>>
@@ -2352,7 +2362,7 @@ export class PostgresBackendDriver implements DataDriver {
         const resolved = resolvedCollection as CollectionConfig | undefined;
         if (!resolved) return undefined;
         const prepared = updates.map(({ id, values }) => {
-            assertUpdateDoesNotSoftDelete(resolved, values as Record<string, unknown>, path);
+            assertUpdateDoesNotSoftDelete(this.tableOf(resolved), values as Record<string, unknown>, path);
             assertKeyUnchanged(resolved, this.registry, String(id), values as Record<string, unknown>, path);
             return { id, values: this.stampAutoValues(resolved, values, "existing", path) as Record<string, unknown> };
         });
@@ -2539,7 +2549,7 @@ export class PostgresBackendDriver implements DataDriver {
         const { collection: resolvedCollection, callbacks, globalCallbacks, propertyCallbacks } = this.resolveCollectionCallbacks(collection, path);
         const resolved = this.assertFilteredWrite(resolvedCollection as CollectionConfig | undefined, path, filter, logical);
         const written = values as Record<string, unknown>;
-        assertUpdateDoesNotSoftDelete(resolved, written, path);
+        assertUpdateDoesNotSoftDelete(this.tableOf(resolved), written, path);
         const keys = getPrimaryKeys(resolved, this.registry).map(key => key.fieldName).filter(field => written[field] !== undefined);
         if (keys.length > 0) {
             throw ApiError.badRequest(
@@ -2578,7 +2588,7 @@ export class PostgresBackendDriver implements DataDriver {
         this.assertWritable(collection, path);
         const { collection: resolvedCollection, callbacks, globalCallbacks, propertyCallbacks } = this.resolveCollectionCallbacks(collection, path);
         const resolved = this.assertFilteredWrite(resolvedCollection as CollectionConfig | undefined, path, filter, logical);
-        const softDeleting = !hard && resolveSoftDelete(resolved) !== undefined;
+        const softDeleting = !hard && resolveSoftDelete(this.tableOf(resolved)) !== undefined;
         if (!softDeleting && !resolved.history && !declaresAnyHook(callbacks, globalCallbacks, propertyCallbacks)) {
             const deleted = await this.dataService.getPersistService().deleteWhere(path, filter, logical, {
                 commitsTransaction: this.lastWriteCommits(resolved)
@@ -2837,7 +2847,7 @@ export class PostgresBackendDriver implements DataDriver {
         // row that is not there (or not the caller's) is its 404, answered as
         // the read would have answered it — see `explainZeroRowWrite` — and
         // the row's address comes back from the statement.
-        const softDeleting = !hard && !unlinking && resolveSoftDelete(resolvedCollection as CollectionConfig | undefined) !== undefined;
+        const softDeleting = !hard && !unlinking && resolveSoftDelete(this.tableOf(resolvedCollection as CollectionConfig | undefined)) !== undefined;
         if (!precondition && !hop && !softDeleting && !resolvedCollection?.history
             && !declaresAnyHook(callbacks, globalCallbacks, propertyCallbacks)) {
             await this.dataService.delete(targetPath, row.id, resolvedCollection?.databaseId, {
@@ -2954,7 +2964,7 @@ export class PostgresBackendDriver implements DataDriver {
         // here, it trashed the tag for every post and re-asserted the link.
         const softDelete = hard || unlinking
             ? undefined
-            : resolveSoftDelete(resolvedCollection as CollectionConfig | undefined);
+            : resolveSoftDelete(this.tableOf(resolvedCollection as CollectionConfig | undefined));
         if (softDelete) {
             await this.dataService.save(
                 targetPath,

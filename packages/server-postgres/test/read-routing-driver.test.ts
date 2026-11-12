@@ -16,7 +16,8 @@ import { pgTable, serial, varchar } from "drizzle-orm/pg-core";
 import type { CollectionConfig, User } from "@rebasepro/types";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { RealtimeService } from "../src/services/realtimeService";
 import { ReadRouter } from "../src/read-routing";
 import { testUser } from "./helpers/spg-c-user";
@@ -58,9 +59,9 @@ async function seeded(title: string): Promise<PGlite> {
 beforeEach(async () => {
     primary = await seeded("from-primary");
     replica = await seeded("from-replica");
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
     registry.registerMultiple([notes]);
-    registry.registerTable(notesTable, "notes");
+    registry.registerPgTable(notesTable, "notes");
     const primaryDb = drizzle(primary, { schema: { notes: notesTable } });
     const replicaDb = drizzle(replica, { schema: { notes: notesTable } });
     // PGlite's drizzle databases stand in for node-postgres's: the driver and its read router name

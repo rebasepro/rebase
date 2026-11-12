@@ -15,7 +15,8 @@ import { relations } from "drizzle-orm";
 import type { CollectionConfig } from "@rebasepro/types";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { RealtimeService } from "../src/services/realtimeService";
 import { unusedDb } from "./helpers/spg-c-db";
 import { HistoryService } from "../src/history/HistoryService";
@@ -54,10 +55,10 @@ let db: PGlite;
 let recorded: { tableName: string; id: string; action: string }[];
 
 function driverOver(pglite: PGlite): PostgresBackendDriver {
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
     registry.registerMultiple([ownersCollection(), docsCollection()]);
-    registry.registerTable(ownersTable, "owners");
-    registry.registerTable(docsTable, "docs");
+    registry.registerPgTable(ownersTable, "owners");
+    registry.registerPgTable(docsTable, "docs");
     registry.registerRelations({ owners: ownersRelations, docs: docsRelations });
     const orm = drizzle(pglite, { schema: { owners: ownersTable, docs: docsTable, ownersRelations, docsRelations } });
     // A real history service whose writes are recorded here instead of stored.

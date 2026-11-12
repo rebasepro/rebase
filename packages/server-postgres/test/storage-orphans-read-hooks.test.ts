@@ -17,7 +17,8 @@ import { pgTable, primaryKey, serial, timestamp, varchar } from "drizzle-orm/pg-
 import type { CollectionConfig } from "@rebasepro/types";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry, tablesFromCollections } from "./helpers/tables";
 import { RealtimeService } from "../src/services/realtimeService";
 import { HistoryService } from "../src/history/HistoryService";
 import { findOrphans } from "../../server/src/storage/maintenance";
@@ -45,7 +46,8 @@ const docs: CollectionConfig = {
     properties: {
         id: { name: "ID", type: "number", isId: "increment" },
         owner_id: { name: "Owner", type: "string" },
-        file: { name: "File", type: "string", storage: { storagePath: "docs" } }
+        file: { name: "File", type: "string", storage: { storagePath: "docs" } },
+        deletedAt: { name: "Deleted at", type: "date" }
     },
     callbacks: {
         // Exactly the JSDoc example on `CollectionCallbacks.beforeQuery`.
@@ -57,6 +59,15 @@ const docs: CollectionConfig = {
         afterRead: ({ row }: { row: Record<string, unknown> }) => ({ ...row, file: undefined })
     }
 };
+
+/** The tables a storage scan reads, from fixture collections, with the driver seam that names them. */
+function scanSources(collections: CollectionConfig[]) {
+    const fixture = tablesFromCollections(collections);
+    return {
+        tables: fixture.tables,
+        driverCollection: (slug: string) => fixture.collections.find(collection => collection.slug === slug)
+    };
+}
 
 const tags: CollectionConfig = {
     name: "Tags",
@@ -113,10 +124,10 @@ describe("storage orphans over a collection with read hooks", () => {
         for (let n = 0; n < 5; n++) for (let m = 0; m < 5; m++) values.push(`('ns${n}', 'name${m}', 'icons/${n}-${m}.svg')`);
         await db.exec(`INSERT INTO tags (ns, name, icon) VALUES ${values.join(", ")};`);
 
-        const registry = new PostgresCollectionRegistry();
+        const registry = new FixtureTableRegistry();
         registry.registerMultiple([docs, tags]);
-        registry.registerTable(docsTable, "docs");
-        registry.registerTable(tagsTable, "tags");
+        registry.registerPgTable(docsTable, "docs");
+        registry.registerPgTable(tagsTable, "tags");
         // PGlite's drizzle database stands in for node-postgres's: the driver names NodePgDatabase, whose
         // `$client` is a pg pool, and no typed bridge between the two exists.
         const orm = drizzle(db, { schema: { docs: docsTable, tags: tagsTable } }) as unknown as NodePgDatabase;
@@ -131,7 +142,9 @@ describe("storage orphans over a collection with read hooks", () => {
     it("calls no file a row names an orphan, whatever the hooks let through", async () => {
         const report = await findOrphans({
             controller: sourceHolding(["docs/u1-contract.pdf", "docs/u2-passport.jpg", "docs/u3-trashed.pdf", "docs/unused.pdf"]),
-            collections: [docs],
+            // `docs` as the server's storage scan reads it: compiled, its read
+            // hooks beside the descriptor, and the collection the driver is handed.
+            ...scanSources([docs]),
             driverFor: () => driver,
             olderThanMs: DAY
         });
@@ -158,7 +171,7 @@ describe("storage orphans over a collection with read hooks", () => {
         const history = new HistoryService(orm);
         const report = await findOrphans({
             controller: sourceHolding(["docs/u1-draft.pdf", "docs/u2-old-scan.jpg", "docs/unused.pdf"]),
-            collections: [],
+            ...scanSources([]),
             driverFor: () => driver,
             history: { scanStoredValues: () => history.scanStoredValues(2) },
             olderThanMs: DAY

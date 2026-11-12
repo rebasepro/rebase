@@ -24,7 +24,8 @@ jest.mock("../src/services/dataService", () => ({
 
 import type { CollectionConfig } from "@rebasepro/types";
 import { RealtimeService, type SubscriptionAuthContext } from "../src/services/realtimeService";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { fakeCallContextDriver, fakeRealtimeSocket, type FakeRealtimeSocket } from "./helpers/spg-c-socket";
 import { recordingDb } from "./helpers/spg-c-db";
 
@@ -78,7 +79,7 @@ async function write() {
 beforeEach(() => {
     jest.useFakeTimers();
     const { db } = recordingDb();
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
     registry.registerMultiple([posts, tags]);
     service = new RealtimeService(db, registry);
     service.setDataDriver(fakeCallContextDriver());
@@ -141,7 +142,7 @@ describe("a single-row subscription with an include", () => {
             ...posts,
             properties: { ...posts.properties, tags: { type: "relation", relation: { kind: "manyToMany", target: () => guardedTags } } }
         };
-        const registry = new PostgresCollectionRegistry();
+        const registry = new FixtureTableRegistry();
         registry.registerMultiple([guardedPosts, guardedTags]);
         await service.destroy();
         service = new RealtimeService(recordingDb().db, registry);

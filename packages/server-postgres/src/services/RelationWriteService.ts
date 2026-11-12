@@ -6,7 +6,7 @@ import { getTableName, resolveCollectionRelations, findRelation, fieldKeyForColu
 import { ApiError, logger } from "@rebasepro/server";
 import { DrizzleClient } from "../interfaces";
 import { DrizzleConditionBuilder } from "../utils/drizzle-conditions";
-import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../model/PostgresTableRegistry";
 import {
     getTableForCollection,
     relationMisconfigured,
@@ -155,7 +155,7 @@ export class RelationWriteService {
 
     constructor(
         private db: DrizzleClient,
-        private registry: PostgresCollectionRegistry,
+        private registry: PostgresTableRegistry,
         /**
          * How this service's reads reach the identity their `beforeQuery` hooks
          * run as. Passed by the driver that constructed it; absent only in a

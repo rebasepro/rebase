@@ -1,10 +1,11 @@
 import { DataService } from "../src/services/dataService";
 import { integer, pgTable, serial, varchar } from "drizzle-orm/pg-core";
 import { CollectionConfig } from "@rebasepro/types";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { arrayRowsFor, recordingDb, type RecordedQuery } from "./helpers/spg-b-recording-db";
 
-const collectionRegistry = new PostgresCollectionRegistry();
+const collectionRegistry = new FixtureTableRegistry();
 
 // Real Drizzle tables, and the real `DrizzleConditionBuilder` behind them.
 //
@@ -172,11 +173,11 @@ const collectionsBySlug: Record<string, CollectionConfig> = {
     views: viewsCollection
 };
 
-collectionRegistry.registerTable(tagsTable, "tags");
-collectionRegistry.registerTable(postsTable, "posts");
-collectionRegistry.registerTable(authorsTable, "authors");
-collectionRegistry.registerTable(commentsTable, "comments");
-collectionRegistry.registerTable(viewsTable, "views");
+collectionRegistry.registerPgTable(tagsTable, "tags");
+collectionRegistry.registerPgTable(postsTable, "posts");
+collectionRegistry.registerPgTable(authorsTable, "authors");
+collectionRegistry.registerPgTable(commentsTable, "comments");
+collectionRegistry.registerPgTable(viewsTable, "views");
 
 /**
  * A real drizzle database that keeps the SQL instead of running it: every

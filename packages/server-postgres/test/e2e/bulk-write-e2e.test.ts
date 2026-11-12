@@ -26,7 +26,8 @@ import { pgTable, varchar, integer } from "drizzle-orm/pg-core";
 import type { CollectionConfig } from "@rebasepro/types";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
-import { PostgresCollectionRegistry } from "../../src/collections/PostgresCollectionRegistry.js";
+import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry.js";
+import { FixtureTableRegistry } from "../helpers/tables";
 import { RealtimeService } from "../../src/services/realtimeService.js";
 
 const itemsTable = pgTable("items", {
@@ -50,7 +51,7 @@ describe("bulk update/delete (E2E)", () => {
     let admin: pg.Client;
     let pool: pg.Pool;
     let driver: PostgresBackendDriver;
-    let registry: PostgresCollectionRegistry;
+    let registry: PostgresTableRegistry;
 
     async function rows(): Promise<{ id: string; name: string; qty: number }[]> {
         const r = await admin.query("SELECT id, name, qty FROM public.items ORDER BY id");
@@ -79,9 +80,9 @@ describe("bulk update/delete (E2E)", () => {
         `);
 
         pool = new pg.Pool({ connectionString: container.connectionString });
-        registry = new PostgresCollectionRegistry();
+        registry = new FixtureTableRegistry();
         registry.registerMultiple([itemsCollection]);
-        registry.registerTable(itemsTable, "items");
+        registry.registerPgTable(itemsTable, "items");
 
         const db = drizzle(pool);
         const realtime = new RealtimeService(db, registry);

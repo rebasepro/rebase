@@ -1,340 +1,252 @@
 import { pgTable, primaryKey, text, integer } from "drizzle-orm/pg-core";
-import type { CollectionConfig, JoinStep, PostgresCollectionConfig, Relation } from "@rebasepro/types";
+import type { PgTable } from "drizzle-orm/pg-core";
+import type { ColumnDescriptor, JoinStep, RelationDescriptor, TableDescriptor } from "@rebasepro/types";
+import { compileDescribedTables } from "@rebasepro/common";
 
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
-import { findRelationDefects, assertRelationsResolve } from "../src/collections/validate-relations";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { findRelationDefects, assertRelationsResolve } from "../src/model/validate-relations";
 
 /**
- * The union settled what a relation may *say*. This settles whether what it
- * says is true of the database.
+ * Compiling settles what a relation may *say*, and that its names agree with
+ * the declaration of both tables. This settles whether what it says is true of
+ * the database the driver is connected to.
  *
  * Each case here used to boot fine and then answer `[]` at query time, which is
  * the same answer a correctly-configured relation gives for a parent with no
  * children — so there was no way to tell a broken relation from an empty one.
+ *
+ * The tables are written as descriptors, the way a declaration compiles: the
+ * point of each case is a database that disagrees with one.
+ *
+ * (A relation whose target is outside the tables handed over is no longer a
+ * case: compiling refuses a target that is not among the tables compiled.)
  */
 
-// ── Schema ───────────────────────────────────────────────────────────────
+// ── The database ─────────────────────────────────────────────────────────
 
-const posts = pgTable("posts", { id: text("id").primaryKey(),
-author_id: text("author_id") });
+const posts = pgTable("posts", { id: text("id").primaryKey(), author_id: text("author_id") });
 const users = pgTable("users", { id: text("id").primaryKey() });
 const tags = pgTable("tags", { id: text("id").primaryKey() });
-const comments = pgTable("comments", { id: text("id").primaryKey(),
-post_id: text("post_id") });
-const posts_tags = pgTable("posts_tags", { post_id: text("post_id"),
-tag_id: text("tag_id") });
-const user_roles = pgTable("user_roles", { user_id: text("user_id"),
-role_id: integer("role_id") });
+const comments = pgTable("comments", { id: text("id").primaryKey(), post_id: text("post_id") });
+const posts_tags = pgTable("posts_tags", { post_id: text("post_id"), tag_id: text("tag_id") });
+const user_roles = pgTable("user_roles", { user_id: text("user_id"), role_id: integer("role_id") });
 const roles = pgTable("roles", { id: integer("id").primaryKey() });
 
-const coll = (slug: string, table: string, extra: Partial<PostgresCollectionConfig> = {}): PostgresCollectionConfig => ({
-    slug,
-    name: slug,
-    table,
-    properties: { id: { type: "string",
-isId: true } },
-    ...extra
-});
+// ── The declarations ─────────────────────────────────────────────────────
 
-const usersCollection = coll("users", "users");
-const tagsCollection = coll("tags", "tags");
-const commentsCollection = coll("comments", "comments");
-const rolesCollection = coll("roles", "roles");
+const column = (key: string, sqlName = key, kind: "text" | "integer" = "text"): ColumnDescriptor =>
+    ({ key, column: sqlName, type: { kind }, nullable: true });
 
-/** Build a registry holding the whole schema plus the collections given. */
-function registryWith(collections: CollectionConfig[]): PostgresCollectionRegistry {
-    const registry = new PostgresCollectionRegistry();
-    registry.registerMultiple(collections);
-    for (const [name, table] of Object.entries({ posts,
-users,
-tags,
-comments,
-posts_tags,
-user_roles,
-roles })) {
-        registry.registerTable(table, name);
-    }
+const table = (
+    slug: string,
+    options: { keys?: ColumnDescriptor[]; columns?: ColumnDescriptor[]; relations?: RelationDescriptor[] } = {}
+): TableDescriptor => {
+    const keys = (options.keys ?? [column("id")]).map(key => ({ ...key, nullable: false, primaryKey: true as const }));
+    return {
+        name: slug, slug, table: slug, schema: "public", kind: "table",
+        columns: [...keys, ...(options.columns ?? [])],
+        primaryKey: keys.map(key => key.key),
+        relations: options.relations ?? [],
+        rls: { posture: "admin-only", rules: [], defaultPolicies: true }
+    };
+};
+
+const belongsTo = (name: string, target: string, localKey: string): RelationDescriptor =>
+    ({ name, kind: "belongsTo", target, cardinality: "one", localKey, localField: localKey, index: true, constraint: true });
+const hasMany = (name: string, target: string, foreignKey: string, sourceKey?: string): RelationDescriptor =>
+    ({ name, kind: "hasMany", target, cardinality: "many", foreignKey, ...(sourceKey ? { sourceKey } : {}) });
+const manyToMany = (name: string, target: string, through: string, sourceKey: string, targetKey: string): RelationDescriptor =>
+    ({ name, kind: "manyToMany", target, cardinality: "many", through: { table: through, sourceKey, targetKey, pivot: [] } });
+const via = (name: string, target: string, steps: JoinStep[], cardinality: "one" | "many" = "many"): RelationDescriptor =>
+    ({ name, kind: "via", target, cardinality, steps, writable: false });
+
+/** A registry serving these tables over these catalogue tables. */
+function registryWith(descriptors: TableDescriptor[], pgTables: Record<string, PgTable>): PostgresTableRegistry {
+    const registry = new PostgresTableRegistry();
+    registry.registerTables(compileDescribedTables(descriptors, { rls: () => "admin-only" }));
+    for (const [name, pg] of Object.entries(pgTables)) registry.registerPgTable(pg, name);
     return registry;
 }
 
-/** The defects found for a `posts` collection carrying one relation. */
-function defectsFor(relations: Relation[]): ReturnType<typeof findRelationDefects> {
-    const postsCollection = coll("posts", "posts", { relations });
-    const all = [postsCollection, usersCollection, tagsCollection, commentsCollection, rolesCollection];
-    return findRelationDefects(all, registryWith(all));
+const SCHEMA = { posts, users, tags, comments, posts_tags, user_roles, roles };
+const others = [table("users"), table("tags"), table("comments", { columns: [column("postId", "post_id")] }), table("roles", { keys: [column("id", "id", "integer")] })];
+
+/** The defects found for a `posts` table carrying these relations. */
+function defectsFor(relations: RelationDescriptor[]): ReturnType<typeof findRelationDefects> {
+    const postsTable = table("posts", { columns: [column("authorId", "author_id")], relations });
+    return findRelationDefects(registryWith([postsTable, ...others], SCHEMA));
 }
 
 describe("relation validation at boot", () => {
     describe("accepts what is actually there", () => {
         it("passes every kind when all the names resolve", () => {
             expect(defectsFor([
-                { kind: "belongsTo",
-relationName: "author",
-target: () => usersCollection,
-localKey: "author_id" },
-                { kind: "hasMany",
-relationName: "comments",
-target: () => commentsCollection,
-foreignKeyOnTarget: "post_id" },
-                {
-                    kind: "manyToMany",
-                    relationName: "tags",
-                    target: () => tagsCollection,
-                    through: { table: "posts_tags",
-sourceColumn: "post_id",
-targetColumn: "tag_id" }
-                },
-                // A link on a natural key: `author_id` is on `posts`, and the
-                // comments carry it too.
-                { kind: "hasMany",
-relationName: "sibling_comments",
-target: () => commentsCollection,
-sourceKey: "author_id",
-foreignKeyOnTarget: "post_id" }
+                belongsTo("author", "users", "author_id"),
+                hasMany("comments", "comments", "post_id"),
+                manyToMany("tags", "tags", "posts_tags", "post_id", "tag_id"),
+                // A link on a natural key: `author_id` is on `posts`.
+                hasMany("sibling_comments", "comments", "post_id", "author_id")
             ])).toEqual([]);
         });
 
-        it("stays quiet about a target belonging to another backend", () => {
-            const elsewhere = coll("elsewhere", "elsewhere");
-            const postsCollection = coll("posts", "posts", {
-                relations: [{ kind: "belongsTo",
-relationName: "x",
-target: () => elsewhere,
-localKey: "author_id" }]
-            });
-            // `elsewhere` is never registered — its tables are not ours to check.
-            const all = [postsCollection, usersCollection];
-            expect(findRelationDefects(all, registryWith(all))).toEqual([]);
+        it("stays quiet about a target this driver does not serve", () => {
+            expect(defectsFor([belongsTo("x", "elsewhere", "author_id")])).toEqual([]);
+        });
+
+        it("skips a table this database does not hold", () => {
+            const registry = registryWith([table("posts", { relations: [belongsTo("author", "users", "writer_id")] }), table("users")], { users });
+            expect(findRelationDefects(registry)).toEqual([]);
         });
     });
 
-    describe("catches names the type system cannot", () => {
+    describe("catches names the database does not have", () => {
         it("a belongsTo pointing at a column that does not exist", () => {
-            const [d] = defectsFor([
-                { kind: "belongsTo",
-relationName: "author",
-target: () => usersCollection,
-localKey: "writer_id" }
-            ]);
+            const [d] = defectsFor([belongsTo("author", "users", "writer_id")]);
+            expect(d).toMatchObject({ table: "posts", relationName: "author", kind: "belongsTo" });
             expect(d.problem).toContain("`localKey: \"writer_id\"` is not a column on `posts`");
             expect(d.fix).toContain("`author_id`");
         });
 
         it("a hasMany whose foreign key is not on the target", () => {
-            const [d] = defectsFor([
-                { kind: "hasMany",
-relationName: "comments",
-target: () => commentsCollection,
-foreignKeyOnTarget: "article_id" }
-            ]);
-            expect(d.problem).toContain("is not a column on the target table `comments`");
+            const [d] = defectsFor([hasMany("comments", "comments", "article_id")]);
+            expect(d.problem).toBe("`foreignKey: \"article_id\"` is not a column on the target table `comments`");
+            expect(d.fix).toContain("set `foreignKey` to one of:");
             expect(d.fix).toContain("`post_id`");
         });
 
         it("a sourceKey that names a column on the target instead of the source", () => {
             // The likeliest way to get `sourceKey` wrong, because it sits next
-            // to `foreignKeyOnTarget` and every other column in the block does
-            // live on the target.
-            const [d] = defectsFor([
-                {
-                    kind: "hasMany",
-                    relationName: "comments",
-                    target: () => commentsCollection,
-                    foreignKeyOnTarget: "post_id",
-                    sourceKey: "post_id"
-                }
-            ]);
+            // to `foreignKey` and every other column in the block lives on the
+            // target.
+            const [d] = defectsFor([hasMany("comments", "comments", "post_id", "post_id")]);
             expect(d.problem).toContain("`sourceKey: \"post_id\"` is not a column on `posts`");
             expect(d.fix).toContain("it is a column on the *target* table `comments`");
+            expect(d.fix).toContain("the column of this table that the target's foreign key points at");
         });
 
         it("a sourceKey that exists nowhere", () => {
-            const [d] = defectsFor([
-                {
-                    kind: "hasMany",
-                    relationName: "comments",
-                    target: () => commentsCollection,
-                    foreignKeyOnTarget: "post_id",
-                    sourceKey: "auth_user_id"
-                }
-            ]);
+            const [d] = defectsFor([hasMany("comments", "comments", "post_id", "auth_user_id")]);
             expect(d.problem).toContain("`sourceKey: \"auth_user_id\"` is not a column on `posts`");
             expect(d.fix).toContain("add the column");
         });
 
         it("the junction-name footgun: a derived table that was never created", () => {
-            // No `through` — the table name is derived by sorting and joining,
-            // which is exactly what silently changes when a table is renamed.
-            const [d] = defectsFor([
-                { kind: "manyToMany",
-relationName: "categories",
-target: () => rolesCollection }
-            ]);
-            expect(d.problem).toContain("junction table");
-            expect(d.problem).toContain("does not exist");
+            const [d] = defectsFor([manyToMany("categories", "roles", "posts_roles", "post_id", "role_id")]);
+            expect(d.problem).toBe("its junction table `posts_roles` does not exist");
+            expect(d.fix).toContain("name the real one with `through: \"...\"`");
             expect(d.fix).toContain("derived from the two table names sorted");
         });
 
         it("a junction column that is not on the junction table", () => {
-            const found = defectsFor([
-                {
-                    kind: "manyToMany",
-                    relationName: "tags",
-                    target: () => tagsCollection,
-                    through: { table: "posts_tags",
-sourceColumn: "article_id",
-targetColumn: "tag_id" }
-                }
-            ]);
+            const found = defectsFor([manyToMany("tags", "tags", "posts_tags", "article_id", "tag_id")]);
             expect(found).toHaveLength(1);
-            expect(found[0].problem).toContain("`through.sourceColumn: \"article_id\"`");
-            expect(found[0].fix).toContain("naming *this* collection");
+            expect(found[0].problem).toBe("`sourceKey: \"article_id\"` is not a column on the junction table `posts_tags`");
+            expect(found[0].fix).toContain("naming *this* table");
+        });
+
+        it("a target whose table this database does not hold", () => {
+            const registry = registryWith([table("posts", { columns: [column("authorId", "author_id")], relations: [belongsTo("author", "users", "author_id")] }), table("users")], { posts });
+            const [d] = findRelationDefects(registry);
+            expect(d.problem).toBe("it points at table `users`, which has no table `users` in this database");
+            expect(d.fix).toContain("apply the schema to this database");
         });
     });
 
     describe("walks a via chain and says which hop is wrong", () => {
-        const viaRelation = (joinPath: JoinStep[]): Relation[] => ([{
-            kind: "via",
-            relationName: "roles",
-            target: () => rolesCollection,
-            cardinality: "many",
-            joinPath
-        }]);
+        const toRoles: JoinStep = { table: "roles", on: { from: "role_id", to: "id" } };
+        const viaRoles = (steps: JoinStep[]) => defectsFor([via("roles", "roles", steps)]);
 
         it("accepts a chain that connects", () => {
-            expect(defectsFor(viaRelation([
-                { table: "user_roles",
-on: { from: "author_id",
-to: "user_id" } },
-                { table: "roles",
-on: { from: "role_id",
-to: "id" } }
-            ]))).toEqual([]);
+            expect(viaRoles([{ table: "user_roles", on: { from: "author_id", to: "user_id" } }, toRoles])).toEqual([]);
         });
 
         it("names the step whose table does not exist", () => {
-            const [d] = defectsFor(viaRelation([
-                { table: "account_roles",
-on: { from: "author_id",
-to: "user_id" } }
-            ]));
-            expect(d.problem).toContain("step 1");
-            expect(d.problem).toContain("`account_roles`, which is not a table");
+            const [d] = viaRoles([{ table: "account_roles", on: { from: "author_id", to: "user_id" } }]);
+            expect(d.problem).toContain("step 1 of its `steps` joins `account_roles`, which is not a table");
+            expect(d.fix).toBe("correct `steps[0].table`");
         });
 
         it("catches a `from` column that is not on the previous table", () => {
-            const [d] = defectsFor(viaRelation([
-                { table: "user_roles",
-on: { from: "owner_id",
-to: "user_id" } },
-                { table: "roles",
-on: { from: "role_id",
-to: "id" } }
-            ]));
+            const [d] = viaRoles([{ table: "user_roles", on: { from: "owner_id", to: "user_id" } }, toRoles]);
             expect(d.problem).toContain("step 1 joins `posts.owner_id`");
-            expect(d.fix).toContain("this collection's table");
+            expect(d.fix).toContain("names columns on this table:");
         });
 
         it("catches a `from` column that is not on the *previous step's* table", () => {
-            const [d] = defectsFor(viaRelation([
-                { table: "user_roles",
-on: { from: "author_id",
-to: "user_id" } },
-                { table: "roles",
-on: { from: "group_id",
-to: "id" } }
-            ]));
+            const [d] = viaRoles([{ table: "user_roles", on: { from: "author_id", to: "user_id" } }, { table: "roles", on: { from: "group_id", to: "id" } }]);
             expect(d.problem).toContain("step 2 joins `user_roles.group_id`");
             expect(d.fix).toContain("the previous step's table (`user_roles`)");
         });
 
         it("catches a chain that ends somewhere other than the target", () => {
-            const [d] = defectsFor(viaRelation([
-                { table: "user_roles",
-on: { from: "author_id",
-to: "user_id" } }
-            ]));
-            expect(d.problem).toContain("ends at `user_roles`, but it targets `roles`");
+            const [d] = viaRoles([{ table: "user_roles", on: { from: "author_id", to: "user_id" } }]);
+            expect(d.problem).toBe("its `steps` end at `user_roles`, but it targets `roles` (table `roles`)");
+            expect(d.fix).toContain("point the relation at the table backed by `user_roles`");
         });
 
         it("catches a composite join comparing unequal numbers of columns", () => {
-            const found = defectsFor(viaRelation([
-                { table: "user_roles",
-on: { from: ["author_id", "id"],
-to: "user_id" } },
-                { table: "roles",
-on: { from: "role_id",
-to: "id" } }
-            ]));
+            const found = viaRoles([{ table: "user_roles", on: { from: ["author_id", "id"], to: "user_id" } }, toRoles]);
             expect(found.some(d => d.problem.includes("compares 2 column(s) against 1"))).toBe(true);
         });
 
-        it("rejects an empty joinPath rather than joining nothing", () => {
-            const [d] = defectsFor(viaRelation([]));
-            expect(d.problem).toContain("`joinPath` is empty");
+        it("rejects empty steps rather than joining nothing", () => {
+            // No door produces this (compiling refuses it); a runtime table
+            // built from a descriptor that says it still answers with a defect.
+            const [postsCompiled, ...rest] = compileDescribedTables(
+                [table("posts", { columns: [column("authorId", "author_id")], relations: [via("roles", "roles", [toRoles])] }), ...others],
+                { rls: () => "admin-only" }
+            );
+            const registry = new PostgresTableRegistry();
+            registry.registerTables([
+                { ...postsCompiled, descriptor: { ...postsCompiled.descriptor, relations: [via("roles", "roles", [])] } },
+                ...rest
+            ]);
+            for (const [name, pg] of Object.entries(SCHEMA)) registry.registerPgTable(pg, name);
+            const [d] = findRelationDefects(registry);
+            expect(d.problem).toBe("its `steps` are empty, so it joins nothing");
         });
 
         describe("a step whose `on` lists alternatives", () => {
-            const toRoles = { table: "roles", on: { from: "role_id", to: "id" } };
-
             it("accepts alternatives that each connect the same two tables", () => {
-                expect(defectsFor(viaRelation([
-                    { table: "user_roles", on: [{ from: "author_id", to: "user_id" }, { from: "id", to: "user_id" }] },
-                    toRoles
-                ]))).toEqual([]);
+                expect(viaRoles([{ table: "user_roles", on: [{ from: "author_id", to: "user_id" }, { from: "id", to: "user_id" }] }, toRoles])).toEqual([]);
             });
 
             it("names the alternative whose `from` column is not on the previous table", () => {
-                const [d] = defectsFor(viaRelation([
-                    { table: "user_roles", on: [{ from: "author_id", to: "user_id" }, { from: "owner_id", to: "user_id" }] },
-                    toRoles
-                ]));
+                const [d] = viaRoles([{ table: "user_roles", on: [{ from: "author_id", to: "user_id" }, { from: "owner_id", to: "user_id" }] }, toRoles]);
                 expect(d.problem).toContain("step 1 (alternative 2) joins `posts.owner_id`");
-                expect(d.fix).toContain("`joinPath[0].on[1].from`");
+                expect(d.fix).toContain("`steps[0].on[1].from`");
             });
 
             it("names the alternative whose `to` column is not on the step's table", () => {
-                const [d] = defectsFor(viaRelation([
-                    { table: "user_roles", on: [{ from: "author_id", to: "account_id" }, { from: "id", to: "user_id" }] },
-                    toRoles
-                ]));
+                const [d] = viaRoles([{ table: "user_roles", on: [{ from: "author_id", to: "account_id" }, { from: "id", to: "user_id" }] }, toRoles]);
                 expect(d.problem).toContain("step 1 (alternative 1) joins into `user_roles.account_id`");
-                expect(d.fix).toContain("`joinPath[0].on[0].to`");
+                expect(d.fix).toContain("`steps[0].on[0].to`");
             });
 
             it("names the alternative comparing unequal numbers of columns", () => {
-                const found = defectsFor(viaRelation([
-                    { table: "user_roles", on: [{ from: "author_id", to: "user_id" }, { from: ["author_id", "id"], to: "user_id" }] },
-                    toRoles
-                ]));
+                const found = viaRoles([{ table: "user_roles", on: [{ from: "author_id", to: "user_id" }, { from: ["author_id", "id"], to: "user_id" }] }, toRoles]);
                 const d = found.find(x => x.problem.includes("compares 2 column(s) against 1"));
                 expect(d?.problem).toContain("step 1 (alternative 2)");
-                expect(d?.fix).toContain("`joinPath[0].on[1]`");
+                expect(d?.fix).toContain("`steps[0].on[1]`");
             });
 
             it("rejects an empty list, which would join on nothing", () => {
-                const found = defectsFor(viaRelation([{ table: "user_roles", on: [] }, toRoles]));
+                const found = viaRoles([{ table: "user_roles", on: [] }, toRoles]);
                 expect(found).toHaveLength(1);
-                expect(found[0].problem).toContain("`joinPath[0].on` lists no conditions");
+                expect(found[0].problem).toContain("`steps[0].on` lists no conditions");
                 expect(found[0].fix).toContain("at least one `{ from, to }`");
             });
 
             it("rejects alternatives that name different tables", () => {
-                const found = defectsFor(viaRelation([
-                    { table: "user_roles", on: [{ from: "author_id", to: "user_id" }, { from: "users.id", to: "user_id" }] },
-                    toRoles
-                ]));
+                const found = viaRoles([{ table: "user_roles", on: [{ from: "author_id", to: "user_id" }, { from: "users.id", to: "user_id" }] }, toRoles]);
                 const d = found.find(x => x.problem.includes("join different tables"));
                 expect(d?.problem).toContain("alternative 1 joins `posts` → `user_roles`");
                 expect(d?.problem).toContain("alternative 2 joins `users` → `user_roles`");
-                expect(d?.fix).toContain("every entry of `joinPath[0].on` joins `posts` to `user_roles`");
+                expect(d?.fix).toContain("every entry of `steps[0].on` joins `posts` to `user_roles`");
             });
 
             it("says nothing of tables when a spelling names the tables the step joins anyway", () => {
-                const found = defectsFor(viaRelation([
-                    { table: "user_roles", on: [{ from: "author_id", to: "user_id" }, { from: "posts.id", to: "user_roles.user_id" }] },
-                    toRoles
-                ]));
+                const found = viaRoles([{ table: "user_roles", on: [{ from: "author_id", to: "user_id" }, { from: "posts.id", to: "user_roles.user_id" }] }, toRoles]);
                 expect(found.some(x => x.problem.includes("join different tables"))).toBe(false);
             });
         });
@@ -342,32 +254,20 @@ to: "id" } }
 
     describe("assertRelationsResolve", () => {
         it("says nothing when everything resolves", () => {
-            const all = [coll("posts", "posts"), usersCollection];
-            expect(() => assertRelationsResolve(all, registryWith(all))).not.toThrow();
+            expect(() => assertRelationsResolve(registryWith([table("posts"), table("users")], SCHEMA))).not.toThrow();
         });
 
         it("reports every defect at once, each with its fix", () => {
-            const postsCollection = coll("posts", "posts", {
-                relations: [
-                    { kind: "belongsTo",
-relationName: "author",
-target: () => usersCollection,
-localKey: "writer_id" },
-                    { kind: "hasMany",
-relationName: "comments",
-target: () => commentsCollection,
-foreignKeyOnTarget: "article_id" }
-                ]
-            });
-            const all = [postsCollection, usersCollection, commentsCollection];
-
+            const registry = registryWith([
+                table("posts", { relations: [belongsTo("author", "users", "writer_id"), hasMany("comments", "comments", "article_id")] }),
+                ...others
+            ], SCHEMA);
             let message = "";
             try {
-                assertRelationsResolve(all, registryWith(all));
+                assertRelationsResolve(registry);
             } catch (e) {
-                message = (e as Error).message;
+                message = e instanceof Error ? e.message : String(e);
             }
-
             expect(message).toContain("2 relations cannot resolve");
             // Both, not just the first — one boot, one full list.
             expect(message).toContain("posts.author (belongsTo)");
@@ -375,13 +275,15 @@ foreignKeyOnTarget: "article_id" }
             expect(message).toContain("fix:");
             // Says why it is fatal rather than a warning.
             expect(message).toContain("return no rows at query time");
+            expect(message).toContain("the table definition is what disagrees with the database");
         });
     });
 
     /**
      * A composite key is a key like any other — to read, write and address. A
      * link into one is not: every kind but `via` holds one column, and a lookup
-     * on one column of `(id, locale)` matches every locale of that id.
+     * on one column of `(id, locale)` matches every locale of that id. Compiling
+     * refuses such a link in a declared table; an introspected one is checked here.
      */
     describe("a single-column link into a composite key", () => {
         const companies = pgTable("companies", { id: integer("id").primaryKey() });
@@ -389,174 +291,61 @@ foreignKeyOnTarget: "article_id" }
             id: integer("id").notNull(),
             locale: text("locale").notNull(),
             summary_id: integer("summary_id")
-        }, table => [primaryKey({ columns: [table.id, table.locale] })]);
-        const reviews = pgTable("reviews", {
-            id: integer("id").primaryKey(),
-            translation_id: integer("translation_id"),
-            translation_locale: text("translation_locale")
-        });
-        const reviewsTranslations = pgTable("reviews_translations", {
-            review_id: integer("review_id"),
-            translation_id: integer("translation_id")
-        });
+        }, t => [primaryKey({ columns: [t.id, t.locale] })]);
+        const reviews = pgTable("reviews", { id: integer("id").primaryKey(), translation_id: integer("translation_id"), translation_locale: text("translation_locale") });
+        const reviewsTranslations = pgTable("reviews_translations", { review_id: integer("review_id"), translation_id: integer("translation_id") });
+        const catalogue = { companies, company_translation: translations, reviews, reviews_translations: reviewsTranslations };
 
-        const companiesCollection: CollectionConfig = {
-            slug: "companies", name: "companies", table: "companies",
-            properties: { id: { type: "number", isId: "increment" } }
-        };
-
-        const translationsWith = (relations: Relation[]): CollectionConfig => ({
-            slug: "company_translation", name: "company_translation", table: "company_translation",
-            properties: {
-                id: { type: "number", isId: true },
-                locale: { type: "string", isId: true }
-            },
+        const companiesTable = table("companies", { keys: [column("id", "id", "integer")] });
+        const translationsTable = (relations: RelationDescriptor[] = []) => table("company_translation", {
+            keys: [column("id", "id", "integer"), column("locale")],
+            columns: [column("summaryId", "summary_id", "integer")],
             relations
         });
+        const reviewsTable = (relations: RelationDescriptor[] = []) => table("reviews", {
+            keys: [column("id", "id", "integer")],
+            columns: [column("translationId", "translation_id", "integer"), column("translationLocale", "translation_locale")],
+            relations
+        });
+        const defectsWith = (descriptors: TableDescriptor[]) => findRelationDefects(registryWith(descriptors, catalogue));
 
-        const defectsWith = (collections: CollectionConfig[]) => {
-            const registry = new PostgresCollectionRegistry();
-            registry.registerMultiple(collections);
-            for (const [name, table] of Object.entries({
-                companies, company_translation: translations, reviews, reviews_translations: reviewsTranslations
-            })) {
-                registry.registerTable(table, name);
-            }
-            return findRelationDefects(collections, registry);
-        };
-
-        it("accepts a link *from* a composite-keyed collection to a single-column key", () => {
-            // `company_translation.id` is part of its own key and the foreign
-            // key to the company — the shape composite keys were reported on.
-            const translationsCollection = translationsWith([
-                { kind: "belongsTo", relationName: "company", target: () => companiesCollection, localKey: "id" }
-            ]);
-            expect(defectsWith([translationsCollection, companiesCollection])).toEqual([]);
+        it("accepts a link *from* a composite-keyed table to a single-column key", () => {
+            expect(defectsWith([translationsTable([belongsTo("company", "companies", "id")]), companiesTable])).toEqual([]);
         });
 
         it("refuses a belongsTo into it, naming the key", () => {
-            const translationsCollection = translationsWith([]);
-            const reviewsCollection: CollectionConfig = {
-                slug: "reviews", name: "reviews", table: "reviews",
-                properties: { id: { type: "number", isId: "increment" } },
-                relations: [
-                    { kind: "belongsTo", relationName: "translation", target: () => translationsCollection, localKey: "translation_id" }
-                ]
-            };
-
-            const [defect] = defectsWith([reviewsCollection, translationsCollection]);
-            expect(defect).toMatchObject({ collection: "reviews", relationName: "translation", kind: "belongsTo" });
+            const [defect] = defectsWith([reviewsTable([belongsTo("translation", "company_translation", "translation_id")]), translationsTable()]);
+            expect(defect).toMatchObject({ table: "reviews", relationName: "translation", kind: "belongsTo" });
             expect(defect.problem).toBe(
                 "`localKey: \"translation_id\"` is one column, and `company_translation` is keyed on `id`, `locale` " +
                 "together — one column cannot reference a composite key"
             );
-            expect(defect.fix).toContain("`kind: \"via\"`");
+            expect(defect.fix).toContain("`rel.via(...)`");
         });
 
         it("refuses a hasMany out of it, unless a `sourceKey` names the one column it points at", () => {
-            const hasMany = (sourceKey?: string) => translationsWith([{
-                kind: "hasMany",
-                relationName: "summaries",
-                target: () => ({ slug: "reviews", name: "reviews", table: "reviews", properties: {} }),
-                foreignKeyOnTarget: "translation_id",
-                ...(sourceKey ? { sourceKey } : {})
-            }]);
-            const reviewsCollection: CollectionConfig = {
-                slug: "reviews", name: "reviews", table: "reviews", properties: { id: { type: "number", isId: true } }
-            };
-
-            const [defect] = defectsWith([hasMany(), reviewsCollection]);
-            expect(defect.problem).toContain("`foreignKeyOnTarget: \"translation_id\"` is one column");
+            const [defect] = defectsWith([translationsTable([hasMany("summaries", "reviews", "translation_id")]), reviewsTable()]);
+            expect(defect.problem).toContain("`foreignKey: \"translation_id\"` is one column");
             expect(defect.fix).toContain("`sourceKey`");
-
-            expect(defectsWith([hasMany("summary_id"), reviewsCollection])).toEqual([]);
+            expect(defectsWith([translationsTable([hasMany("summaries", "reviews", "translation_id", "summary_id")]), reviewsTable()])).toEqual([]);
         });
 
         it("refuses a manyToMany whose junction column would point at it", () => {
-            const translationsCollection = translationsWith([]);
-            const reviewsCollection: CollectionConfig = {
-                slug: "reviews", name: "reviews", table: "reviews",
-                properties: { id: { type: "number", isId: "increment" } },
-                relations: [{
-                    kind: "manyToMany",
-                    relationName: "translations",
-                    target: () => translationsCollection,
-                    through: { table: "reviews_translations", sourceColumn: "review_id", targetColumn: "translation_id" }
-                }]
-            };
-
-            const [defect] = defectsWith([reviewsCollection, translationsCollection]);
-            expect(defect.problem).toContain("`through.targetColumn: \"translation_id\"` is one column");
+            const [defect] = defectsWith([
+                reviewsTable([manyToMany("translations", "company_translation", "reviews_translations", "review_id", "translation_id")]),
+                translationsTable()
+            ]);
+            expect(defect.problem).toContain("`targetKey: \"translation_id\"` is one column");
         });
 
         it("accepts a `via` into it, whose steps compare every key column", () => {
-            const translationsCollection = translationsWith([]);
-            const reviewsCollection: CollectionConfig = {
-                slug: "reviews", name: "reviews", table: "reviews",
-                properties: { id: { type: "number", isId: "increment" } },
-                relations: [{
-                    kind: "via",
-                    relationName: "translation",
-                    cardinality: "one",
-                    target: () => translationsCollection,
-                    joinPath: [{
-                        table: "company_translation",
-                        on: { from: ["translation_id", "translation_locale"], to: ["id", "locale"] }
-                    }]
-                }]
-            };
-
-            expect(defectsWith([reviewsCollection, translationsCollection])).toEqual([]);
+            expect(defectsWith([
+                reviewsTable([via("translation", "company_translation", [{
+                    table: "company_translation",
+                    on: { from: ["translation_id", "translation_locale"], to: ["id", "locale"] }
+                }], "one")]),
+                translationsTable()
+            ])).toEqual([]);
         });
-    });
-});
-
-/**
- * A `collections` array that leaves out a relation's target.
- *
- * `createRebaseBackend({ collections: [postsCollection] })` on the blog
- * scaffold failed boot with "it points at collection `tags`, which has no
- * table `tags` in the schema" and "fix: create the `tags` table" — about a
- * table the database had. `tags` was registered only as the relation's
- * target, so no table had been built for it. The fix is the array.
- */
-describe("a relation whose target is not among the collections passed", () => {
-    const postsCollection = coll("posts", "posts", {
-        relations: [{ kind: "manyToMany", relationName: "tags", target: () => tagsCollection, through: { table: "posts_tags", sourceColumn: "post_id", targetColumn: "tag_id" } }]
-    });
-
-    function onlyPosts(): PostgresCollectionRegistry {
-        const registry = new PostgresCollectionRegistry();
-        registry.registerMultiple([postsCollection]);
-        registry.registerTable(posts, "posts");
-        registry.registerTable(posts_tags, "posts_tags");
-        return registry;
-    }
-
-    it("says the target was not passed, and how to pass it, instead of asking for its table", () => {
-        const registry = onlyPosts();
-        const [defect] = findRelationDefects(registry.getCollections(), registry, [postsCollection]);
-
-        expect(defect.problem).toBe(
-            "it points at collection `tags`, which is not among the collections this backend was given — " +
-            "it is registered only as this relation's target, so no table was built for it"
-        );
-        expect(defect.fix).toBe("add the `tags` collection to the `collections` you pass, or pass every collection the relations reach");
-        expect(defect.problem).not.toContain("has no table");
-    });
-
-    it("says it at boot too", () => {
-        const registry = onlyPosts();
-        expect(() => assertRelationsResolve(registry.getCollections(), registry, [postsCollection]))
-            .toThrow(/add the `tags` collection to the `collections` you pass/);
-    });
-
-    it("still asks for the table when the collection was passed and its table is missing", () => {
-        const registry = new PostgresCollectionRegistry();
-        registry.registerMultiple([postsCollection, tagsCollection]);
-        registry.registerTable(posts, "posts");
-        registry.registerTable(posts_tags, "posts_tags");
-        const [defect] = findRelationDefects(registry.getCollections(), registry, [postsCollection, tagsCollection]);
-        expect(defect.problem).toContain("which has no table `tags` in the schema");
     });
 });

@@ -14,10 +14,10 @@ import { isSchemaDefinitionError } from "../src/schema/errors";
  */
 
 const trim: ColumnTransform<string | null> = { beforeSave: ({ value }) => value?.trim() ?? null };
-const mask: ColumnTransform = { afterRead: () => "•••" };
-const nestedTrim: ColumnTransform = { beforeSave: ({ value }) => typeof value === "string" ? value.trim() : value };
-const caption: ColumnTransform = { afterRead: ({ value }) => value };
-const tag: ColumnTransform = { beforeSave: ({ value }) => value };
+const mask: ColumnTransform<string | null> = { afterRead: () => "•••" };
+const nestedTrim: ColumnTransform<string | undefined> = { beforeSave: ({ value }) => value?.trim() };
+const caption: ColumnTransform<string | undefined> = { afterRead: ({ value }) => value };
+const tag: ColumnTransform<string | null> = { beforeSave: ({ value }) => value };
 
 const auditHooks: TableHooks = {
     beforeSave: ({ values }) => values,
@@ -40,7 +40,7 @@ const users = defineAuthTable("users", {
 const posts = defineTable("posts", {
     columns: {
         id: col.uuid().primaryKey().defaultRandom(),
-        title: col.text().notNull().transform(trim),
+        title: col.text().transform(trim).notNull(),
         secret: col.text().transform(mask),
         plain: col.text(),
         tags: col.array(col.text().transform(tag)),

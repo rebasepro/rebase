@@ -2,7 +2,8 @@ import { CollectionConfig } from "@rebasepro/types";
 import { integer, pgTable, text } from "drizzle-orm/pg-core";
 import { FetchService } from "../src/services/FetchService";
 import { RelationService } from "../src/services/RelationService";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { arrayRowsFor, recordingDb } from "./helpers/spg-b-recording-db";
 
 /**
@@ -18,11 +19,11 @@ import { arrayRowsFor, recordingDb } from "./helpers/spg-b-recording-db";
  * The key columns are right there on the row, so they are read directly.
  */
 describe("REST joinPath relations — parent ids come from the row's key columns", () => {
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
 
-    registry.registerTable(pgTable("sku_items", { sku: text("sku").primaryKey(), label: text("label") }), "sku_items");
-    registry.registerTable(pgTable("memberships", { tenant_id: integer("tenant_id"), user_id: integer("user_id") }), "memberships");
-    registry.registerTable(pgTable("warehouses", { id: integer("id").primaryKey(), city: text("city") }), "warehouses");
+    registry.registerPgTable(pgTable("sku_items", { sku: text("sku").primaryKey(), label: text("label") }), "sku_items");
+    registry.registerPgTable(pgTable("memberships", { tenant_id: integer("tenant_id"), user_id: integer("user_id") }), "memberships");
+    registry.registerPgTable(pgTable("warehouses", { id: integer("id").primaryKey(), city: text("city") }), "warehouses");
 
     const warehousesCollection: CollectionConfig = {
         slug: "warehouses",

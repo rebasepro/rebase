@@ -29,7 +29,7 @@ import { compileTables, lowerTables } from "@rebasepro/common";
 
 import { applyAuthContext, REBASE_USER_ROLE } from "../src/security/rls-enforcement";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { RealtimeService } from "../src/services/realtimeService";
 import { MCP_TOOLS, McpToolError } from "../../server/src/mcp/mcp-tools";
 import { pgliteNodePg } from "./helpers/spg-b-pglite-node-pg";
@@ -68,8 +68,8 @@ let db: PGlite;
  * the restricted role, and every statement runs inside it.
  */
 function rlsDriver(): DataDriver {
-    const registry = new PostgresCollectionRegistry(COLLECTIONS);
-    registry.registerTable(candidatesTable, "candidates");
+    const registry = new FixtureTableRegistry(COLLECTIONS);
+    registry.registerPgTable(candidatesTable, "candidates");
     const orm = pgliteNodePg(db, { schema: { candidates: candidatesTable } });
     const driver = new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry);
     driver.rlsUserRole = REBASE_USER_ROLE;

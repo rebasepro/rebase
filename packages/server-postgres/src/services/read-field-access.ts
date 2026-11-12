@@ -1,6 +1,7 @@
 import type { CollectionConfig, FetchCollectionProps } from "@rebasepro/types";
 import type { FieldViewer } from "@rebasepro/common";
 import { assertQueryFieldsReadable } from "@rebasepro/server";
+import type { PostgresTableRegistry } from "../model/PostgresTableRegistry";
 
 /**
  * Refuse a read that names a field its caller may not read, for the doors that
@@ -21,8 +22,12 @@ import { assertQueryFieldsReadable } from "@rebasepro/server";
 export function assertReadRequestReadable(
     request: Pick<FetchCollectionProps, "filter" | "logical" | "orderBy" | "fields" | "include" | "vectorSearch">,
     collection: CollectionConfig,
-    viewer: FieldViewer
+    viewer: FieldViewer,
+    /** Where the table's descriptor — and its relations' targets' — are read from. */
+    registry: Pick<PostgresTableRegistry, "getTable">
 ): void {
+    const table = registry.getTable(collection.slug)?.descriptor;
+    if (!table) return;
     // Every input the REST check takes. An `include` reads its target's
     // columns — `{ staff: { where: { salary: [">", 100000] } } }` answers which
     // departments employ someone over the line — and a vector search measures
@@ -38,7 +43,7 @@ export function assertReadRequestReadable(
         fields: Array.isArray(request.fields) ? request.fields : undefined,
         include: request.include ?? undefined,
         vectorSearch: typeof vectorProperty === "string" ? { property: vectorProperty } : undefined
-    }, collection, viewer);
+    }, table, viewer, slug => registry.getTable(slug)?.descriptor);
 }
 
 /** The fields an `orderBy` sorts on, in either of its two spellings. */

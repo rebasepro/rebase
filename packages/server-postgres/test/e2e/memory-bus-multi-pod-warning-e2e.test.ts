@@ -20,7 +20,8 @@ import type { CollectionConfig } from "@rebasepro/types";
 import { logger } from "@rebasepro/server";
 
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
-import { PostgresCollectionRegistry } from "../../src/collections/PostgresCollectionRegistry.js";
+import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry.js";
+import { FixtureTableRegistry } from "../helpers/tables";
 import { RealtimeService } from "../../src/services/realtimeService.js";
 
 const posts: CollectionConfig = {
@@ -38,7 +39,7 @@ describe("memory-bus multi-pod warning under change capture (E2E)", () => {
     const services: RealtimeService[] = [];
 
     async function startService(): Promise<RealtimeService> {
-        const registry = new PostgresCollectionRegistry();
+        const registry = new FixtureTableRegistry();
         registry.registerMultiple([posts]);
         const service = new RealtimeService(drizzle(pool), registry);
         await service.enableCdc(container.connectionString);

@@ -7,8 +7,9 @@ import {
     readAuthSchemaVersion,
     resolveAuthSchema
 } from "../src/auth/schema-version";
-import { ensureAuthTablesExist } from "../src/auth/ensure-tables";
-import type { CollectionConfig } from "@rebasepro/types";
+import { authUidSqlType, ensureAuthTablesExist } from "../src/auth/ensure-tables";
+import { col, defineAuthTable, type AnyColumn, type TableDescriptor } from "@rebasepro/types";
+import { compileTables } from "@rebasepro/common";
 import type { PgSqlDatabase } from "../src/interfaces";
 import { answerStatements, queryResult, spiedDrizzle } from "./helpers/spg-a-db";
 
@@ -44,21 +45,50 @@ const allColumns = queryResult([
 ]);
 const noRows = queryResult();
 
+/** The descriptor of a `defineAuthTable` keyed by `id`, in `schema` when given. */
+function usersTable(id: AnyColumn, schema?: string): TableDescriptor {
+    return compileTables([defineAuthTable("users", {
+        ...(schema ? { schema } : {}),
+        columns: { id, email: col.text() },
+        rls: "admin-only"
+    })])[0];
+}
+
 describe("resolveAuthSchema", () => {
     // Drift between this and the derivation inside `ensureAuthTablesExist` would
     // write the stamp to one schema and read it from another — which reads as
     // "never stamped" forever, silently disabling the guard.
-    it("defaults to rebase when there is no auth collection", () => {
+    it("defaults to rebase when there is no auth table", () => {
         expect(resolveAuthSchema()).toBe("rebase");
     });
 
     it("puts auth tables in rebase when the users table is in public", () => {
-        expect(resolveAuthSchema({ slug: "users", schema: "public" } as CollectionConfig)).toBe("rebase");
-        expect(resolveAuthSchema({ slug: "users" } as CollectionConfig)).toBe("rebase");
+        expect(resolveAuthSchema(usersTable(col.uuid().primaryKey(), "public"))).toBe("rebase");
+        expect(resolveAuthSchema(usersTable(col.uuid().primaryKey()))).toBe("rebase");
     });
 
     it("follows the users table into a custom schema", () => {
-        expect(resolveAuthSchema({ slug: "users", schema: "tenant_a" } as CollectionConfig)).toBe("tenant_a");
+        expect(resolveAuthSchema(usersTable(col.uuid().primaryKey(), "tenant_a"))).toBe("tenant_a");
+    });
+});
+
+describe("authUidSqlType", () => {
+    // Read from the auth table's key column. It used to be read from `isId` on
+    // a property named `id`, so any other key spelling typed every `uid`
+    // foreign key TEXT.
+    it("is UUID for a uuid key", () => {
+        expect(authUidSqlType(usersTable(col.uuid().primaryKey().defaultRandom()))).toBe("UUID");
+    });
+
+    it("is INTEGER for the integer family, given or generated", () => {
+        expect(authUidSqlType(usersTable(col.integer().primaryKey().identity()))).toBe("INTEGER");
+        expect(authUidSqlType(usersTable(col.integer().primaryKey()))).toBe("INTEGER");
+        expect(authUidSqlType(usersTable(col.bigserial().primaryKey()))).toBe("INTEGER");
+    });
+
+    it("is TEXT for a text key, and with no auth table", () => {
+        expect(authUidSqlType(usersTable(col.text().primaryKey()))).toBe("TEXT");
+        expect(authUidSqlType(undefined)).toBe("TEXT");
     });
 });
 

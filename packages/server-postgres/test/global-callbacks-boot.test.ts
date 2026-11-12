@@ -22,7 +22,8 @@ import type { BackendBootstrapper, CollectionConfig, InitializedDriver, TableHoo
 import { initializeRebaseBackend, _resetRebaseMock } from "@rebasepro/server";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { RealtimeService } from "../src/services/realtimeService";
 import { pgliteNodePg } from "./helpers/spg-b-pglite-node-pg";
 import { tablesFrom } from "./helpers/tables";
@@ -56,9 +57,9 @@ let shutdown: (() => Promise<void>) | undefined;
 
 /** A driver over PGlite, returned with its own registry, as the bootstrapper returns one. */
 function bootstrapperOver(pglite: PGlite): { bootstrapper: BackendBootstrapper; driver: PostgresBackendDriver } {
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
     registry.registerMultiple([notes()]);
-    registry.registerTable(notesTable, "notes");
+    registry.registerPgTable(notesTable, "notes");
     const orm = pgliteNodePg(pglite);
     const driver = new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry);
     const bootstrapper: BackendBootstrapper = {

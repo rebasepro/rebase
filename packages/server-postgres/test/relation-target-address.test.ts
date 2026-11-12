@@ -1,6 +1,7 @@
 import { CollectionConfig } from "@rebasepro/types";
 import { toFlatRow } from "../src/services/row-pipeline";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { textTable } from "./helpers/spg-c-tables";
 
 /**
@@ -14,7 +15,7 @@ import { textTable } from "./helpers/spg-c-tables";
  * `buildCompositeId` now.
  */
 describe("relation ref target — addressed by the whole key", () => {
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
 
     // Composite-keyed target: a seat identified by (row, number).
     const seatsCollection: CollectionConfig = {
@@ -45,7 +46,7 @@ isId: "increment" },
         jest.restoreAllMocks();
         jest.spyOn(registry, "getCollectionByPath").mockImplementation(path =>
             path.startsWith("bookings") ? bookingsCollection : seatsCollection);
-        jest.spyOn(registry, "getTable").mockImplementation(name => {
+        jest.spyOn(registry, "getPgTable").mockImplementation(name => {
             if (name === "bookings") return textTable("bookings", ["id"]);
             if (name === "seats") return textTable("seats", ["seat_row", "seat_number", "occupant"]);
             return undefined;
@@ -92,7 +93,7 @@ occupant: "Ada" }
                 }
             ]
         };
-        jest.spyOn(registry, "getTable").mockImplementation(name => {
+        jest.spyOn(registry, "getPgTable").mockImplementation(name => {
             if (name === "bookings") return textTable("bookings", ["id"]);
             if (name === "notes") return textTable("notes", ["body"]);
             return undefined;

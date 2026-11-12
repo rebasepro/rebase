@@ -16,7 +16,8 @@ import { pgTable, varchar } from "drizzle-orm/pg-core";
 import type { CollectionConfig } from "@rebasepro/types";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { RealtimeService } from "../src/services/realtimeService";
 import { pgliteNodePg } from "./helpers/spg-b-pglite-node-pg";
 
@@ -49,9 +50,9 @@ function tagsCollection(beforeSave?: (values: Record<string, unknown>) => Record
 let db: PGlite;
 
 function driverOver(collection: CollectionConfig): PostgresBackendDriver {
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
     registry.registerMultiple([collection]);
-    registry.registerTable(tagsTable, "tags");
+    registry.registerPgTable(tagsTable, "tags");
     const orm = pgliteNodePg(db, { schema: { tags: tagsTable } });
     return new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry);
 }

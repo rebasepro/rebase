@@ -4,7 +4,8 @@ import { drizzle as drizzleNodePg } from "drizzle-orm/node-postgres";
 import { Client, Pool } from "pg";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { RealtimeService } from "../src/services/realtimeService";
 import { SqlTransactionLeftOpenError } from "../src/services/sql-script";
 import { pgliteNodePg } from "./helpers/spg-b-pglite-node-pg";
@@ -26,7 +27,7 @@ import { pgliteNodePg } from "./helpers/spg-b-pglite-node-pg";
  */
 
 function driverOver(db: ReturnType<typeof pgliteNodePg> | ReturnType<typeof drizzleNodePg>): PostgresBackendDriver {
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
     return new PostgresBackendDriver(db, new RealtimeService(db, registry), registry);
 }
 

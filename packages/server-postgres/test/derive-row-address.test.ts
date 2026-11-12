@@ -1,7 +1,8 @@
 import { CollectionConfig } from "@rebasepro/types";
 import { pgTable, text } from "drizzle-orm/pg-core";
 import { deriveRowAddress } from "../src/services/collection-helpers";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 
 /**
  * The address of a row, derived rather than read off it.
@@ -13,7 +14,7 @@ import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectio
  * they all share.
  */
 describe("deriveRowAddress", () => {
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
 
     /** A table of plain columns, none of them declared a primary key. */
     const table = (name: string, columns: string[]) =>
@@ -77,16 +78,11 @@ isId: true },
         }
     };
 
-    beforeEach(() => {
-        jest.restoreAllMocks();
-        jest.spyOn(registry, "getTable").mockImplementation(name => {
-            if (name === "products") return table("products", ["id", "name"]);
-            if (name === "sku_items") return table("sku_items", ["sku", "label"]);
-            if (name === "memberships") return table("memberships", ["tenant_id", "user_id", "role"]);
-            if (name === "events") return table("events", ["event_id", "id", "name"]);
-            return undefined;
-        });
-    });
+    registry.registerMultiple([productsCollection, skuItemsCollection, membershipsCollection, eventsCollection, unregisteredCollection]);
+    registry.registerPgTable(table("products", ["id", "name"]), "products");
+    registry.registerPgTable(table("sku_items", ["sku", "label"]), "sku_items");
+    registry.registerPgTable(table("memberships", ["tenant_id", "user_id", "role"]), "memberships");
+    registry.registerPgTable(table("events", ["event_id", "id", "name"]), "events");
 
     it("derives a single key from its own column", () => {
         expect(deriveRowAddress({ id: 42,
@@ -116,9 +112,9 @@ name: "Launch" },
         )).toBe("7");
     });
 
-    it("falls back to a literal `id` when the table cannot be resolved", () => {
-        // `getPrimaryKeys` throws for an unregistered table rather than
-        // returning nothing, so the fallback has to survive an exception.
+    it("addresses a table keyed by an implicit `id` by that column", () => {
+        // A collection declaring no key lifts to the implicit `id` key; the
+        // database holds no table for it here, so the descriptor answers.
         expect(deriveRowAddress({ id: "abc",
 name: "Boo" }, unregisteredCollection, registry)).toBe("abc");
     });

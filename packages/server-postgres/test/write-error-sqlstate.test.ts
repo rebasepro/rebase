@@ -1,5 +1,6 @@
 import { PersistService } from "../src/services/PersistService";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { unusedDb } from "./helpers/spg-c-db";
 
 /**
@@ -27,7 +28,7 @@ function pgFailure(code: string, message: string): Error {
 
 /** The private translator, reached the way its callers reach it. */
 function translate(error: unknown): Error {
-    const service = new PersistService(unusedDb(), new PostgresCollectionRegistry());
+    const service = new PersistService(unusedDb(), new FixtureTableRegistry());
     // Private: read by name, then narrowed to what it is.
     const toUserFriendlyError: unknown = Reflect.get(service, "toUserFriendlyError");
     if (typeof toUserFriendlyError !== "function") throw new Error("PersistService has no toUserFriendlyError");

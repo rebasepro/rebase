@@ -13,7 +13,8 @@
  * memory without bound.
  */
 import { RealtimeService } from "../src/services/realtimeService";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { CollectionConfig } from "@rebasepro/types";
 import { WebSocket } from "ws";
 import type { RealtimeClientSocket } from "../src/services/realtimeService";
@@ -45,7 +46,7 @@ const postsCollection: CollectionConfig = {
 
 function createService() {
     const { db } = transactionalDrizzle();
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
     jest.spyOn(registry, "getCollectionByPath").mockReturnValue(postsCollection);
     return new RealtimeService(db, registry);
 }

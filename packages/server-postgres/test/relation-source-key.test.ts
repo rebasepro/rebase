@@ -1,7 +1,8 @@
 import type { CollectionConfig, ResolvedHasMany } from "@rebasepro/types";
 import { resolveCollectionRelations } from "@rebasepro/common";
 import { RelationService } from "../src/services/RelationService";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { recordingDb, shapedRows } from "./helpers/spg-c-db";
 import { textTable } from "./helpers/spg-c-tables";
 
@@ -20,7 +21,7 @@ import { textTable } from "./helpers/spg-c-tables";
  * value does not error either, it hands one parent's children to another.
  */
 describe("hasMany/hasOne — sourceKey", () => {
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
 
     const applications: CollectionConfig = {
         slug: "talent_applications",
@@ -87,7 +88,7 @@ describe("hasMany/hasOne — sourceKey", () => {
         jest.restoreAllMocks();
         jest.spyOn(registry, "getCollectionByPath").mockImplementation(path =>
             path.startsWith("talents") ? talents : applications);
-        jest.spyOn(registry, "getTable").mockImplementation(name => {
+        jest.spyOn(registry, "getPgTable").mockImplementation(name => {
             if (name === "talents") return textTable("talents", ["id", "auth_user_id"]);
             if (name === "talent_applications") return textTable("talent_applications", ["id", "auth_user_id", "role"]);
             return undefined;
@@ -205,7 +206,7 @@ describe("hasMany/hasOne — sourceKey", () => {
         };
         jest.spyOn(registry, "getCollectionByPath").mockImplementation(path =>
             path.startsWith("talents") ? plain : applications);
-        jest.spyOn(registry, "getTable").mockImplementation(name => {
+        jest.spyOn(registry, "getPgTable").mockImplementation(name => {
             if (name === "talents") return textTable("talents", ["id", "auth_user_id"]);
             if (name === "talent_applications") return textTable("talent_applications", ["id", "talentId", "role"]);
             return undefined;
@@ -239,7 +240,7 @@ describe("hasMany/hasOne — sourceKey", () => {
         };
         jest.spyOn(registry, "getCollectionByPath").mockImplementation(path =>
             path.startsWith("talents") ? plain : applications);
-        jest.spyOn(registry, "getTable").mockImplementation(name => {
+        jest.spyOn(registry, "getPgTable").mockImplementation(name => {
             if (name === "talents") return textTable("talents", ["id", "auth_user_id"]);
             if (name === "talent_applications") return textTable("talent_applications", ["id", "talentId", "role"]);
             return undefined;

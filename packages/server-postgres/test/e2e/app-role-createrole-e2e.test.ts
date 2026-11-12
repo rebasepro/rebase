@@ -33,7 +33,8 @@ import {
     type RawSqlRunner
 } from "../../src/security/rls-enforcement.js";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
-import { PostgresCollectionRegistry } from "../../src/collections/PostgresCollectionRegistry.js";
+import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry.js";
+import { FixtureTableRegistry } from "../helpers/tables";
 import { RealtimeService } from "../../src/services/realtimeService.js";
 import { testUser } from "./test-user.js";
 
@@ -91,9 +92,9 @@ describe.each([
         const applied = await ensureCollectionPolicies(queryable, [notesCollection]);
         expect(applied.failures).toEqual([]);
 
-        const registry = new PostgresCollectionRegistry();
+        const registry = new FixtureTableRegistry();
         registry.registerMultiple([notesCollection]);
-        registry.registerTable(notesTable, "notes");
+        registry.registerPgTable(notesTable, "notes");
         const realtime = new RealtimeService(db, registry);
         driver = new PostgresBackendDriver(db, realtime, registry);
         realtime.setDataDriver(driver);

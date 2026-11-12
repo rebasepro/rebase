@@ -1,5 +1,6 @@
 import { integer, pgTable, text } from "drizzle-orm/pg-core";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { bindJoinPathJunction, bindThroughJunction } from "../src/services/junction-writes";
 
 /**
@@ -18,10 +19,10 @@ import { bindJoinPathJunction, bindThroughJunction } from "../src/services/junct
  * are legal, so both are pinned here.
  */
 describe("binding a junction's two columns", () => {
-    const registry = new PostgresCollectionRegistry();
-    registry.registerTable(pgTable("posts", { id: integer("id").primaryKey(), title: text("title") }), "posts");
-    registry.registerTable(pgTable("tags", { id: integer("id").primaryKey(), label: text("label") }), "tags");
-    registry.registerTable(pgTable("posts_tags", { post_id: integer("post_id"), tag_id: integer("tag_id") }), "posts_tags");
+    const registry = new FixtureTableRegistry();
+    registry.registerPgTable(pgTable("posts", { id: integer("id").primaryKey(), title: text("title") }), "posts");
+    registry.registerPgTable(pgTable("tags", { id: integer("id").primaryKey(), label: text("label") }), "tags");
+    registry.registerPgTable(pgTable("posts_tags", { post_id: integer("post_id"), tag_id: integer("tag_id") }), "posts_tags");
 
     describe("declared with `through`", () => {
         it("takes the two columns as named", () => {

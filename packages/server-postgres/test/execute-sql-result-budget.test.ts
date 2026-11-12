@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { RealtimeService } from "../src/services/realtimeService";
 import { pgliteNodePg } from "./helpers/spg-b-pglite-node-pg";
 import { refuseOversizedRows, SQL_RESULT_BYTE_BUDGET, SqlResultTooLargeError } from "../src/services/sql-script";
@@ -31,7 +32,7 @@ describe("the byte budget on PGlite", () => {
         pglite = new PGlite();
         await pglite.waitReady;
         const db = pgliteNodePg(pglite);
-        const registry = new PostgresCollectionRegistry();
+        const registry = new FixtureTableRegistry();
         driver = new PostgresBackendDriver(db, new RealtimeService(db, registry), registry);
     });
 

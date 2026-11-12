@@ -1,10 +1,11 @@
 /**
  * Small, real fixtures for the unit tests: a collection that only needs a
- * name, and a registry that answers `getTable` from a fixed map.
+ * name, and a registry that answers `getPgTable` from a fixed map.
  */
 import type { PgTable } from "drizzle-orm/pg-core";
 import type { PostgresCollectionConfig } from "@rebasepro/types";
-import { PostgresCollectionRegistry } from "../../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./tables";
 
 /**
  * A minimal real collection — enough for the code that only identifies one
@@ -20,9 +21,15 @@ export function namedCollection(slug: string, extra: Partial<PostgresCollectionC
     };
 }
 
-/** A real registry whose `getTable` answers from `tables`, as a spy a test can inspect. */
-export function registryWithTables(tables: Record<string, PgTable>): PostgresCollectionRegistry {
-    const registry = new PostgresCollectionRegistry();
-    jest.spyOn(registry, "getTable").mockImplementation((name) => tables[name]);
+/**
+ * A real registry holding these catalogue tables under these names, its
+ * `getPgTable` a spy that calls through. Fixture collections registered on it
+ * afterwards get their runtime tables built over them.
+ */
+export function registryWithTables(tables: Record<string, PgTable>): PostgresTableRegistry {
+    const registry = new FixtureTableRegistry();
+    for (const [name, table] of Object.entries(tables)) registry.registerPgTable(table, name);
+    // Calls through: a test can still ask which tables were looked up.
+    jest.spyOn(registry, "getPgTable");
     return registry;
 }

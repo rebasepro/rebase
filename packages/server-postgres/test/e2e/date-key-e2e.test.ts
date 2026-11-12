@@ -45,7 +45,7 @@ describe("a date in a composite key (E2E)", () => {
         const conn = createPostgresDatabaseConnection(container.connectionString);
         try {
             const bootstrapper = createPostgresBootstrapper({ connectionString: container.connectionString, connection: conn.db });
-            const driverResult = await bootstrapper.initializeDriver({ collections: [scores], realtime: { subscribe: false, provision: false } });
+            const driverResult = await bootstrapper.initializeDriver({ collections: [scores], tables: tablesFromCollections([scores]).tables, realtime: { subscribe: false, provision: false } });
             await bootstrapper.ensureCollectionSchema!([scores], driverResult);
             await bootstrapper.ensureRlsRuntime!(driverResult);
             await bootstrapper.ensureCollectionPolicies!([scores], driverResult);
@@ -53,7 +53,7 @@ describe("a date in a composite key (E2E)", () => {
         } finally {
             await conn.pool.end();
         }
-        rebase = await openRebase({ databaseUrl: container.connectionString, collections: [scores] });
+        rebase = await openRebase({ databaseUrl: container.connectionString, collections: [scores], tables: tablesFromCollections([scores]).tables });
     }, 180_000);
 
     afterAll(async () => {

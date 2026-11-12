@@ -12,7 +12,8 @@
  *   the target table with correct FK values.
  */
 import { RelationService } from "../src/services/RelationService";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import type { CollectionConfig, ResolvedRelation } from "@rebasepro/types";
 import { resolveCollectionRelations } from "@rebasepro/common";
 import { integer, pgTable, text } from "drizzle-orm/pg-core";
@@ -79,7 +80,7 @@ function generateMockAuthors(count: number): Array<{ id: number; name: string }>
 
 // ─── Tests ────────────────────────────────────────────────────────
 describe("N+1 Query Regression: batchFetchRelatedEntities (owning relations)", () => {
-    let registry: PostgresCollectionRegistry;
+    let registry: PostgresTableRegistry;
     let selects: () => RecordedQuery[];
 
     /**
@@ -100,9 +101,9 @@ describe("N+1 Query Regression: batchFetchRelatedEntities (owning relations)", (
     }
 
     beforeEach(() => {
-        registry = new PostgresCollectionRegistry([postsCollection, authorsCollection]);
-        registry.registerTable(postsTable, "posts");
-        registry.registerTable(authorsTable, "authors");
+        registry = new FixtureTableRegistry([postsCollection, authorsCollection]);
+        registry.registerPgTable(postsTable, "posts");
+        registry.registerPgTable(authorsTable, "authors");
     });
 
     it("should use exactly 2 SQL queries for owning relation batch fetch (not N+1)", async () => {

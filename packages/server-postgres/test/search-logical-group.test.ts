@@ -24,7 +24,8 @@ import { CollectionConfig, LogicalCondition } from "@rebasepro/types";
 import { pgTable, serial, text, vector } from "drizzle-orm/pg-core";
 import { FetchService } from "../src/services/FetchService";
 import { RealtimeService } from "../src/services/realtimeService";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { recordingDb } from "./helpers/spg-c-db";
 import { fakeRealtimeSocket } from "./helpers/spg-c-socket";
 
@@ -76,11 +77,11 @@ const setup = () => {
     /** The SQL the driver was handed, and its bound values. */
     const queries = () => statements.map((statement) => ({ sql: statement.text, params: statement.values }));
 
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
     jest.spyOn(registry, "getCollectionByPath").mockImplementation(path =>
         path === "docs" ? docsCollection : undefined
     );
-    jest.spyOn(registry, "getTable").mockImplementation(name =>
+    jest.spyOn(registry, "getPgTable").mockImplementation(name =>
         name === "docs" ? docs : undefined
     );
 
@@ -160,7 +161,7 @@ describe("the same group survives a live search subscription", () => {
     it("is handed to the RLS-bound refetch, not dropped at the branch", async () => {
         const { db } = recordingDb();
 
-        const registry = new PostgresCollectionRegistry();
+        const registry = new FixtureTableRegistry();
         jest.spyOn(registry, "getCollectionByPath").mockReturnValue(docsCollection);
 
         const service = new RealtimeService(db, registry);

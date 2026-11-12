@@ -67,7 +67,7 @@ async function provision(url: string, collections: CollectionConfig[]): Promise<
     const conn = createPostgresDatabaseConnection(url);
     try {
         const bootstrapper = createPostgresBootstrapper({ connectionString: url, connection: conn.db });
-        const driverResult = await bootstrapper.initializeDriver({ collections, realtime: { subscribe: false, provision: false } });
+        const driverResult = await bootstrapper.initializeDriver({ collections, tables: tablesFromCollections(collections).tables, realtime: { subscribe: false, provision: false } });
         await bootstrapper.ensureCollectionSchema!(collections, driverResult);
         await bootstrapper.ensureRlsRuntime!(driverResult);
         await bootstrapper.ensureCollectionPolicies!(collections, driverResult);
@@ -111,7 +111,7 @@ describe("view collections (E2E)", () => {
         await admin.query(`INSERT INTO public.songs (owner_id, artist, lang) VALUES
             ('ada', 'Rosalía', 'es'), ('ada', 'ROSALÍA', 'es'), ('ada', 'Björk', 'en'), ('bob', 'Muse', 'en')`);
         await provision(container.connectionString, [songs, artists(), langs()]);
-        rebase = await openRebase({ databaseUrl: container.connectionString, collections: [songs, artists(), langs()] });
+        rebase = await openRebase({ databaseUrl: container.connectionString, collections: [songs, artists(), langs()], tables: tablesFromCollections([songs, artists(), langs()]).tables });
     }, 180_000);
 
     afterAll(async () => {

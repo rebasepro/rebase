@@ -27,6 +27,7 @@ import { createPostgresAdapter, createPostgresBootstrapper, createPostgresDataba
 import { defineFunction, initializeRebaseBackend, rebase as serverRebase, _resetRebaseMock } from "../../../server/src/index.js";
 import type { HonoEnv } from "../../../server/src/api/types.js";
 import { Hono } from "hono";
+import { tablesFromCollections } from "../helpers/tables.js";
 
 const tickets: CollectionConfig = {
     name: "Tickets",
@@ -71,7 +72,7 @@ describe("sqlAsAdmin (E2E)", () => {
         const conn = createPostgresDatabaseConnection(container.connectionString);
         try {
             const bootstrapper = createPostgresBootstrapper({ connectionString: container.connectionString, connection: conn.db });
-            const driverResult = await bootstrapper.initializeDriver({ collections: [tickets], realtime: { subscribe: false, provision: false } });
+            const driverResult = await bootstrapper.initializeDriver({ collections: [tickets], tables: tablesFromCollections([tickets]).tables, realtime: { subscribe: false, provision: false } });
             await bootstrapper.ensureCollectionSchema!([tickets], driverResult);
             await bootstrapper.ensureRlsRuntime!(driverResult);
             await bootstrapper.ensureCollectionPolicies!([tickets], driverResult);
@@ -79,7 +80,7 @@ describe("sqlAsAdmin (E2E)", () => {
         } finally {
             await conn.pool.end();
         }
-        rebase = await openRebase({ databaseUrl: container.connectionString, collections: [tickets] });
+        rebase = await openRebase({ databaseUrl: container.connectionString, collections: [tickets], tables: tablesFromCollections([tickets]).tables });
         await rebase.sql("INSERT INTO public.tickets (device, plays) VALUES ('d1', 1), ('d2', 2)");
     }, 180_000);
 
@@ -183,7 +184,7 @@ describe("rebase.sqlAsAdmin in a function, on a backend with auth (E2E)", () => 
         expect(await run("SELECT rebase.uid() AS uid, rebase.roles() AS roles")).toEqual({ rows: [{ uid: "service", roles: "admin" }] });
         expect(await run("SELECT count(*)::int AS n FROM public.tickets")).toEqual({ rows: [{ n: 0 }] });
         // The auth store is not the service identity's to read.
-        const opened = await openRebase({ databaseUrl: container.connectionString, collections: [tickets] });
+        const opened = await openRebase({ databaseUrl: container.connectionString, collections: [tickets], tables: tablesFromCollections([tickets]).tables });
         const plain = await opened.withAuth({ uid: "00000000-0000-4000-8000-000000000001", roles: [] });
         const anon = await opened.withAuth({ uid: "anon", roles: ["anonymous"] });
         const seen = { plain: await plain.sql("SELECT email, password_hash FROM rebase.users").catch((e: { cause?: { code?: string } }) => e.cause?.code),
@@ -229,7 +230,7 @@ describe("the users collection, registered, keeps its grant and its policies (E2
     }, 60_000);
 
     it("leaves rebase.users granted under RLS: admins read it, others do not, and no hash comes out", async () => {
-        const opened = await openRebase({ databaseUrl: container.connectionString, collections: [tickets, defaultUsersCollection] });
+        const opened = await openRebase({ databaseUrl: container.connectionString, collections: [tickets, defaultUsersCollection], tables: tablesFromCollections([tickets, defaultUsersCollection]).tables });
         try {
             const [table] = await opened.sql(
                 "SELECT c.relrowsecurity AS rls, has_table_privilege('rebase_user', c.oid, 'SELECT') AS granted FROM pg_class c WHERE c.oid = 'rebase.users'::regclass"

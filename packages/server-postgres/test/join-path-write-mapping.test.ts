@@ -1,7 +1,8 @@
 import { describe, expect, it } from "@jest/globals";
 import type { CollectionConfig, ResolvedVia } from "@rebasepro/types";
 import { RelationWriteService } from "../src/services/RelationWriteService";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { recordingDb } from "./helpers/spg-b-recording-db";
 
 /**
@@ -16,7 +17,7 @@ import { recordingDb } from "./helpers/spg-b-recording-db";
  */
 
 const products: CollectionConfig = { slug: "products", name: "Products", table: "products", properties: {} };
-const service = new RelationWriteService(recordingDb().db, new PostgresCollectionRegistry());
+const service = new RelationWriteService(recordingDb().db, new FixtureTableRegistry());
 
 function via(joinPath: ResolvedVia["joinPath"]): ResolvedVia {
     return {

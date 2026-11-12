@@ -26,7 +26,8 @@ import type { BackendBootstrapper, CollectionCallbacks, CollectionConfig, Initia
 import { initializeRebaseBackend, rebase, _resetRebaseMock, type HonoEnv } from "@rebasepro/server";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { RealtimeService } from "../src/services/realtimeService";
 import { tablesFrom } from "./helpers/tables";
 
@@ -88,9 +89,9 @@ function widgets(): CollectionConfig {
 }
 
 function driverOver(pglite: PGlite): PostgresBackendDriver {
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
     registry.registerMultiple([widgets()]);
-    registry.registerTable(widgetsTable, "widgets");
+    registry.registerPgTable(widgetsTable, "widgets");
     const orm = drizzle(pglite);
     return new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry);
 }

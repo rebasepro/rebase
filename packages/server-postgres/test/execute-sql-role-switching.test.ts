@@ -7,7 +7,8 @@ import {
     CONNECTION_OWNER
 } from "../src/PostgresBackendDriver";
 import { RealtimeService } from "../src/services/realtimeService";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { recordingDb, type RecordedQuery } from "./helpers/spg-b-recording-db";
 
 /**
@@ -79,7 +80,7 @@ describe("executeSql role switching", () => {
         });
         ({ execute, transaction } = spyOnDb(db));
 
-        const registry = new PostgresCollectionRegistry();
+        const registry = new FixtureTableRegistry();
         driver = new PostgresBackendDriver(db, new RealtimeService(db, registry), registry);
     });
 

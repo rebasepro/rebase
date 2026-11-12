@@ -77,7 +77,8 @@ import { openSocket, type OpenSocket } from "./helpers/spg-a-socket";
 import type { CollectionConfig } from "@rebasepro/types";
 import { PgNotifyListener } from "../src/services/pg-notify-listener";
 import { RealtimeService } from "../src/services/realtimeService";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 
 const posts: CollectionConfig = {
     slug: "posts",
@@ -160,7 +161,7 @@ describe("RealtimeService's cross-instance listener", () => {
 
     beforeEach(() => {
         const { db } = transactionalDrizzle();
-        const registry = new PostgresCollectionRegistry();
+        const registry = new FixtureTableRegistry();
         registry.registerMultiple([posts]);
         service = new RealtimeService(db, registry);
         // The refetch reads through a driver only when one is attached; the

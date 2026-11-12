@@ -22,7 +22,7 @@ import {
 import { parseDataFromServer } from "../data-transformer";
 import { stripUnreadable, toRestRow } from "./row-pipeline";
 import { hiddenColumnsOption } from "../schema/search-column";
-import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../model/PostgresTableRegistry";
 import { ApiError, logger } from "@rebasepro/server";
 import type { NestedPathHop } from "./nested-path";
 import { bindThroughJunction } from "./junction-writes";
@@ -327,7 +327,7 @@ export interface RelatedRow<M extends Record<string, unknown> = Record<string, u
 export class RelationService {
     constructor(
         private db: DrizzleClient,
-        private registry: PostgresCollectionRegistry,
+        private registry: PostgresTableRegistry,
         /**
          * How this service's reads reach the identity their `beforeQuery` hooks
          * run as. Passed by the driver that constructed it; absent only in a
@@ -396,7 +396,7 @@ export class RelationService {
         const targetTable = getTableForCollection(targetCollection, this.registry);
         return andSoftDelete(
             await this.narrowTargetRead(parentCollection, relation, parentId),
-            targetCollection,
+            this.registry.requireTable(targetCollection.slug),
             targetTable
         );
     }
@@ -739,7 +739,7 @@ export class RelationService {
         const parsedParentIdObj = parseIdValues(parentId, parentPks);
         const parsedParentId = parsedParentIdObj[parentIdInfo.fieldName];
         const parentTableName = getTableName(parentCollection);
-        const parentTable = this.registry.getTable(parentTableName);
+        const parentTable = this.registry.getPgTable(parentTableName);
         if (!parentTable) throw unregisteredTable(parentCollection.slug, parentTableName, "parent");
         const parentIdCol = parentTable[parentIdInfo.fieldName as keyof typeof parentTable] as AnyPgColumn;
 
@@ -756,7 +756,7 @@ export class RelationService {
 
             // Apply each join in the path
             for (const join of relation.joinPath) {
-                const joinTable = this.registry.getTable(join.table);
+                const joinTable = this.registry.getPgTable(join.table);
                 if (!joinTable) {
                     throw new Error(`Join table not found: ${join.table}`);
                 }
@@ -778,7 +778,7 @@ export class RelationService {
             // same rows.
             query = query.where(narrowed(
                 rowIdentityCondition(parentTable, parentPks, parentId, parentCollection.slug),
-                andSoftDelete(relatedNarrowing, targetCollection, targetTable)
+                andSoftDelete(relatedNarrowing, this.registry.requireTable(targetCollection.slug), targetTable)
             ));
 
             if (options.limit) {
@@ -820,7 +820,7 @@ export class RelationService {
 
         // Soft delete on the *target*: the rows being loaded belong to the
         // target collection, so it is that collection's flag that decides.
-        const relatedSoftDelete = softDeleteCondition(targetCollection, targetTable);
+        const relatedSoftDelete = softDeleteCondition(this.registry.requireTable(targetCollection.slug), targetTable);
         if (relatedSoftDelete) additionalFilters.push(relatedSoftDelete);
 
         // And the target's `beforeQuery`, for the same reason.
@@ -939,7 +939,7 @@ export class RelationService {
         const parsedParentIdObj = parseIdValues(parentId, parentPks);
         const parsedParentId = parsedParentIdObj[parentIdInfo.fieldName];
         const parentTableName = getTableName(parentCollection);
-        const parentTable = this.registry.getTable(parentTableName);
+        const parentTable = this.registry.getPgTable(parentTableName);
         if (!parentTable) throw unregisteredTable(parentCollection.slug, parentTableName, "parent");
         const parentIdCol = parentTable[parentIdInfo.fieldName as keyof typeof parentTable] as AnyPgColumn;
 
@@ -955,7 +955,7 @@ export class RelationService {
 
         // Soft delete, so a relation's count agrees with what loading it
         // returns — `isRelated` gates writes on this number.
-        const countSoftDelete = softDeleteCondition(targetCollection, targetTable);
+        const countSoftDelete = softDeleteCondition(this.registry.requireTable(targetCollection.slug), targetTable);
         if (countSoftDelete) additionalFilters = [...additionalFilters, countSoftDelete];
 
         // The target's `beforeQuery`, so the count and the listing describe the
@@ -1079,7 +1079,7 @@ export class RelationService {
         const parentPks = requirePrimaryKeys(parentCollection, this.registry);
         const parentIdInfo = parentPks[0];
         const parentTableName = getTableName(parentCollection);
-        const parentTable = this.registry.getTable(parentTableName);
+        const parentTable = this.registry.getPgTable(parentTableName);
         if (!parentTable) throw unregisteredTable(parentCollection.slug, parentTableName, "parent");
         const parentIdCol = parentTable[parentIdInfo.fieldName as keyof typeof parentTable] as AnyPgColumn;
 
@@ -1100,7 +1100,7 @@ export class RelationService {
         // soft-delete stamp for the same reason and at the same point.
         const narrowTarget = andSoftDelete(
             narrowBoth(narrow, await this.narrowTargetRead(parentCollection, relation)),
-            targetCollection, targetTable
+            this.registry.requireTable(targetCollection.slug), targetTable
         );
 
         // Handle join path relations with batching
@@ -1110,7 +1110,7 @@ export class RelationService {
 
             // Apply each join in the path
             for (const join of relation.joinPath) {
-                const joinTable = this.registry.getTable(join.table);
+                const joinTable = this.registry.getPgTable(join.table);
                 if (!joinTable) {
                     throw new Error(`Join table not found: ${join.table}`);
                 }
@@ -1343,7 +1343,7 @@ export class RelationService {
         const parentPks = requirePrimaryKeys(parentCollection, this.registry);
         const parentIdInfo = parentPks[0];
         const parentTableName = getTableName(parentCollection);
-        const parentTable = this.registry.getTable(parentTableName);
+        const parentTable = this.registry.getPgTable(parentTableName);
         if (!parentTable) throw unregisteredTable(parentCollection.slug, parentTableName, "parent");
         const parentIdCol = parentTable[parentIdInfo.fieldName as keyof typeof parentTable] as AnyPgColumn;
 
@@ -1363,7 +1363,7 @@ export class RelationService {
         // soft-delete stamp for the same reason and at the same point.
         const narrowTarget = andSoftDelete(
             narrowBoth(narrow, await this.narrowTargetRead(parentCollection, relation)),
-            targetCollection, targetTable
+            this.registry.requireTable(targetCollection.slug), targetTable
         );
 
         // Handle join path relations (many-to-many through junction tables)
@@ -1372,7 +1372,7 @@ export class RelationService {
             let currentTable = parentTable;
 
             for (const join of relation.joinPath) {
-                const joinTable = this.registry.getTable(join.table);
+                const joinTable = this.registry.getPgTable(join.table);
                 if (!joinTable) throw new Error(`Join table not found: ${join.table}`);
 
                 const step = joinStepCondition(currentTable, joinTable, join);

@@ -1,134 +1,99 @@
-import { CollectionConfig } from "@rebasepro/types";
+import { col, defineTable, rel } from "@rebasepro/types";
+import { compileSchema, lowerTables } from "@rebasepro/common";
 import { pgTable, serial, text, integer } from "drizzle-orm/pg-core";
-import { buildCollectionRegistry } from "../src/collections/buildRegistry";
+import { buildTableRegistry } from "../src/model/build-registry";
 
 /**
- * Building the registry is an ordering problem, which is why it is one function.
+ * Building a driver's registry: one entry per table, carrying the compiled
+ * table (as a runtime table over its catalogue table) and the collection it
+ * was lowered into. An entry with one half and not the other is refused at
+ * build time — the half a reader would miss is exactly where a fallback would
+ * otherwise answer.
  *
- * Keys are resolved from the drizzle schema, so anything that reads them has to
- * run after the tables are registered. `warnOnKeysTheAdminCannotResolve` is the
- * one that does, and it fails *open*: a collection whose table it cannot look
- * up is one it skips, because a collection on another engine legitimately has
- * none. Run before the tables land, it skips everything and reports nothing —
- * which is indistinguishable from a clean bill of health.
+ * (The boot warning about keys "the admin cannot resolve" is gone: the admin
+ * no longer compiles collection files, it reads the served descriptors, which
+ * always state the key.)
  */
-describe("buildCollectionRegistry", () => {
-    // `sku` is the key in the schema; the collection config never says so, and
-    // the admin cannot see the schema — exactly what the warning is for.
-    const skuItems = pgTable("sku_items", {
-        sku: text("sku").primaryKey(),
-        label: text("label")
+describe("buildTableRegistry", () => {
+    const skuItems = defineTable("sku_items", {
+        columns: { sku: col.text().primaryKey(), label: col.text() },
+        rls: "admin-only"
     });
-
-    const products = pgTable("products", {
-        id: serial("id").primaryKey(),
-        name: text("name")
+    const products = defineTable("products", {
+        columns: { id: col.serial().primaryKey(), name: col.text(), skuRef: col.text().column("sku_ref") },
+        relations: { sku: rel.belongsTo(() => skuItems, { localKey: "sku_ref" }) },
+        rls: "admin-only"
     });
+    const compiled = compileSchema([skuItems, products]);
+    const collections = lowerTables([skuItems, products]);
 
-    const skuItemsCollection: CollectionConfig = {
-        slug: "sku_items",
-        name: "SKU Items",
-        table: "sku_items",
-        properties: {
-            sku: { type: "string" },
-            label: { type: "string" }
-        }
-    };
-
-    const productsCollection: CollectionConfig = {
-        slug: "products",
-        name: "Products",
-        table: "products",
-        properties: {
-            id: { type: "number" },
-            name: { type: "string" }
-        }
-    };
-
-    let warn: jest.SpyInstance;
+    const skuItemsTable = pgTable("sku_items", { sku: text("sku").primaryKey(), label: text("label") });
+    const productsTable = pgTable("products", { id: serial("id").primaryKey(), name: text("name"), skuRef: text("sku_ref") });
 
     beforeEach(() => {
         jest.restoreAllMocks();
-        warn = jest.spyOn(require("@rebasepro/server").logger, "warn").mockImplementation(() => undefined);
+        jest.spyOn(require("@rebasepro/server").logger, "warn").mockImplementation(() => undefined);
         jest.spyOn(require("@rebasepro/server").logger, "info").mockImplementation(() => undefined);
     });
 
-    it("registers the collections and their tables", () => {
-        const registry = buildCollectionRegistry({
-            collections: [skuItemsCollection, productsCollection],
-            tables: { skuItems,
-products }
+    it("registers each table's runtime table over its catalogue table, beside its collection", () => {
+        const registry = buildTableRegistry({
+            compiledTables: compiled,
+            collections,
+            tables: { skuItems: skuItemsTable, products: productsTable }
         });
 
         expect(registry.getCollections().map(c => c.slug).sort()).toEqual(["products", "sku_items"]);
-        expect(registry.getTable("sku_items")).toBeDefined();
-        expect(registry.getTable("products")).toBeDefined();
+        expect(registry.tables().map(t => t.slug)).toEqual(["sku_items", "products"]);
+        expect(registry.getTable("products")?.pg).toBe(productsTable);
+        expect(registry.getTable("products")?.descriptor).toBe(compiled[1].descriptor);
+        expect(registry.getTableBySqlName("sku_items")?.slug).toBe("sku_items");
+        expect(registry.getPgTable("products")).toBe(productsTable);
     });
 
-    it("warns about a key the admin cannot resolve — which needs the tables to be in first", () => {
-        buildCollectionRegistry({
-            collections: [skuItemsCollection],
-            tables: { skuItems }
-        });
-
-        // If this ran before `registerTable`, the key would be unresolvable, the
-        // collection skipped, and this warning silently absent.
-        expect(warn).toHaveBeenCalledTimes(1);
-        const message = warn.mock.calls[0][0] as string;
-        expect(message).toContain("sku_items");
-        expect(message).toContain("`sku`");
+    it("builds the lookups once: columns both ways, relations by name with their target slug, keys", () => {
+        const registry = buildTableRegistry({ compiledTables: compiled, collections, tables: { products: productsTable, skuItems: skuItemsTable } });
+        const table = registry.requireTable("products");
+        expect(table.columnsByKey.get("skuRef")?.column).toBe("sku_ref");
+        expect(table.columnsBySqlName.get("sku_ref")?.key).toBe("skuRef");
+        expect(table.relations.get("sku")?.target).toBe("sku_items");
+        expect(table.keys.map(key => [key.key, key.identity])).toEqual([["id", "serial"]]);
     });
 
-    it("says nothing about a collection whose key resolves on both sides", () => {
-        buildCollectionRegistry({
-            collections: [productsCollection],
-            tables: { products }
-        });
-
-        expect(warn).not.toHaveBeenCalled();
+    it("leaves pg undefined for a table this database does not hold", () => {
+        const registry = buildTableRegistry({ compiledTables: compiled, collections, tables: { skuItems: skuItemsTable } });
+        expect(registry.requireTable("products").pg).toBeUndefined();
+        expect(registry.requireTable("sku_items").pg).toBe(skuItemsTable);
     });
 
-    it("says nothing when there is no schema to resolve keys from", () => {
-        // A driver configured with collections but no tables cannot resolve any
-        // key, and has nothing to report rather than everything.
-        buildCollectionRegistry({ collections: [skuItemsCollection] });
+    it("refuses collections handed over without their compiled tables, naming them", () => {
+        expect(() => buildTableRegistry({ collections }))
+            .toThrow(/no compiled table for: sku_items, products/);
+    });
 
-        expect(warn).not.toHaveBeenCalled();
+    it("refuses compiled tables handed over without their collections, naming them", () => {
+        expect(() => buildTableRegistry({ compiledTables: compiled, collections: [collections[0]] }))
+            .toThrow(/no lowered collection for: products/);
     });
 
     it("ignores non-table values in the schema object", () => {
-        // The generated schema module exports relations and enums alongside the
-        // tables; only the tables are registered.
-        const registry = buildCollectionRegistry({
-            collections: [productsCollection],
-            tables: { products,
-notATable: { some: "export" },
-alsoNot: 42 } as Record<string, unknown>
+        const registry = buildTableRegistry({
+            compiledTables: compiled,
+            collections,
+            tables: { products: productsTable, skuItems: skuItemsTable, notATable: { some: "export" }, alsoNot: 42 }
         });
-
-        expect(registry.getTableNames()).toEqual(["products"]);
+        expect(registry.getPgTableNames().sort()).toEqual(["products", "sku_items"]);
     });
 
-    // `createRebaseBackend({ collections: [postsCollection] })` failed boot
-    // asking for a `tags` table the database had: `tags` was only the
-    // relation's target. The registry is told which collections were passed.
-    it("refuses a relation target left out of the collections, naming the array", () => {
-        const postsTable = pgTable("posts", { id: text("id").primaryKey() });
-        const postsTagsTable = pgTable("posts_tags", { post_id: text("post_id"), tag_id: text("tag_id") });
-        const tagsCollection: CollectionConfig = {
-            slug: "tags", name: "Tags", table: "tags",
-            properties: { id: { type: "string", isId: true } }
-        };
-        const postsCollection: CollectionConfig = {
-            slug: "posts", name: "Posts", table: "posts",
-            properties: { id: { type: "string", isId: true } },
-            relations: [{
-                kind: "manyToMany", relationName: "tags", target: () => tagsCollection,
-                through: { table: "posts_tags", sourceColumn: "post_id", targetColumn: "tag_id" }
-            }]
-        };
+    it("refuses to build when a relation names a column the database does not have", () => {
+        const stale = pgTable("products", { id: serial("id").primaryKey(), name: text("name"), sku: integer("sku") });
+        expect(() => buildTableRegistry({ compiledTables: compiled, collections, tables: { products: stale, skuItems: skuItemsTable } }))
+            .toThrow(/products\.sku \(belongsTo\)[\s\S]*`localKey: "sku_ref"` is not a column on `products`/);
+    });
 
-        expect(() => buildCollectionRegistry({ collections: [postsCollection], tables: { posts: postsTable, posts_tags: postsTagsTable } }))
-            .toThrow(/collection `tags`, which is not among the collections this backend was given/);
+    it("says which table a slug it does not serve is not, and which it does", () => {
+        const registry = buildTableRegistry({ compiledTables: compiled, collections });
+        expect(() => registry.requireTable("orders"))
+            .toThrow('The table "orders" is not one this driver serves. It serves: sku_items, products.');
     });
 });

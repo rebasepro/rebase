@@ -15,7 +15,8 @@ import { PGlite } from "@electric-sql/pglite";
 import type { CollectionConfig } from "@rebasepro/types";
 
 import { RealtimeService } from "../src/services/realtimeService";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { buildCdcFunctionSql, buildCdcTriggerSql } from "../src/services/cdc/trigger-cdc";
 import type { RealtimeClientSocket } from "../src/services/realtimeService";
 import { transactionalDrizzle } from "./helpers/spg-a-db";
@@ -68,7 +69,7 @@ describe("the address of a captured row", () => {
     beforeEach(async () => {
         jest.useFakeTimers();
         const { db } = transactionalDrizzle();
-        const registry = new PostgresCollectionRegistry();
+        const registry = new FixtureTableRegistry();
         registry.registerMultiple([members, docs]);
         realtime = new RealtimeService(db, registry);
         // Switched on the way `enableCdc()` would, without a LISTEN connection.

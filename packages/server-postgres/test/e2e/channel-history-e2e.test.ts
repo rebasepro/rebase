@@ -28,7 +28,8 @@ import { sql } from "drizzle-orm";
 import { createServer, type Server } from "node:http";
 import { WebSocket as NodeWebSocket } from "ws";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
-import { PostgresCollectionRegistry } from "../../src/collections/PostgresCollectionRegistry.js";
+import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry.js";
+import { FixtureTableRegistry } from "../helpers/tables";
 import { RealtimeService } from "../../src/services/realtimeService.js";
 import { ChannelHistoryStore } from "../../src/services/channel-history.js";
 import { createPostgresWebSocket } from "../../src/websocket.js";
@@ -123,7 +124,7 @@ describe("Channel history (E2E, two real clients)", () => {
         }
 
         db = drizzle(pool);
-        const registry = new PostgresCollectionRegistry();
+        const registry = new FixtureTableRegistry();
         realtime = new RealtimeService(db, registry);
 
         // Opt in for `doc:*` only. `cursors:*` matches nothing, so it must keep

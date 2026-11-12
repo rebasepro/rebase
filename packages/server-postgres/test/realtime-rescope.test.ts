@@ -27,7 +27,8 @@ jest.mock("../src/services/dataService", () => ({
 
 import type { CollectionConfig } from "@rebasepro/types";
 import { RealtimeService, type SubscriptionAuthContext } from "../src/services/realtimeService";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { fakeDataDriver, fakeRealtimeSocket, type FakeRealtimeSocket } from "./helpers/spg-c-socket";
 import { recordingDb, type RecordedStatement } from "./helpers/spg-c-db";
 
@@ -59,7 +60,7 @@ beforeEach(() => {
     const recording = recordingDb();
     const db = recording.db;
     statements = recording.statements;
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
     registry.registerMultiple([posts]);
     service = new RealtimeService(db, registry);
     service.setDataDriver({ ...fakeDataDriver(), fetchCollection: mockFetchCollection, fetchOne: mockFetchEntity });

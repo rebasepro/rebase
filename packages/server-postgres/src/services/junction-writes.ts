@@ -3,7 +3,7 @@ import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 import { ApiError, logger } from "@rebasepro/server";
 import { soleJoinCondition, type Properties, type ResolvedVia } from "@rebasepro/types";
 import { DrizzleClient } from "../interfaces";
-import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../model/PostgresTableRegistry";
 import { relationMisconfigured } from "./collection-helpers";
 import { explainZeroRowWrite } from "./write-denial";
 
@@ -92,11 +92,11 @@ function column(table: PgTable, name: string | undefined, label: string, role: s
 
 /** The junction a `manyToMany` names outright. */
 export function bindThroughJunction(
-    registry: PostgresCollectionRegistry,
+    registry: PostgresTableRegistry,
     through: { table: string; sourceColumn: string; targetColumn: string; properties?: Properties },
     label: string
 ): JunctionBinding {
-    const table = registry.getTable(through.table);
+    const table = registry.getPgTable(through.table);
     if (!table) {
         throw misconfigured(label, `no table '${through.table}' in the registry`);
     }
@@ -132,7 +132,7 @@ const tablePart = (spec: string | string[]): string | undefined => {
  * the previous table rather than asking the column names where they live.
  */
 export function bindJoinPathJunction(
-    registry: PostgresCollectionRegistry,
+    registry: PostgresTableRegistry,
     joinPath: ResolvedVia["joinPath"],
     parentTableName: string,
     targetTableName: string,
@@ -146,7 +146,7 @@ export function bindJoinPathJunction(
         throw misconfigured(label, "its joinPath has no table between the two ends to hold the links");
     }
 
-    const table = registry.getTable(junctionName);
+    const table = registry.getPgTable(junctionName);
     if (!table) {
         throw misconfigured(label, `no table '${junctionName}' in the registry`);
     }

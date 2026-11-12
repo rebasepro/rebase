@@ -1,5 +1,6 @@
 import { CollectionConfig } from "@rebasepro/types";
 import { driverStand } from "./helpers/spg-b-driver-stand";
+import { registryOf } from "./helpers/spg-c-registry";
 
 /**
  * `afterRead` shapes what a CALLER reads. It is not the row.
@@ -49,7 +50,7 @@ describe("hooks and history see the stored row, not afterRead's view of it", () 
     } as CollectionConfig;
 
     const stand = () => {
-        const { driver, recordHistory, notifyUpdate } = driverStand();
+        const { driver, recordHistory, notifyUpdate } = driverStand(registryOf(customers));
         jest.spyOn(driver.dataService, "save").mockResolvedValue({ ...STORED });
         jest.spyOn(driver.dataService.getFetchService(), "fetchOneForRest").mockResolvedValue({ ...PREVIOUS });
         jest.spyOn(driver.dataService, "fetchOneForRest").mockResolvedValue({ ...STORED });

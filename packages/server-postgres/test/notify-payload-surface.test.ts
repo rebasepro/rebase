@@ -14,7 +14,8 @@ import { join, relative } from "node:path";
 import { PGlite } from "@electric-sql/pglite";
 
 import { RealtimeService } from "../src/services/realtimeService";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { ChannelHistoryStore } from "../src/services/channel-history";
 import { recordingDb } from "./helpers/spg-b-recording-db";
 import { pgliteNodePg } from "./helpers/spg-b-pglite-node-pg";
@@ -65,7 +66,7 @@ describe("the NOTIFY surface", () => {
 
     it("carries an address, not a row, on the cross-instance entity channel", async () => {
         const { db, queries } = recordingDb();
-        const realtime = new RealtimeService(db, new PostgresCollectionRegistry());
+        const realtime = new RealtimeService(db, new FixtureTableRegistry());
 
         await Reflect.apply(Reflect.get(realtime, "broadcastChange"), realtime, ["posts", "42", undefined]);
 

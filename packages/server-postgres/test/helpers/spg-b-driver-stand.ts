@@ -6,12 +6,13 @@
  */
 import { jest } from "@jest/globals";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver";
-import { PostgresCollectionRegistry } from "../../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./tables";
 import { HistoryService } from "../../src/history/HistoryService";
 import { RealtimeService } from "../../src/services/realtimeService";
 import { recordingDb } from "./spg-b-recording-db";
 
-export function driverStand(registry = new PostgresCollectionRegistry()) {
+export function driverStand(registry = new FixtureTableRegistry()) {
     const recording = recordingDb();
     const realtime = new RealtimeService(recording.db, registry);
     const notifyUpdate = jest.spyOn(realtime, "notifyUpdate").mockResolvedValue(undefined);

@@ -23,8 +23,9 @@ import { introspectSchema, lowerIntrospectedTables, type Queryable } from "../sr
 import { introspectTables } from "../src/schema/introspect-tables";
 import { hiddenColumnsOption } from "../src/schema/search-column";
 import { patchPgNumericToNumber } from "../src/utils/pg-numeric-number-patch";
-import { assertWritableColumns, getPrimaryKeys } from "../src/services/collection-helpers";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { assertWritableColumns, tableKeys } from "../src/services/collection-helpers";
+import { buildRuntimeTable } from "../src/model/runtime-table";
+import { compileDescribedTables } from "@rebasepro/common";
 import { relationalQuery } from "./helpers/spg-a-db";
 import { namedCollection } from "./helpers/spg-a-fixtures";
 
@@ -195,11 +196,18 @@ describe("tables built from the live catalogue", () => {
             .toEqual(["post_id", "tag_id"]);
     });
 
-    it("resolves the composite key of a junction table", () => {
-        const registry = new PostgresCollectionRegistry();
-        registry.registerTable(catalogue.tables.posts_tags, "posts_tags");
-        const junction = { slug: "posts_tags", table: "posts_tags", name: "posts_tags", properties: {} };
-        expect(getPrimaryKeys(junction, registry).map(k => k.fieldName).sort())
+    it("resolves the composite key of a junction table read back without a declared key", () => {
+        // A table whose descriptor states no key (what introspection reports
+        // for one) is addressed by the catalogue's primary-key constraint.
+        const [described] = compileDescribedTables([{
+            name: "posts_tags", slug: "posts_tags", table: "posts_tags", schema: "public", kind: "table",
+            columns: [
+                { key: "post_id", column: "post_id", type: { kind: "text" }, nullable: false },
+                { key: "tag_id", column: "tag_id", type: { kind: "text" }, nullable: false }
+            ],
+            primaryKey: [], relations: [], rls: { posture: "rules", rules: [], defaultPolicies: false }
+        }], { rls: () => "admin-only" });
+        expect(tableKeys(buildRuntimeTable(described, catalogue.tables.posts_tags)).map(k => k.fieldName).sort())
             .toEqual(["post_id", "tag_id"]);
     });
 

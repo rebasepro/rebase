@@ -2,10 +2,11 @@ import { DataService } from "../src/services/dataService";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { integer, PgDialect, pgTable, text } from "drizzle-orm/pg-core";
 import { CollectionConfig } from "@rebasepro/types";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { is, Param, SQL } from "drizzle-orm";
 
-const collectionRegistry = new PostgresCollectionRegistry();
+const collectionRegistry = new FixtureTableRegistry();
 
 // ---------------------------------------------------------------------------
 // Mock Drizzle table definitions
@@ -36,11 +37,11 @@ const projectUsersCollection: CollectionConfig = {
     name: "Project Users",
     table: "project_users",
     properties: {
-        project_id: { type: "string" },
-        user_id: { type: "string" },
+        // The key: both columns, in this order.
+        project_id: { type: "string", isId: true },
+        user_id: { type: "string", isId: true },
         role: { type: "string" }
-    },
-    primaryKeys: ["project_id", "user_id"]
+    }
 };
 
 const itemsCollection: CollectionConfig = {
@@ -148,7 +149,7 @@ function setupRegistryMocks() {
         return undefined;
     });
 
-    jest.spyOn(collectionRegistry, "getTable").mockImplementation(tableName => {
+    jest.spyOn(collectionRegistry, "getPgTable").mockImplementation(tableName => {
         if (tableName === "project_users") return mockProjectUsersTable;
         if (tableName === "items") return mockItemsTable;
         return undefined;

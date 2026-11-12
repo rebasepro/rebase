@@ -3,7 +3,7 @@ import { AnyPgColumn } from "drizzle-orm/pg-core";
 import { CollectionConfig, Properties, Property, ResolvedRelation, RelationProperty, Vector, BinaryProperty, hasForeignKeyOnTarget, type ResolvedBelongsTo, type ResolvedForeignKeyOnTarget, type ResolvedVia } from "@rebasepro/types";
 import { getTableName, resolveCollectionRelations, findRelation, fieldKeyForColumn, createRelationRef, DEFAULT_ONE_OF_TYPE, DEFAULT_ONE_OF_VALUE } from "@rebasepro/common";
 import { isPrototypePollutingKey } from "@rebasepro/utils";
-import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "./model/PostgresTableRegistry";
 import { getPrimaryKeys, buildCompositeId, rowIdentityCondition } from "./services/collection-helpers";
 import { applyDynamicJoin, joinStepCondition } from "./services/RelationService";
 import { ApiError, logger } from "@rebasepro/server";
@@ -122,7 +122,7 @@ export function serializeDataToServer<M extends Record<string, unknown>>(
     row: M,
     properties: Properties,
     collection?: CollectionConfig,
-    registry?: PostgresCollectionRegistry
+    registry?: PostgresTableRegistry
 ): SerializedEntityData {
     if (!row || !properties) return { scalarData: row ?? {},
 inverseRelationUpdates: [],
@@ -432,7 +432,7 @@ export async function parseDataFromServer<M extends Record<string, unknown>>(
     data: M,
     collection: CollectionConfig,
     db?: DrizzleClient,
-    registry?: PostgresCollectionRegistry
+    registry?: PostgresTableRegistry
 ): Promise<M> {
     const properties = collection.properties;
     if (!data || !properties) return data;
@@ -467,7 +467,7 @@ export async function parseDataFromServer<M extends Record<string, unknown>>(
                     // Inverse relation: FK is in target table, need to query for it
                     try {
                         const targetCollection = relation.target();
-                        const targetTable = registry.getTable(getTableName(targetCollection));
+                        const targetTable = registry.getPgTable(getTableName(targetCollection));
                         const pks = getPrimaryKeys(collection, registry!);
                         // What the target's foreign key holds. Ordinarily this
                         // row's id; for a link on a natural key, the value of
@@ -516,7 +516,7 @@ export async function parseDataFromServer<M extends Record<string, unknown>>(
 
                         if (currentId) {
                             // Build the join query following the join path
-                            const sourceTable = registry.getTable(getTableName(collection));
+                            const sourceTable = registry.getPgTable(getTableName(collection));
                             if (!sourceTable) {
                                 logger.warn(`Source table not found for collection: ${collection.slug}`);
                                 continue;
@@ -527,7 +527,7 @@ export async function parseDataFromServer<M extends Record<string, unknown>>(
 
                             // Apply each join in the path
                             for (const join of relation.joinPath) {
-                                const joinTable = registry.getTable(join.table);
+                                const joinTable = registry.getPgTable(join.table);
                                 if (!joinTable) {
                                     logger.warn(`Join table not found: ${join.table}`);
                                     break;

@@ -19,7 +19,8 @@ import { integer, pgTable, serial, timestamp, varchar } from "drizzle-orm/pg-cor
 import type { CollectionConfig, User, CollectionCallbacks } from "@rebasepro/types";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { RealtimeService } from "../src/services/realtimeService";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
@@ -127,13 +128,13 @@ const TENANT_USER: User = {
 let db: PGlite;
 
 function driverOver(pglite: PGlite, user?: User): PostgresBackendDriver {
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
     registry.registerMultiple([owners(), docs(), posts(), tags()]);
-    registry.registerTable(ownersTable, "owners");
-    registry.registerTable(docsTable, "docs");
-    registry.registerTable(postsTable, "posts");
-    registry.registerTable(tagsTable, "tags");
-    registry.registerTable(postsTagsTable, "posts_tags");
+    registry.registerPgTable(ownersTable, "owners");
+    registry.registerPgTable(docsTable, "docs");
+    registry.registerPgTable(postsTable, "posts");
+    registry.registerPgTable(tagsTable, "tags");
+    registry.registerPgTable(postsTagsTable, "posts_tags");
     const orm = drizzle(pglite, {
         schema: { owners: ownersTable, docs: docsTable, posts: postsTable, tags: tagsTable, posts_tags: postsTagsTable }
     });

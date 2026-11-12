@@ -17,7 +17,8 @@ import type { CollectionConfig, User } from "@rebasepro/types";
 import { testUser } from "./helpers/spg-a-driver";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { RealtimeService } from "../src/services/realtimeService";
 
 const docsTable = pgTable("docs", {
@@ -55,9 +56,9 @@ let db: PGlite;
 let rowId: number;
 
 function driverOver(pglite: PGlite, user?: User): PostgresBackendDriver {
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
     registry.registerMultiple([docsCollection()]);
-    registry.registerTable(docsTable, "docs");
+    registry.registerPgTable(docsTable, "docs");
     const orm = drizzle(pglite, { schema: { docs: docsTable } });
     return new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry, user);
 }

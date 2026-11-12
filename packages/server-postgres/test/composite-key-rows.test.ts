@@ -22,7 +22,8 @@ import { cursorToStartAfter, decodeCursor } from "@rebasepro/common";
 
 import { readCatalogueSchema } from "../src/schema/catalogue-schema";
 import type { Queryable } from "../src/schema/introspect-runtime";
-import { buildCollectionRegistry } from "../src/collections/buildRegistry";
+import { buildTableRegistry } from "../src/model/build-registry";
+import { tablesFromCollections } from "./helpers/tables";
 import { DataService } from "../src/services/dataService";
 import { RelationService } from "../src/services/RelationService";
 import { DrizzleClient } from "../src/interfaces";
@@ -124,7 +125,7 @@ describe("a composite primary key, read and written by its whole address", () =>
     let pg: PGlite;
     let data: DataService;
     let db: DrizzleClient;
-    let registry: ReturnType<typeof buildCollectionRegistry>;
+    let registry: ReturnType<typeof buildTableRegistry>;
 
     /** The key of every row, straight from the table, in key order. */
     const storedKeys = async (): Promise<string[]> => {
@@ -145,7 +146,8 @@ describe("a composite primary key, read and written by its whole address", () =>
             defaultSchema: "public"
         });
         db = drizzle(pg, { schema: { ...catalogue.tables, ...catalogue.relations } });
-        registry = buildCollectionRegistry({
+        registry = buildTableRegistry({
+            compiledTables: tablesFromCollections([companies, translations, notes]).tables,
             collections: [companies, translations, notes],
             tables: catalogue.tables,
             relations: catalogue.relations

@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { DatabasePoolManager } from "../src/databasePoolManager";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import type { SQLWrapper } from "drizzle-orm";
 import { PgDialect } from "drizzle-orm/pg-core";
 import type { QueryResult } from "pg";
@@ -75,7 +76,7 @@ describe("branches while the server runs on a branch", () => {
         jest.spyOn(poolManager, "getPool").mockImplementation(() => {
             throw new Error("no maintenance pool in this test");
         });
-        const registry = new PostgresCollectionRegistry();
+        const registry = new FixtureTableRegistry();
         driver = new PostgresBackendDriver(branch.db, quietRealtime(branch.db, registry), registry, undefined, poolManager);
     });
 

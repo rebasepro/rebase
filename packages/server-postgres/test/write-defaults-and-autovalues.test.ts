@@ -1,6 +1,7 @@
 import { CollectionConfig, User } from "@rebasepro/types";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { RealtimeService } from "../src/services/realtimeService";
 import { HistoryService } from "../src/history/HistoryService";
 import { unusedDb } from "./helpers/spg-c-db";
@@ -14,7 +15,7 @@ import { unusedDb } from "./helpers/spg-c-db";
  * identity twin of the `date` autoValues the driver has always stamped.
  */
 describe("PostgresBackendDriver.save — defaults and autoValues", () => {
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
 
     const posts: CollectionConfig = {
         slug: "posts",
@@ -59,6 +60,8 @@ describe("PostgresBackendDriver.save — defaults and autoValues", () => {
             createdBy: { type: "string", autoValue: "user_on_create", validation: { required: true } }
         }
     };
+
+    registry.registerMultiple([posts, settings, audited]);
 
     let driver: PostgresBackendDriver;
     let saveSpy: jest.SpyInstance;

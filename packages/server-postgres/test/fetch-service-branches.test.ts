@@ -2,7 +2,8 @@ import { CollectionConfig } from "@rebasepro/types";
 import { integer, pgTable, text, vector } from "drizzle-orm/pg-core";
 import { FetchService } from "../src/services/FetchService";
 import { RelationService } from "../src/services/RelationService";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { arrayRowsFor, recordingDb, type QueryResponder } from "./helpers/spg-b-recording-db";
 
 /**
@@ -22,18 +23,18 @@ import { arrayRowsFor, recordingDb, type QueryResponder } from "./helpers/spg-b-
  */
 describe("FetchService — read-shape branches", () => {
 
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
 
     // Real drizzle tables: a vector search resolves the property it was given
     // against the real columns, and a read compiles to real SQL.
-    registry.registerTable(pgTable("posts", {
+    registry.registerPgTable(pgTable("posts", {
         id: integer("id").primaryKey(),
         title: text("title"),
         author_id: integer("author_id"),
         embedding: vector("embedding", { dimensions: 2 })
     }), "posts");
-    registry.registerTable(pgTable("authors", { id: integer("id").primaryKey(), name: text("name") }), "authors");
-    registry.registerTable(pgTable("tags", { id: integer("id").primaryKey(), name: text("name") }), "tags");
+    registry.registerPgTable(pgTable("authors", { id: integer("id").primaryKey(), name: text("name") }), "authors");
+    registry.registerPgTable(pgTable("tags", { id: integer("id").primaryKey(), name: text("name") }), "tags");
 
     const tagsCollection: CollectionConfig = {
         slug: "tags",

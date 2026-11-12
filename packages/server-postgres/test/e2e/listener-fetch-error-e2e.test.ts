@@ -23,7 +23,8 @@ import { pgTable, varchar } from "drizzle-orm/pg-core";
 import { RebaseApiError, type CollectionConfig, type DataDriver, type User } from "@rebasepro/types";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
-import { PostgresCollectionRegistry } from "../../src/collections/PostgresCollectionRegistry.js";
+import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry.js";
+import { FixtureTableRegistry } from "../helpers/tables";
 import { RealtimeService } from "../../src/services/realtimeService.js";
 
 const contractsTable = pgTable("contracts", {
@@ -146,9 +147,9 @@ describe("an in-process listener is told when a refetch fails (E2E)", () => {
         pool = new pg.Pool({ connectionString: container.connectionString });
         const db = drizzle(pool);
 
-        const registry = new PostgresCollectionRegistry();
+        const registry = new FixtureTableRegistry();
         registry.registerMultiple([contractsCollection]);
-        registry.registerTable(contractsTable, "contracts");
+        registry.registerPgTable(contractsTable, "contracts");
 
         realtime = new RealtimeService(db, registry);
         driver = new PostgresBackendDriver(db, realtime, registry);

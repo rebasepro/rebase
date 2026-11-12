@@ -48,7 +48,8 @@ import { sql } from "drizzle-orm";
 import type { CollectionConfig, PostgresCollectionConfig } from "@rebasepro/types";
 import { generatePostgresDdl } from "../src/schema/generate-postgres-ddl-logic";
 import { buildSearchColumnSpec } from "../src/schema/search-column";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { FetchService } from "../src/services/FetchService";
 import type { PgColumnBuilderBase } from "drizzle-orm/pg-core";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
@@ -132,9 +133,9 @@ beforeAll(async () => {
                     .generatedAlwaysAs(sql.raw(spec.fuzzy.expression));
             }
         }
-        const registry = new PostgresCollectionRegistry();
+        const registry = new FixtureTableRegistry();
         registry.registerMultiple([collection]);
-        registry.registerTable(pgTable(v.slug, columns), v.slug);
+        registry.registerPgTable(pgTable(v.slug, columns), v.slug);
         services[v.slug] = new FetchService(orm, registry);
     }
 }, 120_000);

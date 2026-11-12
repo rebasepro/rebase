@@ -18,7 +18,8 @@ import type { CollectionCallbacks, CollectionConfig } from "@rebasepro/types";
 import { composeCallbacks } from "@rebasepro/common";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { RealtimeService } from "../src/services/realtimeService";
 
 const notesTable = pgTable("notes", {
@@ -139,17 +140,17 @@ async function outcome<T>(work: () => Promise<T>): Promise<{ ok: T } | { error: 
 }
 
 /** The whole scenario, against sets placed by `place`. Returns everything observable. */
-async function scenario(place: (registry: PostgresCollectionRegistry, a: CollectionCallbacks, b: CollectionCallbacks) => CollectionConfig) {
+async function scenario(place: (registry: PostgresTableRegistry, a: CollectionCallbacks, b: CollectionCallbacks) => CollectionConfig) {
     const db = new PGlite();
     try {
         await db.waitReady;
         await db.exec(SCHEMA);
         const log: unknown[] = [];
         const [a, b] = sets(log);
-        const registry = new PostgresCollectionRegistry();
+        const registry = new FixtureTableRegistry();
         const collection = place(registry, a, b);
         registry.registerMultiple([collection]);
-        registry.registerTable(notesTable, "notes");
+        registry.registerPgTable(notesTable, "notes");
         const orm = drizzle(db, { schema: { notes: notesTable } });
         const driver = new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry);
 

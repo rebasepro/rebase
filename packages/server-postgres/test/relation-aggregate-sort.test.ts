@@ -4,7 +4,8 @@ import { SQL } from "drizzle-orm";
 import { CollectionConfig, encodeRelationAggregateSort, parseRelationAggregateSort } from "@rebasepro/types";
 import { ApiError } from "@rebasepro/server";
 import { FetchService } from "../src/services/FetchService";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { DrizzleConditionBuilder } from "../src/utils/drizzle-conditions";
 import { unusedDb } from "./helpers/spg-c-db";
 
@@ -99,14 +100,14 @@ const talentsCollection: CollectionConfig = {
 };
 
 const createRegistry = () => {
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
     const tables = {
         talents: talentsTable,
         talent_applications: applicationsTable,
         skills: skillsTable,
         talents_skills: talentsSkillsTable
     };
-    for (const [name, table] of Object.entries(tables)) registry.registerTable(table, name);
+    for (const [name, table] of Object.entries(tables)) registry.registerPgTable(table, name);
     return registry;
 };
 
@@ -166,7 +167,7 @@ describe("the wire spelling of an aggregate sort key", () => {
 
 describe("compiling an aggregate sort to SQL", () => {
 
-    let registry: PostgresCollectionRegistry;
+    let registry: PostgresTableRegistry;
 
     beforeEach(() => {
         registry = createRegistry();
@@ -279,7 +280,7 @@ describe("compiling an aggregate sort to SQL", () => {
 
 describe("where the rows with nothing to aggregate land", () => {
 
-    const service = new FetchService(unusedDb(), new PostgresCollectionRegistry());
+    const service = new FetchService(unusedDb(), new FixtureTableRegistry());
     const orderExpressions = (
         keys: { field: string; direction: "asc" | "desc"; target: AnyPgColumn | SQL }[]
     ): SQL[] => {
@@ -316,7 +317,7 @@ describe("where the rows with nothing to aggregate land", () => {
 
 describe("paging over an aggregate sort", () => {
 
-    let registry: PostgresCollectionRegistry;
+    let registry: PostgresTableRegistry;
 
     beforeEach(() => {
         registry = createRegistry();

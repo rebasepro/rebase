@@ -24,7 +24,8 @@ import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { WebSocket as NodeWebSocket } from "ws";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
-import { PostgresCollectionRegistry } from "../../src/collections/PostgresCollectionRegistry.js";
+import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry.js";
+import { FixtureTableRegistry } from "../helpers/tables";
 import { RealtimeService } from "../../src/services/realtimeService.js";
 import { createPostgresWebSocket } from "../../src/websocket.js";
 import { RebaseWebSocketClient, RebaseRealtimeChannel, type BroadcastEvent } from "@rebasepro/client";
@@ -75,7 +76,7 @@ describe("socket opt-ins (E2E)", () => {
     beforeAll(async () => {
         container = await startPgContainer();
         pool = new pg.Pool({ connectionString: container.connectionString });
-        realtime = new RealtimeService(drizzle(pool), new PostgresCollectionRegistry());
+        realtime = new RealtimeService(drizzle(pool), new FixtureTableRegistry());
         await realtime.configureChannelHistory([{ match: "doc:*", limit: 50, ttl: "1h" }]);
         server = createServer();
         createPostgresWebSocket(server, realtime, {} as PostgresBackendDriver, { requireAuth: false }, undefined, {

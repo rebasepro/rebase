@@ -1,7 +1,8 @@
 import { CollectionConfig } from "@rebasepro/types";
 import { pgTable, text } from "drizzle-orm/pg-core";
 import { RealtimeService } from "../src/services/realtimeService";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { fakeDataDriver, fakeRealtimeSocket, type FakeRealtimeSocket } from "./helpers/spg-c-socket";
 import { recordingDb, shapedRows } from "./helpers/spg-c-db";
 
@@ -41,7 +42,7 @@ isId: true },
     };
 
     let realtimeService: RealtimeService;
-    let registry: PostgresCollectionRegistry;
+    let registry: PostgresTableRegistry;
     let ws: MockWebSocket;
     /** What the mocked database reads, for every query. */
     let rowsRead: Record<string, unknown>[] = [];
@@ -66,7 +67,7 @@ isId: true },
         // Every read answers `rowsRead`; the statements around it, nothing.
         const { db } = recordingDb((statement) => /^select /i.test(statement.text) ? shapedRows(statement, rowsRead) : []);
 
-        registry = new PostgresCollectionRegistry();
+        registry = new FixtureTableRegistry();
         jest.spyOn(registry, "getCollectionByPath").mockImplementation(path => {
             if (path.startsWith("sku_items")) return skuItemsCollection;
             if (path.startsWith("notes")) return notesCollection;
@@ -75,7 +76,7 @@ isId: true },
         // `notes` is registered too — otherwise subscribing to it errors before
         // any message is built, and the point here is what the message says
         // about keys, not what happens to an unregistered path.
-        jest.spyOn(registry, "getTable").mockImplementation(name => {
+        jest.spyOn(registry, "getPgTable").mockImplementation(name => {
             if (name === "sku_items") return skuItemsTable;
             if (name === "notes") return notesTable;
             return undefined;

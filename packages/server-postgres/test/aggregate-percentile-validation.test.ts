@@ -15,7 +15,8 @@ import { ApiError } from "@rebasepro/server";
 import { integer, interval, numeric, pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { FetchService } from "../src/services/FetchService";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 
 const songs = pgTable("songs", {
     id: serial("id").primaryKey(),
@@ -47,9 +48,9 @@ const songsCollection: CollectionConfig = {
 const setup = () => {
     const queries: string[] = [];
     const db = drizzle.mock({ logger: { logQuery: (query: string) => { queries.push(query); } } });
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
     registry.registerMultiple([songsCollection]);
-    registry.registerTable(songs, "songs");
+    registry.registerPgTable(songs, "songs");
     return { service: new FetchService(db, registry), queries };
 };
 

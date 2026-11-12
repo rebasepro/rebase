@@ -1,6 +1,7 @@
 import { RealtimeService } from "../src/services/realtimeService";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { CollectionConfig } from "@rebasepro/types";
 import { parseCdcPayload, type CdcChangeEvent } from "../src/services/cdc/CdcListener";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
@@ -50,7 +51,7 @@ function emitCdc(service: RealtimeService, event: CdcChangeEvent): Promise<void>
 
 describe("RealtimeService — database-level CDC", () => {
     let service: RealtimeService;
-    let registry: PostgresCollectionRegistry;
+    let registry: PostgresTableRegistry;
     let db: NodePgDatabase;
 
     beforeEach(() => {
@@ -58,7 +59,7 @@ describe("RealtimeService — database-level CDC", () => {
 
         ({ db } = transactionalDrizzle());
 
-        registry = new PostgresCollectionRegistry();
+        registry = new FixtureTableRegistry();
         registry.registerMultiple([postsCollection]);
 
         service = new RealtimeService(db, registry);
@@ -303,7 +304,7 @@ describe("RealtimeService — the record of its own writes", () => {
     }
 
     const visitedFor = (marks: number): number => {
-        const registry = new PostgresCollectionRegistry();
+        const registry = new FixtureTableRegistry();
         const service = new RealtimeService(spiedDrizzle().db, registry);
         const recent = new CountingMap<string, number>();
         Reflect.set(service, "recentAppEmits", recent);

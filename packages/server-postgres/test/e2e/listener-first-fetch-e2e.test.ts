@@ -31,7 +31,8 @@ import { pgTable, varchar } from "drizzle-orm/pg-core";
 import type { CollectionConfig, DataDriver, ListenCollectionProps, User } from "@rebasepro/types";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
-import { PostgresCollectionRegistry } from "../../src/collections/PostgresCollectionRegistry.js";
+import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry.js";
+import { FixtureTableRegistry } from "../helpers/tables";
 import { RealtimeService } from "../../src/services/realtimeService.js";
 import { ensureAppRole, REBASE_USER_ROLE } from "../../src/security/rls-enforcement.js";
 
@@ -245,10 +246,10 @@ describe("an in-process listener's first delivery (E2E)", () => {
         pool = new pg.Pool({ connectionString: container.connectionString });
         const db = drizzle(pool);
 
-        const registry = new PostgresCollectionRegistry();
+        const registry = new FixtureTableRegistry();
         registry.registerMultiple([tasksCollection, notesCollection]);
-        registry.registerTable(tasksTable, "tasks");
-        registry.registerTable(notesTable, "notes");
+        registry.registerPgTable(tasksTable, "tasks");
+        registry.registerPgTable(notesTable, "notes");
 
         realtime = new RealtimeService(db, registry);
         driver = new PostgresBackendDriver(db, realtime, registry);

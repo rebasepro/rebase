@@ -32,7 +32,8 @@ jest.mock("../src/services/dataService", () => ({
 
 import type { CollectionConfig } from "@rebasepro/types";
 import { RealtimeService } from "../src/services/realtimeService";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { answerStatements, queryResult, transactionalDrizzle } from "./helpers/spg-a-db";
 import { openSocket } from "./helpers/spg-a-socket";
@@ -58,7 +59,7 @@ function createService(wire: Wire) {
         }
         return queryResult();
     });
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
     registry.registerMultiple([posts]);
     const service = new RealtimeService(db, registry);
     const driver = new PostgresBackendDriver(db, service, registry);

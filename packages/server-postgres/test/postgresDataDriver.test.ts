@@ -2,7 +2,8 @@
 import { describe, it, expect, beforeEach } from "@jest/globals";
 import { AuthenticatedPostgresBackendDriver, PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { RealtimeService } from "../src/services/realtimeService";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { isSQLAdmin, type PostgresCollectionConfig, type RebaseServerClient, type User } from "@rebasepro/types";
 import { recordingDb, type RecordedQuery } from "./helpers/spg-b-recording-db";
 import { tableMetadata, testUser } from "./helpers/spg-b-fixtures";
@@ -24,7 +25,7 @@ const authStatement = (statements: RecordedQuery[]): RecordedQuery => {
 describe("PostgresBackendDriver", () => {
     let rec: ReturnType<typeof recordingDb>;
     let realtime: RealtimeService;
-    let registry: PostgresCollectionRegistry;
+    let registry: PostgresTableRegistry;
     let delegate: PostgresBackendDriver;
 
     const authed = async (user: User): Promise<AuthenticatedPostgresBackendDriver> => {
@@ -36,7 +37,7 @@ describe("PostgresBackendDriver", () => {
     beforeEach(() => {
         jest.restoreAllMocks();
         rec = recordingDb();
-        registry = new PostgresCollectionRegistry([collection("test_coll")]);
+        registry = new FixtureTableRegistry([collection("test_coll")]);
         realtime = new RealtimeService(rec.db, registry);
         jest.spyOn(realtime, "notifyUpdate").mockResolvedValue(undefined);
         jest.spyOn(realtime, "startDataDriverSubscription").mockImplementation(() => undefined);
@@ -67,7 +68,7 @@ describe("PostgresBackendDriver", () => {
         });
 
         function buildDriver(collections: PostgresCollectionConfig[]) {
-            const driver = new PostgresBackendDriver(rec.db, realtime, new PostgresCollectionRegistry(collections));
+            const driver = new PostgresBackendDriver(rec.db, realtime, new FixtureTableRegistry(collections));
             return { driver, fetch: driver.dataService.getFetchService() };
         }
 
@@ -88,6 +89,7 @@ describe("PostgresBackendDriver", () => {
         it("masks embedded relation data using the TARGET collection's afterRead", async () => {
             const authors = masking("authors");
             const posts = collection("posts", {
+                properties: { author_id: { type: "string" } },
                 relations: [{ kind: "belongsTo", relationName: "author", localKey: "author_id", target: () => authors }]
             });
             const { driver, fetch } = buildDriver([posts, authors]);

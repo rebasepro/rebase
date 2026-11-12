@@ -3,7 +3,8 @@ import { eq, SQL } from "drizzle-orm";
 import { integer, pgTable, PgDialect, PgTable, primaryKey, serial, varchar, text } from "drizzle-orm/pg-core";
 import { CollectionConfig, EntityRelation, Relation, WhereFilterOp } from "@rebasepro/types";
 import { resolveRelation } from "@rebasepro/common";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { DrizzleConditionBuilder } from "../src/utils/drizzle-conditions";
 import { getColumnMeta } from "../src/services/collection-helpers";
 import { namedCollection, registryWithTables } from "./helpers/spg-a-fixtures";
@@ -50,7 +51,7 @@ const createMockRegistry = () => registryWithTables({
 const renderSql = (condition: SQL) => new PgDialect().sqlToQuery(condition);
 
 describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
-    let mockRegistry: PostgresCollectionRegistry;
+    let mockRegistry: PostgresTableRegistry;
 
     beforeEach(() => {
         mockRegistry = createMockRegistry();
@@ -93,7 +94,7 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
                 sql: '"posts_tags"."post_id" = $1',
                 params: [1]
             });
-            expect(mockRegistry.getTable).toHaveBeenCalledWith("posts_tags");
+            expect(mockRegistry.getPgTable).toHaveBeenCalledWith("posts_tags");
         });
 
         it("should handle array of parent entity IDs for owning relation", () => {
@@ -165,7 +166,7 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
                 sql: '"posts_tags"."tag_id" = $1',
                 params: [20]
             });
-            expect(mockRegistry.getTable).toHaveBeenCalledWith("posts_tags");
+            expect(mockRegistry.getPgTable).toHaveBeenCalledWith("posts_tags");
         });
 
         it("should handle array of parent entity IDs for inverse relation", () => {
@@ -202,7 +203,7 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
     describe("Join Path Relations with Junction Tables", () => {
         it("should handle join paths that include many-to-many relationships", () => {
             // Create a special mock registry that simulates missing direct foreign keys
-            const mockRegistryForJunction = new PostgresCollectionRegistry();
+            const mockRegistryForJunction = new FixtureTableRegistry();
 
             // Create tables without the direct foreign key relationship
             const mockPostsTableNoDirect = pgTable("posts", {
@@ -218,7 +219,7 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
                 // Note: NO post_id foreign key column
             });
 
-            jest.spyOn(mockRegistryForJunction, "getTable").mockImplementation((tableName: string) => {
+            jest.spyOn(mockRegistryForJunction, "getPgTable").mockImplementation((tableName: string) => {
                 switch (tableName) {
                     case "posts": return mockPostsTableNoDirect;
                     case "tags": return mockTagsTableNoDirect;
@@ -259,7 +260,7 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
 
             expect(result.joinConditions.length).toBeGreaterThan(0);
             expect(result.whereConditions).toHaveLength(1);
-            expect(mockRegistryForJunction.getTable).toHaveBeenCalledWith("posts_tags");
+            expect(mockRegistryForJunction.getPgTable).toHaveBeenCalledWith("posts_tags");
         });
 
         it("should fallback to error when no junction table is found for missing foreign keys", () => {
@@ -372,9 +373,9 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
 
             // Only the *reversed* name resolves, so a lookup that gave up after
             // `<from>_<to>` would fail here.
-            const mockRegistryWithPatterns = new PostgresCollectionRegistry();
+            const mockRegistryWithPatterns = new FixtureTableRegistry();
 
-            jest.spyOn(mockRegistryWithPatterns, "getTable").mockImplementation((tableName: string) => {
+            jest.spyOn(mockRegistryWithPatterns, "getPgTable").mockImplementation((tableName: string) => {
                 switch (tableName) {
                     case "posts": return postsNoDirect;
                     case "tags": return tagsNoDirect;
@@ -393,8 +394,8 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
                 mockRegistryWithPatterns
             );
 
-            expect(mockRegistryWithPatterns.getTable).toHaveBeenCalledWith("posts_tags");
-            expect(mockRegistryWithPatterns.getTable).toHaveBeenCalledWith("tags_posts");
+            expect(mockRegistryWithPatterns.getPgTable).toHaveBeenCalledWith("posts_tags");
+            expect(mockRegistryWithPatterns.getPgTable).toHaveBeenCalledWith("tags_posts");
 
             // Discovery emits the pair: target→junction, then junction→source.
             expect(result.joinConditions.map(j => j.table)).toEqual([mockPostsTagsTable, postsNoDirect]);
@@ -695,7 +696,7 @@ describe("DrizzleConditionBuilder - Many-to-Many Relations", () => {
             expect(result.whereConditions).toHaveLength(1);
 
             // Verify the registry was called correctly
-            expect(mockRegistry.getTable).toHaveBeenCalledWith("posts_tags");
+            expect(mockRegistry.getPgTable).toHaveBeenCalledWith("posts_tags");
 
             // This used to read `expect(() => result).not.toThrow()`, which
             // cannot fail: `result` was computed on the line above, and a

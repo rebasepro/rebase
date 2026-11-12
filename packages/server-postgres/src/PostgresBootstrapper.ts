@@ -24,15 +24,16 @@ import {
     resourceEnvSuffix,
     type RealtimeChannelsConfig,
     type RealtimeSocketOptions,
+    type CompiledTable,
     type TableDescriptor
 } from "@rebasepro/types";
 import { PostgresBackendDriver } from "./PostgresBackendDriver";
 import { RealtimeService, parseMaxSocketsPerUser, parseMaxSubscriptionsPerSocket, parseRealtimeTuning } from "./services/realtimeService";
-import { buildCollectionRegistry } from "./collections/buildRegistry";
+import { buildTableRegistry } from "./model/build-registry";
 import { DatabasePoolManager } from "./databasePoolManager";
-import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "./model/PostgresTableRegistry";
 import { createEmailService, type EmailConfig, type EmailService, logger } from "@rebasepro/server";
-import { getTableName as getCollectionTableName, sqlRows } from "@rebasepro/common";
+import { compileDescribedTables, getTableName as getCollectionTableName, sqlRows } from "@rebasepro/common";
 import { ensureAuthTablesExist } from "./auth/ensure-tables";
 import { assertAuthSchemaCompatible, probeAuthSchema, resolveAuthSchema } from "./auth/schema-version";
 import { AuthSchemaTables, PostgresAuthRepository, UserService } from "./auth/services";
@@ -52,7 +53,7 @@ import { resolveRlsSettings, rlsConfigFromEnv, rlsHandoverNotes, type PostgresRl
 import { provisionTriggerCdc, removeTriggerCdc, settleInstalledCapture, type CdcTableRef } from "./services/cdc/trigger-cdc";
 import { provisionWalPublication, reportUnpublishedTables, walCaptureBlocker } from "./services/cdc/wal-cdc";
 import { collectJunctionLinks } from "./services/cdc/junction-tables";
-import { collectionKeyColumns } from "./services/cdc/identity-columns";
+import { tableKeyColumns } from "./services/cdc/identity-columns";
 import { createChannelBus, resolveChannelBusSetting } from "./services/channel-bus";
 import { declaredDatabaseRls, declaredRlsPolicyShape, isChannelBusInstance, isPostgresCollectionConfig } from "@rebasepro/types";
 import { configureUnknownFilterFields, type UnknownFilterFieldsMode } from "./utils/drizzle-conditions";
@@ -166,7 +167,7 @@ export interface PostgresDriverConfig {
 export interface PostgresDriverInternals {
     db: NodePgDatabase<any>;
     readDb?: NodePgDatabase<any>;
-    registry: PostgresCollectionRegistry;
+    registry: PostgresTableRegistry;
     realtimeService: RealtimeService;
     driver: PostgresBackendDriver;
     poolManager?: DatabasePoolManager;
@@ -697,7 +698,7 @@ export async function openPostgresDriver(
     pgConfig: PostgresDriverConfig,
     config: DatabaseAdapterInitConfig
 ): Promise<InitializedDriver & { internals: PostgresDriverInternals }> {
-    const { collections, introspectCollections, baas, schemaProvisioning, realtime } = config;
+    const { collections, tables: declaredTables, introspectCollections, baas, schemaProvisioning, realtime } = config;
     // `false` keeps every DDL statement out of this open: the restricted
     // role, the branch table, channel-history tables, capture triggers.
     const provision = config.provision !== false;
@@ -725,6 +726,9 @@ export async function openPostgresDriver(
     // Their descriptors, read from the catalogue: what the server serves at
     // `GET /api/schema/tables` for a project that declares no tables.
     let introspectedDescriptors: TableDescriptor[] | undefined;
+    // The same tables compiled for the runtime: each descriptor as introspected,
+    // beside the definition that states it. No hooks: nobody declared them.
+    let introspectedCompiled: CompiledTable[] | undefined;
     // The tables skipped for having no authorization model, for the server to
     // name if it then has nothing to serve.
     let skippedUnprotected: { schema: string; table: string }[] | undefined;
@@ -800,6 +804,7 @@ export async function openPostgresDriver(
         }
         introspectedDescriptors = lowered.tables;
         introspectedCollections = lowered.collections;
+        introspectedCompiled = compileDescribedTables(lowered.tables, { rls: () => "admin-only" });
 
         // The Drizzle tables the query layer reads, from the same catalogue:
         // the served tables and the protected join tables their relations
@@ -900,12 +905,13 @@ export async function openPostgresDriver(
     }
 
     // Create a fresh registry for this driver. Registration order is
-    // load-bearing, so it lives in one place — see `buildCollectionRegistry`.
+    // load-bearing, so it lives in one place — see `buildTableRegistry`.
     //
     // No enums: a catalogue-built enum column is `text`, which is what a
     // generated `pgEnum` column served anyway (drizzle validates no
     // labels; Postgres does), and nothing reads the registry's enum map.
-    const registry = buildCollectionRegistry({
+    const registry = buildTableRegistry({
+        compiledTables: introspectedCompiled ?? declaredTables ?? [],
         collections: activeCollections,
         tables: schemaTables,
         relations: schemaRelations
@@ -1099,8 +1105,8 @@ export async function openPostgresDriver(
         );
     }
     /** The tables this driver serves — collections, junctions — for `grants: "managed"`. */
-    const managedTables = (): ManagedTable[] => registry.getTableNames().flatMap((name) => {
-        const table = registry.getTable(name);
+    const managedTables = (): ManagedTable[] => registry.getPgTableNames().flatMap((name) => {
+        const table = registry.getPgTable(name);
         if (!table) return [];
         const config = getTableConfig(table);
         return [{ schema: config.schema ?? "public", table: config.name }];
@@ -1445,9 +1451,9 @@ export async function openPostgresDriver(
             .map((c) => ({
                 schema: (c as { schema?: string }).schema ?? "public",
                 table: getCollectionTableName(c),
-                identityColumns: collectionKeyColumns(c, registry).map((k) => k.columnName)
+                identityColumns: tableKeyColumns(registry.requireTable(c.slug)).map((k) => k.columnName)
             }))
-            .filter((t) => Boolean(t.table) && registry.hasTableForCollection(t.table));
+            .filter((t) => Boolean(t.table) && registry.hasPgTable(t.table));
         // Junction tables back no collection, so the list above misses
         // them — and a link or unlink is a write nobody would hear
         // about. Their rows are the contents of a child list, which is
@@ -1668,7 +1674,7 @@ export async function openPostgresDriver(
                 if ((col as { auth?: { enabled?: boolean } }).auth?.enabled) continue;
 
                 const schemaName = "schema" in col && col.schema ? col.schema : "public";
-                const checkName = resolveDriftCheckName(col, registry.getTableNames());
+                const checkName = resolveDriftCheckName(col, registry.getPgTableNames());
                 const fullCheckName = schemaName === "public" ? checkName : `${schemaName}.${checkName}`;
                 if (!dbTables.has(fullCheckName)) {
                     // Report what was actually looked up: an unqualified
@@ -1978,27 +1984,24 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
             const registry = internals.registry;
 
             // Resolve the auth collection from the explicit config.
-            // This replaces the old `registry.getTable("users")` magic string lookup.
+            // This replaces the old `registry.getPgTable("users")` magic string lookup.
             const authCollection = authConfig.collection as CollectionConfig | undefined;
+            // The users table's descriptor: its name, schema and key type.
+            const authDescriptor = authCollection ? registry.requireTable(authCollection.slug).descriptor : undefined;
 
-            // ensureAuthTablesExist works with the collection abstraction — no Drizzle leakage.
             // A driver opened without provisioning creates and migrates nothing:
             // the tables are another process's to make. The one read that
             // guards every login still runs — a database a newer runtime has
             // migrated is refused here, not at the first sign-in.
             if (internals.provisioned !== false) {
-                await ensureAuthTablesExist(db, authCollection);
+                await ensureAuthTablesExist(db, authDescriptor);
             } else {
-                await assertAuthSchemaCompatible(db, resolveAuthSchema(authCollection));
+                await assertAuthSchemaCompatible(db, resolveAuthSchema(authDescriptor));
                 // And the tables themselves, with every column auth reads: a
                 // missing one would otherwise be met as a 500 on the first
                 // sign-in. Placed where `ensureAuthTablesExist` puts them.
-                const usersSchema = authCollection
-                    ? ("schema" in authCollection && typeof authCollection.schema === "string" ? authCollection.schema : "public")
-                    : "rebase";
-                const usersTableName = authCollection
-                    ? ("table" in authCollection && typeof authCollection.table === "string" ? authCollection.table : authCollection.slug)
-                    : "users";
+                const usersSchema = authDescriptor ? authDescriptor.schema : "rebase";
+                const usersTableName = authDescriptor ? authDescriptor.table : "users";
                 const authTablesSchema = usersSchema === "public" ? "rebase" : usersSchema;
                 const expected = createAuthSchema(authTablesSchema);
                 const problems = await findUnusableAuthTables(db, [
@@ -2030,7 +2033,7 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
                             // The auth table above all: its rows carry password
                             // hashes and verification tokens, and the payload
                             // names the row by its key and nothing else.
-                            identityColumns: collectionKeyColumns(authCollection, registry).map((k) => k.columnName)
+                            identityColumns: tableKeyColumns(registry.requireTable(authCollection.slug)).map((k) => k.columnName)
                         }]);
                     } catch (err) {
                         logger.warn(
@@ -2055,7 +2058,7 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
                     : authCollection.slug)
                 : undefined;
             const usersTable = tableName
-                ? registry.getTable(tableName) as RebasePgTable | undefined
+                ? registry.getPgTable(tableName) as RebasePgTable | undefined
                 : undefined;
 
             let usersSchemaName = "rebase";
@@ -2089,7 +2092,7 @@ emailService,
 authRepository,
 // Bound to the same schema `ensureAuthTablesExist` just migrated, so the
 // health endpoint reports on the tables auth actually reads.
-schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authCollection)) };
+schemaHealthCheck: () => probeAuthSchema(db, resolveAuthSchema(authDescriptor)) };
         },
 
         async initializeHistory(config: HistoryConfig, driverResult: InitializedDriver): Promise<{ historyService: HistoryService } | undefined> {

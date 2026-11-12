@@ -16,7 +16,8 @@ import { integer, pgTable, serial, timestamp, varchar } from "drizzle-orm/pg-cor
 import type { CollectionConfig, User, CollectionCallbacks } from "@rebasepro/types";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { RealtimeService } from "../src/services/realtimeService";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
@@ -87,11 +88,11 @@ const TENANT_USER: User = {
 let db: PGlite;
 
 function driverOver(pglite: PGlite, user?: User): PostgresBackendDriver {
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
     registry.registerMultiple([authors(), posts(), profiles()]);
-    registry.registerTable(authorsTable, "authors");
-    registry.registerTable(postsTable, "posts");
-    registry.registerTable(profilesTable, "profiles");
+    registry.registerPgTable(authorsTable, "authors");
+    registry.registerPgTable(postsTable, "posts");
+    registry.registerPgTable(profilesTable, "profiles");
     const orm = drizzle(pglite, {
         schema: { authors: authorsTable, posts: postsTable, profiles: profilesTable }
     });

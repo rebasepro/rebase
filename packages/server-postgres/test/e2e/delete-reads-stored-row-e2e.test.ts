@@ -31,7 +31,8 @@ import { WebSocket as NodeWebSocket } from "ws";
 import type { CollectionConfig, RebaseSdkData } from "@rebasepro/types";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
-import { PostgresCollectionRegistry } from "../../src/collections/PostgresCollectionRegistry.js";
+import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry.js";
+import { FixtureTableRegistry } from "../helpers/tables";
 import { RealtimeService } from "../../src/services/realtimeService.js";
 import { HistoryService } from "../../src/history/HistoryService.js";
 import { ensureHistoryTableExists } from "../../src/history/ensure-history-table.js";
@@ -170,9 +171,9 @@ describe("a delete reads the row it deletes (E2E)", () => {
         const historyTable = await ensureHistoryTableExists(db);
         expect(historyTable.inTransaction).toBe(true);
 
-        const registry = new PostgresCollectionRegistry();
+        const registry = new FixtureTableRegistry();
         registry.registerMultiple([contractsCollection]);
-        registry.registerTable(contractsTable, "contracts");
+        registry.registerPgTable(contractsTable, "contracts");
 
         realtime = new RealtimeService(db, registry);
         driver = new PostgresBackendDriver(

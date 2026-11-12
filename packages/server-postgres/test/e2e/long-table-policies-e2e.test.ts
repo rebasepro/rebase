@@ -21,7 +21,7 @@ import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.
 import { createPostgresBootstrapper } from "../../src/PostgresBootstrapper.js";
 import { createPostgresDatabaseConnection } from "../../src/connection.js";
 import type { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
-import type { PostgresCollectionRegistry } from "../../src/collections/PostgresCollectionRegistry.js";
+import type { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry.js";
 import { testUser } from "./test-user.js";
 
 const TABLE = "a_fifty_byte_collection_table_name_for_rls_policie";
@@ -72,8 +72,8 @@ async function boot(url: string, beforePolicies?: (observer: pg.Client) => Promi
         await beforePolicies?.(observer);
         await bootstrapper.ensureCollectionPolicies!([collection], driverResult);
         await bootstrapper.finalizeSecurityPosture!(driverResult);
-        const internals = driverResult.internals as { driver: PostgresBackendDriver; registry: PostgresCollectionRegistry };
-        internals.registry.registerTable(drizzleTable, TABLE);
+        const internals = driverResult.internals as { driver: PostgresBackendDriver; registry: PostgresTableRegistry };
+        internals.registry.registerPgTable(drizzleTable, TABLE);
         return { observer, conn, driver: internals.driver };
     } finally {
         for (const spy of quiet) spy.mockRestore();

@@ -63,7 +63,7 @@ export function compileSchema(
     const descriptors = compileTables(defs, options.defaultRls !== undefined ? { defaultRls: options.defaultRls } : {});
     // `compileTables` throws unless every definition compiled, and returns them
     // in input order: descriptor i is definition i.
-    return descriptors.map((descriptor, index) => compiledTableOf(defs[index], descriptor));
+    return descriptors.map((descriptor, index) => compiledTable(defs[index], descriptor));
 }
 
 /**
@@ -116,7 +116,15 @@ export function listTransforms(table: CompiledTable): CompiledTransform[] {
 
 // ── One table ────────────────────────────────────────────────────────────────
 
-function compiledTableOf(def: AnyTableDef | AnyViewDef, descriptor: TableDescriptor): CompiledTable {
+/**
+ * One compiled table from a definition and the descriptor it compiled to: the
+ * server-only parts collected from `def` beside `descriptor`. What
+ * {@link compileSchema} does per table, for a caller that compiled the
+ * descriptor itself (`compileTable` with a resolver of its own).
+ *
+ * @group Schema
+ */
+export function compiledTable(def: AnyTableDef | AnyViewDef, descriptor: TableDescriptor): CompiledTable {
     const compiled: CompiledTable = { descriptor, def };
     const hooks = hooksOf(def);
     if (hooks) compiled.hooks = hooks;

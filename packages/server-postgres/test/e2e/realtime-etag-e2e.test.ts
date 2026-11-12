@@ -24,7 +24,8 @@ import { WebSocket as NodeWebSocket } from "ws";
 import type { CollectionConfig } from "@rebasepro/types";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
-import { PostgresCollectionRegistry } from "../../src/collections/PostgresCollectionRegistry.js";
+import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry.js";
+import { FixtureTableRegistry } from "../helpers/tables";
 import { RealtimeService } from "../../src/services/realtimeService.js";
 import { createPostgresWebSocket } from "../../src/websocket.js";
 import { RestApiGenerator } from "../../../server/src/api/rest/api-generator.js";
@@ -148,11 +149,11 @@ describe("ETags on live row frames and PATCH (E2E)", () => {
 
         pool = new pg.Pool({ connectionString: container.connectionString });
         const db = drizzle(pool);
-        const registry = new PostgresCollectionRegistry();
+        const registry = new FixtureTableRegistry();
         registry.registerMultiple([peopleCollection, notesCollection, docsCollection]);
-        registry.registerTable(peopleTable, "people");
-        registry.registerTable(notesTable, "notes");
-        registry.registerTable(docsTable, "docs");
+        registry.registerPgTable(peopleTable, "people");
+        registry.registerPgTable(notesTable, "notes");
+        registry.registerPgTable(docsTable, "docs");
         realtime = new RealtimeService(db, registry);
         const driver = new PostgresBackendDriver(db, realtime, registry);
         realtime.setDataDriver(driver);

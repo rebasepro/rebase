@@ -33,6 +33,7 @@ import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.
 import { createPostgresBootstrapper, createPostgresDatabaseConnection, openRebase, type OpenedRebase } from "../../src/index.js";
 import { runPipelinedTransaction, pipelineTarget } from "../../src/pipelined-transaction.js";
 import { authContextStatement, REBASE_USER_ROLE } from "../../src/security/rls-enforcement.js";
+import { tablesFromCollections } from "../helpers/tables.js";
 
 const notes: CollectionConfig = {
     name: "Notes",
@@ -79,7 +80,7 @@ async function provision(url: string): Promise<void> {
     const conn = createPostgresDatabaseConnection(url);
     try {
         const bootstrapper = createPostgresBootstrapper({ connectionString: url, connection: conn.db });
-        const driverResult = await bootstrapper.initializeDriver({ collections: [notes], realtime: { subscribe: false, provision: false } });
+        const driverResult = await bootstrapper.initializeDriver({ collections: [notes], tables: tablesFromCollections([notes]).tables, realtime: { subscribe: false, provision: false } });
         await bootstrapper.ensureCollectionSchema!([notes], driverResult);
         await bootstrapper.ensureRlsRuntime!(driverResult);
         await bootstrapper.ensureCollectionPolicies!([notes], driverResult);
@@ -104,7 +105,7 @@ describe("pipelined transactions (E2E)", () => {
         );
         await provision(container.connectionString);
         // One connection, so every request reuses the one the last one released.
-        rebase = await openRebase({ databaseUrl: container.connectionString, collections: [notes], pool: { max: 1 } });
+        rebase = await openRebase({ databaseUrl: container.connectionString, collections: [notes], tables: tablesFromCollections([notes]).tables, pool: { max: 1 } });
         observer = new pg.Client({ connectionString: container.connectionString });
         await observer.connect();
         await rebase.sql("INSERT INTO public.notes (owner_id, title) VALUES ('ada', 'hers'), ('bob', 'his')");

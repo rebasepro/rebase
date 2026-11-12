@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach } from "@jest/globals";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { DatabasePoolManager } from "../src/databasePoolManager";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import type { SQLWrapper } from "drizzle-orm";
 import { PgDialect } from "drizzle-orm/pg-core";
 import { answerStatements, queryResult, spiedDrizzle, type SpiedDrizzle } from "./helpers/spg-a-db";
@@ -56,7 +57,7 @@ describe("the app's own database", () => {
         jest.spyOn(poolManager, "getPool").mockImplementation(() => {
             throw new Error("no maintenance pool in this test");
         });
-        const registry = new PostgresCollectionRegistry();
+        const registry = new FixtureTableRegistry();
         driver = new PostgresBackendDriver(app.db, quietRealtime(app.db, registry), registry, undefined, poolManager);
     });
 

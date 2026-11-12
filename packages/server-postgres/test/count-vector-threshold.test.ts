@@ -5,7 +5,8 @@ import type { CollectionConfig, FilterValues } from "@rebasepro/types";
 import { ApiError } from "@rebasepro/server";
 
 import { FetchService } from "../src/services/FetchService";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 
 /**
  * A vector `threshold` narrows the count as well as the listing.
@@ -56,9 +57,9 @@ function recordingDb() {
 }
 
 function registryFor() {
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
     registry.registerMultiple([docsCollection]);
-    registry.registerTable(docsTable, "docs");
+    registry.registerPgTable(docsTable, "docs");
     return registry;
 }
 

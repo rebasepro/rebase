@@ -1,7 +1,8 @@
 import type { CollectionConfig } from "@rebasepro/types";
 import { integer, pgTable, text } from "drizzle-orm/pg-core";
 import { FetchService } from "../src/services/FetchService";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { recordingDb, shapedRows } from "./helpers/spg-c-db";
 
 /**
@@ -19,7 +20,7 @@ import { recordingDb, shapedRows } from "./helpers/spg-c-db";
  * pins the property that used to be a bug: what comes back is columns.
  */
 describe("related rows via path — the target's columns, and only those", () => {
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
 
     const commentsCollection: CollectionConfig = {
         slug: "comments",
@@ -55,7 +56,7 @@ isId: "increment" },
         jest.restoreAllMocks();
         jest.spyOn(registry, "getCollectionByPath").mockImplementation(path =>
             path.startsWith("posts") ? postsCollection : commentsCollection);
-        jest.spyOn(registry, "getTable").mockImplementation(tableName =>
+        jest.spyOn(registry, "getPgTable").mockImplementation(tableName =>
             tableName === "comments" ? commentsTable : undefined);
     });
 

@@ -5,7 +5,8 @@
  */
 import type { PgTable } from "drizzle-orm/pg-core";
 import type { CollectionConfig, DataDriver, SQLAdmin, User } from "@rebasepro/types";
-import { PostgresCollectionRegistry } from "../../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./tables";
 import { RealtimeService } from "../../src/services/realtimeService";
 import type { PgSqlDatabase } from "../../src/interfaces";
 
@@ -28,17 +29,17 @@ export function testUser(uid = "u1", roles: string[] = [], extra: Partial<User> 
  * collections, has no global callbacks, and serves `table` (when given) for
  * any table name.
  */
-export function registryServing(collection: CollectionConfig, table?: PgTable): PostgresCollectionRegistry {
-    const registry = new PostgresCollectionRegistry();
+export function registryServing(collection: CollectionConfig, table?: PgTable): PostgresTableRegistry {
+    const registry = new FixtureTableRegistry();
     jest.spyOn(registry, "getCollectionByPath").mockReturnValue(collection);
     jest.spyOn(registry, "getCollections").mockReturnValue([]);
-    jest.spyOn(registry, "getTable").mockReturnValue(table);
+    jest.spyOn(registry, "getPgTable").mockReturnValue(table);
     jest.spyOn(registry, "getGlobalCallbacks").mockReturnValue(undefined);
     return registry;
 }
 
 /** A real `RealtimeService` whose broadcasts and subscriptions are spies. */
-export function quietRealtime(db: PgSqlDatabase, registry: PostgresCollectionRegistry): RealtimeService {
+export function quietRealtime(db: PgSqlDatabase, registry: PostgresTableRegistry): RealtimeService {
     const realtime = new RealtimeService(db, registry);
     jest.spyOn(realtime, "notifyUpdate").mockResolvedValue(undefined);
     jest.spyOn(realtime, "startDataDriverSubscription").mockImplementation(() => undefined);

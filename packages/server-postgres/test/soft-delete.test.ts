@@ -1,8 +1,11 @@
-import { CollectionConfig } from "@rebasepro/types";
+import { col, defineTable, type AnyColumn, type AnyTableDef, type CollectionConfig } from "@rebasepro/types";
+import { compileSchema } from "@rebasepro/common";
+import { buildRuntimeTable, type RuntimeTable } from "../src/model/runtime-table";
 import { isNotNull, isNull } from "drizzle-orm";
 import { PgDialect, pgTable, timestamp } from "drizzle-orm/pg-core";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { RealtimeService } from "../src/services/realtimeService";
 import { HistoryService } from "../src/history/HistoryService";
 import { DEFAULT_SOFT_DELETE_FIELD } from "@rebasepro/common";
@@ -42,59 +45,58 @@ function realTable(name: string, columns: Record<string, string>) {
     return pgTable(name, shape);
 }
 
-describe("resolveSoftDelete", () => {
-    const base = (softDelete: unknown, extra: Record<string, unknown> = {}): CollectionConfig => ({
-        slug: "posts",
-        name: "Posts",
-        table: "posts",
-        softDelete,
-        properties: {
-            id: { type: "number", isId: "increment" },
-            deletedAt: { type: "date" },
-            ...extra
-        }
-    } as CollectionConfig);
+/** The runtime table of one definition, over no catalogue table. */
+function runtimeOf(def: AnyTableDef): RuntimeTable {
+    return buildRuntimeTable(compileSchema([def])[0], undefined);
+}
 
-    it("says nothing for a collection that does not declare it", () => {
-        expect(resolveSoftDelete(base(undefined))).toBeUndefined();
-        expect(resolveSoftDelete(base(false))).toBeUndefined();
+const plainPosts = defineTable("posts", {
+    columns: { id: col.integer().primaryKey().identity(), deletedAt: col.timestamptz() },
+    rls: "admin-only"
+});
+const offPosts = defineTable("posts", {
+    columns: { id: col.integer().primaryKey().identity(), deletedAt: col.timestamptz() },
+    softDelete: false,
+    rls: "admin-only"
+});
+const softPosts = defineTable("posts", {
+    columns: { id: col.integer().primaryKey().identity(), deletedAt: col.timestamptz() },
+    softDelete: true,
+    rls: "admin-only"
+});
+const removedOnPosts = (removedOn: AnyColumn) => defineTable("posts", {
+    columns: { id: col.integer().primaryKey().identity(), removedOn },
+    softDelete: { field: "removedOn" },
+    rls: "admin-only"
+});
+
+describe("resolveSoftDelete", () => {
+    it("says nothing for a table that does not declare it", () => {
+        expect(resolveSoftDelete(runtimeOf(plainPosts))).toBeUndefined();
+        expect(resolveSoftDelete(runtimeOf(offPosts))).toBeUndefined();
         expect(resolveSoftDelete(undefined)).toBeUndefined();
     });
 
     it("defaults to deletedAt / deleted_at", () => {
-        expect(resolveSoftDelete(base(true))).toEqual({
+        expect(resolveSoftDelete(runtimeOf(softPosts))).toEqual({
             field: DEFAULT_SOFT_DELETE_FIELD,
             columnName: "deleted_at"
         });
     });
 
-    it("takes a named field, and its columnName when it has one", () => {
-        const collection = base({ field: "removedOn" }, {
-            removedOn: { type: "date", columnName: "removed_on_ts" }
-        });
-        expect(resolveSoftDelete(collection)).toEqual({
-            field: "removedOn",
-            columnName: "removed_on_ts"
-        });
+    it("takes a named field, and the SQL name its column declares", () => {
+        const table = runtimeOf(removedOnPosts(col.timestamptz().column("removed_on_ts")));
+        expect(resolveSoftDelete(table)).toEqual({ field: "removedOn", columnName: "removed_on_ts" });
     });
 
-    it("snake-cases a named field with no columnName", () => {
-        const collection = base({ field: "removedOn" }, { removedOn: { type: "date" } });
-        expect(resolveSoftDelete(collection)?.columnName).toBe("removed_on");
+    it("reads the derived SQL name of a named field with no .column()", () => {
+        const table = runtimeOf(removedOnPosts(col.timestamptz()));
+        expect(resolveSoftDelete(table)?.columnName).toBe("removed_on");
     });
 });
 
 describe("softDeleteCondition", () => {
-    const posts: CollectionConfig = {
-        slug: "posts",
-        name: "Posts",
-        table: "posts",
-        softDelete: true,
-        properties: {
-            id: { type: "number", isId: "increment" },
-            deletedAt: { type: "date" }
-        }
-    };
+    const posts = runtimeOf(softPosts);
 
     const table = realTable("posts", { id: "id", deletedAt: "deleted_at" });
     const render = (sql: SQL | undefined) => {
@@ -115,28 +117,24 @@ describe("softDeleteCondition", () => {
             .toBe(render(isNotNull(table.deletedAt)));
     });
 
-    it("adds nothing for a collection without soft delete", () => {
-        const plain = { ...posts, softDelete: undefined } as CollectionConfig;
+    it("adds nothing for a table without soft delete", () => {
+        const plain = runtimeOf(plainPosts);
         expect(softDeleteCondition(plain, table)).toBeUndefined();
-        // Even for `"only"`: silently returning nothing on a collection with no
+        // Even for `"only"`: silently returning nothing on a table with no
         // stamp is a worse answer than ignoring a parameter it cannot honour.
         expect(softDeleteCondition(plain, table, "only")).toBeUndefined();
     });
 
-    it("adds nothing when the table has no such column", () => {
-        // The boot check is what refuses this config; failing open *here* would
-        // be a 500 on a read rather than a message at startup.
+    it("adds nothing when the catalogue table has no such column", () => {
+        // Compiling refuses a definition without the column; failing open
+        // *here* would be a 500 on a read of a database behind its schema.
         expect(softDeleteCondition(posts, realTable("posts", { id: "id" }))).toBeUndefined();
     });
 
     it("finds the column keyed under its physical name too", () => {
-        // An introspected schema keys columns by the column name; a generated
-        // one keys them by the property. Both have to work.
-        const byColumn = {
-            ...posts,
-            properties: { ...posts.properties, deletedAt: { type: "date", columnName: "deleted_at" } }
-        } as CollectionConfig;
-        expect(softDeleteColumn(byColumn, realTable("posts", { deleted_at: "deleted_at" }))).toBeDefined();
+        // A hand-written drizzle table may key columns by the column name; one
+        // read back from the catalogue keys them by the key. Both have to work.
+        expect(softDeleteColumn(posts, realTable("posts", { deleted_at: "deleted_at" }))).toBeDefined();
     });
 
     it("composes with an existing where", () => {
@@ -149,7 +147,7 @@ describe("softDeleteCondition", () => {
  * The driver half: what a delete actually writes.
  */
 describe("PostgresBackendDriver.delete — soft delete", () => {
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
 
     const posts: CollectionConfig = {
         slug: "posts",
@@ -172,6 +170,7 @@ describe("PostgresBackendDriver.delete — soft delete", () => {
             title: { type: "string" }
         }
     };
+    registry.registerMultiple([posts, plain]);
 
     let driver: PostgresBackendDriver;
     let saveSpy: jest.SpyInstance;

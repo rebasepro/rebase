@@ -22,7 +22,7 @@ import { beforeQueryCondition, type ReadCallContextProvider } from "./read-scope
 import { RelationWriteService } from "./RelationWriteService";
 import { FetchService } from "./FetchService";
 import { DrizzleClient } from "../interfaces";
-import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../model/PostgresTableRegistry";
 import {
     assertNoReadOnlyRelationValues,
     assertWritableThrough,
@@ -167,7 +167,7 @@ export class PersistService {
 
     constructor(
         private db: DrizzleClient,
-        private registry: PostgresCollectionRegistry,
+        private registry: PostgresTableRegistry,
         /**
          * How this service's reads reach the identity their `beforeQuery` hooks
          * run as. Passed by the driver that constructed it; absent only in a
@@ -525,7 +525,7 @@ export class PersistService {
         // marker object to the column as data.
         const { values: plainValues, fieldOps } = splitFieldOps(
             effectiveValues as Record<string, unknown>,
-            collection.properties
+            this.registry.getTable(collection.slug)?.descriptor
         );
         const fieldOpKeys = Object.keys(fieldOps);
         if (fieldOpKeys.length > 0) {
@@ -758,8 +758,9 @@ export class PersistService {
                         // `findUpsertTarget`); this is the same rule held by
                         // the statement, for the row that read could not see
                         // or that was trashed since.
-                        const softDelete = resolveSoftDelete(collection);
-                        const trashColumn = softDelete ? softDeleteColumn(collection, table) : undefined;
+                        const runtime = this.registry.requireTable(collection.slug);
+                        const softDelete = resolveSoftDelete(runtime);
+                        const trashColumn = softDelete ? softDeleteColumn(runtime, table) : undefined;
                         const writable = trashColumn
                             ? (scope ? and(scope, isNull(trashColumn)) : isNull(trashColumn))
                             : scope;
@@ -956,7 +957,7 @@ export class PersistService {
         const prepared: { data: Record<string, unknown>; set: string[]; key: string }[] = [];
         for (const row of rows) {
             assertNoReadOnlyRelationValues(row.values, collection);
-            const { values: plainValues, fieldOps } = splitFieldOps(row.values, collection.properties);
+            const { values: plainValues, fieldOps } = splitFieldOps(row.values, this.registry.getTable(collection.slug)?.descriptor);
             if (Object.keys(fieldOps).length > 0) return undefined;
             if (manyRelationKeys.some(key => Object.prototype.hasOwnProperty.call(plainValues, key))) return undefined;
             const serialized = serializeDataToServer(plainValues, collection.properties as Properties, collection, this.registry);
@@ -990,8 +991,9 @@ export class PersistService {
             return column;
         }) : [];
         const scope = upsert ? await this.writeScope(collection, collectionPath, table) : undefined;
-        const softDelete = upsert ? resolveSoftDelete(collection) : undefined;
-        const trashColumn = softDelete ? softDeleteColumn(collection, table) : undefined;
+        const runtime = this.registry.requireTable(collection.slug);
+        const softDelete = upsert ? resolveSoftDelete(runtime) : undefined;
+        const trashColumn = softDelete ? softDeleteColumn(runtime, table) : undefined;
         const writable = trashColumn ? (scope ? and(scope, isNull(trashColumn)) : isNull(trashColumn)) : scope;
         const conditional = Boolean(options?.ignoreDuplicates || options?.conflictWhere);
         const condition = upsert && options?.conflictWhere
@@ -1110,7 +1112,7 @@ export class PersistService {
     ): Promise<Record<string, unknown>[] | undefined> {
         if (isNestedPath(collectionPath)) return undefined;
         const collection = getCollectionByPath(collectionPath, this.registry);
-        if (resolveSoftDelete(collection)) return undefined;
+        if (resolveSoftDelete(this.registry.requireTable(collection.slug))) return undefined;
         const returning = this.fetchService.insertReturning(collection.slug);
         if (!returning) return undefined;
         const table = getTableForCollection(collection, this.registry);
@@ -1122,7 +1124,7 @@ export class PersistService {
         const prepared: { key: Record<string, unknown>; data: Record<string, unknown>; columns: string; id: string }[] = [];
         for (const { id, values } of updates) {
             assertNoReadOnlyRelationValues(values, collection);
-            const { values: plainValues, fieldOps } = splitFieldOps(values, collection.properties);
+            const { values: plainValues, fieldOps } = splitFieldOps(values, this.registry.getTable(collection.slug)?.descriptor);
             if (Object.keys(fieldOps).length > 0) return undefined;
             if (manyRelationKeys.some(key => Object.prototype.hasOwnProperty.call(plainValues, key))) return undefined;
             const serialized = serializeDataToServer(plainValues, collection.properties as Properties, collection, this.registry);
@@ -1225,7 +1227,7 @@ export class PersistService {
         if (!returning) return undefined;
         assertNoReadOnlyRelationValues(values, collection);
         const table = getTableForCollection(collection, this.registry);
-        const { values: plainValues, fieldOps } = splitFieldOps(values, collection.properties);
+        const { values: plainValues, fieldOps } = splitFieldOps(values, this.registry.getTable(collection.slug)?.descriptor);
         const resolvedRelations = resolveCollectionRelations(collection);
         if (Object.keys(resolvedRelations).some(key => resolvedRelations[key]?.cardinality === "many"
             && Object.prototype.hasOwnProperty.call(plainValues, key))) return undefined;

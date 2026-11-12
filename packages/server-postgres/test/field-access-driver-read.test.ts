@@ -18,7 +18,8 @@ import { integer, pgTable, serial, varchar } from "drizzle-orm/pg-core";
 import type { CollectionConfig, DataDriver, User } from "@rebasepro/types";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { RealtimeService } from "../src/services/realtimeService";
 import { testUser } from "./helpers/spg-b-fixtures";
 import { pgliteNodePg } from "./helpers/spg-b-pglite-node-pg";
@@ -55,9 +56,9 @@ let db: PGlite;
  * builder for the table and `fetchOne` takes its `db.select` fallback.
  */
 function driverOver(pglite: PGlite, options: { withSchema: boolean } = { withSchema: true }): PostgresBackendDriver {
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
     registry.registerMultiple([staffCollection()]);
-    registry.registerTable(staffTable, "staff");
+    registry.registerPgTable(staffTable, "staff");
     const orm = options.withSchema ? pgliteNodePg(pglite, { schema: { staff: staffTable } }) : pgliteNodePg(pglite);
     return new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry);
 }
@@ -158,7 +159,7 @@ describe("a tenancy membership read", () => {
     });
 
     function tenancyDriver(): PostgresBackendDriver {
-        const registry = new PostgresCollectionRegistry();
+        const registry = new FixtureTableRegistry();
         registry.registerMultiple([
             {
                 name: "Members", slug: "members", table: "members",
@@ -178,8 +179,8 @@ describe("a tenancy membership read", () => {
                 }
             }
         ]);
-        registry.registerTable(membersTable, "members");
-        registry.registerTable(notesTable, "notes");
+        registry.registerPgTable(membersTable, "members");
+        registry.registerPgTable(notesTable, "notes");
         const orm = pgliteNodePg(db, { schema: { members: membersTable, notes: notesTable } });
         return new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry);
     }
@@ -230,10 +231,10 @@ describe("a withheld relation, on the driver's reads", () => {
     }
 
     function peopleDriver(): PostgresBackendDriver {
-        const registry = new PostgresCollectionRegistry();
+        const registry = new FixtureTableRegistry();
         registry.registerMultiple([people(), bands()]);
-        registry.registerTable(peopleTable, "people");
-        registry.registerTable(bandsTable, "bands");
+        registry.registerPgTable(peopleTable, "people");
+        registry.registerPgTable(bandsTable, "bands");
         const orm = pgliteNodePg(db, { schema: { people: peopleTable, bands: bandsTable } });
         return new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry);
     }

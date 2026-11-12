@@ -18,6 +18,7 @@ import type { CollectionConfig } from "@rebasepro/types";
 
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { createPostgresBootstrapper, createPostgresDatabaseConnection, openRebase, type OpenedRebase } from "../../src/index.js";
+import { tablesFromCollections } from "../helpers/tables.js";
 
 const songs: CollectionConfig = {
     name: "Songs",
@@ -65,7 +66,7 @@ async function provision(url: string, collections: CollectionConfig[]): Promise<
     const conn = createPostgresDatabaseConnection(url);
     try {
         const bootstrapper = createPostgresBootstrapper({ connectionString: url, connection: conn.db });
-        const driverResult = await bootstrapper.initializeDriver({ collections, realtime: { subscribe: false, provision: false } });
+        const driverResult = await bootstrapper.initializeDriver({ collections, tables: tablesFromCollections(collections).tables, realtime: { subscribe: false, provision: false } });
         await bootstrapper.ensureCollectionSchema!(collections, driverResult);
         await bootstrapper.ensureRlsRuntime!(driverResult);
         await bootstrapper.ensureCollectionPolicies!(collections, driverResult);
@@ -89,7 +90,7 @@ describe("SQL as the caller (E2E)", () => {
             vi.spyOn(console, "warn").mockImplementation(() => undefined)
         );
         await provision(container.connectionString, [songs, notes, people]);
-        rebase = await openRebase({ databaseUrl: container.connectionString, collections: [songs, notes, people] });
+        rebase = await openRebase({ databaseUrl: container.connectionString, collections: [songs, notes, people], tables: tablesFromCollections([songs, notes, people]).tables });
         await rebase.sql(`INSERT INTO public.songs (owner_id, artist) VALUES
             ('ada', 'Rosalía'), ('ada', 'Björk'), ('bob', 'Muse')`);
         await rebase.sql("INSERT INTO public.notes (org_id, body) VALUES ('a', 'first'), ('b', 'second')");

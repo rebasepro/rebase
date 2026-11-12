@@ -17,7 +17,8 @@ import { integer, jsonb, pgTable, serial } from "drizzle-orm/pg-core";
 import type { CollectionConfig } from "@rebasepro/types";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { RealtimeService } from "../src/services/realtimeService";
 import { pgliteNodePg } from "./helpers/spg-b-pglite-node-pg";
 
@@ -41,9 +42,9 @@ const docs = {
 let db: PGlite;
 
 function driver(): PostgresBackendDriver {
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
     registry.registerMultiple([docs]);
-    registry.registerTable(docsTable, "docs");
+    registry.registerPgTable(docsTable, "docs");
     const orm = pgliteNodePg(db, { schema: { docs: docsTable } });
     return new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry);
 }

@@ -22,7 +22,8 @@ import { pgTable, timestamp, varchar } from "drizzle-orm/pg-core";
 import type { CollectionConfig } from "@rebasepro/types";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
-import { PostgresCollectionRegistry } from "../../src/collections/PostgresCollectionRegistry.js";
+import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry.js";
+import { FixtureTableRegistry } from "../helpers/tables";
 import { RealtimeService } from "../../src/services/realtimeService.js";
 import { assertDeleteContract } from "../../../server/test/contract/delete-contract";
 
@@ -91,10 +92,10 @@ describe("DataDriver.delete contract (Postgres, E2E)", () => {
 
         pool = new pg.Pool({ connectionString: container.connectionString });
         const db = drizzle(pool);
-        const registry = new PostgresCollectionRegistry();
+        const registry = new FixtureTableRegistry();
         registry.registerMultiple([notesCollection, trashCollection]);
-        registry.registerTable(notesTable, "notes");
-        registry.registerTable(trashTable, "trash_notes");
+        registry.registerPgTable(notesTable, "notes");
+        registry.registerPgTable(trashTable, "trash_notes");
         const realtime = new RealtimeService(db, registry);
         driver = new PostgresBackendDriver(db, realtime, registry);
         realtime.setDataDriver(driver);

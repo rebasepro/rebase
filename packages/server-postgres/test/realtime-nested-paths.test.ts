@@ -14,7 +14,8 @@
  * only about *who is asked to refetch*.
  */
 import { RealtimeService } from "../src/services/realtimeService";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import type { CollectionConfig } from "@rebasepro/types";
 import { recordingDb } from "./helpers/spg-c-db";
 import { fakeRealtimeSocket, type FakeRealtimeSocket } from "./helpers/spg-c-socket";
@@ -64,7 +65,7 @@ describe("realtime over nested paths", () => {
     beforeEach(async () => {
         jest.useFakeTimers();
         const { db } = recordingDb();
-        const registry = new PostgresCollectionRegistry();
+        const registry = new FixtureTableRegistry();
         registry.registerMultiple([authors, posts]);
         realtime = new RealtimeService(db, registry);
 

@@ -28,7 +28,8 @@ import { buildCollectionFromTableMetadata } from "@rebasepro/common";
 import type { PostgresCollectionConfig } from "@rebasepro/types";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { RealtimeService } from "../src/services/realtimeService";
 import { pgliteNodePg } from "./helpers/spg-b-pglite-node-pg";
 import { generatePolicyStatements } from "../src/schema/generate-postgres-ddl-logic";
@@ -70,7 +71,7 @@ afterEach(async () => {
 });
 
 function driverOver(pglite: PGlite): PostgresBackendDriver {
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
     const orm = pgliteNodePg(pglite);
     return new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry);
 }

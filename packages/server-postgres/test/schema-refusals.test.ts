@@ -28,7 +28,9 @@ import type { CollectionConfig } from "@rebasepro/types";
 const emptyDb = (): ExistingSchema => ({ tables: new Map(), enums: new Set(), constraints: new Set() });
 
 describe("a configuration with no correct column is refused by all three emitters", () => {
-    for (const { collection, because } of refused) {
+    for (const { collection, because: legacyBecause } of refused) {
+        // Refused before the planner now, in the table model's words where the message moved.
+        const because = PLAN_REFUSAL_ALLOWED_MESSAGES.find(moved => moved.id === `property-matrix.${collection.slug}`)?.pattern ?? legacyBecause;
         it(`${collection.slug}`, () => {
             expect(() => generateSchema([collection])).toThrow(because);
             expect(() => generatePostgresDdl([collection])).toThrow(because);
@@ -47,7 +49,8 @@ describe("a foreign key into a composite primary key is refused by all three emi
     // is not unique. The composite key itself is fine — it is the link into it
     // that has no column to point at.
     const collections = [companies, companyTranslations, linkIntoComposite];
-    const because = /relation "link_into_composite\.translation" points at collection "company_translations", whose primary key spans 2 columns \("id", "locale"\)/;
+    // Refused by `compileTables` now, before the planner (see PLAN_REFUSAL_ALLOWED_MESSAGES).
+    const because = /one column cannot reference a composite key/;
 
     it("naming the link and the key it cannot reference", () => {
         expect(() => generateSchema(collections)).toThrow(because);

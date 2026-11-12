@@ -44,7 +44,9 @@ function loadProblems(collections: CollectionConfig[]): readonly SchemaDefinitio
 }
 
 describe("a configuration the schema planner refuses", () => {
-    for (const { collection, because } of refused) {
+    for (const { collection, because: legacyBecause } of refused) {
+        // Refused before the planner now, in the table model's words where the message moved.
+        const because = PLAN_REFUSAL_ALLOWED_MESSAGES.find(moved => moved.id === `property-matrix.${collection.slug}`)?.pattern ?? legacyBecause;
         it(`${collection.slug} — is refused at config load too`, () => {
             expect(() => planSchema([collection])).toThrow(because);
 

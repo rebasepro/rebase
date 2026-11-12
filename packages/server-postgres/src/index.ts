@@ -24,7 +24,7 @@ export * from "./services/realtimeService";
 // here) and is passed to `realtime.bus`. Without this export it would be one.
 export * from "./services/channel-bus";
 export * from "./websocket";
-export * from "./collections/PostgresCollectionRegistry";
+export * from "./model/PostgresTableRegistry";
 export * from "./services/BranchService";
 export { diffDatabaseBranch, mergeDatabaseBranch, DEFAULT_BRANCH_DIFF_SAMPLE_LIMIT, DEFAULT_BRANCH_DIFF_MAX_ROWS } from "./branching/branch-diff";
 export * from "./backup";

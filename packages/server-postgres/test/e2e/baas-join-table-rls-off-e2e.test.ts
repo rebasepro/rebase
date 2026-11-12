@@ -263,9 +263,9 @@ can_write: true }
             { collections: [], introspectCollections: true, provision: false, realtime: false }
         );
         const { registry } = opened.internals;
-        expect(registry.getTable("people")).toBeDefined();
-        expect(registry.getTable("memberships")).toBeUndefined();
-        expect(registry.getTable("assignments")).toBeUndefined();
+        expect(registry.getPgTable("people")).toBeDefined();
+        expect(registry.getPgTable("memberships")).toBeUndefined();
+        expect(registry.getPgTable("assignments")).toBeUndefined();
     });
 
     it("keeps rebase_user's grants, so a served table's policy can still read a join table", async () => {

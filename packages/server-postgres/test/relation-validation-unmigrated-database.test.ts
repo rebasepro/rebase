@@ -1,8 +1,9 @@
 import { pgTable, text } from "drizzle-orm/pg-core";
 import { CollectionConfig } from "@rebasepro/types";
 
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
-import { assertRelationsResolve } from "../src/collections/validate-relations";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
+import { assertRelationsResolve } from "../src/model/validate-relations";
 
 /**
  * What the boot error tells you when a relation names a column the database
@@ -55,13 +56,13 @@ const productsCollection: CollectionConfig = {
 };
 
 function boot() {
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
     const all = [productsCollection, categoriesCollection];
     registry.registerMultiple(all);
     for (const [name, table] of Object.entries({ products, categories, categories_products })) {
-        registry.registerTable(table, name);
+        registry.registerPgTable(table, name);
     }
-    assertRelationsResolve(all, registry);
+    assertRelationsResolve(registry);
 }
 
 function bootMessage(): string {
@@ -112,6 +113,6 @@ describe("relation validation against a database the schema was never applied to
     });
 
     it("never advises pinning the column that is about to be renamed", () => {
-        expect(bootMessage()).not.toMatch(/set `through\.\w+` to one of/);
+        expect(bootMessage()).not.toMatch(/set `(sourceKey|targetKey)` to one of/);
     });
 });

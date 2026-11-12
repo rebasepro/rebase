@@ -17,7 +17,8 @@ import { drizzle } from "drizzle-orm/pglite";
 import { integer, jsonb, numeric, pgTable, timestamp, varchar } from "drizzle-orm/pg-core";
 import type { CollectionConfig } from "@rebasepro/types";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { RealtimeService } from "../src/services/realtimeService";
 import { serializePropertyToServer } from "../src/data-transformer";
 
@@ -56,9 +57,9 @@ beforeEach(async () => {
         CREATE TABLE people (id varchar PRIMARY KEY, name varchar, note varchar, meta jsonb, score integer, price numeric, seen_at timestamptz);
         INSERT INTO people (id, name, score, price) VALUES ('p1', 'Ada', 1, 1.5);
     `);
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
     registry.registerMultiple([people]);
-    registry.registerTable(peopleTable, "people");
+    registry.registerPgTable(peopleTable, "people");
     const orm = drizzle(db, { schema: { people: peopleTable } });
     driver = new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry);
 });

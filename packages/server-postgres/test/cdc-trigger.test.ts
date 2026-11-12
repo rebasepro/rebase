@@ -13,7 +13,8 @@ import {
 } from "../src/services/cdc/trigger-cdc";
 import { parseCdcPayload } from "../src/services/cdc/CdcListener";
 import { RealtimeService } from "../src/services/realtimeService";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { spiedDrizzle } from "./helpers/spg-a-db";
 
 describe("CDC trigger SQL", () => {
@@ -475,7 +476,7 @@ describe("refreshInstalledCdcFunction", () => {
 
 describe("enableCdc capability detection (drives REALTIME_CDC=auto fallback)", () => {
     it("rejects and stays inactive when the LISTEN connection cannot be established", async () => {
-        const registry = new PostgresCollectionRegistry();
+        const registry = new FixtureTableRegistry();
         const service = new RealtimeService(spiedDrizzle().db, registry);
 
         // Port 1 refuses immediately → start() surfaces the failure so `auto`

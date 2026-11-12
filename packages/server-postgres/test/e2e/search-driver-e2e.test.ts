@@ -14,7 +14,8 @@ import { pgTable, text, uuid, customType, jsonb } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { PostgresCollectionConfig, CollectionConfig } from "@rebasepro/types";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
-import { PostgresCollectionRegistry } from "../../src/collections/PostgresCollectionRegistry.js";
+import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry.js";
+import { FixtureTableRegistry } from "../helpers/tables";
 import { FetchService } from "../../src/services/FetchService.js";
 import { generatePostgresDdl } from "../../src/schema/generate-postgres-ddl-logic.js";
 import { buildSearchColumnSpec } from "../../src/schema/search-column.js";
@@ -113,16 +114,16 @@ describe("search through the driver", () => {
         `);
 
         pool = new pg.Pool({ connectionString: container.connectionString });
-        const registry = new PostgresCollectionRegistry();
+        const registry = new FixtureTableRegistry();
         registry.registerMultiple([searched as CollectionConfig, plain as CollectionConfig]);
-        registry.registerTable(talentsTable, "talents");
-        registry.registerTable(notesTable, "notes");
+        registry.registerPgTable(talentsTable, "talents");
+        registry.registerPgTable(notesTable, "notes");
 
         fetchService = new FetchService(drizzle(pool), registry);
 
-        const fuzzyRegistry = new PostgresCollectionRegistry();
+        const fuzzyRegistry = new FixtureTableRegistry();
         fuzzyRegistry.registerMultiple([fuzzied as CollectionConfig]);
-        fuzzyRegistry.registerTable(fuzziesTable, "fuzzies");
+        fuzzyRegistry.registerPgTable(fuzziesTable, "fuzzies");
         fuzzyService = new FetchService(drizzle(pool), fuzzyRegistry);
     }, 180_000);
 

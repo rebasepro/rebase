@@ -20,7 +20,8 @@ import { pgTable, integer, varchar } from "drizzle-orm/pg-core";
 import type { CollectionConfig } from "@rebasepro/types";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
-import { PostgresCollectionRegistry } from "../../src/collections/PostgresCollectionRegistry.js";
+import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry.js";
+import { FixtureTableRegistry } from "../helpers/tables";
 import { RealtimeService } from "../../src/services/realtimeService.js";
 import { collectJunctionLinks } from "../../src/services/cdc/junction-tables.js";
 import { CDC_PUBLICATION, provisionWalPublication, walCaptureBlocker } from "../../src/services/cdc/wal-cdc.js";
@@ -143,12 +144,12 @@ describe("Database-level CDC from the WAL (E2E)", () => {
 
         pool = new pg.Pool({ connectionString: container.connectionString });
         const db = drizzle(pool);
-        const registry = new PostgresCollectionRegistry();
+        const registry = new FixtureTableRegistry();
         registry.registerMultiple([postsCollection, tagsCollection]);
-        registry.registerTable(postsTable, "posts");
-        registry.registerTable(tagsTable, "tags");
-        registry.registerTable(postsTagsTable, "posts_tags");
-        registry.registerTable(postsLabelsTable, "posts_labels");
+        registry.registerPgTable(postsTable, "posts");
+        registry.registerPgTable(tagsTable, "tags");
+        registry.registerPgTable(postsTagsTable, "posts_tags");
+        registry.registerPgTable(postsLabelsTable, "posts_labels");
 
         realtime = new RealtimeService(db, registry);
         const driver = new PostgresBackendDriver(db, realtime, registry);
@@ -380,9 +381,9 @@ describe("Database-level CDC from the WAL (E2E)", () => {
         url.username = "no_replication";
         url.password = "pw";
 
-        const registry = new PostgresCollectionRegistry();
+        const registry = new FixtureTableRegistry();
         registry.registerMultiple([postsCollection]);
-        registry.registerTable(postsTable, "posts");
+        registry.registerPgTable(postsTable, "posts");
         const other = new RealtimeService(drizzle(pool), registry);
         await expect(other.enableWalCdc(url.toString(), tables)).rejects.toThrow();
         expect(other.isCdcActive()).toBe(false);
@@ -390,9 +391,9 @@ describe("Database-level CDC from the WAL (E2E)", () => {
     });
 
     it("drops its temporary slot with the connection", async () => {
-        const registry = new PostgresCollectionRegistry();
+        const registry = new FixtureTableRegistry();
         registry.registerMultiple([postsCollection]);
-        registry.registerTable(postsTable, "posts");
+        registry.registerPgTable(postsTable, "posts");
         const second = new RealtimeService(drizzle(pool), registry);
         await second.enableWalCdc(container.connectionString, tables);
         const during = await adminClient.query(`SELECT count(*)::int AS n FROM pg_replication_slots WHERE slot_name LIKE 'rebase_cdc_%'`);

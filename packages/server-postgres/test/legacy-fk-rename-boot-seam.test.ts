@@ -10,7 +10,7 @@
  *
  * There used to be three of them, and that was the bug: the DATABASE, the
  * collections, and the project's checked-in `backend/src/schema.generated.ts`.
- * `assertRelationsResolve` read the third — `registry.getTable()` returned a
+ * `assertRelationsResolve` read the third — `registry.getPgTable()` returned a
  * Drizzle table from the generated module — so on the first boot after
  * `pnpm install`, boot-ensure renamed the column and then the boot died on a
  * column that *did* exist, advising the developer to pin the name that had just
@@ -26,8 +26,9 @@ import { pgTable, text } from "drizzle-orm/pg-core";
 import { CollectionConfig } from "@rebasepro/types";
 import { generateForeignKeyName, legacyForeignKeyName } from "@rebasepro/utils";
 
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
-import { findRelationDefects, assertRelationsResolve } from "../src/collections/validate-relations";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
+import { findRelationDefects, assertRelationsResolve } from "../src/model/validate-relations";
 
 // ── The collections, as 0.13 reads them ──────────────────────────────────────
 
@@ -69,18 +70,18 @@ const LEGACY = legacyForeignKeyName("categories");      // categorie_id
  * This is the whole point of the fixture: the database still carries the old
  * column, and the catalogue-built table the validator reads says so.
  */
-function registryFromGeneratedSchema(junctionColumn: string): PostgresCollectionRegistry {
-    const registry = new PostgresCollectionRegistry();
+function registryFromGeneratedSchema(junctionColumn: string): PostgresTableRegistry {
+    const registry = new FixtureTableRegistry();
     registry.registerMultiple(collections);
-    registry.registerTable(
+    registry.registerPgTable(
         pgTable("products", { id: text("id").primaryKey(), title: text("title") }),
         "products"
     );
-    registry.registerTable(
+    registry.registerPgTable(
         pgTable("categories", { id: text("id").primaryKey(), name: text("name") }),
         "categories"
     );
-    registry.registerTable(
+    registry.registerPgTable(
         pgTable("categories_products", {
             product_id: text("product_id"),
             [junctionColumn]: text(junctionColumn)
@@ -102,18 +103,18 @@ describe("a database left behind by the FK singularization rename", () => {
 
     it("still resolves cleanly once the rename has been applied", () => {
         const registry = registryFromGeneratedSchema(CURRENT);
-        expect(findRelationDefects(collections, registry)).toEqual([]);
-        expect(() => assertRelationsResolve(collections, registry)).not.toThrow();
+        expect(findRelationDefects(registry)).toEqual([]);
+        expect(() => assertRelationsResolve(registry)).not.toThrow();
     });
 
     describe("while it is still stale", () => {
         const registry = () => registryFromGeneratedSchema(LEGACY);
 
         it("is reported as an unapplied rename, not as a bad column name", () => {
-            const [defect] = findRelationDefects(collections, registry());
+            const [defect] = findRelationDefects(registry());
 
             expect(defect).toBeDefined();
-            expect(defect.collection).toBe("products");
+            expect(defect.table).toBe("products");
             expect(defect.relationName).toBe("categories");
             // The database is the thing that is behind, and the message has to
             // say so — the collection already names the new column.
@@ -123,24 +124,24 @@ describe("a database left behind by the FK singularization rename", () => {
         });
 
         it("names the command that fixes it", () => {
-            const [defect] = findRelationDefects(collections, registry());
+            const [defect] = findRelationDefects(registry());
             expect(defect.fix).toContain("rebase db push");
         });
 
         it("never advises writing the migrated-away column into the collection", () => {
-            const [defect] = findRelationDefects(collections, registry());
+            const [defect] = findRelationDefects(registry());
 
             // The old message said: set `through.targetColumn` to one of:
             // `product_id`, `categorie_id`. That column no longer exists in the
             // database, so taking the advice breaks the relation for good.
-            expect(defect.fix).not.toMatch(/through\.targetColumn.*categorie_id/s);
-            expect(defect.fix).not.toMatch(/set `through\.\w+` to one of/);
+            expect(defect.fix).not.toMatch(/targetKey.*categorie_id/s);
+            expect(defect.fix).not.toMatch(/set `(sourceKey|targetKey)` to one of/);
         });
 
         it("does not advise writing the migrated-away column into the collection", () => {
             let message = "";
             try {
-                assertRelationsResolve(collections, registry());
+                assertRelationsResolve(registry());
             } catch (e) {
                 message = (e as Error).message;
             }
@@ -149,7 +150,7 @@ describe("a database left behind by the FK singularization rename", () => {
             // The boot still fails — that part was right, an unresolvable
             // relation must not serve empty results. What it must not do is
             // describe a database it never read.
-            expect(message).not.toMatch(new RegExp(`\`through\\.targetColumn: "${CURRENT}"\` is not a column`));
+            expect(message).not.toMatch(new RegExp(`\`targetKey: "${CURRENT}"\` is not a column`));
             expect(message).toMatch(/rebase db push/);
         });
     });

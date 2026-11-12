@@ -36,7 +36,8 @@ import { pgTable, varchar } from "drizzle-orm/pg-core";
 import type { CollectionCallbacks, CollectionConfig } from "@rebasepro/types";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
-import { PostgresCollectionRegistry } from "../../src/collections/PostgresCollectionRegistry.js";
+import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry.js";
+import { FixtureTableRegistry } from "../helpers/tables";
 import { RealtimeService } from "../../src/services/realtimeService.js";
 import {
     detectConnectionPosture,
@@ -114,17 +115,17 @@ const noticesCollection: CollectionConfig = {
     ]
 };
 
-function buildRegistry(): PostgresCollectionRegistry {
-    const registry = new PostgresCollectionRegistry();
+function buildRegistry(): PostgresTableRegistry {
+    const registry = new FixtureTableRegistry();
     registry.registerMultiple([
         tasksCollection, secretsCollection, docsCollection, noticesCollection, topicsCollection
     ]);
-    registry.registerTable(tasksTable, "tasks");
-    registry.registerTable(secretsTable, "secrets");
-    registry.registerTable(docsTable, "docs");
-    registry.registerTable(noticesTable, "notices");
-    registry.registerTable(topicsTable, "topics");
-    registry.registerTable(noticeTopicsTable, "notice_topics");
+    registry.registerPgTable(tasksTable, "tasks");
+    registry.registerPgTable(secretsTable, "secrets");
+    registry.registerPgTable(docsTable, "docs");
+    registry.registerPgTable(noticesTable, "notices");
+    registry.registerPgTable(topicsTable, "topics");
+    registry.registerPgTable(noticeTopicsTable, "notice_topics");
     return registry;
 }
 
@@ -134,7 +135,7 @@ describe("Unified RLS enforcement (E2E)", () => {
     let pool: pg.Pool;            // the app's connection (superuser worst case)
     let driver: PostgresBackendDriver;
     let realtime: RealtimeService;
-    let registry: PostgresCollectionRegistry;
+    let registry: PostgresTableRegistry;
     let runSql: RawSqlRunner;
 
     async function userDriver(uid: string) {

@@ -33,6 +33,7 @@ import { initializeRebaseBackend, _resetRebaseMock } from "../../../server/src/i
 import type { HonoEnv } from "../../../server/src/api/types.js";
 import { authContextStatement } from "../../src/security/rls-enforcement.js";
 import { resolveRlsSettings } from "../../src/security/rls-settings.js";
+import { tablesFromCollections } from "../helpers/tables.js";
 
 const songs: CollectionConfig = {
     name: "Songs",
@@ -142,7 +143,7 @@ describe("admin requests plan as the owner's (E2E)", () => {
         container = await startPgContainer();
         connection = createPostgresDatabaseConnection(container.connectionString);
         await boot();
-        rebase = await openRebase({ databaseUrl: container.connectionString, collections: [songs, drafts] });
+        rebase = await openRebase({ databaseUrl: container.connectionString, collections: [songs, drafts], tables: tablesFromCollections([songs, drafts]).tables });
         await rebase.sql(`INSERT INTO public.songs (owner_id, tags)
             SELECT 'u' || (g % 37), ARRAY['t' || (g % 500), 'x' || (g % 7)] FROM generate_series(1, 30000) g`);
         await rebase.sql(`INSERT INTO public.drafts (owner_id, hidden, tags)

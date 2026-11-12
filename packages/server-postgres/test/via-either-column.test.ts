@@ -19,7 +19,8 @@ import { integer, pgTable, serial, varchar } from "drizzle-orm/pg-core";
 import type { CollectionConfig } from "@rebasepro/types";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { RealtimeService } from "../src/services/realtimeService";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
@@ -84,10 +85,10 @@ function friendships(): CollectionConfig {
 let db: PGlite;
 
 function driverOver(pglite: PGlite, withFriendPeople = false): PostgresBackendDriver {
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
     registry.registerMultiple([people(withFriendPeople), friendships()]);
-    registry.registerTable(peopleTable, "people");
-    registry.registerTable(friendshipsTable, "friendships");
+    registry.registerPgTable(peopleTable, "people");
+    registry.registerPgTable(friendshipsTable, "friendships");
     const orm = drizzle(pglite, { schema: { people: peopleTable, friendships: friendshipsTable } });
     return new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry);
 }

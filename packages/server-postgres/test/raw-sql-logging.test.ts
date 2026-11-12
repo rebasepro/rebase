@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 
 import { DataService } from "../src/services/dataService";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { recordingDb } from "./helpers/spg-c-db";
 
 /**
@@ -56,7 +57,7 @@ function fakeDb(): NodePgDatabase {
 }
 
 function makeService(): DataService {
-    return new DataService(fakeDb(), new PostgresCollectionRegistry());
+    return new DataService(fakeDb(), new FixtureTableRegistry());
 }
 
 describe("raw SQL is only printed when asked for", () => {

@@ -11,7 +11,8 @@
 
 import { RealtimeService } from "../src/services/realtimeService";
 import { ChannelHistoryStore, channelMatchesRule, parseTtlMs } from "../src/services/channel-history";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { WebSocket } from "ws";
 import type { PgSqlDatabase } from "../src/interfaces";
 import type { RealtimeClientSocket } from "../src/services/realtimeService";
@@ -243,7 +244,7 @@ describe("RealtimeService — retained channels", () => {
 
     beforeEach(async () => {
         db = createDb();
-        service = new RealtimeService(db, new PostgresCollectionRegistry());
+        service = new RealtimeService(db, new FixtureTableRegistry());
         await service.configureChannelHistory([{ match: "doc:*", limit: 100, ttl: "1h" }]);
         // Forget the CREATE TABLEs, so a test can assert that a channel issued
         // no queries of its own.

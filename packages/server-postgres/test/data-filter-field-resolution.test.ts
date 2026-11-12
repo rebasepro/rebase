@@ -25,7 +25,8 @@ import { drizzle } from "drizzle-orm/pglite";
 import { jsonb, pgTable, text, varchar } from "drizzle-orm/pg-core";
 import type { CollectionConfig } from "@rebasepro/types";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { RealtimeService } from "../src/services/realtimeService";
 import type { RestFetchService } from "@rebasepro/types";
 
@@ -67,9 +68,9 @@ beforeAll(async () => {
             ('d', 'Delta', NULL, NULL, NULL),
             ('e', 'Epsilon', '{red,blue}', '[2, 3]', '["y"]');
     `);
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
     registry.registerMultiple([items]);
-    registry.registerTable(itemsTable, "items");
+    registry.registerPgTable(itemsTable, "items");
     const orm = drizzle(db, { schema: { items: itemsTable } });
     driver = new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry);
 });

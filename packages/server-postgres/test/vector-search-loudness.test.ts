@@ -25,7 +25,8 @@ import { ApiError } from "@rebasepro/server";
 import { DrizzleConditionBuilder } from "../src/utils/drizzle-conditions";
 import { ensureCollectionTables, type Queryable } from "../src/schema/ensure-collection-tables";
 import { RealtimeService } from "../src/services/realtimeService";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { fakeRealtimeSocket, type FakeRealtimeSocket } from "./helpers/spg-c-socket";
 import { recordingDb } from "./helpers/spg-c-db";
 
@@ -194,7 +195,7 @@ describe("a realtime subscription that asks for a vector search", () => {
 
     const setup = () => {
         const { db } = recordingDb();
-        const registry = new PostgresCollectionRegistry();
+        const registry = new FixtureTableRegistry();
         jest.spyOn(registry, "getCollectionByPath").mockReturnValue(collection);
 
         const service = new RealtimeService(db, registry);

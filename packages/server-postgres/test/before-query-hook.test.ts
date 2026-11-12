@@ -29,7 +29,8 @@ import type { CollectionConfig, QueryNarrowing, User } from "@rebasepro/types";
 import { testUser } from "./helpers/spg-a-driver";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { RealtimeService } from "../src/services/realtimeService";
 import { FetchService } from "../src/services/FetchService";
 import { configureUnknownFilterFields } from "../src/utils/drizzle-conditions";
@@ -112,11 +113,11 @@ const TENANT_USER = testUser("u1", ["user"], { claims: { tenant: "a" } });
 
 let db: PGlite;
 
-function registryFor(): PostgresCollectionRegistry {
-    const registry = new PostgresCollectionRegistry();
+function registryFor(): PostgresTableRegistry {
+    const registry = new FixtureTableRegistry();
     registry.registerMultiple([ownersCollection(), docsCollection()]);
-    registry.registerTable(ownersTable, "owners");
-    registry.registerTable(docsTable, "docs");
+    registry.registerPgTable(ownersTable, "owners");
+    registry.registerPgTable(docsTable, "docs");
     registry.registerRelations?.(ownersRelations, "owners");
     registry.registerRelations?.(docsRelations, "docs");
     return registry;

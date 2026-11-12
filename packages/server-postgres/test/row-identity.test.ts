@@ -1,10 +1,11 @@
 import { DataService } from "../src/services/dataService";
 import { CollectionConfig } from "@rebasepro/types";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { recordingDb, shapedRows } from "./helpers/spg-c-db";
 import { textTable } from "./helpers/spg-c-tables";
 
-const collectionRegistry = new PostgresCollectionRegistry();
+const collectionRegistry = new FixtureTableRegistry();
 
 /**
  * A row is exactly its columns.
@@ -93,7 +94,7 @@ isId: true },
             return undefined;
         });
 
-        jest.spyOn(collectionRegistry, "getTable").mockImplementation(name => {
+        jest.spyOn(collectionRegistry, "getPgTable").mockImplementation(name => {
             if (name === "products") return mockProducts;
             if (name === "sku_items") return mockSkuItems;
             if (name === "memberships") return mockMemberships;

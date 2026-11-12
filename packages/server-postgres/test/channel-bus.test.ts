@@ -9,7 +9,8 @@
  */
 
 import { RealtimeService } from "../src/services/realtimeService";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { WebSocket } from "ws";
 import type { ChannelBus, ChannelBusFrame, ChannelBusHandler } from "../src/services/channel-bus";
 import { MemoryChannelBus, frameByteLength, isChannelBusInstance } from "../src/services/channel-bus";
@@ -173,7 +174,7 @@ function createService(state: FakeDbState) {
         return queryResult();
     });
 
-    const service = new RealtimeService(db, new PostgresCollectionRegistry());
+    const service = new RealtimeService(db, new FixtureTableRegistry());
     return { service, execute };
 }
 

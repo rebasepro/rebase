@@ -34,7 +34,7 @@ const PG_TRGM_WORD_SIMILARITY_DEFAULT = 0.6;
  */
 const HYBRID_SUBSTRING_SCORE = 0.001;
 import { buildSearchColumnSpec, SEARCH_UNACCENT_FN, type SearchColumnSpec } from "../schema/search-column";
-import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../model/PostgresTableRegistry";
 import { ConditionBuilderStatic } from "../interfaces";
 import { ApiError, logger } from "@rebasepro/server";
 import { columnAtKey, columnNamed, getColumnMeta } from "../services/collection-helpers";
@@ -285,7 +285,7 @@ export interface FilterCompilationOptions {
      * `hasMany`/`hasOne` to one over the target table — neither of which this
      * builder can reach from the collection alone.
      */
-    registry?: PostgresCollectionRegistry;
+    registry?: PostgresTableRegistry;
     /**
      * The key column of the table being filtered — what those `EXISTS`
      * subqueries correlate back to.
@@ -327,7 +327,7 @@ type FilterTarget =
         kind: "relation";
         relation: ResolvedForeignKeyOnTarget | ResolvedManyToMany;
         /** Bound here so the compile step cannot be reached without them. */
-        registry: PostgresCollectionRegistry;
+        registry: PostgresTableRegistry;
         sourceIdColumn: AnyPgColumn;
     }
     | {
@@ -343,7 +343,7 @@ type FilterTarget =
          * relation there is no correlation for.
          */
         relation: ResolvedBelongsTo | ResolvedForeignKeyOnTarget | ResolvedManyToMany;
-        registry: PostgresCollectionRegistry;
+        registry: PostgresTableRegistry;
         /** The column on *this* table the subquery correlates back to. */
         sourceIdColumn: AnyPgColumn;
         /** The table the predicate is asked of, already resolved. */
@@ -560,7 +560,7 @@ export class DrizzleConditionBuilder {
         parentId: string | number,
         targetTable: PgTable<any>,
         targetIdColumn: AnyPgColumn,
-        registry: PostgresCollectionRegistry
+        registry: PostgresTableRegistry
     ): SQL {
         // The parent row, inside a subquery that names its table unaliased.
         const parentRow = (key: { column: AnyPgColumn; value: string | number }[]): SQL =>
@@ -576,7 +576,7 @@ export class DrizzleConditionBuilder {
 
             case "manyToMany": {
                 const { table: junctionName, sourceColumn, targetColumn } = relation.through;
-                const junctionTable = registry.getTable(junctionName);
+                const junctionTable = registry.getPgTable(junctionName);
                 if (!junctionTable) {
                     throw junctionTableMissing(junctionName);
                 }
@@ -661,7 +661,7 @@ export class DrizzleConditionBuilder {
         /** The parent row's key, every column with its value. */
         parentKey: { column: AnyPgColumn; value: string | number }[],
         targetTable: PgTable<any>,
-        registry: PostgresCollectionRegistry
+        registry: PostgresTableRegistry
     ): SQL {
         const sourceAlias = "__rel_src";
         const aliasFor = (index: number) => `__rel_j${index}`;
@@ -690,7 +690,7 @@ export class DrizzleConditionBuilder {
         const last = joinPath[joinPath.length - 1];
 
         const joins: SQL[] = inner.map((step, index) => {
-            const table = registry.getTable(step.table);
+            const table = registry.getPgTable(step.table);
             if (!table) throw new Error(`Join table not found: ${step.table}`);
             const on = anyOf(step, ({ from, to }) =>
                 sql`${fromRef(index, from)} = ${sql.identifier(aliasFor(index))}.${sql.identifier(getColumnName(to))}`
@@ -917,7 +917,7 @@ export class DrizzleConditionBuilder {
         table: PgTable<any>,
         path: { relationKey: string; fieldKey: string },
         collection: CollectionConfig,
-        registry: PostgresCollectionRegistry,
+        registry: PostgresTableRegistry,
         sourceIdColumn: AnyPgColumn,
         field: string,
         collectionPath: string
@@ -936,7 +936,7 @@ export class DrizzleConditionBuilder {
         }
 
         const targetCollection = targetOf(relation);
-        const targetTable = targetCollection && registry.getTable(getTableName(targetCollection));
+        const targetTable = targetCollection && registry.getPgTable(getTableName(targetCollection));
         if (!targetCollection || !targetTable) {
             throw new Error(
                 `Table not found for the target of relation '${relation.relationName}' on '${collectionPath}', ` +
@@ -1229,7 +1229,7 @@ export class DrizzleConditionBuilder {
         op: WhereFilterOp,
         value: unknown,
         sourceIdColumn: AnyPgColumn,
-        registry: PostgresCollectionRegistry,
+        registry: PostgresTableRegistry,
         field: string,
         collectionPath: string
     ): SQL {
@@ -1243,7 +1243,7 @@ export class DrizzleConditionBuilder {
 
         if (relation.kind === "manyToMany") {
             const { table: junctionName, sourceColumn, targetColumn } = relation.through;
-            const junctionTable = registry.getTable(junctionName);
+            const junctionTable = registry.getPgTable(junctionName);
             if (!junctionTable) {
                 throw junctionTableMissing(junctionName);
             }
@@ -1259,7 +1259,7 @@ export class DrizzleConditionBuilder {
             comparedColumn = targetCol;
         } else {
             const targetCollection = relation.target();
-            const targetTable = registry.getTable(getTableName(targetCollection));
+            const targetTable = registry.getPgTable(getTableName(targetCollection));
             if (!targetTable) {
                 throw new Error(
                     `Table not found for the target of relation '${relation.relationName}' ` +
@@ -1458,7 +1458,7 @@ export class DrizzleConditionBuilder {
 
         if (relation.kind === "manyToMany") {
             const { table: junctionName, sourceColumn, targetColumn: junctionTargetColumn } = relation.through;
-            const junctionTable = target.registry.getTable(junctionName);
+            const junctionTable = target.registry.getPgTable(junctionName);
             if (!junctionTable) {
                 throw junctionTableMissing(junctionName);
             }
@@ -1669,7 +1669,7 @@ export class DrizzleConditionBuilder {
         spec: RelationAggregateSort,
         table: PgTable<any>,
         collection: CollectionConfig,
-        registry: PostgresCollectionRegistry,
+        registry: PostgresTableRegistry,
         sourceIdColumn: AnyPgColumn,
         collectionPath: string,
         correlateTo?: unknown
@@ -1697,7 +1697,7 @@ export class DrizzleConditionBuilder {
         }
 
         const targetCollection = targetOf(relation);
-        const targetTable = targetCollection && registry.getTable(getTableName(targetCollection));
+        const targetTable = targetCollection && registry.getPgTable(getTableName(targetCollection));
         if (!targetCollection || !targetTable) {
             throw new Error(
                 `Table not found for the target of relation '${relation.relationName}' on '${collectionPath}', ` +
@@ -1750,7 +1750,7 @@ export class DrizzleConditionBuilder {
 
         if (relation.kind === "manyToMany") {
             const { table: junctionName, sourceColumn, targetColumn } = relation.through;
-            const junctionTable = registry.getTable(junctionName);
+            const junctionTable = registry.getPgTable(junctionName);
             if (!junctionTable) {
                 throw junctionTableMissing(junctionName);
             }
@@ -1998,7 +1998,7 @@ export class DrizzleConditionBuilder {
         parentTable: PgTable<any>,
         parentIdColumn: AnyPgColumn,
         targetIdColumn: AnyPgColumn,
-        registry: PostgresCollectionRegistry
+        registry: PostgresTableRegistry
     ): {
         joinConditions: { table: PgTable<any>; condition: SQL }[];
         whereConditions: SQL[];
@@ -2052,7 +2052,7 @@ whereConditions };
         parentTable: PgTable<any>,
         parentIdColumn: AnyPgColumn,
         parentId: string | number | (string | number)[],
-        registry: PostgresCollectionRegistry
+        registry: PostgresTableRegistry
     ): {
         joins: { table: PgTable<any>; condition: SQL }[];
         finalCondition: SQL;
@@ -2136,12 +2136,12 @@ whereConditions };
         index: number,
         sourceTableName: string,
         currentTable: PgTable<any>,
-        registry: PostgresCollectionRegistry,
+        registry: PostgresTableRegistry,
         allowJunctionFallback: boolean
     ): { joinTable: PgTable<any>; condition: SQL; additionalJoins?: { table: PgTable<any>; condition: SQL }[] } {
         const { fromTableName, toTableName } = this.joinStepTableNames(joinPath, index, sourceTableName);
-        const fromTable = registry.getTable(fromTableName);
-        const toTable = registry.getTable(toTableName);
+        const fromTable = registry.getPgTable(fromTableName);
+        const toTable = registry.getPgTable(toTableName);
 
         if (!fromTable || !toTable) {
             throw new Error(`Join tables not found for step: from ${fromTableName} to ${toTableName}`);
@@ -2176,7 +2176,7 @@ whereConditions };
         toColName: string,
         fromTableName: string,
         toTableName: string,
-        registry?: PostgresCollectionRegistry
+        registry?: PostgresTableRegistry
     ): { joinTable: PgTable<any>; condition: SQL; additionalJoins?: { table: PgTable<any>; condition: SQL }[] } {
         let joinTable: PgTable<any>;
         let condition: SQL;
@@ -2261,7 +2261,7 @@ whereConditions };
         toColName: string,
         fromTableName: string,
         toTableName: string,
-        registry: PostgresCollectionRegistry
+        registry: PostgresTableRegistry
     ): { joinTable: PgTable<any>; condition: SQL; additionalJoins: { table: PgTable<any>; condition: SQL }[] } | null {
         // Try to find a junction table that connects these two tables
         // Common naming patterns: table1_table2, table1Table2, etc.
@@ -2273,7 +2273,7 @@ whereConditions };
         ];
 
         for (const junctionName of possibleJunctionNames) {
-            const junctionTable = registry.getTable(junctionName);
+            const junctionTable = registry.getPgTable(junctionName);
             if (junctionTable) {
                 // Try to find the appropriate columns in the junction table
                 const sourceColName = `${fromTableName.slice(0, -1)}_id`; // Remove 's' and add '_id'
@@ -2331,9 +2331,9 @@ whereConditions };
         through: { table: string; sourceColumn: string; targetColumn: string },
         targetIdColumn: AnyPgColumn,
         parentId: string | number | (string | number)[],
-        registry: PostgresCollectionRegistry
+        registry: PostgresTableRegistry
     ): { join: { table: PgTable<any>; condition: SQL }; condition: SQL } {
-        const junctionTable = registry.getTable(through.table);
+        const junctionTable = registry.getPgTable(through.table);
         if (!junctionTable) {
             throw junctionTableMissing(through.table);
         }
@@ -2884,7 +2884,7 @@ whereConditions };
         parentTable: PgTable<any>,
         parentIdColumn: AnyPgColumn,
         targetIdColumn: AnyPgColumn,
-        registry: PostgresCollectionRegistry,
+        registry: PostgresTableRegistry,
         additionalFilters?: SQL[]
     ): T {
         const { joinConditions, whereConditions } = this.buildRelationConditions(
@@ -2933,7 +2933,7 @@ whereConditions };
         parentTable: PgTable<any>,
         parentIdColumn: AnyPgColumn,
         targetIdColumn: AnyPgColumn,
-        registry: PostgresCollectionRegistry,
+        registry: PostgresTableRegistry,
         additionalFilters?: SQL[]
     ): T {
         switch (relation.kind) {
@@ -2975,7 +2975,7 @@ whereConditions };
         parentTable: PgTable<any>,
         parentIdColumn: AnyPgColumn,
         parentId: string | number,
-        registry: PostgresCollectionRegistry,
+        registry: PostgresTableRegistry,
         additionalFilters?: SQL[]
     ): T {
         let query = baseCountQuery;
@@ -3010,10 +3010,10 @@ whereConditions };
         through: { table: string; sourceColumn: string; targetColumn: string },
         targetIdColumn: AnyPgColumn,
         parentId: string | number,
-        registry: PostgresCollectionRegistry,
+        registry: PostgresTableRegistry,
         additionalFilters?: SQL[]
     ): T {
-        const junctionTable = registry.getTable(through.table);
+        const junctionTable = registry.getPgTable(through.table);
         if (!junctionTable) {
             throw junctionTableMissing(through.table);
         }

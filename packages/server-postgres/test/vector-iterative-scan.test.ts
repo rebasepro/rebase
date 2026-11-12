@@ -21,7 +21,8 @@ import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { pgTable, serial, text, vector } from "drizzle-orm/pg-core";
 import type { CollectionConfig } from "@rebasepro/types";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { FetchService } from "../src/services/FetchService";
 import { hasIterativeIndexScans } from "../src/services/vector-iterative-scan";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
@@ -65,7 +66,7 @@ const clustered = (sign: 1 | -1): number[] =>
 
 let db: PGlite;
 let service: FetchService;
-let registry: PostgresCollectionRegistry;
+let registry: PostgresTableRegistry;
 const query = clustered(1);
 const literal = `'[${query.join(",")}]'::vector`;
 
@@ -92,9 +93,9 @@ beforeAll(async () => {
     }
     await db.exec("CREATE INDEX items_emb_hnsw ON items USING hnsw (emb vector_cosine_ops); ANALYZE items;");
 
-    registry = new PostgresCollectionRegistry();
+    registry = new FixtureTableRegistry();
     registry.registerMultiple([items]);
-    registry.registerTable(itemsTable, "items");
+    registry.registerPgTable(itemsTable, "items");
     service = new FetchService(drizzle(db), registry);
 }, 120_000);
 

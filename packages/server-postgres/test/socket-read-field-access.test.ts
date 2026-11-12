@@ -33,7 +33,8 @@ jest.mock("ws", () => ({
 
 import { createPostgresWebSocket } from "../src/websocket";
 import { RealtimeService } from "../src/services/realtimeService";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { fakeAuthAdapter, fakeDataDriver, fakeSocketRealtime, fakeRealtimeSocket, type FakeRealtimeSocket } from "./helpers/spg-c-socket";
 import { registryOf } from "./helpers/spg-c-registry";
 import { unusedDb } from "./helpers/spg-c-db";
@@ -252,7 +253,7 @@ describe("subscribe_collection", () => {
     let ws: FakeRealtimeSocket;
 
     beforeEach(() => {
-        const registry = new PostgresCollectionRegistry();
+        const registry = new FixtureTableRegistry();
         registry.registerMultiple([staff, depts]);
         // No database: a refused subscription never reaches one, and the
         // allowed case below only asserts that it got past the check.

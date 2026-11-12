@@ -13,7 +13,8 @@
  * The public methods below it are primitives the server calls on its own behalf.
  */
 import { RealtimeService } from "../src/services/realtimeService";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { CollectionConfig } from "@rebasepro/types";
 import { WebSocket } from "ws";
 import { recordingDb } from "./helpers/spg-c-db";
@@ -46,7 +47,7 @@ const mockPostsCollection: CollectionConfig = {
 function createService() {
     const { db } = recordingDb();
 
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
     jest.spyOn(registry, "getCollectionByPath").mockReturnValue(mockPostsCollection);
 
     return new RealtimeService(db, registry);

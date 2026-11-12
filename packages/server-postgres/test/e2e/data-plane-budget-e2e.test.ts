@@ -40,6 +40,7 @@ import type { CollectionConfig } from "@rebasepro/types";
 
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { createPostgresBootstrapper, createPostgresDatabaseConnection, openRebase, type OpenedRebase } from "../../src/index.js";
+import { tablesFromCollections } from "../helpers/tables.js";
 
 const ROWS = 20_000;
 const OWNERS = 1_000;
@@ -140,7 +141,7 @@ async function provision(url: string): Promise<void> {
     const conn = createPostgresDatabaseConnection(url);
     try {
         const bootstrapper = createPostgresBootstrapper({ connectionString: url, connection: conn.db });
-        const driverResult = await bootstrapper.initializeDriver({ collections, realtime: { subscribe: false, provision: false } });
+        const driverResult = await bootstrapper.initializeDriver({ collections, tables: tablesFromCollections(collections).tables, realtime: { subscribe: false, provision: false } });
         await bootstrapper.ensureCollectionSchema!(collections, driverResult);
         await bootstrapper.ensureRlsRuntime!(driverResult);
         await bootstrapper.ensureCollectionPolicies!(collections, driverResult);
@@ -193,7 +194,7 @@ describe("data-plane cost budget (E2E)", () => {
             vi.spyOn(console, "debug").mockImplementation(() => undefined)
         );
         await provision(container.connectionString);
-        rebase = await openRebase({ databaseUrl: container.connectionString, collections, pool: { max: 2 } });
+        rebase = await openRebase({ databaseUrl: container.connectionString, collections, tables: tablesFromCollections(collections).tables, pool: { max: 2 } });
         observer = new pg.Client({ connectionString: container.connectionString });
         await observer.connect();
 

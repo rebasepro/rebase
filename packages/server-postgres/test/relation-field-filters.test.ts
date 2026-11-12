@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { integer, pgTable, PgDialect, primaryKey, serial, timestamp, varchar } from "drizzle-orm/pg-core";
 import type { CollectionConfig, FilterValues } from "@rebasepro/types";
 import { ApiError } from "@rebasepro/server";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { DrizzleConditionBuilder } from "../src/utils/drizzle-conditions";
 
 /**
@@ -122,7 +123,7 @@ const talentsWithAgencyTable = pgTable("talents", {
 });
 
 const createRegistry = () => {
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
     const tables = {
         talents: talentsTable,
         talent_applications: applicationsTable,
@@ -130,13 +131,13 @@ const createRegistry = () => {
         talents_skills: talentsSkillsTable,
         agencies: agenciesTable
     };
-    for (const [name, table] of Object.entries(tables)) registry.registerTable(table, name);
+    for (const [name, table] of Object.entries(tables)) registry.registerPgTable(table, name);
     return registry;
 };
 
 describe("filtering by a column of a related row", () => {
 
-    let registry: PostgresCollectionRegistry;
+    let registry: PostgresTableRegistry;
 
     beforeEach(() => {
         registry = createRegistry();

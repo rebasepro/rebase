@@ -50,6 +50,7 @@ jest.mock("@rebasepro/server", () => ({
 }));
 
 import { PgNotifyListener } from "../src/services/pg-notify-listener";
+import { FixtureTableRegistry } from "./helpers/tables";
 
 async function flush() {
     for (let i = 0; i < 20; i++) await Promise.resolve();
@@ -144,11 +145,11 @@ describe("a LISTEN connection's heartbeat", () => {
 describe("isCdcActive", () => {
     it("is false while the CDC connection is down, however CDC was configured", async () => {
         const { RealtimeService } = await import("../src/services/realtimeService");
-        const { PostgresCollectionRegistry } = await import("../src/collections/PostgresCollectionRegistry");
+        const { PostgresTableRegistry } = await import("../src/model/PostgresTableRegistry");
         const { recordingDb } = await import("./helpers/spg-b-recording-db");
         // On a real pg client, not the listener's stand-in above.
         const { db } = recordingDb(() => [], { Client: jest.requireActual<typeof import("pg")>("pg").Client });
-        const realtime = new RealtimeService(db, new PostgresCollectionRegistry());
+        const realtime = new RealtimeService(db, new FixtureTableRegistry());
         Reflect.set(realtime, "cdcActive", true);
         Reflect.set(realtime, "cdcListener", { connected: false, status: () => ({ channel: "rebase_cdc", connected: false, downSince: 1 }) });
 

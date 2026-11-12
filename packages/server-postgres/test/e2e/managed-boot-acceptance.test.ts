@@ -42,7 +42,8 @@ import {
     type RawSqlRunner
 } from "../../src/security/rls-enforcement.js";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
-import { PostgresCollectionRegistry } from "../../src/collections/PostgresCollectionRegistry.js";
+import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry.js";
+import { FixtureTableRegistry } from "../helpers/tables";
 import { RealtimeService } from "../../src/services/realtimeService.js";
 import { testUser } from "./test-user.js";
 
@@ -200,12 +201,12 @@ describe("managed boot: a fresh tenant DB serves data with no db push (E2E)", ()
         expect(applied.tablesSecured).toBe(5);
         expect(applied.policiesApplied).toBeGreaterThan(0);
 
-        const registry = new PostgresCollectionRegistry();
+        const registry = new FixtureTableRegistry();
         registry.registerMultiple(collections);
-        registry.registerTable(tiersTable, "tiers");
-        registry.registerTable(customersTable, "customers");
-        registry.registerTable(secretsTable, "secrets");
-        registry.registerTable(ordersTable, "orders");
+        registry.registerPgTable(tiersTable, "tiers");
+        registry.registerPgTable(customersTable, "customers");
+        registry.registerPgTable(secretsTable, "secrets");
+        registry.registerPgTable(ordersTable, "orders");
 
         realtime = new RealtimeService(db, registry);
         driver = new PostgresBackendDriver(db, realtime, registry);

@@ -18,7 +18,8 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import pg from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
-import { PostgresCollectionRegistry } from "../../src/collections/PostgresCollectionRegistry.js";
+import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry.js";
+import { FixtureTableRegistry } from "../helpers/tables";
 import { RealtimeService } from "../../src/services/realtimeService.js";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
 import { createJobQueue, createJobStore, type JobQueue } from "../../../server/src/jobs/index.js";
@@ -33,7 +34,7 @@ async function waitFor(predicate: () => boolean | Promise<boolean>, message: str
 }
 
 function driverOn(pool: pg.Pool): PostgresBackendDriver {
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
     const db = drizzle(pool);
     return new PostgresBackendDriver(db, new RealtimeService(db, registry), registry);
 }

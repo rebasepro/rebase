@@ -27,7 +27,8 @@ import { integer, pgTable, serial, varchar } from "drizzle-orm/pg-core";
 import type { CollectionCallbacks, CollectionConfig, DataDriver, RebaseSdkData } from "@rebasepro/types";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { RealtimeService } from "../src/services/realtimeService";
 import { createJobQueue, createJobStore } from "../../server/src/jobs";
 import { testUser } from "./helpers/spg-a-driver";
@@ -123,13 +124,13 @@ beforeEach(async () => {
         "$$ BEGIN RAISE EXCEPTION 'audit rows are kept' USING ERRCODE = '23503'; END $$;" +
         "CREATE TRIGGER audit_kept BEFORE DELETE ON audit FOR EACH ROW EXECUTE FUNCTION refuse_audit_delete();"
     );
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
     registry.registerMultiple([orders, customers, audit, owners, docs]);
-    registry.registerTable(ordersTable, "orders");
-    registry.registerTable(customersTable, "customers");
-    registry.registerTable(auditTable, "audit");
-    registry.registerTable(ownersTable, "owners");
-    registry.registerTable(docsTable, "docs");
+    registry.registerPgTable(ordersTable, "orders");
+    registry.registerPgTable(customersTable, "customers");
+    registry.registerPgTable(auditTable, "audit");
+    registry.registerPgTable(ownersTable, "owners");
+    registry.registerPgTable(docsTable, "docs");
     const orm = drizzle(db, {
         schema: { orders: ordersTable, customers: customersTable, audit: auditTable, owners: ownersTable, docs: docsTable }
     });

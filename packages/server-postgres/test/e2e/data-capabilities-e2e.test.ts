@@ -23,6 +23,7 @@ import type { CollectionConfig } from "@rebasepro/types";
 
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { createPostgresBootstrapper, createPostgresDatabaseConnection, openRebase, type OpenedRebase } from "../../src/index.js";
+import { tablesFromCollections } from "../helpers/tables.js";
 
 const songs: CollectionConfig = {
     name: "Songs",
@@ -75,7 +76,7 @@ describe("data capabilities (E2E)", () => {
         const conn = createPostgresDatabaseConnection(container.connectionString);
         try {
             const bootstrapper = createPostgresBootstrapper({ connectionString: container.connectionString, connection: conn.db });
-            const driverResult = await bootstrapper.initializeDriver({ collections: [songs], realtime: { subscribe: false, provision: false } });
+            const driverResult = await bootstrapper.initializeDriver({ collections: [songs], tables: tablesFromCollections([songs]).tables, realtime: { subscribe: false, provision: false } });
             await bootstrapper.ensureCollectionSchema!([songs], driverResult);
             await bootstrapper.ensureRlsRuntime!(driverResult);
             await bootstrapper.ensureCollectionPolicies!([songs], driverResult);
@@ -83,7 +84,7 @@ describe("data capabilities (E2E)", () => {
         } finally {
             await conn.pool.end();
         }
-        rebase = await openRebase({ databaseUrl: container.connectionString, collections: [songs] });
+        rebase = await openRebase({ databaseUrl: container.connectionString, collections: [songs], tables: tablesFromCollections([songs]).tables });
         songsOf = data => data.songs;
         await songsOf(rebase.dataAsAdmin).createMany([
             { ownerId: "ada", artist: "Rosalía", lang: "es", fame: 90, tags: ["pop", "flamenco"], playedAt: "2026-11-01T23:30:00Z", props: { music: "pop", players: 4 } },

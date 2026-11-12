@@ -28,7 +28,7 @@ import { parseDataFromServer } from "../data-transformer";
 import { RelationService } from "./RelationService";
 import { RelationalQueryBuilder } from "drizzle-orm/pg-core/query-builders/query";
 import { DrizzleClient } from "../interfaces";
-import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../model/PostgresTableRegistry";
 import { toFlatRow, toRestRow, stripUnreadable, canReadRelation } from "./row-pipeline";
 import { visibleColumnProjection, hiddenColumnsOption } from "../schema/search-column";
 import { isNestedPath, resolveNestedPath, type NestedPathHop } from "./nested-path";
@@ -192,7 +192,7 @@ export class FetchService {
 
     constructor(
         private db: DrizzleClient,
-        private registry: PostgresCollectionRegistry,
+        private registry: PostgresTableRegistry,
         /**
          * How this service's reads reach the identity their `beforeQuery` hooks
          * run as. Passed by the driver that constructed it; absent only in a
@@ -1557,7 +1557,7 @@ target });
                     // Soft delete: a stamped row answers 404 like any other
                     // absent one, so `findById` and `find` agree about which
                     // rows exist.
-                    where: andSoftDelete(identity, collection, table, withDeleted),
+                    where: andSoftDelete(identity, this.registry.requireTable(collection.slug), table, withDeleted),
                     ...(hidden ? { columns: hidden } : {})
                 } as Parameters<NonNullable<typeof qb>["findFirst"]>[0]);
             } catch (e) {
@@ -1583,7 +1583,7 @@ target });
         const result = await this.db
             .select(visibleOne)
             .from(table)
-            .where(andSoftDelete(identity, collection, table, withDeleted))
+            .where(andSoftDelete(identity, this.registry.requireTable(collection.slug), table, withDeleted))
             .limit(1);
 
         if (result.length === 0) return undefined;
@@ -1894,7 +1894,7 @@ target });
 
         // Soft delete. A listing that filters and a count that does not is a
         // page saying "1 of 4 results".
-        withSoftDelete(allConditions, collection, table, options.withDeleted);
+        withSoftDelete(allConditions, this.registry.requireTable(collection.slug), table, options.withDeleted);
 
         if (options.searchString) {
             const searchConditions = DrizzleConditionBuilder.buildSearchConditions(
@@ -2121,7 +2121,7 @@ target });
         const conditions: SQL[] = [];
         // Soft delete. A dashboard that sums deleted orders is reporting
         // revenue that was withdrawn.
-        withSoftDelete(conditions, collection, table, options.withDeleted);
+        withSoftDelete(conditions, this.registry.requireTable(collection.slug), table, options.withDeleted);
         if (options.searchString) {
             const searchConditions = DrizzleConditionBuilder.buildSearchConditions(
                 options.searchString, collection.properties, table, collection
@@ -2504,7 +2504,7 @@ relatedTo: hop }, include
         const result = await this.db
             .select(projection ?? getTableColumns(table))
             .from(table)
-            .where(andSoftDelete(identity, collection, table, withDeleted))
+            .where(andSoftDelete(identity, this.registry.requireTable(collection.slug), table, withDeleted))
             .limit(1);
 
         if (result.length === 0) return null;
@@ -2697,7 +2697,7 @@ _distance: vectorMeta.distanceSelect }).from(table).$dynamic()
         // Soft delete, on the `db.select` path. Both paths serve the same
         // request, so a deleted row must not come back down one and not the
         // other — which is exactly what happens when each grows its own filter.
-        withSoftDelete(allConditions, collection, table, options.withDeleted);
+        withSoftDelete(allConditions, this.registry.requireTable(collection.slug), table, options.withDeleted);
 
         if (options.searchString) {
             const searchConditions = DrizzleConditionBuilder.buildSearchConditions(

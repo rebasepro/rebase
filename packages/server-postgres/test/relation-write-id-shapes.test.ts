@@ -1,7 +1,8 @@
 import type { CollectionConfig } from "@rebasepro/types";
 import { RelationService } from "../src/services/RelationService";
 import { RelationWriteService } from "../src/services/RelationWriteService";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { insertedRows, recordingDb, shapedRows, unusedDb } from "./helpers/spg-c-db";
 import { textTable } from "./helpers/spg-c-tables";
 
@@ -27,7 +28,7 @@ import { textTable } from "./helpers/spg-c-tables";
  * These pin all of it.
  */
 describe("relation writes accept rows or bare keys", () => {
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
 
 
     // A string-keyed target: the shape whose failure was silent.
@@ -51,6 +52,7 @@ describe("relation writes accept rows or bare keys", () => {
             tags: { type: "relation", relation: { kind: "manyToMany", relationName: "tags", target: () => tagsCollection, through: { table: "posts_tags", sourceColumn: "post_id", targetColumn: "tag_id" } } }
         }
     };
+    registry.registerMultiple([postsCollection, tagsCollection]);
 
     /**
      * A tx that records what was inserted into the junction. `existing` is what
@@ -75,7 +77,7 @@ describe("relation writes accept rows or bare keys", () => {
 
     beforeEach(() => {
         jest.restoreAllMocks();
-        jest.spyOn(registry, "getTable").mockImplementation(name => {
+        jest.spyOn(registry, "getPgTable").mockImplementation(name => {
             if (name === "posts") return textTable("posts", ["id", "title"]);
             if (name === "tags") return textTable("tags", ["id", "name"]);
             if (name === "posts_tags") return textTable("posts_tags", ["post_id", "tag_id"]);

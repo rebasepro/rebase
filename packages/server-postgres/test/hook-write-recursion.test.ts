@@ -19,7 +19,8 @@ import { integer, pgTable, serial, varchar } from "drizzle-orm/pg-core";
 import type { CollectionConfig, DataDriver } from "@rebasepro/types";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { RealtimeService } from "../src/services/realtimeService";
 import { MAX_WRITE_DEPTH } from "../src/services/write-depth";
 import { testUser } from "./helpers/spg-b-fixtures";
@@ -72,10 +73,10 @@ beforeEach(async () => {
         "CREATE TABLE orders (id serial PRIMARY KEY, title varchar, touched integer);" +
         "CREATE TABLE steps (id serial PRIMARY KEY, n integer);"
     );
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
     registry.registerMultiple([orders, steps]);
-    registry.registerTable(ordersTable, "orders");
-    registry.registerTable(stepsTable, "steps");
+    registry.registerPgTable(ordersTable, "orders");
+    registry.registerPgTable(stepsTable, "steps");
     const orm = pgliteNodePg(db, { schema: { orders: ordersTable, steps: stepsTable } });
     const base = new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry);
     user = await base.withAuth(testUser({ uid: "u1", roles: ["editor"] }));

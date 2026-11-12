@@ -41,7 +41,8 @@ import { introspectSchema } from "../../src/schema/introspect-runtime.js";
 import { buildDrizzleTablesFromSchema } from "../../src/schema/dynamic-tables.js";
 import { patchPgNumericToNumber } from "../../src/utils/pg-numeric-number-patch.js";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
-import { PostgresCollectionRegistry } from "../../src/collections/PostgresCollectionRegistry.js";
+import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry.js";
+import { FixtureTableRegistry } from "../helpers/tables";
 import { RealtimeService } from "../../src/services/realtimeService.js";
 
 const wireTypes: CollectionConfig = {
@@ -132,9 +133,9 @@ describe("property kinds: the wire value has the generated type (E2E)", () => {
         patchPgNumericToNumber(schema as Record<string, unknown>);
 
         db = drizzle(pool, { schema });
-        const registry = new PostgresCollectionRegistry();
+        const registry = new FixtureTableRegistry();
         registry.registerMultiple([wireTypes]);
-        registry.registerTable(table, "wire_types");
+        registry.registerPgTable(table, "wire_types");
 
         const realtime = new RealtimeService(db, registry);
         driver = new PostgresBackendDriver(db, realtime, registry);

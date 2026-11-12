@@ -58,7 +58,7 @@ import type {
     ReadQuery,
     RebaseCallContext
 } from "@rebasepro/types";
-import type { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
+import type { PostgresTableRegistry } from "../model/PostgresTableRegistry";
 import { assertViewReadable } from "./view-access";
 import {
     DrizzleConditionBuilder,
@@ -88,7 +88,7 @@ export type ReadCallContextProvider = () => RebaseCallContext;
  * a row filter is not a value.
  */
 function resolveBeforeQuery(
-    registry: PostgresCollectionRegistry | undefined,
+    registry: PostgresTableRegistry | undefined,
     collection: CollectionConfig | undefined
 ): NonNullable<CollectionCallbacks["beforeQuery"]>[] {
     const hooks: NonNullable<CollectionCallbacks["beforeQuery"]>[] = [];
@@ -101,7 +101,7 @@ function resolveBeforeQuery(
 
 /** Whether anything at all would run for this collection. */
 export function hasBeforeQuery(
-    registry: PostgresCollectionRegistry | undefined,
+    registry: PostgresTableRegistry | undefined,
     collection: CollectionConfig | undefined
 ): boolean {
     return resolveBeforeQuery(registry, collection).length > 0;
@@ -121,7 +121,7 @@ export interface ReadQueryDescription {
 
 /** Everything `beforeQueryConditions` needs that is not about this one read. */
 export interface BeforeQueryEnv {
-    registry: PostgresCollectionRegistry | undefined;
+    registry: PostgresTableRegistry | undefined;
     /**
      * The context provider the driver handed down. `undefined` means no driver
      * built this service, which is a refusal rather than a bypass — see the

@@ -16,7 +16,8 @@ import { ApiError } from "@rebasepro/server";
 import { numeric, pgTable, serial, text } from "drizzle-orm/pg-core";
 import { drizzle } from "drizzle-orm/pg-proxy";
 import { FetchService } from "../src/services/FetchService";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 
 const orders = pgTable("orders", {
     id: serial("id").primaryKey(),
@@ -45,11 +46,11 @@ const setup = () => {
         return { rows: [] };
     });
 
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
     jest.spyOn(registry, "getCollectionByPath").mockImplementation(path =>
         path === "orders" ? ordersCollection : undefined
     );
-    jest.spyOn(registry, "getTable").mockImplementation(name =>
+    jest.spyOn(registry, "getPgTable").mockImplementation(name =>
         name === "orders" ? orders : undefined
     );
 

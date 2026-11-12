@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach, afterEach, jest } from "@jest/globals
 import { PGlite } from "@electric-sql/pglite";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { RealtimeService } from "../src/services/realtimeService";
 import { pgliteNodePg } from "./helpers/spg-b-pglite-node-pg";
 
@@ -37,7 +38,7 @@ describe("fetchTableMetadata on a table with enum columns", () => {
             statements++;
             return execute(query);
         });
-        const registry = new PostgresCollectionRegistry();
+        const registry = new FixtureTableRegistry();
         driver = new PostgresBackendDriver(db, new RealtimeService(db, registry), registry);
     });
 

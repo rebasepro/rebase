@@ -1,7 +1,8 @@
 import type { CollectionConfig } from "@rebasepro/types";
 import { resolveCollectionRelations } from "@rebasepro/common";
 import { RelationService } from "../src/services/RelationService";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { recordingDb, shapedRows } from "./helpers/spg-c-db";
 import { textTable } from "./helpers/spg-c-tables";
 
@@ -15,7 +16,7 @@ import { textTable } from "./helpers/spg-c-tables";
  * errors; it just goes to the wrong place.
  */
 describe("RelationService — related rows are addressed by the whole key", () => {
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
 
     /** A relation as the service reads it: resolved from the collection. */
     const link = (collection: CollectionConfig, key: string) => {
@@ -66,7 +67,7 @@ isId: "increment" },
         jest.restoreAllMocks();
         jest.spyOn(registry, "getCollectionByPath").mockImplementation(path =>
             path.startsWith("bookings") ? bookingsCollection : seatsCollection);
-        jest.spyOn(registry, "getTable").mockImplementation(name => {
+        jest.spyOn(registry, "getPgTable").mockImplementation(name => {
             if (name === "bookings") return textTable("bookings", ["id"]);
             if (name === "seats") return textTable("seats", ["seat_row", "seat_number", "booking_id"]);
             return undefined;
@@ -112,7 +113,7 @@ isId: true },
         beforeEach(() => {
             jest.spyOn(registry, "getCollectionByPath").mockImplementation(path =>
                 path.startsWith("tenant_bookings") ? tenantBookings : seatsCollection);
-            jest.spyOn(registry, "getTable").mockImplementation(name => {
+            jest.spyOn(registry, "getPgTable").mockImplementation(name => {
                 if (name === "tenant_bookings") return textTable("tenant_bookings", ["tenant_id", "ref"]);
                 if (name === "seats") return textTable("seats", ["seat_row", "seat_number", "booking_ref"]);
                 return undefined;
@@ -173,7 +174,7 @@ isId: true },
         beforeEach(() => {
             jest.spyOn(registry, "getCollectionByPath").mockImplementation(path =>
                 path.startsWith("tenant_bookings") ? viaSingleFk : seatsCollection);
-            jest.spyOn(registry, "getTable").mockImplementation(name => {
+            jest.spyOn(registry, "getPgTable").mockImplementation(name => {
                 if (name === "tenant_bookings") return textTable("tenant_bookings", ["tenant_id", "ref"]);
                 if (name === "seats") return textTable("seats", ["seat_row", "seat_number", "booking_id"]);
                 return undefined;
@@ -216,7 +217,7 @@ isId: "increment" },
         };
         jest.spyOn(registry, "getCollectionByPath").mockImplementation(path =>
             path.startsWith("bookings") ? withGuests : guestsCollection);
-        jest.spyOn(registry, "getTable").mockImplementation(name => {
+        jest.spyOn(registry, "getPgTable").mockImplementation(name => {
             if (name === "bookings") return textTable("bookings", ["id"]);
             if (name === "guests") return textTable("guests", ["id", "booking_id"]);
             return undefined;

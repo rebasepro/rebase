@@ -23,7 +23,8 @@ import pg from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
-import { PostgresCollectionRegistry } from "../../src/collections/PostgresCollectionRegistry.js";
+import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry.js";
+import { FixtureTableRegistry } from "../helpers/tables";
 import { RealtimeService } from "../../src/services/realtimeService.js";
 
 // Relative, not by package name: inside a git worktree `@rebasepro/server`
@@ -70,7 +71,7 @@ describe("live schema editing, end to end", () => {
         await admin.query(`INSERT INTO public.posts (id, title) VALUES ('1', 'first');`);
 
         pool = new pg.Pool({ connectionString: container.connectionString });
-        const registry = new PostgresCollectionRegistry();
+        const registry = new FixtureTableRegistry();
         const db = drizzle(pool);
         const realtime = new RealtimeService(db, registry);
         driver = new PostgresBackendDriver(db, realtime, registry);

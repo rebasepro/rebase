@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { TableDescriptor } from "@rebasepro/types";
 import type { PgSqlDatabase } from "../interfaces";
 
 /**
@@ -87,12 +87,9 @@ export class AuthSchemaVersionError extends Error {
  * derives it. Shared so the two cannot drift: a stamp written to one schema and
  * read from another would read as "never stamped" forever.
  */
-export function resolveAuthSchema(collection?: CollectionConfig): string {
-    if (!collection) return "rebase";
-    const usersSchema = ("schema" in collection && typeof collection.schema === "string")
-        ? collection.schema
-        : "public";
-    return usersSchema === "public" ? "rebase" : usersSchema;
+export function resolveAuthSchema(table?: TableDescriptor): string {
+    if (!table) return "rebase";
+    return table.schema === "public" ? "rebase" : table.schema;
 }
 
 /**

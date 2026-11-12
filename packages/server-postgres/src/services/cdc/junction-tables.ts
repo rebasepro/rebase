@@ -1,7 +1,7 @@
 import { CollectionConfig, ResolvedRelation, isManyToMany } from "@rebasepro/types";
 import { resolveCollectionRelations } from "@rebasepro/common";
 
-import { PostgresCollectionRegistry } from "../../collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../../model/PostgresTableRegistry";
 
 /**
  * One end of a many-to-many, as seen from the junction table.
@@ -33,7 +33,7 @@ export interface JunctionLink {
  * each direction addresses a different child list: `posts/1/tags` and
  * `tags/t/posts` both change when one link is written.
  */
-export function collectJunctionLinks(registry: PostgresCollectionRegistry): JunctionLink[] {
+export function collectJunctionLinks(registry: PostgresTableRegistry): JunctionLink[] {
     const links: JunctionLink[] = [];
     const seen = new Set<string>();
 
@@ -76,7 +76,7 @@ export function collectJunctionLinks(registry: PostgresCollectionRegistry): Junc
  * bare name — a change event carries whatever the trigger reports, and a
  * collection need not declare a schema.
  */
-export function buildJunctionLinkMap(registry: PostgresCollectionRegistry): Map<string, JunctionLink[]> {
+export function buildJunctionLinkMap(registry: PostgresTableRegistry): Map<string, JunctionLink[]> {
     const map = new Map<string, JunctionLink[]>();
 
     for (const link of collectJunctionLinks(registry)) {

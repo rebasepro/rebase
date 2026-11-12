@@ -1,8 +1,9 @@
 import { DataService } from "../src/services/dataService";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { CollectionConfig } from "@rebasepro/types";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
-const collectionRegistry = new PostgresCollectionRegistry();
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
+const collectionRegistry = new FixtureTableRegistry();
 
 /**
  * The literal SQL a condition will emit — string fragments and column names,
@@ -71,7 +72,7 @@ dataType: "number" },
             return undefined;
         });
 
-        jest.spyOn(collectionRegistry, "getTable").mockImplementation(tableName => {
+        jest.spyOn(collectionRegistry, "getPgTable").mockImplementation(tableName => {
             if (tableName === "test_table") return mockTable as any;
             return undefined;
         });
@@ -110,7 +111,7 @@ dataType: "number" },
         });
 
         it("should throw error when table is not found for collection", async () => {
-            jest.spyOn(collectionRegistry, "getTable").mockReturnValue(undefined);
+            jest.spyOn(collectionRegistry, "getPgTable").mockReturnValue(undefined);
 
             await expect(
                 dataService.fetchOne("test", 1)
@@ -165,7 +166,7 @@ isId: "uuid" },
 
             jest.spyOn(collectionRegistry, "getCollectionByPath").mockImplementation(path =>
                 (path === "uuidthings" || path === "uuid_table") ? uuidCollection : undefined);
-            jest.spyOn(collectionRegistry, "getTable").mockImplementation(tableName =>
+            jest.spyOn(collectionRegistry, "getPgTable").mockImplementation(tableName =>
                 tableName === "uuid_table" ? uuidTable as any : undefined);
 
             await expect(dataService.fetchOne("uuidthings", "new")).resolves.toBeUndefined();

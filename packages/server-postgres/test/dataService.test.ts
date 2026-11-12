@@ -1,7 +1,8 @@
 import { DataService } from "../src/services/dataService";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { CollectionConfig } from "@rebasepro/types";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 
 /**
  * A query chain that resolves to `rows` however it is continued.
@@ -23,7 +24,7 @@ function resolvesTo(rows: unknown[]) {
     return chain;
 }
 
-const collectionRegistry = new PostgresCollectionRegistry();
+const collectionRegistry = new FixtureTableRegistry();
 
 // --- Mock Drizzle ORM table definitions ---
 const mockAuthorsTable = {
@@ -156,12 +157,12 @@ describe("DataService", () => {
             if (path.startsWith("project_users")) return projectUsersCollection;
             return undefined;
         });
-        jest.spyOn(collectionRegistry, "getTable").mockImplementation(tableName => {
-            if (tableName === "authors") return mockAuthorsTable as unknown as ReturnType<typeof collectionRegistry.getTable>;
-            if (tableName === "posts") return mockPostsTable as unknown as ReturnType<typeof collectionRegistry.getTable>;
-            if (tableName === "tags") return mockTagsTable as unknown as ReturnType<typeof collectionRegistry.getTable>;
-            if (tableName === "posts_tags") return mockPostsTagsTable as unknown as ReturnType<typeof collectionRegistry.getTable>;
-            if (tableName === "project_users") return mockProjectUsersTable as unknown as ReturnType<typeof collectionRegistry.getTable>;
+        jest.spyOn(collectionRegistry, "getPgTable").mockImplementation(tableName => {
+            if (tableName === "authors") return mockAuthorsTable as unknown as ReturnType<typeof collectionRegistry.getPgTable>;
+            if (tableName === "posts") return mockPostsTable as unknown as ReturnType<typeof collectionRegistry.getPgTable>;
+            if (tableName === "tags") return mockTagsTable as unknown as ReturnType<typeof collectionRegistry.getPgTable>;
+            if (tableName === "posts_tags") return mockPostsTagsTable as unknown as ReturnType<typeof collectionRegistry.getPgTable>;
+            if (tableName === "project_users") return mockProjectUsersTable as unknown as ReturnType<typeof collectionRegistry.getPgTable>;
             return undefined;
         });
         jest.spyOn(collectionRegistry, "getCollections").mockReturnValue([authorsCollection, postsCollection, tagsCollection, projectUsersCollection]);
@@ -651,14 +652,14 @@ relationName: "children" }
             return undefined;
         });
 
-        jest.spyOn(collectionRegistry, "getTable").mockImplementation(tableName => {
-            if (tableName === "users") return mockUsersTable as unknown as ReturnType<typeof collectionRegistry.getTable>;
-            if (tableName === "companies") return mockCompaniesTable as unknown as ReturnType<typeof collectionRegistry.getTable>;
-            if (tableName === "projects") return mockProjectsTable as unknown as ReturnType<typeof collectionRegistry.getTable>;
-            if (tableName === "tasks") return mockTasksTable as unknown as ReturnType<typeof collectionRegistry.getTable>;
-            if (tableName === "tags") return mockTagsTable as unknown as ReturnType<typeof collectionRegistry.getTable>;
-            if (tableName === "categories") return mockCategoriesTable as unknown as ReturnType<typeof collectionRegistry.getTable>;
-            if (tableName === "project_tags") return mockProjectTagsTable as unknown as ReturnType<typeof collectionRegistry.getTable>;
+        jest.spyOn(collectionRegistry, "getPgTable").mockImplementation(tableName => {
+            if (tableName === "users") return mockUsersTable as unknown as ReturnType<typeof collectionRegistry.getPgTable>;
+            if (tableName === "companies") return mockCompaniesTable as unknown as ReturnType<typeof collectionRegistry.getPgTable>;
+            if (tableName === "projects") return mockProjectsTable as unknown as ReturnType<typeof collectionRegistry.getPgTable>;
+            if (tableName === "tasks") return mockTasksTable as unknown as ReturnType<typeof collectionRegistry.getPgTable>;
+            if (tableName === "tags") return mockTagsTable as unknown as ReturnType<typeof collectionRegistry.getPgTable>;
+            if (tableName === "categories") return mockCategoriesTable as unknown as ReturnType<typeof collectionRegistry.getPgTable>;
+            if (tableName === "project_tags") return mockProjectTagsTable as unknown as ReturnType<typeof collectionRegistry.getPgTable>;
             return undefined;
         });
 
@@ -707,28 +708,34 @@ name: "Test User" };
 
         it("should handle string IDs correctly for string ID type collections", async () => {
             // Create a collection with string ID type
-            const stringIdCollection = {
-                ...usersCollection,
+            // Without the relations: their targets point back at the
+            // number-keyed `usersCollection`, which would be a second "users".
+            const stringIdCollection: CollectionConfig = {
+                slug: "users",
+                name: "Users",
+                table: "users",
                 properties: {
-                    ...usersCollection.properties,
-                    id: { type: "string" }
+                    id: { type: "string" },
+                    email: { type: "string" },
+                    name: { type: "string" },
+                    created_at: { type: "date" }
                 }
             };
             jest.spyOn(collectionRegistry, "getCollectionByPath").mockReturnValue(stringIdCollection);
-            jest.spyOn(collectionRegistry, "getTable").mockImplementation(tableName => {
+            jest.spyOn(collectionRegistry, "getPgTable").mockImplementation(tableName => {
                 if (tableName === "users") return {
                     id: { name: "id",
 dataType: "string" },
                     email: { name: "email" },
                     name: { name: "name" },
                     _def: { tableName: "users" }
-                } as unknown as ReturnType<typeof collectionRegistry.getTable>;
-                if (tableName === "companies") return mockCompaniesTable as unknown as ReturnType<typeof collectionRegistry.getTable>;
-                if (tableName === "projects") return mockProjectsTable as unknown as ReturnType<typeof collectionRegistry.getTable>;
-                if (tableName === "tasks") return mockTasksTable as unknown as ReturnType<typeof collectionRegistry.getTable>;
-                if (tableName === "tags") return mockTagsTable as unknown as ReturnType<typeof collectionRegistry.getTable>;
-                if (tableName === "categories") return mockCategoriesTable as unknown as ReturnType<typeof collectionRegistry.getTable>;
-                if (tableName === "project_tags") return mockProjectTagsTable as unknown as ReturnType<typeof collectionRegistry.getTable>;
+                } as unknown as ReturnType<typeof collectionRegistry.getPgTable>;
+                if (tableName === "companies") return mockCompaniesTable as unknown as ReturnType<typeof collectionRegistry.getPgTable>;
+                if (tableName === "projects") return mockProjectsTable as unknown as ReturnType<typeof collectionRegistry.getPgTable>;
+                if (tableName === "tasks") return mockTasksTable as unknown as ReturnType<typeof collectionRegistry.getPgTable>;
+                if (tableName === "tags") return mockTagsTable as unknown as ReturnType<typeof collectionRegistry.getPgTable>;
+                if (tableName === "categories") return mockCategoriesTable as unknown as ReturnType<typeof collectionRegistry.getPgTable>;
+                if (tableName === "project_tags") return mockProjectTagsTable as unknown as ReturnType<typeof collectionRegistry.getPgTable>;
                 return undefined;
             });
 
@@ -1042,7 +1049,7 @@ status: "active" }
         });
 
         it("should handle missing table definitions", async () => {
-            jest.spyOn(collectionRegistry, "getTable").mockReturnValue(undefined);
+            jest.spyOn(collectionRegistry, "getPgTable").mockReturnValue(undefined);
 
             await expect(
                 dataService.fetchOne("users", 1)

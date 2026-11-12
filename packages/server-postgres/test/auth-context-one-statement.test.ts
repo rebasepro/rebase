@@ -22,7 +22,8 @@ import { sql } from "drizzle-orm";
 import { pgTable, text, uuid } from "drizzle-orm/pg-core";
 import type { CollectionConfig } from "@rebasepro/types";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { RealtimeService } from "../src/services/realtimeService";
 import { applyAuthContext, REBASE_USER_ROLE, type SqlTx } from "../src/security/rls-enforcement";
 import { isRoleSwitchingPermissionError } from "../src/utils/pg-error-utils";
@@ -183,9 +184,9 @@ describe("an authenticated read on the driver", () => {
         theirs = (await pglite.query<{ id: string }>("INSERT INTO notes (owner_id, title) VALUES ('user-2', 'theirs') RETURNING id")).rows[0].id;
 
         statements = [];
-        const registry = new PostgresCollectionRegistry();
+        const registry = new FixtureTableRegistry();
         registry.registerMultiple([notes]);
-        registry.registerTable(notesTable, "notes");
+        registry.registerPgTable(notesTable, "notes");
         const orm = drizzle(pglite, {
             schema: { notes: notesTable },
             logger: { logQuery: (query: string) => { statements.push(query); } }

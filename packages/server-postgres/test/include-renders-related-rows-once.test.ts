@@ -1,7 +1,8 @@
 import { CollectionConfig } from "@rebasepro/types";
 import { integer, pgTable, varchar } from "drizzle-orm/pg-core";
 import { RelationService } from "../src/services/RelationService";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import * as transformer from "../src/data-transformer";
 import { arrayRowsFor, recordingDb } from "./helpers/spg-b-recording-db";
 
@@ -17,7 +18,7 @@ import { arrayRowsFor, recordingDb } from "./helpers/spg-b-recording-db";
  * run at all on the REST path, and must still run on the admin's.
  */
 describe("the include loader renders a related row once", () => {
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
 
     const postsTable = pgTable("posts", { id: integer("id").primaryKey(), title: varchar("title") });
     const commentsTable = pgTable("comments", {
@@ -51,8 +52,8 @@ describe("the include loader renders a related row once", () => {
     const db = () => recordingDb(({ text }) =>
         (/^\s*select\b/i.test(text) ? arrayRowsFor(text, commentRows.map(({ postId, ...row }) => ({ ...row, post_id: postId }))) : [])).db;
 
-    registry.registerTable(postsTable, "posts");
-    registry.registerTable(commentsTable, "comments");
+    registry.registerPgTable(postsTable, "posts");
+    registry.registerPgTable(commentsTable, "comments");
 
     beforeEach(() => {
         jest.restoreAllMocks();

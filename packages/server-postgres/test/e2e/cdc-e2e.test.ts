@@ -20,7 +20,8 @@ import { pgTable, integer, varchar } from "drizzle-orm/pg-core";
 import type { CollectionConfig } from "@rebasepro/types";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
-import { PostgresCollectionRegistry } from "../../src/collections/PostgresCollectionRegistry.js";
+import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry.js";
+import { FixtureTableRegistry } from "../helpers/tables";
 import { RealtimeService } from "../../src/services/realtimeService.js";
 import { provisionTriggerCdc } from "../../src/services/cdc/trigger-cdc.js";
 import { collectJunctionLinks } from "../../src/services/cdc/junction-tables.js";
@@ -125,11 +126,11 @@ describe("Database-level CDC (E2E)", () => {
 
         pool = new pg.Pool({ connectionString: container.connectionString });
         const db = drizzle(pool);
-        const registry = new PostgresCollectionRegistry();
+        const registry = new FixtureTableRegistry();
         registry.registerMultiple([postsCollection, tagsCollection]);
-        registry.registerTable(postsTable, "posts");
-        registry.registerTable(tagsTable, "tags");
-        registry.registerTable(postsTagsTable, "posts_tags");
+        registry.registerPgTable(postsTable, "posts");
+        registry.registerPgTable(tagsTable, "tags");
+        registry.registerPgTable(postsTagsTable, "posts_tags");
 
         realtime = new RealtimeService(db, registry);
         driver = new PostgresBackendDriver(db, realtime, registry);

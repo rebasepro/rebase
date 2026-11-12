@@ -17,7 +17,8 @@
  */
 import { CollectionConfig } from "@rebasepro/types";
 import { toRestRow } from "../src/services/row-pipeline";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 
 const authorsCollection: CollectionConfig = {
     slug: "authors",
@@ -40,8 +41,8 @@ const postsCollection: CollectionConfig = {
     }
 };
 
-function makeRegistry(): PostgresCollectionRegistry {
-    const registry = new PostgresCollectionRegistry();
+function makeRegistry(): PostgresTableRegistry {
+    const registry = new FixtureTableRegistry();
     registry.registerCollection?.(authorsCollection);
     registry.registerCollection?.(postsCollection);
     return registry;

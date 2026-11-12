@@ -1,7 +1,8 @@
 import { describe, it, expect } from "@jest/globals";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { RealtimeService } from "../src/services/realtimeService";
-import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
+import { FixtureTableRegistry } from "./helpers/tables";
 import { recordingDb, type QueryAnswers } from "./helpers/spg-b-recording-db";
 import { rowsOfResult } from "../src/utils/result-rows";
 
@@ -31,7 +32,7 @@ function driverAnswering(answers: QueryAnswers, owner = "rebase") {
         if (/;\s*select 2/i.test(text)) return answers;
         return [];
     });
-    const registry = new PostgresCollectionRegistry();
+    const registry = new FixtureTableRegistry();
     return new PostgresBackendDriver(db, new RealtimeService(db, registry), registry);
 }
 
