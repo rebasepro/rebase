@@ -1,0 +1,2839 @@
+{
+  "schemas": [
+    "rebase"
+  ],
+  "declaredSchemas": [],
+  "enums": [],
+  "tables": [
+    {
+      "schema": "public",
+      "table": "area",
+      "qualified": "public.area",
+      "varName": "area",
+      "kind": "collection",
+      "slug": "area",
+      "columns": [
+        {
+          "key": "id",
+          "column": "id",
+          "type": {
+            "kind": "serial"
+          },
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "id",
+            "slug": "area"
+          }
+        },
+        {
+          "key": "name",
+          "column": "name",
+          "type": {
+            "kind": "text"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "name",
+            "slug": "area"
+          }
+        },
+        {
+          "key": "type",
+          "column": "type",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": {
+            "schema": "public",
+            "table": "area",
+            "column": "type",
+            "targetSchema": "public",
+            "targetTable": "area_type",
+            "targetColumn": "id",
+            "onDelete": "no action",
+            "constraintName": "area_type_fkey",
+            "sql": "ALTER TABLE \"public\".\"area\" ADD CONSTRAINT \"area_type_fkey\" FOREIGN KEY (\"type\") REFERENCES \"public\".\"area_type\" (\"id\") ON DELETE NO ACTION"
+          },
+          "source": {
+            "kind": "relation",
+            "propName": "type",
+            "slug": "area"
+          }
+        },
+        {
+          "key": "gid",
+          "column": "gid",
+          "type": {
+            "kind": "uuid"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "gid",
+            "slug": "area"
+          }
+        },
+        {
+          "key": "comment",
+          "column": "comment",
+          "type": {
+            "kind": "varchar",
+            "length": 255
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": {
+            "kind": "literal",
+            "value": "",
+            "sql": "''"
+          },
+          "source": {
+            "kind": "property",
+            "propName": "comment",
+            "slug": "area"
+          }
+        },
+        {
+          "key": "ended",
+          "column": "ended",
+          "type": {
+            "kind": "boolean"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": {
+            "kind": "literal",
+            "value": false,
+            "sql": "FALSE"
+          },
+          "source": {
+            "kind": "property",
+            "propName": "ended",
+            "slug": "area"
+          }
+        },
+        {
+          "key": "editsPending",
+          "column": "edits_pending",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": {
+            "kind": "literal",
+            "value": 0,
+            "sql": "0"
+          },
+          "source": {
+            "kind": "property",
+            "propName": "editsPending",
+            "slug": "area"
+          }
+        },
+        {
+          "key": "beginDateYear",
+          "column": "begin_date_year",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "beginDateYear",
+            "slug": "area"
+          }
+        },
+        {
+          "key": "beginDateMonth",
+          "column": "begin_date_month",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "beginDateMonth",
+            "slug": "area"
+          }
+        },
+        {
+          "key": "beginDateDay",
+          "column": "begin_date_day",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "beginDateDay",
+            "slug": "area"
+          }
+        },
+        {
+          "key": "endDateYear",
+          "column": "end_date_year",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "endDateYear",
+            "slug": "area"
+          }
+        },
+        {
+          "key": "endDateMonth",
+          "column": "end_date_month",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "endDateMonth",
+            "slug": "area"
+          }
+        },
+        {
+          "key": "endDateDay",
+          "column": "end_date_day",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "endDateDay",
+            "slug": "area"
+          }
+        },
+        {
+          "key": "lastUpdated",
+          "column": "last_updated",
+          "type": {
+            "kind": "timestamptz"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "default": {
+            "kind": "sql",
+            "expression": "now()"
+          },
+          "source": {
+            "kind": "property",
+            "propName": "lastUpdated",
+            "slug": "area"
+          }
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "schema": "public",
+          "table": "area",
+          "method": "btree",
+          "unique": false,
+          "keys": [
+            {
+              "column": "type",
+              "direction": "asc",
+              "nulls": "last"
+            }
+          ],
+          "include": [],
+          "predicate": null,
+          "reason": "Derived for a foreign key: Postgres indexes the key a constraint points at, never the column holding it.",
+          "indexName": "area_type_ix_911e749",
+          "derived": "foreign-key"
+        }
+      ],
+      "vector": {
+        "specs": [],
+        "skipped": []
+      },
+      "vectorColumns": [],
+      "policies": [
+        {
+          "name": "area_default_admin_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "area_default_admin_read",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "area_default_admin_read_ar_9f97caa3",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "area_default_admin_write_insert",
+          "operation": "insert",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": null,
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "area_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "area_default_admin_write_insert_ar_bfb8afd0",
+            "using": null,
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "area_default_admin_write_update",
+          "operation": "update",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "area_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "area_default_admin_write_update_ar_ee72e5eb",
+            "using": "true",
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "area_default_admin_write_delete",
+          "operation": "delete",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "area_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "area_default_admin_write_delete_ar_8ed3a4f5",
+            "using": "true",
+            "withCheck": null
+          }
+        }
+      ],
+      "triggers": [],
+      "auth": false
+    },
+    {
+      "schema": "public",
+      "table": "area_tag",
+      "qualified": "public.area_tag",
+      "varName": "areaTag",
+      "kind": "collection",
+      "slug": "area_tag",
+      "columns": [
+        {
+          "key": "area",
+          "column": "area",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "area",
+            "slug": "area_tag"
+          }
+        },
+        {
+          "key": "tag",
+          "column": "tag",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "tag",
+            "slug": "area_tag"
+          }
+        },
+        {
+          "key": "count",
+          "column": "count",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "count",
+            "slug": "area_tag"
+          }
+        },
+        {
+          "key": "lastUpdated",
+          "column": "last_updated",
+          "type": {
+            "kind": "timestamptz"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "default": {
+            "kind": "sql",
+            "expression": "now()"
+          },
+          "source": {
+            "kind": "property",
+            "propName": "lastUpdated",
+            "slug": "area_tag"
+          }
+        },
+        {
+          "key": "area",
+          "column": "area",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "columnOwnedByProperty": true,
+          "foreignKey": {
+            "schema": "public",
+            "table": "area_tag",
+            "column": "area",
+            "targetSchema": "public",
+            "targetTable": "area",
+            "targetColumn": "id",
+            "onDelete": "no action",
+            "constraintName": "area_tag_area_fkey",
+            "sql": "ALTER TABLE \"public\".\"area_tag\" ADD CONSTRAINT \"area_tag_area_fkey\" FOREIGN KEY (\"area\") REFERENCES \"public\".\"area\" (\"id\") ON DELETE NO ACTION"
+          },
+          "source": {
+            "kind": "relation",
+            "propName": "areaRelation",
+            "slug": "area_tag"
+          }
+        },
+        {
+          "key": "tag",
+          "column": "tag",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "columnOwnedByProperty": true,
+          "foreignKey": {
+            "schema": "public",
+            "table": "area_tag",
+            "column": "tag",
+            "targetSchema": "public",
+            "targetTable": "tag",
+            "targetColumn": "id",
+            "onDelete": "no action",
+            "constraintName": "area_tag_tag_fkey",
+            "sql": "ALTER TABLE \"public\".\"area_tag\" ADD CONSTRAINT \"area_tag_tag_fkey\" FOREIGN KEY (\"tag\") REFERENCES \"public\".\"tag\" (\"id\") ON DELETE NO ACTION"
+          },
+          "source": {
+            "kind": "relation",
+            "propName": "tagRelation",
+            "slug": "area_tag"
+          }
+        }
+      ],
+      "primaryKey": [
+        "area",
+        "tag"
+      ],
+      "indexes": [
+        {
+          "schema": "public",
+          "table": "area_tag",
+          "method": "btree",
+          "unique": false,
+          "keys": [
+            {
+              "column": "tag",
+              "direction": "asc",
+              "nulls": "last"
+            }
+          ],
+          "include": [],
+          "predicate": null,
+          "reason": "Derived for a foreign key: Postgres indexes the key a constraint points at, never the column holding it.",
+          "indexName": "area_tag_tag_ix_3c85ad5",
+          "derived": "foreign-key"
+        }
+      ],
+      "vector": {
+        "specs": [],
+        "skipped": []
+      },
+      "vectorColumns": [],
+      "policies": [
+        {
+          "name": "area_tag_default_admin_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "area_tag_default_admin_read",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "area_tag_default_admin_read_ar_21366bc7",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "area_tag_default_admin_write_insert",
+          "operation": "insert",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": null,
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "area_tag_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "area_tag_default_admin_write_insert_ar_f6f8ce75",
+            "using": null,
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "area_tag_default_admin_write_update",
+          "operation": "update",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "area_tag_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "area_tag_default_admin_write_update_ar_accb8aba",
+            "using": "true",
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "area_tag_default_admin_write_delete",
+          "operation": "delete",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "area_tag_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "area_tag_default_admin_write_delete_ar_dd1049b6",
+            "using": "true",
+            "withCheck": null
+          }
+        }
+      ],
+      "triggers": [],
+      "auth": false
+    },
+    {
+      "schema": "public",
+      "table": "area_tag_raw",
+      "qualified": "public.area_tag_raw",
+      "varName": "areaTagRaw",
+      "kind": "collection",
+      "slug": "area_tag_raw",
+      "columns": [
+        {
+          "key": "area",
+          "column": "area",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "area",
+            "slug": "area_tag_raw"
+          }
+        },
+        {
+          "key": "editor",
+          "column": "editor",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "editor",
+            "slug": "area_tag_raw"
+          }
+        },
+        {
+          "key": "tag",
+          "column": "tag",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "tag",
+            "slug": "area_tag_raw"
+          }
+        },
+        {
+          "key": "isUpvote",
+          "column": "is_upvote",
+          "type": {
+            "kind": "boolean"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": {
+            "kind": "literal",
+            "value": true,
+            "sql": "TRUE"
+          },
+          "source": {
+            "kind": "property",
+            "propName": "isUpvote",
+            "slug": "area_tag_raw"
+          }
+        },
+        {
+          "key": "area",
+          "column": "area",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "columnOwnedByProperty": true,
+          "foreignKey": {
+            "schema": "public",
+            "table": "area_tag_raw",
+            "column": "area",
+            "targetSchema": "public",
+            "targetTable": "area",
+            "targetColumn": "id",
+            "onDelete": "no action",
+            "constraintName": "area_tag_raw_area_fkey",
+            "sql": "ALTER TABLE \"public\".\"area_tag_raw\" ADD CONSTRAINT \"area_tag_raw_area_fkey\" FOREIGN KEY (\"area\") REFERENCES \"public\".\"area\" (\"id\") ON DELETE NO ACTION"
+          },
+          "source": {
+            "kind": "relation",
+            "propName": "areaRelation",
+            "slug": "area_tag_raw"
+          }
+        },
+        {
+          "key": "editor",
+          "column": "editor",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "columnOwnedByProperty": true,
+          "foreignKey": {
+            "schema": "public",
+            "table": "area_tag_raw",
+            "column": "editor",
+            "targetSchema": "public",
+            "targetTable": "editor",
+            "targetColumn": "id",
+            "onDelete": "no action",
+            "constraintName": "area_tag_raw_editor_fkey",
+            "sql": "ALTER TABLE \"public\".\"area_tag_raw\" ADD CONSTRAINT \"area_tag_raw_editor_fkey\" FOREIGN KEY (\"editor\") REFERENCES \"public\".\"editor\" (\"id\") ON DELETE NO ACTION"
+          },
+          "source": {
+            "kind": "relation",
+            "propName": "editorRelation",
+            "slug": "area_tag_raw"
+          }
+        },
+        {
+          "key": "tag",
+          "column": "tag",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "columnOwnedByProperty": true,
+          "foreignKey": {
+            "schema": "public",
+            "table": "area_tag_raw",
+            "column": "tag",
+            "targetSchema": "public",
+            "targetTable": "tag",
+            "targetColumn": "id",
+            "onDelete": "no action",
+            "constraintName": "area_tag_raw_tag_fkey",
+            "sql": "ALTER TABLE \"public\".\"area_tag_raw\" ADD CONSTRAINT \"area_tag_raw_tag_fkey\" FOREIGN KEY (\"tag\") REFERENCES \"public\".\"tag\" (\"id\") ON DELETE NO ACTION"
+          },
+          "source": {
+            "kind": "relation",
+            "propName": "tagRelation",
+            "slug": "area_tag_raw"
+          }
+        }
+      ],
+      "primaryKey": [
+        "area",
+        "editor",
+        "tag"
+      ],
+      "indexes": [
+        {
+          "schema": "public",
+          "table": "area_tag_raw",
+          "method": "btree",
+          "unique": false,
+          "keys": [
+            {
+              "column": "editor",
+              "direction": "asc",
+              "nulls": "last"
+            }
+          ],
+          "include": [],
+          "predicate": null,
+          "reason": "Derived for a foreign key: Postgres indexes the key a constraint points at, never the column holding it.",
+          "indexName": "area_tag_raw_editor_ix_2a7b59e",
+          "derived": "foreign-key"
+        },
+        {
+          "schema": "public",
+          "table": "area_tag_raw",
+          "method": "btree",
+          "unique": false,
+          "keys": [
+            {
+              "column": "tag",
+              "direction": "asc",
+              "nulls": "last"
+            }
+          ],
+          "include": [],
+          "predicate": null,
+          "reason": "Derived for a foreign key: Postgres indexes the key a constraint points at, never the column holding it.",
+          "indexName": "area_tag_raw_tag_ix_a4d1daf",
+          "derived": "foreign-key"
+        }
+      ],
+      "vector": {
+        "specs": [],
+        "skipped": []
+      },
+      "vectorColumns": [],
+      "policies": [
+        {
+          "name": "area_tag_raw_default_admin_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "area_tag_raw_default_admin_read",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "area_tag_raw_default_admin_read_ar_8eb2aa2a",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "area_tag_raw_default_admin_write_insert",
+          "operation": "insert",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": null,
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "area_tag_raw_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "area_tag_raw_default_admin_write_insert_ar_31fed9ac",
+            "using": null,
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "area_tag_raw_default_admin_write_update",
+          "operation": "update",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "area_tag_raw_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "area_tag_raw_default_admin_write_update_ar_9607b376",
+            "using": "true",
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "area_tag_raw_default_admin_write_delete",
+          "operation": "delete",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "area_tag_raw_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "area_tag_raw_default_admin_write_delete_ar_b680db30",
+            "using": "true",
+            "withCheck": null
+          }
+        }
+      ],
+      "triggers": [],
+      "auth": false
+    },
+    {
+      "schema": "public",
+      "table": "area_type",
+      "qualified": "public.area_type",
+      "varName": "areaType",
+      "kind": "collection",
+      "slug": "area_type",
+      "columns": [
+        {
+          "key": "id",
+          "column": "id",
+          "type": {
+            "kind": "serial"
+          },
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "id",
+            "slug": "area_type"
+          }
+        },
+        {
+          "key": "name",
+          "column": "name",
+          "type": {
+            "kind": "varchar",
+            "length": 255
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "name",
+            "slug": "area_type"
+          }
+        },
+        {
+          "key": "gid",
+          "column": "gid",
+          "type": {
+            "kind": "uuid"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "gid",
+            "slug": "area_type"
+          }
+        },
+        {
+          "key": "childOrder",
+          "column": "child_order",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": {
+            "kind": "literal",
+            "value": 0,
+            "sql": "0"
+          },
+          "source": {
+            "kind": "property",
+            "propName": "childOrder",
+            "slug": "area_type"
+          }
+        },
+        {
+          "key": "parent",
+          "column": "parent",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": {
+            "schema": "public",
+            "table": "area_type",
+            "column": "parent",
+            "targetSchema": "public",
+            "targetTable": "area_type",
+            "targetColumn": "id",
+            "onDelete": "no action",
+            "constraintName": "area_type_parent_fkey",
+            "sql": "ALTER TABLE \"public\".\"area_type\" ADD CONSTRAINT \"area_type_parent_fkey\" FOREIGN KEY (\"parent\") REFERENCES \"public\".\"area_type\" (\"id\") ON DELETE NO ACTION"
+          },
+          "source": {
+            "kind": "relation",
+            "propName": "parent",
+            "slug": "area_type"
+          }
+        },
+        {
+          "key": "description",
+          "column": "description",
+          "type": {
+            "kind": "text"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "description",
+            "slug": "area_type"
+          }
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "schema": "public",
+          "table": "area_type",
+          "method": "btree",
+          "unique": false,
+          "keys": [
+            {
+              "column": "parent",
+              "direction": "asc",
+              "nulls": "last"
+            }
+          ],
+          "include": [],
+          "predicate": null,
+          "reason": "Derived for a foreign key: Postgres indexes the key a constraint points at, never the column holding it.",
+          "indexName": "area_type_parent_ix_5109391",
+          "derived": "foreign-key"
+        }
+      ],
+      "vector": {
+        "specs": [],
+        "skipped": []
+      },
+      "vectorColumns": [],
+      "policies": [
+        {
+          "name": "area_type_default_admin_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "area_type_default_admin_read",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "area_type_default_admin_read_ar_c1c303e8",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "area_type_default_admin_write_insert",
+          "operation": "insert",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": null,
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "area_type_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "area_type_default_admin_write_insert_ar_968d0fda",
+            "using": null,
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "area_type_default_admin_write_update",
+          "operation": "update",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "area_type_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "area_type_default_admin_write_update_ar_37c4d811",
+            "using": "true",
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "area_type_default_admin_write_delete",
+          "operation": "delete",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "area_type_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "area_type_default_admin_write_delete_ar_5394b81d",
+            "using": "true",
+            "withCheck": null
+          }
+        }
+      ],
+      "triggers": [],
+      "auth": false
+    },
+    {
+      "schema": "public",
+      "table": "artist",
+      "qualified": "public.artist",
+      "varName": "artist",
+      "kind": "collection",
+      "slug": "artist",
+      "columns": [
+        {
+          "key": "id",
+          "column": "id",
+          "type": {
+            "kind": "serial"
+          },
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "id",
+            "slug": "artist"
+          }
+        },
+        {
+          "key": "name",
+          "column": "name",
+          "type": {
+            "kind": "text"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "name",
+            "slug": "artist"
+          }
+        },
+        {
+          "key": "sortName",
+          "column": "sort_name",
+          "type": {
+            "kind": "text"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "sortName",
+            "slug": "artist"
+          }
+        },
+        {
+          "key": "type",
+          "column": "type",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "type",
+            "slug": "artist"
+          }
+        },
+        {
+          "key": "gid",
+          "column": "gid",
+          "type": {
+            "kind": "uuid"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "gid",
+            "slug": "artist"
+          }
+        },
+        {
+          "key": "comment",
+          "column": "comment",
+          "type": {
+            "kind": "varchar",
+            "length": 255
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": {
+            "kind": "literal",
+            "value": "",
+            "sql": "''"
+          },
+          "source": {
+            "kind": "property",
+            "propName": "comment",
+            "slug": "artist"
+          }
+        },
+        {
+          "key": "ended",
+          "column": "ended",
+          "type": {
+            "kind": "boolean"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": {
+            "kind": "literal",
+            "value": false,
+            "sql": "FALSE"
+          },
+          "source": {
+            "kind": "property",
+            "propName": "ended",
+            "slug": "artist"
+          }
+        },
+        {
+          "key": "beginDateYear",
+          "column": "begin_date_year",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "beginDateYear",
+            "slug": "artist"
+          }
+        },
+        {
+          "key": "beginDateMonth",
+          "column": "begin_date_month",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "beginDateMonth",
+            "slug": "artist"
+          }
+        },
+        {
+          "key": "beginDateDay",
+          "column": "begin_date_day",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "beginDateDay",
+            "slug": "artist"
+          }
+        },
+        {
+          "key": "endDateYear",
+          "column": "end_date_year",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "endDateYear",
+            "slug": "artist"
+          }
+        },
+        {
+          "key": "endDateMonth",
+          "column": "end_date_month",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "endDateMonth",
+            "slug": "artist"
+          }
+        },
+        {
+          "key": "endDateDay",
+          "column": "end_date_day",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "endDateDay",
+            "slug": "artist"
+          }
+        },
+        {
+          "key": "gender",
+          "column": "gender",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "gender",
+            "slug": "artist"
+          }
+        },
+        {
+          "key": "editsPending",
+          "column": "edits_pending",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": {
+            "kind": "literal",
+            "value": 0,
+            "sql": "0"
+          },
+          "source": {
+            "kind": "property",
+            "propName": "editsPending",
+            "slug": "artist"
+          }
+        },
+        {
+          "key": "lastUpdated",
+          "column": "last_updated",
+          "type": {
+            "kind": "timestamptz"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "default": {
+            "kind": "sql",
+            "expression": "now()"
+          },
+          "source": {
+            "kind": "property",
+            "propName": "lastUpdated",
+            "slug": "artist"
+          }
+        },
+        {
+          "key": "area",
+          "column": "area",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": {
+            "schema": "public",
+            "table": "artist",
+            "column": "area",
+            "targetSchema": "public",
+            "targetTable": "area",
+            "targetColumn": "id",
+            "onDelete": "no action",
+            "constraintName": "artist_area_fkey",
+            "sql": "ALTER TABLE \"public\".\"artist\" ADD CONSTRAINT \"artist_area_fkey\" FOREIGN KEY (\"area\") REFERENCES \"public\".\"area\" (\"id\") ON DELETE NO ACTION"
+          },
+          "source": {
+            "kind": "relation",
+            "propName": "area",
+            "slug": "artist"
+          }
+        },
+        {
+          "key": "beginArea",
+          "column": "begin_area",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": {
+            "schema": "public",
+            "table": "artist",
+            "column": "begin_area",
+            "targetSchema": "public",
+            "targetTable": "area",
+            "targetColumn": "id",
+            "onDelete": "no action",
+            "constraintName": "artist_begin_area_fkey",
+            "sql": "ALTER TABLE \"public\".\"artist\" ADD CONSTRAINT \"artist_begin_area_fkey\" FOREIGN KEY (\"begin_area\") REFERENCES \"public\".\"area\" (\"id\") ON DELETE NO ACTION"
+          },
+          "source": {
+            "kind": "relation",
+            "propName": "beginArea",
+            "slug": "artist"
+          }
+        },
+        {
+          "key": "endArea",
+          "column": "end_area",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": {
+            "schema": "public",
+            "table": "artist",
+            "column": "end_area",
+            "targetSchema": "public",
+            "targetTable": "area",
+            "targetColumn": "id",
+            "onDelete": "no action",
+            "constraintName": "artist_end_area_fkey",
+            "sql": "ALTER TABLE \"public\".\"artist\" ADD CONSTRAINT \"artist_end_area_fkey\" FOREIGN KEY (\"end_area\") REFERENCES \"public\".\"area\" (\"id\") ON DELETE NO ACTION"
+          },
+          "source": {
+            "kind": "relation",
+            "propName": "endArea",
+            "slug": "artist"
+          }
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "schema": "public",
+          "table": "artist",
+          "method": "btree",
+          "unique": false,
+          "keys": [
+            {
+              "column": "area",
+              "direction": "asc",
+              "nulls": "last"
+            }
+          ],
+          "include": [],
+          "predicate": null,
+          "reason": "Derived for a foreign key: Postgres indexes the key a constraint points at, never the column holding it.",
+          "indexName": "artist_area_ix_11a1da4",
+          "derived": "foreign-key"
+        },
+        {
+          "schema": "public",
+          "table": "artist",
+          "method": "btree",
+          "unique": false,
+          "keys": [
+            {
+              "column": "begin_area",
+              "direction": "asc",
+              "nulls": "last"
+            }
+          ],
+          "include": [],
+          "predicate": null,
+          "reason": "Derived for a foreign key: Postgres indexes the key a constraint points at, never the column holding it.",
+          "indexName": "artist_begin_area_ix_44c6495",
+          "derived": "foreign-key"
+        },
+        {
+          "schema": "public",
+          "table": "artist",
+          "method": "btree",
+          "unique": false,
+          "keys": [
+            {
+              "column": "end_area",
+              "direction": "asc",
+              "nulls": "last"
+            }
+          ],
+          "include": [],
+          "predicate": null,
+          "reason": "Derived for a foreign key: Postgres indexes the key a constraint points at, never the column holding it.",
+          "indexName": "artist_end_area_ix_8e1e1f4",
+          "derived": "foreign-key"
+        }
+      ],
+      "vector": {
+        "specs": [],
+        "skipped": []
+      },
+      "vectorColumns": [],
+      "policies": [
+        {
+          "name": "artist_default_admin_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "artist_default_admin_read",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "artist_default_admin_read_ar_4e15dd0a",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "artist_default_admin_write_insert",
+          "operation": "insert",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": null,
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "artist_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "artist_default_admin_write_insert_ar_e2915928",
+            "using": null,
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "artist_default_admin_write_update",
+          "operation": "update",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "artist_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "artist_default_admin_write_update_ar_fb4e51cd",
+            "using": "true",
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "artist_default_admin_write_delete",
+          "operation": "delete",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "artist_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "artist_default_admin_write_delete_ar_c3308fe7",
+            "using": "true",
+            "withCheck": null
+          }
+        }
+      ],
+      "triggers": [],
+      "auth": false
+    },
+    {
+      "schema": "public",
+      "table": "artist_credit",
+      "qualified": "public.artist_credit",
+      "varName": "artistCredit",
+      "kind": "collection",
+      "slug": "artist_credit",
+      "columns": [
+        {
+          "key": "id",
+          "column": "id",
+          "type": {
+            "kind": "serial"
+          },
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "id",
+            "slug": "artist_credit"
+          }
+        },
+        {
+          "key": "name",
+          "column": "name",
+          "type": {
+            "kind": "text"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "name",
+            "slug": "artist_credit"
+          }
+        },
+        {
+          "key": "gid",
+          "column": "gid",
+          "type": {
+            "kind": "uuid"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "gid",
+            "slug": "artist_credit"
+          }
+        },
+        {
+          "key": "artistCount",
+          "column": "artist_count",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "artistCount",
+            "slug": "artist_credit"
+          }
+        },
+        {
+          "key": "refCount",
+          "column": "ref_count",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "default": {
+            "kind": "literal",
+            "value": 0,
+            "sql": "0"
+          },
+          "source": {
+            "kind": "property",
+            "propName": "refCount",
+            "slug": "artist_credit"
+          }
+        },
+        {
+          "key": "editsPending",
+          "column": "edits_pending",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": {
+            "kind": "literal",
+            "value": 0,
+            "sql": "0"
+          },
+          "source": {
+            "kind": "property",
+            "propName": "editsPending",
+            "slug": "artist_credit"
+          }
+        },
+        {
+          "key": "created",
+          "column": "created",
+          "type": {
+            "kind": "timestamptz"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "default": {
+            "kind": "sql",
+            "expression": "now()"
+          },
+          "source": {
+            "kind": "property",
+            "propName": "created",
+            "slug": "artist_credit"
+          }
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [],
+      "vector": {
+        "specs": [],
+        "skipped": []
+      },
+      "vectorColumns": [],
+      "policies": [
+        {
+          "name": "artist_credit_default_admin_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "artist_credit_default_admin_read",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "artist_credit_default_admin_read_ar_dfbcb038",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "artist_credit_default_admin_write_insert",
+          "operation": "insert",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": null,
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "artist_credit_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "artist_credit_default_admin_write_insert_ar_e24d3379",
+            "using": null,
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "artist_credit_default_admin_write_update",
+          "operation": "update",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "artist_credit_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "artist_credit_default_admin_write_update_ar_7a4e023e",
+            "using": "true",
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "artist_credit_default_admin_write_delete",
+          "operation": "delete",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "artist_credit_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "artist_credit_default_admin_write_delete_ar_0e3561a4",
+            "using": "true",
+            "withCheck": null
+          }
+        }
+      ],
+      "triggers": [],
+      "auth": false
+    },
+    {
+      "schema": "public",
+      "table": "artist_credit_name",
+      "qualified": "public.artist_credit_name",
+      "varName": "artistCreditName",
+      "kind": "collection",
+      "slug": "artist_credit_name",
+      "columns": [
+        {
+          "key": "artistCredit",
+          "column": "artist_credit",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "artistCredit",
+            "slug": "artist_credit_name"
+          }
+        },
+        {
+          "key": "position",
+          "column": "position",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "position",
+            "slug": "artist_credit_name"
+          }
+        },
+        {
+          "key": "name",
+          "column": "name",
+          "type": {
+            "kind": "text"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "name",
+            "slug": "artist_credit_name"
+          }
+        },
+        {
+          "key": "artist",
+          "column": "artist",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": {
+            "schema": "public",
+            "table": "artist_credit_name",
+            "column": "artist",
+            "targetSchema": "public",
+            "targetTable": "artist",
+            "targetColumn": "id",
+            "onDelete": "cascade",
+            "constraintName": "artist_credit_name_artist_fkey",
+            "sql": "ALTER TABLE \"public\".\"artist_credit_name\" ADD CONSTRAINT \"artist_credit_name_artist_fkey\" FOREIGN KEY (\"artist\") REFERENCES \"public\".\"artist\" (\"id\") ON DELETE CASCADE"
+          },
+          "source": {
+            "kind": "relation",
+            "propName": "artist",
+            "slug": "artist_credit_name"
+          }
+        },
+        {
+          "key": "artistCredit",
+          "column": "artist_credit",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "columnOwnedByProperty": true,
+          "foreignKey": {
+            "schema": "public",
+            "table": "artist_credit_name",
+            "column": "artist_credit",
+            "targetSchema": "public",
+            "targetTable": "artist_credit",
+            "targetColumn": "id",
+            "onDelete": "cascade",
+            "constraintName": "artist_credit_name_artist_credit_fkey",
+            "sql": "ALTER TABLE \"public\".\"artist_credit_name\" ADD CONSTRAINT \"artist_credit_name_artist_credit_fkey\" FOREIGN KEY (\"artist_credit\") REFERENCES \"public\".\"artist_credit\" (\"id\") ON DELETE CASCADE"
+          },
+          "source": {
+            "kind": "relation",
+            "propName": "artistCreditRelation",
+            "slug": "artist_credit_name"
+          }
+        },
+        {
+          "key": "joinPhrase",
+          "column": "join_phrase",
+          "type": {
+            "kind": "text"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": {
+            "kind": "literal",
+            "value": "",
+            "sql": "''"
+          },
+          "source": {
+            "kind": "property",
+            "propName": "joinPhrase",
+            "slug": "artist_credit_name"
+          }
+        }
+      ],
+      "primaryKey": [
+        "artist_credit",
+        "position"
+      ],
+      "indexes": [
+        {
+          "schema": "public",
+          "table": "artist_credit_name",
+          "method": "btree",
+          "unique": false,
+          "keys": [
+            {
+              "column": "artist",
+              "direction": "asc",
+              "nulls": "last"
+            }
+          ],
+          "include": [],
+          "predicate": null,
+          "reason": "Derived for a foreign key: Postgres indexes the key a constraint points at, never the column holding it.",
+          "indexName": "artist_credit_name_artist_ix_9621eba",
+          "derived": "foreign-key"
+        }
+      ],
+      "vector": {
+        "specs": [],
+        "skipped": []
+      },
+      "vectorColumns": [],
+      "policies": [
+        {
+          "name": "artist_credit_name_default_admin_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "artist_credit_name_default_admin_read",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "artist_credit_name_default_admin_read_ar_4e5fda77",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "artist_credit_name_default_admin_write_insert",
+          "operation": "insert",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": null,
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "artist_credit_name_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "artist_credit_name_default_admin_write_insert_ar_9c1969f9",
+            "using": null,
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "artist_credit_name_default_admin_write_update",
+          "operation": "update",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "artist_credit_name_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "artist_credit_name_default_admin_write_update_ar_b2696d9d",
+            "using": "true",
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "artist_credit_name_default_admin_write_delete",
+          "operation": "delete",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "artist_credit_name_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "artist_credit_name_default_admin_write_delete_ar_edf9a338",
+            "using": "true",
+            "withCheck": null
+          }
+        }
+      ],
+      "triggers": [],
+      "auth": false
+    },
+    {
+      "schema": "public",
+      "table": "editor",
+      "qualified": "public.editor",
+      "varName": "editor",
+      "kind": "collection",
+      "slug": "editor",
+      "columns": [
+        {
+          "key": "id",
+          "column": "id",
+          "type": {
+            "kind": "serial"
+          },
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "id",
+            "slug": "editor"
+          }
+        },
+        {
+          "key": "name",
+          "column": "name",
+          "type": {
+            "kind": "varchar",
+            "length": 64
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "name",
+            "slug": "editor"
+          }
+        },
+        {
+          "key": "email",
+          "column": "email",
+          "type": {
+            "kind": "varchar",
+            "length": 64
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "email",
+            "slug": "editor"
+          }
+        },
+        {
+          "key": "website",
+          "column": "website",
+          "type": {
+            "kind": "varchar",
+            "length": 255
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "website",
+            "slug": "editor"
+          }
+        },
+        {
+          "key": "password",
+          "column": "password",
+          "type": {
+            "kind": "varchar",
+            "length": 128
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "password",
+            "slug": "editor"
+          }
+        },
+        {
+          "key": "ha1",
+          "column": "ha1",
+          "type": {
+            "kind": "char",
+            "length": 32
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "ha1",
+            "slug": "editor"
+          }
+        },
+        {
+          "key": "deleted",
+          "column": "deleted",
+          "type": {
+            "kind": "boolean"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": {
+            "kind": "literal",
+            "value": false,
+            "sql": "FALSE"
+          },
+          "source": {
+            "kind": "property",
+            "propName": "deleted",
+            "slug": "editor"
+          }
+        },
+        {
+          "key": "privs",
+          "column": "privs",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "default": {
+            "kind": "literal",
+            "value": 0,
+            "sql": "0"
+          },
+          "source": {
+            "kind": "property",
+            "propName": "privs",
+            "slug": "editor"
+          }
+        },
+        {
+          "key": "gender",
+          "column": "gender",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "gender",
+            "slug": "editor"
+          }
+        },
+        {
+          "key": "memberSince",
+          "column": "member_since",
+          "type": {
+            "kind": "timestamptz"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "default": {
+            "kind": "sql",
+            "expression": "now()"
+          },
+          "source": {
+            "kind": "property",
+            "propName": "memberSince",
+            "slug": "editor"
+          }
+        },
+        {
+          "key": "emailConfirmDate",
+          "column": "email_confirm_date",
+          "type": {
+            "kind": "timestamptz"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "emailConfirmDate",
+            "slug": "editor"
+          }
+        },
+        {
+          "key": "lastLoginDate",
+          "column": "last_login_date",
+          "type": {
+            "kind": "timestamptz"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "default": {
+            "kind": "sql",
+            "expression": "now()"
+          },
+          "source": {
+            "kind": "property",
+            "propName": "lastLoginDate",
+            "slug": "editor"
+          }
+        },
+        {
+          "key": "lastUpdated",
+          "column": "last_updated",
+          "type": {
+            "kind": "timestamptz"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "default": {
+            "kind": "sql",
+            "expression": "now()"
+          },
+          "source": {
+            "kind": "property",
+            "propName": "lastUpdated",
+            "slug": "editor"
+          }
+        },
+        {
+          "key": "birthDate",
+          "column": "birth_date",
+          "type": {
+            "kind": "date"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "birthDate",
+            "slug": "editor"
+          }
+        },
+        {
+          "key": "area",
+          "column": "area",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": {
+            "schema": "public",
+            "table": "editor",
+            "column": "area",
+            "targetSchema": "public",
+            "targetTable": "area",
+            "targetColumn": "id",
+            "onDelete": "no action",
+            "constraintName": "editor_area_fkey",
+            "sql": "ALTER TABLE \"public\".\"editor\" ADD CONSTRAINT \"editor_area_fkey\" FOREIGN KEY (\"area\") REFERENCES \"public\".\"area\" (\"id\") ON DELETE NO ACTION"
+          },
+          "source": {
+            "kind": "relation",
+            "propName": "area",
+            "slug": "editor"
+          }
+        },
+        {
+          "key": "bio",
+          "column": "bio",
+          "type": {
+            "kind": "text"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "bio",
+            "slug": "editor"
+          }
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "schema": "public",
+          "table": "editor",
+          "method": "btree",
+          "unique": false,
+          "keys": [
+            {
+              "column": "area",
+              "direction": "asc",
+              "nulls": "last"
+            }
+          ],
+          "include": [],
+          "predicate": null,
+          "reason": "Derived for a foreign key: Postgres indexes the key a constraint points at, never the column holding it.",
+          "indexName": "editor_area_ix_b808ff2",
+          "derived": "foreign-key"
+        }
+      ],
+      "vector": {
+        "specs": [],
+        "skipped": []
+      },
+      "vectorColumns": [],
+      "policies": [
+        {
+          "name": "editor_default_admin_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "editor_default_admin_read",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "editor_default_admin_read_ar_c6430ef5",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "editor_default_admin_write_insert",
+          "operation": "insert",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": null,
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "editor_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "editor_default_admin_write_insert_ar_30c8a9ef",
+            "using": null,
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "editor_default_admin_write_update",
+          "operation": "update",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "editor_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "editor_default_admin_write_update_ar_262a60f5",
+            "using": "true",
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "editor_default_admin_write_delete",
+          "operation": "delete",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "editor_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "editor_default_admin_write_delete_ar_15afb59e",
+            "using": "true",
+            "withCheck": null
+          }
+        }
+      ],
+      "triggers": [],
+      "auth": false
+    },
+    {
+      "schema": "public",
+      "table": "tag",
+      "qualified": "public.tag",
+      "varName": "tag",
+      "kind": "collection",
+      "slug": "tag",
+      "columns": [
+        {
+          "key": "id",
+          "column": "id",
+          "type": {
+            "kind": "serial"
+          },
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "id",
+            "slug": "tag"
+          }
+        },
+        {
+          "key": "name",
+          "column": "name",
+          "type": {
+            "kind": "varchar",
+            "length": 255
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "name",
+            "slug": "tag"
+          }
+        },
+        {
+          "key": "refCount",
+          "column": "ref_count",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": {
+            "kind": "literal",
+            "value": 0,
+            "sql": "0"
+          },
+          "source": {
+            "kind": "property",
+            "propName": "refCount",
+            "slug": "tag"
+          }
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [],
+      "vector": {
+        "specs": [],
+        "skipped": []
+      },
+      "vectorColumns": [],
+      "policies": [
+        {
+          "name": "tag_default_admin_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "tag_default_admin_read",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "tag_default_admin_read_ar_b74fd8a5",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "tag_default_admin_write_insert",
+          "operation": "insert",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": null,
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "tag_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "tag_default_admin_write_insert_ar_ecf99ab9",
+            "using": null,
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "tag_default_admin_write_update",
+          "operation": "update",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "tag_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "tag_default_admin_write_update_ar_84db62fa",
+            "using": "true",
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "tag_default_admin_write_delete",
+          "operation": "delete",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "tag_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "tag_default_admin_write_delete_ar_77f92a20",
+            "using": "true",
+            "withCheck": null
+          }
+        }
+      ],
+      "triggers": [],
+      "auth": false
+    }
+  ],
+  "views": [],
+  "relations": [
+    {
+      "tableVar": "area",
+      "key": "area_tag",
+      "kind": "many",
+      "targetVar": "areaTag",
+      "relationName": "area_tag_area"
+    },
+    {
+      "tableVar": "area",
+      "key": "area_tag_raw",
+      "kind": "many",
+      "targetVar": "areaTagRaw",
+      "relationName": "area_tag_raw_area"
+    },
+    {
+      "tableVar": "area",
+      "key": "artist",
+      "kind": "many",
+      "targetVar": "artist",
+      "relationName": "artist_area"
+    },
+    {
+      "tableVar": "area",
+      "key": "artist_by_begin_area",
+      "kind": "many",
+      "targetVar": "artist",
+      "relationName": "artist_beginArea"
+    },
+    {
+      "tableVar": "area",
+      "key": "artist_by_end_area",
+      "kind": "many",
+      "targetVar": "artist",
+      "relationName": "artist_endArea"
+    },
+    {
+      "tableVar": "area",
+      "key": "editor",
+      "kind": "many",
+      "targetVar": "editor",
+      "relationName": "editor_area"
+    },
+    {
+      "tableVar": "area",
+      "key": "type",
+      "kind": "one",
+      "targetVar": "areaType",
+      "relationName": "area_type",
+      "fields": [
+        "type"
+      ],
+      "references": [
+        "id"
+      ]
+    },
+    {
+      "tableVar": "areaTag",
+      "key": "areaRelation",
+      "kind": "one",
+      "targetVar": "area",
+      "relationName": "area_tag_area",
+      "fields": [
+        "area"
+      ],
+      "references": [
+        "id"
+      ]
+    },
+    {
+      "tableVar": "areaTag",
+      "key": "tagRelation",
+      "kind": "one",
+      "targetVar": "tag",
+      "relationName": "area_tag_tag",
+      "fields": [
+        "tag"
+      ],
+      "references": [
+        "id"
+      ]
+    },
+    {
+      "tableVar": "areaTagRaw",
+      "key": "areaRelation",
+      "kind": "one",
+      "targetVar": "area",
+      "relationName": "area_tag_raw_area",
+      "fields": [
+        "area"
+      ],
+      "references": [
+        "id"
+      ]
+    },
+    {
+      "tableVar": "areaTagRaw",
+      "key": "editorRelation",
+      "kind": "one",
+      "targetVar": "editor",
+      "relationName": "area_tag_raw_editor",
+      "fields": [
+        "editor"
+      ],
+      "references": [
+        "id"
+      ]
+    },
+    {
+      "tableVar": "areaTagRaw",
+      "key": "tagRelation",
+      "kind": "one",
+      "targetVar": "tag",
+      "relationName": "area_tag_raw_tag",
+      "fields": [
+        "tag"
+      ],
+      "references": [
+        "id"
+      ]
+    },
+    {
+      "tableVar": "areaType",
+      "key": "area",
+      "kind": "many",
+      "targetVar": "area",
+      "relationName": "area_type"
+    },
+    {
+      "tableVar": "areaType",
+      "key": "area_type",
+      "kind": "many",
+      "targetVar": "areaType",
+      "relationName": "area_type_parent"
+    },
+    {
+      "tableVar": "areaType",
+      "key": "parent",
+      "kind": "one",
+      "targetVar": "areaType",
+      "relationName": "area_type_parent",
+      "fields": [
+        "parent"
+      ],
+      "references": [
+        "id"
+      ]
+    },
+    {
+      "tableVar": "artist",
+      "key": "artist_credit_name",
+      "kind": "many",
+      "targetVar": "artistCreditName",
+      "relationName": "artist_credit_name_artist"
+    },
+    {
+      "tableVar": "artist",
+      "key": "area",
+      "kind": "one",
+      "targetVar": "area",
+      "relationName": "artist_area",
+      "fields": [
+        "area"
+      ],
+      "references": [
+        "id"
+      ]
+    },
+    {
+      "tableVar": "artist",
+      "key": "beginArea",
+      "kind": "one",
+      "targetVar": "area",
+      "relationName": "artist_beginArea",
+      "fields": [
+        "beginArea"
+      ],
+      "references": [
+        "id"
+      ]
+    },
+    {
+      "tableVar": "artist",
+      "key": "endArea",
+      "kind": "one",
+      "targetVar": "area",
+      "relationName": "artist_endArea",
+      "fields": [
+        "endArea"
+      ],
+      "references": [
+        "id"
+      ]
+    },
+    {
+      "tableVar": "artistCredit",
+      "key": "artist_credit_name",
+      "kind": "many",
+      "targetVar": "artistCreditName",
+      "relationName": "artist_credit_name_artistCredit"
+    },
+    {
+      "tableVar": "artistCreditName",
+      "key": "artist",
+      "kind": "one",
+      "targetVar": "artist",
+      "relationName": "artist_credit_name_artist",
+      "fields": [
+        "artist"
+      ],
+      "references": [
+        "id"
+      ]
+    },
+    {
+      "tableVar": "artistCreditName",
+      "key": "artistCreditRelation",
+      "kind": "one",
+      "targetVar": "artistCredit",
+      "relationName": "artist_credit_name_artistCredit",
+      "fields": [
+        "artistCredit"
+      ],
+      "references": [
+        "id"
+      ]
+    },
+    {
+      "tableVar": "editor",
+      "key": "area_tag_raw",
+      "kind": "many",
+      "targetVar": "areaTagRaw",
+      "relationName": "area_tag_raw_editor"
+    },
+    {
+      "tableVar": "editor",
+      "key": "area",
+      "kind": "one",
+      "targetVar": "area",
+      "relationName": "editor_area",
+      "fields": [
+        "area"
+      ],
+      "references": [
+        "id"
+      ]
+    },
+    {
+      "tableVar": "tag",
+      "key": "area_tag",
+      "kind": "many",
+      "targetVar": "areaTag",
+      "relationName": "area_tag_tag"
+    },
+    {
+      "tableVar": "tag",
+      "key": "area_tag_raw",
+      "kind": "many",
+      "targetVar": "areaTagRaw",
+      "relationName": "area_tag_raw_tag"
+    }
+  ],
+  "extensions": [],
+  "functions": [],
+  "options": {
+    "databaseExtensions": []
+  }
+}

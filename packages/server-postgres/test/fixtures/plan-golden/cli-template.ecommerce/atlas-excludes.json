@@ -1,0 +1,7 @@
+{
+  "search": [],
+  "vector": [],
+  "triggers": [
+    "rebase.users.users_updated_at_touch"
+  ]
+}

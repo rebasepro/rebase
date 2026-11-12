@@ -1,0 +1,1415 @@
+[
+  {
+    "schema": "public",
+    "table": "accounts",
+    "qualified": "public.accounts",
+    "enableRls": "ALTER TABLE \"public\".\"accounts\" ENABLE ROW LEVEL SECURITY;",
+    "policyStatements": [
+      "DROP POLICY IF EXISTS \"accounts_update_0eba17e_ar_0b4e6560\" ON \"public\".\"accounts\";",
+      "DROP POLICY IF EXISTS \"accounts_update_0eba17e\" ON \"public\".\"accounts\";",
+      "CREATE POLICY \"accounts_update_0eba17e\" ON \"public\".\"accounts\" AS PERMISSIVE FOR UPDATE TO \"public\" USING ((id)::text = (SELECT rebase.uid())) WITH CHECK ((id)::text = (SELECT rebase.uid()));",
+      "DROP POLICY IF EXISTS \"accounts_default_admin_read_ar_42cd1fe0\" ON \"public\".\"accounts\";",
+      "DROP POLICY IF EXISTS \"accounts_default_admin_read\" ON \"public\".\"accounts\";",
+      "CREATE POLICY \"accounts_default_admin_read\" ON \"public\".\"accounts\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DROP POLICY IF EXISTS \"accounts_default_admin_write_insert_ar_ba596a97\" ON \"public\".\"accounts\";",
+      "DROP POLICY IF EXISTS \"accounts_default_admin_write_insert\" ON \"public\".\"accounts\";",
+      "CREATE POLICY \"accounts_default_admin_write_insert\" ON \"public\".\"accounts\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DROP POLICY IF EXISTS \"accounts_default_admin_write_update_ar_4585cca3\" ON \"public\".\"accounts\";",
+      "DROP POLICY IF EXISTS \"accounts_default_admin_write_update\" ON \"public\".\"accounts\";",
+      "CREATE POLICY \"accounts_default_admin_write_update\" ON \"public\".\"accounts\" AS PERMISSIVE FOR UPDATE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))) WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DROP POLICY IF EXISTS \"accounts_default_admin_write_delete_ar_cf9ca8f8\" ON \"public\".\"accounts\";",
+      "DROP POLICY IF EXISTS \"accounts_default_admin_write_delete\" ON \"public\".\"accounts\";",
+      "CREATE POLICY \"accounts_default_admin_write_delete\" ON \"public\".\"accounts\" AS PERMISSIVE FOR DELETE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DROP POLICY IF EXISTS \"accounts_default_self_read_ar_39a4fe89\" ON \"public\".\"accounts\";",
+      "DROP POLICY IF EXISTS \"accounts_default_self_read\" ON \"public\".\"accounts\";",
+      "CREATE POLICY \"accounts_default_self_read\" ON \"public\".\"accounts\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((id)::text = (SELECT rebase.uid()));",
+      "DROP POLICY IF EXISTS \"accounts_require_admin_write_insert_ar_d417d4a1\" ON \"public\".\"accounts\";",
+      "DROP POLICY IF EXISTS \"accounts_require_admin_write_insert\" ON \"public\".\"accounts\";",
+      "CREATE POLICY \"accounts_require_admin_write_insert\" ON \"public\".\"accounts\" AS RESTRICTIVE FOR INSERT TO \"public\" WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DROP POLICY IF EXISTS \"accounts_require_admin_write_update_ar_2401bcbf\" ON \"public\".\"accounts\";",
+      "DROP POLICY IF EXISTS \"accounts_require_admin_write_update\" ON \"public\".\"accounts\";",
+      "CREATE POLICY \"accounts_require_admin_write_update\" ON \"public\".\"accounts\" AS RESTRICTIVE FOR UPDATE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))) WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DROP POLICY IF EXISTS \"accounts_require_admin_write_delete_ar_488f86cf\" ON \"public\".\"accounts\";",
+      "DROP POLICY IF EXISTS \"accounts_require_admin_write_delete\" ON \"public\".\"accounts\";",
+      "CREATE POLICY \"accounts_require_admin_write_delete\" ON \"public\".\"accounts\" AS RESTRICTIVE FOR DELETE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+    ],
+    "policies": [
+      {
+        "name": "accounts_update_0eba17e",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"accounts_update_0eba17e_ar_0b4e6560\" ON \"public\".\"accounts\";",
+          "DROP POLICY IF EXISTS \"accounts_update_0eba17e\" ON \"public\".\"accounts\";",
+          "CREATE POLICY \"accounts_update_0eba17e\" ON \"public\".\"accounts\" AS PERMISSIVE FOR UPDATE TO \"public\" USING ((id)::text = (SELECT rebase.uid())) WITH CHECK ((id)::text = (SELECT rebase.uid()));"
+        ]
+      },
+      {
+        "name": "accounts_default_admin_read",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"accounts_default_admin_read_ar_42cd1fe0\" ON \"public\".\"accounts\";",
+          "DROP POLICY IF EXISTS \"accounts_default_admin_read\" ON \"public\".\"accounts\";",
+          "CREATE POLICY \"accounts_default_admin_read\" ON \"public\".\"accounts\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "accounts_default_admin_write_insert",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"accounts_default_admin_write_insert_ar_ba596a97\" ON \"public\".\"accounts\";",
+          "DROP POLICY IF EXISTS \"accounts_default_admin_write_insert\" ON \"public\".\"accounts\";",
+          "CREATE POLICY \"accounts_default_admin_write_insert\" ON \"public\".\"accounts\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "accounts_default_admin_write_update",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"accounts_default_admin_write_update_ar_4585cca3\" ON \"public\".\"accounts\";",
+          "DROP POLICY IF EXISTS \"accounts_default_admin_write_update\" ON \"public\".\"accounts\";",
+          "CREATE POLICY \"accounts_default_admin_write_update\" ON \"public\".\"accounts\" AS PERMISSIVE FOR UPDATE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))) WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "accounts_default_admin_write_delete",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"accounts_default_admin_write_delete_ar_cf9ca8f8\" ON \"public\".\"accounts\";",
+          "DROP POLICY IF EXISTS \"accounts_default_admin_write_delete\" ON \"public\".\"accounts\";",
+          "CREATE POLICY \"accounts_default_admin_write_delete\" ON \"public\".\"accounts\" AS PERMISSIVE FOR DELETE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "accounts_default_self_read",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"accounts_default_self_read_ar_39a4fe89\" ON \"public\".\"accounts\";",
+          "DROP POLICY IF EXISTS \"accounts_default_self_read\" ON \"public\".\"accounts\";",
+          "CREATE POLICY \"accounts_default_self_read\" ON \"public\".\"accounts\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((id)::text = (SELECT rebase.uid()));"
+        ]
+      },
+      {
+        "name": "accounts_require_admin_write_insert",
+        "adminTarget": false,
+        "restrictive": true,
+        "statements": [
+          "DROP POLICY IF EXISTS \"accounts_require_admin_write_insert_ar_d417d4a1\" ON \"public\".\"accounts\";",
+          "DROP POLICY IF EXISTS \"accounts_require_admin_write_insert\" ON \"public\".\"accounts\";",
+          "CREATE POLICY \"accounts_require_admin_write_insert\" ON \"public\".\"accounts\" AS RESTRICTIVE FOR INSERT TO \"public\" WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ],
+        "denying": [
+          "DROP POLICY IF EXISTS \"accounts_require_admin_write_insert\" ON \"public\".\"accounts\";",
+          "CREATE POLICY \"accounts_require_admin_write_insert\" ON \"public\".\"accounts\" AS RESTRICTIVE FOR INSERT TO \"public\" WITH CHECK (false);"
+        ]
+      },
+      {
+        "name": "accounts_require_admin_write_update",
+        "adminTarget": false,
+        "restrictive": true,
+        "statements": [
+          "DROP POLICY IF EXISTS \"accounts_require_admin_write_update_ar_2401bcbf\" ON \"public\".\"accounts\";",
+          "DROP POLICY IF EXISTS \"accounts_require_admin_write_update\" ON \"public\".\"accounts\";",
+          "CREATE POLICY \"accounts_require_admin_write_update\" ON \"public\".\"accounts\" AS RESTRICTIVE FOR UPDATE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))) WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ],
+        "denying": [
+          "DROP POLICY IF EXISTS \"accounts_require_admin_write_update\" ON \"public\".\"accounts\";",
+          "CREATE POLICY \"accounts_require_admin_write_update\" ON \"public\".\"accounts\" AS RESTRICTIVE FOR UPDATE TO \"public\" USING (false) WITH CHECK (false);"
+        ]
+      },
+      {
+        "name": "accounts_require_admin_write_delete",
+        "adminTarget": false,
+        "restrictive": true,
+        "statements": [
+          "DROP POLICY IF EXISTS \"accounts_require_admin_write_delete_ar_488f86cf\" ON \"public\".\"accounts\";",
+          "DROP POLICY IF EXISTS \"accounts_require_admin_write_delete\" ON \"public\".\"accounts\";",
+          "CREATE POLICY \"accounts_require_admin_write_delete\" ON \"public\".\"accounts\" AS RESTRICTIVE FOR DELETE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ],
+        "denying": [
+          "DROP POLICY IF EXISTS \"accounts_require_admin_write_delete\" ON \"public\".\"accounts\";",
+          "CREATE POLICY \"accounts_require_admin_write_delete\" ON \"public\".\"accounts\" AS RESTRICTIVE FOR DELETE TO \"public\" USING (false);"
+        ]
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "table": "articles",
+    "qualified": "public.articles",
+    "enableRls": "ALTER TABLE \"public\".\"articles\" ENABLE ROW LEVEL SECURITY;",
+    "policyStatements": [
+      "DROP POLICY IF EXISTS \"articles_select_841c287_ar_8ef9a8ca\" ON \"public\".\"articles\";",
+      "DROP POLICY IF EXISTS \"articles_select_841c287\" ON \"public\".\"articles\";",
+      "CREATE POLICY \"articles_select_841c287\" ON \"public\".\"articles\" AS PERMISSIVE FOR SELECT TO \"public\" USING (true);",
+      "DROP POLICY IF EXISTS \"articles_insert_f4378b2_0_ar_114345ed\" ON \"public\".\"articles\";",
+      "DROP POLICY IF EXISTS \"articles_insert_f4378b2_0\" ON \"public\".\"articles\";",
+      "CREATE POLICY \"articles_insert_f4378b2_0\" ON \"public\".\"articles\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK ((SELECT string_to_array(rebase.roles(), ',') && ARRAY['editor']));",
+      "DROP POLICY IF EXISTS \"articles_update_f4378b2_1_ar_03bf0b0c\" ON \"public\".\"articles\";",
+      "DROP POLICY IF EXISTS \"articles_update_f4378b2_1\" ON \"public\".\"articles\";",
+      "CREATE POLICY \"articles_update_f4378b2_1\" ON \"public\".\"articles\" AS PERMISSIVE FOR UPDATE TO \"public\" USING ((SELECT string_to_array(rebase.roles(), ',') && ARRAY['editor'])) WITH CHECK ((SELECT string_to_array(rebase.roles(), ',') && ARRAY['editor']));",
+      "DROP POLICY IF EXISTS \"articles_delete_f4378b2_2_ar_bc803344\" ON \"public\".\"articles\";",
+      "DROP POLICY IF EXISTS \"articles_delete_f4378b2_2\" ON \"public\".\"articles\";",
+      "CREATE POLICY \"articles_delete_f4378b2_2\" ON \"public\".\"articles\" AS PERMISSIVE FOR DELETE TO \"public\" USING ((SELECT string_to_array(rebase.roles(), ',') && ARRAY['editor']));",
+      "DROP POLICY IF EXISTS \"articles_default_admin_read_ar_2c8bbbc4\" ON \"public\".\"articles\";",
+      "DROP POLICY IF EXISTS \"articles_default_admin_read\" ON \"public\".\"articles\";",
+      "CREATE POLICY \"articles_default_admin_read\" ON \"public\".\"articles\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DROP POLICY IF EXISTS \"articles_default_admin_write_insert_ar_2d33a68a\" ON \"public\".\"articles\";",
+      "DROP POLICY IF EXISTS \"articles_default_admin_write_insert\" ON \"public\".\"articles\";",
+      "CREATE POLICY \"articles_default_admin_write_insert\" ON \"public\".\"articles\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DROP POLICY IF EXISTS \"articles_default_admin_write_update_ar_55f6484b\" ON \"public\".\"articles\";",
+      "DROP POLICY IF EXISTS \"articles_default_admin_write_update\" ON \"public\".\"articles\";",
+      "CREATE POLICY \"articles_default_admin_write_update\" ON \"public\".\"articles\" AS PERMISSIVE FOR UPDATE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))) WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DROP POLICY IF EXISTS \"articles_default_admin_write_delete_ar_7cee8974\" ON \"public\".\"articles\";",
+      "DROP POLICY IF EXISTS \"articles_default_admin_write_delete\" ON \"public\".\"articles\";",
+      "CREATE POLICY \"articles_default_admin_write_delete\" ON \"public\".\"articles\" AS PERMISSIVE FOR DELETE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+    ],
+    "policies": [
+      {
+        "name": "articles_select_841c287",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"articles_select_841c287_ar_8ef9a8ca\" ON \"public\".\"articles\";",
+          "DROP POLICY IF EXISTS \"articles_select_841c287\" ON \"public\".\"articles\";",
+          "CREATE POLICY \"articles_select_841c287\" ON \"public\".\"articles\" AS PERMISSIVE FOR SELECT TO \"public\" USING (true);"
+        ]
+      },
+      {
+        "name": "articles_insert_f4378b2_0",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"articles_insert_f4378b2_0_ar_114345ed\" ON \"public\".\"articles\";",
+          "DROP POLICY IF EXISTS \"articles_insert_f4378b2_0\" ON \"public\".\"articles\";",
+          "CREATE POLICY \"articles_insert_f4378b2_0\" ON \"public\".\"articles\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK ((SELECT string_to_array(rebase.roles(), ',') && ARRAY['editor']));"
+        ]
+      },
+      {
+        "name": "articles_update_f4378b2_1",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"articles_update_f4378b2_1_ar_03bf0b0c\" ON \"public\".\"articles\";",
+          "DROP POLICY IF EXISTS \"articles_update_f4378b2_1\" ON \"public\".\"articles\";",
+          "CREATE POLICY \"articles_update_f4378b2_1\" ON \"public\".\"articles\" AS PERMISSIVE FOR UPDATE TO \"public\" USING ((SELECT string_to_array(rebase.roles(), ',') && ARRAY['editor'])) WITH CHECK ((SELECT string_to_array(rebase.roles(), ',') && ARRAY['editor']));"
+        ]
+      },
+      {
+        "name": "articles_delete_f4378b2_2",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"articles_delete_f4378b2_2_ar_bc803344\" ON \"public\".\"articles\";",
+          "DROP POLICY IF EXISTS \"articles_delete_f4378b2_2\" ON \"public\".\"articles\";",
+          "CREATE POLICY \"articles_delete_f4378b2_2\" ON \"public\".\"articles\" AS PERMISSIVE FOR DELETE TO \"public\" USING ((SELECT string_to_array(rebase.roles(), ',') && ARRAY['editor']));"
+        ]
+      },
+      {
+        "name": "articles_default_admin_read",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"articles_default_admin_read_ar_2c8bbbc4\" ON \"public\".\"articles\";",
+          "DROP POLICY IF EXISTS \"articles_default_admin_read\" ON \"public\".\"articles\";",
+          "CREATE POLICY \"articles_default_admin_read\" ON \"public\".\"articles\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "articles_default_admin_write_insert",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"articles_default_admin_write_insert_ar_2d33a68a\" ON \"public\".\"articles\";",
+          "DROP POLICY IF EXISTS \"articles_default_admin_write_insert\" ON \"public\".\"articles\";",
+          "CREATE POLICY \"articles_default_admin_write_insert\" ON \"public\".\"articles\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "articles_default_admin_write_update",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"articles_default_admin_write_update_ar_55f6484b\" ON \"public\".\"articles\";",
+          "DROP POLICY IF EXISTS \"articles_default_admin_write_update\" ON \"public\".\"articles\";",
+          "CREATE POLICY \"articles_default_admin_write_update\" ON \"public\".\"articles\" AS PERMISSIVE FOR UPDATE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))) WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "articles_default_admin_write_delete",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"articles_default_admin_write_delete_ar_7cee8974\" ON \"public\".\"articles\";",
+          "DROP POLICY IF EXISTS \"articles_default_admin_write_delete\" ON \"public\".\"articles\";",
+          "CREATE POLICY \"articles_default_admin_write_delete\" ON \"public\".\"articles\" AS PERMISSIVE FOR DELETE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "table": "boards",
+    "qualified": "public.boards",
+    "enableRls": "ALTER TABLE \"public\".\"boards\" ENABLE ROW LEVEL SECURITY;",
+    "policyStatements": [
+      "DROP POLICY IF EXISTS \"boards_select_eb2b93c_ar_8fa2a537\" ON \"public\".\"boards\";",
+      "DROP POLICY IF EXISTS \"boards_select_eb2b93c\" ON \"public\".\"boards\";",
+      "CREATE POLICY \"boards_select_eb2b93c\" ON \"public\".\"boards\" AS PERMISSIVE FOR SELECT TO \"public\" USING (EXISTS (SELECT 1 FROM \"public\".\"memberships\" \"_ex0\" WHERE (\"_ex0\".org_id = \"public\".\"boards\".org_id) AND ((\"_ex0\".user_id)::text = (SELECT rebase.uid()))));",
+      "DROP POLICY IF EXISTS \"boards_update_944cfe2_ar_674fdc42\" ON \"public\".\"boards\";",
+      "DROP POLICY IF EXISTS \"boards_update_944cfe2\" ON \"public\".\"boards\";",
+      "CREATE POLICY \"boards_update_944cfe2\" ON \"public\".\"boards\" AS PERMISSIVE FOR UPDATE TO \"public\" USING (((SELECT string_to_array(rebase.roles(), ',') && ARRAY['support'])) OR (((SELECT NOT (string_to_array(rebase.roles(), ',') && ARRAY['banned']))) AND (EXISTS (SELECT 1 FROM \"public\".\"memberships\" \"_ex0\" WHERE (\"_ex0\".org_id = \"public\".\"boards\".org_id) AND ((\"_ex0\".user_id)::text = (SELECT rebase.uid())))))) WITH CHECK (((SELECT string_to_array(rebase.roles(), ',') && ARRAY['support'])) OR (((SELECT NOT (string_to_array(rebase.roles(), ',') && ARRAY['banned']))) AND (EXISTS (SELECT 1 FROM \"public\".\"memberships\" \"_ex0\" WHERE (\"_ex0\".org_id = \"public\".\"boards\".org_id) AND ((\"_ex0\".user_id)::text = (SELECT rebase.uid()))))));",
+      "DROP POLICY IF EXISTS \"boards_default_admin_read_ar_25b0eda0\" ON \"public\".\"boards\";",
+      "DROP POLICY IF EXISTS \"boards_default_admin_read\" ON \"public\".\"boards\";",
+      "CREATE POLICY \"boards_default_admin_read\" ON \"public\".\"boards\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DROP POLICY IF EXISTS \"boards_default_admin_write_insert_ar_56d6926f\" ON \"public\".\"boards\";",
+      "DROP POLICY IF EXISTS \"boards_default_admin_write_insert\" ON \"public\".\"boards\";",
+      "CREATE POLICY \"boards_default_admin_write_insert\" ON \"public\".\"boards\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DROP POLICY IF EXISTS \"boards_default_admin_write_update_ar_94e0fa0d\" ON \"public\".\"boards\";",
+      "DROP POLICY IF EXISTS \"boards_default_admin_write_update\" ON \"public\".\"boards\";",
+      "CREATE POLICY \"boards_default_admin_write_update\" ON \"public\".\"boards\" AS PERMISSIVE FOR UPDATE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))) WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DROP POLICY IF EXISTS \"boards_default_admin_write_delete_ar_4e696277\" ON \"public\".\"boards\";",
+      "DROP POLICY IF EXISTS \"boards_default_admin_write_delete\" ON \"public\".\"boards\";",
+      "CREATE POLICY \"boards_default_admin_write_delete\" ON \"public\".\"boards\" AS PERMISSIVE FOR DELETE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+    ],
+    "policies": [
+      {
+        "name": "boards_select_eb2b93c",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"boards_select_eb2b93c_ar_8fa2a537\" ON \"public\".\"boards\";",
+          "DROP POLICY IF EXISTS \"boards_select_eb2b93c\" ON \"public\".\"boards\";",
+          "CREATE POLICY \"boards_select_eb2b93c\" ON \"public\".\"boards\" AS PERMISSIVE FOR SELECT TO \"public\" USING (EXISTS (SELECT 1 FROM \"public\".\"memberships\" \"_ex0\" WHERE (\"_ex0\".org_id = \"public\".\"boards\".org_id) AND ((\"_ex0\".user_id)::text = (SELECT rebase.uid()))));"
+        ]
+      },
+      {
+        "name": "boards_update_944cfe2",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"boards_update_944cfe2_ar_674fdc42\" ON \"public\".\"boards\";",
+          "DROP POLICY IF EXISTS \"boards_update_944cfe2\" ON \"public\".\"boards\";",
+          "CREATE POLICY \"boards_update_944cfe2\" ON \"public\".\"boards\" AS PERMISSIVE FOR UPDATE TO \"public\" USING (((SELECT string_to_array(rebase.roles(), ',') && ARRAY['support'])) OR (((SELECT NOT (string_to_array(rebase.roles(), ',') && ARRAY['banned']))) AND (EXISTS (SELECT 1 FROM \"public\".\"memberships\" \"_ex0\" WHERE (\"_ex0\".org_id = \"public\".\"boards\".org_id) AND ((\"_ex0\".user_id)::text = (SELECT rebase.uid())))))) WITH CHECK (((SELECT string_to_array(rebase.roles(), ',') && ARRAY['support'])) OR (((SELECT NOT (string_to_array(rebase.roles(), ',') && ARRAY['banned']))) AND (EXISTS (SELECT 1 FROM \"public\".\"memberships\" \"_ex0\" WHERE (\"_ex0\".org_id = \"public\".\"boards\".org_id) AND ((\"_ex0\".user_id)::text = (SELECT rebase.uid()))))));"
+        ]
+      },
+      {
+        "name": "boards_default_admin_read",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"boards_default_admin_read_ar_25b0eda0\" ON \"public\".\"boards\";",
+          "DROP POLICY IF EXISTS \"boards_default_admin_read\" ON \"public\".\"boards\";",
+          "CREATE POLICY \"boards_default_admin_read\" ON \"public\".\"boards\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "boards_default_admin_write_insert",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"boards_default_admin_write_insert_ar_56d6926f\" ON \"public\".\"boards\";",
+          "DROP POLICY IF EXISTS \"boards_default_admin_write_insert\" ON \"public\".\"boards\";",
+          "CREATE POLICY \"boards_default_admin_write_insert\" ON \"public\".\"boards\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "boards_default_admin_write_update",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"boards_default_admin_write_update_ar_94e0fa0d\" ON \"public\".\"boards\";",
+          "DROP POLICY IF EXISTS \"boards_default_admin_write_update\" ON \"public\".\"boards\";",
+          "CREATE POLICY \"boards_default_admin_write_update\" ON \"public\".\"boards\" AS PERMISSIVE FOR UPDATE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))) WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "boards_default_admin_write_delete",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"boards_default_admin_write_delete_ar_4e696277\" ON \"public\".\"boards\";",
+          "DROP POLICY IF EXISTS \"boards_default_admin_write_delete\" ON \"public\".\"boards\";",
+          "CREATE POLICY \"boards_default_admin_write_delete\" ON \"public\".\"boards\" AS PERMISSIVE FOR DELETE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "table": "docs",
+    "qualified": "public.docs",
+    "enableRls": "ALTER TABLE \"public\".\"docs\" ENABLE ROW LEVEL SECURITY;",
+    "policyStatements": [
+      "DROP POLICY IF EXISTS \"docs_default_admin_read_ar_74eedaed\" ON \"public\".\"docs\";",
+      "DROP POLICY IF EXISTS \"docs_default_admin_read\" ON \"public\".\"docs\";",
+      "CREATE POLICY \"docs_default_admin_read\" ON \"public\".\"docs\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DROP POLICY IF EXISTS \"docs_default_admin_write_insert_ar_5dea5202\" ON \"public\".\"docs\";",
+      "DROP POLICY IF EXISTS \"docs_default_admin_write_insert\" ON \"public\".\"docs\";",
+      "CREATE POLICY \"docs_default_admin_write_insert\" ON \"public\".\"docs\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DROP POLICY IF EXISTS \"docs_default_admin_write_update_ar_74af17b3\" ON \"public\".\"docs\";",
+      "DROP POLICY IF EXISTS \"docs_default_admin_write_update\" ON \"public\".\"docs\";",
+      "CREATE POLICY \"docs_default_admin_write_update\" ON \"public\".\"docs\" AS PERMISSIVE FOR UPDATE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))) WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DROP POLICY IF EXISTS \"docs_default_admin_write_delete_ar_c118e767\" ON \"public\".\"docs\";",
+      "DROP POLICY IF EXISTS \"docs_default_admin_write_delete\" ON \"public\".\"docs\";",
+      "CREATE POLICY \"docs_default_admin_write_delete\" ON \"public\".\"docs\" AS PERMISSIVE FOR DELETE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+    ],
+    "policies": [
+      {
+        "name": "docs_default_admin_read",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"docs_default_admin_read_ar_74eedaed\" ON \"public\".\"docs\";",
+          "DROP POLICY IF EXISTS \"docs_default_admin_read\" ON \"public\".\"docs\";",
+          "CREATE POLICY \"docs_default_admin_read\" ON \"public\".\"docs\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "docs_default_admin_write_insert",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"docs_default_admin_write_insert_ar_5dea5202\" ON \"public\".\"docs\";",
+          "DROP POLICY IF EXISTS \"docs_default_admin_write_insert\" ON \"public\".\"docs\";",
+          "CREATE POLICY \"docs_default_admin_write_insert\" ON \"public\".\"docs\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "docs_default_admin_write_update",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"docs_default_admin_write_update_ar_74af17b3\" ON \"public\".\"docs\";",
+          "DROP POLICY IF EXISTS \"docs_default_admin_write_update\" ON \"public\".\"docs\";",
+          "CREATE POLICY \"docs_default_admin_write_update\" ON \"public\".\"docs\" AS PERMISSIVE FOR UPDATE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))) WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "docs_default_admin_write_delete",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"docs_default_admin_write_delete_ar_c118e767\" ON \"public\".\"docs\";",
+          "DROP POLICY IF EXISTS \"docs_default_admin_write_delete\" ON \"public\".\"docs\";",
+          "CREATE POLICY \"docs_default_admin_write_delete\" ON \"public\".\"docs\" AS PERMISSIVE FOR DELETE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "table": "flags",
+    "qualified": "public.flags",
+    "enableRls": "ALTER TABLE \"public\".\"flags\" ENABLE ROW LEVEL SECURITY;",
+    "policyStatements": [
+      "DROP POLICY IF EXISTS \"flags_select_50cd14c_ar_7c427e28\" ON \"public\".\"flags\";",
+      "DROP POLICY IF EXISTS \"flags_select_50cd14c\" ON \"public\".\"flags\";",
+      "CREATE POLICY \"flags_select_50cd14c\" ON \"public\".\"flags\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((SELECT rebase.uid() != 'anonymous'));",
+      "DROP POLICY IF EXISTS \"flags_insert_d790931_ar_124ed13c\" ON \"public\".\"flags\";",
+      "DROP POLICY IF EXISTS \"flags_insert_d790931\" ON \"public\".\"flags\";",
+      "CREATE POLICY \"flags_insert_d790931\" ON \"public\".\"flags\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK ((SELECT (rebase.uid() IS NOT NULL AND rebase.uid() NOT IN ('anonymous', 'anon')) AND (string_to_array(rebase.roles(), ',') && ARRAY['editor'])));",
+      "DROP POLICY IF EXISTS \"flags_update_c12cb43_ar_1bbd091f\" ON \"public\".\"flags\";",
+      "DROP POLICY IF EXISTS \"flags_update_c12cb43\" ON \"public\".\"flags\";",
+      "CREATE POLICY \"flags_update_c12cb43\" ON \"public\".\"flags\" AS PERMISSIVE FOR UPDATE TO \"public\" USING ((SELECT (false) OR (string_to_array(rebase.roles(), ',') && ARRAY['editor','support']))) WITH CHECK ((SELECT (false) OR (string_to_array(rebase.roles(), ',') && ARRAY['editor','support'])));",
+      "DROP POLICY IF EXISTS \"flags_delete_0a0ffd3_ar_299bc865\" ON \"public\".\"flags\";",
+      "DROP POLICY IF EXISTS \"flags_delete_0a0ffd3\" ON \"public\".\"flags\";",
+      "CREATE POLICY \"flags_delete_0a0ffd3\" ON \"public\".\"flags\" AS RESTRICTIVE FOR DELETE TO \"public\" USING ((SELECT (NOT (string_to_array(rebase.roles(), ',') && ARRAY['intern'])) OR (false)));",
+      "DROP POLICY IF EXISTS \"flags_default_admin_read_ar_8ac6dadd\" ON \"public\".\"flags\";",
+      "DROP POLICY IF EXISTS \"flags_default_admin_read\" ON \"public\".\"flags\";",
+      "CREATE POLICY \"flags_default_admin_read\" ON \"public\".\"flags\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DROP POLICY IF EXISTS \"flags_default_admin_write_insert_ar_8162a6db\" ON \"public\".\"flags\";",
+      "DROP POLICY IF EXISTS \"flags_default_admin_write_insert\" ON \"public\".\"flags\";",
+      "CREATE POLICY \"flags_default_admin_write_insert\" ON \"public\".\"flags\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DROP POLICY IF EXISTS \"flags_default_admin_write_update_ar_14890f14\" ON \"public\".\"flags\";",
+      "DROP POLICY IF EXISTS \"flags_default_admin_write_update\" ON \"public\".\"flags\";",
+      "CREATE POLICY \"flags_default_admin_write_update\" ON \"public\".\"flags\" AS PERMISSIVE FOR UPDATE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))) WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DROP POLICY IF EXISTS \"flags_default_admin_write_delete_ar_4de9f6df\" ON \"public\".\"flags\";",
+      "DROP POLICY IF EXISTS \"flags_default_admin_write_delete\" ON \"public\".\"flags\";",
+      "CREATE POLICY \"flags_default_admin_write_delete\" ON \"public\".\"flags\" AS PERMISSIVE FOR DELETE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+    ],
+    "policies": [
+      {
+        "name": "flags_select_50cd14c",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"flags_select_50cd14c_ar_7c427e28\" ON \"public\".\"flags\";",
+          "DROP POLICY IF EXISTS \"flags_select_50cd14c\" ON \"public\".\"flags\";",
+          "CREATE POLICY \"flags_select_50cd14c\" ON \"public\".\"flags\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((SELECT rebase.uid() != 'anonymous'));"
+        ]
+      },
+      {
+        "name": "flags_insert_d790931",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"flags_insert_d790931_ar_124ed13c\" ON \"public\".\"flags\";",
+          "DROP POLICY IF EXISTS \"flags_insert_d790931\" ON \"public\".\"flags\";",
+          "CREATE POLICY \"flags_insert_d790931\" ON \"public\".\"flags\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK ((SELECT (rebase.uid() IS NOT NULL AND rebase.uid() NOT IN ('anonymous', 'anon')) AND (string_to_array(rebase.roles(), ',') && ARRAY['editor'])));"
+        ]
+      },
+      {
+        "name": "flags_update_c12cb43",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"flags_update_c12cb43_ar_1bbd091f\" ON \"public\".\"flags\";",
+          "DROP POLICY IF EXISTS \"flags_update_c12cb43\" ON \"public\".\"flags\";",
+          "CREATE POLICY \"flags_update_c12cb43\" ON \"public\".\"flags\" AS PERMISSIVE FOR UPDATE TO \"public\" USING ((SELECT (false) OR (string_to_array(rebase.roles(), ',') && ARRAY['editor','support']))) WITH CHECK ((SELECT (false) OR (string_to_array(rebase.roles(), ',') && ARRAY['editor','support'])));"
+        ]
+      },
+      {
+        "name": "flags_delete_0a0ffd3",
+        "adminTarget": false,
+        "restrictive": true,
+        "statements": [
+          "DROP POLICY IF EXISTS \"flags_delete_0a0ffd3_ar_299bc865\" ON \"public\".\"flags\";",
+          "DROP POLICY IF EXISTS \"flags_delete_0a0ffd3\" ON \"public\".\"flags\";",
+          "CREATE POLICY \"flags_delete_0a0ffd3\" ON \"public\".\"flags\" AS RESTRICTIVE FOR DELETE TO \"public\" USING ((SELECT (NOT (string_to_array(rebase.roles(), ',') && ARRAY['intern'])) OR (false)));"
+        ],
+        "denying": [
+          "DROP POLICY IF EXISTS \"flags_delete_0a0ffd3\" ON \"public\".\"flags\";",
+          "CREATE POLICY \"flags_delete_0a0ffd3\" ON \"public\".\"flags\" AS RESTRICTIVE FOR DELETE TO \"public\" USING (false);"
+        ]
+      },
+      {
+        "name": "flags_default_admin_read",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"flags_default_admin_read_ar_8ac6dadd\" ON \"public\".\"flags\";",
+          "DROP POLICY IF EXISTS \"flags_default_admin_read\" ON \"public\".\"flags\";",
+          "CREATE POLICY \"flags_default_admin_read\" ON \"public\".\"flags\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "flags_default_admin_write_insert",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"flags_default_admin_write_insert_ar_8162a6db\" ON \"public\".\"flags\";",
+          "DROP POLICY IF EXISTS \"flags_default_admin_write_insert\" ON \"public\".\"flags\";",
+          "CREATE POLICY \"flags_default_admin_write_insert\" ON \"public\".\"flags\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "flags_default_admin_write_update",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"flags_default_admin_write_update_ar_14890f14\" ON \"public\".\"flags\";",
+          "DROP POLICY IF EXISTS \"flags_default_admin_write_update\" ON \"public\".\"flags\";",
+          "CREATE POLICY \"flags_default_admin_write_update\" ON \"public\".\"flags\" AS PERMISSIVE FOR UPDATE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))) WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "flags_default_admin_write_delete",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"flags_default_admin_write_delete_ar_4de9f6df\" ON \"public\".\"flags\";",
+          "DROP POLICY IF EXISTS \"flags_default_admin_write_delete\" ON \"public\".\"flags\";",
+          "CREATE POLICY \"flags_default_admin_write_delete\" ON \"public\".\"flags\" AS PERMISSIVE FOR DELETE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "table": "jobs",
+    "qualified": "public.jobs",
+    "enableRls": "ALTER TABLE \"public\".\"jobs\" ENABLE ROW LEVEL SECURITY;",
+    "policyStatements": [
+      "DROP POLICY IF EXISTS \"jobs_all_85fdfe6_ar_b0ddf634\" ON \"public\".\"jobs\";",
+      "DROP POLICY IF EXISTS \"jobs_all_85fdfe6\" ON \"public\".\"jobs\";",
+      "CREATE POLICY \"jobs_all_85fdfe6\" ON \"public\".\"jobs\" AS PERMISSIVE FOR ALL TO \"public\" USING ((SELECT rebase.uid() IS NULL)) WITH CHECK ((SELECT rebase.uid() IS NULL));"
+    ],
+    "policies": [
+      {
+        "name": "jobs_all_85fdfe6",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"jobs_all_85fdfe6_ar_b0ddf634\" ON \"public\".\"jobs\";",
+          "DROP POLICY IF EXISTS \"jobs_all_85fdfe6\" ON \"public\".\"jobs\";",
+          "CREATE POLICY \"jobs_all_85fdfe6\" ON \"public\".\"jobs\" AS PERMISSIVE FOR ALL TO \"public\" USING ((SELECT rebase.uid() IS NULL)) WITH CHECK ((SELECT rebase.uid() IS NULL));"
+        ]
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "table": "memberships",
+    "qualified": "public.memberships",
+    "enableRls": "ALTER TABLE \"public\".\"memberships\" ENABLE ROW LEVEL SECURITY;",
+    "policyStatements": [
+      "DROP POLICY IF EXISTS \"memberships_select_8baab12_ar_69ff4313\" ON \"public\".\"memberships\";",
+      "DROP POLICY IF EXISTS \"memberships_select_8baab12\" ON \"public\".\"memberships\";",
+      "CREATE POLICY \"memberships_select_8baab12\" ON \"public\".\"memberships\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((user_id)::text = (SELECT rebase.uid()));",
+      "DROP POLICY IF EXISTS \"memberships_default_admin_read_ar_7a16ab4a\" ON \"public\".\"memberships\";",
+      "DROP POLICY IF EXISTS \"memberships_default_admin_read\" ON \"public\".\"memberships\";",
+      "CREATE POLICY \"memberships_default_admin_read\" ON \"public\".\"memberships\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DROP POLICY IF EXISTS \"memberships_default_admin_write_insert_ar_6d950625\" ON \"public\".\"memberships\";",
+      "DROP POLICY IF EXISTS \"memberships_default_admin_write_insert\" ON \"public\".\"memberships\";",
+      "CREATE POLICY \"memberships_default_admin_write_insert\" ON \"public\".\"memberships\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DROP POLICY IF EXISTS \"memberships_default_admin_write_update_ar_2d9d74ff\" ON \"public\".\"memberships\";",
+      "DROP POLICY IF EXISTS \"memberships_default_admin_write_update\" ON \"public\".\"memberships\";",
+      "CREATE POLICY \"memberships_default_admin_write_update\" ON \"public\".\"memberships\" AS PERMISSIVE FOR UPDATE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))) WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DROP POLICY IF EXISTS \"memberships_default_admin_write_delete_ar_df7afe5c\" ON \"public\".\"memberships\";",
+      "DROP POLICY IF EXISTS \"memberships_default_admin_write_delete\" ON \"public\".\"memberships\";",
+      "CREATE POLICY \"memberships_default_admin_write_delete\" ON \"public\".\"memberships\" AS PERMISSIVE FOR DELETE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+    ],
+    "policies": [
+      {
+        "name": "memberships_select_8baab12",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"memberships_select_8baab12_ar_69ff4313\" ON \"public\".\"memberships\";",
+          "DROP POLICY IF EXISTS \"memberships_select_8baab12\" ON \"public\".\"memberships\";",
+          "CREATE POLICY \"memberships_select_8baab12\" ON \"public\".\"memberships\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((user_id)::text = (SELECT rebase.uid()));"
+        ]
+      },
+      {
+        "name": "memberships_default_admin_read",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"memberships_default_admin_read_ar_7a16ab4a\" ON \"public\".\"memberships\";",
+          "DROP POLICY IF EXISTS \"memberships_default_admin_read\" ON \"public\".\"memberships\";",
+          "CREATE POLICY \"memberships_default_admin_read\" ON \"public\".\"memberships\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "memberships_default_admin_write_insert",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"memberships_default_admin_write_insert_ar_6d950625\" ON \"public\".\"memberships\";",
+          "DROP POLICY IF EXISTS \"memberships_default_admin_write_insert\" ON \"public\".\"memberships\";",
+          "CREATE POLICY \"memberships_default_admin_write_insert\" ON \"public\".\"memberships\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "memberships_default_admin_write_update",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"memberships_default_admin_write_update_ar_2d9d74ff\" ON \"public\".\"memberships\";",
+          "DROP POLICY IF EXISTS \"memberships_default_admin_write_update\" ON \"public\".\"memberships\";",
+          "CREATE POLICY \"memberships_default_admin_write_update\" ON \"public\".\"memberships\" AS PERMISSIVE FOR UPDATE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))) WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "memberships_default_admin_write_delete",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"memberships_default_admin_write_delete_ar_df7afe5c\" ON \"public\".\"memberships\";",
+          "DROP POLICY IF EXISTS \"memberships_default_admin_write_delete\" ON \"public\".\"memberships\";",
+          "CREATE POLICY \"memberships_default_admin_write_delete\" ON \"public\".\"memberships\" AS PERMISSIVE FOR DELETE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "table": "notes",
+    "qualified": "public.notes",
+    "enableRls": "ALTER TABLE \"public\".\"notes\" ENABLE ROW LEVEL SECURITY;",
+    "policyStatements": [
+      "DROP POLICY IF EXISTS \"notes_all_23c62de_ar_a0d84aee\" ON \"public\".\"notes\";",
+      "DROP POLICY IF EXISTS \"notes_all_23c62de\" ON \"public\".\"notes\";",
+      "CREATE POLICY \"notes_all_23c62de\" ON \"public\".\"notes\" AS PERMISSIVE FOR ALL TO \"public\" USING ((owner_id)::text = (SELECT rebase.uid())) WITH CHECK ((owner_id)::text = (SELECT rebase.uid()));",
+      "DROP POLICY IF EXISTS \"notes_default_admin_read_ar_a30a0f27\" ON \"public\".\"notes\";",
+      "DROP POLICY IF EXISTS \"notes_default_admin_read\" ON \"public\".\"notes\";",
+      "CREATE POLICY \"notes_default_admin_read\" ON \"public\".\"notes\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DROP POLICY IF EXISTS \"notes_default_admin_write_insert_ar_092129f7\" ON \"public\".\"notes\";",
+      "DROP POLICY IF EXISTS \"notes_default_admin_write_insert\" ON \"public\".\"notes\";",
+      "CREATE POLICY \"notes_default_admin_write_insert\" ON \"public\".\"notes\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DROP POLICY IF EXISTS \"notes_default_admin_write_update_ar_153091c5\" ON \"public\".\"notes\";",
+      "DROP POLICY IF EXISTS \"notes_default_admin_write_update\" ON \"public\".\"notes\";",
+      "CREATE POLICY \"notes_default_admin_write_update\" ON \"public\".\"notes\" AS PERMISSIVE FOR UPDATE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))) WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DROP POLICY IF EXISTS \"notes_default_admin_write_delete_ar_45e136ab\" ON \"public\".\"notes\";",
+      "DROP POLICY IF EXISTS \"notes_default_admin_write_delete\" ON \"public\".\"notes\";",
+      "CREATE POLICY \"notes_default_admin_write_delete\" ON \"public\".\"notes\" AS PERMISSIVE FOR DELETE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+    ],
+    "policies": [
+      {
+        "name": "notes_all_23c62de",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"notes_all_23c62de_ar_a0d84aee\" ON \"public\".\"notes\";",
+          "DROP POLICY IF EXISTS \"notes_all_23c62de\" ON \"public\".\"notes\";",
+          "CREATE POLICY \"notes_all_23c62de\" ON \"public\".\"notes\" AS PERMISSIVE FOR ALL TO \"public\" USING ((owner_id)::text = (SELECT rebase.uid())) WITH CHECK ((owner_id)::text = (SELECT rebase.uid()));"
+        ]
+      },
+      {
+        "name": "notes_default_admin_read",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"notes_default_admin_read_ar_a30a0f27\" ON \"public\".\"notes\";",
+          "DROP POLICY IF EXISTS \"notes_default_admin_read\" ON \"public\".\"notes\";",
+          "CREATE POLICY \"notes_default_admin_read\" ON \"public\".\"notes\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "notes_default_admin_write_insert",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"notes_default_admin_write_insert_ar_092129f7\" ON \"public\".\"notes\";",
+          "DROP POLICY IF EXISTS \"notes_default_admin_write_insert\" ON \"public\".\"notes\";",
+          "CREATE POLICY \"notes_default_admin_write_insert\" ON \"public\".\"notes\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "notes_default_admin_write_update",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"notes_default_admin_write_update_ar_153091c5\" ON \"public\".\"notes\";",
+          "DROP POLICY IF EXISTS \"notes_default_admin_write_update\" ON \"public\".\"notes\";",
+          "CREATE POLICY \"notes_default_admin_write_update\" ON \"public\".\"notes\" AS PERMISSIVE FOR UPDATE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))) WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "notes_default_admin_write_delete",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"notes_default_admin_write_delete_ar_45e136ab\" ON \"public\".\"notes\";",
+          "DROP POLICY IF EXISTS \"notes_default_admin_write_delete\" ON \"public\".\"notes\";",
+          "CREATE POLICY \"notes_default_admin_write_delete\" ON \"public\".\"notes\" AS PERMISSIVE FOR DELETE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "table": "posts",
+    "qualified": "public.posts",
+    "enableRls": "ALTER TABLE \"public\".\"posts\" ENABLE ROW LEVEL SECURITY;",
+    "policyStatements": [
+      "DROP POLICY IF EXISTS \"posts_select_841c287_ar_42d082bc\" ON \"public\".\"posts\";",
+      "DROP POLICY IF EXISTS \"posts_select_841c287\" ON \"public\".\"posts\";",
+      "CREATE POLICY \"posts_select_841c287\" ON \"public\".\"posts\" AS PERMISSIVE FOR SELECT TO \"public\" USING (true);",
+      "DROP POLICY IF EXISTS \"posts_update_25b861c_ar_c2cf0233\" ON \"public\".\"posts\";",
+      "DROP POLICY IF EXISTS \"posts_update_25b861c\" ON \"public\".\"posts\";",
+      "CREATE POLICY \"posts_update_25b861c\" ON \"public\".\"posts\" AS PERMISSIVE FOR UPDATE TO \"public\" USING ((owner_id)::text = (SELECT rebase.uid())) WITH CHECK ((owner_id)::text = (SELECT rebase.uid()));",
+      "DROP POLICY IF EXISTS \"posts_default_admin_read_ar_99f56e3b\" ON \"public\".\"posts\";",
+      "DROP POLICY IF EXISTS \"posts_default_admin_read\" ON \"public\".\"posts\";",
+      "CREATE POLICY \"posts_default_admin_read\" ON \"public\".\"posts\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DROP POLICY IF EXISTS \"posts_default_admin_write_insert_ar_013fffeb\" ON \"public\".\"posts\";",
+      "DROP POLICY IF EXISTS \"posts_default_admin_write_insert\" ON \"public\".\"posts\";",
+      "CREATE POLICY \"posts_default_admin_write_insert\" ON \"public\".\"posts\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DROP POLICY IF EXISTS \"posts_default_admin_write_update_ar_3d716296\" ON \"public\".\"posts\";",
+      "DROP POLICY IF EXISTS \"posts_default_admin_write_update\" ON \"public\".\"posts\";",
+      "CREATE POLICY \"posts_default_admin_write_update\" ON \"public\".\"posts\" AS PERMISSIVE FOR UPDATE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))) WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DROP POLICY IF EXISTS \"posts_default_admin_write_delete_ar_2461401c\" ON \"public\".\"posts\";",
+      "DROP POLICY IF EXISTS \"posts_default_admin_write_delete\" ON \"public\".\"posts\";",
+      "CREATE POLICY \"posts_default_admin_write_delete\" ON \"public\".\"posts\" AS PERMISSIVE FOR DELETE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+    ],
+    "policies": [
+      {
+        "name": "posts_select_841c287",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"posts_select_841c287_ar_42d082bc\" ON \"public\".\"posts\";",
+          "DROP POLICY IF EXISTS \"posts_select_841c287\" ON \"public\".\"posts\";",
+          "CREATE POLICY \"posts_select_841c287\" ON \"public\".\"posts\" AS PERMISSIVE FOR SELECT TO \"public\" USING (true);"
+        ]
+      },
+      {
+        "name": "posts_update_25b861c",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"posts_update_25b861c_ar_c2cf0233\" ON \"public\".\"posts\";",
+          "DROP POLICY IF EXISTS \"posts_update_25b861c\" ON \"public\".\"posts\";",
+          "CREATE POLICY \"posts_update_25b861c\" ON \"public\".\"posts\" AS PERMISSIVE FOR UPDATE TO \"public\" USING ((owner_id)::text = (SELECT rebase.uid())) WITH CHECK ((owner_id)::text = (SELECT rebase.uid()));"
+        ]
+      },
+      {
+        "name": "posts_default_admin_read",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"posts_default_admin_read_ar_99f56e3b\" ON \"public\".\"posts\";",
+          "DROP POLICY IF EXISTS \"posts_default_admin_read\" ON \"public\".\"posts\";",
+          "CREATE POLICY \"posts_default_admin_read\" ON \"public\".\"posts\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "posts_default_admin_write_insert",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"posts_default_admin_write_insert_ar_013fffeb\" ON \"public\".\"posts\";",
+          "DROP POLICY IF EXISTS \"posts_default_admin_write_insert\" ON \"public\".\"posts\";",
+          "CREATE POLICY \"posts_default_admin_write_insert\" ON \"public\".\"posts\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "posts_default_admin_write_update",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"posts_default_admin_write_update_ar_3d716296\" ON \"public\".\"posts\";",
+          "DROP POLICY IF EXISTS \"posts_default_admin_write_update\" ON \"public\".\"posts\";",
+          "CREATE POLICY \"posts_default_admin_write_update\" ON \"public\".\"posts\" AS PERMISSIVE FOR UPDATE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))) WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "posts_default_admin_write_delete",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"posts_default_admin_write_delete_ar_2461401c\" ON \"public\".\"posts\";",
+          "DROP POLICY IF EXISTS \"posts_default_admin_write_delete\" ON \"public\".\"posts\";",
+          "CREATE POLICY \"posts_default_admin_write_delete\" ON \"public\".\"posts\" AS PERMISSIVE FOR DELETE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "table": "projects",
+    "qualified": "public.projects",
+    "enableRls": "ALTER TABLE \"public\".\"projects\" ENABLE ROW LEVEL SECURITY;",
+    "policyStatements": [
+      "DROP POLICY IF EXISTS \"projects_all_d087a01_ar_40cb7d9c\" ON \"public\".\"projects\";",
+      "DROP POLICY IF EXISTS \"projects_all_d087a01\" ON \"public\".\"projects\";",
+      "CREATE POLICY \"projects_all_d087a01\" ON \"public\".\"projects\" AS PERMISSIVE FOR ALL TO \"public\" USING ((SELECT rebase.uid()) IS NOT NULL AND (SELECT rebase.uid()) NOT IN ('anonymous', 'anon')) WITH CHECK ((SELECT rebase.uid()) IS NOT NULL AND (SELECT rebase.uid()) NOT IN ('anonymous', 'anon'));",
+      "DROP POLICY IF EXISTS \"projects_default_admin_read_ar_d02aa031\" ON \"public\".\"projects\";",
+      "DROP POLICY IF EXISTS \"projects_default_admin_read\" ON \"public\".\"projects\";",
+      "CREATE POLICY \"projects_default_admin_read\" ON \"public\".\"projects\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DROP POLICY IF EXISTS \"projects_default_admin_write_insert_ar_7a3a6c80\" ON \"public\".\"projects\";",
+      "DROP POLICY IF EXISTS \"projects_default_admin_write_insert\" ON \"public\".\"projects\";",
+      "CREATE POLICY \"projects_default_admin_write_insert\" ON \"public\".\"projects\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DROP POLICY IF EXISTS \"projects_default_admin_write_update_ar_ce925073\" ON \"public\".\"projects\";",
+      "DROP POLICY IF EXISTS \"projects_default_admin_write_update\" ON \"public\".\"projects\";",
+      "CREATE POLICY \"projects_default_admin_write_update\" ON \"public\".\"projects\" AS PERMISSIVE FOR UPDATE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))) WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DROP POLICY IF EXISTS \"projects_default_admin_write_delete_ar_aa4ad156\" ON \"public\".\"projects\";",
+      "DROP POLICY IF EXISTS \"projects_default_admin_write_delete\" ON \"public\".\"projects\";",
+      "CREATE POLICY \"projects_default_admin_write_delete\" ON \"public\".\"projects\" AS PERMISSIVE FOR DELETE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DROP POLICY IF EXISTS \"projects_tenant_scope_ar_16c380f3\" ON \"public\".\"projects\";",
+      "DROP POLICY IF EXISTS \"projects_tenant_scope\" ON \"public\".\"projects\";",
+      "CREATE POLICY \"projects_tenant_scope\" ON \"public\".\"projects\" AS RESTRICTIVE FOR ALL TO \"public\" USING (((SELECT rebase.uid() IS NULL)) OR ((SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])) OR (org_id = (SELECT CASE WHEN NULLIF(rebase.jwt() ->> 'org', '') ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$' THEN (NULLIF(rebase.jwt() ->> 'org', ''))::uuid END))) WITH CHECK (((SELECT rebase.uid() IS NULL)) OR ((SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])) OR (org_id = (SELECT CASE WHEN NULLIF(rebase.jwt() ->> 'org', '') ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$' THEN (NULLIF(rebase.jwt() ->> 'org', ''))::uuid END)));"
+    ],
+    "policies": [
+      {
+        "name": "projects_all_d087a01",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"projects_all_d087a01_ar_40cb7d9c\" ON \"public\".\"projects\";",
+          "DROP POLICY IF EXISTS \"projects_all_d087a01\" ON \"public\".\"projects\";",
+          "CREATE POLICY \"projects_all_d087a01\" ON \"public\".\"projects\" AS PERMISSIVE FOR ALL TO \"public\" USING ((SELECT rebase.uid()) IS NOT NULL AND (SELECT rebase.uid()) NOT IN ('anonymous', 'anon')) WITH CHECK ((SELECT rebase.uid()) IS NOT NULL AND (SELECT rebase.uid()) NOT IN ('anonymous', 'anon'));"
+        ]
+      },
+      {
+        "name": "projects_default_admin_read",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"projects_default_admin_read_ar_d02aa031\" ON \"public\".\"projects\";",
+          "DROP POLICY IF EXISTS \"projects_default_admin_read\" ON \"public\".\"projects\";",
+          "CREATE POLICY \"projects_default_admin_read\" ON \"public\".\"projects\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "projects_default_admin_write_insert",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"projects_default_admin_write_insert_ar_7a3a6c80\" ON \"public\".\"projects\";",
+          "DROP POLICY IF EXISTS \"projects_default_admin_write_insert\" ON \"public\".\"projects\";",
+          "CREATE POLICY \"projects_default_admin_write_insert\" ON \"public\".\"projects\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "projects_default_admin_write_update",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"projects_default_admin_write_update_ar_ce925073\" ON \"public\".\"projects\";",
+          "DROP POLICY IF EXISTS \"projects_default_admin_write_update\" ON \"public\".\"projects\";",
+          "CREATE POLICY \"projects_default_admin_write_update\" ON \"public\".\"projects\" AS PERMISSIVE FOR UPDATE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))) WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "projects_default_admin_write_delete",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"projects_default_admin_write_delete_ar_aa4ad156\" ON \"public\".\"projects\";",
+          "DROP POLICY IF EXISTS \"projects_default_admin_write_delete\" ON \"public\".\"projects\";",
+          "CREATE POLICY \"projects_default_admin_write_delete\" ON \"public\".\"projects\" AS PERMISSIVE FOR DELETE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "projects_tenant_scope",
+        "adminTarget": false,
+        "restrictive": true,
+        "statements": [
+          "DROP POLICY IF EXISTS \"projects_tenant_scope_ar_16c380f3\" ON \"public\".\"projects\";",
+          "DROP POLICY IF EXISTS \"projects_tenant_scope\" ON \"public\".\"projects\";",
+          "CREATE POLICY \"projects_tenant_scope\" ON \"public\".\"projects\" AS RESTRICTIVE FOR ALL TO \"public\" USING (((SELECT rebase.uid() IS NULL)) OR ((SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])) OR (org_id = (SELECT CASE WHEN NULLIF(rebase.jwt() ->> 'org', '') ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$' THEN (NULLIF(rebase.jwt() ->> 'org', ''))::uuid END))) WITH CHECK (((SELECT rebase.uid() IS NULL)) OR ((SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])) OR (org_id = (SELECT CASE WHEN NULLIF(rebase.jwt() ->> 'org', '') ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$' THEN (NULLIF(rebase.jwt() ->> 'org', ''))::uuid END)));"
+        ],
+        "denying": [
+          "DROP POLICY IF EXISTS \"projects_tenant_scope\" ON \"public\".\"projects\";",
+          "CREATE POLICY \"projects_tenant_scope\" ON \"public\".\"projects\" AS RESTRICTIVE FOR ALL TO \"public\" USING (false) WITH CHECK (false);"
+        ]
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "table": "secrets",
+    "qualified": "public.secrets",
+    "enableRls": "ALTER TABLE \"public\".\"secrets\" ENABLE ROW LEVEL SECURITY;",
+    "policyStatements": [
+      "DROP POLICY IF EXISTS \"secrets_select_15c9aec_ar_8a664ca0\" ON \"public\".\"secrets\";",
+      "DROP POLICY IF EXISTS \"secrets_select_15c9aec\" ON \"public\".\"secrets\";",
+      "CREATE POLICY \"secrets_select_15c9aec\" ON \"public\".\"secrets\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((SELECT rebase.uid()) IS NOT NULL AND (SELECT rebase.uid()) NOT IN ('anonymous', 'anon'));",
+      "DROP POLICY IF EXISTS \"secrets_select_d924d73_ar_8585526a\" ON \"public\".\"secrets\";",
+      "DROP POLICY IF EXISTS \"secrets_select_d924d73\" ON \"public\".\"secrets\";",
+      "CREATE POLICY \"secrets_select_d924d73\" ON \"public\".\"secrets\" AS RESTRICTIVE FOR SELECT TO \"public\" USING (((SELECT NOT (string_to_array(rebase.roles(), ',') && ARRAY['auditor']))) OR (level <= 3));",
+      "DROP POLICY IF EXISTS \"secrets_select_94f4f80_ar_349f5927\" ON \"public\".\"secrets\";",
+      "DROP POLICY IF EXISTS \"secrets_select_94f4f80\" ON \"public\".\"secrets\";",
+      "CREATE POLICY \"secrets_select_94f4f80\" ON \"public\".\"secrets\" AS PERMISSIVE FOR SELECT TO \"public\" USING (level <= (SELECT CASE WHEN NULLIF(rebase.jwt() ->> 'clearance', '') ~ '^-?[0-9]{1,18}$' THEN (NULLIF(rebase.jwt() ->> 'clearance', ''))::bigint END));",
+      "DROP POLICY IF EXISTS \"secrets_insert_fb9c563_ar_cc329a01\" ON \"public\".\"secrets\";",
+      "DROP POLICY IF EXISTS \"secrets_insert_fb9c563\" ON \"public\".\"secrets\";",
+      "CREATE POLICY \"secrets_insert_fb9c563\" ON \"public\".\"secrets\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK ((SELECT rebase.uid()) IS NOT NULL AND (SELECT rebase.uid()) NOT IN ('anonymous', 'anon') AND NOT (SELECT rebase.is_anonymous()));",
+      "DROP POLICY IF EXISTS \"secrets_update_1749d40_ar_8e273471\" ON \"public\".\"secrets\";",
+      "DROP POLICY IF EXISTS \"secrets_update_1749d40\" ON \"public\".\"secrets\";",
+      "CREATE POLICY \"secrets_update_1749d40\" ON \"public\".\"secrets\" AS PERMISSIVE FOR UPDATE TO \"public\" USING (region = (SELECT NULLIF(rebase.jwt() ->> 'region', ''))) WITH CHECK (region = (SELECT NULLIF(rebase.jwt() ->> 'region', '')));",
+      "DROP POLICY IF EXISTS \"secrets_delete_c04410a_ar_e7680958\" ON \"public\".\"secrets\";",
+      "DROP POLICY IF EXISTS \"secrets_delete_c04410a\" ON \"public\".\"secrets\";",
+      "CREATE POLICY \"secrets_delete_c04410a\" ON \"public\".\"secrets\" AS PERMISSIVE FOR DELETE TO \"public\" USING ((SELECT string_to_array(rebase.roles(), ',') @> ARRAY['admin','editor']));",
+      "DROP POLICY IF EXISTS \"secrets_default_admin_read_ar_d7920c97\" ON \"public\".\"secrets\";",
+      "DROP POLICY IF EXISTS \"secrets_default_admin_read\" ON \"public\".\"secrets\";",
+      "CREATE POLICY \"secrets_default_admin_read\" ON \"public\".\"secrets\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DROP POLICY IF EXISTS \"secrets_default_admin_write_insert_ar_f524a013\" ON \"public\".\"secrets\";",
+      "DROP POLICY IF EXISTS \"secrets_default_admin_write_insert\" ON \"public\".\"secrets\";",
+      "CREATE POLICY \"secrets_default_admin_write_insert\" ON \"public\".\"secrets\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DROP POLICY IF EXISTS \"secrets_default_admin_write_update_ar_1c7fb59c\" ON \"public\".\"secrets\";",
+      "DROP POLICY IF EXISTS \"secrets_default_admin_write_update\" ON \"public\".\"secrets\";",
+      "CREATE POLICY \"secrets_default_admin_write_update\" ON \"public\".\"secrets\" AS PERMISSIVE FOR UPDATE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))) WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DROP POLICY IF EXISTS \"secrets_default_admin_write_delete_ar_bcc81209\" ON \"public\".\"secrets\";",
+      "DROP POLICY IF EXISTS \"secrets_default_admin_write_delete\" ON \"public\".\"secrets\";",
+      "CREATE POLICY \"secrets_default_admin_write_delete\" ON \"public\".\"secrets\" AS PERMISSIVE FOR DELETE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+    ],
+    "policies": [
+      {
+        "name": "secrets_select_15c9aec",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"secrets_select_15c9aec_ar_8a664ca0\" ON \"public\".\"secrets\";",
+          "DROP POLICY IF EXISTS \"secrets_select_15c9aec\" ON \"public\".\"secrets\";",
+          "CREATE POLICY \"secrets_select_15c9aec\" ON \"public\".\"secrets\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((SELECT rebase.uid()) IS NOT NULL AND (SELECT rebase.uid()) NOT IN ('anonymous', 'anon'));"
+        ]
+      },
+      {
+        "name": "secrets_select_d924d73",
+        "adminTarget": false,
+        "restrictive": true,
+        "statements": [
+          "DROP POLICY IF EXISTS \"secrets_select_d924d73_ar_8585526a\" ON \"public\".\"secrets\";",
+          "DROP POLICY IF EXISTS \"secrets_select_d924d73\" ON \"public\".\"secrets\";",
+          "CREATE POLICY \"secrets_select_d924d73\" ON \"public\".\"secrets\" AS RESTRICTIVE FOR SELECT TO \"public\" USING (((SELECT NOT (string_to_array(rebase.roles(), ',') && ARRAY['auditor']))) OR (level <= 3));"
+        ],
+        "denying": [
+          "DROP POLICY IF EXISTS \"secrets_select_d924d73\" ON \"public\".\"secrets\";",
+          "CREATE POLICY \"secrets_select_d924d73\" ON \"public\".\"secrets\" AS RESTRICTIVE FOR SELECT TO \"public\" USING (false);"
+        ]
+      },
+      {
+        "name": "secrets_select_94f4f80",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"secrets_select_94f4f80_ar_349f5927\" ON \"public\".\"secrets\";",
+          "DROP POLICY IF EXISTS \"secrets_select_94f4f80\" ON \"public\".\"secrets\";",
+          "CREATE POLICY \"secrets_select_94f4f80\" ON \"public\".\"secrets\" AS PERMISSIVE FOR SELECT TO \"public\" USING (level <= (SELECT CASE WHEN NULLIF(rebase.jwt() ->> 'clearance', '') ~ '^-?[0-9]{1,18}$' THEN (NULLIF(rebase.jwt() ->> 'clearance', ''))::bigint END));"
+        ]
+      },
+      {
+        "name": "secrets_insert_fb9c563",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"secrets_insert_fb9c563_ar_cc329a01\" ON \"public\".\"secrets\";",
+          "DROP POLICY IF EXISTS \"secrets_insert_fb9c563\" ON \"public\".\"secrets\";",
+          "CREATE POLICY \"secrets_insert_fb9c563\" ON \"public\".\"secrets\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK ((SELECT rebase.uid()) IS NOT NULL AND (SELECT rebase.uid()) NOT IN ('anonymous', 'anon') AND NOT (SELECT rebase.is_anonymous()));"
+        ]
+      },
+      {
+        "name": "secrets_update_1749d40",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"secrets_update_1749d40_ar_8e273471\" ON \"public\".\"secrets\";",
+          "DROP POLICY IF EXISTS \"secrets_update_1749d40\" ON \"public\".\"secrets\";",
+          "CREATE POLICY \"secrets_update_1749d40\" ON \"public\".\"secrets\" AS PERMISSIVE FOR UPDATE TO \"public\" USING (region = (SELECT NULLIF(rebase.jwt() ->> 'region', ''))) WITH CHECK (region = (SELECT NULLIF(rebase.jwt() ->> 'region', '')));"
+        ]
+      },
+      {
+        "name": "secrets_delete_c04410a",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"secrets_delete_c04410a_ar_e7680958\" ON \"public\".\"secrets\";",
+          "DROP POLICY IF EXISTS \"secrets_delete_c04410a\" ON \"public\".\"secrets\";",
+          "CREATE POLICY \"secrets_delete_c04410a\" ON \"public\".\"secrets\" AS PERMISSIVE FOR DELETE TO \"public\" USING ((SELECT string_to_array(rebase.roles(), ',') @> ARRAY['admin','editor']));"
+        ]
+      },
+      {
+        "name": "secrets_default_admin_read",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"secrets_default_admin_read_ar_d7920c97\" ON \"public\".\"secrets\";",
+          "DROP POLICY IF EXISTS \"secrets_default_admin_read\" ON \"public\".\"secrets\";",
+          "CREATE POLICY \"secrets_default_admin_read\" ON \"public\".\"secrets\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "secrets_default_admin_write_insert",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"secrets_default_admin_write_insert_ar_f524a013\" ON \"public\".\"secrets\";",
+          "DROP POLICY IF EXISTS \"secrets_default_admin_write_insert\" ON \"public\".\"secrets\";",
+          "CREATE POLICY \"secrets_default_admin_write_insert\" ON \"public\".\"secrets\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "secrets_default_admin_write_update",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"secrets_default_admin_write_update_ar_1c7fb59c\" ON \"public\".\"secrets\";",
+          "DROP POLICY IF EXISTS \"secrets_default_admin_write_update\" ON \"public\".\"secrets\";",
+          "CREATE POLICY \"secrets_default_admin_write_update\" ON \"public\".\"secrets\" AS PERMISSIVE FOR UPDATE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))) WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "secrets_default_admin_write_delete",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"secrets_default_admin_write_delete_ar_bcc81209\" ON \"public\".\"secrets\";",
+          "DROP POLICY IF EXISTS \"secrets_default_admin_write_delete\" ON \"public\".\"secrets\";",
+          "CREATE POLICY \"secrets_default_admin_write_delete\" ON \"public\".\"secrets\" AS PERMISSIVE FOR DELETE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "table": "tags",
+    "qualified": "public.tags",
+    "enableRls": "ALTER TABLE \"public\".\"tags\" ENABLE ROW LEVEL SECURITY;",
+    "policyStatements": [
+      "DROP POLICY IF EXISTS \"tags_select_29d0af3_ar_11bf97d5\" ON \"public\".\"tags\";",
+      "DROP POLICY IF EXISTS \"tags_select_29d0af3\" ON \"public\".\"tags\";",
+      "CREATE POLICY \"tags_select_29d0af3\" ON \"public\".\"tags\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((SELECT NOT (rebase.uid() = 'blocked-user')));",
+      "DROP POLICY IF EXISTS \"tags_default_admin_read_ar_8bb5294e\" ON \"public\".\"tags\";",
+      "DROP POLICY IF EXISTS \"tags_default_admin_read\" ON \"public\".\"tags\";",
+      "CREATE POLICY \"tags_default_admin_read\" ON \"public\".\"tags\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DROP POLICY IF EXISTS \"tags_default_admin_write_insert_ar_aa55f68d\" ON \"public\".\"tags\";",
+      "DROP POLICY IF EXISTS \"tags_default_admin_write_insert\" ON \"public\".\"tags\";",
+      "CREATE POLICY \"tags_default_admin_write_insert\" ON \"public\".\"tags\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DROP POLICY IF EXISTS \"tags_default_admin_write_update_ar_fcba2204\" ON \"public\".\"tags\";",
+      "DROP POLICY IF EXISTS \"tags_default_admin_write_update\" ON \"public\".\"tags\";",
+      "CREATE POLICY \"tags_default_admin_write_update\" ON \"public\".\"tags\" AS PERMISSIVE FOR UPDATE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))) WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DROP POLICY IF EXISTS \"tags_default_admin_write_delete_ar_a9150697\" ON \"public\".\"tags\";",
+      "DROP POLICY IF EXISTS \"tags_default_admin_write_delete\" ON \"public\".\"tags\";",
+      "CREATE POLICY \"tags_default_admin_write_delete\" ON \"public\".\"tags\" AS PERMISSIVE FOR DELETE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+    ],
+    "policies": [
+      {
+        "name": "tags_select_29d0af3",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"tags_select_29d0af3_ar_11bf97d5\" ON \"public\".\"tags\";",
+          "DROP POLICY IF EXISTS \"tags_select_29d0af3\" ON \"public\".\"tags\";",
+          "CREATE POLICY \"tags_select_29d0af3\" ON \"public\".\"tags\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((SELECT NOT (rebase.uid() = 'blocked-user')));"
+        ]
+      },
+      {
+        "name": "tags_default_admin_read",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"tags_default_admin_read_ar_8bb5294e\" ON \"public\".\"tags\";",
+          "DROP POLICY IF EXISTS \"tags_default_admin_read\" ON \"public\".\"tags\";",
+          "CREATE POLICY \"tags_default_admin_read\" ON \"public\".\"tags\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "tags_default_admin_write_insert",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"tags_default_admin_write_insert_ar_aa55f68d\" ON \"public\".\"tags\";",
+          "DROP POLICY IF EXISTS \"tags_default_admin_write_insert\" ON \"public\".\"tags\";",
+          "CREATE POLICY \"tags_default_admin_write_insert\" ON \"public\".\"tags\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "tags_default_admin_write_update",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"tags_default_admin_write_update_ar_fcba2204\" ON \"public\".\"tags\";",
+          "DROP POLICY IF EXISTS \"tags_default_admin_write_update\" ON \"public\".\"tags\";",
+          "CREATE POLICY \"tags_default_admin_write_update\" ON \"public\".\"tags\" AS PERMISSIVE FOR UPDATE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))) WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "tags_default_admin_write_delete",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"tags_default_admin_write_delete_ar_a9150697\" ON \"public\".\"tags\";",
+          "DROP POLICY IF EXISTS \"tags_default_admin_write_delete\" ON \"public\".\"tags\";",
+          "CREATE POLICY \"tags_default_admin_write_delete\" ON \"public\".\"tags\" AS PERMISSIVE FOR DELETE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "table": "tasks",
+    "qualified": "public.tasks",
+    "enableRls": "ALTER TABLE \"public\".\"tasks\" ENABLE ROW LEVEL SECURITY;",
+    "policyStatements": [
+      "DROP POLICY IF EXISTS \"tasks_select_841c287_ar_34c16b7e\" ON \"public\".\"tasks\";",
+      "DROP POLICY IF EXISTS \"tasks_select_841c287\" ON \"public\".\"tasks\";",
+      "CREATE POLICY \"tasks_select_841c287\" ON \"public\".\"tasks\" AS PERMISSIVE FOR SELECT TO \"public\" USING (true);",
+      "DROP POLICY IF EXISTS \"tasks_insert_7d725c8_0_ar_a615838d\" ON \"public\".\"tasks\";",
+      "DROP POLICY IF EXISTS \"tasks_insert_7d725c8_0\" ON \"public\".\"tasks\";",
+      "CREATE POLICY \"tasks_insert_7d725c8_0\" ON \"public\".\"tasks\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK ((SELECT rebase.uid()) IS NOT NULL AND (SELECT rebase.uid()) NOT IN ('anonymous', 'anon'));",
+      "DROP POLICY IF EXISTS \"tasks_update_7d725c8_1_ar_bdcece10\" ON \"public\".\"tasks\";",
+      "DROP POLICY IF EXISTS \"tasks_update_7d725c8_1\" ON \"public\".\"tasks\";",
+      "CREATE POLICY \"tasks_update_7d725c8_1\" ON \"public\".\"tasks\" AS PERMISSIVE FOR UPDATE TO \"public\" USING ((SELECT rebase.uid()) IS NOT NULL AND (SELECT rebase.uid()) NOT IN ('anonymous', 'anon')) WITH CHECK ((SELECT rebase.uid()) IS NOT NULL AND (SELECT rebase.uid()) NOT IN ('anonymous', 'anon'));",
+      "DROP POLICY IF EXISTS \"tasks_default_admin_read_ar_276c9ff5\" ON \"public\".\"tasks\";",
+      "DROP POLICY IF EXISTS \"tasks_default_admin_read\" ON \"public\".\"tasks\";",
+      "CREATE POLICY \"tasks_default_admin_read\" ON \"public\".\"tasks\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DROP POLICY IF EXISTS \"tasks_default_admin_write_insert_ar_bedc43ee\" ON \"public\".\"tasks\";",
+      "DROP POLICY IF EXISTS \"tasks_default_admin_write_insert\" ON \"public\".\"tasks\";",
+      "CREATE POLICY \"tasks_default_admin_write_insert\" ON \"public\".\"tasks\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DROP POLICY IF EXISTS \"tasks_default_admin_write_update_ar_b3922316\" ON \"public\".\"tasks\";",
+      "DROP POLICY IF EXISTS \"tasks_default_admin_write_update\" ON \"public\".\"tasks\";",
+      "CREATE POLICY \"tasks_default_admin_write_update\" ON \"public\".\"tasks\" AS PERMISSIVE FOR UPDATE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))) WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DROP POLICY IF EXISTS \"tasks_default_admin_write_delete_ar_4a83e55e\" ON \"public\".\"tasks\";",
+      "DROP POLICY IF EXISTS \"tasks_default_admin_write_delete\" ON \"public\".\"tasks\";",
+      "CREATE POLICY \"tasks_default_admin_write_delete\" ON \"public\".\"tasks\" AS PERMISSIVE FOR DELETE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DROP POLICY IF EXISTS \"tasks_tenant_scope_ar_6b1f5f49\" ON \"public\".\"tasks\";",
+      "DROP POLICY IF EXISTS \"tasks_tenant_scope\" ON \"public\".\"tasks\";",
+      "CREATE POLICY \"tasks_tenant_scope\" ON \"public\".\"tasks\" AS RESTRICTIVE FOR ALL TO \"public\" USING (((SELECT rebase.uid() IS NULL)) OR ((SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin','support'])) OR (EXISTS (SELECT 1 FROM \"public\".\"memberships\" \"_ex0\" WHERE (\"_ex0\".org_id = \"public\".\"tasks\".org_id) AND ((\"_ex0\".user_id)::text = (SELECT rebase.uid()))))) WITH CHECK (((SELECT rebase.uid() IS NULL)) OR ((SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin','support'])) OR (EXISTS (SELECT 1 FROM \"public\".\"memberships\" \"_ex0\" WHERE (\"_ex0\".org_id = \"public\".\"tasks\".org_id) AND ((\"_ex0\".user_id)::text = (SELECT rebase.uid())))));"
+    ],
+    "policies": [
+      {
+        "name": "tasks_select_841c287",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"tasks_select_841c287_ar_34c16b7e\" ON \"public\".\"tasks\";",
+          "DROP POLICY IF EXISTS \"tasks_select_841c287\" ON \"public\".\"tasks\";",
+          "CREATE POLICY \"tasks_select_841c287\" ON \"public\".\"tasks\" AS PERMISSIVE FOR SELECT TO \"public\" USING (true);"
+        ]
+      },
+      {
+        "name": "tasks_insert_7d725c8_0",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"tasks_insert_7d725c8_0_ar_a615838d\" ON \"public\".\"tasks\";",
+          "DROP POLICY IF EXISTS \"tasks_insert_7d725c8_0\" ON \"public\".\"tasks\";",
+          "CREATE POLICY \"tasks_insert_7d725c8_0\" ON \"public\".\"tasks\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK ((SELECT rebase.uid()) IS NOT NULL AND (SELECT rebase.uid()) NOT IN ('anonymous', 'anon'));"
+        ]
+      },
+      {
+        "name": "tasks_update_7d725c8_1",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"tasks_update_7d725c8_1_ar_bdcece10\" ON \"public\".\"tasks\";",
+          "DROP POLICY IF EXISTS \"tasks_update_7d725c8_1\" ON \"public\".\"tasks\";",
+          "CREATE POLICY \"tasks_update_7d725c8_1\" ON \"public\".\"tasks\" AS PERMISSIVE FOR UPDATE TO \"public\" USING ((SELECT rebase.uid()) IS NOT NULL AND (SELECT rebase.uid()) NOT IN ('anonymous', 'anon')) WITH CHECK ((SELECT rebase.uid()) IS NOT NULL AND (SELECT rebase.uid()) NOT IN ('anonymous', 'anon'));"
+        ]
+      },
+      {
+        "name": "tasks_default_admin_read",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"tasks_default_admin_read_ar_276c9ff5\" ON \"public\".\"tasks\";",
+          "DROP POLICY IF EXISTS \"tasks_default_admin_read\" ON \"public\".\"tasks\";",
+          "CREATE POLICY \"tasks_default_admin_read\" ON \"public\".\"tasks\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "tasks_default_admin_write_insert",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"tasks_default_admin_write_insert_ar_bedc43ee\" ON \"public\".\"tasks\";",
+          "DROP POLICY IF EXISTS \"tasks_default_admin_write_insert\" ON \"public\".\"tasks\";",
+          "CREATE POLICY \"tasks_default_admin_write_insert\" ON \"public\".\"tasks\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "tasks_default_admin_write_update",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"tasks_default_admin_write_update_ar_b3922316\" ON \"public\".\"tasks\";",
+          "DROP POLICY IF EXISTS \"tasks_default_admin_write_update\" ON \"public\".\"tasks\";",
+          "CREATE POLICY \"tasks_default_admin_write_update\" ON \"public\".\"tasks\" AS PERMISSIVE FOR UPDATE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))) WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "tasks_default_admin_write_delete",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"tasks_default_admin_write_delete_ar_4a83e55e\" ON \"public\".\"tasks\";",
+          "DROP POLICY IF EXISTS \"tasks_default_admin_write_delete\" ON \"public\".\"tasks\";",
+          "CREATE POLICY \"tasks_default_admin_write_delete\" ON \"public\".\"tasks\" AS PERMISSIVE FOR DELETE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "tasks_tenant_scope",
+        "adminTarget": false,
+        "restrictive": true,
+        "statements": [
+          "DROP POLICY IF EXISTS \"tasks_tenant_scope_ar_6b1f5f49\" ON \"public\".\"tasks\";",
+          "DROP POLICY IF EXISTS \"tasks_tenant_scope\" ON \"public\".\"tasks\";",
+          "CREATE POLICY \"tasks_tenant_scope\" ON \"public\".\"tasks\" AS RESTRICTIVE FOR ALL TO \"public\" USING (((SELECT rebase.uid() IS NULL)) OR ((SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin','support'])) OR (EXISTS (SELECT 1 FROM \"public\".\"memberships\" \"_ex0\" WHERE (\"_ex0\".org_id = \"public\".\"tasks\".org_id) AND ((\"_ex0\".user_id)::text = (SELECT rebase.uid()))))) WITH CHECK (((SELECT rebase.uid() IS NULL)) OR ((SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin','support'])) OR (EXISTS (SELECT 1 FROM \"public\".\"memberships\" \"_ex0\" WHERE (\"_ex0\".org_id = \"public\".\"tasks\".org_id) AND ((\"_ex0\".user_id)::text = (SELECT rebase.uid())))));"
+        ],
+        "denying": [
+          "DROP POLICY IF EXISTS \"tasks_tenant_scope\" ON \"public\".\"tasks\";",
+          "CREATE POLICY \"tasks_tenant_scope\" ON \"public\".\"tasks\" AS RESTRICTIVE FOR ALL TO \"public\" USING (false) WITH CHECK (false);"
+        ]
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "table": "wiki",
+    "qualified": "public.wiki",
+    "enableRls": "ALTER TABLE \"public\".\"wiki\" ENABLE ROW LEVEL SECURITY;",
+    "policyStatements": [
+      "DROP POLICY IF EXISTS \"wiki_select_ad5ed8f_ar_88cd93fd\" ON \"public\".\"wiki\";",
+      "DROP POLICY IF EXISTS \"wiki_select_ad5ed8f\" ON \"public\".\"wiki\";",
+      "CREATE POLICY \"wiki_select_ad5ed8f\" ON \"public\".\"wiki\" AS PERMISSIVE FOR SELECT TO \"public\" USING (((owner_id)::text = (SELECT rebase.uid())) OR (visibility = 'public'));",
+      "DROP POLICY IF EXISTS \"wiki_insert_e78fed1_ar_7505c25b\" ON \"public\".\"wiki\";",
+      "DROP POLICY IF EXISTS \"wiki_insert_e78fed1\" ON \"public\".\"wiki\";",
+      "CREATE POLICY \"wiki_insert_e78fed1\" ON \"public\".\"wiki\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK ((length(title) > 3) AND ((owner_id)::text = (SELECT rebase.uid())));",
+      "DROP POLICY IF EXISTS \"wiki_default_admin_read_ar_b845b3c0\" ON \"public\".\"wiki\";",
+      "DROP POLICY IF EXISTS \"wiki_default_admin_read\" ON \"public\".\"wiki\";",
+      "CREATE POLICY \"wiki_default_admin_read\" ON \"public\".\"wiki\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DROP POLICY IF EXISTS \"wiki_default_admin_write_insert_ar_b3b39898\" ON \"public\".\"wiki\";",
+      "DROP POLICY IF EXISTS \"wiki_default_admin_write_insert\" ON \"public\".\"wiki\";",
+      "CREATE POLICY \"wiki_default_admin_write_insert\" ON \"public\".\"wiki\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DROP POLICY IF EXISTS \"wiki_default_admin_write_update_ar_972e9f63\" ON \"public\".\"wiki\";",
+      "DROP POLICY IF EXISTS \"wiki_default_admin_write_update\" ON \"public\".\"wiki\";",
+      "CREATE POLICY \"wiki_default_admin_write_update\" ON \"public\".\"wiki\" AS PERMISSIVE FOR UPDATE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))) WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DROP POLICY IF EXISTS \"wiki_default_admin_write_delete_ar_896b743c\" ON \"public\".\"wiki\";",
+      "DROP POLICY IF EXISTS \"wiki_default_admin_write_delete\" ON \"public\".\"wiki\";",
+      "CREATE POLICY \"wiki_default_admin_write_delete\" ON \"public\".\"wiki\" AS PERMISSIVE FOR DELETE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+    ],
+    "policies": [
+      {
+        "name": "wiki_select_ad5ed8f",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"wiki_select_ad5ed8f_ar_88cd93fd\" ON \"public\".\"wiki\";",
+          "DROP POLICY IF EXISTS \"wiki_select_ad5ed8f\" ON \"public\".\"wiki\";",
+          "CREATE POLICY \"wiki_select_ad5ed8f\" ON \"public\".\"wiki\" AS PERMISSIVE FOR SELECT TO \"public\" USING (((owner_id)::text = (SELECT rebase.uid())) OR (visibility = 'public'));"
+        ]
+      },
+      {
+        "name": "wiki_insert_e78fed1",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"wiki_insert_e78fed1_ar_7505c25b\" ON \"public\".\"wiki\";",
+          "DROP POLICY IF EXISTS \"wiki_insert_e78fed1\" ON \"public\".\"wiki\";",
+          "CREATE POLICY \"wiki_insert_e78fed1\" ON \"public\".\"wiki\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK ((length(title) > 3) AND ((owner_id)::text = (SELECT rebase.uid())));"
+        ]
+      },
+      {
+        "name": "wiki_default_admin_read",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"wiki_default_admin_read_ar_b845b3c0\" ON \"public\".\"wiki\";",
+          "DROP POLICY IF EXISTS \"wiki_default_admin_read\" ON \"public\".\"wiki\";",
+          "CREATE POLICY \"wiki_default_admin_read\" ON \"public\".\"wiki\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "wiki_default_admin_write_insert",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"wiki_default_admin_write_insert_ar_b3b39898\" ON \"public\".\"wiki\";",
+          "DROP POLICY IF EXISTS \"wiki_default_admin_write_insert\" ON \"public\".\"wiki\";",
+          "CREATE POLICY \"wiki_default_admin_write_insert\" ON \"public\".\"wiki\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "wiki_default_admin_write_update",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"wiki_default_admin_write_update_ar_972e9f63\" ON \"public\".\"wiki\";",
+          "DROP POLICY IF EXISTS \"wiki_default_admin_write_update\" ON \"public\".\"wiki\";",
+          "CREATE POLICY \"wiki_default_admin_write_update\" ON \"public\".\"wiki\" AS PERMISSIVE FOR UPDATE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))) WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "wiki_default_admin_write_delete",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"wiki_default_admin_write_delete_ar_896b743c\" ON \"public\".\"wiki\";",
+          "DROP POLICY IF EXISTS \"wiki_default_admin_write_delete\" ON \"public\".\"wiki\";",
+          "CREATE POLICY \"wiki_default_admin_write_delete\" ON \"public\".\"wiki\" AS PERMISSIVE FOR DELETE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "table": "posts_tags",
+    "qualified": "public.posts_tags",
+    "enableRls": "ALTER TABLE \"public\".\"posts_tags\" ENABLE ROW LEVEL SECURITY;",
+    "policyStatements": [
+      "DROP POLICY IF EXISTS \"posts_tags_default_admin_read_ar_79398cd8\" ON \"public\".\"posts_tags\";",
+      "DROP POLICY IF EXISTS \"posts_tags_default_admin_read\" ON \"public\".\"posts_tags\";",
+      "CREATE POLICY \"posts_tags_default_admin_read\" ON \"public\".\"posts_tags\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DROP POLICY IF EXISTS \"posts_tags_default_admin_write_insert_ar_c13fc632\" ON \"public\".\"posts_tags\";",
+      "DROP POLICY IF EXISTS \"posts_tags_default_admin_write_insert\" ON \"public\".\"posts_tags\";",
+      "CREATE POLICY \"posts_tags_default_admin_write_insert\" ON \"public\".\"posts_tags\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DROP POLICY IF EXISTS \"posts_tags_default_admin_write_update_ar_a0915f75\" ON \"public\".\"posts_tags\";",
+      "DROP POLICY IF EXISTS \"posts_tags_default_admin_write_update\" ON \"public\".\"posts_tags\";",
+      "CREATE POLICY \"posts_tags_default_admin_write_update\" ON \"public\".\"posts_tags\" AS PERMISSIVE FOR UPDATE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))) WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DROP POLICY IF EXISTS \"posts_tags_default_admin_write_delete_ar_b4d576aa\" ON \"public\".\"posts_tags\";",
+      "DROP POLICY IF EXISTS \"posts_tags_default_admin_write_delete\" ON \"public\".\"posts_tags\";",
+      "CREATE POLICY \"posts_tags_default_admin_write_delete\" ON \"public\".\"posts_tags\" AS PERMISSIVE FOR DELETE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DROP POLICY IF EXISTS \"posts_tags_default_edge_read_ar_615444e7\" ON \"public\".\"posts_tags\";",
+      "DROP POLICY IF EXISTS \"posts_tags_default_edge_read\" ON \"public\".\"posts_tags\";",
+      "CREATE POLICY \"posts_tags_default_edge_read\" ON \"public\".\"posts_tags\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((EXISTS (SELECT 1 FROM \"public\".\"posts\" \"_ex0\" WHERE \"_ex0\".id = \"public\".\"posts_tags\".post_id)) AND (EXISTS (SELECT 1 FROM \"public\".\"tags\" \"_ex1\" WHERE \"_ex1\".id = \"public\".\"posts_tags\".tag_id)));",
+      "DROP POLICY IF EXISTS \"posts_tags_default_edge_write_insert_ar_322c2628\" ON \"public\".\"posts_tags\";",
+      "DROP POLICY IF EXISTS \"posts_tags_default_edge_write_insert\" ON \"public\".\"posts_tags\";",
+      "CREATE POLICY \"posts_tags_default_edge_write_insert\" ON \"public\".\"posts_tags\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK (EXISTS (SELECT 1 FROM \"public\".\"posts\" \"_ex0\" WHERE (\"_ex0\".id = \"public\".\"posts_tags\".post_id) AND (((\"_ex0\".owner_id)::text = (SELECT rebase.uid())))));",
+      "DROP POLICY IF EXISTS \"posts_tags_default_edge_write_update_ar_1905c6a6\" ON \"public\".\"posts_tags\";",
+      "DROP POLICY IF EXISTS \"posts_tags_default_edge_write_update\" ON \"public\".\"posts_tags\";",
+      "CREATE POLICY \"posts_tags_default_edge_write_update\" ON \"public\".\"posts_tags\" AS PERMISSIVE FOR UPDATE TO \"public\" USING (EXISTS (SELECT 1 FROM \"public\".\"posts\" \"_ex0\" WHERE (\"_ex0\".id = \"public\".\"posts_tags\".post_id) AND (((\"_ex0\".owner_id)::text = (SELECT rebase.uid()))))) WITH CHECK (EXISTS (SELECT 1 FROM \"public\".\"posts\" \"_ex0\" WHERE (\"_ex0\".id = \"public\".\"posts_tags\".post_id) AND (((\"_ex0\".owner_id)::text = (SELECT rebase.uid())))));",
+      "DROP POLICY IF EXISTS \"posts_tags_default_edge_write_delete_ar_f0be2342\" ON \"public\".\"posts_tags\";",
+      "DROP POLICY IF EXISTS \"posts_tags_default_edge_write_delete\" ON \"public\".\"posts_tags\";",
+      "CREATE POLICY \"posts_tags_default_edge_write_delete\" ON \"public\".\"posts_tags\" AS PERMISSIVE FOR DELETE TO \"public\" USING (EXISTS (SELECT 1 FROM \"public\".\"posts\" \"_ex0\" WHERE (\"_ex0\".id = \"public\".\"posts_tags\".post_id) AND (((\"_ex0\".owner_id)::text = (SELECT rebase.uid())))));"
+    ],
+    "policies": [
+      {
+        "name": "posts_tags_default_admin_read",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"posts_tags_default_admin_read_ar_79398cd8\" ON \"public\".\"posts_tags\";",
+          "DROP POLICY IF EXISTS \"posts_tags_default_admin_read\" ON \"public\".\"posts_tags\";",
+          "CREATE POLICY \"posts_tags_default_admin_read\" ON \"public\".\"posts_tags\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "posts_tags_default_admin_write_insert",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"posts_tags_default_admin_write_insert_ar_c13fc632\" ON \"public\".\"posts_tags\";",
+          "DROP POLICY IF EXISTS \"posts_tags_default_admin_write_insert\" ON \"public\".\"posts_tags\";",
+          "CREATE POLICY \"posts_tags_default_admin_write_insert\" ON \"public\".\"posts_tags\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "posts_tags_default_admin_write_update",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"posts_tags_default_admin_write_update_ar_a0915f75\" ON \"public\".\"posts_tags\";",
+          "DROP POLICY IF EXISTS \"posts_tags_default_admin_write_update\" ON \"public\".\"posts_tags\";",
+          "CREATE POLICY \"posts_tags_default_admin_write_update\" ON \"public\".\"posts_tags\" AS PERMISSIVE FOR UPDATE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))) WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "posts_tags_default_admin_write_delete",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"posts_tags_default_admin_write_delete_ar_b4d576aa\" ON \"public\".\"posts_tags\";",
+          "DROP POLICY IF EXISTS \"posts_tags_default_admin_write_delete\" ON \"public\".\"posts_tags\";",
+          "CREATE POLICY \"posts_tags_default_admin_write_delete\" ON \"public\".\"posts_tags\" AS PERMISSIVE FOR DELETE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "posts_tags_default_edge_read",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"posts_tags_default_edge_read_ar_615444e7\" ON \"public\".\"posts_tags\";",
+          "DROP POLICY IF EXISTS \"posts_tags_default_edge_read\" ON \"public\".\"posts_tags\";",
+          "CREATE POLICY \"posts_tags_default_edge_read\" ON \"public\".\"posts_tags\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((EXISTS (SELECT 1 FROM \"public\".\"posts\" \"_ex0\" WHERE \"_ex0\".id = \"public\".\"posts_tags\".post_id)) AND (EXISTS (SELECT 1 FROM \"public\".\"tags\" \"_ex1\" WHERE \"_ex1\".id = \"public\".\"posts_tags\".tag_id)));"
+        ]
+      },
+      {
+        "name": "posts_tags_default_edge_write_insert",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"posts_tags_default_edge_write_insert_ar_322c2628\" ON \"public\".\"posts_tags\";",
+          "DROP POLICY IF EXISTS \"posts_tags_default_edge_write_insert\" ON \"public\".\"posts_tags\";",
+          "CREATE POLICY \"posts_tags_default_edge_write_insert\" ON \"public\".\"posts_tags\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK (EXISTS (SELECT 1 FROM \"public\".\"posts\" \"_ex0\" WHERE (\"_ex0\".id = \"public\".\"posts_tags\".post_id) AND (((\"_ex0\".owner_id)::text = (SELECT rebase.uid())))));"
+        ]
+      },
+      {
+        "name": "posts_tags_default_edge_write_update",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"posts_tags_default_edge_write_update_ar_1905c6a6\" ON \"public\".\"posts_tags\";",
+          "DROP POLICY IF EXISTS \"posts_tags_default_edge_write_update\" ON \"public\".\"posts_tags\";",
+          "CREATE POLICY \"posts_tags_default_edge_write_update\" ON \"public\".\"posts_tags\" AS PERMISSIVE FOR UPDATE TO \"public\" USING (EXISTS (SELECT 1 FROM \"public\".\"posts\" \"_ex0\" WHERE (\"_ex0\".id = \"public\".\"posts_tags\".post_id) AND (((\"_ex0\".owner_id)::text = (SELECT rebase.uid()))))) WITH CHECK (EXISTS (SELECT 1 FROM \"public\".\"posts\" \"_ex0\" WHERE (\"_ex0\".id = \"public\".\"posts_tags\".post_id) AND (((\"_ex0\".owner_id)::text = (SELECT rebase.uid())))));"
+        ]
+      },
+      {
+        "name": "posts_tags_default_edge_write_delete",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"posts_tags_default_edge_write_delete_ar_f0be2342\" ON \"public\".\"posts_tags\";",
+          "DROP POLICY IF EXISTS \"posts_tags_default_edge_write_delete\" ON \"public\".\"posts_tags\";",
+          "CREATE POLICY \"posts_tags_default_edge_write_delete\" ON \"public\".\"posts_tags\" AS PERMISSIVE FOR DELETE TO \"public\" USING (EXISTS (SELECT 1 FROM \"public\".\"posts\" \"_ex0\" WHERE (\"_ex0\".id = \"public\".\"posts_tags\".post_id) AND (((\"_ex0\".owner_id)::text = (SELECT rebase.uid())))));"
+        ]
+      }
+    ]
+  }
+]

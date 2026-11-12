@@ -1,0 +1,3414 @@
+{
+  "schemas": [
+    "rebase"
+  ],
+  "declaredSchemas": [],
+  "enums": [],
+  "tables": [
+    {
+      "schema": "public",
+      "table": "categories",
+      "qualified": "public.categories",
+      "varName": "categories",
+      "kind": "collection",
+      "slug": "categories",
+      "columns": [
+        {
+          "key": "categoryId",
+          "column": "category_id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "categoryId",
+            "slug": "categories"
+          }
+        },
+        {
+          "key": "categoryName",
+          "column": "category_name",
+          "type": {
+            "kind": "varchar",
+            "length": 15
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "categoryName",
+            "slug": "categories"
+          }
+        },
+        {
+          "key": "description",
+          "column": "description",
+          "type": {
+            "kind": "text"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "description",
+            "slug": "categories"
+          }
+        },
+        {
+          "key": "picture",
+          "column": "picture",
+          "type": {
+            "kind": "bytea"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "picture",
+            "slug": "categories"
+          }
+        }
+      ],
+      "primaryKey": [
+        "category_id"
+      ],
+      "indexes": [],
+      "vector": {
+        "specs": [],
+        "skipped": []
+      },
+      "vectorColumns": [],
+      "policies": [
+        {
+          "name": "categories_default_admin_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "categories_default_admin_read",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "categories_default_admin_read_ar_5f45dbfb",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "categories_default_admin_write_insert",
+          "operation": "insert",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": null,
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "categories_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "categories_default_admin_write_insert_ar_640c8dd7",
+            "using": null,
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "categories_default_admin_write_update",
+          "operation": "update",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "categories_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "categories_default_admin_write_update_ar_64730287",
+            "using": "true",
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "categories_default_admin_write_delete",
+          "operation": "delete",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "categories_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "categories_default_admin_write_delete_ar_e93c2898",
+            "using": "true",
+            "withCheck": null
+          }
+        }
+      ],
+      "triggers": [],
+      "auth": false
+    },
+    {
+      "schema": "public",
+      "table": "customer_demographics",
+      "qualified": "public.customer_demographics",
+      "varName": "customerDemographics",
+      "kind": "collection",
+      "slug": "customer_demographics",
+      "columns": [
+        {
+          "key": "customerTypeId",
+          "column": "customer_type_id",
+          "type": {
+            "kind": "varchar",
+            "length": 5
+          },
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "customerTypeId",
+            "slug": "customer_demographics"
+          }
+        },
+        {
+          "key": "customerDesc",
+          "column": "customer_desc",
+          "type": {
+            "kind": "text"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "customerDesc",
+            "slug": "customer_demographics"
+          }
+        }
+      ],
+      "primaryKey": [
+        "customer_type_id"
+      ],
+      "indexes": [],
+      "vector": {
+        "specs": [],
+        "skipped": []
+      },
+      "vectorColumns": [],
+      "policies": [
+        {
+          "name": "customer_demographics_default_admin_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "customer_demographics_default_admin_read",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "customer_demographics_default_admin_read_ar_123958da",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "customer_demographics_default_admin_write_insert",
+          "operation": "insert",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": null,
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "customer_demographics_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "customer_demographics_default_admin_write_insert_ar_a54e308b",
+            "using": null,
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "customer_demographics_default_admin_write_update",
+          "operation": "update",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "customer_demographics_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "customer_demographics_default_admin_write_update_ar_156d32ae",
+            "using": "true",
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "customer_demographics_default_admin_write_delete",
+          "operation": "delete",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "customer_demographics_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "customer_demographics_default_admin_write_delete_ar_0cca2132",
+            "using": "true",
+            "withCheck": null
+          }
+        }
+      ],
+      "triggers": [],
+      "auth": false
+    },
+    {
+      "schema": "public",
+      "table": "customers",
+      "qualified": "public.customers",
+      "varName": "customers",
+      "kind": "collection",
+      "slug": "customers",
+      "columns": [
+        {
+          "key": "customerId",
+          "column": "customer_id",
+          "type": {
+            "kind": "varchar",
+            "length": 5
+          },
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "customerId",
+            "slug": "customers"
+          }
+        },
+        {
+          "key": "companyName",
+          "column": "company_name",
+          "type": {
+            "kind": "varchar",
+            "length": 40
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "companyName",
+            "slug": "customers"
+          }
+        },
+        {
+          "key": "contactName",
+          "column": "contact_name",
+          "type": {
+            "kind": "varchar",
+            "length": 30
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "contactName",
+            "slug": "customers"
+          }
+        },
+        {
+          "key": "contactTitle",
+          "column": "contact_title",
+          "type": {
+            "kind": "varchar",
+            "length": 30
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "contactTitle",
+            "slug": "customers"
+          }
+        },
+        {
+          "key": "phone",
+          "column": "phone",
+          "type": {
+            "kind": "varchar",
+            "length": 24
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "phone",
+            "slug": "customers"
+          }
+        },
+        {
+          "key": "address",
+          "column": "address",
+          "type": {
+            "kind": "varchar",
+            "length": 60
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "address",
+            "slug": "customers"
+          }
+        },
+        {
+          "key": "city",
+          "column": "city",
+          "type": {
+            "kind": "varchar",
+            "length": 15
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "city",
+            "slug": "customers"
+          }
+        },
+        {
+          "key": "region",
+          "column": "region",
+          "type": {
+            "kind": "varchar",
+            "length": 15
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "region",
+            "slug": "customers"
+          }
+        },
+        {
+          "key": "postalCode",
+          "column": "postal_code",
+          "type": {
+            "kind": "varchar",
+            "length": 10
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "postalCode",
+            "slug": "customers"
+          }
+        },
+        {
+          "key": "country",
+          "column": "country",
+          "type": {
+            "kind": "varchar",
+            "length": 15
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "country",
+            "slug": "customers"
+          }
+        },
+        {
+          "key": "fax",
+          "column": "fax",
+          "type": {
+            "kind": "varchar",
+            "length": 24
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "fax",
+            "slug": "customers"
+          }
+        }
+      ],
+      "primaryKey": [
+        "customer_id"
+      ],
+      "indexes": [],
+      "vector": {
+        "specs": [],
+        "skipped": []
+      },
+      "vectorColumns": [],
+      "policies": [
+        {
+          "name": "customers_default_admin_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "customers_default_admin_read",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "customers_default_admin_read_ar_3594c2a8",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "customers_default_admin_write_insert",
+          "operation": "insert",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": null,
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "customers_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "customers_default_admin_write_insert_ar_c430879f",
+            "using": null,
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "customers_default_admin_write_update",
+          "operation": "update",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "customers_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "customers_default_admin_write_update_ar_19cb54dc",
+            "using": "true",
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "customers_default_admin_write_delete",
+          "operation": "delete",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "customers_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "customers_default_admin_write_delete_ar_b309f4d3",
+            "using": "true",
+            "withCheck": null
+          }
+        }
+      ],
+      "triggers": [],
+      "auth": false
+    },
+    {
+      "schema": "public",
+      "table": "customer_customer_demo",
+      "qualified": "public.customer_customer_demo",
+      "varName": "customerCustomerDemo",
+      "kind": "junction",
+      "declaringSlugs": [
+        "customers"
+      ],
+      "columns": [
+        {
+          "key": "customer_id",
+          "column": "customer_id",
+          "type": {
+            "kind": "varchar",
+            "length": 5
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": {
+            "schema": "public",
+            "table": "customer_customer_demo",
+            "column": "customer_id",
+            "targetSchema": "public",
+            "targetTable": "customers",
+            "targetColumn": "customer_id",
+            "onDelete": "CASCADE",
+            "constraintName": "customer_customer_demo_customer_id_fkey",
+            "sql": "ALTER TABLE \"public\".\"customer_customer_demo\" ADD CONSTRAINT \"customer_customer_demo_customer_id_fkey\" FOREIGN KEY (\"customer_id\") REFERENCES \"public\".\"customers\" (\"customer_id\") ON DELETE CASCADE"
+          },
+          "source": {
+            "kind": "junction-key"
+          }
+        },
+        {
+          "key": "customer_type_id",
+          "column": "customer_type_id",
+          "type": {
+            "kind": "varchar",
+            "length": 5
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": {
+            "schema": "public",
+            "table": "customer_customer_demo",
+            "column": "customer_type_id",
+            "targetSchema": "public",
+            "targetTable": "customer_demographics",
+            "targetColumn": "customer_type_id",
+            "onDelete": "CASCADE",
+            "constraintName": "customer_customer_demo_customer_type_id_fkey",
+            "sql": "ALTER TABLE \"public\".\"customer_customer_demo\" ADD CONSTRAINT \"customer_customer_demo_customer_type_id_fkey\" FOREIGN KEY (\"customer_type_id\") REFERENCES \"public\".\"customer_demographics\" (\"customer_type_id\") ON DELETE CASCADE"
+          },
+          "source": {
+            "kind": "junction-key"
+          }
+        }
+      ],
+      "primaryKey": [
+        "customer_id",
+        "customer_type_id"
+      ],
+      "indexes": [
+        {
+          "schema": "public",
+          "table": "customer_customer_demo",
+          "method": "btree",
+          "unique": false,
+          "keys": [
+            {
+              "column": "customer_type_id",
+              "direction": "asc",
+              "nulls": "last"
+            }
+          ],
+          "include": [],
+          "predicate": null,
+          "reason": "Derived for a foreign key: Postgres indexes the key a constraint points at, never the column holding it.",
+          "indexName": "customer_customer_demo_customer_type_id_ix_696549f",
+          "derived": "foreign-key"
+        }
+      ],
+      "vectorColumns": [],
+      "policies": [
+        {
+          "name": "customer_customer_demo_default_admin_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "customer_customer_demo_default_admin_read",
+          "injected": false,
+          "adminRequestCompanion": {
+            "name": "customer_customer_demo_default_admin_read_ar_ff877bee",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "customer_customer_demo_default_admin_write_insert",
+          "operation": "insert",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": null,
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "customer_customer_demo_default_admin_write",
+          "injected": false,
+          "adminRequestCompanion": {
+            "name": "customer_customer_demo_default_admin_write_insert_ar_fc70f5eb",
+            "using": null,
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "customer_customer_demo_default_admin_write_update",
+          "operation": "update",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "customer_customer_demo_default_admin_write",
+          "injected": false,
+          "adminRequestCompanion": {
+            "name": "customer_customer_demo_default_admin_write_update_ar_f9843263",
+            "using": "true",
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "customer_customer_demo_default_admin_write_delete",
+          "operation": "delete",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "customer_customer_demo_default_admin_write",
+          "injected": false,
+          "adminRequestCompanion": {
+            "name": "customer_customer_demo_default_admin_write_delete_ar_fa138ce1",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "customer_customer_demo_default_edge_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "public"
+          ],
+          "using": "(EXISTS (SELECT 1 FROM \"public\".\"customers\" \"_ex0\" WHERE \"_ex0\".customer_id = \"public\".\"customer_customer_demo\".customer_id)) AND (EXISTS (SELECT 1 FROM \"public\".\"customer_demographics\" \"_ex1\" WHERE \"_ex1\".customer_type_id = \"public\".\"customer_customer_demo\".customer_type_id))",
+          "withCheck": null,
+          "ruleKey": "customer_customer_demo_default_edge_read",
+          "injected": false
+        }
+      ],
+      "triggers": [],
+      "auth": false
+    },
+    {
+      "schema": "public",
+      "table": "employees",
+      "qualified": "public.employees",
+      "varName": "employees",
+      "kind": "collection",
+      "slug": "employees",
+      "columns": [
+        {
+          "key": "employeeId",
+          "column": "employee_id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "employeeId",
+            "slug": "employees"
+          }
+        },
+        {
+          "key": "title",
+          "column": "title",
+          "type": {
+            "kind": "varchar",
+            "length": 30
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "title",
+            "slug": "employees"
+          }
+        },
+        {
+          "key": "titleOfCourtesy",
+          "column": "title_of_courtesy",
+          "type": {
+            "kind": "varchar",
+            "length": 25
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "titleOfCourtesy",
+            "slug": "employees"
+          }
+        },
+        {
+          "key": "firstName",
+          "column": "first_name",
+          "type": {
+            "kind": "varchar",
+            "length": 10
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "firstName",
+            "slug": "employees"
+          }
+        },
+        {
+          "key": "lastName",
+          "column": "last_name",
+          "type": {
+            "kind": "varchar",
+            "length": 20
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "lastName",
+            "slug": "employees"
+          }
+        },
+        {
+          "key": "address",
+          "column": "address",
+          "type": {
+            "kind": "varchar",
+            "length": 60
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "address",
+            "slug": "employees"
+          }
+        },
+        {
+          "key": "city",
+          "column": "city",
+          "type": {
+            "kind": "varchar",
+            "length": 15
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "city",
+            "slug": "employees"
+          }
+        },
+        {
+          "key": "region",
+          "column": "region",
+          "type": {
+            "kind": "varchar",
+            "length": 15
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "region",
+            "slug": "employees"
+          }
+        },
+        {
+          "key": "postalCode",
+          "column": "postal_code",
+          "type": {
+            "kind": "varchar",
+            "length": 10
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "postalCode",
+            "slug": "employees"
+          }
+        },
+        {
+          "key": "country",
+          "column": "country",
+          "type": {
+            "kind": "varchar",
+            "length": 15
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "country",
+            "slug": "employees"
+          }
+        },
+        {
+          "key": "homePhone",
+          "column": "home_phone",
+          "type": {
+            "kind": "varchar",
+            "length": 24
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "homePhone",
+            "slug": "employees"
+          }
+        },
+        {
+          "key": "extension",
+          "column": "extension",
+          "type": {
+            "kind": "varchar",
+            "length": 4
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "extension",
+            "slug": "employees"
+          }
+        },
+        {
+          "key": "birthDate",
+          "column": "birth_date",
+          "type": {
+            "kind": "date"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "birthDate",
+            "slug": "employees"
+          }
+        },
+        {
+          "key": "hireDate",
+          "column": "hire_date",
+          "type": {
+            "kind": "date"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "hireDate",
+            "slug": "employees"
+          }
+        },
+        {
+          "key": "reportsTo",
+          "column": "reports_to",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": {
+            "schema": "public",
+            "table": "employees",
+            "column": "reports_to",
+            "targetSchema": "public",
+            "targetTable": "employees",
+            "targetColumn": "employee_id",
+            "onDelete": "no action",
+            "constraintName": "employees_reports_to_fkey",
+            "sql": "ALTER TABLE \"public\".\"employees\" ADD CONSTRAINT \"employees_reports_to_fkey\" FOREIGN KEY (\"reports_to\") REFERENCES \"public\".\"employees\" (\"employee_id\") ON DELETE NO ACTION"
+          },
+          "source": {
+            "kind": "relation",
+            "propName": "reportsTo",
+            "slug": "employees"
+          }
+        },
+        {
+          "key": "notes",
+          "column": "notes",
+          "type": {
+            "kind": "text"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "notes",
+            "slug": "employees"
+          }
+        },
+        {
+          "key": "photoPath",
+          "column": "photo_path",
+          "type": {
+            "kind": "varchar",
+            "length": 255
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "photoPath",
+            "slug": "employees"
+          }
+        },
+        {
+          "key": "photo",
+          "column": "photo",
+          "type": {
+            "kind": "bytea"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "photo",
+            "slug": "employees"
+          }
+        }
+      ],
+      "primaryKey": [
+        "employee_id"
+      ],
+      "indexes": [
+        {
+          "schema": "public",
+          "table": "employees",
+          "method": "btree",
+          "unique": false,
+          "keys": [
+            {
+              "column": "reports_to",
+              "direction": "asc",
+              "nulls": "last"
+            }
+          ],
+          "include": [],
+          "predicate": null,
+          "reason": "Derived for a foreign key: Postgres indexes the key a constraint points at, never the column holding it.",
+          "indexName": "employees_reports_to_ix_56def75",
+          "derived": "foreign-key"
+        }
+      ],
+      "vector": {
+        "specs": [],
+        "skipped": []
+      },
+      "vectorColumns": [],
+      "policies": [
+        {
+          "name": "employees_default_admin_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "employees_default_admin_read",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "employees_default_admin_read_ar_b7e0d41e",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "employees_default_admin_write_insert",
+          "operation": "insert",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": null,
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "employees_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "employees_default_admin_write_insert_ar_9abd7b7e",
+            "using": null,
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "employees_default_admin_write_update",
+          "operation": "update",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "employees_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "employees_default_admin_write_update_ar_af1b148d",
+            "using": "true",
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "employees_default_admin_write_delete",
+          "operation": "delete",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "employees_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "employees_default_admin_write_delete_ar_14b66a9c",
+            "using": "true",
+            "withCheck": null
+          }
+        }
+      ],
+      "triggers": [],
+      "auth": false
+    },
+    {
+      "schema": "public",
+      "table": "employee_territories",
+      "qualified": "public.employee_territories",
+      "varName": "employeeTerritories",
+      "kind": "junction",
+      "declaringSlugs": [
+        "employees",
+        "territories"
+      ],
+      "columns": [
+        {
+          "key": "employee_id",
+          "column": "employee_id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": {
+            "schema": "public",
+            "table": "employee_territories",
+            "column": "employee_id",
+            "targetSchema": "public",
+            "targetTable": "employees",
+            "targetColumn": "employee_id",
+            "onDelete": "CASCADE",
+            "constraintName": "employee_territories_employee_id_fkey",
+            "sql": "ALTER TABLE \"public\".\"employee_territories\" ADD CONSTRAINT \"employee_territories_employee_id_fkey\" FOREIGN KEY (\"employee_id\") REFERENCES \"public\".\"employees\" (\"employee_id\") ON DELETE CASCADE"
+          },
+          "source": {
+            "kind": "junction-key"
+          }
+        },
+        {
+          "key": "territory_id",
+          "column": "territory_id",
+          "type": {
+            "kind": "varchar",
+            "length": 20
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "legacyColumn": "territorie_id",
+          "foreignKey": {
+            "schema": "public",
+            "table": "employee_territories",
+            "column": "territory_id",
+            "targetSchema": "public",
+            "targetTable": "territories",
+            "targetColumn": "territory_id",
+            "onDelete": "CASCADE",
+            "constraintName": "employee_territories_territory_id_fkey",
+            "sql": "ALTER TABLE \"public\".\"employee_territories\" ADD CONSTRAINT \"employee_territories_territory_id_fkey\" FOREIGN KEY (\"territory_id\") REFERENCES \"public\".\"territories\" (\"territory_id\") ON DELETE CASCADE"
+          },
+          "source": {
+            "kind": "junction-key"
+          }
+        }
+      ],
+      "primaryKey": [
+        "employee_id",
+        "territory_id"
+      ],
+      "indexes": [
+        {
+          "schema": "public",
+          "table": "employee_territories",
+          "method": "btree",
+          "unique": false,
+          "keys": [
+            {
+              "column": "territory_id",
+              "direction": "asc",
+              "nulls": "last"
+            }
+          ],
+          "include": [],
+          "predicate": null,
+          "reason": "Derived for a foreign key: Postgres indexes the key a constraint points at, never the column holding it.",
+          "indexName": "employee_territories_territory_id_ix_609d28b",
+          "derived": "foreign-key"
+        }
+      ],
+      "vectorColumns": [],
+      "policies": [
+        {
+          "name": "employee_territories_default_admin_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "employee_territories_default_admin_read",
+          "injected": false,
+          "adminRequestCompanion": {
+            "name": "employee_territories_default_admin_read_ar_68d2530d",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "employee_territories_default_admin_write_insert",
+          "operation": "insert",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": null,
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "employee_territories_default_admin_write",
+          "injected": false,
+          "adminRequestCompanion": {
+            "name": "employee_territories_default_admin_write_insert_ar_6bc44a7f",
+            "using": null,
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "employee_territories_default_admin_write_update",
+          "operation": "update",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "employee_territories_default_admin_write",
+          "injected": false,
+          "adminRequestCompanion": {
+            "name": "employee_territories_default_admin_write_update_ar_2afebf08",
+            "using": "true",
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "employee_territories_default_admin_write_delete",
+          "operation": "delete",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "employee_territories_default_admin_write",
+          "injected": false,
+          "adminRequestCompanion": {
+            "name": "employee_territories_default_admin_write_delete_ar_70fec7aa",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "employee_territories_default_edge_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "public"
+          ],
+          "using": "(EXISTS (SELECT 1 FROM \"public\".\"employees\" \"_ex0\" WHERE \"_ex0\".employee_id = \"public\".\"employee_territories\".employee_id)) AND (EXISTS (SELECT 1 FROM \"public\".\"territories\" \"_ex1\" WHERE \"_ex1\".territory_id = \"public\".\"employee_territories\".territory_id))",
+          "withCheck": null,
+          "ruleKey": "employee_territories_default_edge_read",
+          "injected": false
+        }
+      ],
+      "triggers": [],
+      "auth": false
+    },
+    {
+      "schema": "public",
+      "table": "order_details",
+      "qualified": "public.order_details",
+      "varName": "orderDetails",
+      "kind": "collection",
+      "slug": "order_details",
+      "columns": [
+        {
+          "key": "orderId",
+          "column": "order_id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "orderId",
+            "slug": "order_details"
+          }
+        },
+        {
+          "key": "productId",
+          "column": "product_id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "productId",
+            "slug": "order_details"
+          }
+        },
+        {
+          "key": "orderId",
+          "column": "order_id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "columnOwnedByProperty": true,
+          "foreignKey": {
+            "schema": "public",
+            "table": "order_details",
+            "column": "order_id",
+            "targetSchema": "public",
+            "targetTable": "orders",
+            "targetColumn": "order_id",
+            "onDelete": "no action",
+            "constraintName": "order_details_order_id_fkey",
+            "sql": "ALTER TABLE \"public\".\"order_details\" ADD CONSTRAINT \"order_details_order_id_fkey\" FOREIGN KEY (\"order_id\") REFERENCES \"public\".\"orders\" (\"order_id\") ON DELETE NO ACTION"
+          },
+          "source": {
+            "kind": "relation",
+            "propName": "order",
+            "slug": "order_details"
+          }
+        },
+        {
+          "key": "unitPrice",
+          "column": "unit_price",
+          "type": {
+            "kind": "real"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "unitPrice",
+            "slug": "order_details"
+          }
+        },
+        {
+          "key": "quantity",
+          "column": "quantity",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "quantity",
+            "slug": "order_details"
+          }
+        },
+        {
+          "key": "discount",
+          "column": "discount",
+          "type": {
+            "kind": "real"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "discount",
+            "slug": "order_details"
+          }
+        },
+        {
+          "key": "productId",
+          "column": "product_id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "columnOwnedByProperty": true,
+          "foreignKey": {
+            "schema": "public",
+            "table": "order_details",
+            "column": "product_id",
+            "targetSchema": "public",
+            "targetTable": "products",
+            "targetColumn": "product_id",
+            "onDelete": "no action",
+            "constraintName": "order_details_product_id_fkey",
+            "sql": "ALTER TABLE \"public\".\"order_details\" ADD CONSTRAINT \"order_details_product_id_fkey\" FOREIGN KEY (\"product_id\") REFERENCES \"public\".\"products\" (\"product_id\") ON DELETE NO ACTION"
+          },
+          "source": {
+            "kind": "relation",
+            "propName": "product",
+            "slug": "order_details"
+          }
+        }
+      ],
+      "primaryKey": [
+        "order_id",
+        "product_id"
+      ],
+      "indexes": [
+        {
+          "schema": "public",
+          "table": "order_details",
+          "method": "btree",
+          "unique": false,
+          "keys": [
+            {
+              "column": "product_id",
+              "direction": "asc",
+              "nulls": "last"
+            }
+          ],
+          "include": [],
+          "predicate": null,
+          "reason": "Derived for a foreign key: Postgres indexes the key a constraint points at, never the column holding it.",
+          "indexName": "order_details_product_id_ix_3f60913",
+          "derived": "foreign-key"
+        }
+      ],
+      "vector": {
+        "specs": [],
+        "skipped": []
+      },
+      "vectorColumns": [],
+      "policies": [
+        {
+          "name": "order_details_default_admin_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "order_details_default_admin_read",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "order_details_default_admin_read_ar_8521a3a2",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "order_details_default_admin_write_insert",
+          "operation": "insert",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": null,
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "order_details_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "order_details_default_admin_write_insert_ar_f885a0c6",
+            "using": null,
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "order_details_default_admin_write_update",
+          "operation": "update",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "order_details_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "order_details_default_admin_write_update_ar_d2d45546",
+            "using": "true",
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "order_details_default_admin_write_delete",
+          "operation": "delete",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "order_details_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "order_details_default_admin_write_delete_ar_a7aeef06",
+            "using": "true",
+            "withCheck": null
+          }
+        }
+      ],
+      "triggers": [],
+      "auth": false
+    },
+    {
+      "schema": "public",
+      "table": "orders",
+      "qualified": "public.orders",
+      "varName": "orders",
+      "kind": "collection",
+      "slug": "orders",
+      "columns": [
+        {
+          "key": "orderId",
+          "column": "order_id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "orderId",
+            "slug": "orders"
+          }
+        },
+        {
+          "key": "shipName",
+          "column": "ship_name",
+          "type": {
+            "kind": "varchar",
+            "length": 40
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "shipName",
+            "slug": "orders"
+          }
+        },
+        {
+          "key": "shipAddress",
+          "column": "ship_address",
+          "type": {
+            "kind": "varchar",
+            "length": 60
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "shipAddress",
+            "slug": "orders"
+          }
+        },
+        {
+          "key": "shipCity",
+          "column": "ship_city",
+          "type": {
+            "kind": "varchar",
+            "length": 15
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "shipCity",
+            "slug": "orders"
+          }
+        },
+        {
+          "key": "shipRegion",
+          "column": "ship_region",
+          "type": {
+            "kind": "varchar",
+            "length": 15
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "shipRegion",
+            "slug": "orders"
+          }
+        },
+        {
+          "key": "shipPostalCode",
+          "column": "ship_postal_code",
+          "type": {
+            "kind": "varchar",
+            "length": 10
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "shipPostalCode",
+            "slug": "orders"
+          }
+        },
+        {
+          "key": "shipCountry",
+          "column": "ship_country",
+          "type": {
+            "kind": "varchar",
+            "length": 15
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "shipCountry",
+            "slug": "orders"
+          }
+        },
+        {
+          "key": "freight",
+          "column": "freight",
+          "type": {
+            "kind": "real"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "freight",
+            "slug": "orders"
+          }
+        },
+        {
+          "key": "orderDate",
+          "column": "order_date",
+          "type": {
+            "kind": "date"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "orderDate",
+            "slug": "orders"
+          }
+        },
+        {
+          "key": "requiredDate",
+          "column": "required_date",
+          "type": {
+            "kind": "date"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "requiredDate",
+            "slug": "orders"
+          }
+        },
+        {
+          "key": "shippedDate",
+          "column": "shipped_date",
+          "type": {
+            "kind": "date"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "shippedDate",
+            "slug": "orders"
+          }
+        },
+        {
+          "key": "customerId",
+          "column": "customer_id",
+          "type": {
+            "kind": "varchar",
+            "length": 5
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": {
+            "schema": "public",
+            "table": "orders",
+            "column": "customer_id",
+            "targetSchema": "public",
+            "targetTable": "customers",
+            "targetColumn": "customer_id",
+            "onDelete": "no action",
+            "constraintName": "orders_customer_id_fkey",
+            "sql": "ALTER TABLE \"public\".\"orders\" ADD CONSTRAINT \"orders_customer_id_fkey\" FOREIGN KEY (\"customer_id\") REFERENCES \"public\".\"customers\" (\"customer_id\") ON DELETE NO ACTION"
+          },
+          "source": {
+            "kind": "relation",
+            "propName": "customer",
+            "slug": "orders"
+          }
+        },
+        {
+          "key": "employeeId",
+          "column": "employee_id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": {
+            "schema": "public",
+            "table": "orders",
+            "column": "employee_id",
+            "targetSchema": "public",
+            "targetTable": "employees",
+            "targetColumn": "employee_id",
+            "onDelete": "no action",
+            "constraintName": "orders_employee_id_fkey",
+            "sql": "ALTER TABLE \"public\".\"orders\" ADD CONSTRAINT \"orders_employee_id_fkey\" FOREIGN KEY (\"employee_id\") REFERENCES \"public\".\"employees\" (\"employee_id\") ON DELETE NO ACTION"
+          },
+          "source": {
+            "kind": "relation",
+            "propName": "employee",
+            "slug": "orders"
+          }
+        },
+        {
+          "key": "shipVia",
+          "column": "ship_via",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": {
+            "schema": "public",
+            "table": "orders",
+            "column": "ship_via",
+            "targetSchema": "public",
+            "targetTable": "shippers",
+            "targetColumn": "shipper_id",
+            "onDelete": "no action",
+            "constraintName": "orders_ship_via_fkey",
+            "sql": "ALTER TABLE \"public\".\"orders\" ADD CONSTRAINT \"orders_ship_via_fkey\" FOREIGN KEY (\"ship_via\") REFERENCES \"public\".\"shippers\" (\"shipper_id\") ON DELETE NO ACTION"
+          },
+          "source": {
+            "kind": "relation",
+            "propName": "shipVia",
+            "slug": "orders"
+          }
+        }
+      ],
+      "primaryKey": [
+        "order_id"
+      ],
+      "indexes": [
+        {
+          "schema": "public",
+          "table": "orders",
+          "method": "btree",
+          "unique": false,
+          "keys": [
+            {
+              "column": "customer_id",
+              "direction": "asc",
+              "nulls": "last"
+            }
+          ],
+          "include": [],
+          "predicate": null,
+          "reason": "Derived for a foreign key: Postgres indexes the key a constraint points at, never the column holding it.",
+          "indexName": "orders_customer_id_ix_f0b5d92",
+          "derived": "foreign-key"
+        },
+        {
+          "schema": "public",
+          "table": "orders",
+          "method": "btree",
+          "unique": false,
+          "keys": [
+            {
+              "column": "employee_id",
+              "direction": "asc",
+              "nulls": "last"
+            }
+          ],
+          "include": [],
+          "predicate": null,
+          "reason": "Derived for a foreign key: Postgres indexes the key a constraint points at, never the column holding it.",
+          "indexName": "orders_employee_id_ix_d3de9b4",
+          "derived": "foreign-key"
+        },
+        {
+          "schema": "public",
+          "table": "orders",
+          "method": "btree",
+          "unique": false,
+          "keys": [
+            {
+              "column": "ship_via",
+              "direction": "asc",
+              "nulls": "last"
+            }
+          ],
+          "include": [],
+          "predicate": null,
+          "reason": "Derived for a foreign key: Postgres indexes the key a constraint points at, never the column holding it.",
+          "indexName": "orders_ship_via_ix_ca90713",
+          "derived": "foreign-key"
+        }
+      ],
+      "vector": {
+        "specs": [],
+        "skipped": []
+      },
+      "vectorColumns": [],
+      "policies": [
+        {
+          "name": "orders_default_admin_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "orders_default_admin_read",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "orders_default_admin_read_ar_5735bf44",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "orders_default_admin_write_insert",
+          "operation": "insert",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": null,
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "orders_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "orders_default_admin_write_insert_ar_875ffecc",
+            "using": null,
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "orders_default_admin_write_update",
+          "operation": "update",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "orders_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "orders_default_admin_write_update_ar_f65d77e2",
+            "using": "true",
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "orders_default_admin_write_delete",
+          "operation": "delete",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "orders_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "orders_default_admin_write_delete_ar_b4874a4a",
+            "using": "true",
+            "withCheck": null
+          }
+        }
+      ],
+      "triggers": [],
+      "auth": false
+    },
+    {
+      "schema": "public",
+      "table": "products",
+      "qualified": "public.products",
+      "varName": "products",
+      "kind": "collection",
+      "slug": "products",
+      "columns": [
+        {
+          "key": "productId",
+          "column": "product_id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "productId",
+            "slug": "products"
+          }
+        },
+        {
+          "key": "productName",
+          "column": "product_name",
+          "type": {
+            "kind": "varchar",
+            "length": 40
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "productName",
+            "slug": "products"
+          }
+        },
+        {
+          "key": "categoryId",
+          "column": "category_id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": {
+            "schema": "public",
+            "table": "products",
+            "column": "category_id",
+            "targetSchema": "public",
+            "targetTable": "categories",
+            "targetColumn": "category_id",
+            "onDelete": "no action",
+            "constraintName": "products_category_id_fkey",
+            "sql": "ALTER TABLE \"public\".\"products\" ADD CONSTRAINT \"products_category_id_fkey\" FOREIGN KEY (\"category_id\") REFERENCES \"public\".\"categories\" (\"category_id\") ON DELETE NO ACTION"
+          },
+          "source": {
+            "kind": "relation",
+            "propName": "category",
+            "slug": "products"
+          }
+        },
+        {
+          "key": "quantityPerUnit",
+          "column": "quantity_per_unit",
+          "type": {
+            "kind": "varchar",
+            "length": 20
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "quantityPerUnit",
+            "slug": "products"
+          }
+        },
+        {
+          "key": "unitPrice",
+          "column": "unit_price",
+          "type": {
+            "kind": "real"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "unitPrice",
+            "slug": "products"
+          }
+        },
+        {
+          "key": "unitsInStock",
+          "column": "units_in_stock",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "unitsInStock",
+            "slug": "products"
+          }
+        },
+        {
+          "key": "unitsOnOrder",
+          "column": "units_on_order",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "unitsOnOrder",
+            "slug": "products"
+          }
+        },
+        {
+          "key": "reorderLevel",
+          "column": "reorder_level",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "reorderLevel",
+            "slug": "products"
+          }
+        },
+        {
+          "key": "discontinued",
+          "column": "discontinued",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "discontinued",
+            "slug": "products"
+          }
+        },
+        {
+          "key": "supplierId",
+          "column": "supplier_id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": {
+            "schema": "public",
+            "table": "products",
+            "column": "supplier_id",
+            "targetSchema": "public",
+            "targetTable": "suppliers",
+            "targetColumn": "supplier_id",
+            "onDelete": "no action",
+            "constraintName": "products_supplier_id_fkey",
+            "sql": "ALTER TABLE \"public\".\"products\" ADD CONSTRAINT \"products_supplier_id_fkey\" FOREIGN KEY (\"supplier_id\") REFERENCES \"public\".\"suppliers\" (\"supplier_id\") ON DELETE NO ACTION"
+          },
+          "source": {
+            "kind": "relation",
+            "propName": "supplier",
+            "slug": "products"
+          }
+        }
+      ],
+      "primaryKey": [
+        "product_id"
+      ],
+      "indexes": [
+        {
+          "schema": "public",
+          "table": "products",
+          "method": "btree",
+          "unique": false,
+          "keys": [
+            {
+              "column": "category_id",
+              "direction": "asc",
+              "nulls": "last"
+            }
+          ],
+          "include": [],
+          "predicate": null,
+          "reason": "Derived for a foreign key: Postgres indexes the key a constraint points at, never the column holding it.",
+          "indexName": "products_category_id_ix_066548f",
+          "derived": "foreign-key"
+        },
+        {
+          "schema": "public",
+          "table": "products",
+          "method": "btree",
+          "unique": false,
+          "keys": [
+            {
+              "column": "supplier_id",
+              "direction": "asc",
+              "nulls": "last"
+            }
+          ],
+          "include": [],
+          "predicate": null,
+          "reason": "Derived for a foreign key: Postgres indexes the key a constraint points at, never the column holding it.",
+          "indexName": "products_supplier_id_ix_ea7ba57",
+          "derived": "foreign-key"
+        }
+      ],
+      "vector": {
+        "specs": [],
+        "skipped": []
+      },
+      "vectorColumns": [],
+      "policies": [
+        {
+          "name": "products_default_admin_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "products_default_admin_read",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "products_default_admin_read_ar_cd6a5cf2",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "products_default_admin_write_insert",
+          "operation": "insert",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": null,
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "products_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "products_default_admin_write_insert_ar_7be54415",
+            "using": null,
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "products_default_admin_write_update",
+          "operation": "update",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "products_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "products_default_admin_write_update_ar_0abfb972",
+            "using": "true",
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "products_default_admin_write_delete",
+          "operation": "delete",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "products_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "products_default_admin_write_delete_ar_810b2bb6",
+            "using": "true",
+            "withCheck": null
+          }
+        }
+      ],
+      "triggers": [],
+      "auth": false
+    },
+    {
+      "schema": "public",
+      "table": "region",
+      "qualified": "public.region",
+      "varName": "region",
+      "kind": "collection",
+      "slug": "region",
+      "columns": [
+        {
+          "key": "regionId",
+          "column": "region_id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "regionId",
+            "slug": "region"
+          }
+        },
+        {
+          "key": "regionDescription",
+          "column": "region_description",
+          "type": {
+            "kind": "varchar",
+            "length": 60
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "regionDescription",
+            "slug": "region"
+          }
+        }
+      ],
+      "primaryKey": [
+        "region_id"
+      ],
+      "indexes": [],
+      "vector": {
+        "specs": [],
+        "skipped": []
+      },
+      "vectorColumns": [],
+      "policies": [
+        {
+          "name": "region_default_admin_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "region_default_admin_read",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "region_default_admin_read_ar_04181c6e",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "region_default_admin_write_insert",
+          "operation": "insert",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": null,
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "region_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "region_default_admin_write_insert_ar_7bd39627",
+            "using": null,
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "region_default_admin_write_update",
+          "operation": "update",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "region_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "region_default_admin_write_update_ar_a4aa4bc2",
+            "using": "true",
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "region_default_admin_write_delete",
+          "operation": "delete",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "region_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "region_default_admin_write_delete_ar_16cc1d0a",
+            "using": "true",
+            "withCheck": null
+          }
+        }
+      ],
+      "triggers": [],
+      "auth": false
+    },
+    {
+      "schema": "public",
+      "table": "shippers",
+      "qualified": "public.shippers",
+      "varName": "shippers",
+      "kind": "collection",
+      "slug": "shippers",
+      "columns": [
+        {
+          "key": "shipperId",
+          "column": "shipper_id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "shipperId",
+            "slug": "shippers"
+          }
+        },
+        {
+          "key": "companyName",
+          "column": "company_name",
+          "type": {
+            "kind": "varchar",
+            "length": 40
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "companyName",
+            "slug": "shippers"
+          }
+        },
+        {
+          "key": "phone",
+          "column": "phone",
+          "type": {
+            "kind": "varchar",
+            "length": 24
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "phone",
+            "slug": "shippers"
+          }
+        }
+      ],
+      "primaryKey": [
+        "shipper_id"
+      ],
+      "indexes": [],
+      "vector": {
+        "specs": [],
+        "skipped": []
+      },
+      "vectorColumns": [],
+      "policies": [
+        {
+          "name": "shippers_default_admin_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "shippers_default_admin_read",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "shippers_default_admin_read_ar_12ba8d95",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "shippers_default_admin_write_insert",
+          "operation": "insert",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": null,
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "shippers_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "shippers_default_admin_write_insert_ar_95566abb",
+            "using": null,
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "shippers_default_admin_write_update",
+          "operation": "update",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "shippers_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "shippers_default_admin_write_update_ar_354b304c",
+            "using": "true",
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "shippers_default_admin_write_delete",
+          "operation": "delete",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "shippers_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "shippers_default_admin_write_delete_ar_645f655e",
+            "using": "true",
+            "withCheck": null
+          }
+        }
+      ],
+      "triggers": [],
+      "auth": false
+    },
+    {
+      "schema": "public",
+      "table": "suppliers",
+      "qualified": "public.suppliers",
+      "varName": "suppliers",
+      "kind": "collection",
+      "slug": "suppliers",
+      "columns": [
+        {
+          "key": "supplierId",
+          "column": "supplier_id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "supplierId",
+            "slug": "suppliers"
+          }
+        },
+        {
+          "key": "companyName",
+          "column": "company_name",
+          "type": {
+            "kind": "varchar",
+            "length": 40
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "companyName",
+            "slug": "suppliers"
+          }
+        },
+        {
+          "key": "contactName",
+          "column": "contact_name",
+          "type": {
+            "kind": "varchar",
+            "length": 30
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "contactName",
+            "slug": "suppliers"
+          }
+        },
+        {
+          "key": "contactTitle",
+          "column": "contact_title",
+          "type": {
+            "kind": "varchar",
+            "length": 30
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "contactTitle",
+            "slug": "suppliers"
+          }
+        },
+        {
+          "key": "phone",
+          "column": "phone",
+          "type": {
+            "kind": "varchar",
+            "length": 24
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "phone",
+            "slug": "suppliers"
+          }
+        },
+        {
+          "key": "address",
+          "column": "address",
+          "type": {
+            "kind": "varchar",
+            "length": 60
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "address",
+            "slug": "suppliers"
+          }
+        },
+        {
+          "key": "city",
+          "column": "city",
+          "type": {
+            "kind": "varchar",
+            "length": 15
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "city",
+            "slug": "suppliers"
+          }
+        },
+        {
+          "key": "region",
+          "column": "region",
+          "type": {
+            "kind": "varchar",
+            "length": 15
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "region",
+            "slug": "suppliers"
+          }
+        },
+        {
+          "key": "postalCode",
+          "column": "postal_code",
+          "type": {
+            "kind": "varchar",
+            "length": 10
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "postalCode",
+            "slug": "suppliers"
+          }
+        },
+        {
+          "key": "country",
+          "column": "country",
+          "type": {
+            "kind": "varchar",
+            "length": 15
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "country",
+            "slug": "suppliers"
+          }
+        },
+        {
+          "key": "fax",
+          "column": "fax",
+          "type": {
+            "kind": "varchar",
+            "length": 24
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "fax",
+            "slug": "suppliers"
+          }
+        },
+        {
+          "key": "homepage",
+          "column": "homepage",
+          "type": {
+            "kind": "text"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "homepage",
+            "slug": "suppliers"
+          }
+        }
+      ],
+      "primaryKey": [
+        "supplier_id"
+      ],
+      "indexes": [],
+      "vector": {
+        "specs": [],
+        "skipped": []
+      },
+      "vectorColumns": [],
+      "policies": [
+        {
+          "name": "suppliers_default_admin_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "suppliers_default_admin_read",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "suppliers_default_admin_read_ar_85446b86",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "suppliers_default_admin_write_insert",
+          "operation": "insert",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": null,
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "suppliers_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "suppliers_default_admin_write_insert_ar_d97043bc",
+            "using": null,
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "suppliers_default_admin_write_update",
+          "operation": "update",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "suppliers_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "suppliers_default_admin_write_update_ar_977ffef0",
+            "using": "true",
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "suppliers_default_admin_write_delete",
+          "operation": "delete",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "suppliers_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "suppliers_default_admin_write_delete_ar_093db021",
+            "using": "true",
+            "withCheck": null
+          }
+        }
+      ],
+      "triggers": [],
+      "auth": false
+    },
+    {
+      "schema": "public",
+      "table": "territories",
+      "qualified": "public.territories",
+      "varName": "territories",
+      "kind": "collection",
+      "slug": "territories",
+      "columns": [
+        {
+          "key": "territoryId",
+          "column": "territory_id",
+          "type": {
+            "kind": "varchar",
+            "length": 20
+          },
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "territoryId",
+            "slug": "territories"
+          }
+        },
+        {
+          "key": "territoryDescription",
+          "column": "territory_description",
+          "type": {
+            "kind": "varchar",
+            "length": 60
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "territoryDescription",
+            "slug": "territories"
+          }
+        },
+        {
+          "key": "regionId",
+          "column": "region_id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": {
+            "schema": "public",
+            "table": "territories",
+            "column": "region_id",
+            "targetSchema": "public",
+            "targetTable": "region",
+            "targetColumn": "region_id",
+            "onDelete": "no action",
+            "constraintName": "territories_region_id_fkey",
+            "sql": "ALTER TABLE \"public\".\"territories\" ADD CONSTRAINT \"territories_region_id_fkey\" FOREIGN KEY (\"region_id\") REFERENCES \"public\".\"region\" (\"region_id\") ON DELETE NO ACTION"
+          },
+          "source": {
+            "kind": "relation",
+            "propName": "region",
+            "slug": "territories"
+          }
+        }
+      ],
+      "primaryKey": [
+        "territory_id"
+      ],
+      "indexes": [
+        {
+          "schema": "public",
+          "table": "territories",
+          "method": "btree",
+          "unique": false,
+          "keys": [
+            {
+              "column": "region_id",
+              "direction": "asc",
+              "nulls": "last"
+            }
+          ],
+          "include": [],
+          "predicate": null,
+          "reason": "Derived for a foreign key: Postgres indexes the key a constraint points at, never the column holding it.",
+          "indexName": "territories_region_id_ix_f2519bb",
+          "derived": "foreign-key"
+        }
+      ],
+      "vector": {
+        "specs": [],
+        "skipped": []
+      },
+      "vectorColumns": [],
+      "policies": [
+        {
+          "name": "territories_default_admin_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "territories_default_admin_read",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "territories_default_admin_read_ar_755c1df9",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "territories_default_admin_write_insert",
+          "operation": "insert",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": null,
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "territories_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "territories_default_admin_write_insert_ar_2863fa0b",
+            "using": null,
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "territories_default_admin_write_update",
+          "operation": "update",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "territories_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "territories_default_admin_write_update_ar_424ad9f3",
+            "using": "true",
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "territories_default_admin_write_delete",
+          "operation": "delete",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "territories_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "territories_default_admin_write_delete_ar_bf5c7bd1",
+            "using": "true",
+            "withCheck": null
+          }
+        }
+      ],
+      "triggers": [],
+      "auth": false
+    },
+    {
+      "schema": "public",
+      "table": "us_states",
+      "qualified": "public.us_states",
+      "varName": "usStates",
+      "kind": "collection",
+      "slug": "us_states",
+      "columns": [
+        {
+          "key": "stateId",
+          "column": "state_id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "stateId",
+            "slug": "us_states"
+          }
+        },
+        {
+          "key": "stateName",
+          "column": "state_name",
+          "type": {
+            "kind": "varchar",
+            "length": 100
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "stateName",
+            "slug": "us_states"
+          }
+        },
+        {
+          "key": "stateAbbr",
+          "column": "state_abbr",
+          "type": {
+            "kind": "varchar",
+            "length": 2
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "stateAbbr",
+            "slug": "us_states"
+          }
+        },
+        {
+          "key": "stateRegion",
+          "column": "state_region",
+          "type": {
+            "kind": "varchar",
+            "length": 50
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "stateRegion",
+            "slug": "us_states"
+          }
+        }
+      ],
+      "primaryKey": [
+        "state_id"
+      ],
+      "indexes": [],
+      "vector": {
+        "specs": [],
+        "skipped": []
+      },
+      "vectorColumns": [],
+      "policies": [
+        {
+          "name": "us_states_default_admin_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "us_states_default_admin_read",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "us_states_default_admin_read_ar_5ee1ab87",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "us_states_default_admin_write_insert",
+          "operation": "insert",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": null,
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "us_states_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "us_states_default_admin_write_insert_ar_e2e967ab",
+            "using": null,
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "us_states_default_admin_write_update",
+          "operation": "update",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "us_states_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "us_states_default_admin_write_update_ar_d4387d25",
+            "using": "true",
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "us_states_default_admin_write_delete",
+          "operation": "delete",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "us_states_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "us_states_default_admin_write_delete_ar_d7ecd245",
+            "using": "true",
+            "withCheck": null
+          }
+        }
+      ],
+      "triggers": [],
+      "auth": false
+    }
+  ],
+  "views": [],
+  "relations": [
+    {
+      "tableVar": "categories",
+      "key": "products",
+      "kind": "many",
+      "targetVar": "products",
+      "relationName": "products_categoryId"
+    },
+    {
+      "tableVar": "customers",
+      "key": "orders",
+      "kind": "many",
+      "targetVar": "orders",
+      "relationName": "orders_customerId"
+    },
+    {
+      "tableVar": "customers",
+      "key": "customer_demographics",
+      "kind": "many",
+      "targetVar": "customerCustomerDemo",
+      "relationName": "customer_demographics"
+    },
+    {
+      "tableVar": "customerCustomerDemo",
+      "key": "customer_id",
+      "kind": "one",
+      "targetVar": "customers",
+      "relationName": "customer_demographics",
+      "fields": [
+        "customer_id"
+      ],
+      "references": [
+        "customerId"
+      ]
+    },
+    {
+      "tableVar": "customerCustomerDemo",
+      "key": "customer_type_id",
+      "kind": "one",
+      "targetVar": "customerDemographics",
+      "relationName": "customer_customer_demo_customer_type_id",
+      "fields": [
+        "customer_type_id"
+      ],
+      "references": [
+        "customerTypeId"
+      ]
+    },
+    {
+      "tableVar": "employees",
+      "key": "employees",
+      "kind": "many",
+      "targetVar": "employees",
+      "relationName": "employees_reportsTo"
+    },
+    {
+      "tableVar": "employees",
+      "key": "orders",
+      "kind": "many",
+      "targetVar": "orders",
+      "relationName": "orders_employeeId"
+    },
+    {
+      "tableVar": "employees",
+      "key": "territories",
+      "kind": "many",
+      "targetVar": "employeeTerritories",
+      "relationName": "territories"
+    },
+    {
+      "tableVar": "employees",
+      "key": "reportsTo",
+      "kind": "one",
+      "targetVar": "employees",
+      "relationName": "employees_reportsTo",
+      "fields": [
+        "reportsTo"
+      ],
+      "references": [
+        "employeeId"
+      ]
+    },
+    {
+      "tableVar": "employeeTerritories",
+      "key": "employee_id",
+      "kind": "one",
+      "targetVar": "employees",
+      "relationName": "territories",
+      "fields": [
+        "employee_id"
+      ],
+      "references": [
+        "employeeId"
+      ]
+    },
+    {
+      "tableVar": "employeeTerritories",
+      "key": "territory_id",
+      "kind": "one",
+      "targetVar": "territories",
+      "relationName": "employees",
+      "fields": [
+        "territory_id"
+      ],
+      "references": [
+        "territoryId"
+      ]
+    },
+    {
+      "tableVar": "orderDetails",
+      "key": "order",
+      "kind": "one",
+      "targetVar": "orders",
+      "relationName": "order_details_orderId",
+      "fields": [
+        "orderId"
+      ],
+      "references": [
+        "orderId"
+      ]
+    },
+    {
+      "tableVar": "orderDetails",
+      "key": "product",
+      "kind": "one",
+      "targetVar": "products",
+      "relationName": "order_details_productId",
+      "fields": [
+        "productId"
+      ],
+      "references": [
+        "productId"
+      ]
+    },
+    {
+      "tableVar": "orders",
+      "key": "order_details",
+      "kind": "many",
+      "targetVar": "orderDetails",
+      "relationName": "order_details_orderId"
+    },
+    {
+      "tableVar": "orders",
+      "key": "customer",
+      "kind": "one",
+      "targetVar": "customers",
+      "relationName": "orders_customerId",
+      "fields": [
+        "customerId"
+      ],
+      "references": [
+        "customerId"
+      ]
+    },
+    {
+      "tableVar": "orders",
+      "key": "employee",
+      "kind": "one",
+      "targetVar": "employees",
+      "relationName": "orders_employeeId",
+      "fields": [
+        "employeeId"
+      ],
+      "references": [
+        "employeeId"
+      ]
+    },
+    {
+      "tableVar": "orders",
+      "key": "shipVia",
+      "kind": "one",
+      "targetVar": "shippers",
+      "relationName": "orders_shipVia",
+      "fields": [
+        "shipVia"
+      ],
+      "references": [
+        "shipperId"
+      ]
+    },
+    {
+      "tableVar": "products",
+      "key": "order_details",
+      "kind": "many",
+      "targetVar": "orderDetails",
+      "relationName": "order_details_productId"
+    },
+    {
+      "tableVar": "products",
+      "key": "category",
+      "kind": "one",
+      "targetVar": "categories",
+      "relationName": "products_categoryId",
+      "fields": [
+        "categoryId"
+      ],
+      "references": [
+        "categoryId"
+      ]
+    },
+    {
+      "tableVar": "products",
+      "key": "supplier",
+      "kind": "one",
+      "targetVar": "suppliers",
+      "relationName": "products_supplierId",
+      "fields": [
+        "supplierId"
+      ],
+      "references": [
+        "supplierId"
+      ]
+    },
+    {
+      "tableVar": "region",
+      "key": "territories",
+      "kind": "many",
+      "targetVar": "territories",
+      "relationName": "territories_regionId"
+    },
+    {
+      "tableVar": "shippers",
+      "key": "orders",
+      "kind": "many",
+      "targetVar": "orders",
+      "relationName": "orders_shipVia"
+    },
+    {
+      "tableVar": "suppliers",
+      "key": "products",
+      "kind": "many",
+      "targetVar": "products",
+      "relationName": "products_supplierId"
+    },
+    {
+      "tableVar": "territories",
+      "key": "employees",
+      "kind": "many",
+      "targetVar": "employeeTerritories",
+      "relationName": "employees"
+    },
+    {
+      "tableVar": "territories",
+      "key": "region",
+      "kind": "one",
+      "targetVar": "region",
+      "relationName": "territories_regionId",
+      "fields": [
+        "regionId"
+      ],
+      "references": [
+        "regionId"
+      ]
+    }
+  ],
+  "extensions": [],
+  "functions": [],
+  "options": {
+    "databaseExtensions": []
+  }
+}

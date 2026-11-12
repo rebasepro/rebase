@@ -1,0 +1,164 @@
+[
+  {
+    "schema": "public",
+    "table": "album",
+    "column": "artist_id",
+    "type": "INTEGER",
+    "required": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "album",
+      "column": "artist_id",
+      "targetSchema": "public",
+      "targetTable": "artist",
+      "targetColumn": "artist_id",
+      "onDelete": "no action",
+      "constraintName": "album_artist_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"album\" ADD CONSTRAINT \"album_artist_id_fkey\" FOREIGN KEY (\"artist_id\") REFERENCES \"public\".\"artist\" (\"artist_id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "customer",
+    "column": "support_rep_id",
+    "type": "INTEGER",
+    "required": false,
+    "foreignKey": {
+      "schema": "public",
+      "table": "customer",
+      "column": "support_rep_id",
+      "targetSchema": "public",
+      "targetTable": "employee",
+      "targetColumn": "employee_id",
+      "onDelete": "no action",
+      "constraintName": "customer_support_rep_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"customer\" ADD CONSTRAINT \"customer_support_rep_id_fkey\" FOREIGN KEY (\"support_rep_id\") REFERENCES \"public\".\"employee\" (\"employee_id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "employee",
+    "column": "reports_to",
+    "type": "INTEGER",
+    "required": false,
+    "foreignKey": {
+      "schema": "public",
+      "table": "employee",
+      "column": "reports_to",
+      "targetSchema": "public",
+      "targetTable": "employee",
+      "targetColumn": "employee_id",
+      "onDelete": "no action",
+      "constraintName": "employee_reports_to_fkey",
+      "sql": "ALTER TABLE \"public\".\"employee\" ADD CONSTRAINT \"employee_reports_to_fkey\" FOREIGN KEY (\"reports_to\") REFERENCES \"public\".\"employee\" (\"employee_id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "invoice",
+    "column": "customer_id",
+    "type": "INTEGER",
+    "required": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "invoice",
+      "column": "customer_id",
+      "targetSchema": "public",
+      "targetTable": "customer",
+      "targetColumn": "customer_id",
+      "onDelete": "no action",
+      "constraintName": "invoice_customer_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"invoice\" ADD CONSTRAINT \"invoice_customer_id_fkey\" FOREIGN KEY (\"customer_id\") REFERENCES \"public\".\"customer\" (\"customer_id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "invoice_line",
+    "column": "invoice_id",
+    "type": "INTEGER",
+    "required": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "invoice_line",
+      "column": "invoice_id",
+      "targetSchema": "public",
+      "targetTable": "invoice",
+      "targetColumn": "invoice_id",
+      "onDelete": "no action",
+      "constraintName": "invoice_line_invoice_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"invoice_line\" ADD CONSTRAINT \"invoice_line_invoice_id_fkey\" FOREIGN KEY (\"invoice_id\") REFERENCES \"public\".\"invoice\" (\"invoice_id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "invoice_line",
+    "column": "track_id",
+    "type": "INTEGER",
+    "required": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "invoice_line",
+      "column": "track_id",
+      "targetSchema": "public",
+      "targetTable": "track",
+      "targetColumn": "track_id",
+      "onDelete": "no action",
+      "constraintName": "invoice_line_track_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"invoice_line\" ADD CONSTRAINT \"invoice_line_track_id_fkey\" FOREIGN KEY (\"track_id\") REFERENCES \"public\".\"track\" (\"track_id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "track",
+    "column": "album_id",
+    "type": "INTEGER",
+    "required": false,
+    "foreignKey": {
+      "schema": "public",
+      "table": "track",
+      "column": "album_id",
+      "targetSchema": "public",
+      "targetTable": "album",
+      "targetColumn": "album_id",
+      "onDelete": "no action",
+      "constraintName": "track_album_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"track\" ADD CONSTRAINT \"track_album_id_fkey\" FOREIGN KEY (\"album_id\") REFERENCES \"public\".\"album\" (\"album_id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "track",
+    "column": "genre_id",
+    "type": "INTEGER",
+    "required": false,
+    "foreignKey": {
+      "schema": "public",
+      "table": "track",
+      "column": "genre_id",
+      "targetSchema": "public",
+      "targetTable": "genre",
+      "targetColumn": "genre_id",
+      "onDelete": "no action",
+      "constraintName": "track_genre_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"track\" ADD CONSTRAINT \"track_genre_id_fkey\" FOREIGN KEY (\"genre_id\") REFERENCES \"public\".\"genre\" (\"genre_id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "track",
+    "column": "media_type_id",
+    "type": "INTEGER",
+    "required": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "track",
+      "column": "media_type_id",
+      "targetSchema": "public",
+      "targetTable": "media_type",
+      "targetColumn": "media_type_id",
+      "onDelete": "no action",
+      "constraintName": "track_media_type_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"track\" ADD CONSTRAINT \"track_media_type_id_fkey\" FOREIGN KEY (\"media_type_id\") REFERENCES \"public\".\"media_type\" (\"media_type_id\") ON DELETE NO ACTION"
+    }
+  }
+]

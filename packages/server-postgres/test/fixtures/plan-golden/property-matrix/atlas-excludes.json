@@ -1,0 +1,25 @@
+{
+  "search": [
+    "public.searched.search_vector",
+    "public.searched.search_vector_text",
+    "public.searched.searched_search_vector_gin",
+    "public.searched.searched_search_vector_text_trgm"
+  ],
+  "vector": [
+    "public.misc.vec",
+    "public.misc.vec_req",
+    "public.misc.vec_idx",
+    "public.misc.vec_wide",
+    "public.misc.vec_uniq",
+    "public.misc.misc_vec_hnsw_cosine",
+    "public.misc.misc_vec_req_hnsw_cosine",
+    "public.misc.misc_vec_idx_hnsw_cosine",
+    "public.misc.misc_vec_uniq_hnsw_cosine"
+  ],
+  "triggers": [
+    "public.bdm.bdm_d_update_touch",
+    "public.claim_tenanted.claim_tenanted_keep_tenant",
+    "public.membership_tenanted.membership_tenanted_keep_tenant",
+    "public.org_members.org_members_touched_at_touch"
+  ]
+}

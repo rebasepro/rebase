@@ -1,0 +1,41 @@
+[
+  {
+    "schema": "public",
+    "table": "playlist_track",
+    "columns": [
+      {
+        "name": "playlist_id",
+        "type": "INTEGER"
+      },
+      {
+        "name": "track_id",
+        "type": "INTEGER"
+      }
+    ],
+    "createTable": "CREATE TABLE IF NOT EXISTS \"public\".\"playlist_track\" (\"playlist_id\" INTEGER NOT NULL, \"track_id\" INTEGER NOT NULL, PRIMARY KEY (\"playlist_id\", \"track_id\"));",
+    "foreignKeys": [
+      {
+        "schema": "public",
+        "table": "playlist_track",
+        "column": "playlist_id",
+        "targetSchema": "public",
+        "targetTable": "playlist",
+        "targetColumn": "playlist_id",
+        "onDelete": "CASCADE",
+        "constraintName": "playlist_track_playlist_id_fkey",
+        "sql": "ALTER TABLE \"public\".\"playlist_track\" ADD CONSTRAINT \"playlist_track_playlist_id_fkey\" FOREIGN KEY (\"playlist_id\") REFERENCES \"public\".\"playlist\" (\"playlist_id\") ON DELETE CASCADE"
+      },
+      {
+        "schema": "public",
+        "table": "playlist_track",
+        "column": "track_id",
+        "targetSchema": "public",
+        "targetTable": "track",
+        "targetColumn": "track_id",
+        "onDelete": "CASCADE",
+        "constraintName": "playlist_track_track_id_fkey",
+        "sql": "ALTER TABLE \"public\".\"playlist_track\" ADD CONSTRAINT \"playlist_track_track_id_fkey\" FOREIGN KEY (\"track_id\") REFERENCES \"public\".\"track\" (\"track_id\") ON DELETE CASCADE"
+      }
+    ]
+  }
+]

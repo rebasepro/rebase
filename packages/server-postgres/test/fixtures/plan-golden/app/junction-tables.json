@@ -1,0 +1,41 @@
+[
+  {
+    "schema": "public",
+    "table": "posts_tags",
+    "columns": [
+      {
+        "name": "post_id",
+        "type": "UUID"
+      },
+      {
+        "name": "tag_id",
+        "type": "UUID"
+      }
+    ],
+    "createTable": "CREATE TABLE IF NOT EXISTS \"public\".\"posts_tags\" (\"post_id\" UUID NOT NULL, \"tag_id\" UUID NOT NULL, PRIMARY KEY (\"post_id\", \"tag_id\"));",
+    "foreignKeys": [
+      {
+        "schema": "public",
+        "table": "posts_tags",
+        "column": "post_id",
+        "targetSchema": "public",
+        "targetTable": "posts",
+        "targetColumn": "id",
+        "onDelete": "CASCADE",
+        "constraintName": "posts_tags_post_id_fkey",
+        "sql": "ALTER TABLE \"public\".\"posts_tags\" ADD CONSTRAINT \"posts_tags_post_id_fkey\" FOREIGN KEY (\"post_id\") REFERENCES \"public\".\"posts\" (\"id\") ON DELETE CASCADE"
+      },
+      {
+        "schema": "public",
+        "table": "posts_tags",
+        "column": "tag_id",
+        "targetSchema": "public",
+        "targetTable": "tags",
+        "targetColumn": "id",
+        "onDelete": "CASCADE",
+        "constraintName": "posts_tags_tag_id_fkey",
+        "sql": "ALTER TABLE \"public\".\"posts_tags\" ADD CONSTRAINT \"posts_tags_tag_id_fkey\" FOREIGN KEY (\"tag_id\") REFERENCES \"public\".\"tags\" (\"id\") ON DELETE CASCADE"
+      }
+    ]
+  }
+]

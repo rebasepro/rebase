@@ -1,0 +1,126 @@
+[
+  {
+    "schema": "public",
+    "table": "constraint_shapes",
+    "qualified": "public.constraint_shapes",
+    "enableRls": "ALTER TABLE \"public\".\"constraint_shapes\" ENABLE ROW LEVEL SECURITY;",
+    "policyStatements": [
+      "DROP POLICY IF EXISTS \"constraint_shapes_default_admin_read_ar_69c60494\" ON \"public\".\"constraint_shapes\";",
+      "DROP POLICY IF EXISTS \"constraint_shapes_default_admin_read\" ON \"public\".\"constraint_shapes\";",
+      "CREATE POLICY \"constraint_shapes_default_admin_read\" ON \"public\".\"constraint_shapes\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DROP POLICY IF EXISTS \"constraint_shapes_default_admin_write_insert_ar_bfbab573\" ON \"public\".\"constraint_shapes\";",
+      "DROP POLICY IF EXISTS \"constraint_shapes_default_admin_write_insert\" ON \"public\".\"constraint_shapes\";",
+      "CREATE POLICY \"constraint_shapes_default_admin_write_insert\" ON \"public\".\"constraint_shapes\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DROP POLICY IF EXISTS \"constraint_shapes_default_admin_write_update_ar_3b489c42\" ON \"public\".\"constraint_shapes\";",
+      "DROP POLICY IF EXISTS \"constraint_shapes_default_admin_write_update\" ON \"public\".\"constraint_shapes\";",
+      "CREATE POLICY \"constraint_shapes_default_admin_write_update\" ON \"public\".\"constraint_shapes\" AS PERMISSIVE FOR UPDATE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))) WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DROP POLICY IF EXISTS \"constraint_shapes_default_admin_write_delete_ar_4afd3c56\" ON \"public\".\"constraint_shapes\";",
+      "DROP POLICY IF EXISTS \"constraint_shapes_default_admin_write_delete\" ON \"public\".\"constraint_shapes\";",
+      "CREATE POLICY \"constraint_shapes_default_admin_write_delete\" ON \"public\".\"constraint_shapes\" AS PERMISSIVE FOR DELETE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+    ],
+    "policies": [
+      {
+        "name": "constraint_shapes_default_admin_read",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"constraint_shapes_default_admin_read_ar_69c60494\" ON \"public\".\"constraint_shapes\";",
+          "DROP POLICY IF EXISTS \"constraint_shapes_default_admin_read\" ON \"public\".\"constraint_shapes\";",
+          "CREATE POLICY \"constraint_shapes_default_admin_read\" ON \"public\".\"constraint_shapes\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "constraint_shapes_default_admin_write_insert",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"constraint_shapes_default_admin_write_insert_ar_bfbab573\" ON \"public\".\"constraint_shapes\";",
+          "DROP POLICY IF EXISTS \"constraint_shapes_default_admin_write_insert\" ON \"public\".\"constraint_shapes\";",
+          "CREATE POLICY \"constraint_shapes_default_admin_write_insert\" ON \"public\".\"constraint_shapes\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "constraint_shapes_default_admin_write_update",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"constraint_shapes_default_admin_write_update_ar_3b489c42\" ON \"public\".\"constraint_shapes\";",
+          "DROP POLICY IF EXISTS \"constraint_shapes_default_admin_write_update\" ON \"public\".\"constraint_shapes\";",
+          "CREATE POLICY \"constraint_shapes_default_admin_write_update\" ON \"public\".\"constraint_shapes\" AS PERMISSIVE FOR UPDATE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))) WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "constraint_shapes_default_admin_write_delete",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"constraint_shapes_default_admin_write_delete_ar_4afd3c56\" ON \"public\".\"constraint_shapes\";",
+          "DROP POLICY IF EXISTS \"constraint_shapes_default_admin_write_delete\" ON \"public\".\"constraint_shapes\";",
+          "CREATE POLICY \"constraint_shapes_default_admin_write_delete\" ON \"public\".\"constraint_shapes\" AS PERMISSIVE FOR DELETE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "table": "constraint_shapes_child",
+    "qualified": "public.constraint_shapes_child",
+    "enableRls": "ALTER TABLE \"public\".\"constraint_shapes_child\" ENABLE ROW LEVEL SECURITY;",
+    "policyStatements": [
+      "DROP POLICY IF EXISTS \"constraint_shapes_child_default_admin_read_ar_252706db\" ON \"public\".\"constraint_shapes_child\";",
+      "DROP POLICY IF EXISTS \"constraint_shapes_child_default_admin_read\" ON \"public\".\"constraint_shapes_child\";",
+      "CREATE POLICY \"constraint_shapes_child_default_admin_read\" ON \"public\".\"constraint_shapes_child\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DROP POLICY IF EXISTS \"constraint_shapes_child_default_admin_write_insert_ar_b75d3ab4\" ON \"public\".\"constraint_shapes_child\";",
+      "DROP POLICY IF EXISTS \"constraint_shapes_child_default_admin_write_insert\" ON \"public\".\"constraint_shapes_child\";",
+      "CREATE POLICY \"constraint_shapes_child_default_admin_write_insert\" ON \"public\".\"constraint_shapes_child\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DROP POLICY IF EXISTS \"constraint_shapes_child_default_admin_write_update_ar_09155eb8\" ON \"public\".\"constraint_shapes_child\";",
+      "DROP POLICY IF EXISTS \"constraint_shapes_child_default_admin_write_update\" ON \"public\".\"constraint_shapes_child\";",
+      "CREATE POLICY \"constraint_shapes_child_default_admin_write_update\" ON \"public\".\"constraint_shapes_child\" AS PERMISSIVE FOR UPDATE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))) WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DROP POLICY IF EXISTS \"constraint_shapes_child_default_admin_write_delete_ar_68681330\" ON \"public\".\"constraint_shapes_child\";",
+      "DROP POLICY IF EXISTS \"constraint_shapes_child_default_admin_write_delete\" ON \"public\".\"constraint_shapes_child\";",
+      "CREATE POLICY \"constraint_shapes_child_default_admin_write_delete\" ON \"public\".\"constraint_shapes_child\" AS PERMISSIVE FOR DELETE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+    ],
+    "policies": [
+      {
+        "name": "constraint_shapes_child_default_admin_read",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"constraint_shapes_child_default_admin_read_ar_252706db\" ON \"public\".\"constraint_shapes_child\";",
+          "DROP POLICY IF EXISTS \"constraint_shapes_child_default_admin_read\" ON \"public\".\"constraint_shapes_child\";",
+          "CREATE POLICY \"constraint_shapes_child_default_admin_read\" ON \"public\".\"constraint_shapes_child\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "constraint_shapes_child_default_admin_write_insert",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"constraint_shapes_child_default_admin_write_insert_ar_b75d3ab4\" ON \"public\".\"constraint_shapes_child\";",
+          "DROP POLICY IF EXISTS \"constraint_shapes_child_default_admin_write_insert\" ON \"public\".\"constraint_shapes_child\";",
+          "CREATE POLICY \"constraint_shapes_child_default_admin_write_insert\" ON \"public\".\"constraint_shapes_child\" AS PERMISSIVE FOR INSERT TO \"public\" WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "constraint_shapes_child_default_admin_write_update",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"constraint_shapes_child_default_admin_write_update_ar_09155eb8\" ON \"public\".\"constraint_shapes_child\";",
+          "DROP POLICY IF EXISTS \"constraint_shapes_child_default_admin_write_update\" ON \"public\".\"constraint_shapes_child\";",
+          "CREATE POLICY \"constraint_shapes_child_default_admin_write_update\" ON \"public\".\"constraint_shapes_child\" AS PERMISSIVE FOR UPDATE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))) WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "constraint_shapes_child_default_admin_write_delete",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"constraint_shapes_child_default_admin_write_delete_ar_68681330\" ON \"public\".\"constraint_shapes_child\";",
+          "DROP POLICY IF EXISTS \"constraint_shapes_child_default_admin_write_delete\" ON \"public\".\"constraint_shapes_child\";",
+          "CREATE POLICY \"constraint_shapes_child_default_admin_write_delete\" ON \"public\".\"constraint_shapes_child\" AS PERMISSIVE FOR DELETE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      }
+    ]
+  }
+]

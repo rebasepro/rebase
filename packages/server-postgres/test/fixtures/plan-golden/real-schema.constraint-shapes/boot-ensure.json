@@ -1,0 +1,242 @@
+{
+  "actions": [
+    {
+      "kind": "create-enum",
+      "target": "public.constraint_shapes_status",
+      "sql": "CREATE TYPE \"public\".\"constraint_shapes_status\" AS ENUM ('draft', 'published', 'archived');"
+    },
+    {
+      "kind": "create-enum",
+      "target": "public.constraint_shapes_tier",
+      "sql": "CREATE TYPE \"public\".\"constraint_shapes_tier\" AS ENUM ('free', 'pro', 'enterprise');"
+    },
+    {
+      "kind": "create-enum",
+      "target": "public.constraint_shapes_visibility",
+      "sql": "CREATE TYPE \"public\".\"constraint_shapes_visibility\" AS ENUM ('public', 'private');"
+    },
+    {
+      "kind": "create-enum",
+      "target": "public.constraint_shapes_pinned_kind",
+      "sql": "CREATE TYPE \"public\".\"constraint_shapes_pinned_kind\" AS ENUM ('only-one');"
+    },
+    {
+      "kind": "create-enum",
+      "target": "public.constraint_shapes_apostrophe_set",
+      "sql": "CREATE TYPE \"public\".\"constraint_shapes_apostrophe_set\" AS ENUM ('it''s', 'won''t');"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.constraint_shapes",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"constraint_shapes\" (\"id\" INTEGER PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.constraint_shapes",
+      "sql": "ALTER TABLE \"public\".\"constraint_shapes\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.constraint_shapes_child",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"constraint_shapes_child\" (\"id\" INTEGER PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.constraint_shapes_child",
+      "sql": "ALTER TABLE \"public\".\"constraint_shapes_child\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.constraint_shapes.email",
+      "sql": "ALTER TABLE \"public\".\"constraint_shapes\" ADD COLUMN IF NOT EXISTS \"email\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.constraint_shapes.slug",
+      "sql": "ALTER TABLE \"public\".\"constraint_shapes\" ADD COLUMN IF NOT EXISTS \"slug\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.constraint_shapes.code",
+      "sql": "ALTER TABLE \"public\".\"constraint_shapes\" ADD COLUMN IF NOT EXISTS \"code\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.constraint_shapes.status",
+      "sql": "ALTER TABLE \"public\".\"constraint_shapes\" ADD COLUMN IF NOT EXISTS \"status\" \"public\".\"constraint_shapes_status\" NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.constraint_shapes.tier",
+      "sql": "ALTER TABLE \"public\".\"constraint_shapes\" ADD COLUMN IF NOT EXISTS \"tier\" \"public\".\"constraint_shapes_tier\";"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.constraint_shapes.search",
+      "sql": "ALTER TABLE \"public\".\"constraint_shapes\" ADD COLUMN IF NOT EXISTS \"search\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.constraint_shapes.price",
+      "sql": "ALTER TABLE \"public\".\"constraint_shapes\" ADD COLUMN IF NOT EXISTS \"price\" NUMERIC NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.constraint_shapes.discount",
+      "sql": "ALTER TABLE \"public\".\"constraint_shapes\" ADD COLUMN IF NOT EXISTS \"discount\" REAL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.constraint_shapes.quantity",
+      "sql": "ALTER TABLE \"public\".\"constraint_shapes\" ADD COLUMN IF NOT EXISTS \"quantity\" INTEGER;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.constraint_shapes.rating",
+      "sql": "ALTER TABLE \"public\".\"constraint_shapes\" ADD COLUMN IF NOT EXISTS \"rating\" INTEGER;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.constraint_shapes.temperature",
+      "sql": "ALTER TABLE \"public\".\"constraint_shapes\" ADD COLUMN IF NOT EXISTS \"temperature\" INTEGER;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.constraint_shapes.exact_count",
+      "sql": "ALTER TABLE \"public\".\"constraint_shapes\" ADD COLUMN IF NOT EXISTS \"exact_count\" INTEGER;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.constraint_shapes.percent",
+      "sql": "ALTER TABLE \"public\".\"constraint_shapes\" ADD COLUMN IF NOT EXISTS \"percent\" NUMERIC(5, 2);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.constraint_shapes.start_day",
+      "sql": "ALTER TABLE \"public\".\"constraint_shapes\" ADD COLUMN IF NOT EXISTS \"start_day\" INTEGER;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.constraint_shapes.end_day",
+      "sql": "ALTER TABLE \"public\".\"constraint_shapes\" ADD COLUMN IF NOT EXISTS \"end_day\" INTEGER;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.constraint_shapes.either_way",
+      "sql": "ALTER TABLE \"public\".\"constraint_shapes\" ADD COLUMN IF NOT EXISTS \"either_way\" INTEGER;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.constraint_shapes.computed_total",
+      "sql": "ALTER TABLE \"public\".\"constraint_shapes\" ADD COLUMN IF NOT EXISTS \"computed_total\" NUMERIC;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.constraint_shapes.visibility",
+      "sql": "ALTER TABLE \"public\".\"constraint_shapes\" ADD COLUMN IF NOT EXISTS \"visibility\" \"public\".\"constraint_shapes_visibility\";"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.constraint_shapes.pinned_kind",
+      "sql": "ALTER TABLE \"public\".\"constraint_shapes\" ADD COLUMN IF NOT EXISTS \"pinned_kind\" \"public\".\"constraint_shapes_pinned_kind\";"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.constraint_shapes.apostrophe_set",
+      "sql": "ALTER TABLE \"public\".\"constraint_shapes\" ADD COLUMN IF NOT EXISTS \"apostrophe_set\" \"public\".\"constraint_shapes_apostrophe_set\";"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.constraint_shapes.fixed_len",
+      "sql": "ALTER TABLE \"public\".\"constraint_shapes\" ADD COLUMN IF NOT EXISTS \"fixed_len\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.constraint_shapes.not_reserved",
+      "sql": "ALTER TABLE \"public\".\"constraint_shapes\" ADD COLUMN IF NOT EXISTS \"not_reserved\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.constraint_shapes.email_unique",
+      "sql": "ALTER TABLE \"public\".\"constraint_shapes\" ADD COLUMN IF NOT EXISTS \"email_unique\" TEXT UNIQUE;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.constraint_shapes.payload",
+      "sql": "ALTER TABLE \"public\".\"constraint_shapes\" ADD COLUMN IF NOT EXISTS \"payload\" JSONB;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.constraint_shapes.created_at",
+      "sql": "ALTER TABLE \"public\".\"constraint_shapes\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.constraint_shapes_child.note",
+      "sql": "ALTER TABLE \"public\".\"constraint_shapes_child\" ADD COLUMN IF NOT EXISTS \"note\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.constraint_shapes_child.parent_id",
+      "sql": "ALTER TABLE \"public\".\"constraint_shapes_child\" ADD COLUMN IF NOT EXISTS \"parent_id\" INTEGER NOT NULL;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.constraint_shapes_child.constraint_shapes_child_parent_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"constraint_shapes_child\" ADD CONSTRAINT \"constraint_shapes_child_parent_id_fkey\" FOREIGN KEY (\"parent_id\") REFERENCES \"public\".\"constraint_shapes\" (\"id\") ON DELETE CASCADE;"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.constraint_shapes_child",
+      "sql": "CREATE INDEX IF NOT EXISTS \"constraint_shapes_child_parent_id_ix_d373065\" ON \"public\".\"constraint_shapes_child\" (\"parent_id\");"
+    }
+  ],
+  "statements": [
+    "CREATE TYPE \"public\".\"constraint_shapes_status\" AS ENUM ('draft', 'published', 'archived');",
+    "CREATE TYPE \"public\".\"constraint_shapes_tier\" AS ENUM ('free', 'pro', 'enterprise');",
+    "CREATE TYPE \"public\".\"constraint_shapes_visibility\" AS ENUM ('public', 'private');",
+    "CREATE TYPE \"public\".\"constraint_shapes_pinned_kind\" AS ENUM ('only-one');",
+    "CREATE TYPE \"public\".\"constraint_shapes_apostrophe_set\" AS ENUM ('it''s', 'won''t');",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"constraint_shapes\" (\"id\" INTEGER PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"constraint_shapes\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"constraint_shapes_child\" (\"id\" INTEGER PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"constraint_shapes_child\" ENABLE ROW LEVEL SECURITY;",
+    "ALTER TABLE \"public\".\"constraint_shapes\" ADD COLUMN IF NOT EXISTS \"email\" TEXT;",
+    "ALTER TABLE \"public\".\"constraint_shapes\" ADD COLUMN IF NOT EXISTS \"slug\" TEXT;",
+    "ALTER TABLE \"public\".\"constraint_shapes\" ADD COLUMN IF NOT EXISTS \"code\" TEXT;",
+    "ALTER TABLE \"public\".\"constraint_shapes\" ADD COLUMN IF NOT EXISTS \"status\" \"public\".\"constraint_shapes_status\" NOT NULL;",
+    "ALTER TABLE \"public\".\"constraint_shapes\" ADD COLUMN IF NOT EXISTS \"tier\" \"public\".\"constraint_shapes_tier\";",
+    "ALTER TABLE \"public\".\"constraint_shapes\" ADD COLUMN IF NOT EXISTS \"search\" TEXT;",
+    "ALTER TABLE \"public\".\"constraint_shapes\" ADD COLUMN IF NOT EXISTS \"price\" NUMERIC NOT NULL;",
+    "ALTER TABLE \"public\".\"constraint_shapes\" ADD COLUMN IF NOT EXISTS \"discount\" REAL;",
+    "ALTER TABLE \"public\".\"constraint_shapes\" ADD COLUMN IF NOT EXISTS \"quantity\" INTEGER;",
+    "ALTER TABLE \"public\".\"constraint_shapes\" ADD COLUMN IF NOT EXISTS \"rating\" INTEGER;",
+    "ALTER TABLE \"public\".\"constraint_shapes\" ADD COLUMN IF NOT EXISTS \"temperature\" INTEGER;",
+    "ALTER TABLE \"public\".\"constraint_shapes\" ADD COLUMN IF NOT EXISTS \"exact_count\" INTEGER;",
+    "ALTER TABLE \"public\".\"constraint_shapes\" ADD COLUMN IF NOT EXISTS \"percent\" NUMERIC(5, 2);",
+    "ALTER TABLE \"public\".\"constraint_shapes\" ADD COLUMN IF NOT EXISTS \"start_day\" INTEGER;",
+    "ALTER TABLE \"public\".\"constraint_shapes\" ADD COLUMN IF NOT EXISTS \"end_day\" INTEGER;",
+    "ALTER TABLE \"public\".\"constraint_shapes\" ADD COLUMN IF NOT EXISTS \"either_way\" INTEGER;",
+    "ALTER TABLE \"public\".\"constraint_shapes\" ADD COLUMN IF NOT EXISTS \"computed_total\" NUMERIC;",
+    "ALTER TABLE \"public\".\"constraint_shapes\" ADD COLUMN IF NOT EXISTS \"visibility\" \"public\".\"constraint_shapes_visibility\";",
+    "ALTER TABLE \"public\".\"constraint_shapes\" ADD COLUMN IF NOT EXISTS \"pinned_kind\" \"public\".\"constraint_shapes_pinned_kind\";",
+    "ALTER TABLE \"public\".\"constraint_shapes\" ADD COLUMN IF NOT EXISTS \"apostrophe_set\" \"public\".\"constraint_shapes_apostrophe_set\";",
+    "ALTER TABLE \"public\".\"constraint_shapes\" ADD COLUMN IF NOT EXISTS \"fixed_len\" TEXT;",
+    "ALTER TABLE \"public\".\"constraint_shapes\" ADD COLUMN IF NOT EXISTS \"not_reserved\" TEXT;",
+    "ALTER TABLE \"public\".\"constraint_shapes\" ADD COLUMN IF NOT EXISTS \"email_unique\" TEXT UNIQUE;",
+    "ALTER TABLE \"public\".\"constraint_shapes\" ADD COLUMN IF NOT EXISTS \"payload\" JSONB;",
+    "ALTER TABLE \"public\".\"constraint_shapes\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;",
+    "ALTER TABLE \"public\".\"constraint_shapes_child\" ADD COLUMN IF NOT EXISTS \"note\" TEXT;",
+    "ALTER TABLE \"public\".\"constraint_shapes_child\" ADD COLUMN IF NOT EXISTS \"parent_id\" INTEGER NOT NULL;",
+    "ALTER TABLE \"public\".\"constraint_shapes_child\" ADD CONSTRAINT \"constraint_shapes_child_parent_id_fkey\" FOREIGN KEY (\"parent_id\") REFERENCES \"public\".\"constraint_shapes\" (\"id\") ON DELETE CASCADE;",
+    "CREATE INDEX IF NOT EXISTS \"constraint_shapes_child_parent_id_ix_d373065\" ON \"public\".\"constraint_shapes_child\" (\"parent_id\");"
+  ],
+  "legacyForeignKeys": [],
+  "searchDrift": [],
+  "searchAdopted": [],
+  "vectorIndexSkipped": [],
+  "withheldConstraints": [],
+  "columnTypeDrift": [],
+  "orphanedRequiredColumns": [],
+  "deferredIndexes": []
+}

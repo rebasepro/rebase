@@ -1,0 +1,945 @@
+[
+  {
+    "schema": "public",
+    "table": "active_storage_attachments",
+    "column": "blob_id",
+    "type": "BIGINT",
+    "required": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "active_storage_attachments",
+      "column": "blob_id",
+      "targetSchema": "public",
+      "targetTable": "active_storage_blobs",
+      "targetColumn": "id",
+      "onDelete": "no action",
+      "constraintName": "active_storage_attachments_blob_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"active_storage_attachments\" ADD CONSTRAINT \"active_storage_attachments_blob_id_fkey\" FOREIGN KEY (\"blob_id\") REFERENCES \"public\".\"active_storage_blobs\" (\"id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "active_storage_variant_records",
+    "column": "blob_id",
+    "type": "BIGINT",
+    "required": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "active_storage_variant_records",
+      "column": "blob_id",
+      "targetSchema": "public",
+      "targetTable": "active_storage_blobs",
+      "targetColumn": "id",
+      "onDelete": "no action",
+      "constraintName": "active_storage_variant_records_blob_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"active_storage_variant_records\" ADD CONSTRAINT \"active_storage_variant_records_blob_id_fkey\" FOREIGN KEY (\"blob_id\") REFERENCES \"public\".\"active_storage_blobs\" (\"id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "changeset_comments",
+    "column": "author_id",
+    "type": "BIGINT",
+    "required": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "changeset_comments",
+      "column": "author_id",
+      "targetSchema": "public",
+      "targetTable": "users",
+      "targetColumn": "id",
+      "onDelete": "no action",
+      "constraintName": "changeset_comments_author_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"changeset_comments\" ADD CONSTRAINT \"changeset_comments_author_id_fkey\" FOREIGN KEY (\"author_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "changeset_comments",
+    "column": "changeset_id",
+    "type": "BIGINT",
+    "required": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "changeset_comments",
+      "column": "changeset_id",
+      "targetSchema": "public",
+      "targetTable": "changesets",
+      "targetColumn": "id",
+      "onDelete": "no action",
+      "constraintName": "changeset_comments_changeset_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"changeset_comments\" ADD CONSTRAINT \"changeset_comments_changeset_id_fkey\" FOREIGN KEY (\"changeset_id\") REFERENCES \"public\".\"changesets\" (\"id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "changeset_tags",
+    "column": "changeset_id",
+    "type": "BIGINT",
+    "required": true,
+    "columnOwnedByProperty": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "changeset_tags",
+      "column": "changeset_id",
+      "targetSchema": "public",
+      "targetTable": "changesets",
+      "targetColumn": "id",
+      "onDelete": "no action",
+      "constraintName": "changeset_tags_changeset_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"changeset_tags\" ADD CONSTRAINT \"changeset_tags_changeset_id_fkey\" FOREIGN KEY (\"changeset_id\") REFERENCES \"public\".\"changesets\" (\"id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "changesets",
+    "column": "user_id",
+    "type": "BIGINT",
+    "required": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "changesets",
+      "column": "user_id",
+      "targetSchema": "public",
+      "targetTable": "users",
+      "targetColumn": "id",
+      "onDelete": "no action",
+      "constraintName": "changesets_user_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"changesets\" ADD CONSTRAINT \"changesets_user_id_fkey\" FOREIGN KEY (\"user_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "current_node_tags",
+    "column": "node_id",
+    "type": "BIGINT",
+    "required": true,
+    "columnOwnedByProperty": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "current_node_tags",
+      "column": "node_id",
+      "targetSchema": "public",
+      "targetTable": "current_nodes",
+      "targetColumn": "id",
+      "onDelete": "no action",
+      "constraintName": "current_node_tags_node_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"current_node_tags\" ADD CONSTRAINT \"current_node_tags_node_id_fkey\" FOREIGN KEY (\"node_id\") REFERENCES \"public\".\"current_nodes\" (\"id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "current_nodes",
+    "column": "changeset_id",
+    "type": "BIGINT",
+    "required": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "current_nodes",
+      "column": "changeset_id",
+      "targetSchema": "public",
+      "targetTable": "changesets",
+      "targetColumn": "id",
+      "onDelete": "no action",
+      "constraintName": "current_nodes_changeset_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"current_nodes\" ADD CONSTRAINT \"current_nodes_changeset_id_fkey\" FOREIGN KEY (\"changeset_id\") REFERENCES \"public\".\"changesets\" (\"id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "current_relation_members",
+    "column": "relation_id",
+    "type": "BIGINT",
+    "required": true,
+    "columnOwnedByProperty": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "current_relation_members",
+      "column": "relation_id",
+      "targetSchema": "public",
+      "targetTable": "current_relations",
+      "targetColumn": "id",
+      "onDelete": "no action",
+      "constraintName": "current_relation_members_relation_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"current_relation_members\" ADD CONSTRAINT \"current_relation_members_relation_id_fkey\" FOREIGN KEY (\"relation_id\") REFERENCES \"public\".\"current_relations\" (\"id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "current_relation_tags",
+    "column": "relation_id",
+    "type": "BIGINT",
+    "required": true,
+    "columnOwnedByProperty": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "current_relation_tags",
+      "column": "relation_id",
+      "targetSchema": "public",
+      "targetTable": "current_relations",
+      "targetColumn": "id",
+      "onDelete": "no action",
+      "constraintName": "current_relation_tags_relation_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"current_relation_tags\" ADD CONSTRAINT \"current_relation_tags_relation_id_fkey\" FOREIGN KEY (\"relation_id\") REFERENCES \"public\".\"current_relations\" (\"id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "current_relations",
+    "column": "changeset_id",
+    "type": "BIGINT",
+    "required": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "current_relations",
+      "column": "changeset_id",
+      "targetSchema": "public",
+      "targetTable": "changesets",
+      "targetColumn": "id",
+      "onDelete": "no action",
+      "constraintName": "current_relations_changeset_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"current_relations\" ADD CONSTRAINT \"current_relations_changeset_id_fkey\" FOREIGN KEY (\"changeset_id\") REFERENCES \"public\".\"changesets\" (\"id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "current_way_nodes",
+    "column": "way_id",
+    "type": "BIGINT",
+    "required": true,
+    "columnOwnedByProperty": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "current_way_nodes",
+      "column": "way_id",
+      "targetSchema": "public",
+      "targetTable": "current_ways",
+      "targetColumn": "id",
+      "onDelete": "no action",
+      "constraintName": "current_way_nodes_way_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"current_way_nodes\" ADD CONSTRAINT \"current_way_nodes_way_id_fkey\" FOREIGN KEY (\"way_id\") REFERENCES \"public\".\"current_ways\" (\"id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "current_way_nodes",
+    "column": "node_id",
+    "type": "BIGINT",
+    "required": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "current_way_nodes",
+      "column": "node_id",
+      "targetSchema": "public",
+      "targetTable": "current_nodes",
+      "targetColumn": "id",
+      "onDelete": "no action",
+      "constraintName": "current_way_nodes_node_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"current_way_nodes\" ADD CONSTRAINT \"current_way_nodes_node_id_fkey\" FOREIGN KEY (\"node_id\") REFERENCES \"public\".\"current_nodes\" (\"id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "current_way_tags",
+    "column": "way_id",
+    "type": "BIGINT",
+    "required": true,
+    "columnOwnedByProperty": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "current_way_tags",
+      "column": "way_id",
+      "targetSchema": "public",
+      "targetTable": "current_ways",
+      "targetColumn": "id",
+      "onDelete": "no action",
+      "constraintName": "current_way_tags_way_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"current_way_tags\" ADD CONSTRAINT \"current_way_tags_way_id_fkey\" FOREIGN KEY (\"way_id\") REFERENCES \"public\".\"current_ways\" (\"id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "current_ways",
+    "column": "changeset_id",
+    "type": "BIGINT",
+    "required": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "current_ways",
+      "column": "changeset_id",
+      "targetSchema": "public",
+      "targetTable": "changesets",
+      "targetColumn": "id",
+      "onDelete": "no action",
+      "constraintName": "current_ways_changeset_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"current_ways\" ADD CONSTRAINT \"current_ways_changeset_id_fkey\" FOREIGN KEY (\"changeset_id\") REFERENCES \"public\".\"changesets\" (\"id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "diary_comments",
+    "column": "diary_entry_id",
+    "type": "BIGINT",
+    "required": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "diary_comments",
+      "column": "diary_entry_id",
+      "targetSchema": "public",
+      "targetTable": "diary_entries",
+      "targetColumn": "id",
+      "onDelete": "no action",
+      "constraintName": "diary_comments_diary_entry_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"diary_comments\" ADD CONSTRAINT \"diary_comments_diary_entry_id_fkey\" FOREIGN KEY (\"diary_entry_id\") REFERENCES \"public\".\"diary_entries\" (\"id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "diary_comments",
+    "column": "user_id",
+    "type": "BIGINT",
+    "required": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "diary_comments",
+      "column": "user_id",
+      "targetSchema": "public",
+      "targetTable": "users",
+      "targetColumn": "id",
+      "onDelete": "no action",
+      "constraintName": "diary_comments_user_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"diary_comments\" ADD CONSTRAINT \"diary_comments_user_id_fkey\" FOREIGN KEY (\"user_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "diary_entries",
+    "column": "language_code",
+    "type": "TEXT",
+    "required": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "diary_entries",
+      "column": "language_code",
+      "targetSchema": "public",
+      "targetTable": "languages",
+      "targetColumn": "code",
+      "onDelete": "no action",
+      "constraintName": "diary_entries_language_code_fkey",
+      "sql": "ALTER TABLE \"public\".\"diary_entries\" ADD CONSTRAINT \"diary_entries_language_code_fkey\" FOREIGN KEY (\"language_code\") REFERENCES \"public\".\"languages\" (\"code\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "diary_entries",
+    "column": "user_id",
+    "type": "BIGINT",
+    "required": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "diary_entries",
+      "column": "user_id",
+      "targetSchema": "public",
+      "targetTable": "users",
+      "targetColumn": "id",
+      "onDelete": "no action",
+      "constraintName": "diary_entries_user_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"diary_entries\" ADD CONSTRAINT \"diary_entries_user_id_fkey\" FOREIGN KEY (\"user_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "friends",
+    "column": "friend_user_id",
+    "type": "BIGINT",
+    "required": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "friends",
+      "column": "friend_user_id",
+      "targetSchema": "public",
+      "targetTable": "users",
+      "targetColumn": "id",
+      "onDelete": "no action",
+      "constraintName": "friends_friend_user_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"friends\" ADD CONSTRAINT \"friends_friend_user_id_fkey\" FOREIGN KEY (\"friend_user_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "friends",
+    "column": "user_id",
+    "type": "BIGINT",
+    "required": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "friends",
+      "column": "user_id",
+      "targetSchema": "public",
+      "targetTable": "users",
+      "targetColumn": "id",
+      "onDelete": "no action",
+      "constraintName": "friends_user_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"friends\" ADD CONSTRAINT \"friends_user_id_fkey\" FOREIGN KEY (\"user_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "gps_points",
+    "column": "gpx_id",
+    "type": "BIGINT",
+    "required": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "gps_points",
+      "column": "gpx_id",
+      "targetSchema": "public",
+      "targetTable": "gpx_files",
+      "targetColumn": "id",
+      "onDelete": "no action",
+      "constraintName": "gps_points_gpx_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"gps_points\" ADD CONSTRAINT \"gps_points_gpx_id_fkey\" FOREIGN KEY (\"gpx_id\") REFERENCES \"public\".\"gpx_files\" (\"id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "gpx_file_tags",
+    "column": "gpx_id",
+    "type": "BIGINT",
+    "required": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "gpx_file_tags",
+      "column": "gpx_id",
+      "targetSchema": "public",
+      "targetTable": "gpx_files",
+      "targetColumn": "id",
+      "onDelete": "no action",
+      "constraintName": "gpx_file_tags_gpx_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"gpx_file_tags\" ADD CONSTRAINT \"gpx_file_tags_gpx_id_fkey\" FOREIGN KEY (\"gpx_id\") REFERENCES \"public\".\"gpx_files\" (\"id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "gpx_files",
+    "column": "user_id",
+    "type": "BIGINT",
+    "required": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "gpx_files",
+      "column": "user_id",
+      "targetSchema": "public",
+      "targetTable": "users",
+      "targetColumn": "id",
+      "onDelete": "no action",
+      "constraintName": "gpx_files_user_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"gpx_files\" ADD CONSTRAINT \"gpx_files_user_id_fkey\" FOREIGN KEY (\"user_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "issue_comments",
+    "column": "issue_id",
+    "type": "INTEGER",
+    "required": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "issue_comments",
+      "column": "issue_id",
+      "targetSchema": "public",
+      "targetTable": "issues",
+      "targetColumn": "id",
+      "onDelete": "no action",
+      "constraintName": "issue_comments_issue_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"issue_comments\" ADD CONSTRAINT \"issue_comments_issue_id_fkey\" FOREIGN KEY (\"issue_id\") REFERENCES \"public\".\"issues\" (\"id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "issue_comments",
+    "column": "user_id",
+    "type": "BIGINT",
+    "required": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "issue_comments",
+      "column": "user_id",
+      "targetSchema": "public",
+      "targetTable": "users",
+      "targetColumn": "id",
+      "onDelete": "no action",
+      "constraintName": "issue_comments_user_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"issue_comments\" ADD CONSTRAINT \"issue_comments_user_id_fkey\" FOREIGN KEY (\"user_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "issues",
+    "column": "reported_user_id",
+    "type": "BIGINT",
+    "required": false,
+    "foreignKey": {
+      "schema": "public",
+      "table": "issues",
+      "column": "reported_user_id",
+      "targetSchema": "public",
+      "targetTable": "users",
+      "targetColumn": "id",
+      "onDelete": "no action",
+      "constraintName": "issues_reported_user_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"issues\" ADD CONSTRAINT \"issues_reported_user_id_fkey\" FOREIGN KEY (\"reported_user_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "issues",
+    "column": "resolved_by",
+    "type": "BIGINT",
+    "required": false,
+    "foreignKey": {
+      "schema": "public",
+      "table": "issues",
+      "column": "resolved_by",
+      "targetSchema": "public",
+      "targetTable": "users",
+      "targetColumn": "id",
+      "onDelete": "no action",
+      "constraintName": "issues_resolved_by_fkey",
+      "sql": "ALTER TABLE \"public\".\"issues\" ADD CONSTRAINT \"issues_resolved_by_fkey\" FOREIGN KEY (\"resolved_by\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "issues",
+    "column": "updated_by",
+    "type": "BIGINT",
+    "required": false,
+    "foreignKey": {
+      "schema": "public",
+      "table": "issues",
+      "column": "updated_by",
+      "targetSchema": "public",
+      "targetTable": "users",
+      "targetColumn": "id",
+      "onDelete": "no action",
+      "constraintName": "issues_updated_by_fkey",
+      "sql": "ALTER TABLE \"public\".\"issues\" ADD CONSTRAINT \"issues_updated_by_fkey\" FOREIGN KEY (\"updated_by\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "messages",
+    "column": "from_user_id",
+    "type": "BIGINT",
+    "required": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "messages",
+      "column": "from_user_id",
+      "targetSchema": "public",
+      "targetTable": "users",
+      "targetColumn": "id",
+      "onDelete": "no action",
+      "constraintName": "messages_from_user_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"messages\" ADD CONSTRAINT \"messages_from_user_id_fkey\" FOREIGN KEY (\"from_user_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "messages",
+    "column": "to_user_id",
+    "type": "BIGINT",
+    "required": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "messages",
+      "column": "to_user_id",
+      "targetSchema": "public",
+      "targetTable": "users",
+      "targetColumn": "id",
+      "onDelete": "no action",
+      "constraintName": "messages_to_user_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"messages\" ADD CONSTRAINT \"messages_to_user_id_fkey\" FOREIGN KEY (\"to_user_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "note_comments",
+    "column": "author_id",
+    "type": "BIGINT",
+    "required": false,
+    "foreignKey": {
+      "schema": "public",
+      "table": "note_comments",
+      "column": "author_id",
+      "targetSchema": "public",
+      "targetTable": "users",
+      "targetColumn": "id",
+      "onDelete": "no action",
+      "constraintName": "note_comments_author_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"note_comments\" ADD CONSTRAINT \"note_comments_author_id_fkey\" FOREIGN KEY (\"author_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "note_comments",
+    "column": "note_id",
+    "type": "BIGINT",
+    "required": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "note_comments",
+      "column": "note_id",
+      "targetSchema": "public",
+      "targetTable": "notes",
+      "targetColumn": "id",
+      "onDelete": "no action",
+      "constraintName": "note_comments_note_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"note_comments\" ADD CONSTRAINT \"note_comments_note_id_fkey\" FOREIGN KEY (\"note_id\") REFERENCES \"public\".\"notes\" (\"id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "notes",
+    "column": "user_id",
+    "type": "BIGINT",
+    "required": false,
+    "foreignKey": {
+      "schema": "public",
+      "table": "notes",
+      "column": "user_id",
+      "targetSchema": "public",
+      "targetTable": "users",
+      "targetColumn": "id",
+      "onDelete": "no action",
+      "constraintName": "notes_user_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"notes\" ADD CONSTRAINT \"notes_user_id_fkey\" FOREIGN KEY (\"user_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "oauth_access_grants",
+    "column": "resource_owner_id",
+    "type": "BIGINT",
+    "required": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "oauth_access_grants",
+      "column": "resource_owner_id",
+      "targetSchema": "public",
+      "targetTable": "users",
+      "targetColumn": "id",
+      "onDelete": "no action",
+      "constraintName": "oauth_access_grants_resource_owner_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"oauth_access_grants\" ADD CONSTRAINT \"oauth_access_grants_resource_owner_id_fkey\" FOREIGN KEY (\"resource_owner_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "oauth_access_grants",
+    "column": "application_id",
+    "type": "BIGINT",
+    "required": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "oauth_access_grants",
+      "column": "application_id",
+      "targetSchema": "public",
+      "targetTable": "oauth_applications",
+      "targetColumn": "id",
+      "onDelete": "no action",
+      "constraintName": "oauth_access_grants_application_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"oauth_access_grants\" ADD CONSTRAINT \"oauth_access_grants_application_id_fkey\" FOREIGN KEY (\"application_id\") REFERENCES \"public\".\"oauth_applications\" (\"id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "oauth_access_tokens",
+    "column": "application_id",
+    "type": "BIGINT",
+    "required": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "oauth_access_tokens",
+      "column": "application_id",
+      "targetSchema": "public",
+      "targetTable": "oauth_applications",
+      "targetColumn": "id",
+      "onDelete": "no action",
+      "constraintName": "oauth_access_tokens_application_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"oauth_access_tokens\" ADD CONSTRAINT \"oauth_access_tokens_application_id_fkey\" FOREIGN KEY (\"application_id\") REFERENCES \"public\".\"oauth_applications\" (\"id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "oauth_access_tokens",
+    "column": "resource_owner_id",
+    "type": "BIGINT",
+    "required": false,
+    "foreignKey": {
+      "schema": "public",
+      "table": "oauth_access_tokens",
+      "column": "resource_owner_id",
+      "targetSchema": "public",
+      "targetTable": "users",
+      "targetColumn": "id",
+      "onDelete": "no action",
+      "constraintName": "oauth_access_tokens_resource_owner_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"oauth_access_tokens\" ADD CONSTRAINT \"oauth_access_tokens_resource_owner_id_fkey\" FOREIGN KEY (\"resource_owner_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "oauth_applications",
+    "column": "owner_id",
+    "type": "BIGINT",
+    "required": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "oauth_applications",
+      "column": "owner_id",
+      "targetSchema": "public",
+      "targetTable": "users",
+      "targetColumn": "id",
+      "onDelete": "no action",
+      "constraintName": "oauth_applications_owner_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"oauth_applications\" ADD CONSTRAINT \"oauth_applications_owner_id_fkey\" FOREIGN KEY (\"owner_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "oauth_openid_requests",
+    "column": "access_grant_id",
+    "type": "BIGINT",
+    "required": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "oauth_openid_requests",
+      "column": "access_grant_id",
+      "targetSchema": "public",
+      "targetTable": "oauth_access_grants",
+      "targetColumn": "id",
+      "onDelete": "cascade",
+      "constraintName": "oauth_openid_requests_access_grant_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"oauth_openid_requests\" ADD CONSTRAINT \"oauth_openid_requests_access_grant_id_fkey\" FOREIGN KEY (\"access_grant_id\") REFERENCES \"public\".\"oauth_access_grants\" (\"id\") ON DELETE CASCADE"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "redactions",
+    "column": "user_id",
+    "type": "BIGINT",
+    "required": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "redactions",
+      "column": "user_id",
+      "targetSchema": "public",
+      "targetTable": "users",
+      "targetColumn": "id",
+      "onDelete": "no action",
+      "constraintName": "redactions_user_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"redactions\" ADD CONSTRAINT \"redactions_user_id_fkey\" FOREIGN KEY (\"user_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "reports",
+    "column": "issue_id",
+    "type": "INTEGER",
+    "required": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "reports",
+      "column": "issue_id",
+      "targetSchema": "public",
+      "targetTable": "issues",
+      "targetColumn": "id",
+      "onDelete": "no action",
+      "constraintName": "reports_issue_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"reports\" ADD CONSTRAINT \"reports_issue_id_fkey\" FOREIGN KEY (\"issue_id\") REFERENCES \"public\".\"issues\" (\"id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "reports",
+    "column": "user_id",
+    "type": "BIGINT",
+    "required": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "reports",
+      "column": "user_id",
+      "targetSchema": "public",
+      "targetTable": "users",
+      "targetColumn": "id",
+      "onDelete": "no action",
+      "constraintName": "reports_user_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"reports\" ADD CONSTRAINT \"reports_user_id_fkey\" FOREIGN KEY (\"user_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "social_links",
+    "column": "user_id",
+    "type": "BIGINT",
+    "required": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "social_links",
+      "column": "user_id",
+      "targetSchema": "public",
+      "targetTable": "users",
+      "targetColumn": "id",
+      "onDelete": "no action",
+      "constraintName": "social_links_user_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"social_links\" ADD CONSTRAINT \"social_links_user_id_fkey\" FOREIGN KEY (\"user_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "user_blocks",
+    "column": "creator_id",
+    "type": "BIGINT",
+    "required": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "user_blocks",
+      "column": "creator_id",
+      "targetSchema": "public",
+      "targetTable": "users",
+      "targetColumn": "id",
+      "onDelete": "no action",
+      "constraintName": "user_blocks_creator_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"user_blocks\" ADD CONSTRAINT \"user_blocks_creator_id_fkey\" FOREIGN KEY (\"creator_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "user_blocks",
+    "column": "revoker_id",
+    "type": "BIGINT",
+    "required": false,
+    "foreignKey": {
+      "schema": "public",
+      "table": "user_blocks",
+      "column": "revoker_id",
+      "targetSchema": "public",
+      "targetTable": "users",
+      "targetColumn": "id",
+      "onDelete": "no action",
+      "constraintName": "user_blocks_revoker_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"user_blocks\" ADD CONSTRAINT \"user_blocks_revoker_id_fkey\" FOREIGN KEY (\"revoker_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "user_blocks",
+    "column": "user_id",
+    "type": "BIGINT",
+    "required": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "user_blocks",
+      "column": "user_id",
+      "targetSchema": "public",
+      "targetTable": "users",
+      "targetColumn": "id",
+      "onDelete": "no action",
+      "constraintName": "user_blocks_user_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"user_blocks\" ADD CONSTRAINT \"user_blocks_user_id_fkey\" FOREIGN KEY (\"user_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "user_mutes",
+    "column": "subject_id",
+    "type": "BIGINT",
+    "required": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "user_mutes",
+      "column": "subject_id",
+      "targetSchema": "public",
+      "targetTable": "users",
+      "targetColumn": "id",
+      "onDelete": "no action",
+      "constraintName": "user_mutes_subject_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"user_mutes\" ADD CONSTRAINT \"user_mutes_subject_id_fkey\" FOREIGN KEY (\"subject_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "user_mutes",
+    "column": "owner_id",
+    "type": "BIGINT",
+    "required": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "user_mutes",
+      "column": "owner_id",
+      "targetSchema": "public",
+      "targetTable": "users",
+      "targetColumn": "id",
+      "onDelete": "no action",
+      "constraintName": "user_mutes_owner_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"user_mutes\" ADD CONSTRAINT \"user_mutes_owner_id_fkey\" FOREIGN KEY (\"owner_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "user_preferences",
+    "column": "user_id",
+    "type": "BIGINT",
+    "required": true,
+    "columnOwnedByProperty": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "user_preferences",
+      "column": "user_id",
+      "targetSchema": "public",
+      "targetTable": "users",
+      "targetColumn": "id",
+      "onDelete": "no action",
+      "constraintName": "user_preferences_user_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"user_preferences\" ADD CONSTRAINT \"user_preferences_user_id_fkey\" FOREIGN KEY (\"user_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "user_roles",
+    "column": "granter_id",
+    "type": "BIGINT",
+    "required": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "user_roles",
+      "column": "granter_id",
+      "targetSchema": "public",
+      "targetTable": "users",
+      "targetColumn": "id",
+      "onDelete": "no action",
+      "constraintName": "user_roles_granter_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"user_roles\" ADD CONSTRAINT \"user_roles_granter_id_fkey\" FOREIGN KEY (\"granter_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "user_roles",
+    "column": "user_id",
+    "type": "BIGINT",
+    "required": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "user_roles",
+      "column": "user_id",
+      "targetSchema": "public",
+      "targetTable": "users",
+      "targetColumn": "id",
+      "onDelete": "no action",
+      "constraintName": "user_roles_user_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"user_roles\" ADD CONSTRAINT \"user_roles_user_id_fkey\" FOREIGN KEY (\"user_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION"
+    }
+  }
+]

@@ -1,0 +1,1972 @@
+{
+  "actions": [
+    {
+      "kind": "create-enum",
+      "target": "app.app_items_status",
+      "sql": "CREATE TYPE \"app\".\"app_items_status\" AS ENUM ('on', 'off');"
+    },
+    {
+      "kind": "create-enum",
+      "target": "public.indexed_status",
+      "sql": "CREATE TYPE \"public\".\"indexed_status\" AS ENUM ('draft', 'live');"
+    },
+    {
+      "kind": "create-enum",
+      "target": "public.str_enum_rec_enum_rec",
+      "sql": "CREATE TYPE \"public\".\"str_enum_rec_enum_rec\" AS ENUM ('x', 'y');"
+    },
+    {
+      "kind": "create-enum",
+      "target": "public.str_props_enum_arr",
+      "sql": "CREATE TYPE \"public\".\"str_props_enum_arr\" AS ENUM ('a', 'b');"
+    },
+    {
+      "kind": "create-enum",
+      "target": "public.str_props_enum_obj",
+      "sql": "CREATE TYPE \"public\".\"str_props_enum_obj\" AS ENUM ('p', 'q');"
+    },
+    {
+      "kind": "create-enum",
+      "target": "public.str_props_enum_req",
+      "sql": "CREATE TYPE \"public\".\"str_props_enum_req\" AS ENUM ('a', 'b');"
+    },
+    {
+      "kind": "create-enum",
+      "target": "public.org_members_role",
+      "sql": "CREATE TYPE \"public\".\"org_members_role\" AS ENUM ('owner', 'admin', 'member');"
+    },
+    {
+      "kind": "create-extension",
+      "target": "pg_trgm WITH SCHEMA public",
+      "sql": "CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public;"
+    },
+    {
+      "kind": "create-function",
+      "target": "public.rebase_search_text",
+      "sql": "CREATE OR REPLACE FUNCTION public.rebase_search_text(text[]) RETURNS text\n    LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE AS\n    $$ SELECT array_to_string($1, ' ') $$;"
+    },
+    {
+      "kind": "create-function",
+      "target": "public.rebase_search_text",
+      "sql": "CREATE OR REPLACE FUNCTION public.rebase_search_text(jsonb) RETURNS text\n    LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE AS\n    $$ SELECT coalesce(string_agg(v, ' '), '')\n       FROM jsonb_array_elements_text(jsonb_path_query_array($1, 'strict $.**?(@.type() == \"string\")')) AS v $$;"
+    },
+    {
+      "kind": "create-function",
+      "target": "rebase.set_updated_at",
+      "sql": "CREATE OR REPLACE FUNCTION rebase.set_updated_at() RETURNS trigger\nLANGUAGE plpgsql AS $$\nBEGIN\n    NEW := jsonb_populate_record(NEW, jsonb_build_object(TG_ARGV[0], now()));\n    RETURN NEW;\nEND;\n$$;"
+    },
+    {
+      "kind": "create-function",
+      "target": "public.rebase_search_text",
+      "sql": "CREATE OR REPLACE FUNCTION rebase.keep_tenant() RETURNS trigger\nLANGUAGE plpgsql AS $$\nBEGIN\n    IF row_security_active(TG_RELID) THEN\n        IF to_jsonb(OLD) -> TG_ARGV[0] IS DISTINCT FROM to_jsonb(NEW) -> TG_ARGV[0] THEN\n            IF NOT (string_to_array(COALESCE(current_setting('app.user_roles', true), ''), ',') && TG_ARGV[1:TG_NARGS - 1]) THEN\n                RAISE EXCEPTION 'TENANT_IMMUTABLE: an update cannot move a row of \"%\" to another tenant (column \"%\")', TG_TABLE_NAME, TG_ARGV[0]\n                    USING ERRCODE = '42501',\n                          HINT = 'Move it as a role listed in the collection''s tenant.bypassRoles.';\n            END IF;\n        END IF;\n    END IF;\n    RETURN NEW;\nEND;\n$$;"
+    },
+    {
+      "kind": "create-table",
+      "target": "app.app_items",
+      "sql": "CREATE TABLE IF NOT EXISTS \"app\".\"app_items\" (\"id\" UUID PRIMARY KEY DEFAULT gen_random_uuid());"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "app.app_items",
+      "sql": "ALTER TABLE \"app\".\"app_items\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.arrs",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"arrs\" (\"id\" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.arrs",
+      "sql": "ALTER TABLE \"public\".\"arrs\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.authors",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"authors\" (\"id\" UUID PRIMARY KEY DEFAULT gen_random_uuid());"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.authors",
+      "sql": "ALTER TABLE \"public\".\"authors\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.bdm",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"bdm\" (\"id\" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.bdm",
+      "sql": "ALTER TABLE \"public\".\"bdm\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.claim_tenanted",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"claim_tenanted\" (\"id\" UUID PRIMARY KEY DEFAULT gen_random_uuid());"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.claim_tenanted",
+      "sql": "ALTER TABLE \"public\".\"claim_tenanted\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.comments",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"comments\" (\"id\" UUID PRIMARY KEY DEFAULT gen_random_uuid());"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.comments",
+      "sql": "ALTER TABLE \"public\".\"comments\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.companies",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"companies\" (\"id\" INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.companies",
+      "sql": "ALTER TABLE \"public\".\"companies\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.company_translations",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"company_translations\" (\"id\" INTEGER NOT NULL, \"locale\" TEXT NOT NULL, PRIMARY KEY (\"id\", \"locale\"));"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.company_translations",
+      "sql": "ALTER TABLE \"public\".\"company_translations\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.composite",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"composite\" (\"tenant\" TEXT NOT NULL, \"code\" INTEGER NOT NULL, PRIMARY KEY (\"tenant\", \"code\"));"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.composite",
+      "sql": "ALTER TABLE \"public\".\"composite\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.derived_fk",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"derived_fk\" (\"id\" UUID PRIMARY KEY DEFAULT gen_random_uuid());"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.derived_fk",
+      "sql": "ALTER TABLE \"public\".\"derived_fk\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.id_named",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"id_named\" (\"id\" TEXT PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.id_named",
+      "sql": "ALTER TABLE \"public\".\"id_named\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.id_num_named",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"id_num_named\" (\"id\" INTEGER PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.id_num_named",
+      "sql": "ALTER TABLE \"public\".\"id_num_named\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.indexed",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"indexed\" (\"id\" UUID PRIMARY KEY DEFAULT gen_random_uuid());"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.indexed",
+      "sql": "ALTER TABLE \"public\".\"indexed\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.int_target",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"int_target\" (\"id\" INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.int_target",
+      "sql": "ALTER TABLE \"public\".\"int_target\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.membership_tenanted",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"membership_tenanted\" (\"id\" UUID PRIMARY KEY DEFAULT gen_random_uuid());"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.membership_tenanted",
+      "sql": "ALTER TABLE \"public\".\"membership_tenanted\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.memberships",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"memberships\" (\"id\" UUID PRIMARY KEY DEFAULT gen_random_uuid());"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.memberships",
+      "sql": "ALTER TABLE \"public\".\"memberships\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.misc",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"misc\" (\"id\" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.misc",
+      "sql": "ALTER TABLE \"public\".\"misc\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.no_id",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"no_id\" (\"id\" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.no_id",
+      "sql": "ALTER TABLE \"public\".\"no_id\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.num_enum_rec",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"num_enum_rec\" (\"id\" INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.num_enum_rec",
+      "sql": "ALTER TABLE \"public\".\"num_enum_rec\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.num_id_inc_bigint",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"num_id_inc_bigint\" (\"id\" INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.num_id_inc_bigint",
+      "sql": "ALTER TABLE \"public\".\"num_id_inc_bigint\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.num_id_inc_bigserial",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"num_id_inc_bigserial\" (\"id\" INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.num_id_inc_bigserial",
+      "sql": "ALTER TABLE \"public\".\"num_id_inc_bigserial\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.num_id_inc_req",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"num_id_inc_req\" (\"id\" INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.num_id_inc_req",
+      "sql": "ALTER TABLE \"public\".\"num_id_inc_req\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.num_id_manual",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"num_id_manual\" (\"code\" INTEGER PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.num_id_manual",
+      "sql": "ALTER TABLE \"public\".\"num_id_manual\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.num_id_serial",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"num_id_serial\" (\"id\" SERIAL PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.num_id_serial",
+      "sql": "ALTER TABLE \"public\".\"num_id_serial\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.num_id_sql",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"num_id_sql\" (\"id\" INTEGER PRIMARY KEY DEFAULT nextval('s'));"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.num_id_sql",
+      "sql": "ALTER TABLE \"public\".\"num_id_sql\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.num_id_true",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"num_id_true\" (\"code\" INTEGER PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.num_id_true",
+      "sql": "ALTER TABLE \"public\".\"num_id_true\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.num_props",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"num_props\" (\"id\" INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.num_props",
+      "sql": "ALTER TABLE \"public\".\"num_props\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.orgs",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"orgs\" (\"id\" UUID PRIMARY KEY DEFAULT gen_random_uuid());"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.orgs",
+      "sql": "ALTER TABLE \"public\".\"orgs\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.people",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"people\" (\"id\" INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.people",
+      "sql": "ALTER TABLE \"public\".\"people\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.posts",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"posts\" (\"id\" INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.posts",
+      "sql": "ALTER TABLE \"public\".\"posts\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.profiles",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"profiles\" (\"id\" UUID PRIMARY KEY DEFAULT gen_random_uuid());"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.profiles",
+      "sql": "ALTER TABLE \"public\".\"profiles\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.refs",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"refs\" (\"id\" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.refs",
+      "sql": "ALTER TABLE \"public\".\"refs\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.searched",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"searched\" (\"id\" UUID PRIMARY KEY DEFAULT gen_random_uuid());"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.searched",
+      "sql": "ALTER TABLE \"public\".\"searched\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.smallint_only",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"smallint_only\" (\"id\" INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.smallint_only",
+      "sql": "ALTER TABLE \"public\".\"smallint_only\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.str_enum_rec",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"str_enum_rec\" (\"id\" UUID PRIMARY KEY DEFAULT gen_random_uuid());"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.str_enum_rec",
+      "sql": "ALTER TABLE \"public\".\"str_enum_rec\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.str_id_manual",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"str_id_manual\" (\"code\" TEXT PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.str_id_manual",
+      "sql": "ALTER TABLE \"public\".\"str_id_manual\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.str_id_sql",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"str_id_sql\" (\"id\" TEXT PRIMARY KEY DEFAULT gen_id());"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.str_id_sql",
+      "sql": "ALTER TABLE \"public\".\"str_id_sql\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.str_id_sql_bare",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"str_id_sql_bare\" (\"id\" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.str_id_sql_bare",
+      "sql": "ALTER TABLE \"public\".\"str_id_sql_bare\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.str_id_true",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"str_id_true\" (\"code\" TEXT PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.str_id_true",
+      "sql": "ALTER TABLE \"public\".\"str_id_true\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.str_id_uuid_ru",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"str_id_uuid_ru\" (\"id\" UUID PRIMARY KEY DEFAULT gen_random_uuid());"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.str_id_uuid_ru",
+      "sql": "ALTER TABLE \"public\".\"str_id_uuid_ru\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.str_id_uuid_vc",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"str_id_uuid_vc\" (\"id\" UUID PRIMARY KEY DEFAULT gen_random_uuid());"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.str_id_uuid_vc",
+      "sql": "ALTER TABLE \"public\".\"str_id_uuid_vc\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.str_props",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"str_props\" (\"id\" UUID PRIMARY KEY DEFAULT gen_random_uuid());"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.str_props",
+      "sql": "ALTER TABLE \"public\".\"str_props\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.tags",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"tags\" (\"id\" UUID PRIMARY KEY DEFAULT gen_random_uuid());"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.tags",
+      "sql": "ALTER TABLE \"public\".\"tags\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.tenant_orgs",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"tenant_orgs\" (\"id\" UUID PRIMARY KEY DEFAULT gen_random_uuid());"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.tenant_orgs",
+      "sql": "ALTER TABLE \"public\".\"tenant_orgs\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.text_target",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"text_target\" (\"code\" TEXT PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.text_target",
+      "sql": "ALTER TABLE \"public\".\"text_target\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.uuid_only",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"uuid_only\" (\"id\" INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.uuid_only",
+      "sql": "ALTER TABLE \"public\".\"uuid_only\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.uuid_target",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"uuid_target\" (\"id\" UUID PRIMARY KEY DEFAULT gen_random_uuid());"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.uuid_target",
+      "sql": "ALTER TABLE \"public\".\"uuid_target\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.org_members",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"org_members\" (\"org_id\" UUID NOT NULL, \"person_id\" INTEGER NOT NULL, \"role\" \"public\".\"org_members_role\" DEFAULT 'member' NOT NULL, \"seat\" INTEGER UNIQUE, \"joined_at\" TIMESTAMP WITH TIME ZONE, \"touched_at\" TIMESTAMP WITH TIME ZONE DEFAULT now(), PRIMARY KEY (\"org_id\", \"person_id\"));"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.org_members",
+      "sql": "ALTER TABLE \"public\".\"org_members\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.post_tags",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"post_tags\" (\"post_id\" INTEGER NOT NULL, \"tag_id\" UUID NOT NULL, PRIMARY KEY (\"post_id\", \"tag_id\"));"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.post_tags",
+      "sql": "ALTER TABLE \"public\".\"post_tags\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "add-column",
+      "target": "app.app_items.status",
+      "sql": "ALTER TABLE \"app\".\"app_items\" ADD COLUMN IF NOT EXISTS \"status\" \"app\".\"app_items_status\";"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.arrs.of_string",
+      "sql": "ALTER TABLE \"public\".\"arrs\" ADD COLUMN IF NOT EXISTS \"of_string\" TEXT[];"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.arrs.of_number",
+      "sql": "ALTER TABLE \"public\".\"arrs\" ADD COLUMN IF NOT EXISTS \"of_number\" NUMERIC[];"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.arrs.of_integer",
+      "sql": "ALTER TABLE \"public\".\"arrs\" ADD COLUMN IF NOT EXISTS \"of_integer\" INTEGER[];"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.arrs.of_bigint",
+      "sql": "ALTER TABLE \"public\".\"arrs\" ADD COLUMN IF NOT EXISTS \"of_bigint\" NUMERIC[];"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.arrs.of_boolean",
+      "sql": "ALTER TABLE \"public\".\"arrs\" ADD COLUMN IF NOT EXISTS \"of_boolean\" BOOLEAN[];"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.arrs.of_enum",
+      "sql": "ALTER TABLE \"public\".\"arrs\" ADD COLUMN IF NOT EXISTS \"of_enum\" TEXT[];"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.arrs.of_uuid",
+      "sql": "ALTER TABLE \"public\".\"arrs\" ADD COLUMN IF NOT EXISTS \"of_uuid\" TEXT[];"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.arrs.of_date",
+      "sql": "ALTER TABLE \"public\".\"arrs\" ADD COLUMN IF NOT EXISTS \"of_date\" JSONB;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.arrs.of_map",
+      "sql": "ALTER TABLE \"public\".\"arrs\" ADD COLUMN IF NOT EXISTS \"of_map\" JSONB;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.arrs.of_reference",
+      "sql": "ALTER TABLE \"public\".\"arrs\" ADD COLUMN IF NOT EXISTS \"of_reference\" JSONB;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.arrs.of_geopoint",
+      "sql": "ALTER TABLE \"public\".\"arrs\" ADD COLUMN IF NOT EXISTS \"of_geopoint\" JSONB;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.arrs.of_tuple",
+      "sql": "ALTER TABLE \"public\".\"arrs\" ADD COLUMN IF NOT EXISTS \"of_tuple\" JSONB;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.arrs.no_of",
+      "sql": "ALTER TABLE \"public\".\"arrs\" ADD COLUMN IF NOT EXISTS \"no_of\" JSONB;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.arrs.ct_json",
+      "sql": "ALTER TABLE \"public\".\"arrs\" ADD COLUMN IF NOT EXISTS \"ct_json\" JSON;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.arrs.ct_jsonb",
+      "sql": "ALTER TABLE \"public\".\"arrs\" ADD COLUMN IF NOT EXISTS \"ct_jsonb\" JSONB;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.arrs.ct_text_arr",
+      "sql": "ALTER TABLE \"public\".\"arrs\" ADD COLUMN IF NOT EXISTS \"ct_text_arr\" TEXT[];"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.arrs.ct_int_arr",
+      "sql": "ALTER TABLE \"public\".\"arrs\" ADD COLUMN IF NOT EXISTS \"ct_int_arr\" INTEGER[];"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.arrs.ct_bool_arr",
+      "sql": "ALTER TABLE \"public\".\"arrs\" ADD COLUMN IF NOT EXISTS \"ct_bool_arr\" BOOLEAN[];"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.arrs.ct_num_arr",
+      "sql": "ALTER TABLE \"public\".\"arrs\" ADD COLUMN IF NOT EXISTS \"ct_num_arr\" NUMERIC[];"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.arrs.req",
+      "sql": "ALTER TABLE \"public\".\"arrs\" ADD COLUMN IF NOT EXISTS \"req\" TEXT[] NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.arrs.uniq",
+      "sql": "ALTER TABLE \"public\".\"arrs\" ADD COLUMN IF NOT EXISTS \"uniq\" TEXT[] UNIQUE;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.arrs.with_default",
+      "sql": "ALTER TABLE \"public\".\"arrs\" ADD COLUMN IF NOT EXISTS \"with_default\" TEXT[];"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.arrs.min_max",
+      "sql": "ALTER TABLE \"public\".\"arrs\" ADD COLUMN IF NOT EXISTS \"min_max\" TEXT[];"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.authors.name",
+      "sql": "ALTER TABLE \"public\".\"authors\" ADD COLUMN IF NOT EXISTS \"name\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.bdm.b",
+      "sql": "ALTER TABLE \"public\".\"bdm\" ADD COLUMN IF NOT EXISTS \"b\" BOOLEAN;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.bdm.b_req",
+      "sql": "ALTER TABLE \"public\".\"bdm\" ADD COLUMN IF NOT EXISTS \"b_req\" BOOLEAN NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.bdm.b_def",
+      "sql": "ALTER TABLE \"public\".\"bdm\" ADD COLUMN IF NOT EXISTS \"b_def\" BOOLEAN DEFAULT TRUE;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.bdm.b_uniq",
+      "sql": "ALTER TABLE \"public\".\"bdm\" ADD COLUMN IF NOT EXISTS \"b_uniq\" BOOLEAN UNIQUE;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.bdm.d",
+      "sql": "ALTER TABLE \"public\".\"bdm\" ADD COLUMN IF NOT EXISTS \"d\" TIMESTAMP WITH TIME ZONE;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.bdm.d_date",
+      "sql": "ALTER TABLE \"public\".\"bdm\" ADD COLUMN IF NOT EXISTS \"d_date\" DATE;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.bdm.d_time",
+      "sql": "ALTER TABLE \"public\".\"bdm\" ADD COLUMN IF NOT EXISTS \"d_time\" TIME;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.bdm.d_ts",
+      "sql": "ALTER TABLE \"public\".\"bdm\" ADD COLUMN IF NOT EXISTS \"d_ts\" TIMESTAMP WITH TIME ZONE;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.bdm.d_create",
+      "sql": "ALTER TABLE \"public\".\"bdm\" ADD COLUMN IF NOT EXISTS \"d_create\" TIMESTAMP WITH TIME ZONE DEFAULT now();"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.bdm.d_update",
+      "sql": "ALTER TABLE \"public\".\"bdm\" ADD COLUMN IF NOT EXISTS \"d_update\" TIMESTAMP WITH TIME ZONE DEFAULT now();"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.bdm.d_create_req",
+      "sql": "ALTER TABLE \"public\".\"bdm\" ADD COLUMN IF NOT EXISTS \"d_create_req\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.bdm.d_date_create",
+      "sql": "ALTER TABLE \"public\".\"bdm\" ADD COLUMN IF NOT EXISTS \"d_date_create\" DATE DEFAULT now();"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.bdm.d_def",
+      "sql": "ALTER TABLE \"public\".\"bdm\" ADD COLUMN IF NOT EXISTS \"d_def\" TIMESTAMP WITH TIME ZONE DEFAULT '2020-01-01T00:00:00.000Z';"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.bdm.d_uniq",
+      "sql": "ALTER TABLE \"public\".\"bdm\" ADD COLUMN IF NOT EXISTS \"d_uniq\" TIMESTAMP WITH TIME ZONE UNIQUE;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.bdm.m",
+      "sql": "ALTER TABLE \"public\".\"bdm\" ADD COLUMN IF NOT EXISTS \"m\" JSONB;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.bdm.m_json",
+      "sql": "ALTER TABLE \"public\".\"bdm\" ADD COLUMN IF NOT EXISTS \"m_json\" JSON;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.bdm.m_jsonb",
+      "sql": "ALTER TABLE \"public\".\"bdm\" ADD COLUMN IF NOT EXISTS \"m_jsonb\" JSONB;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.bdm.m_req",
+      "sql": "ALTER TABLE \"public\".\"bdm\" ADD COLUMN IF NOT EXISTS \"m_req\" JSONB NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.bdm.m_def",
+      "sql": "ALTER TABLE \"public\".\"bdm\" ADD COLUMN IF NOT EXISTS \"m_def\" JSONB DEFAULT '{\"a\":1}'::jsonb;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.bdm.m_props",
+      "sql": "ALTER TABLE \"public\".\"bdm\" ADD COLUMN IF NOT EXISTS \"m_props\" JSONB;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.bdm.m_uniq",
+      "sql": "ALTER TABLE \"public\".\"bdm\" ADD COLUMN IF NOT EXISTS \"m_uniq\" JSONB UNIQUE;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.claim_tenanted.org_id",
+      "sql": "ALTER TABLE \"public\".\"claim_tenanted\" ADD COLUMN IF NOT EXISTS \"org_id\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.claim_tenanted.title",
+      "sql": "ALTER TABLE \"public\".\"claim_tenanted\" ADD COLUMN IF NOT EXISTS \"title\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.comments.body",
+      "sql": "ALTER TABLE \"public\".\"comments\" ADD COLUMN IF NOT EXISTS \"body\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.comments.post_id",
+      "sql": "ALTER TABLE \"public\".\"comments\" ADD COLUMN IF NOT EXISTS \"post_id\" INTEGER;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.companies.name",
+      "sql": "ALTER TABLE \"public\".\"companies\" ADD COLUMN IF NOT EXISTS \"name\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.company_translations.name",
+      "sql": "ALTER TABLE \"public\".\"company_translations\" ADD COLUMN IF NOT EXISTS \"name\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.composite.v",
+      "sql": "ALTER TABLE \"public\".\"composite\" ADD COLUMN IF NOT EXISTS \"v\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.id_named.v",
+      "sql": "ALTER TABLE \"public\".\"id_named\" ADD COLUMN IF NOT EXISTS \"v\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.id_num_named.v",
+      "sql": "ALTER TABLE \"public\".\"id_num_named\" ADD COLUMN IF NOT EXISTS \"v\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.indexed.owner_id",
+      "sql": "ALTER TABLE \"public\".\"indexed\" ADD COLUMN IF NOT EXISTS \"owner_id\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.indexed.created_at",
+      "sql": "ALTER TABLE \"public\".\"indexed\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now();"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.indexed.status",
+      "sql": "ALTER TABLE \"public\".\"indexed\" ADD COLUMN IF NOT EXISTS \"status\" \"public\".\"indexed_status\";"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.indexed.meta",
+      "sql": "ALTER TABLE \"public\".\"indexed\" ADD COLUMN IF NOT EXISTS \"meta\" JSONB;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.indexed.email",
+      "sql": "ALTER TABLE \"public\".\"indexed\" ADD COLUMN IF NOT EXISTS \"email\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.int_target.v",
+      "sql": "ALTER TABLE \"public\".\"int_target\" ADD COLUMN IF NOT EXISTS \"v\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.membership_tenanted.body",
+      "sql": "ALTER TABLE \"public\".\"membership_tenanted\" ADD COLUMN IF NOT EXISTS \"body\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.memberships.user_id",
+      "sql": "ALTER TABLE \"public\".\"memberships\" ADD COLUMN IF NOT EXISTS \"user_id\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.misc.geo",
+      "sql": "ALTER TABLE \"public\".\"misc\" ADD COLUMN IF NOT EXISTS \"geo\" JSONB;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.misc.geo_req",
+      "sql": "ALTER TABLE \"public\".\"misc\" ADD COLUMN IF NOT EXISTS \"geo_req\" JSONB NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.misc.geo_def",
+      "sql": "ALTER TABLE \"public\".\"misc\" ADD COLUMN IF NOT EXISTS \"geo_def\" JSONB DEFAULT '{\"latitude\":1,\"longitude\":2}'::jsonb;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.misc.vec",
+      "sql": "ALTER TABLE \"public\".\"misc\" ADD COLUMN IF NOT EXISTS \"vec\" VECTOR(3);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.misc.vec_req",
+      "sql": "ALTER TABLE \"public\".\"misc\" ADD COLUMN IF NOT EXISTS \"vec_req\" VECTOR(3) NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.misc.vec_idx",
+      "sql": "ALTER TABLE \"public\".\"misc\" ADD COLUMN IF NOT EXISTS \"vec_idx\" VECTOR(4);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.misc.vec_wide",
+      "sql": "ALTER TABLE \"public\".\"misc\" ADD COLUMN IF NOT EXISTS \"vec_wide\" VECTOR(3000);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.misc.vec_uniq",
+      "sql": "ALTER TABLE \"public\".\"misc\" ADD COLUMN IF NOT EXISTS \"vec_uniq\" VECTOR(3) UNIQUE;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.misc.bin",
+      "sql": "ALTER TABLE \"public\".\"misc\" ADD COLUMN IF NOT EXISTS \"bin\" BYTEA;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.misc.bin_req",
+      "sql": "ALTER TABLE \"public\".\"misc\" ADD COLUMN IF NOT EXISTS \"bin_req\" BYTEA NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.misc.bin_uniq",
+      "sql": "ALTER TABLE \"public\".\"misc\" ADD COLUMN IF NOT EXISTS \"bin_uniq\" BYTEA UNIQUE;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.no_id.v",
+      "sql": "ALTER TABLE \"public\".\"no_id\" ADD COLUMN IF NOT EXISTS \"v\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.num_enum_rec.enum_num_rec",
+      "sql": "ALTER TABLE \"public\".\"num_enum_rec\" ADD COLUMN IF NOT EXISTS \"enum_num_rec\" NUMERIC;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.num_id_inc_bigint.v",
+      "sql": "ALTER TABLE \"public\".\"num_id_inc_bigint\" ADD COLUMN IF NOT EXISTS \"v\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.num_id_inc_bigserial.v",
+      "sql": "ALTER TABLE \"public\".\"num_id_inc_bigserial\" ADD COLUMN IF NOT EXISTS \"v\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.num_id_inc_req.v",
+      "sql": "ALTER TABLE \"public\".\"num_id_inc_req\" ADD COLUMN IF NOT EXISTS \"v\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.num_id_manual.v",
+      "sql": "ALTER TABLE \"public\".\"num_id_manual\" ADD COLUMN IF NOT EXISTS \"v\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.num_id_serial.v",
+      "sql": "ALTER TABLE \"public\".\"num_id_serial\" ADD COLUMN IF NOT EXISTS \"v\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.num_id_sql.v",
+      "sql": "ALTER TABLE \"public\".\"num_id_sql\" ADD COLUMN IF NOT EXISTS \"v\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.num_id_true.v",
+      "sql": "ALTER TABLE \"public\".\"num_id_true\" ADD COLUMN IF NOT EXISTS \"v\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.num_props.plain",
+      "sql": "ALTER TABLE \"public\".\"num_props\" ADD COLUMN IF NOT EXISTS \"plain\" NUMERIC;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.num_props.integer",
+      "sql": "ALTER TABLE \"public\".\"num_props\" ADD COLUMN IF NOT EXISTS \"integer\" INTEGER;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.num_props.req",
+      "sql": "ALTER TABLE \"public\".\"num_props\" ADD COLUMN IF NOT EXISTS \"req\" NUMERIC NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.num_props.uniq",
+      "sql": "ALTER TABLE \"public\".\"num_props\" ADD COLUMN IF NOT EXISTS \"uniq\" NUMERIC UNIQUE;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.num_props.ct_integer",
+      "sql": "ALTER TABLE \"public\".\"num_props\" ADD COLUMN IF NOT EXISTS \"ct_integer\" INTEGER;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.num_props.ct_real",
+      "sql": "ALTER TABLE \"public\".\"num_props\" ADD COLUMN IF NOT EXISTS \"ct_real\" REAL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.num_props.ct_double",
+      "sql": "ALTER TABLE \"public\".\"num_props\" ADD COLUMN IF NOT EXISTS \"ct_double\" DOUBLE PRECISION;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.num_props.ct_numeric",
+      "sql": "ALTER TABLE \"public\".\"num_props\" ADD COLUMN IF NOT EXISTS \"ct_numeric\" NUMERIC;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.num_props.ct_bigint",
+      "sql": "ALTER TABLE \"public\".\"num_props\" ADD COLUMN IF NOT EXISTS \"ct_bigint\" BIGINT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.num_props.ct_serial",
+      "sql": "ALTER TABLE \"public\".\"num_props\" ADD COLUMN IF NOT EXISTS \"ct_serial\" SERIAL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.num_props.ct_bigserial",
+      "sql": "ALTER TABLE \"public\".\"num_props\" ADD COLUMN IF NOT EXISTS \"ct_bigserial\" BIGSERIAL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.num_props.ct_smallint",
+      "sql": "ALTER TABLE \"public\".\"num_props\" ADD COLUMN IF NOT EXISTS \"ct_smallint\" SMALLINT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.num_props.enum_num",
+      "sql": "ALTER TABLE \"public\".\"num_props\" ADD COLUMN IF NOT EXISTS \"enum_num\" NUMERIC;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.num_props.enum_num_real",
+      "sql": "ALTER TABLE \"public\".\"num_props\" ADD COLUMN IF NOT EXISTS \"enum_num_real\" REAL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.num_props.with_default",
+      "sql": "ALTER TABLE \"public\".\"num_props\" ADD COLUMN IF NOT EXISTS \"with_default\" NUMERIC DEFAULT 5;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.num_props.min_max",
+      "sql": "ALTER TABLE \"public\".\"num_props\" ADD COLUMN IF NOT EXISTS \"min_max\" NUMERIC;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.num_props.integer_real",
+      "sql": "ALTER TABLE \"public\".\"num_props\" ADD COLUMN IF NOT EXISTS \"integer_real\" REAL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.orgs.name",
+      "sql": "ALTER TABLE \"public\".\"orgs\" ADD COLUMN IF NOT EXISTS \"name\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.people.handle",
+      "sql": "ALTER TABLE \"public\".\"people\" ADD COLUMN IF NOT EXISTS \"handle\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.posts.title",
+      "sql": "ALTER TABLE \"public\".\"posts\" ADD COLUMN IF NOT EXISTS \"title\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.profiles.bio",
+      "sql": "ALTER TABLE \"public\".\"profiles\" ADD COLUMN IF NOT EXISTS \"bio\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.searched.title",
+      "sql": "ALTER TABLE \"public\".\"searched\" ADD COLUMN IF NOT EXISTS \"title\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.searched.body",
+      "sql": "ALTER TABLE \"public\".\"searched\" ADD COLUMN IF NOT EXISTS \"body\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.smallint_only.small",
+      "sql": "ALTER TABLE \"public\".\"smallint_only\" ADD COLUMN IF NOT EXISTS \"small\" SMALLINT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.str_enum_rec.enum_rec",
+      "sql": "ALTER TABLE \"public\".\"str_enum_rec\" ADD COLUMN IF NOT EXISTS \"enum_rec\" \"public\".\"str_enum_rec_enum_rec\";"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.str_id_manual.v",
+      "sql": "ALTER TABLE \"public\".\"str_id_manual\" ADD COLUMN IF NOT EXISTS \"v\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.str_id_sql.v",
+      "sql": "ALTER TABLE \"public\".\"str_id_sql\" ADD COLUMN IF NOT EXISTS \"v\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.str_id_sql_bare.v",
+      "sql": "ALTER TABLE \"public\".\"str_id_sql_bare\" ADD COLUMN IF NOT EXISTS \"v\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.str_id_true.v",
+      "sql": "ALTER TABLE \"public\".\"str_id_true\" ADD COLUMN IF NOT EXISTS \"v\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.str_id_uuid_ru.v",
+      "sql": "ALTER TABLE \"public\".\"str_id_uuid_ru\" ADD COLUMN IF NOT EXISTS \"v\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.str_id_uuid_vc.v",
+      "sql": "ALTER TABLE \"public\".\"str_id_uuid_vc\" ADD COLUMN IF NOT EXISTS \"v\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.str_props.plain",
+      "sql": "ALTER TABLE \"public\".\"str_props\" ADD COLUMN IF NOT EXISTS \"plain\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.str_props.req",
+      "sql": "ALTER TABLE \"public\".\"str_props\" ADD COLUMN IF NOT EXISTS \"req\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.str_props.uniq",
+      "sql": "ALTER TABLE \"public\".\"str_props\" ADD COLUMN IF NOT EXISTS \"uniq\" TEXT UNIQUE;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.str_props.enum_arr",
+      "sql": "ALTER TABLE \"public\".\"str_props\" ADD COLUMN IF NOT EXISTS \"enum_arr\" \"public\".\"str_props_enum_arr\";"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.str_props.enum_obj",
+      "sql": "ALTER TABLE \"public\".\"str_props\" ADD COLUMN IF NOT EXISTS \"enum_obj\" \"public\".\"str_props_enum_obj\";"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.str_props.enum_req",
+      "sql": "ALTER TABLE \"public\".\"str_props\" ADD COLUMN IF NOT EXISTS \"enum_req\" \"public\".\"str_props_enum_req\" NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.str_props.col_uuid",
+      "sql": "ALTER TABLE \"public\".\"str_props\" ADD COLUMN IF NOT EXISTS \"col_uuid\" UUID;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.str_props.col_char",
+      "sql": "ALTER TABLE \"public\".\"str_props\" ADD COLUMN IF NOT EXISTS \"col_char\" CHAR(3);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.str_props.col_varchar",
+      "sql": "ALTER TABLE \"public\".\"str_props\" ADD COLUMN IF NOT EXISTS \"col_varchar\" VARCHAR(100);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.str_props.col_varchar_no_max",
+      "sql": "ALTER TABLE \"public\".\"str_props\" ADD COLUMN IF NOT EXISTS \"col_varchar_no_max\" VARCHAR(255);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.str_props.col_text",
+      "sql": "ALTER TABLE \"public\".\"str_props\" ADD COLUMN IF NOT EXISTS \"col_text\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.str_props.max_only",
+      "sql": "ALTER TABLE \"public\".\"str_props\" ADD COLUMN IF NOT EXISTS \"max_only\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.str_props.multiline",
+      "sql": "ALTER TABLE \"public\".\"str_props\" ADD COLUMN IF NOT EXISTS \"multiline\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.str_props.markdown",
+      "sql": "ALTER TABLE \"public\".\"str_props\" ADD COLUMN IF NOT EXISTS \"markdown\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.str_props.email",
+      "sql": "ALTER TABLE \"public\".\"str_props\" ADD COLUMN IF NOT EXISTS \"email\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.str_props.url",
+      "sql": "ALTER TABLE \"public\".\"str_props\" ADD COLUMN IF NOT EXISTS \"url\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.str_props.storage",
+      "sql": "ALTER TABLE \"public\".\"str_props\" ADD COLUMN IF NOT EXISTS \"storage\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.str_props.with_default",
+      "sql": "ALTER TABLE \"public\".\"str_props\" ADD COLUMN IF NOT EXISTS \"with_default\" TEXT DEFAULT 'hello';"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.str_props.custom_col",
+      "sql": "ALTER TABLE \"public\".\"str_props\" ADD COLUMN IF NOT EXISTS \"custom_col\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.str_props.read_only",
+      "sql": "ALTER TABLE \"public\".\"str_props\" ADD COLUMN IF NOT EXISTS \"read_only\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.str_props.disabled",
+      "sql": "ALTER TABLE \"public\".\"str_props\" ADD COLUMN IF NOT EXISTS \"disabled\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.str_props.min_max",
+      "sql": "ALTER TABLE \"public\".\"str_props\" ADD COLUMN IF NOT EXISTS \"min_max\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.str_props.spaced_name",
+      "sql": "ALTER TABLE \"public\".\"str_props\" ADD COLUMN IF NOT EXISTS \"spaced_name\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.str_props.excluded",
+      "sql": "ALTER TABLE \"public\".\"str_props\" ADD COLUMN IF NOT EXISTS \"excluded\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.tags.label",
+      "sql": "ALTER TABLE \"public\".\"tags\" ADD COLUMN IF NOT EXISTS \"label\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.tenant_orgs.name",
+      "sql": "ALTER TABLE \"public\".\"tenant_orgs\" ADD COLUMN IF NOT EXISTS \"name\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.text_target.v",
+      "sql": "ALTER TABLE \"public\".\"text_target\" ADD COLUMN IF NOT EXISTS \"v\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.uuid_only.ext",
+      "sql": "ALTER TABLE \"public\".\"uuid_only\" ADD COLUMN IF NOT EXISTS \"ext\" UUID;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.uuid_target.v",
+      "sql": "ALTER TABLE \"public\".\"uuid_target\" ADD COLUMN IF NOT EXISTS \"v\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.searched.search_vector",
+      "sql": "ALTER TABLE \"public\".\"searched\" ADD COLUMN IF NOT EXISTS \"search_vector\" tsvector GENERATED ALWAYS AS (setweight(to_tsvector('simple', coalesce(\"title\", '')), 'B') || setweight(to_tsvector('simple', coalesce(\"body\", '')), 'B')) STORED;"
+    },
+    {
+      "kind": "comment-column",
+      "target": "public.searched.search_vector",
+      "sql": "COMMENT ON COLUMN \"public\".\"searched\".\"search_vector\" IS 'rebase:search:v1:ab099946b0f3f150';"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.searched.search_vector_text",
+      "sql": "ALTER TABLE \"public\".\"searched\" ADD COLUMN IF NOT EXISTS \"search_vector_text\" text GENERATED ALWAYS AS (coalesce(\"title\", '') || ' ' || coalesce(\"body\", '')) STORED;"
+    },
+    {
+      "kind": "comment-column",
+      "target": "public.searched.search_vector_text",
+      "sql": "COMMENT ON COLUMN \"public\".\"searched\".\"search_vector_text\" IS 'rebase:search:v1:bbabe2e5eeeb7c78';"
+    },
+    {
+      "kind": "add-column",
+      "target": "app.app_items.owner_id",
+      "sql": "ALTER TABLE \"app\".\"app_items\" ADD COLUMN IF NOT EXISTS \"owner_id\" UUID NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "app.app_items.ref",
+      "sql": "ALTER TABLE \"app\".\"app_items\" ADD COLUMN IF NOT EXISTS \"ref\" UUID;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.derived_fk.category_id",
+      "sql": "ALTER TABLE \"public\".\"derived_fk\" ADD COLUMN IF NOT EXISTS \"category_id\" UUID;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.membership_tenanted.org_id",
+      "sql": "ALTER TABLE \"public\".\"membership_tenanted\" ADD COLUMN IF NOT EXISTS \"org_id\" UUID NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.memberships.org_id",
+      "sql": "ALTER TABLE \"public\".\"memberships\" ADD COLUMN IF NOT EXISTS \"org_id\" UUID;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.posts.author_id",
+      "sql": "ALTER TABLE \"public\".\"posts\" ADD COLUMN IF NOT EXISTS \"author_id\" UUID NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.posts.editor_id",
+      "sql": "ALTER TABLE \"public\".\"posts\" ADD COLUMN IF NOT EXISTS \"editor_id\" UUID;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.posts.parent_id",
+      "sql": "ALTER TABLE \"public\".\"posts\" ADD COLUMN IF NOT EXISTS \"parent_id\" INTEGER;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.profiles.author_id",
+      "sql": "ALTER TABLE \"public\".\"profiles\" ADD COLUMN IF NOT EXISTS \"author_id\" UUID NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.refs.to_uuid",
+      "sql": "ALTER TABLE \"public\".\"refs\" ADD COLUMN IF NOT EXISTS \"to_uuid\" UUID;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.refs.to_int",
+      "sql": "ALTER TABLE \"public\".\"refs\" ADD COLUMN IF NOT EXISTS \"to_int\" INTEGER;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.refs.to_text",
+      "sql": "ALTER TABLE \"public\".\"refs\" ADD COLUMN IF NOT EXISTS \"to_text\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.refs.to_unknown",
+      "sql": "ALTER TABLE \"public\".\"refs\" ADD COLUMN IF NOT EXISTS \"to_unknown\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.refs.to_uuid_req",
+      "sql": "ALTER TABLE \"public\".\"refs\" ADD COLUMN IF NOT EXISTS \"to_uuid_req\" UUID NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.refs.to_int_uniq",
+      "sql": "ALTER TABLE \"public\".\"refs\" ADD COLUMN IF NOT EXISTS \"to_int_uniq\" INTEGER UNIQUE;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.refs.to_uuid_def",
+      "sql": "ALTER TABLE \"public\".\"refs\" ADD COLUMN IF NOT EXISTS \"to_uuid_def\" UUID;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.refs.custom_ref",
+      "sql": "ALTER TABLE \"public\".\"refs\" ADD COLUMN IF NOT EXISTS \"custom_ref\" UUID;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "app.app_items.app_items_owner_id_fkey",
+      "sql": "ALTER TABLE \"app\".\"app_items\" ADD CONSTRAINT \"app_items_owner_id_fkey\" FOREIGN KEY (\"owner_id\") REFERENCES \"public\".\"uuid_target\" (\"id\") ON DELETE RESTRICT;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "app.app_items.app_items_ref_fkey",
+      "sql": "ALTER TABLE \"app\".\"app_items\" ADD CONSTRAINT \"app_items_ref_fkey\" FOREIGN KEY (\"ref\") REFERENCES \"public\".\"uuid_target\" (\"id\") ON DELETE SET NULL;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.comments.comments_post_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"comments\" ADD CONSTRAINT \"comments_post_id_fkey\" FOREIGN KEY (\"post_id\") REFERENCES \"public\".\"posts\" (\"id\") ON DELETE CASCADE;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.company_translations.company_translations_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"company_translations\" ADD CONSTRAINT \"company_translations_id_fkey\" FOREIGN KEY (\"id\") REFERENCES \"public\".\"companies\" (\"id\") ON DELETE CASCADE;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.derived_fk.derived_fk_category_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"derived_fk\" ADD CONSTRAINT \"derived_fk_category_id_fkey\" FOREIGN KEY (\"category_id\") REFERENCES \"public\".\"tags\" (\"id\") ON DELETE SET NULL;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.membership_tenanted.membership_tenanted_org_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"membership_tenanted\" ADD CONSTRAINT \"membership_tenanted_org_id_fkey\" FOREIGN KEY (\"org_id\") REFERENCES \"public\".\"tenant_orgs\" (\"id\") ON DELETE RESTRICT;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.memberships.memberships_org_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"memberships\" ADD CONSTRAINT \"memberships_org_id_fkey\" FOREIGN KEY (\"org_id\") REFERENCES \"public\".\"tenant_orgs\" (\"id\") ON DELETE SET NULL;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.posts.posts_author_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"posts\" ADD CONSTRAINT \"posts_author_id_fkey\" FOREIGN KEY (\"author_id\") REFERENCES \"public\".\"authors\" (\"id\") ON DELETE CASCADE ON UPDATE CASCADE;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.posts.posts_editor_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"posts\" ADD CONSTRAINT \"posts_editor_id_fkey\" FOREIGN KEY (\"editor_id\") REFERENCES \"public\".\"authors\" (\"id\") ON DELETE SET NULL;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.posts.posts_parent_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"posts\" ADD CONSTRAINT \"posts_parent_id_fkey\" FOREIGN KEY (\"parent_id\") REFERENCES \"public\".\"posts\" (\"id\") ON DELETE SET NULL;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.profiles.profiles_author_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"profiles\" ADD CONSTRAINT \"profiles_author_id_fkey\" FOREIGN KEY (\"author_id\") REFERENCES \"public\".\"authors\" (\"id\") ON DELETE RESTRICT;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.refs.refs_to_uuid_fkey",
+      "sql": "ALTER TABLE \"public\".\"refs\" ADD CONSTRAINT \"refs_to_uuid_fkey\" FOREIGN KEY (\"to_uuid\") REFERENCES \"public\".\"uuid_target\" (\"id\") ON DELETE SET NULL;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.refs.refs_to_int_fkey",
+      "sql": "ALTER TABLE \"public\".\"refs\" ADD CONSTRAINT \"refs_to_int_fkey\" FOREIGN KEY (\"to_int\") REFERENCES \"public\".\"int_target\" (\"id\") ON DELETE SET NULL;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.refs.refs_to_text_fkey",
+      "sql": "ALTER TABLE \"public\".\"refs\" ADD CONSTRAINT \"refs_to_text_fkey\" FOREIGN KEY (\"to_text\") REFERENCES \"public\".\"text_target\" (\"code\") ON DELETE SET NULL;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.refs.refs_to_uuid_req_fkey",
+      "sql": "ALTER TABLE \"public\".\"refs\" ADD CONSTRAINT \"refs_to_uuid_req_fkey\" FOREIGN KEY (\"to_uuid_req\") REFERENCES \"public\".\"uuid_target\" (\"id\") ON DELETE RESTRICT;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.refs.refs_to_int_uniq_fkey",
+      "sql": "ALTER TABLE \"public\".\"refs\" ADD CONSTRAINT \"refs_to_int_uniq_fkey\" FOREIGN KEY (\"to_int_uniq\") REFERENCES \"public\".\"int_target\" (\"id\") ON DELETE SET NULL;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.refs.refs_to_uuid_def_fkey",
+      "sql": "ALTER TABLE \"public\".\"refs\" ADD CONSTRAINT \"refs_to_uuid_def_fkey\" FOREIGN KEY (\"to_uuid_def\") REFERENCES \"public\".\"uuid_target\" (\"id\") ON DELETE SET NULL;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.refs.refs_custom_ref_fkey",
+      "sql": "ALTER TABLE \"public\".\"refs\" ADD CONSTRAINT \"refs_custom_ref_fkey\" FOREIGN KEY (\"custom_ref\") REFERENCES \"public\".\"uuid_target\" (\"id\") ON DELETE SET NULL;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.org_members.org_members_org_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"org_members\" ADD CONSTRAINT \"org_members_org_id_fkey\" FOREIGN KEY (\"org_id\") REFERENCES \"public\".\"orgs\" (\"id\") ON DELETE CASCADE;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.org_members.org_members_person_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"org_members\" ADD CONSTRAINT \"org_members_person_id_fkey\" FOREIGN KEY (\"person_id\") REFERENCES \"public\".\"people\" (\"id\") ON DELETE CASCADE;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.post_tags.post_tags_post_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"post_tags\" ADD CONSTRAINT \"post_tags_post_id_fkey\" FOREIGN KEY (\"post_id\") REFERENCES \"public\".\"posts\" (\"id\") ON DELETE RESTRICT;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.post_tags.post_tags_tag_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"post_tags\" ADD CONSTRAINT \"post_tags_tag_id_fkey\" FOREIGN KEY (\"tag_id\") REFERENCES \"public\".\"tags\" (\"id\") ON DELETE RESTRICT;"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.searched",
+      "sql": "CREATE INDEX IF NOT EXISTS \"searched_search_vector_gin\" ON \"public\".\"searched\" USING GIN (\"search_vector\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.searched",
+      "sql": "CREATE INDEX IF NOT EXISTS \"searched_search_vector_text_trgm\" ON \"public\".\"searched\" USING GIN (\"search_vector_text\" public.gin_trgm_ops);"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.misc",
+      "sql": "CREATE INDEX IF NOT EXISTS \"misc_vec_hnsw_cosine\" ON \"public\".\"misc\" USING hnsw (\"vec\" vector_cosine_ops);"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.misc",
+      "sql": "CREATE INDEX IF NOT EXISTS \"misc_vec_req_hnsw_cosine\" ON \"public\".\"misc\" USING hnsw (\"vec_req\" vector_cosine_ops);"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.misc",
+      "sql": "CREATE INDEX IF NOT EXISTS \"misc_vec_idx_hnsw_cosine\" ON \"public\".\"misc\" USING hnsw (\"vec_idx\" vector_cosine_ops);"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.misc",
+      "sql": "CREATE INDEX IF NOT EXISTS \"misc_vec_uniq_hnsw_cosine\" ON \"public\".\"misc\" USING hnsw (\"vec_uniq\" vector_cosine_ops);"
+    },
+    {
+      "kind": "create-index",
+      "target": "app.app_items",
+      "sql": "CREATE INDEX IF NOT EXISTS \"app_items_owner_id_ix_01606a2\" ON \"app\".\"app_items\" (\"owner_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.claim_tenanted",
+      "sql": "CREATE INDEX IF NOT EXISTS \"claim_tenanted_org_id_ix_0e9638e\" ON \"public\".\"claim_tenanted\" (\"org_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.comments",
+      "sql": "CREATE INDEX IF NOT EXISTS \"comments_post_id_ix_e33996b\" ON \"public\".\"comments\" (\"post_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.derived_fk",
+      "sql": "CREATE INDEX IF NOT EXISTS \"derived_fk_category_id_ix_48b934d\" ON \"public\".\"derived_fk\" (\"category_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.indexed",
+      "sql": "CREATE INDEX IF NOT EXISTS \"indexed_created_at_ix_fc745d0\" ON \"public\".\"indexed\" (\"created_at\") INCLUDE (\"status\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.indexed",
+      "sql": "CREATE UNIQUE INDEX IF NOT EXISTS \"indexed_email_ux_fac43ad\" ON \"public\".\"indexed\" (\"email\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.indexed",
+      "sql": "CREATE INDEX IF NOT EXISTS \"indexed_meta_ix_99e8045\" ON \"public\".\"indexed\" USING gin (\"meta\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.indexed",
+      "sql": "CREATE INDEX IF NOT EXISTS \"indexed_owner_id_created_at_ix_215bb47\" ON \"public\".\"indexed\" (\"owner_id\", \"created_at\" DESC);"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.indexed",
+      "sql": "CREATE INDEX IF NOT EXISTS \"indexed_owner_id_ix_ace470a\" ON \"public\".\"indexed\" (\"owner_id\") WHERE \"status\" = 'live';"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.membership_tenanted",
+      "sql": "CREATE INDEX IF NOT EXISTS \"membership_tenanted_org_id_ix_fd9634c\" ON \"public\".\"membership_tenanted\" (\"org_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.memberships",
+      "sql": "CREATE INDEX IF NOT EXISTS \"memberships_org_id_ix_cb67cc8\" ON \"public\".\"memberships\" (\"org_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.org_members",
+      "sql": "CREATE INDEX IF NOT EXISTS \"org_members_person_id_ix_2ee80f6\" ON \"public\".\"org_members\" (\"person_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.post_tags",
+      "sql": "CREATE INDEX IF NOT EXISTS \"post_tags_tag_id_ix_1b3d736\" ON \"public\".\"post_tags\" (\"tag_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.posts",
+      "sql": "CREATE INDEX IF NOT EXISTS \"posts_author_id_ix_00ad191\" ON \"public\".\"posts\" (\"author_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.posts",
+      "sql": "CREATE INDEX IF NOT EXISTS \"posts_editor_id_ix_ab3063a\" ON \"public\".\"posts\" (\"editor_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.posts",
+      "sql": "CREATE INDEX IF NOT EXISTS \"posts_parent_id_ix_b05127c\" ON \"public\".\"posts\" (\"parent_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.profiles",
+      "sql": "CREATE INDEX IF NOT EXISTS \"profiles_author_id_ix_4915dd6\" ON \"public\".\"profiles\" (\"author_id\");"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "public.bdm.bdm_d_update_touch",
+      "sql": "DROP TRIGGER IF EXISTS \"bdm_d_update_touch\" ON \"public\".\"bdm\";"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "public.bdm.bdm_d_update_touch",
+      "sql": "CREATE TRIGGER \"bdm_d_update_touch\" BEFORE UPDATE ON \"public\".\"bdm\" FOR EACH ROW EXECUTE FUNCTION rebase.set_updated_at('d_update');"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "public.claim_tenanted.claim_tenanted_keep_tenant",
+      "sql": "DROP TRIGGER IF EXISTS \"claim_tenanted_keep_tenant\" ON \"public\".\"claim_tenanted\";"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "public.claim_tenanted.claim_tenanted_keep_tenant",
+      "sql": "CREATE TRIGGER \"claim_tenanted_keep_tenant\" BEFORE UPDATE ON \"public\".\"claim_tenanted\" FOR EACH ROW EXECUTE FUNCTION rebase.keep_tenant('org_id', 'admin');"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "public.membership_tenanted.membership_tenanted_keep_tenant",
+      "sql": "DROP TRIGGER IF EXISTS \"membership_tenanted_keep_tenant\" ON \"public\".\"membership_tenanted\";"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "public.membership_tenanted.membership_tenanted_keep_tenant",
+      "sql": "CREATE TRIGGER \"membership_tenanted_keep_tenant\" BEFORE UPDATE ON \"public\".\"membership_tenanted\" FOR EACH ROW EXECUTE FUNCTION rebase.keep_tenant('org_id', 'admin');"
+    }
+  ],
+  "statements": [
+    "CREATE TYPE \"app\".\"app_items_status\" AS ENUM ('on', 'off');",
+    "CREATE TYPE \"public\".\"indexed_status\" AS ENUM ('draft', 'live');",
+    "CREATE TYPE \"public\".\"str_enum_rec_enum_rec\" AS ENUM ('x', 'y');",
+    "CREATE TYPE \"public\".\"str_props_enum_arr\" AS ENUM ('a', 'b');",
+    "CREATE TYPE \"public\".\"str_props_enum_obj\" AS ENUM ('p', 'q');",
+    "CREATE TYPE \"public\".\"str_props_enum_req\" AS ENUM ('a', 'b');",
+    "CREATE TYPE \"public\".\"org_members_role\" AS ENUM ('owner', 'admin', 'member');",
+    "CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA public;",
+    "CREATE OR REPLACE FUNCTION public.rebase_search_text(text[]) RETURNS text\n    LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE AS\n    $$ SELECT array_to_string($1, ' ') $$;",
+    "CREATE OR REPLACE FUNCTION public.rebase_search_text(jsonb) RETURNS text\n    LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE AS\n    $$ SELECT coalesce(string_agg(v, ' '), '')\n       FROM jsonb_array_elements_text(jsonb_path_query_array($1, 'strict $.**?(@.type() == \"string\")')) AS v $$;",
+    "CREATE OR REPLACE FUNCTION rebase.set_updated_at() RETURNS trigger\nLANGUAGE plpgsql AS $$\nBEGIN\n    NEW := jsonb_populate_record(NEW, jsonb_build_object(TG_ARGV[0], now()));\n    RETURN NEW;\nEND;\n$$;",
+    "CREATE OR REPLACE FUNCTION rebase.keep_tenant() RETURNS trigger\nLANGUAGE plpgsql AS $$\nBEGIN\n    IF row_security_active(TG_RELID) THEN\n        IF to_jsonb(OLD) -> TG_ARGV[0] IS DISTINCT FROM to_jsonb(NEW) -> TG_ARGV[0] THEN\n            IF NOT (string_to_array(COALESCE(current_setting('app.user_roles', true), ''), ',') && TG_ARGV[1:TG_NARGS - 1]) THEN\n                RAISE EXCEPTION 'TENANT_IMMUTABLE: an update cannot move a row of \"%\" to another tenant (column \"%\")', TG_TABLE_NAME, TG_ARGV[0]\n                    USING ERRCODE = '42501',\n                          HINT = 'Move it as a role listed in the collection''s tenant.bypassRoles.';\n            END IF;\n        END IF;\n    END IF;\n    RETURN NEW;\nEND;\n$$;",
+    "CREATE TABLE IF NOT EXISTS \"app\".\"app_items\" (\"id\" UUID PRIMARY KEY DEFAULT gen_random_uuid());",
+    "ALTER TABLE \"app\".\"app_items\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"arrs\" (\"id\" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text);",
+    "ALTER TABLE \"public\".\"arrs\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"authors\" (\"id\" UUID PRIMARY KEY DEFAULT gen_random_uuid());",
+    "ALTER TABLE \"public\".\"authors\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"bdm\" (\"id\" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text);",
+    "ALTER TABLE \"public\".\"bdm\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"claim_tenanted\" (\"id\" UUID PRIMARY KEY DEFAULT gen_random_uuid());",
+    "ALTER TABLE \"public\".\"claim_tenanted\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"comments\" (\"id\" UUID PRIMARY KEY DEFAULT gen_random_uuid());",
+    "ALTER TABLE \"public\".\"comments\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"companies\" (\"id\" INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"companies\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"company_translations\" (\"id\" INTEGER NOT NULL, \"locale\" TEXT NOT NULL, PRIMARY KEY (\"id\", \"locale\"));",
+    "ALTER TABLE \"public\".\"company_translations\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"composite\" (\"tenant\" TEXT NOT NULL, \"code\" INTEGER NOT NULL, PRIMARY KEY (\"tenant\", \"code\"));",
+    "ALTER TABLE \"public\".\"composite\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"derived_fk\" (\"id\" UUID PRIMARY KEY DEFAULT gen_random_uuid());",
+    "ALTER TABLE \"public\".\"derived_fk\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"id_named\" (\"id\" TEXT PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"id_named\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"id_num_named\" (\"id\" INTEGER PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"id_num_named\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"indexed\" (\"id\" UUID PRIMARY KEY DEFAULT gen_random_uuid());",
+    "ALTER TABLE \"public\".\"indexed\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"int_target\" (\"id\" INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"int_target\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"membership_tenanted\" (\"id\" UUID PRIMARY KEY DEFAULT gen_random_uuid());",
+    "ALTER TABLE \"public\".\"membership_tenanted\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"memberships\" (\"id\" UUID PRIMARY KEY DEFAULT gen_random_uuid());",
+    "ALTER TABLE \"public\".\"memberships\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"misc\" (\"id\" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text);",
+    "ALTER TABLE \"public\".\"misc\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"no_id\" (\"id\" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text);",
+    "ALTER TABLE \"public\".\"no_id\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"num_enum_rec\" (\"id\" INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"num_enum_rec\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"num_id_inc_bigint\" (\"id\" INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"num_id_inc_bigint\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"num_id_inc_bigserial\" (\"id\" INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"num_id_inc_bigserial\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"num_id_inc_req\" (\"id\" INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"num_id_inc_req\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"num_id_manual\" (\"code\" INTEGER PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"num_id_manual\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"num_id_serial\" (\"id\" SERIAL PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"num_id_serial\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"num_id_sql\" (\"id\" INTEGER PRIMARY KEY DEFAULT nextval('s'));",
+    "ALTER TABLE \"public\".\"num_id_sql\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"num_id_true\" (\"code\" INTEGER PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"num_id_true\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"num_props\" (\"id\" INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"num_props\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"orgs\" (\"id\" UUID PRIMARY KEY DEFAULT gen_random_uuid());",
+    "ALTER TABLE \"public\".\"orgs\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"people\" (\"id\" INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"people\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"posts\" (\"id\" INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"posts\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"profiles\" (\"id\" UUID PRIMARY KEY DEFAULT gen_random_uuid());",
+    "ALTER TABLE \"public\".\"profiles\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"refs\" (\"id\" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text);",
+    "ALTER TABLE \"public\".\"refs\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"searched\" (\"id\" UUID PRIMARY KEY DEFAULT gen_random_uuid());",
+    "ALTER TABLE \"public\".\"searched\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"smallint_only\" (\"id\" INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"smallint_only\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"str_enum_rec\" (\"id\" UUID PRIMARY KEY DEFAULT gen_random_uuid());",
+    "ALTER TABLE \"public\".\"str_enum_rec\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"str_id_manual\" (\"code\" TEXT PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"str_id_manual\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"str_id_sql\" (\"id\" TEXT PRIMARY KEY DEFAULT gen_id());",
+    "ALTER TABLE \"public\".\"str_id_sql\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"str_id_sql_bare\" (\"id\" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text);",
+    "ALTER TABLE \"public\".\"str_id_sql_bare\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"str_id_true\" (\"code\" TEXT PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"str_id_true\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"str_id_uuid_ru\" (\"id\" UUID PRIMARY KEY DEFAULT gen_random_uuid());",
+    "ALTER TABLE \"public\".\"str_id_uuid_ru\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"str_id_uuid_vc\" (\"id\" UUID PRIMARY KEY DEFAULT gen_random_uuid());",
+    "ALTER TABLE \"public\".\"str_id_uuid_vc\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"str_props\" (\"id\" UUID PRIMARY KEY DEFAULT gen_random_uuid());",
+    "ALTER TABLE \"public\".\"str_props\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"tags\" (\"id\" UUID PRIMARY KEY DEFAULT gen_random_uuid());",
+    "ALTER TABLE \"public\".\"tags\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"tenant_orgs\" (\"id\" UUID PRIMARY KEY DEFAULT gen_random_uuid());",
+    "ALTER TABLE \"public\".\"tenant_orgs\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"text_target\" (\"code\" TEXT PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"text_target\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"uuid_only\" (\"id\" INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"uuid_only\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"uuid_target\" (\"id\" UUID PRIMARY KEY DEFAULT gen_random_uuid());",
+    "ALTER TABLE \"public\".\"uuid_target\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"org_members\" (\"org_id\" UUID NOT NULL, \"person_id\" INTEGER NOT NULL, \"role\" \"public\".\"org_members_role\" DEFAULT 'member' NOT NULL, \"seat\" INTEGER UNIQUE, \"joined_at\" TIMESTAMP WITH TIME ZONE, \"touched_at\" TIMESTAMP WITH TIME ZONE DEFAULT now(), PRIMARY KEY (\"org_id\", \"person_id\"));",
+    "ALTER TABLE \"public\".\"org_members\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"post_tags\" (\"post_id\" INTEGER NOT NULL, \"tag_id\" UUID NOT NULL, PRIMARY KEY (\"post_id\", \"tag_id\"));",
+    "ALTER TABLE \"public\".\"post_tags\" ENABLE ROW LEVEL SECURITY;",
+    "ALTER TABLE \"app\".\"app_items\" ADD COLUMN IF NOT EXISTS \"status\" \"app\".\"app_items_status\";",
+    "ALTER TABLE \"public\".\"arrs\" ADD COLUMN IF NOT EXISTS \"of_string\" TEXT[];",
+    "ALTER TABLE \"public\".\"arrs\" ADD COLUMN IF NOT EXISTS \"of_number\" NUMERIC[];",
+    "ALTER TABLE \"public\".\"arrs\" ADD COLUMN IF NOT EXISTS \"of_integer\" INTEGER[];",
+    "ALTER TABLE \"public\".\"arrs\" ADD COLUMN IF NOT EXISTS \"of_bigint\" NUMERIC[];",
+    "ALTER TABLE \"public\".\"arrs\" ADD COLUMN IF NOT EXISTS \"of_boolean\" BOOLEAN[];",
+    "ALTER TABLE \"public\".\"arrs\" ADD COLUMN IF NOT EXISTS \"of_enum\" TEXT[];",
+    "ALTER TABLE \"public\".\"arrs\" ADD COLUMN IF NOT EXISTS \"of_uuid\" TEXT[];",
+    "ALTER TABLE \"public\".\"arrs\" ADD COLUMN IF NOT EXISTS \"of_date\" JSONB;",
+    "ALTER TABLE \"public\".\"arrs\" ADD COLUMN IF NOT EXISTS \"of_map\" JSONB;",
+    "ALTER TABLE \"public\".\"arrs\" ADD COLUMN IF NOT EXISTS \"of_reference\" JSONB;",
+    "ALTER TABLE \"public\".\"arrs\" ADD COLUMN IF NOT EXISTS \"of_geopoint\" JSONB;",
+    "ALTER TABLE \"public\".\"arrs\" ADD COLUMN IF NOT EXISTS \"of_tuple\" JSONB;",
+    "ALTER TABLE \"public\".\"arrs\" ADD COLUMN IF NOT EXISTS \"no_of\" JSONB;",
+    "ALTER TABLE \"public\".\"arrs\" ADD COLUMN IF NOT EXISTS \"ct_json\" JSON;",
+    "ALTER TABLE \"public\".\"arrs\" ADD COLUMN IF NOT EXISTS \"ct_jsonb\" JSONB;",
+    "ALTER TABLE \"public\".\"arrs\" ADD COLUMN IF NOT EXISTS \"ct_text_arr\" TEXT[];",
+    "ALTER TABLE \"public\".\"arrs\" ADD COLUMN IF NOT EXISTS \"ct_int_arr\" INTEGER[];",
+    "ALTER TABLE \"public\".\"arrs\" ADD COLUMN IF NOT EXISTS \"ct_bool_arr\" BOOLEAN[];",
+    "ALTER TABLE \"public\".\"arrs\" ADD COLUMN IF NOT EXISTS \"ct_num_arr\" NUMERIC[];",
+    "ALTER TABLE \"public\".\"arrs\" ADD COLUMN IF NOT EXISTS \"req\" TEXT[] NOT NULL;",
+    "ALTER TABLE \"public\".\"arrs\" ADD COLUMN IF NOT EXISTS \"uniq\" TEXT[] UNIQUE;",
+    "ALTER TABLE \"public\".\"arrs\" ADD COLUMN IF NOT EXISTS \"with_default\" TEXT[];",
+    "ALTER TABLE \"public\".\"arrs\" ADD COLUMN IF NOT EXISTS \"min_max\" TEXT[];",
+    "ALTER TABLE \"public\".\"authors\" ADD COLUMN IF NOT EXISTS \"name\" TEXT;",
+    "ALTER TABLE \"public\".\"bdm\" ADD COLUMN IF NOT EXISTS \"b\" BOOLEAN;",
+    "ALTER TABLE \"public\".\"bdm\" ADD COLUMN IF NOT EXISTS \"b_req\" BOOLEAN NOT NULL;",
+    "ALTER TABLE \"public\".\"bdm\" ADD COLUMN IF NOT EXISTS \"b_def\" BOOLEAN DEFAULT TRUE;",
+    "ALTER TABLE \"public\".\"bdm\" ADD COLUMN IF NOT EXISTS \"b_uniq\" BOOLEAN UNIQUE;",
+    "ALTER TABLE \"public\".\"bdm\" ADD COLUMN IF NOT EXISTS \"d\" TIMESTAMP WITH TIME ZONE;",
+    "ALTER TABLE \"public\".\"bdm\" ADD COLUMN IF NOT EXISTS \"d_date\" DATE;",
+    "ALTER TABLE \"public\".\"bdm\" ADD COLUMN IF NOT EXISTS \"d_time\" TIME;",
+    "ALTER TABLE \"public\".\"bdm\" ADD COLUMN IF NOT EXISTS \"d_ts\" TIMESTAMP WITH TIME ZONE;",
+    "ALTER TABLE \"public\".\"bdm\" ADD COLUMN IF NOT EXISTS \"d_create\" TIMESTAMP WITH TIME ZONE DEFAULT now();",
+    "ALTER TABLE \"public\".\"bdm\" ADD COLUMN IF NOT EXISTS \"d_update\" TIMESTAMP WITH TIME ZONE DEFAULT now();",
+    "ALTER TABLE \"public\".\"bdm\" ADD COLUMN IF NOT EXISTS \"d_create_req\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;",
+    "ALTER TABLE \"public\".\"bdm\" ADD COLUMN IF NOT EXISTS \"d_date_create\" DATE DEFAULT now();",
+    "ALTER TABLE \"public\".\"bdm\" ADD COLUMN IF NOT EXISTS \"d_def\" TIMESTAMP WITH TIME ZONE DEFAULT '2020-01-01T00:00:00.000Z';",
+    "ALTER TABLE \"public\".\"bdm\" ADD COLUMN IF NOT EXISTS \"d_uniq\" TIMESTAMP WITH TIME ZONE UNIQUE;",
+    "ALTER TABLE \"public\".\"bdm\" ADD COLUMN IF NOT EXISTS \"m\" JSONB;",
+    "ALTER TABLE \"public\".\"bdm\" ADD COLUMN IF NOT EXISTS \"m_json\" JSON;",
+    "ALTER TABLE \"public\".\"bdm\" ADD COLUMN IF NOT EXISTS \"m_jsonb\" JSONB;",
+    "ALTER TABLE \"public\".\"bdm\" ADD COLUMN IF NOT EXISTS \"m_req\" JSONB NOT NULL;",
+    "ALTER TABLE \"public\".\"bdm\" ADD COLUMN IF NOT EXISTS \"m_def\" JSONB DEFAULT '{\"a\":1}'::jsonb;",
+    "ALTER TABLE \"public\".\"bdm\" ADD COLUMN IF NOT EXISTS \"m_props\" JSONB;",
+    "ALTER TABLE \"public\".\"bdm\" ADD COLUMN IF NOT EXISTS \"m_uniq\" JSONB UNIQUE;",
+    "ALTER TABLE \"public\".\"claim_tenanted\" ADD COLUMN IF NOT EXISTS \"org_id\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"claim_tenanted\" ADD COLUMN IF NOT EXISTS \"title\" TEXT;",
+    "ALTER TABLE \"public\".\"comments\" ADD COLUMN IF NOT EXISTS \"body\" TEXT;",
+    "ALTER TABLE \"public\".\"comments\" ADD COLUMN IF NOT EXISTS \"post_id\" INTEGER;",
+    "ALTER TABLE \"public\".\"companies\" ADD COLUMN IF NOT EXISTS \"name\" TEXT;",
+    "ALTER TABLE \"public\".\"company_translations\" ADD COLUMN IF NOT EXISTS \"name\" TEXT;",
+    "ALTER TABLE \"public\".\"composite\" ADD COLUMN IF NOT EXISTS \"v\" TEXT;",
+    "ALTER TABLE \"public\".\"id_named\" ADD COLUMN IF NOT EXISTS \"v\" TEXT;",
+    "ALTER TABLE \"public\".\"id_num_named\" ADD COLUMN IF NOT EXISTS \"v\" TEXT;",
+    "ALTER TABLE \"public\".\"indexed\" ADD COLUMN IF NOT EXISTS \"owner_id\" TEXT;",
+    "ALTER TABLE \"public\".\"indexed\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now();",
+    "ALTER TABLE \"public\".\"indexed\" ADD COLUMN IF NOT EXISTS \"status\" \"public\".\"indexed_status\";",
+    "ALTER TABLE \"public\".\"indexed\" ADD COLUMN IF NOT EXISTS \"meta\" JSONB;",
+    "ALTER TABLE \"public\".\"indexed\" ADD COLUMN IF NOT EXISTS \"email\" TEXT;",
+    "ALTER TABLE \"public\".\"int_target\" ADD COLUMN IF NOT EXISTS \"v\" TEXT;",
+    "ALTER TABLE \"public\".\"membership_tenanted\" ADD COLUMN IF NOT EXISTS \"body\" TEXT;",
+    "ALTER TABLE \"public\".\"memberships\" ADD COLUMN IF NOT EXISTS \"user_id\" TEXT;",
+    "ALTER TABLE \"public\".\"misc\" ADD COLUMN IF NOT EXISTS \"geo\" JSONB;",
+    "ALTER TABLE \"public\".\"misc\" ADD COLUMN IF NOT EXISTS \"geo_req\" JSONB NOT NULL;",
+    "ALTER TABLE \"public\".\"misc\" ADD COLUMN IF NOT EXISTS \"geo_def\" JSONB DEFAULT '{\"latitude\":1,\"longitude\":2}'::jsonb;",
+    "ALTER TABLE \"public\".\"misc\" ADD COLUMN IF NOT EXISTS \"vec\" VECTOR(3);",
+    "ALTER TABLE \"public\".\"misc\" ADD COLUMN IF NOT EXISTS \"vec_req\" VECTOR(3) NOT NULL;",
+    "ALTER TABLE \"public\".\"misc\" ADD COLUMN IF NOT EXISTS \"vec_idx\" VECTOR(4);",
+    "ALTER TABLE \"public\".\"misc\" ADD COLUMN IF NOT EXISTS \"vec_wide\" VECTOR(3000);",
+    "ALTER TABLE \"public\".\"misc\" ADD COLUMN IF NOT EXISTS \"vec_uniq\" VECTOR(3) UNIQUE;",
+    "ALTER TABLE \"public\".\"misc\" ADD COLUMN IF NOT EXISTS \"bin\" BYTEA;",
+    "ALTER TABLE \"public\".\"misc\" ADD COLUMN IF NOT EXISTS \"bin_req\" BYTEA NOT NULL;",
+    "ALTER TABLE \"public\".\"misc\" ADD COLUMN IF NOT EXISTS \"bin_uniq\" BYTEA UNIQUE;",
+    "ALTER TABLE \"public\".\"no_id\" ADD COLUMN IF NOT EXISTS \"v\" TEXT;",
+    "ALTER TABLE \"public\".\"num_enum_rec\" ADD COLUMN IF NOT EXISTS \"enum_num_rec\" NUMERIC;",
+    "ALTER TABLE \"public\".\"num_id_inc_bigint\" ADD COLUMN IF NOT EXISTS \"v\" TEXT;",
+    "ALTER TABLE \"public\".\"num_id_inc_bigserial\" ADD COLUMN IF NOT EXISTS \"v\" TEXT;",
+    "ALTER TABLE \"public\".\"num_id_inc_req\" ADD COLUMN IF NOT EXISTS \"v\" TEXT;",
+    "ALTER TABLE \"public\".\"num_id_manual\" ADD COLUMN IF NOT EXISTS \"v\" TEXT;",
+    "ALTER TABLE \"public\".\"num_id_serial\" ADD COLUMN IF NOT EXISTS \"v\" TEXT;",
+    "ALTER TABLE \"public\".\"num_id_sql\" ADD COLUMN IF NOT EXISTS \"v\" TEXT;",
+    "ALTER TABLE \"public\".\"num_id_true\" ADD COLUMN IF NOT EXISTS \"v\" TEXT;",
+    "ALTER TABLE \"public\".\"num_props\" ADD COLUMN IF NOT EXISTS \"plain\" NUMERIC;",
+    "ALTER TABLE \"public\".\"num_props\" ADD COLUMN IF NOT EXISTS \"integer\" INTEGER;",
+    "ALTER TABLE \"public\".\"num_props\" ADD COLUMN IF NOT EXISTS \"req\" NUMERIC NOT NULL;",
+    "ALTER TABLE \"public\".\"num_props\" ADD COLUMN IF NOT EXISTS \"uniq\" NUMERIC UNIQUE;",
+    "ALTER TABLE \"public\".\"num_props\" ADD COLUMN IF NOT EXISTS \"ct_integer\" INTEGER;",
+    "ALTER TABLE \"public\".\"num_props\" ADD COLUMN IF NOT EXISTS \"ct_real\" REAL;",
+    "ALTER TABLE \"public\".\"num_props\" ADD COLUMN IF NOT EXISTS \"ct_double\" DOUBLE PRECISION;",
+    "ALTER TABLE \"public\".\"num_props\" ADD COLUMN IF NOT EXISTS \"ct_numeric\" NUMERIC;",
+    "ALTER TABLE \"public\".\"num_props\" ADD COLUMN IF NOT EXISTS \"ct_bigint\" BIGINT;",
+    "ALTER TABLE \"public\".\"num_props\" ADD COLUMN IF NOT EXISTS \"ct_serial\" SERIAL;",
+    "ALTER TABLE \"public\".\"num_props\" ADD COLUMN IF NOT EXISTS \"ct_bigserial\" BIGSERIAL;",
+    "ALTER TABLE \"public\".\"num_props\" ADD COLUMN IF NOT EXISTS \"ct_smallint\" SMALLINT;",
+    "ALTER TABLE \"public\".\"num_props\" ADD COLUMN IF NOT EXISTS \"enum_num\" NUMERIC;",
+    "ALTER TABLE \"public\".\"num_props\" ADD COLUMN IF NOT EXISTS \"enum_num_real\" REAL;",
+    "ALTER TABLE \"public\".\"num_props\" ADD COLUMN IF NOT EXISTS \"with_default\" NUMERIC DEFAULT 5;",
+    "ALTER TABLE \"public\".\"num_props\" ADD COLUMN IF NOT EXISTS \"min_max\" NUMERIC;",
+    "ALTER TABLE \"public\".\"num_props\" ADD COLUMN IF NOT EXISTS \"integer_real\" REAL;",
+    "ALTER TABLE \"public\".\"orgs\" ADD COLUMN IF NOT EXISTS \"name\" TEXT;",
+    "ALTER TABLE \"public\".\"people\" ADD COLUMN IF NOT EXISTS \"handle\" TEXT;",
+    "ALTER TABLE \"public\".\"posts\" ADD COLUMN IF NOT EXISTS \"title\" TEXT;",
+    "ALTER TABLE \"public\".\"profiles\" ADD COLUMN IF NOT EXISTS \"bio\" TEXT;",
+    "ALTER TABLE \"public\".\"searched\" ADD COLUMN IF NOT EXISTS \"title\" TEXT;",
+    "ALTER TABLE \"public\".\"searched\" ADD COLUMN IF NOT EXISTS \"body\" TEXT;",
+    "ALTER TABLE \"public\".\"smallint_only\" ADD COLUMN IF NOT EXISTS \"small\" SMALLINT;",
+    "ALTER TABLE \"public\".\"str_enum_rec\" ADD COLUMN IF NOT EXISTS \"enum_rec\" \"public\".\"str_enum_rec_enum_rec\";",
+    "ALTER TABLE \"public\".\"str_id_manual\" ADD COLUMN IF NOT EXISTS \"v\" TEXT;",
+    "ALTER TABLE \"public\".\"str_id_sql\" ADD COLUMN IF NOT EXISTS \"v\" TEXT;",
+    "ALTER TABLE \"public\".\"str_id_sql_bare\" ADD COLUMN IF NOT EXISTS \"v\" TEXT;",
+    "ALTER TABLE \"public\".\"str_id_true\" ADD COLUMN IF NOT EXISTS \"v\" TEXT;",
+    "ALTER TABLE \"public\".\"str_id_uuid_ru\" ADD COLUMN IF NOT EXISTS \"v\" TEXT;",
+    "ALTER TABLE \"public\".\"str_id_uuid_vc\" ADD COLUMN IF NOT EXISTS \"v\" TEXT;",
+    "ALTER TABLE \"public\".\"str_props\" ADD COLUMN IF NOT EXISTS \"plain\" TEXT;",
+    "ALTER TABLE \"public\".\"str_props\" ADD COLUMN IF NOT EXISTS \"req\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"str_props\" ADD COLUMN IF NOT EXISTS \"uniq\" TEXT UNIQUE;",
+    "ALTER TABLE \"public\".\"str_props\" ADD COLUMN IF NOT EXISTS \"enum_arr\" \"public\".\"str_props_enum_arr\";",
+    "ALTER TABLE \"public\".\"str_props\" ADD COLUMN IF NOT EXISTS \"enum_obj\" \"public\".\"str_props_enum_obj\";",
+    "ALTER TABLE \"public\".\"str_props\" ADD COLUMN IF NOT EXISTS \"enum_req\" \"public\".\"str_props_enum_req\" NOT NULL;",
+    "ALTER TABLE \"public\".\"str_props\" ADD COLUMN IF NOT EXISTS \"col_uuid\" UUID;",
+    "ALTER TABLE \"public\".\"str_props\" ADD COLUMN IF NOT EXISTS \"col_char\" CHAR(3);",
+    "ALTER TABLE \"public\".\"str_props\" ADD COLUMN IF NOT EXISTS \"col_varchar\" VARCHAR(100);",
+    "ALTER TABLE \"public\".\"str_props\" ADD COLUMN IF NOT EXISTS \"col_varchar_no_max\" VARCHAR(255);",
+    "ALTER TABLE \"public\".\"str_props\" ADD COLUMN IF NOT EXISTS \"col_text\" TEXT;",
+    "ALTER TABLE \"public\".\"str_props\" ADD COLUMN IF NOT EXISTS \"max_only\" TEXT;",
+    "ALTER TABLE \"public\".\"str_props\" ADD COLUMN IF NOT EXISTS \"multiline\" TEXT;",
+    "ALTER TABLE \"public\".\"str_props\" ADD COLUMN IF NOT EXISTS \"markdown\" TEXT;",
+    "ALTER TABLE \"public\".\"str_props\" ADD COLUMN IF NOT EXISTS \"email\" TEXT;",
+    "ALTER TABLE \"public\".\"str_props\" ADD COLUMN IF NOT EXISTS \"url\" TEXT;",
+    "ALTER TABLE \"public\".\"str_props\" ADD COLUMN IF NOT EXISTS \"storage\" TEXT;",
+    "ALTER TABLE \"public\".\"str_props\" ADD COLUMN IF NOT EXISTS \"with_default\" TEXT DEFAULT 'hello';",
+    "ALTER TABLE \"public\".\"str_props\" ADD COLUMN IF NOT EXISTS \"custom_col\" TEXT;",
+    "ALTER TABLE \"public\".\"str_props\" ADD COLUMN IF NOT EXISTS \"read_only\" TEXT;",
+    "ALTER TABLE \"public\".\"str_props\" ADD COLUMN IF NOT EXISTS \"disabled\" TEXT;",
+    "ALTER TABLE \"public\".\"str_props\" ADD COLUMN IF NOT EXISTS \"min_max\" TEXT;",
+    "ALTER TABLE \"public\".\"str_props\" ADD COLUMN IF NOT EXISTS \"spaced_name\" TEXT;",
+    "ALTER TABLE \"public\".\"str_props\" ADD COLUMN IF NOT EXISTS \"excluded\" TEXT;",
+    "ALTER TABLE \"public\".\"tags\" ADD COLUMN IF NOT EXISTS \"label\" TEXT;",
+    "ALTER TABLE \"public\".\"tenant_orgs\" ADD COLUMN IF NOT EXISTS \"name\" TEXT;",
+    "ALTER TABLE \"public\".\"text_target\" ADD COLUMN IF NOT EXISTS \"v\" TEXT;",
+    "ALTER TABLE \"public\".\"uuid_only\" ADD COLUMN IF NOT EXISTS \"ext\" UUID;",
+    "ALTER TABLE \"public\".\"uuid_target\" ADD COLUMN IF NOT EXISTS \"v\" TEXT;",
+    "ALTER TABLE \"public\".\"searched\" ADD COLUMN IF NOT EXISTS \"search_vector\" tsvector GENERATED ALWAYS AS (setweight(to_tsvector('simple', coalesce(\"title\", '')), 'B') || setweight(to_tsvector('simple', coalesce(\"body\", '')), 'B')) STORED;",
+    "COMMENT ON COLUMN \"public\".\"searched\".\"search_vector\" IS 'rebase:search:v1:ab099946b0f3f150';",
+    "ALTER TABLE \"public\".\"searched\" ADD COLUMN IF NOT EXISTS \"search_vector_text\" text GENERATED ALWAYS AS (coalesce(\"title\", '') || ' ' || coalesce(\"body\", '')) STORED;",
+    "COMMENT ON COLUMN \"public\".\"searched\".\"search_vector_text\" IS 'rebase:search:v1:bbabe2e5eeeb7c78';",
+    "ALTER TABLE \"app\".\"app_items\" ADD COLUMN IF NOT EXISTS \"owner_id\" UUID NOT NULL;",
+    "ALTER TABLE \"app\".\"app_items\" ADD COLUMN IF NOT EXISTS \"ref\" UUID;",
+    "ALTER TABLE \"public\".\"derived_fk\" ADD COLUMN IF NOT EXISTS \"category_id\" UUID;",
+    "ALTER TABLE \"public\".\"membership_tenanted\" ADD COLUMN IF NOT EXISTS \"org_id\" UUID NOT NULL;",
+    "ALTER TABLE \"public\".\"memberships\" ADD COLUMN IF NOT EXISTS \"org_id\" UUID;",
+    "ALTER TABLE \"public\".\"posts\" ADD COLUMN IF NOT EXISTS \"author_id\" UUID NOT NULL;",
+    "ALTER TABLE \"public\".\"posts\" ADD COLUMN IF NOT EXISTS \"editor_id\" UUID;",
+    "ALTER TABLE \"public\".\"posts\" ADD COLUMN IF NOT EXISTS \"parent_id\" INTEGER;",
+    "ALTER TABLE \"public\".\"profiles\" ADD COLUMN IF NOT EXISTS \"author_id\" UUID NOT NULL;",
+    "ALTER TABLE \"public\".\"refs\" ADD COLUMN IF NOT EXISTS \"to_uuid\" UUID;",
+    "ALTER TABLE \"public\".\"refs\" ADD COLUMN IF NOT EXISTS \"to_int\" INTEGER;",
+    "ALTER TABLE \"public\".\"refs\" ADD COLUMN IF NOT EXISTS \"to_text\" TEXT;",
+    "ALTER TABLE \"public\".\"refs\" ADD COLUMN IF NOT EXISTS \"to_unknown\" TEXT;",
+    "ALTER TABLE \"public\".\"refs\" ADD COLUMN IF NOT EXISTS \"to_uuid_req\" UUID NOT NULL;",
+    "ALTER TABLE \"public\".\"refs\" ADD COLUMN IF NOT EXISTS \"to_int_uniq\" INTEGER UNIQUE;",
+    "ALTER TABLE \"public\".\"refs\" ADD COLUMN IF NOT EXISTS \"to_uuid_def\" UUID;",
+    "ALTER TABLE \"public\".\"refs\" ADD COLUMN IF NOT EXISTS \"custom_ref\" UUID;",
+    "ALTER TABLE \"app\".\"app_items\" ADD CONSTRAINT \"app_items_owner_id_fkey\" FOREIGN KEY (\"owner_id\") REFERENCES \"public\".\"uuid_target\" (\"id\") ON DELETE RESTRICT;",
+    "ALTER TABLE \"app\".\"app_items\" ADD CONSTRAINT \"app_items_ref_fkey\" FOREIGN KEY (\"ref\") REFERENCES \"public\".\"uuid_target\" (\"id\") ON DELETE SET NULL;",
+    "ALTER TABLE \"public\".\"comments\" ADD CONSTRAINT \"comments_post_id_fkey\" FOREIGN KEY (\"post_id\") REFERENCES \"public\".\"posts\" (\"id\") ON DELETE CASCADE;",
+    "ALTER TABLE \"public\".\"company_translations\" ADD CONSTRAINT \"company_translations_id_fkey\" FOREIGN KEY (\"id\") REFERENCES \"public\".\"companies\" (\"id\") ON DELETE CASCADE;",
+    "ALTER TABLE \"public\".\"derived_fk\" ADD CONSTRAINT \"derived_fk_category_id_fkey\" FOREIGN KEY (\"category_id\") REFERENCES \"public\".\"tags\" (\"id\") ON DELETE SET NULL;",
+    "ALTER TABLE \"public\".\"membership_tenanted\" ADD CONSTRAINT \"membership_tenanted_org_id_fkey\" FOREIGN KEY (\"org_id\") REFERENCES \"public\".\"tenant_orgs\" (\"id\") ON DELETE RESTRICT;",
+    "ALTER TABLE \"public\".\"memberships\" ADD CONSTRAINT \"memberships_org_id_fkey\" FOREIGN KEY (\"org_id\") REFERENCES \"public\".\"tenant_orgs\" (\"id\") ON DELETE SET NULL;",
+    "ALTER TABLE \"public\".\"posts\" ADD CONSTRAINT \"posts_author_id_fkey\" FOREIGN KEY (\"author_id\") REFERENCES \"public\".\"authors\" (\"id\") ON DELETE CASCADE ON UPDATE CASCADE;",
+    "ALTER TABLE \"public\".\"posts\" ADD CONSTRAINT \"posts_editor_id_fkey\" FOREIGN KEY (\"editor_id\") REFERENCES \"public\".\"authors\" (\"id\") ON DELETE SET NULL;",
+    "ALTER TABLE \"public\".\"posts\" ADD CONSTRAINT \"posts_parent_id_fkey\" FOREIGN KEY (\"parent_id\") REFERENCES \"public\".\"posts\" (\"id\") ON DELETE SET NULL;",
+    "ALTER TABLE \"public\".\"profiles\" ADD CONSTRAINT \"profiles_author_id_fkey\" FOREIGN KEY (\"author_id\") REFERENCES \"public\".\"authors\" (\"id\") ON DELETE RESTRICT;",
+    "ALTER TABLE \"public\".\"refs\" ADD CONSTRAINT \"refs_to_uuid_fkey\" FOREIGN KEY (\"to_uuid\") REFERENCES \"public\".\"uuid_target\" (\"id\") ON DELETE SET NULL;",
+    "ALTER TABLE \"public\".\"refs\" ADD CONSTRAINT \"refs_to_int_fkey\" FOREIGN KEY (\"to_int\") REFERENCES \"public\".\"int_target\" (\"id\") ON DELETE SET NULL;",
+    "ALTER TABLE \"public\".\"refs\" ADD CONSTRAINT \"refs_to_text_fkey\" FOREIGN KEY (\"to_text\") REFERENCES \"public\".\"text_target\" (\"code\") ON DELETE SET NULL;",
+    "ALTER TABLE \"public\".\"refs\" ADD CONSTRAINT \"refs_to_uuid_req_fkey\" FOREIGN KEY (\"to_uuid_req\") REFERENCES \"public\".\"uuid_target\" (\"id\") ON DELETE RESTRICT;",
+    "ALTER TABLE \"public\".\"refs\" ADD CONSTRAINT \"refs_to_int_uniq_fkey\" FOREIGN KEY (\"to_int_uniq\") REFERENCES \"public\".\"int_target\" (\"id\") ON DELETE SET NULL;",
+    "ALTER TABLE \"public\".\"refs\" ADD CONSTRAINT \"refs_to_uuid_def_fkey\" FOREIGN KEY (\"to_uuid_def\") REFERENCES \"public\".\"uuid_target\" (\"id\") ON DELETE SET NULL;",
+    "ALTER TABLE \"public\".\"refs\" ADD CONSTRAINT \"refs_custom_ref_fkey\" FOREIGN KEY (\"custom_ref\") REFERENCES \"public\".\"uuid_target\" (\"id\") ON DELETE SET NULL;",
+    "ALTER TABLE \"public\".\"org_members\" ADD CONSTRAINT \"org_members_org_id_fkey\" FOREIGN KEY (\"org_id\") REFERENCES \"public\".\"orgs\" (\"id\") ON DELETE CASCADE;",
+    "ALTER TABLE \"public\".\"org_members\" ADD CONSTRAINT \"org_members_person_id_fkey\" FOREIGN KEY (\"person_id\") REFERENCES \"public\".\"people\" (\"id\") ON DELETE CASCADE;",
+    "ALTER TABLE \"public\".\"post_tags\" ADD CONSTRAINT \"post_tags_post_id_fkey\" FOREIGN KEY (\"post_id\") REFERENCES \"public\".\"posts\" (\"id\") ON DELETE RESTRICT;",
+    "ALTER TABLE \"public\".\"post_tags\" ADD CONSTRAINT \"post_tags_tag_id_fkey\" FOREIGN KEY (\"tag_id\") REFERENCES \"public\".\"tags\" (\"id\") ON DELETE RESTRICT;",
+    "CREATE INDEX IF NOT EXISTS \"searched_search_vector_gin\" ON \"public\".\"searched\" USING GIN (\"search_vector\");",
+    "CREATE INDEX IF NOT EXISTS \"searched_search_vector_text_trgm\" ON \"public\".\"searched\" USING GIN (\"search_vector_text\" public.gin_trgm_ops);",
+    "CREATE INDEX IF NOT EXISTS \"misc_vec_hnsw_cosine\" ON \"public\".\"misc\" USING hnsw (\"vec\" vector_cosine_ops);",
+    "CREATE INDEX IF NOT EXISTS \"misc_vec_req_hnsw_cosine\" ON \"public\".\"misc\" USING hnsw (\"vec_req\" vector_cosine_ops);",
+    "CREATE INDEX IF NOT EXISTS \"misc_vec_idx_hnsw_cosine\" ON \"public\".\"misc\" USING hnsw (\"vec_idx\" vector_cosine_ops);",
+    "CREATE INDEX IF NOT EXISTS \"misc_vec_uniq_hnsw_cosine\" ON \"public\".\"misc\" USING hnsw (\"vec_uniq\" vector_cosine_ops);",
+    "CREATE INDEX IF NOT EXISTS \"app_items_owner_id_ix_01606a2\" ON \"app\".\"app_items\" (\"owner_id\");",
+    "CREATE INDEX IF NOT EXISTS \"claim_tenanted_org_id_ix_0e9638e\" ON \"public\".\"claim_tenanted\" (\"org_id\");",
+    "CREATE INDEX IF NOT EXISTS \"comments_post_id_ix_e33996b\" ON \"public\".\"comments\" (\"post_id\");",
+    "CREATE INDEX IF NOT EXISTS \"derived_fk_category_id_ix_48b934d\" ON \"public\".\"derived_fk\" (\"category_id\");",
+    "CREATE INDEX IF NOT EXISTS \"indexed_created_at_ix_fc745d0\" ON \"public\".\"indexed\" (\"created_at\") INCLUDE (\"status\");",
+    "CREATE UNIQUE INDEX IF NOT EXISTS \"indexed_email_ux_fac43ad\" ON \"public\".\"indexed\" (\"email\");",
+    "CREATE INDEX IF NOT EXISTS \"indexed_meta_ix_99e8045\" ON \"public\".\"indexed\" USING gin (\"meta\");",
+    "CREATE INDEX IF NOT EXISTS \"indexed_owner_id_created_at_ix_215bb47\" ON \"public\".\"indexed\" (\"owner_id\", \"created_at\" DESC);",
+    "CREATE INDEX IF NOT EXISTS \"indexed_owner_id_ix_ace470a\" ON \"public\".\"indexed\" (\"owner_id\") WHERE \"status\" = 'live';",
+    "CREATE INDEX IF NOT EXISTS \"membership_tenanted_org_id_ix_fd9634c\" ON \"public\".\"membership_tenanted\" (\"org_id\");",
+    "CREATE INDEX IF NOT EXISTS \"memberships_org_id_ix_cb67cc8\" ON \"public\".\"memberships\" (\"org_id\");",
+    "CREATE INDEX IF NOT EXISTS \"org_members_person_id_ix_2ee80f6\" ON \"public\".\"org_members\" (\"person_id\");",
+    "CREATE INDEX IF NOT EXISTS \"post_tags_tag_id_ix_1b3d736\" ON \"public\".\"post_tags\" (\"tag_id\");",
+    "CREATE INDEX IF NOT EXISTS \"posts_author_id_ix_00ad191\" ON \"public\".\"posts\" (\"author_id\");",
+    "CREATE INDEX IF NOT EXISTS \"posts_editor_id_ix_ab3063a\" ON \"public\".\"posts\" (\"editor_id\");",
+    "CREATE INDEX IF NOT EXISTS \"posts_parent_id_ix_b05127c\" ON \"public\".\"posts\" (\"parent_id\");",
+    "CREATE INDEX IF NOT EXISTS \"profiles_author_id_ix_4915dd6\" ON \"public\".\"profiles\" (\"author_id\");",
+    "DROP TRIGGER IF EXISTS \"bdm_d_update_touch\" ON \"public\".\"bdm\";",
+    "CREATE TRIGGER \"bdm_d_update_touch\" BEFORE UPDATE ON \"public\".\"bdm\" FOR EACH ROW EXECUTE FUNCTION rebase.set_updated_at('d_update');",
+    "DROP TRIGGER IF EXISTS \"claim_tenanted_keep_tenant\" ON \"public\".\"claim_tenanted\";",
+    "CREATE TRIGGER \"claim_tenanted_keep_tenant\" BEFORE UPDATE ON \"public\".\"claim_tenanted\" FOR EACH ROW EXECUTE FUNCTION rebase.keep_tenant('org_id', 'admin');",
+    "DROP TRIGGER IF EXISTS \"membership_tenanted_keep_tenant\" ON \"public\".\"membership_tenanted\";",
+    "CREATE TRIGGER \"membership_tenanted_keep_tenant\" BEFORE UPDATE ON \"public\".\"membership_tenanted\" FOR EACH ROW EXECUTE FUNCTION rebase.keep_tenant('org_id', 'admin');"
+  ],
+  "legacyForeignKeys": [],
+  "searchDrift": [],
+  "searchAdopted": [],
+  "vectorIndexSkipped": [
+    {
+      "schema": "public",
+      "table": "misc",
+      "column": "vec_wide",
+      "dimensions": 3000,
+      "reason": "pgvector cannot index a vector wider than 2000 dimensions, and misc.vecWide declares 3000. The column works and `vectorSearch` still answers, as an exact scan. To index it, reduce the dimensions (many embedding models support a shorter output) or set `index: false` to state that the scan is intended."
+    }
+  ],
+  "withheldConstraints": [],
+  "columnTypeDrift": [],
+  "orphanedRequiredColumns": [],
+  "deferredIndexes": []
+}

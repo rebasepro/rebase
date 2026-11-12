@@ -1,0 +1,482 @@
+{
+  "actions": [
+    {
+      "kind": "create-function",
+      "target": "public.rebase_search_text",
+      "sql": "CREATE OR REPLACE FUNCTION rebase.keep_tenant() RETURNS trigger\nLANGUAGE plpgsql AS $$\nBEGIN\n    IF row_security_active(TG_RELID) THEN\n        IF to_jsonb(OLD) -> TG_ARGV[0] IS DISTINCT FROM to_jsonb(NEW) -> TG_ARGV[0] THEN\n            IF NOT (string_to_array(COALESCE(current_setting('app.user_roles', true), ''), ',') && TG_ARGV[1:TG_NARGS - 1]) THEN\n                RAISE EXCEPTION 'TENANT_IMMUTABLE: an update cannot move a row of \"%\" to another tenant (column \"%\")', TG_TABLE_NAME, TG_ARGV[0]\n                    USING ERRCODE = '42501',\n                          HINT = 'Move it as a role listed in the collection''s tenant.bypassRoles.';\n            END IF;\n        END IF;\n    END IF;\n    RETURN NEW;\nEND;\n$$;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.accounts",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"accounts\" (\"id\" TEXT PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.accounts",
+      "sql": "ALTER TABLE \"public\".\"accounts\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.articles",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"articles\" (\"id\" TEXT PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.articles",
+      "sql": "ALTER TABLE \"public\".\"articles\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.boards",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"boards\" (\"id\" TEXT PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.boards",
+      "sql": "ALTER TABLE \"public\".\"boards\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.docs",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"docs\" (\"id\" TEXT PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.docs",
+      "sql": "ALTER TABLE \"public\".\"docs\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.flags",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"flags\" (\"id\" TEXT PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.flags",
+      "sql": "ALTER TABLE \"public\".\"flags\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.jobs",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"jobs\" (\"id\" TEXT PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.jobs",
+      "sql": "ALTER TABLE \"public\".\"jobs\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.memberships",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"memberships\" (\"id\" TEXT PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.memberships",
+      "sql": "ALTER TABLE \"public\".\"memberships\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.notes",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"notes\" (\"id\" TEXT PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.notes",
+      "sql": "ALTER TABLE \"public\".\"notes\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.posts",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"posts\" (\"id\" TEXT PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.posts",
+      "sql": "ALTER TABLE \"public\".\"posts\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.projects",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"projects\" (\"id\" TEXT PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.projects",
+      "sql": "ALTER TABLE \"public\".\"projects\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.secrets",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"secrets\" (\"id\" TEXT PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.secrets",
+      "sql": "ALTER TABLE \"public\".\"secrets\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.tags",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"tags\" (\"id\" TEXT PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.tags",
+      "sql": "ALTER TABLE \"public\".\"tags\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.tasks",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"tasks\" (\"id\" TEXT PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.tasks",
+      "sql": "ALTER TABLE \"public\".\"tasks\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.wiki",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"wiki\" (\"id\" TEXT PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.wiki",
+      "sql": "ALTER TABLE \"public\".\"wiki\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.posts_tags",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"posts_tags\" (\"post_id\" TEXT NOT NULL, \"tag_id\" TEXT NOT NULL, PRIMARY KEY (\"post_id\", \"tag_id\"));"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.posts_tags",
+      "sql": "ALTER TABLE \"public\".\"posts_tags\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.accounts.email",
+      "sql": "ALTER TABLE \"public\".\"accounts\" ADD COLUMN IF NOT EXISTS \"email\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.accounts.display_name",
+      "sql": "ALTER TABLE \"public\".\"accounts\" ADD COLUMN IF NOT EXISTS \"display_name\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.accounts.photo_url",
+      "sql": "ALTER TABLE \"public\".\"accounts\" ADD COLUMN IF NOT EXISTS \"photo_url\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.accounts.roles",
+      "sql": "ALTER TABLE \"public\".\"accounts\" ADD COLUMN IF NOT EXISTS \"roles\" TEXT[] DEFAULT '{}' NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.accounts.password_hash",
+      "sql": "ALTER TABLE \"public\".\"accounts\" ADD COLUMN IF NOT EXISTS \"password_hash\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.accounts.email_verified",
+      "sql": "ALTER TABLE \"public\".\"accounts\" ADD COLUMN IF NOT EXISTS \"email_verified\" BOOLEAN DEFAULT FALSE NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.accounts.email_verification_token",
+      "sql": "ALTER TABLE \"public\".\"accounts\" ADD COLUMN IF NOT EXISTS \"email_verification_token\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.accounts.email_verification_sent_at",
+      "sql": "ALTER TABLE \"public\".\"accounts\" ADD COLUMN IF NOT EXISTS \"email_verification_sent_at\" TIMESTAMP WITH TIME ZONE;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.accounts.is_anonymous",
+      "sql": "ALTER TABLE \"public\".\"accounts\" ADD COLUMN IF NOT EXISTS \"is_anonymous\" BOOLEAN DEFAULT FALSE NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.accounts.metadata",
+      "sql": "ALTER TABLE \"public\".\"accounts\" ADD COLUMN IF NOT EXISTS \"metadata\" JSONB DEFAULT '{}' NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.accounts.tokens_valid_after",
+      "sql": "ALTER TABLE \"public\".\"accounts\" ADD COLUMN IF NOT EXISTS \"tokens_valid_after\" TIMESTAMP WITH TIME ZONE;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.accounts.disabled_at",
+      "sql": "ALTER TABLE \"public\".\"accounts\" ADD COLUMN IF NOT EXISTS \"disabled_at\" TIMESTAMP WITH TIME ZONE;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.accounts.pending_email",
+      "sql": "ALTER TABLE \"public\".\"accounts\" ADD COLUMN IF NOT EXISTS \"pending_email\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.accounts.email_change_token",
+      "sql": "ALTER TABLE \"public\".\"accounts\" ADD COLUMN IF NOT EXISTS \"email_change_token\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.accounts.email_change_sent_at",
+      "sql": "ALTER TABLE \"public\".\"accounts\" ADD COLUMN IF NOT EXISTS \"email_change_sent_at\" TIMESTAMP WITH TIME ZONE;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.accounts.created_at",
+      "sql": "ALTER TABLE \"public\".\"accounts\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.accounts.updated_at",
+      "sql": "ALTER TABLE \"public\".\"accounts\" ADD COLUMN IF NOT EXISTS \"updated_at\" TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.articles.title",
+      "sql": "ALTER TABLE \"public\".\"articles\" ADD COLUMN IF NOT EXISTS \"title\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.boards.org_id",
+      "sql": "ALTER TABLE \"public\".\"boards\" ADD COLUMN IF NOT EXISTS \"org_id\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.docs.title",
+      "sql": "ALTER TABLE \"public\".\"docs\" ADD COLUMN IF NOT EXISTS \"title\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.flags.name",
+      "sql": "ALTER TABLE \"public\".\"flags\" ADD COLUMN IF NOT EXISTS \"name\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.jobs.payload",
+      "sql": "ALTER TABLE \"public\".\"jobs\" ADD COLUMN IF NOT EXISTS \"payload\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.memberships.user_id",
+      "sql": "ALTER TABLE \"public\".\"memberships\" ADD COLUMN IF NOT EXISTS \"user_id\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.memberships.org_id",
+      "sql": "ALTER TABLE \"public\".\"memberships\" ADD COLUMN IF NOT EXISTS \"org_id\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.notes.owner_id",
+      "sql": "ALTER TABLE \"public\".\"notes\" ADD COLUMN IF NOT EXISTS \"owner_id\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.notes.body",
+      "sql": "ALTER TABLE \"public\".\"notes\" ADD COLUMN IF NOT EXISTS \"body\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.posts.owner_id",
+      "sql": "ALTER TABLE \"public\".\"posts\" ADD COLUMN IF NOT EXISTS \"owner_id\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.posts.title",
+      "sql": "ALTER TABLE \"public\".\"posts\" ADD COLUMN IF NOT EXISTS \"title\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.projects.org_id",
+      "sql": "ALTER TABLE \"public\".\"projects\" ADD COLUMN IF NOT EXISTS \"org_id\" UUID NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.projects.name",
+      "sql": "ALTER TABLE \"public\".\"projects\" ADD COLUMN IF NOT EXISTS \"name\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.secrets.level",
+      "sql": "ALTER TABLE \"public\".\"secrets\" ADD COLUMN IF NOT EXISTS \"level\" INTEGER;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.secrets.region",
+      "sql": "ALTER TABLE \"public\".\"secrets\" ADD COLUMN IF NOT EXISTS \"region\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.tags.label",
+      "sql": "ALTER TABLE \"public\".\"tags\" ADD COLUMN IF NOT EXISTS \"label\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.tasks.org_id",
+      "sql": "ALTER TABLE \"public\".\"tasks\" ADD COLUMN IF NOT EXISTS \"org_id\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.tasks.title",
+      "sql": "ALTER TABLE \"public\".\"tasks\" ADD COLUMN IF NOT EXISTS \"title\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.wiki.owner_id",
+      "sql": "ALTER TABLE \"public\".\"wiki\" ADD COLUMN IF NOT EXISTS \"owner_id\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.wiki.visibility",
+      "sql": "ALTER TABLE \"public\".\"wiki\" ADD COLUMN IF NOT EXISTS \"visibility\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.wiki.title",
+      "sql": "ALTER TABLE \"public\".\"wiki\" ADD COLUMN IF NOT EXISTS \"title\" TEXT;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.posts_tags.posts_tags_post_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"posts_tags\" ADD CONSTRAINT \"posts_tags_post_id_fkey\" FOREIGN KEY (\"post_id\") REFERENCES \"public\".\"posts\" (\"id\") ON DELETE CASCADE;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.posts_tags.posts_tags_tag_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"posts_tags\" ADD CONSTRAINT \"posts_tags_tag_id_fkey\" FOREIGN KEY (\"tag_id\") REFERENCES \"public\".\"tags\" (\"id\") ON DELETE CASCADE;"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.posts_tags",
+      "sql": "CREATE INDEX IF NOT EXISTS \"posts_tags_tag_id_ix_d4456f1\" ON \"public\".\"posts_tags\" (\"tag_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.projects",
+      "sql": "CREATE INDEX IF NOT EXISTS \"projects_org_id_ix_8a76723\" ON \"public\".\"projects\" (\"org_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.tasks",
+      "sql": "CREATE INDEX IF NOT EXISTS \"tasks_org_id_ix_a6108bd\" ON \"public\".\"tasks\" (\"org_id\");"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "public.projects.projects_keep_tenant",
+      "sql": "DROP TRIGGER IF EXISTS \"projects_keep_tenant\" ON \"public\".\"projects\";"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "public.projects.projects_keep_tenant",
+      "sql": "CREATE TRIGGER \"projects_keep_tenant\" BEFORE UPDATE ON \"public\".\"projects\" FOR EACH ROW EXECUTE FUNCTION rebase.keep_tenant('org_id', 'admin');"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "public.tasks.tasks_keep_tenant",
+      "sql": "DROP TRIGGER IF EXISTS \"tasks_keep_tenant\" ON \"public\".\"tasks\";"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "public.tasks.tasks_keep_tenant",
+      "sql": "CREATE TRIGGER \"tasks_keep_tenant\" BEFORE UPDATE ON \"public\".\"tasks\" FOR EACH ROW EXECUTE FUNCTION rebase.keep_tenant('org_id', 'admin', 'support');"
+    }
+  ],
+  "statements": [
+    "CREATE OR REPLACE FUNCTION rebase.keep_tenant() RETURNS trigger\nLANGUAGE plpgsql AS $$\nBEGIN\n    IF row_security_active(TG_RELID) THEN\n        IF to_jsonb(OLD) -> TG_ARGV[0] IS DISTINCT FROM to_jsonb(NEW) -> TG_ARGV[0] THEN\n            IF NOT (string_to_array(COALESCE(current_setting('app.user_roles', true), ''), ',') && TG_ARGV[1:TG_NARGS - 1]) THEN\n                RAISE EXCEPTION 'TENANT_IMMUTABLE: an update cannot move a row of \"%\" to another tenant (column \"%\")', TG_TABLE_NAME, TG_ARGV[0]\n                    USING ERRCODE = '42501',\n                          HINT = 'Move it as a role listed in the collection''s tenant.bypassRoles.';\n            END IF;\n        END IF;\n    END IF;\n    RETURN NEW;\nEND;\n$$;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"accounts\" (\"id\" TEXT PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"accounts\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"articles\" (\"id\" TEXT PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"articles\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"boards\" (\"id\" TEXT PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"boards\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"docs\" (\"id\" TEXT PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"docs\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"flags\" (\"id\" TEXT PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"flags\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"jobs\" (\"id\" TEXT PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"jobs\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"memberships\" (\"id\" TEXT PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"memberships\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"notes\" (\"id\" TEXT PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"notes\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"posts\" (\"id\" TEXT PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"posts\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"projects\" (\"id\" TEXT PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"projects\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"secrets\" (\"id\" TEXT PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"secrets\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"tags\" (\"id\" TEXT PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"tags\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"tasks\" (\"id\" TEXT PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"tasks\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"wiki\" (\"id\" TEXT PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"wiki\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"posts_tags\" (\"post_id\" TEXT NOT NULL, \"tag_id\" TEXT NOT NULL, PRIMARY KEY (\"post_id\", \"tag_id\"));",
+    "ALTER TABLE \"public\".\"posts_tags\" ENABLE ROW LEVEL SECURITY;",
+    "ALTER TABLE \"public\".\"accounts\" ADD COLUMN IF NOT EXISTS \"email\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"accounts\" ADD COLUMN IF NOT EXISTS \"display_name\" TEXT;",
+    "ALTER TABLE \"public\".\"accounts\" ADD COLUMN IF NOT EXISTS \"photo_url\" TEXT;",
+    "ALTER TABLE \"public\".\"accounts\" ADD COLUMN IF NOT EXISTS \"roles\" TEXT[] DEFAULT '{}' NOT NULL;",
+    "ALTER TABLE \"public\".\"accounts\" ADD COLUMN IF NOT EXISTS \"password_hash\" TEXT;",
+    "ALTER TABLE \"public\".\"accounts\" ADD COLUMN IF NOT EXISTS \"email_verified\" BOOLEAN DEFAULT FALSE NOT NULL;",
+    "ALTER TABLE \"public\".\"accounts\" ADD COLUMN IF NOT EXISTS \"email_verification_token\" TEXT;",
+    "ALTER TABLE \"public\".\"accounts\" ADD COLUMN IF NOT EXISTS \"email_verification_sent_at\" TIMESTAMP WITH TIME ZONE;",
+    "ALTER TABLE \"public\".\"accounts\" ADD COLUMN IF NOT EXISTS \"is_anonymous\" BOOLEAN DEFAULT FALSE NOT NULL;",
+    "ALTER TABLE \"public\".\"accounts\" ADD COLUMN IF NOT EXISTS \"metadata\" JSONB DEFAULT '{}' NOT NULL;",
+    "ALTER TABLE \"public\".\"accounts\" ADD COLUMN IF NOT EXISTS \"tokens_valid_after\" TIMESTAMP WITH TIME ZONE;",
+    "ALTER TABLE \"public\".\"accounts\" ADD COLUMN IF NOT EXISTS \"disabled_at\" TIMESTAMP WITH TIME ZONE;",
+    "ALTER TABLE \"public\".\"accounts\" ADD COLUMN IF NOT EXISTS \"pending_email\" TEXT;",
+    "ALTER TABLE \"public\".\"accounts\" ADD COLUMN IF NOT EXISTS \"email_change_token\" TEXT;",
+    "ALTER TABLE \"public\".\"accounts\" ADD COLUMN IF NOT EXISTS \"email_change_sent_at\" TIMESTAMP WITH TIME ZONE;",
+    "ALTER TABLE \"public\".\"accounts\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL;",
+    "ALTER TABLE \"public\".\"accounts\" ADD COLUMN IF NOT EXISTS \"updated_at\" TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL;",
+    "ALTER TABLE \"public\".\"articles\" ADD COLUMN IF NOT EXISTS \"title\" TEXT;",
+    "ALTER TABLE \"public\".\"boards\" ADD COLUMN IF NOT EXISTS \"org_id\" TEXT;",
+    "ALTER TABLE \"public\".\"docs\" ADD COLUMN IF NOT EXISTS \"title\" TEXT;",
+    "ALTER TABLE \"public\".\"flags\" ADD COLUMN IF NOT EXISTS \"name\" TEXT;",
+    "ALTER TABLE \"public\".\"jobs\" ADD COLUMN IF NOT EXISTS \"payload\" TEXT;",
+    "ALTER TABLE \"public\".\"memberships\" ADD COLUMN IF NOT EXISTS \"user_id\" TEXT;",
+    "ALTER TABLE \"public\".\"memberships\" ADD COLUMN IF NOT EXISTS \"org_id\" TEXT;",
+    "ALTER TABLE \"public\".\"notes\" ADD COLUMN IF NOT EXISTS \"owner_id\" TEXT;",
+    "ALTER TABLE \"public\".\"notes\" ADD COLUMN IF NOT EXISTS \"body\" TEXT;",
+    "ALTER TABLE \"public\".\"posts\" ADD COLUMN IF NOT EXISTS \"owner_id\" TEXT;",
+    "ALTER TABLE \"public\".\"posts\" ADD COLUMN IF NOT EXISTS \"title\" TEXT;",
+    "ALTER TABLE \"public\".\"projects\" ADD COLUMN IF NOT EXISTS \"org_id\" UUID NOT NULL;",
+    "ALTER TABLE \"public\".\"projects\" ADD COLUMN IF NOT EXISTS \"name\" TEXT;",
+    "ALTER TABLE \"public\".\"secrets\" ADD COLUMN IF NOT EXISTS \"level\" INTEGER;",
+    "ALTER TABLE \"public\".\"secrets\" ADD COLUMN IF NOT EXISTS \"region\" TEXT;",
+    "ALTER TABLE \"public\".\"tags\" ADD COLUMN IF NOT EXISTS \"label\" TEXT;",
+    "ALTER TABLE \"public\".\"tasks\" ADD COLUMN IF NOT EXISTS \"org_id\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"tasks\" ADD COLUMN IF NOT EXISTS \"title\" TEXT;",
+    "ALTER TABLE \"public\".\"wiki\" ADD COLUMN IF NOT EXISTS \"owner_id\" TEXT;",
+    "ALTER TABLE \"public\".\"wiki\" ADD COLUMN IF NOT EXISTS \"visibility\" TEXT;",
+    "ALTER TABLE \"public\".\"wiki\" ADD COLUMN IF NOT EXISTS \"title\" TEXT;",
+    "ALTER TABLE \"public\".\"posts_tags\" ADD CONSTRAINT \"posts_tags_post_id_fkey\" FOREIGN KEY (\"post_id\") REFERENCES \"public\".\"posts\" (\"id\") ON DELETE CASCADE;",
+    "ALTER TABLE \"public\".\"posts_tags\" ADD CONSTRAINT \"posts_tags_tag_id_fkey\" FOREIGN KEY (\"tag_id\") REFERENCES \"public\".\"tags\" (\"id\") ON DELETE CASCADE;",
+    "CREATE INDEX IF NOT EXISTS \"posts_tags_tag_id_ix_d4456f1\" ON \"public\".\"posts_tags\" (\"tag_id\");",
+    "CREATE INDEX IF NOT EXISTS \"projects_org_id_ix_8a76723\" ON \"public\".\"projects\" (\"org_id\");",
+    "CREATE INDEX IF NOT EXISTS \"tasks_org_id_ix_a6108bd\" ON \"public\".\"tasks\" (\"org_id\");",
+    "DROP TRIGGER IF EXISTS \"projects_keep_tenant\" ON \"public\".\"projects\";",
+    "CREATE TRIGGER \"projects_keep_tenant\" BEFORE UPDATE ON \"public\".\"projects\" FOR EACH ROW EXECUTE FUNCTION rebase.keep_tenant('org_id', 'admin');",
+    "DROP TRIGGER IF EXISTS \"tasks_keep_tenant\" ON \"public\".\"tasks\";",
+    "CREATE TRIGGER \"tasks_keep_tenant\" BEFORE UPDATE ON \"public\".\"tasks\" FOR EACH ROW EXECUTE FUNCTION rebase.keep_tenant('org_id', 'admin', 'support');"
+  ],
+  "legacyForeignKeys": [],
+  "searchDrift": [],
+  "searchAdopted": [],
+  "vectorIndexSkipped": [],
+  "withheldConstraints": [],
+  "columnTypeDrift": [],
+  "orphanedRequiredColumns": [],
+  "deferredIndexes": []
+}

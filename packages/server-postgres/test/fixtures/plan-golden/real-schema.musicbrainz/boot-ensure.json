@@ -1,0 +1,650 @@
+{
+  "actions": [
+    {
+      "kind": "create-table",
+      "target": "public.area",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"area\" (\"id\" SERIAL PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.area",
+      "sql": "ALTER TABLE \"public\".\"area\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.area_tag",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"area_tag\" (\"area\" INTEGER NOT NULL, \"tag\" INTEGER NOT NULL, PRIMARY KEY (\"area\", \"tag\"));"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.area_tag",
+      "sql": "ALTER TABLE \"public\".\"area_tag\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.area_tag_raw",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"area_tag_raw\" (\"area\" INTEGER NOT NULL, \"editor\" INTEGER NOT NULL, \"tag\" INTEGER NOT NULL, PRIMARY KEY (\"area\", \"editor\", \"tag\"));"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.area_tag_raw",
+      "sql": "ALTER TABLE \"public\".\"area_tag_raw\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.area_type",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"area_type\" (\"id\" SERIAL PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.area_type",
+      "sql": "ALTER TABLE \"public\".\"area_type\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.artist",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"artist\" (\"id\" SERIAL PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.artist",
+      "sql": "ALTER TABLE \"public\".\"artist\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.artist_credit",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"artist_credit\" (\"id\" SERIAL PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.artist_credit",
+      "sql": "ALTER TABLE \"public\".\"artist_credit\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.artist_credit_name",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"artist_credit_name\" (\"artist_credit\" INTEGER NOT NULL, \"position\" INTEGER NOT NULL, PRIMARY KEY (\"artist_credit\", \"position\"));"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.artist_credit_name",
+      "sql": "ALTER TABLE \"public\".\"artist_credit_name\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.editor",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"editor\" (\"id\" SERIAL PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.editor",
+      "sql": "ALTER TABLE \"public\".\"editor\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.tag",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"tag\" (\"id\" SERIAL PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.tag",
+      "sql": "ALTER TABLE \"public\".\"tag\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.area.name",
+      "sql": "ALTER TABLE \"public\".\"area\" ADD COLUMN IF NOT EXISTS \"name\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.area.gid",
+      "sql": "ALTER TABLE \"public\".\"area\" ADD COLUMN IF NOT EXISTS \"gid\" UUID NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.area.comment",
+      "sql": "ALTER TABLE \"public\".\"area\" ADD COLUMN IF NOT EXISTS \"comment\" VARCHAR(255) DEFAULT '' NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.area.ended",
+      "sql": "ALTER TABLE \"public\".\"area\" ADD COLUMN IF NOT EXISTS \"ended\" BOOLEAN DEFAULT FALSE NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.area.edits_pending",
+      "sql": "ALTER TABLE \"public\".\"area\" ADD COLUMN IF NOT EXISTS \"edits_pending\" INTEGER DEFAULT 0 NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.area.begin_date_year",
+      "sql": "ALTER TABLE \"public\".\"area\" ADD COLUMN IF NOT EXISTS \"begin_date_year\" INTEGER;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.area.begin_date_month",
+      "sql": "ALTER TABLE \"public\".\"area\" ADD COLUMN IF NOT EXISTS \"begin_date_month\" INTEGER;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.area.begin_date_day",
+      "sql": "ALTER TABLE \"public\".\"area\" ADD COLUMN IF NOT EXISTS \"begin_date_day\" INTEGER;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.area.end_date_year",
+      "sql": "ALTER TABLE \"public\".\"area\" ADD COLUMN IF NOT EXISTS \"end_date_year\" INTEGER;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.area.end_date_month",
+      "sql": "ALTER TABLE \"public\".\"area\" ADD COLUMN IF NOT EXISTS \"end_date_month\" INTEGER;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.area.end_date_day",
+      "sql": "ALTER TABLE \"public\".\"area\" ADD COLUMN IF NOT EXISTS \"end_date_day\" INTEGER;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.area.last_updated",
+      "sql": "ALTER TABLE \"public\".\"area\" ADD COLUMN IF NOT EXISTS \"last_updated\" TIMESTAMP WITH TIME ZONE DEFAULT now();"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.area_tag.count",
+      "sql": "ALTER TABLE \"public\".\"area_tag\" ADD COLUMN IF NOT EXISTS \"count\" INTEGER NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.area_tag.last_updated",
+      "sql": "ALTER TABLE \"public\".\"area_tag\" ADD COLUMN IF NOT EXISTS \"last_updated\" TIMESTAMP WITH TIME ZONE DEFAULT now();"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.area_tag_raw.is_upvote",
+      "sql": "ALTER TABLE \"public\".\"area_tag_raw\" ADD COLUMN IF NOT EXISTS \"is_upvote\" BOOLEAN DEFAULT TRUE NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.area_type.name",
+      "sql": "ALTER TABLE \"public\".\"area_type\" ADD COLUMN IF NOT EXISTS \"name\" VARCHAR(255) NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.area_type.gid",
+      "sql": "ALTER TABLE \"public\".\"area_type\" ADD COLUMN IF NOT EXISTS \"gid\" UUID NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.area_type.child_order",
+      "sql": "ALTER TABLE \"public\".\"area_type\" ADD COLUMN IF NOT EXISTS \"child_order\" INTEGER DEFAULT 0 NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.area_type.description",
+      "sql": "ALTER TABLE \"public\".\"area_type\" ADD COLUMN IF NOT EXISTS \"description\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.artist.name",
+      "sql": "ALTER TABLE \"public\".\"artist\" ADD COLUMN IF NOT EXISTS \"name\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.artist.sort_name",
+      "sql": "ALTER TABLE \"public\".\"artist\" ADD COLUMN IF NOT EXISTS \"sort_name\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.artist.type",
+      "sql": "ALTER TABLE \"public\".\"artist\" ADD COLUMN IF NOT EXISTS \"type\" INTEGER;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.artist.gid",
+      "sql": "ALTER TABLE \"public\".\"artist\" ADD COLUMN IF NOT EXISTS \"gid\" UUID NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.artist.comment",
+      "sql": "ALTER TABLE \"public\".\"artist\" ADD COLUMN IF NOT EXISTS \"comment\" VARCHAR(255) DEFAULT '' NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.artist.ended",
+      "sql": "ALTER TABLE \"public\".\"artist\" ADD COLUMN IF NOT EXISTS \"ended\" BOOLEAN DEFAULT FALSE NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.artist.begin_date_year",
+      "sql": "ALTER TABLE \"public\".\"artist\" ADD COLUMN IF NOT EXISTS \"begin_date_year\" INTEGER;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.artist.begin_date_month",
+      "sql": "ALTER TABLE \"public\".\"artist\" ADD COLUMN IF NOT EXISTS \"begin_date_month\" INTEGER;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.artist.begin_date_day",
+      "sql": "ALTER TABLE \"public\".\"artist\" ADD COLUMN IF NOT EXISTS \"begin_date_day\" INTEGER;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.artist.end_date_year",
+      "sql": "ALTER TABLE \"public\".\"artist\" ADD COLUMN IF NOT EXISTS \"end_date_year\" INTEGER;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.artist.end_date_month",
+      "sql": "ALTER TABLE \"public\".\"artist\" ADD COLUMN IF NOT EXISTS \"end_date_month\" INTEGER;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.artist.end_date_day",
+      "sql": "ALTER TABLE \"public\".\"artist\" ADD COLUMN IF NOT EXISTS \"end_date_day\" INTEGER;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.artist.gender",
+      "sql": "ALTER TABLE \"public\".\"artist\" ADD COLUMN IF NOT EXISTS \"gender\" INTEGER;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.artist.edits_pending",
+      "sql": "ALTER TABLE \"public\".\"artist\" ADD COLUMN IF NOT EXISTS \"edits_pending\" INTEGER DEFAULT 0 NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.artist.last_updated",
+      "sql": "ALTER TABLE \"public\".\"artist\" ADD COLUMN IF NOT EXISTS \"last_updated\" TIMESTAMP WITH TIME ZONE DEFAULT now();"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.artist_credit.name",
+      "sql": "ALTER TABLE \"public\".\"artist_credit\" ADD COLUMN IF NOT EXISTS \"name\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.artist_credit.gid",
+      "sql": "ALTER TABLE \"public\".\"artist_credit\" ADD COLUMN IF NOT EXISTS \"gid\" UUID NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.artist_credit.artist_count",
+      "sql": "ALTER TABLE \"public\".\"artist_credit\" ADD COLUMN IF NOT EXISTS \"artist_count\" INTEGER NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.artist_credit.ref_count",
+      "sql": "ALTER TABLE \"public\".\"artist_credit\" ADD COLUMN IF NOT EXISTS \"ref_count\" INTEGER DEFAULT 0;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.artist_credit.edits_pending",
+      "sql": "ALTER TABLE \"public\".\"artist_credit\" ADD COLUMN IF NOT EXISTS \"edits_pending\" INTEGER DEFAULT 0 NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.artist_credit.created",
+      "sql": "ALTER TABLE \"public\".\"artist_credit\" ADD COLUMN IF NOT EXISTS \"created\" TIMESTAMP WITH TIME ZONE DEFAULT now();"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.artist_credit_name.name",
+      "sql": "ALTER TABLE \"public\".\"artist_credit_name\" ADD COLUMN IF NOT EXISTS \"name\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.artist_credit_name.join_phrase",
+      "sql": "ALTER TABLE \"public\".\"artist_credit_name\" ADD COLUMN IF NOT EXISTS \"join_phrase\" TEXT DEFAULT '' NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.editor.name",
+      "sql": "ALTER TABLE \"public\".\"editor\" ADD COLUMN IF NOT EXISTS \"name\" VARCHAR(64) NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.editor.email",
+      "sql": "ALTER TABLE \"public\".\"editor\" ADD COLUMN IF NOT EXISTS \"email\" VARCHAR(64);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.editor.website",
+      "sql": "ALTER TABLE \"public\".\"editor\" ADD COLUMN IF NOT EXISTS \"website\" VARCHAR(255);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.editor.password",
+      "sql": "ALTER TABLE \"public\".\"editor\" ADD COLUMN IF NOT EXISTS \"password\" VARCHAR(128) NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.editor.ha1",
+      "sql": "ALTER TABLE \"public\".\"editor\" ADD COLUMN IF NOT EXISTS \"ha1\" CHAR(32) NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.editor.deleted",
+      "sql": "ALTER TABLE \"public\".\"editor\" ADD COLUMN IF NOT EXISTS \"deleted\" BOOLEAN DEFAULT FALSE NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.editor.privs",
+      "sql": "ALTER TABLE \"public\".\"editor\" ADD COLUMN IF NOT EXISTS \"privs\" INTEGER DEFAULT 0;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.editor.gender",
+      "sql": "ALTER TABLE \"public\".\"editor\" ADD COLUMN IF NOT EXISTS \"gender\" INTEGER;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.editor.member_since",
+      "sql": "ALTER TABLE \"public\".\"editor\" ADD COLUMN IF NOT EXISTS \"member_since\" TIMESTAMP WITH TIME ZONE DEFAULT now();"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.editor.email_confirm_date",
+      "sql": "ALTER TABLE \"public\".\"editor\" ADD COLUMN IF NOT EXISTS \"email_confirm_date\" TIMESTAMP WITH TIME ZONE;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.editor.last_login_date",
+      "sql": "ALTER TABLE \"public\".\"editor\" ADD COLUMN IF NOT EXISTS \"last_login_date\" TIMESTAMP WITH TIME ZONE DEFAULT now();"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.editor.last_updated",
+      "sql": "ALTER TABLE \"public\".\"editor\" ADD COLUMN IF NOT EXISTS \"last_updated\" TIMESTAMP WITH TIME ZONE DEFAULT now();"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.editor.birth_date",
+      "sql": "ALTER TABLE \"public\".\"editor\" ADD COLUMN IF NOT EXISTS \"birth_date\" DATE;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.editor.bio",
+      "sql": "ALTER TABLE \"public\".\"editor\" ADD COLUMN IF NOT EXISTS \"bio\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.tag.name",
+      "sql": "ALTER TABLE \"public\".\"tag\" ADD COLUMN IF NOT EXISTS \"name\" VARCHAR(255) NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.tag.ref_count",
+      "sql": "ALTER TABLE \"public\".\"tag\" ADD COLUMN IF NOT EXISTS \"ref_count\" INTEGER DEFAULT 0 NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.area.type",
+      "sql": "ALTER TABLE \"public\".\"area\" ADD COLUMN IF NOT EXISTS \"type\" INTEGER;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.area_type.parent",
+      "sql": "ALTER TABLE \"public\".\"area_type\" ADD COLUMN IF NOT EXISTS \"parent\" INTEGER;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.artist.area",
+      "sql": "ALTER TABLE \"public\".\"artist\" ADD COLUMN IF NOT EXISTS \"area\" INTEGER;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.artist.begin_area",
+      "sql": "ALTER TABLE \"public\".\"artist\" ADD COLUMN IF NOT EXISTS \"begin_area\" INTEGER;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.artist.end_area",
+      "sql": "ALTER TABLE \"public\".\"artist\" ADD COLUMN IF NOT EXISTS \"end_area\" INTEGER;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.artist_credit_name.artist",
+      "sql": "ALTER TABLE \"public\".\"artist_credit_name\" ADD COLUMN IF NOT EXISTS \"artist\" INTEGER NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.editor.area",
+      "sql": "ALTER TABLE \"public\".\"editor\" ADD COLUMN IF NOT EXISTS \"area\" INTEGER;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.area.area_type_fkey",
+      "sql": "ALTER TABLE \"public\".\"area\" ADD CONSTRAINT \"area_type_fkey\" FOREIGN KEY (\"type\") REFERENCES \"public\".\"area_type\" (\"id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.area_tag.area_tag_area_fkey",
+      "sql": "ALTER TABLE \"public\".\"area_tag\" ADD CONSTRAINT \"area_tag_area_fkey\" FOREIGN KEY (\"area\") REFERENCES \"public\".\"area\" (\"id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.area_tag.area_tag_tag_fkey",
+      "sql": "ALTER TABLE \"public\".\"area_tag\" ADD CONSTRAINT \"area_tag_tag_fkey\" FOREIGN KEY (\"tag\") REFERENCES \"public\".\"tag\" (\"id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.area_tag_raw.area_tag_raw_area_fkey",
+      "sql": "ALTER TABLE \"public\".\"area_tag_raw\" ADD CONSTRAINT \"area_tag_raw_area_fkey\" FOREIGN KEY (\"area\") REFERENCES \"public\".\"area\" (\"id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.area_tag_raw.area_tag_raw_editor_fkey",
+      "sql": "ALTER TABLE \"public\".\"area_tag_raw\" ADD CONSTRAINT \"area_tag_raw_editor_fkey\" FOREIGN KEY (\"editor\") REFERENCES \"public\".\"editor\" (\"id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.area_tag_raw.area_tag_raw_tag_fkey",
+      "sql": "ALTER TABLE \"public\".\"area_tag_raw\" ADD CONSTRAINT \"area_tag_raw_tag_fkey\" FOREIGN KEY (\"tag\") REFERENCES \"public\".\"tag\" (\"id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.area_type.area_type_parent_fkey",
+      "sql": "ALTER TABLE \"public\".\"area_type\" ADD CONSTRAINT \"area_type_parent_fkey\" FOREIGN KEY (\"parent\") REFERENCES \"public\".\"area_type\" (\"id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.artist.artist_area_fkey",
+      "sql": "ALTER TABLE \"public\".\"artist\" ADD CONSTRAINT \"artist_area_fkey\" FOREIGN KEY (\"area\") REFERENCES \"public\".\"area\" (\"id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.artist.artist_begin_area_fkey",
+      "sql": "ALTER TABLE \"public\".\"artist\" ADD CONSTRAINT \"artist_begin_area_fkey\" FOREIGN KEY (\"begin_area\") REFERENCES \"public\".\"area\" (\"id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.artist.artist_end_area_fkey",
+      "sql": "ALTER TABLE \"public\".\"artist\" ADD CONSTRAINT \"artist_end_area_fkey\" FOREIGN KEY (\"end_area\") REFERENCES \"public\".\"area\" (\"id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.artist_credit_name.artist_credit_name_artist_fkey",
+      "sql": "ALTER TABLE \"public\".\"artist_credit_name\" ADD CONSTRAINT \"artist_credit_name_artist_fkey\" FOREIGN KEY (\"artist\") REFERENCES \"public\".\"artist\" (\"id\") ON DELETE CASCADE;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.artist_credit_name.artist_credit_name_artist_credit_fkey",
+      "sql": "ALTER TABLE \"public\".\"artist_credit_name\" ADD CONSTRAINT \"artist_credit_name_artist_credit_fkey\" FOREIGN KEY (\"artist_credit\") REFERENCES \"public\".\"artist_credit\" (\"id\") ON DELETE CASCADE;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.editor.editor_area_fkey",
+      "sql": "ALTER TABLE \"public\".\"editor\" ADD CONSTRAINT \"editor_area_fkey\" FOREIGN KEY (\"area\") REFERENCES \"public\".\"area\" (\"id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.area",
+      "sql": "CREATE INDEX IF NOT EXISTS \"area_type_ix_911e749\" ON \"public\".\"area\" (\"type\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.area_tag",
+      "sql": "CREATE INDEX IF NOT EXISTS \"area_tag_tag_ix_3c85ad5\" ON \"public\".\"area_tag\" (\"tag\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.area_tag_raw",
+      "sql": "CREATE INDEX IF NOT EXISTS \"area_tag_raw_editor_ix_2a7b59e\" ON \"public\".\"area_tag_raw\" (\"editor\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.area_tag_raw",
+      "sql": "CREATE INDEX IF NOT EXISTS \"area_tag_raw_tag_ix_a4d1daf\" ON \"public\".\"area_tag_raw\" (\"tag\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.area_type",
+      "sql": "CREATE INDEX IF NOT EXISTS \"area_type_parent_ix_5109391\" ON \"public\".\"area_type\" (\"parent\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.artist",
+      "sql": "CREATE INDEX IF NOT EXISTS \"artist_area_ix_11a1da4\" ON \"public\".\"artist\" (\"area\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.artist",
+      "sql": "CREATE INDEX IF NOT EXISTS \"artist_begin_area_ix_44c6495\" ON \"public\".\"artist\" (\"begin_area\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.artist",
+      "sql": "CREATE INDEX IF NOT EXISTS \"artist_end_area_ix_8e1e1f4\" ON \"public\".\"artist\" (\"end_area\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.artist_credit_name",
+      "sql": "CREATE INDEX IF NOT EXISTS \"artist_credit_name_artist_ix_9621eba\" ON \"public\".\"artist_credit_name\" (\"artist\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.editor",
+      "sql": "CREATE INDEX IF NOT EXISTS \"editor_area_ix_b808ff2\" ON \"public\".\"editor\" (\"area\");"
+    }
+  ],
+  "statements": [
+    "CREATE TABLE IF NOT EXISTS \"public\".\"area\" (\"id\" SERIAL PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"area\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"area_tag\" (\"area\" INTEGER NOT NULL, \"tag\" INTEGER NOT NULL, PRIMARY KEY (\"area\", \"tag\"));",
+    "ALTER TABLE \"public\".\"area_tag\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"area_tag_raw\" (\"area\" INTEGER NOT NULL, \"editor\" INTEGER NOT NULL, \"tag\" INTEGER NOT NULL, PRIMARY KEY (\"area\", \"editor\", \"tag\"));",
+    "ALTER TABLE \"public\".\"area_tag_raw\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"area_type\" (\"id\" SERIAL PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"area_type\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"artist\" (\"id\" SERIAL PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"artist\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"artist_credit\" (\"id\" SERIAL PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"artist_credit\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"artist_credit_name\" (\"artist_credit\" INTEGER NOT NULL, \"position\" INTEGER NOT NULL, PRIMARY KEY (\"artist_credit\", \"position\"));",
+    "ALTER TABLE \"public\".\"artist_credit_name\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"editor\" (\"id\" SERIAL PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"editor\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"tag\" (\"id\" SERIAL PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"tag\" ENABLE ROW LEVEL SECURITY;",
+    "ALTER TABLE \"public\".\"area\" ADD COLUMN IF NOT EXISTS \"name\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"area\" ADD COLUMN IF NOT EXISTS \"gid\" UUID NOT NULL;",
+    "ALTER TABLE \"public\".\"area\" ADD COLUMN IF NOT EXISTS \"comment\" VARCHAR(255) DEFAULT '' NOT NULL;",
+    "ALTER TABLE \"public\".\"area\" ADD COLUMN IF NOT EXISTS \"ended\" BOOLEAN DEFAULT FALSE NOT NULL;",
+    "ALTER TABLE \"public\".\"area\" ADD COLUMN IF NOT EXISTS \"edits_pending\" INTEGER DEFAULT 0 NOT NULL;",
+    "ALTER TABLE \"public\".\"area\" ADD COLUMN IF NOT EXISTS \"begin_date_year\" INTEGER;",
+    "ALTER TABLE \"public\".\"area\" ADD COLUMN IF NOT EXISTS \"begin_date_month\" INTEGER;",
+    "ALTER TABLE \"public\".\"area\" ADD COLUMN IF NOT EXISTS \"begin_date_day\" INTEGER;",
+    "ALTER TABLE \"public\".\"area\" ADD COLUMN IF NOT EXISTS \"end_date_year\" INTEGER;",
+    "ALTER TABLE \"public\".\"area\" ADD COLUMN IF NOT EXISTS \"end_date_month\" INTEGER;",
+    "ALTER TABLE \"public\".\"area\" ADD COLUMN IF NOT EXISTS \"end_date_day\" INTEGER;",
+    "ALTER TABLE \"public\".\"area\" ADD COLUMN IF NOT EXISTS \"last_updated\" TIMESTAMP WITH TIME ZONE DEFAULT now();",
+    "ALTER TABLE \"public\".\"area_tag\" ADD COLUMN IF NOT EXISTS \"count\" INTEGER NOT NULL;",
+    "ALTER TABLE \"public\".\"area_tag\" ADD COLUMN IF NOT EXISTS \"last_updated\" TIMESTAMP WITH TIME ZONE DEFAULT now();",
+    "ALTER TABLE \"public\".\"area_tag_raw\" ADD COLUMN IF NOT EXISTS \"is_upvote\" BOOLEAN DEFAULT TRUE NOT NULL;",
+    "ALTER TABLE \"public\".\"area_type\" ADD COLUMN IF NOT EXISTS \"name\" VARCHAR(255) NOT NULL;",
+    "ALTER TABLE \"public\".\"area_type\" ADD COLUMN IF NOT EXISTS \"gid\" UUID NOT NULL;",
+    "ALTER TABLE \"public\".\"area_type\" ADD COLUMN IF NOT EXISTS \"child_order\" INTEGER DEFAULT 0 NOT NULL;",
+    "ALTER TABLE \"public\".\"area_type\" ADD COLUMN IF NOT EXISTS \"description\" TEXT;",
+    "ALTER TABLE \"public\".\"artist\" ADD COLUMN IF NOT EXISTS \"name\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"artist\" ADD COLUMN IF NOT EXISTS \"sort_name\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"artist\" ADD COLUMN IF NOT EXISTS \"type\" INTEGER;",
+    "ALTER TABLE \"public\".\"artist\" ADD COLUMN IF NOT EXISTS \"gid\" UUID NOT NULL;",
+    "ALTER TABLE \"public\".\"artist\" ADD COLUMN IF NOT EXISTS \"comment\" VARCHAR(255) DEFAULT '' NOT NULL;",
+    "ALTER TABLE \"public\".\"artist\" ADD COLUMN IF NOT EXISTS \"ended\" BOOLEAN DEFAULT FALSE NOT NULL;",
+    "ALTER TABLE \"public\".\"artist\" ADD COLUMN IF NOT EXISTS \"begin_date_year\" INTEGER;",
+    "ALTER TABLE \"public\".\"artist\" ADD COLUMN IF NOT EXISTS \"begin_date_month\" INTEGER;",
+    "ALTER TABLE \"public\".\"artist\" ADD COLUMN IF NOT EXISTS \"begin_date_day\" INTEGER;",
+    "ALTER TABLE \"public\".\"artist\" ADD COLUMN IF NOT EXISTS \"end_date_year\" INTEGER;",
+    "ALTER TABLE \"public\".\"artist\" ADD COLUMN IF NOT EXISTS \"end_date_month\" INTEGER;",
+    "ALTER TABLE \"public\".\"artist\" ADD COLUMN IF NOT EXISTS \"end_date_day\" INTEGER;",
+    "ALTER TABLE \"public\".\"artist\" ADD COLUMN IF NOT EXISTS \"gender\" INTEGER;",
+    "ALTER TABLE \"public\".\"artist\" ADD COLUMN IF NOT EXISTS \"edits_pending\" INTEGER DEFAULT 0 NOT NULL;",
+    "ALTER TABLE \"public\".\"artist\" ADD COLUMN IF NOT EXISTS \"last_updated\" TIMESTAMP WITH TIME ZONE DEFAULT now();",
+    "ALTER TABLE \"public\".\"artist_credit\" ADD COLUMN IF NOT EXISTS \"name\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"artist_credit\" ADD COLUMN IF NOT EXISTS \"gid\" UUID NOT NULL;",
+    "ALTER TABLE \"public\".\"artist_credit\" ADD COLUMN IF NOT EXISTS \"artist_count\" INTEGER NOT NULL;",
+    "ALTER TABLE \"public\".\"artist_credit\" ADD COLUMN IF NOT EXISTS \"ref_count\" INTEGER DEFAULT 0;",
+    "ALTER TABLE \"public\".\"artist_credit\" ADD COLUMN IF NOT EXISTS \"edits_pending\" INTEGER DEFAULT 0 NOT NULL;",
+    "ALTER TABLE \"public\".\"artist_credit\" ADD COLUMN IF NOT EXISTS \"created\" TIMESTAMP WITH TIME ZONE DEFAULT now();",
+    "ALTER TABLE \"public\".\"artist_credit_name\" ADD COLUMN IF NOT EXISTS \"name\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"artist_credit_name\" ADD COLUMN IF NOT EXISTS \"join_phrase\" TEXT DEFAULT '' NOT NULL;",
+    "ALTER TABLE \"public\".\"editor\" ADD COLUMN IF NOT EXISTS \"name\" VARCHAR(64) NOT NULL;",
+    "ALTER TABLE \"public\".\"editor\" ADD COLUMN IF NOT EXISTS \"email\" VARCHAR(64);",
+    "ALTER TABLE \"public\".\"editor\" ADD COLUMN IF NOT EXISTS \"website\" VARCHAR(255);",
+    "ALTER TABLE \"public\".\"editor\" ADD COLUMN IF NOT EXISTS \"password\" VARCHAR(128) NOT NULL;",
+    "ALTER TABLE \"public\".\"editor\" ADD COLUMN IF NOT EXISTS \"ha1\" CHAR(32) NOT NULL;",
+    "ALTER TABLE \"public\".\"editor\" ADD COLUMN IF NOT EXISTS \"deleted\" BOOLEAN DEFAULT FALSE NOT NULL;",
+    "ALTER TABLE \"public\".\"editor\" ADD COLUMN IF NOT EXISTS \"privs\" INTEGER DEFAULT 0;",
+    "ALTER TABLE \"public\".\"editor\" ADD COLUMN IF NOT EXISTS \"gender\" INTEGER;",
+    "ALTER TABLE \"public\".\"editor\" ADD COLUMN IF NOT EXISTS \"member_since\" TIMESTAMP WITH TIME ZONE DEFAULT now();",
+    "ALTER TABLE \"public\".\"editor\" ADD COLUMN IF NOT EXISTS \"email_confirm_date\" TIMESTAMP WITH TIME ZONE;",
+    "ALTER TABLE \"public\".\"editor\" ADD COLUMN IF NOT EXISTS \"last_login_date\" TIMESTAMP WITH TIME ZONE DEFAULT now();",
+    "ALTER TABLE \"public\".\"editor\" ADD COLUMN IF NOT EXISTS \"last_updated\" TIMESTAMP WITH TIME ZONE DEFAULT now();",
+    "ALTER TABLE \"public\".\"editor\" ADD COLUMN IF NOT EXISTS \"birth_date\" DATE;",
+    "ALTER TABLE \"public\".\"editor\" ADD COLUMN IF NOT EXISTS \"bio\" TEXT;",
+    "ALTER TABLE \"public\".\"tag\" ADD COLUMN IF NOT EXISTS \"name\" VARCHAR(255) NOT NULL;",
+    "ALTER TABLE \"public\".\"tag\" ADD COLUMN IF NOT EXISTS \"ref_count\" INTEGER DEFAULT 0 NOT NULL;",
+    "ALTER TABLE \"public\".\"area\" ADD COLUMN IF NOT EXISTS \"type\" INTEGER;",
+    "ALTER TABLE \"public\".\"area_type\" ADD COLUMN IF NOT EXISTS \"parent\" INTEGER;",
+    "ALTER TABLE \"public\".\"artist\" ADD COLUMN IF NOT EXISTS \"area\" INTEGER;",
+    "ALTER TABLE \"public\".\"artist\" ADD COLUMN IF NOT EXISTS \"begin_area\" INTEGER;",
+    "ALTER TABLE \"public\".\"artist\" ADD COLUMN IF NOT EXISTS \"end_area\" INTEGER;",
+    "ALTER TABLE \"public\".\"artist_credit_name\" ADD COLUMN IF NOT EXISTS \"artist\" INTEGER NOT NULL;",
+    "ALTER TABLE \"public\".\"editor\" ADD COLUMN IF NOT EXISTS \"area\" INTEGER;",
+    "ALTER TABLE \"public\".\"area\" ADD CONSTRAINT \"area_type_fkey\" FOREIGN KEY (\"type\") REFERENCES \"public\".\"area_type\" (\"id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"area_tag\" ADD CONSTRAINT \"area_tag_area_fkey\" FOREIGN KEY (\"area\") REFERENCES \"public\".\"area\" (\"id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"area_tag\" ADD CONSTRAINT \"area_tag_tag_fkey\" FOREIGN KEY (\"tag\") REFERENCES \"public\".\"tag\" (\"id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"area_tag_raw\" ADD CONSTRAINT \"area_tag_raw_area_fkey\" FOREIGN KEY (\"area\") REFERENCES \"public\".\"area\" (\"id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"area_tag_raw\" ADD CONSTRAINT \"area_tag_raw_editor_fkey\" FOREIGN KEY (\"editor\") REFERENCES \"public\".\"editor\" (\"id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"area_tag_raw\" ADD CONSTRAINT \"area_tag_raw_tag_fkey\" FOREIGN KEY (\"tag\") REFERENCES \"public\".\"tag\" (\"id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"area_type\" ADD CONSTRAINT \"area_type_parent_fkey\" FOREIGN KEY (\"parent\") REFERENCES \"public\".\"area_type\" (\"id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"artist\" ADD CONSTRAINT \"artist_area_fkey\" FOREIGN KEY (\"area\") REFERENCES \"public\".\"area\" (\"id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"artist\" ADD CONSTRAINT \"artist_begin_area_fkey\" FOREIGN KEY (\"begin_area\") REFERENCES \"public\".\"area\" (\"id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"artist\" ADD CONSTRAINT \"artist_end_area_fkey\" FOREIGN KEY (\"end_area\") REFERENCES \"public\".\"area\" (\"id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"artist_credit_name\" ADD CONSTRAINT \"artist_credit_name_artist_fkey\" FOREIGN KEY (\"artist\") REFERENCES \"public\".\"artist\" (\"id\") ON DELETE CASCADE;",
+    "ALTER TABLE \"public\".\"artist_credit_name\" ADD CONSTRAINT \"artist_credit_name_artist_credit_fkey\" FOREIGN KEY (\"artist_credit\") REFERENCES \"public\".\"artist_credit\" (\"id\") ON DELETE CASCADE;",
+    "ALTER TABLE \"public\".\"editor\" ADD CONSTRAINT \"editor_area_fkey\" FOREIGN KEY (\"area\") REFERENCES \"public\".\"area\" (\"id\") ON DELETE NO ACTION;",
+    "CREATE INDEX IF NOT EXISTS \"area_type_ix_911e749\" ON \"public\".\"area\" (\"type\");",
+    "CREATE INDEX IF NOT EXISTS \"area_tag_tag_ix_3c85ad5\" ON \"public\".\"area_tag\" (\"tag\");",
+    "CREATE INDEX IF NOT EXISTS \"area_tag_raw_editor_ix_2a7b59e\" ON \"public\".\"area_tag_raw\" (\"editor\");",
+    "CREATE INDEX IF NOT EXISTS \"area_tag_raw_tag_ix_a4d1daf\" ON \"public\".\"area_tag_raw\" (\"tag\");",
+    "CREATE INDEX IF NOT EXISTS \"area_type_parent_ix_5109391\" ON \"public\".\"area_type\" (\"parent\");",
+    "CREATE INDEX IF NOT EXISTS \"artist_area_ix_11a1da4\" ON \"public\".\"artist\" (\"area\");",
+    "CREATE INDEX IF NOT EXISTS \"artist_begin_area_ix_44c6495\" ON \"public\".\"artist\" (\"begin_area\");",
+    "CREATE INDEX IF NOT EXISTS \"artist_end_area_ix_8e1e1f4\" ON \"public\".\"artist\" (\"end_area\");",
+    "CREATE INDEX IF NOT EXISTS \"artist_credit_name_artist_ix_9621eba\" ON \"public\".\"artist_credit_name\" (\"artist\");",
+    "CREATE INDEX IF NOT EXISTS \"editor_area_ix_b808ff2\" ON \"public\".\"editor\" (\"area\");"
+  ],
+  "legacyForeignKeys": [],
+  "searchDrift": [],
+  "searchAdopted": [],
+  "vectorIndexSkipped": [],
+  "withheldConstraints": [],
+  "columnTypeDrift": [],
+  "orphanedRequiredColumns": [],
+  "deferredIndexes": []
+}

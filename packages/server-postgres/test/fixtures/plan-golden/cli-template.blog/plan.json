@@ -1,0 +1,1525 @@
+{
+  "schemas": [
+    "rebase"
+  ],
+  "declaredSchemas": [
+    "rebase"
+  ],
+  "enums": [
+    {
+      "schema": "public",
+      "name": "posts_status",
+      "qualified": "public.posts_status",
+      "varName": "postsStatus",
+      "labels": [
+        "draft",
+        "review",
+        "published"
+      ]
+    }
+  ],
+  "tables": [
+    {
+      "schema": "public",
+      "table": "authors",
+      "qualified": "public.authors",
+      "varName": "authors",
+      "kind": "collection",
+      "slug": "authors",
+      "columns": [
+        {
+          "key": "id",
+          "column": "id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "default": {
+            "kind": "identity"
+          },
+          "source": {
+            "kind": "property",
+            "propName": "id",
+            "slug": "authors"
+          }
+        },
+        {
+          "key": "name",
+          "column": "name",
+          "type": {
+            "kind": "text"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "name",
+            "slug": "authors"
+          }
+        },
+        {
+          "key": "email",
+          "column": "email",
+          "type": {
+            "kind": "text"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "email",
+            "slug": "authors"
+          }
+        },
+        {
+          "key": "picture",
+          "column": "picture",
+          "type": {
+            "kind": "text"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "picture",
+            "slug": "authors"
+          }
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [],
+      "vector": {
+        "specs": [],
+        "skipped": []
+      },
+      "vectorColumns": [],
+      "policies": [
+        {
+          "name": "authors_select_841c287",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "public"
+          ],
+          "using": "true",
+          "withCheck": null,
+          "ruleKey": "#0",
+          "injected": false
+        },
+        {
+          "name": "authors_insert_3561e70_0",
+          "operation": "insert",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": null,
+          "withCheck": "(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])",
+          "ruleKey": "#1",
+          "injected": false,
+          "adminRequestCompanion": {
+            "name": "authors_insert_3561e70_0_ar_95941ca6",
+            "using": null,
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "authors_update_3561e70_1",
+          "operation": "update",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])",
+          "withCheck": "(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])",
+          "ruleKey": "#1",
+          "injected": false,
+          "adminRequestCompanion": {
+            "name": "authors_update_3561e70_1_ar_d4f8a3ee",
+            "using": "true",
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "authors_delete_3561e70_2",
+          "operation": "delete",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])",
+          "withCheck": null,
+          "ruleKey": "#1",
+          "injected": false,
+          "adminRequestCompanion": {
+            "name": "authors_delete_3561e70_2_ar_16f81a8f",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "authors_default_admin_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "authors_default_admin_read",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "authors_default_admin_read_ar_58ab3697",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "authors_default_admin_write_insert",
+          "operation": "insert",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": null,
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "authors_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "authors_default_admin_write_insert_ar_14e16377",
+            "using": null,
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "authors_default_admin_write_update",
+          "operation": "update",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "authors_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "authors_default_admin_write_update_ar_60af55bd",
+            "using": "true",
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "authors_default_admin_write_delete",
+          "operation": "delete",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "authors_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "authors_default_admin_write_delete_ar_a8ded2de",
+            "using": "true",
+            "withCheck": null
+          }
+        }
+      ],
+      "triggers": [],
+      "auth": false
+    },
+    {
+      "schema": "public",
+      "table": "posts",
+      "qualified": "public.posts",
+      "varName": "posts",
+      "kind": "collection",
+      "slug": "posts",
+      "columns": [
+        {
+          "key": "id",
+          "column": "id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "default": {
+            "kind": "identity"
+          },
+          "source": {
+            "kind": "property",
+            "propName": "id",
+            "slug": "posts"
+          }
+        },
+        {
+          "key": "title",
+          "column": "title",
+          "type": {
+            "kind": "text"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "title",
+            "slug": "posts"
+          }
+        },
+        {
+          "key": "content",
+          "column": "content",
+          "type": {
+            "kind": "text"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "content",
+            "slug": "posts"
+          }
+        },
+        {
+          "key": "status",
+          "column": "status",
+          "type": {
+            "kind": "enum",
+            "schema": "public",
+            "name": "posts_status",
+            "varName": "postsStatus",
+            "labels": [
+              "draft",
+              "review",
+              "published"
+            ]
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "status",
+            "slug": "posts"
+          }
+        },
+        {
+          "key": "authorId",
+          "column": "author_id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": {
+            "schema": "public",
+            "table": "posts",
+            "column": "author_id",
+            "targetSchema": "public",
+            "targetTable": "authors",
+            "targetColumn": "id",
+            "onDelete": "SET NULL",
+            "constraintName": "posts_author_id_fkey",
+            "sql": "ALTER TABLE \"public\".\"posts\" ADD CONSTRAINT \"posts_author_id_fkey\" FOREIGN KEY (\"author_id\") REFERENCES \"public\".\"authors\" (\"id\") ON DELETE SET NULL"
+          },
+          "source": {
+            "kind": "relation",
+            "propName": "author",
+            "slug": "posts"
+          }
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "schema": "public",
+          "table": "posts",
+          "method": "btree",
+          "unique": false,
+          "keys": [
+            {
+              "column": "author_id",
+              "direction": "asc",
+              "nulls": "last"
+            }
+          ],
+          "include": [],
+          "predicate": null,
+          "reason": "Derived for a foreign key: Postgres indexes the key a constraint points at, never the column holding it.",
+          "indexName": "posts_author_id_ix_00ad191",
+          "derived": "foreign-key"
+        }
+      ],
+      "vector": {
+        "specs": [],
+        "skipped": []
+      },
+      "vectorColumns": [],
+      "policies": [
+        {
+          "name": "posts_select_f2fe10c",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "public"
+          ],
+          "using": "\"public\".\"posts\".status = 'published'",
+          "withCheck": null,
+          "ruleKey": "#0",
+          "injected": false
+        },
+        {
+          "name": "posts_select_6264b4d",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "public"
+          ],
+          "using": "(SELECT string_to_array(rebase.roles(), ',') && ARRAY['editor'])",
+          "withCheck": null,
+          "ruleKey": "#1",
+          "injected": false
+        },
+        {
+          "name": "posts_insert_3561e70_0",
+          "operation": "insert",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": null,
+          "withCheck": "(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])",
+          "ruleKey": "#2",
+          "injected": false,
+          "adminRequestCompanion": {
+            "name": "posts_insert_3561e70_0_ar_783e895d",
+            "using": null,
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "posts_update_3561e70_1",
+          "operation": "update",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])",
+          "withCheck": "(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])",
+          "ruleKey": "#2",
+          "injected": false,
+          "adminRequestCompanion": {
+            "name": "posts_update_3561e70_1_ar_6f223089",
+            "using": "true",
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "posts_delete_3561e70_2",
+          "operation": "delete",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])",
+          "withCheck": null,
+          "ruleKey": "#2",
+          "injected": false,
+          "adminRequestCompanion": {
+            "name": "posts_delete_3561e70_2_ar_da0cd5d9",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "posts_default_admin_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "posts_default_admin_read",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "posts_default_admin_read_ar_99f56e3b",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "posts_default_admin_write_insert",
+          "operation": "insert",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": null,
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "posts_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "posts_default_admin_write_insert_ar_013fffeb",
+            "using": null,
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "posts_default_admin_write_update",
+          "operation": "update",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "posts_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "posts_default_admin_write_update_ar_3d716296",
+            "using": "true",
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "posts_default_admin_write_delete",
+          "operation": "delete",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "posts_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "posts_default_admin_write_delete_ar_2461401c",
+            "using": "true",
+            "withCheck": null
+          }
+        }
+      ],
+      "triggers": [],
+      "auth": false
+    },
+    {
+      "schema": "public",
+      "table": "posts_tags",
+      "qualified": "public.posts_tags",
+      "varName": "postsTags",
+      "kind": "junction",
+      "declaringSlugs": [
+        "posts"
+      ],
+      "columns": [
+        {
+          "key": "post_id",
+          "column": "post_id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": {
+            "schema": "public",
+            "table": "posts_tags",
+            "column": "post_id",
+            "targetSchema": "public",
+            "targetTable": "posts",
+            "targetColumn": "id",
+            "onDelete": "CASCADE",
+            "constraintName": "posts_tags_post_id_fkey",
+            "sql": "ALTER TABLE \"public\".\"posts_tags\" ADD CONSTRAINT \"posts_tags_post_id_fkey\" FOREIGN KEY (\"post_id\") REFERENCES \"public\".\"posts\" (\"id\") ON DELETE CASCADE"
+          },
+          "source": {
+            "kind": "junction-key"
+          }
+        },
+        {
+          "key": "tag_id",
+          "column": "tag_id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": {
+            "schema": "public",
+            "table": "posts_tags",
+            "column": "tag_id",
+            "targetSchema": "public",
+            "targetTable": "tags",
+            "targetColumn": "id",
+            "onDelete": "CASCADE",
+            "constraintName": "posts_tags_tag_id_fkey",
+            "sql": "ALTER TABLE \"public\".\"posts_tags\" ADD CONSTRAINT \"posts_tags_tag_id_fkey\" FOREIGN KEY (\"tag_id\") REFERENCES \"public\".\"tags\" (\"id\") ON DELETE CASCADE"
+          },
+          "source": {
+            "kind": "junction-key"
+          }
+        }
+      ],
+      "primaryKey": [
+        "post_id",
+        "tag_id"
+      ],
+      "indexes": [
+        {
+          "schema": "public",
+          "table": "posts_tags",
+          "method": "btree",
+          "unique": false,
+          "keys": [
+            {
+              "column": "tag_id",
+              "direction": "asc",
+              "nulls": "last"
+            }
+          ],
+          "include": [],
+          "predicate": null,
+          "reason": "Derived for a foreign key: Postgres indexes the key a constraint points at, never the column holding it.",
+          "indexName": "posts_tags_tag_id_ix_d4456f1",
+          "derived": "foreign-key"
+        }
+      ],
+      "vectorColumns": [],
+      "policies": [
+        {
+          "name": "posts_tags_default_admin_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "posts_tags_default_admin_read",
+          "injected": false,
+          "adminRequestCompanion": {
+            "name": "posts_tags_default_admin_read_ar_79398cd8",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "posts_tags_default_admin_write_insert",
+          "operation": "insert",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": null,
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "posts_tags_default_admin_write",
+          "injected": false,
+          "adminRequestCompanion": {
+            "name": "posts_tags_default_admin_write_insert_ar_c13fc632",
+            "using": null,
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "posts_tags_default_admin_write_update",
+          "operation": "update",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "posts_tags_default_admin_write",
+          "injected": false,
+          "adminRequestCompanion": {
+            "name": "posts_tags_default_admin_write_update_ar_a0915f75",
+            "using": "true",
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "posts_tags_default_admin_write_delete",
+          "operation": "delete",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "posts_tags_default_admin_write",
+          "injected": false,
+          "adminRequestCompanion": {
+            "name": "posts_tags_default_admin_write_delete_ar_b4d576aa",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "posts_tags_default_edge_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "public"
+          ],
+          "using": "(EXISTS (SELECT 1 FROM \"public\".\"posts\" \"_ex0\" WHERE \"_ex0\".id = \"public\".\"posts_tags\".post_id)) AND (EXISTS (SELECT 1 FROM \"public\".\"tags\" \"_ex1\" WHERE \"_ex1\".id = \"public\".\"posts_tags\".tag_id))",
+          "withCheck": null,
+          "ruleKey": "posts_tags_default_edge_read",
+          "injected": false
+        },
+        {
+          "name": "posts_tags_default_edge_write_insert",
+          "operation": "insert",
+          "mode": "permissive",
+          "roles": [
+            "public"
+          ],
+          "using": null,
+          "withCheck": "EXISTS (SELECT 1 FROM \"public\".\"posts\" \"_ex0\" WHERE (\"_ex0\".id = \"public\".\"posts_tags\".post_id) AND ((SELECT (string_to_array(rebase.roles(), ',') && ARRAY['admin']))))",
+          "ruleKey": "posts_tags_default_edge_write",
+          "injected": false
+        },
+        {
+          "name": "posts_tags_default_edge_write_update",
+          "operation": "update",
+          "mode": "permissive",
+          "roles": [
+            "public"
+          ],
+          "using": "EXISTS (SELECT 1 FROM \"public\".\"posts\" \"_ex0\" WHERE (\"_ex0\".id = \"public\".\"posts_tags\".post_id) AND ((SELECT (string_to_array(rebase.roles(), ',') && ARRAY['admin']))))",
+          "withCheck": "EXISTS (SELECT 1 FROM \"public\".\"posts\" \"_ex0\" WHERE (\"_ex0\".id = \"public\".\"posts_tags\".post_id) AND ((SELECT (string_to_array(rebase.roles(), ',') && ARRAY['admin']))))",
+          "ruleKey": "posts_tags_default_edge_write",
+          "injected": false
+        },
+        {
+          "name": "posts_tags_default_edge_write_delete",
+          "operation": "delete",
+          "mode": "permissive",
+          "roles": [
+            "public"
+          ],
+          "using": "EXISTS (SELECT 1 FROM \"public\".\"posts\" \"_ex0\" WHERE (\"_ex0\".id = \"public\".\"posts_tags\".post_id) AND ((SELECT (string_to_array(rebase.roles(), ',') && ARRAY['admin']))))",
+          "withCheck": null,
+          "ruleKey": "posts_tags_default_edge_write",
+          "injected": false
+        }
+      ],
+      "triggers": [],
+      "auth": false
+    },
+    {
+      "schema": "public",
+      "table": "tags",
+      "qualified": "public.tags",
+      "varName": "tags",
+      "kind": "collection",
+      "slug": "tags",
+      "columns": [
+        {
+          "key": "id",
+          "column": "id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "default": {
+            "kind": "identity"
+          },
+          "source": {
+            "kind": "property",
+            "propName": "id",
+            "slug": "tags"
+          }
+        },
+        {
+          "key": "name",
+          "column": "name",
+          "type": {
+            "kind": "text"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "name",
+            "slug": "tags"
+          }
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [],
+      "vector": {
+        "specs": [],
+        "skipped": []
+      },
+      "vectorColumns": [],
+      "policies": [
+        {
+          "name": "tags_select_841c287",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "public"
+          ],
+          "using": "true",
+          "withCheck": null,
+          "ruleKey": "#0",
+          "injected": false
+        },
+        {
+          "name": "tags_insert_3561e70_0",
+          "operation": "insert",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": null,
+          "withCheck": "(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])",
+          "ruleKey": "#1",
+          "injected": false,
+          "adminRequestCompanion": {
+            "name": "tags_insert_3561e70_0_ar_e8006c2a",
+            "using": null,
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "tags_update_3561e70_1",
+          "operation": "update",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])",
+          "withCheck": "(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])",
+          "ruleKey": "#1",
+          "injected": false,
+          "adminRequestCompanion": {
+            "name": "tags_update_3561e70_1_ar_f575070b",
+            "using": "true",
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "tags_delete_3561e70_2",
+          "operation": "delete",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])",
+          "withCheck": null,
+          "ruleKey": "#1",
+          "injected": false,
+          "adminRequestCompanion": {
+            "name": "tags_delete_3561e70_2_ar_401cd4a9",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "tags_default_admin_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "tags_default_admin_read",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "tags_default_admin_read_ar_8bb5294e",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "tags_default_admin_write_insert",
+          "operation": "insert",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": null,
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "tags_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "tags_default_admin_write_insert_ar_aa55f68d",
+            "using": null,
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "tags_default_admin_write_update",
+          "operation": "update",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "tags_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "tags_default_admin_write_update_ar_fcba2204",
+            "using": "true",
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "tags_default_admin_write_delete",
+          "operation": "delete",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "tags_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "tags_default_admin_write_delete_ar_a9150697",
+            "using": "true",
+            "withCheck": null
+          }
+        }
+      ],
+      "triggers": [],
+      "auth": false
+    },
+    {
+      "schema": "rebase",
+      "table": "users",
+      "qualified": "rebase.users",
+      "declaredSchema": "rebase",
+      "varName": "users",
+      "kind": "collection",
+      "slug": "users",
+      "columns": [
+        {
+          "key": "id",
+          "column": "id",
+          "type": {
+            "kind": "uuid"
+          },
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "default": {
+            "kind": "sql",
+            "expression": "gen_random_uuid()"
+          },
+          "source": {
+            "kind": "property",
+            "propName": "id",
+            "slug": "users"
+          }
+        },
+        {
+          "key": "email",
+          "column": "email",
+          "type": {
+            "kind": "text"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": true,
+          "sqlDefinition": "TEXT NOT NULL",
+          "source": {
+            "kind": "property",
+            "propName": "email",
+            "slug": "users"
+          }
+        },
+        {
+          "key": "displayName",
+          "column": "display_name",
+          "type": {
+            "kind": "text"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "sqlDefinition": "TEXT",
+          "source": {
+            "kind": "property",
+            "propName": "displayName",
+            "slug": "users"
+          }
+        },
+        {
+          "key": "photoURL",
+          "column": "photo_url",
+          "type": {
+            "kind": "text"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "sqlDefinition": "TEXT",
+          "source": {
+            "kind": "property",
+            "propName": "photoURL",
+            "slug": "users"
+          }
+        },
+        {
+          "key": "roles",
+          "column": "roles",
+          "type": {
+            "kind": "array",
+            "of": {
+              "kind": "text"
+            }
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "sqlDefinition": "TEXT[] DEFAULT '{}' NOT NULL",
+          "source": {
+            "kind": "property",
+            "propName": "roles",
+            "slug": "users"
+          }
+        },
+        {
+          "key": "passwordHash",
+          "column": "password_hash",
+          "type": {
+            "kind": "text"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "sqlDefinition": "TEXT",
+          "source": {
+            "kind": "property",
+            "propName": "passwordHash",
+            "slug": "users"
+          }
+        },
+        {
+          "key": "emailVerified",
+          "column": "email_verified",
+          "type": {
+            "kind": "boolean"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "default": {
+            "kind": "literal",
+            "value": false,
+            "sql": "FALSE"
+          },
+          "sqlDefinition": "BOOLEAN DEFAULT FALSE NOT NULL",
+          "source": {
+            "kind": "property",
+            "propName": "emailVerified",
+            "slug": "users"
+          }
+        },
+        {
+          "key": "emailVerificationToken",
+          "column": "email_verification_token",
+          "type": {
+            "kind": "text"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "sqlDefinition": "TEXT",
+          "source": {
+            "kind": "property",
+            "propName": "emailVerificationToken",
+            "slug": "users"
+          }
+        },
+        {
+          "key": "emailVerificationSentAt",
+          "column": "email_verification_sent_at",
+          "type": {
+            "kind": "timestamptz"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "sqlDefinition": "TIMESTAMP WITH TIME ZONE",
+          "source": {
+            "kind": "property",
+            "propName": "emailVerificationSentAt",
+            "slug": "users"
+          }
+        },
+        {
+          "key": "metadata",
+          "column": "metadata",
+          "type": {
+            "kind": "jsonb"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "default": {
+            "kind": "literal",
+            "value": {},
+            "sql": "'{}'::jsonb"
+          },
+          "sqlDefinition": "JSONB DEFAULT '{}' NOT NULL",
+          "source": {
+            "kind": "property",
+            "propName": "metadata",
+            "slug": "users"
+          }
+        },
+        {
+          "key": "createdAt",
+          "column": "created_at",
+          "type": {
+            "kind": "timestamptz"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "default": {
+            "kind": "sql",
+            "expression": "now()"
+          },
+          "sqlDefinition": "TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL",
+          "source": {
+            "kind": "property",
+            "propName": "createdAt",
+            "slug": "users"
+          }
+        },
+        {
+          "key": "updatedAt",
+          "column": "updated_at",
+          "type": {
+            "kind": "timestamptz"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "default": {
+            "kind": "sql",
+            "expression": "now()"
+          },
+          "sqlDefinition": "TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL",
+          "source": {
+            "kind": "property",
+            "propName": "updatedAt",
+            "slug": "users"
+          },
+          "touchOnUpdate": true
+        },
+        {
+          "key": "is_anonymous",
+          "column": "is_anonymous",
+          "type": {
+            "kind": "boolean"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "sqlDefinition": "BOOLEAN DEFAULT FALSE NOT NULL",
+          "source": {
+            "kind": "auth",
+            "slug": "users"
+          }
+        },
+        {
+          "key": "tokens_valid_after",
+          "column": "tokens_valid_after",
+          "type": {
+            "kind": "timestamptz"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "sqlDefinition": "TIMESTAMP WITH TIME ZONE",
+          "source": {
+            "kind": "auth",
+            "slug": "users"
+          }
+        },
+        {
+          "key": "disabled_at",
+          "column": "disabled_at",
+          "type": {
+            "kind": "timestamptz"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "sqlDefinition": "TIMESTAMP WITH TIME ZONE",
+          "source": {
+            "kind": "auth",
+            "slug": "users"
+          }
+        },
+        {
+          "key": "pending_email",
+          "column": "pending_email",
+          "type": {
+            "kind": "text"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "sqlDefinition": "TEXT",
+          "source": {
+            "kind": "auth",
+            "slug": "users"
+          }
+        },
+        {
+          "key": "email_change_token",
+          "column": "email_change_token",
+          "type": {
+            "kind": "text"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "sqlDefinition": "TEXT",
+          "source": {
+            "kind": "auth",
+            "slug": "users"
+          }
+        },
+        {
+          "key": "email_change_sent_at",
+          "column": "email_change_sent_at",
+          "type": {
+            "kind": "timestamptz"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "sqlDefinition": "TIMESTAMP WITH TIME ZONE",
+          "source": {
+            "kind": "auth",
+            "slug": "users"
+          }
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [],
+      "vector": {
+        "specs": [],
+        "skipped": []
+      },
+      "vectorColumns": [],
+      "policies": [
+        {
+          "name": "users_select_5f32f06",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])",
+          "withCheck": null,
+          "ruleKey": "#0",
+          "injected": false,
+          "adminRequestCompanion": {
+            "name": "users_select_5f32f06_ar_c118f1a5",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "users_insert_3561e70_0",
+          "operation": "insert",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": null,
+          "withCheck": "(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])",
+          "ruleKey": "#1",
+          "injected": false,
+          "adminRequestCompanion": {
+            "name": "users_insert_3561e70_0_ar_256f49d5",
+            "using": null,
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "users_update_3561e70_1",
+          "operation": "update",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])",
+          "withCheck": "(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])",
+          "ruleKey": "#1",
+          "injected": false,
+          "adminRequestCompanion": {
+            "name": "users_update_3561e70_1_ar_5be2f8fb",
+            "using": "true",
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "users_delete_3561e70_2",
+          "operation": "delete",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])",
+          "withCheck": null,
+          "ruleKey": "#1",
+          "injected": false,
+          "adminRequestCompanion": {
+            "name": "users_delete_3561e70_2_ar_40c56324",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "users_default_admin_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "users_default_admin_read",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "users_default_admin_read_ar_b3a52ae4",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "users_default_admin_write_insert",
+          "operation": "insert",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": null,
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "users_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "users_default_admin_write_insert_ar_f5b0fae5",
+            "using": null,
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "users_default_admin_write_update",
+          "operation": "update",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "users_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "users_default_admin_write_update_ar_687e5ca3",
+            "using": "true",
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "users_default_admin_write_delete",
+          "operation": "delete",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "users_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "users_default_admin_write_delete_ar_7e609e9b",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "users_default_self_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "public"
+          ],
+          "using": "(id)::text = (SELECT rebase.uid())",
+          "withCheck": null,
+          "ruleKey": "users_default_self_read",
+          "injected": true
+        },
+        {
+          "name": "users_require_admin_write_insert",
+          "operation": "insert",
+          "mode": "restrictive",
+          "roles": [
+            "public"
+          ],
+          "using": null,
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "users_require_admin_write",
+          "injected": true
+        },
+        {
+          "name": "users_require_admin_write_update",
+          "operation": "update",
+          "mode": "restrictive",
+          "roles": [
+            "public"
+          ],
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "users_require_admin_write",
+          "injected": true
+        },
+        {
+          "name": "users_require_admin_write_delete",
+          "operation": "delete",
+          "mode": "restrictive",
+          "roles": [
+            "public"
+          ],
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "users_require_admin_write",
+          "injected": true
+        }
+      ],
+      "triggers": [
+        {
+          "schema": "rebase",
+          "table": "users",
+          "column": "updated_at",
+          "name": "users_updated_at_touch"
+        }
+      ],
+      "auth": true
+    }
+  ],
+  "views": [],
+  "relations": [
+    {
+      "tableVar": "posts",
+      "key": "author",
+      "kind": "one",
+      "targetVar": "authors",
+      "relationName": "posts_authorId",
+      "fields": [
+        "authorId"
+      ],
+      "references": [
+        "id"
+      ]
+    },
+    {
+      "tableVar": "posts",
+      "key": "tags",
+      "kind": "many",
+      "targetVar": "postsTags",
+      "relationName": "tags"
+    },
+    {
+      "tableVar": "postsTags",
+      "key": "post_id",
+      "kind": "one",
+      "targetVar": "posts",
+      "relationName": "tags",
+      "fields": [
+        "post_id"
+      ],
+      "references": [
+        "id"
+      ]
+    },
+    {
+      "tableVar": "postsTags",
+      "key": "tag_id",
+      "kind": "one",
+      "targetVar": "tags",
+      "relationName": "posts_tags_tag_id",
+      "fields": [
+        "tag_id"
+      ],
+      "references": [
+        "id"
+      ]
+    }
+  ],
+  "extensions": [],
+  "functions": [
+    "CREATE OR REPLACE FUNCTION rebase.set_updated_at() RETURNS trigger\nLANGUAGE plpgsql AS $$\nBEGIN\n    NEW := jsonb_populate_record(NEW, jsonb_build_object(TG_ARGV[0], now()));\n    RETURN NEW;\nEND;\n$$;"
+  ],
+  "options": {
+    "databaseExtensions": []
+  }
+}

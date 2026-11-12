@@ -1,0 +1,120 @@
+[
+  {
+    "schema": "public",
+    "table": "changesets_subscribers",
+    "columns": [
+      {
+        "name": "changeset_id",
+        "type": "BIGINT"
+      },
+      {
+        "name": "subscriber_id",
+        "type": "BIGINT"
+      }
+    ],
+    "createTable": "CREATE TABLE IF NOT EXISTS \"public\".\"changesets_subscribers\" (\"changeset_id\" BIGINT NOT NULL, \"subscriber_id\" BIGINT NOT NULL, PRIMARY KEY (\"changeset_id\", \"subscriber_id\"));",
+    "foreignKeys": [
+      {
+        "schema": "public",
+        "table": "changesets_subscribers",
+        "column": "changeset_id",
+        "targetSchema": "public",
+        "targetTable": "changesets",
+        "targetColumn": "id",
+        "onDelete": "CASCADE",
+        "constraintName": "changesets_subscribers_changeset_id_fkey",
+        "sql": "ALTER TABLE \"public\".\"changesets_subscribers\" ADD CONSTRAINT \"changesets_subscribers_changeset_id_fkey\" FOREIGN KEY (\"changeset_id\") REFERENCES \"public\".\"changesets\" (\"id\") ON DELETE CASCADE"
+      },
+      {
+        "schema": "public",
+        "table": "changesets_subscribers",
+        "column": "subscriber_id",
+        "targetSchema": "public",
+        "targetTable": "users",
+        "targetColumn": "id",
+        "onDelete": "CASCADE",
+        "constraintName": "changesets_subscribers_subscriber_id_fkey",
+        "sql": "ALTER TABLE \"public\".\"changesets_subscribers\" ADD CONSTRAINT \"changesets_subscribers_subscriber_id_fkey\" FOREIGN KEY (\"subscriber_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE CASCADE"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "table": "diary_entry_subscriptions",
+    "columns": [
+      {
+        "name": "user_id",
+        "type": "BIGINT"
+      },
+      {
+        "name": "diary_entry_id",
+        "type": "BIGINT",
+        "legacyName": "diary_entrie_id"
+      }
+    ],
+    "createTable": "CREATE TABLE IF NOT EXISTS \"public\".\"diary_entry_subscriptions\" (\"user_id\" BIGINT NOT NULL, \"diary_entry_id\" BIGINT NOT NULL, PRIMARY KEY (\"user_id\", \"diary_entry_id\"));",
+    "foreignKeys": [
+      {
+        "schema": "public",
+        "table": "diary_entry_subscriptions",
+        "column": "user_id",
+        "targetSchema": "public",
+        "targetTable": "users",
+        "targetColumn": "id",
+        "onDelete": "CASCADE",
+        "constraintName": "diary_entry_subscriptions_user_id_fkey",
+        "sql": "ALTER TABLE \"public\".\"diary_entry_subscriptions\" ADD CONSTRAINT \"diary_entry_subscriptions_user_id_fkey\" FOREIGN KEY (\"user_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE CASCADE"
+      },
+      {
+        "schema": "public",
+        "table": "diary_entry_subscriptions",
+        "column": "diary_entry_id",
+        "targetSchema": "public",
+        "targetTable": "diary_entries",
+        "targetColumn": "id",
+        "onDelete": "CASCADE",
+        "constraintName": "diary_entry_subscriptions_diary_entry_id_fkey",
+        "sql": "ALTER TABLE \"public\".\"diary_entry_subscriptions\" ADD CONSTRAINT \"diary_entry_subscriptions_diary_entry_id_fkey\" FOREIGN KEY (\"diary_entry_id\") REFERENCES \"public\".\"diary_entries\" (\"id\") ON DELETE CASCADE"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "table": "note_subscriptions",
+    "columns": [
+      {
+        "name": "user_id",
+        "type": "BIGINT"
+      },
+      {
+        "name": "note_id",
+        "type": "BIGINT"
+      }
+    ],
+    "createTable": "CREATE TABLE IF NOT EXISTS \"public\".\"note_subscriptions\" (\"user_id\" BIGINT NOT NULL, \"note_id\" BIGINT NOT NULL, PRIMARY KEY (\"user_id\", \"note_id\"));",
+    "foreignKeys": [
+      {
+        "schema": "public",
+        "table": "note_subscriptions",
+        "column": "user_id",
+        "targetSchema": "public",
+        "targetTable": "users",
+        "targetColumn": "id",
+        "onDelete": "CASCADE",
+        "constraintName": "note_subscriptions_user_id_fkey",
+        "sql": "ALTER TABLE \"public\".\"note_subscriptions\" ADD CONSTRAINT \"note_subscriptions_user_id_fkey\" FOREIGN KEY (\"user_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE CASCADE"
+      },
+      {
+        "schema": "public",
+        "table": "note_subscriptions",
+        "column": "note_id",
+        "targetSchema": "public",
+        "targetTable": "notes",
+        "targetColumn": "id",
+        "onDelete": "CASCADE",
+        "constraintName": "note_subscriptions_note_id_fkey",
+        "sql": "ALTER TABLE \"public\".\"note_subscriptions\" ADD CONSTRAINT \"note_subscriptions_note_id_fkey\" FOREIGN KEY (\"note_id\") REFERENCES \"public\".\"notes\" (\"id\") ON DELETE CASCADE"
+      }
+    ]
+  }
+]

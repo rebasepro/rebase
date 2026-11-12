@@ -1,0 +1,336 @@
+[
+  {
+    "schema": "app",
+    "table": "app_items",
+    "column": "owner_id",
+    "type": "UUID",
+    "required": true,
+    "foreignKey": {
+      "schema": "app",
+      "table": "app_items",
+      "column": "owner_id",
+      "targetSchema": "public",
+      "targetTable": "uuid_target",
+      "targetColumn": "id",
+      "onDelete": "RESTRICT",
+      "constraintName": "app_items_owner_id_fkey",
+      "sql": "ALTER TABLE \"app\".\"app_items\" ADD CONSTRAINT \"app_items_owner_id_fkey\" FOREIGN KEY (\"owner_id\") REFERENCES \"public\".\"uuid_target\" (\"id\") ON DELETE RESTRICT"
+    }
+  },
+  {
+    "schema": "app",
+    "table": "app_items",
+    "column": "ref",
+    "type": "UUID",
+    "required": false,
+    "foreignKey": {
+      "schema": "app",
+      "table": "app_items",
+      "column": "ref",
+      "targetSchema": "public",
+      "targetTable": "uuid_target",
+      "targetColumn": "id",
+      "onDelete": "SET NULL",
+      "constraintName": "app_items_ref_fkey",
+      "sql": "ALTER TABLE \"app\".\"app_items\" ADD CONSTRAINT \"app_items_ref_fkey\" FOREIGN KEY (\"ref\") REFERENCES \"public\".\"uuid_target\" (\"id\") ON DELETE SET NULL"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "comments",
+    "column": "post_id",
+    "type": "INTEGER",
+    "required": false,
+    "columnOwnedByProperty": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "comments",
+      "column": "post_id",
+      "targetSchema": "public",
+      "targetTable": "posts",
+      "targetColumn": "id",
+      "onDelete": "cascade",
+      "constraintName": "comments_post_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"comments\" ADD CONSTRAINT \"comments_post_id_fkey\" FOREIGN KEY (\"post_id\") REFERENCES \"public\".\"posts\" (\"id\") ON DELETE CASCADE"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "company_translations",
+    "column": "id",
+    "type": "INTEGER",
+    "required": false,
+    "columnOwnedByProperty": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "company_translations",
+      "column": "id",
+      "targetSchema": "public",
+      "targetTable": "companies",
+      "targetColumn": "id",
+      "onDelete": "cascade",
+      "constraintName": "company_translations_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"company_translations\" ADD CONSTRAINT \"company_translations_id_fkey\" FOREIGN KEY (\"id\") REFERENCES \"public\".\"companies\" (\"id\") ON DELETE CASCADE"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "derived_fk",
+    "column": "category_id",
+    "type": "UUID",
+    "required": false,
+    "foreignKey": {
+      "schema": "public",
+      "table": "derived_fk",
+      "column": "category_id",
+      "targetSchema": "public",
+      "targetTable": "tags",
+      "targetColumn": "id",
+      "onDelete": "SET NULL",
+      "constraintName": "derived_fk_category_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"derived_fk\" ADD CONSTRAINT \"derived_fk_category_id_fkey\" FOREIGN KEY (\"category_id\") REFERENCES \"public\".\"tags\" (\"id\") ON DELETE SET NULL"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "membership_tenanted",
+    "column": "org_id",
+    "type": "UUID",
+    "required": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "membership_tenanted",
+      "column": "org_id",
+      "targetSchema": "public",
+      "targetTable": "tenant_orgs",
+      "targetColumn": "id",
+      "onDelete": "RESTRICT",
+      "constraintName": "membership_tenanted_org_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"membership_tenanted\" ADD CONSTRAINT \"membership_tenanted_org_id_fkey\" FOREIGN KEY (\"org_id\") REFERENCES \"public\".\"tenant_orgs\" (\"id\") ON DELETE RESTRICT"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "memberships",
+    "column": "org_id",
+    "type": "UUID",
+    "required": false,
+    "foreignKey": {
+      "schema": "public",
+      "table": "memberships",
+      "column": "org_id",
+      "targetSchema": "public",
+      "targetTable": "tenant_orgs",
+      "targetColumn": "id",
+      "onDelete": "SET NULL",
+      "constraintName": "memberships_org_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"memberships\" ADD CONSTRAINT \"memberships_org_id_fkey\" FOREIGN KEY (\"org_id\") REFERENCES \"public\".\"tenant_orgs\" (\"id\") ON DELETE SET NULL"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "posts",
+    "column": "author_id",
+    "type": "UUID",
+    "required": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "posts",
+      "column": "author_id",
+      "targetSchema": "public",
+      "targetTable": "authors",
+      "targetColumn": "id",
+      "onDelete": "cascade",
+      "onUpdate": "cascade",
+      "constraintName": "posts_author_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"posts\" ADD CONSTRAINT \"posts_author_id_fkey\" FOREIGN KEY (\"author_id\") REFERENCES \"public\".\"authors\" (\"id\") ON DELETE CASCADE ON UPDATE CASCADE"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "posts",
+    "column": "editor_id",
+    "type": "UUID",
+    "required": false,
+    "foreignKey": {
+      "schema": "public",
+      "table": "posts",
+      "column": "editor_id",
+      "targetSchema": "public",
+      "targetTable": "authors",
+      "targetColumn": "id",
+      "onDelete": "SET NULL",
+      "constraintName": "posts_editor_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"posts\" ADD CONSTRAINT \"posts_editor_id_fkey\" FOREIGN KEY (\"editor_id\") REFERENCES \"public\".\"authors\" (\"id\") ON DELETE SET NULL"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "posts",
+    "column": "parent_id",
+    "type": "INTEGER",
+    "required": false,
+    "foreignKey": {
+      "schema": "public",
+      "table": "posts",
+      "column": "parent_id",
+      "targetSchema": "public",
+      "targetTable": "posts",
+      "targetColumn": "id",
+      "onDelete": "set null",
+      "constraintName": "posts_parent_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"posts\" ADD CONSTRAINT \"posts_parent_id_fkey\" FOREIGN KEY (\"parent_id\") REFERENCES \"public\".\"posts\" (\"id\") ON DELETE SET NULL"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "profiles",
+    "column": "author_id",
+    "type": "UUID",
+    "required": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "profiles",
+      "column": "author_id",
+      "targetSchema": "public",
+      "targetTable": "authors",
+      "targetColumn": "id",
+      "onDelete": "RESTRICT",
+      "constraintName": "profiles_author_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"profiles\" ADD CONSTRAINT \"profiles_author_id_fkey\" FOREIGN KEY (\"author_id\") REFERENCES \"public\".\"authors\" (\"id\") ON DELETE RESTRICT"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "refs",
+    "column": "to_uuid",
+    "type": "UUID",
+    "required": false,
+    "foreignKey": {
+      "schema": "public",
+      "table": "refs",
+      "column": "to_uuid",
+      "targetSchema": "public",
+      "targetTable": "uuid_target",
+      "targetColumn": "id",
+      "onDelete": "SET NULL",
+      "constraintName": "refs_to_uuid_fkey",
+      "sql": "ALTER TABLE \"public\".\"refs\" ADD CONSTRAINT \"refs_to_uuid_fkey\" FOREIGN KEY (\"to_uuid\") REFERENCES \"public\".\"uuid_target\" (\"id\") ON DELETE SET NULL"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "refs",
+    "column": "to_int",
+    "type": "INTEGER",
+    "required": false,
+    "foreignKey": {
+      "schema": "public",
+      "table": "refs",
+      "column": "to_int",
+      "targetSchema": "public",
+      "targetTable": "int_target",
+      "targetColumn": "id",
+      "onDelete": "SET NULL",
+      "constraintName": "refs_to_int_fkey",
+      "sql": "ALTER TABLE \"public\".\"refs\" ADD CONSTRAINT \"refs_to_int_fkey\" FOREIGN KEY (\"to_int\") REFERENCES \"public\".\"int_target\" (\"id\") ON DELETE SET NULL"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "refs",
+    "column": "to_text",
+    "type": "TEXT",
+    "required": false,
+    "foreignKey": {
+      "schema": "public",
+      "table": "refs",
+      "column": "to_text",
+      "targetSchema": "public",
+      "targetTable": "text_target",
+      "targetColumn": "code",
+      "onDelete": "SET NULL",
+      "constraintName": "refs_to_text_fkey",
+      "sql": "ALTER TABLE \"public\".\"refs\" ADD CONSTRAINT \"refs_to_text_fkey\" FOREIGN KEY (\"to_text\") REFERENCES \"public\".\"text_target\" (\"code\") ON DELETE SET NULL"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "refs",
+    "column": "to_unknown",
+    "type": "TEXT",
+    "required": false
+  },
+  {
+    "schema": "public",
+    "table": "refs",
+    "column": "to_uuid_req",
+    "type": "UUID",
+    "required": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "refs",
+      "column": "to_uuid_req",
+      "targetSchema": "public",
+      "targetTable": "uuid_target",
+      "targetColumn": "id",
+      "onDelete": "RESTRICT",
+      "constraintName": "refs_to_uuid_req_fkey",
+      "sql": "ALTER TABLE \"public\".\"refs\" ADD CONSTRAINT \"refs_to_uuid_req_fkey\" FOREIGN KEY (\"to_uuid_req\") REFERENCES \"public\".\"uuid_target\" (\"id\") ON DELETE RESTRICT"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "refs",
+    "column": "to_int_uniq",
+    "type": "INTEGER",
+    "required": false,
+    "foreignKey": {
+      "schema": "public",
+      "table": "refs",
+      "column": "to_int_uniq",
+      "targetSchema": "public",
+      "targetTable": "int_target",
+      "targetColumn": "id",
+      "onDelete": "SET NULL",
+      "constraintName": "refs_to_int_uniq_fkey",
+      "sql": "ALTER TABLE \"public\".\"refs\" ADD CONSTRAINT \"refs_to_int_uniq_fkey\" FOREIGN KEY (\"to_int_uniq\") REFERENCES \"public\".\"int_target\" (\"id\") ON DELETE SET NULL"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "refs",
+    "column": "to_uuid_def",
+    "type": "UUID",
+    "required": false,
+    "foreignKey": {
+      "schema": "public",
+      "table": "refs",
+      "column": "to_uuid_def",
+      "targetSchema": "public",
+      "targetTable": "uuid_target",
+      "targetColumn": "id",
+      "onDelete": "SET NULL",
+      "constraintName": "refs_to_uuid_def_fkey",
+      "sql": "ALTER TABLE \"public\".\"refs\" ADD CONSTRAINT \"refs_to_uuid_def_fkey\" FOREIGN KEY (\"to_uuid_def\") REFERENCES \"public\".\"uuid_target\" (\"id\") ON DELETE SET NULL"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "refs",
+    "column": "custom_ref",
+    "type": "UUID",
+    "required": false,
+    "foreignKey": {
+      "schema": "public",
+      "table": "refs",
+      "column": "custom_ref",
+      "targetSchema": "public",
+      "targetTable": "uuid_target",
+      "targetColumn": "id",
+      "onDelete": "SET NULL",
+      "constraintName": "refs_custom_ref_fkey",
+      "sql": "ALTER TABLE \"public\".\"refs\" ADD CONSTRAINT \"refs_custom_ref_fkey\" FOREIGN KEY (\"custom_ref\") REFERENCES \"public\".\"uuid_target\" (\"id\") ON DELETE SET NULL"
+    }
+  }
+]

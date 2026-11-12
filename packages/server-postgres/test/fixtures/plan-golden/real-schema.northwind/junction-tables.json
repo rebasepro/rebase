@@ -1,0 +1,81 @@
+[
+  {
+    "schema": "public",
+    "table": "customer_customer_demo",
+    "columns": [
+      {
+        "name": "customer_id",
+        "type": "VARCHAR(5)"
+      },
+      {
+        "name": "customer_type_id",
+        "type": "VARCHAR(5)"
+      }
+    ],
+    "createTable": "CREATE TABLE IF NOT EXISTS \"public\".\"customer_customer_demo\" (\"customer_id\" VARCHAR(5) NOT NULL, \"customer_type_id\" VARCHAR(5) NOT NULL, PRIMARY KEY (\"customer_id\", \"customer_type_id\"));",
+    "foreignKeys": [
+      {
+        "schema": "public",
+        "table": "customer_customer_demo",
+        "column": "customer_id",
+        "targetSchema": "public",
+        "targetTable": "customers",
+        "targetColumn": "customer_id",
+        "onDelete": "CASCADE",
+        "constraintName": "customer_customer_demo_customer_id_fkey",
+        "sql": "ALTER TABLE \"public\".\"customer_customer_demo\" ADD CONSTRAINT \"customer_customer_demo_customer_id_fkey\" FOREIGN KEY (\"customer_id\") REFERENCES \"public\".\"customers\" (\"customer_id\") ON DELETE CASCADE"
+      },
+      {
+        "schema": "public",
+        "table": "customer_customer_demo",
+        "column": "customer_type_id",
+        "targetSchema": "public",
+        "targetTable": "customer_demographics",
+        "targetColumn": "customer_type_id",
+        "onDelete": "CASCADE",
+        "constraintName": "customer_customer_demo_customer_type_id_fkey",
+        "sql": "ALTER TABLE \"public\".\"customer_customer_demo\" ADD CONSTRAINT \"customer_customer_demo_customer_type_id_fkey\" FOREIGN KEY (\"customer_type_id\") REFERENCES \"public\".\"customer_demographics\" (\"customer_type_id\") ON DELETE CASCADE"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "table": "employee_territories",
+    "columns": [
+      {
+        "name": "employee_id",
+        "type": "INTEGER"
+      },
+      {
+        "name": "territory_id",
+        "type": "VARCHAR(20)",
+        "legacyName": "territorie_id"
+      }
+    ],
+    "createTable": "CREATE TABLE IF NOT EXISTS \"public\".\"employee_territories\" (\"employee_id\" INTEGER NOT NULL, \"territory_id\" VARCHAR(20) NOT NULL, PRIMARY KEY (\"employee_id\", \"territory_id\"));",
+    "foreignKeys": [
+      {
+        "schema": "public",
+        "table": "employee_territories",
+        "column": "employee_id",
+        "targetSchema": "public",
+        "targetTable": "employees",
+        "targetColumn": "employee_id",
+        "onDelete": "CASCADE",
+        "constraintName": "employee_territories_employee_id_fkey",
+        "sql": "ALTER TABLE \"public\".\"employee_territories\" ADD CONSTRAINT \"employee_territories_employee_id_fkey\" FOREIGN KEY (\"employee_id\") REFERENCES \"public\".\"employees\" (\"employee_id\") ON DELETE CASCADE"
+      },
+      {
+        "schema": "public",
+        "table": "employee_territories",
+        "column": "territory_id",
+        "targetSchema": "public",
+        "targetTable": "territories",
+        "targetColumn": "territory_id",
+        "onDelete": "CASCADE",
+        "constraintName": "employee_territories_territory_id_fkey",
+        "sql": "ALTER TABLE \"public\".\"employee_territories\" ADD CONSTRAINT \"employee_territories_territory_id_fkey\" FOREIGN KEY (\"territory_id\") REFERENCES \"public\".\"territories\" (\"territory_id\") ON DELETE CASCADE"
+      }
+    ]
+  }
+]

@@ -1,0 +1,50 @@
+{
+  "actions": [
+    {
+      "kind": "create-table",
+      "target": "public.products",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"products\" (\"id\" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.products",
+      "sql": "ALTER TABLE \"public\".\"products\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.products.name",
+      "sql": "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"name\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.products.price",
+      "sql": "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"price\" NUMERIC;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.products.active",
+      "sql": "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"active\" BOOLEAN DEFAULT TRUE;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.products.created_at",
+      "sql": "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now();"
+    }
+  ],
+  "statements": [
+    "CREATE TABLE IF NOT EXISTS \"public\".\"products\" (\"id\" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text);",
+    "ALTER TABLE \"public\".\"products\" ENABLE ROW LEVEL SECURITY;",
+    "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"name\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"price\" NUMERIC;",
+    "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"active\" BOOLEAN DEFAULT TRUE;",
+    "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now();"
+  ],
+  "legacyForeignKeys": [],
+  "searchDrift": [],
+  "searchAdopted": [],
+  "vectorIndexSkipped": [],
+  "withheldConstraints": [],
+  "columnTypeDrift": [],
+  "orphanedRequiredColumns": [],
+  "deferredIndexes": []
+}

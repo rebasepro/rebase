@@ -1,0 +1,23 @@
+{
+  "search": [],
+  "vector": [],
+  "triggers": [
+    "public.ar_internal_metadata.ar_internal_metadata_updated_at_touch",
+    "public.delayed_jobs.delayed_jobs_updated_at_touch",
+    "public.diary_comments.diary_comments_updated_at_touch",
+    "public.diary_entries.diary_entries_updated_at_touch",
+    "public.issue_comments.issue_comments_updated_at_touch",
+    "public.issues.issues_updated_at_touch",
+    "public.notes.notes_updated_at_touch",
+    "public.noticed_events.noticed_events_updated_at_touch",
+    "public.noticed_notifications.noticed_notifications_updated_at_touch",
+    "public.oauth_applications.oauth_applications_updated_at_touch",
+    "public.redactions.redactions_updated_at_touch",
+    "public.reports.reports_updated_at_touch",
+    "public.social_links.social_links_updated_at_touch",
+    "public.spammy_phrases.spammy_phrases_updated_at_touch",
+    "public.user_blocks.user_blocks_updated_at_touch",
+    "public.user_mutes.user_mutes_updated_at_touch",
+    "public.user_roles.user_roles_updated_at_touch"
+  ]
+}

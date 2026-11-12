@@ -1,0 +1,20 @@
+[
+  {
+    "schema": "public",
+    "table": "products",
+    "column": "category_id",
+    "type": "INTEGER",
+    "required": false,
+    "foreignKey": {
+      "schema": "public",
+      "table": "products",
+      "column": "category_id",
+      "targetSchema": "public",
+      "targetTable": "categories",
+      "targetColumn": "id",
+      "onDelete": "SET NULL",
+      "constraintName": "products_category_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"products\" ADD CONSTRAINT \"products_category_id_fkey\" FOREIGN KEY (\"category_id\") REFERENCES \"public\".\"categories\" (\"id\") ON DELETE SET NULL"
+    }
+  }
+]

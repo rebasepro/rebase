@@ -1,0 +1,168 @@
+[
+  {
+    "schema": "public",
+    "table": "categories_products",
+    "columns": [
+      {
+        "name": "product_id",
+        "type": "UUID"
+      },
+      {
+        "name": "category_id",
+        "type": "UUID",
+        "legacyName": "categorie_id"
+      }
+    ],
+    "createTable": "CREATE TABLE IF NOT EXISTS \"public\".\"categories_products\" (\"product_id\" UUID NOT NULL, \"category_id\" UUID NOT NULL, PRIMARY KEY (\"product_id\", \"category_id\"));",
+    "foreignKeys": [
+      {
+        "schema": "public",
+        "table": "categories_products",
+        "column": "product_id",
+        "targetSchema": "public",
+        "targetTable": "products",
+        "targetColumn": "id",
+        "onDelete": "CASCADE",
+        "constraintName": "categories_products_product_id_fkey",
+        "sql": "ALTER TABLE \"public\".\"categories_products\" ADD CONSTRAINT \"categories_products_product_id_fkey\" FOREIGN KEY (\"product_id\") REFERENCES \"public\".\"products\" (\"id\") ON DELETE CASCADE"
+      },
+      {
+        "schema": "public",
+        "table": "categories_products",
+        "column": "category_id",
+        "targetSchema": "public",
+        "targetTable": "categories",
+        "targetColumn": "id",
+        "onDelete": "CASCADE",
+        "constraintName": "categories_products_category_id_fkey",
+        "sql": "ALTER TABLE \"public\".\"categories_products\" ADD CONSTRAINT \"categories_products_category_id_fkey\" FOREIGN KEY (\"category_id\") REFERENCES \"public\".\"categories\" (\"id\") ON DELETE CASCADE"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "table": "products_tags",
+    "columns": [
+      {
+        "name": "product_id",
+        "type": "UUID"
+      },
+      {
+        "name": "tag_id",
+        "type": "INTEGER"
+      }
+    ],
+    "createTable": "CREATE TABLE IF NOT EXISTS \"public\".\"products_tags\" (\"product_id\" UUID NOT NULL, \"tag_id\" INTEGER NOT NULL, PRIMARY KEY (\"product_id\", \"tag_id\"));",
+    "foreignKeys": [
+      {
+        "schema": "public",
+        "table": "products_tags",
+        "column": "product_id",
+        "targetSchema": "public",
+        "targetTable": "products",
+        "targetColumn": "id",
+        "onDelete": "CASCADE",
+        "constraintName": "products_tags_product_id_fkey",
+        "sql": "ALTER TABLE \"public\".\"products_tags\" ADD CONSTRAINT \"products_tags_product_id_fkey\" FOREIGN KEY (\"product_id\") REFERENCES \"public\".\"products\" (\"id\") ON DELETE CASCADE"
+      },
+      {
+        "schema": "public",
+        "table": "products_tags",
+        "column": "tag_id",
+        "targetSchema": "public",
+        "targetTable": "tags",
+        "targetColumn": "id",
+        "onDelete": "CASCADE",
+        "constraintName": "products_tags_tag_id_fkey",
+        "sql": "ALTER TABLE \"public\".\"products_tags\" ADD CONSTRAINT \"products_tags_tag_id_fkey\" FOREIGN KEY (\"tag_id\") REFERENCES \"public\".\"tags\" (\"id\") ON DELETE CASCADE"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "table": "products_statuses",
+    "columns": [
+      {
+        "name": "product_id",
+        "type": "UUID"
+      },
+      {
+        "name": "status_id",
+        "type": "INTEGER",
+        "legacyName": "statuse_id"
+      }
+    ],
+    "createTable": "CREATE TABLE IF NOT EXISTS \"public\".\"products_statuses\" (\"product_id\" UUID NOT NULL, \"status_id\" INTEGER NOT NULL, PRIMARY KEY (\"product_id\", \"status_id\"));",
+    "foreignKeys": [
+      {
+        "schema": "public",
+        "table": "products_statuses",
+        "column": "product_id",
+        "targetSchema": "public",
+        "targetTable": "products",
+        "targetColumn": "id",
+        "onDelete": "CASCADE",
+        "constraintName": "products_statuses_product_id_fkey",
+        "sql": "ALTER TABLE \"public\".\"products_statuses\" ADD CONSTRAINT \"products_statuses_product_id_fkey\" FOREIGN KEY (\"product_id\") REFERENCES \"public\".\"products\" (\"id\") ON DELETE CASCADE"
+      },
+      {
+        "schema": "public",
+        "table": "products_statuses",
+        "column": "status_id",
+        "targetSchema": "public",
+        "targetTable": "statuses",
+        "targetColumn": "id",
+        "onDelete": "CASCADE",
+        "constraintName": "products_statuses_status_id_fkey",
+        "sql": "ALTER TABLE \"public\".\"products_statuses\" ADD CONSTRAINT \"products_statuses_status_id_fkey\" FOREIGN KEY (\"status_id\") REFERENCES \"public\".\"statuses\" (\"id\") ON DELETE CASCADE"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "table": "players_teams",
+    "columns": [
+      {
+        "name": "team_id",
+        "type": "UUID"
+      },
+      {
+        "name": "player_id",
+        "type": "INTEGER"
+      },
+      {
+        "name": "position",
+        "type": "\"public\".\"players_teams_position\""
+      },
+      {
+        "name": "changed_at",
+        "type": "TIMESTAMP WITH TIME ZONE"
+      }
+    ],
+    "createTable": "CREATE TABLE IF NOT EXISTS \"public\".\"players_teams\" (\"team_id\" UUID NOT NULL, \"player_id\" INTEGER NOT NULL, \"position\" \"public\".\"players_teams_position\" NOT NULL, \"changed_at\" TIMESTAMP WITH TIME ZONE NOT NULL, PRIMARY KEY (\"team_id\", \"player_id\"));",
+    "foreignKeys": [
+      {
+        "schema": "public",
+        "table": "players_teams",
+        "column": "team_id",
+        "targetSchema": "public",
+        "targetTable": "teams",
+        "targetColumn": "id",
+        "onDelete": "CASCADE",
+        "constraintName": "players_teams_team_id_fkey",
+        "sql": "ALTER TABLE \"public\".\"players_teams\" ADD CONSTRAINT \"players_teams_team_id_fkey\" FOREIGN KEY (\"team_id\") REFERENCES \"public\".\"teams\" (\"id\") ON DELETE CASCADE"
+      },
+      {
+        "schema": "public",
+        "table": "players_teams",
+        "column": "player_id",
+        "targetSchema": "public",
+        "targetTable": "players",
+        "targetColumn": "id",
+        "onDelete": "CASCADE",
+        "constraintName": "players_teams_player_id_fkey",
+        "sql": "ALTER TABLE \"public\".\"players_teams\" ADD CONSTRAINT \"players_teams_player_id_fkey\" FOREIGN KEY (\"player_id\") REFERENCES \"public\".\"players\" (\"id\") ON DELETE CASCADE"
+      }
+    ]
+  }
+]

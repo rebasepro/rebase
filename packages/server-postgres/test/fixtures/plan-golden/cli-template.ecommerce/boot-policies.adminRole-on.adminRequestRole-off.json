@@ -1,0 +1,405 @@
+[
+  {
+    "schema": "public",
+    "table": "categories",
+    "qualified": "public.categories",
+    "enableRls": "ALTER TABLE \"public\".\"categories\" ENABLE ROW LEVEL SECURITY;",
+    "policyStatements": [
+      "DO $rebase_companion$ BEGIN IF EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = 'public' AND p.tablename = 'categories' AND p.policyname = 'categories_all_c924b8e_ar_4eefe17f' AND NOT (p.cmd = 'ALL' AND p.permissive = 'PERMISSIVE' AND p.roles = ARRAY['rebase_admin_request']::name[] AND COALESCE(p.qual, 'true') = 'true' AND COALESCE(p.with_check, 'true') = 'true')) THEN EXECUTE 'DROP POLICY \"categories_all_c924b8e_ar_4eefe17f\" ON \"public\".\"categories\"'; END IF; END $rebase_companion$;",
+      "DROP POLICY IF EXISTS \"categories_all_c924b8e\" ON \"public\".\"categories\";",
+      "CREATE POLICY \"categories_all_c924b8e\" ON \"public\".\"categories\" AS PERMISSIVE FOR ALL TO \"rebase_admin\" USING ((SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])) WITH CHECK ((SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin']));",
+      "DO $rebase_companion$ BEGIN IF EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = 'public' AND p.tablename = 'categories' AND p.policyname = 'categories_default_admin_read_ar_5f45dbfb' AND NOT (p.cmd = 'SELECT' AND p.permissive = 'PERMISSIVE' AND p.roles = ARRAY['rebase_admin_request']::name[] AND COALESCE(p.qual, 'true') = 'true' AND COALESCE(p.with_check, 'true') = 'true')) THEN EXECUTE 'DROP POLICY \"categories_default_admin_read_ar_5f45dbfb\" ON \"public\".\"categories\"'; END IF; END $rebase_companion$;",
+      "DROP POLICY IF EXISTS \"categories_default_admin_read\" ON \"public\".\"categories\";",
+      "CREATE POLICY \"categories_default_admin_read\" ON \"public\".\"categories\" AS PERMISSIVE FOR SELECT TO \"rebase_admin\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DO $rebase_companion$ BEGIN IF EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = 'public' AND p.tablename = 'categories' AND p.policyname = 'categories_default_admin_write_insert_ar_640c8dd7' AND NOT (p.cmd = 'INSERT' AND p.permissive = 'PERMISSIVE' AND p.roles = ARRAY['rebase_admin_request']::name[] AND COALESCE(p.qual, 'true') = 'true' AND COALESCE(p.with_check, 'true') = 'true')) THEN EXECUTE 'DROP POLICY \"categories_default_admin_write_insert_ar_640c8dd7\" ON \"public\".\"categories\"'; END IF; END $rebase_companion$;",
+      "DROP POLICY IF EXISTS \"categories_default_admin_write_insert\" ON \"public\".\"categories\";",
+      "CREATE POLICY \"categories_default_admin_write_insert\" ON \"public\".\"categories\" AS PERMISSIVE FOR INSERT TO \"rebase_admin\" WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DO $rebase_companion$ BEGIN IF EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = 'public' AND p.tablename = 'categories' AND p.policyname = 'categories_default_admin_write_update_ar_64730287' AND NOT (p.cmd = 'UPDATE' AND p.permissive = 'PERMISSIVE' AND p.roles = ARRAY['rebase_admin_request']::name[] AND COALESCE(p.qual, 'true') = 'true' AND COALESCE(p.with_check, 'true') = 'true')) THEN EXECUTE 'DROP POLICY \"categories_default_admin_write_update_ar_64730287\" ON \"public\".\"categories\"'; END IF; END $rebase_companion$;",
+      "DROP POLICY IF EXISTS \"categories_default_admin_write_update\" ON \"public\".\"categories\";",
+      "CREATE POLICY \"categories_default_admin_write_update\" ON \"public\".\"categories\" AS PERMISSIVE FOR UPDATE TO \"rebase_admin\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))) WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DO $rebase_companion$ BEGIN IF EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = 'public' AND p.tablename = 'categories' AND p.policyname = 'categories_default_admin_write_delete_ar_e93c2898' AND NOT (p.cmd = 'DELETE' AND p.permissive = 'PERMISSIVE' AND p.roles = ARRAY['rebase_admin_request']::name[] AND COALESCE(p.qual, 'true') = 'true' AND COALESCE(p.with_check, 'true') = 'true')) THEN EXECUTE 'DROP POLICY \"categories_default_admin_write_delete_ar_e93c2898\" ON \"public\".\"categories\"'; END IF; END $rebase_companion$;",
+      "DROP POLICY IF EXISTS \"categories_default_admin_write_delete\" ON \"public\".\"categories\";",
+      "CREATE POLICY \"categories_default_admin_write_delete\" ON \"public\".\"categories\" AS PERMISSIVE FOR DELETE TO \"rebase_admin\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+    ],
+    "policies": [
+      {
+        "name": "categories_all_c924b8e",
+        "adminTarget": true,
+        "restrictive": false,
+        "statements": [
+          "DO $rebase_companion$ BEGIN IF EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = 'public' AND p.tablename = 'categories' AND p.policyname = 'categories_all_c924b8e_ar_4eefe17f' AND NOT (p.cmd = 'ALL' AND p.permissive = 'PERMISSIVE' AND p.roles = ARRAY['rebase_admin_request']::name[] AND COALESCE(p.qual, 'true') = 'true' AND COALESCE(p.with_check, 'true') = 'true')) THEN EXECUTE 'DROP POLICY \"categories_all_c924b8e_ar_4eefe17f\" ON \"public\".\"categories\"'; END IF; END $rebase_companion$;",
+          "DROP POLICY IF EXISTS \"categories_all_c924b8e\" ON \"public\".\"categories\";",
+          "CREATE POLICY \"categories_all_c924b8e\" ON \"public\".\"categories\" AS PERMISSIVE FOR ALL TO \"rebase_admin\" USING ((SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])) WITH CHECK ((SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin']));"
+        ]
+      },
+      {
+        "name": "categories_default_admin_read",
+        "adminTarget": true,
+        "restrictive": false,
+        "statements": [
+          "DO $rebase_companion$ BEGIN IF EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = 'public' AND p.tablename = 'categories' AND p.policyname = 'categories_default_admin_read_ar_5f45dbfb' AND NOT (p.cmd = 'SELECT' AND p.permissive = 'PERMISSIVE' AND p.roles = ARRAY['rebase_admin_request']::name[] AND COALESCE(p.qual, 'true') = 'true' AND COALESCE(p.with_check, 'true') = 'true')) THEN EXECUTE 'DROP POLICY \"categories_default_admin_read_ar_5f45dbfb\" ON \"public\".\"categories\"'; END IF; END $rebase_companion$;",
+          "DROP POLICY IF EXISTS \"categories_default_admin_read\" ON \"public\".\"categories\";",
+          "CREATE POLICY \"categories_default_admin_read\" ON \"public\".\"categories\" AS PERMISSIVE FOR SELECT TO \"rebase_admin\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "categories_default_admin_write_insert",
+        "adminTarget": true,
+        "restrictive": false,
+        "statements": [
+          "DO $rebase_companion$ BEGIN IF EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = 'public' AND p.tablename = 'categories' AND p.policyname = 'categories_default_admin_write_insert_ar_640c8dd7' AND NOT (p.cmd = 'INSERT' AND p.permissive = 'PERMISSIVE' AND p.roles = ARRAY['rebase_admin_request']::name[] AND COALESCE(p.qual, 'true') = 'true' AND COALESCE(p.with_check, 'true') = 'true')) THEN EXECUTE 'DROP POLICY \"categories_default_admin_write_insert_ar_640c8dd7\" ON \"public\".\"categories\"'; END IF; END $rebase_companion$;",
+          "DROP POLICY IF EXISTS \"categories_default_admin_write_insert\" ON \"public\".\"categories\";",
+          "CREATE POLICY \"categories_default_admin_write_insert\" ON \"public\".\"categories\" AS PERMISSIVE FOR INSERT TO \"rebase_admin\" WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "categories_default_admin_write_update",
+        "adminTarget": true,
+        "restrictive": false,
+        "statements": [
+          "DO $rebase_companion$ BEGIN IF EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = 'public' AND p.tablename = 'categories' AND p.policyname = 'categories_default_admin_write_update_ar_64730287' AND NOT (p.cmd = 'UPDATE' AND p.permissive = 'PERMISSIVE' AND p.roles = ARRAY['rebase_admin_request']::name[] AND COALESCE(p.qual, 'true') = 'true' AND COALESCE(p.with_check, 'true') = 'true')) THEN EXECUTE 'DROP POLICY \"categories_default_admin_write_update_ar_64730287\" ON \"public\".\"categories\"'; END IF; END $rebase_companion$;",
+          "DROP POLICY IF EXISTS \"categories_default_admin_write_update\" ON \"public\".\"categories\";",
+          "CREATE POLICY \"categories_default_admin_write_update\" ON \"public\".\"categories\" AS PERMISSIVE FOR UPDATE TO \"rebase_admin\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))) WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "categories_default_admin_write_delete",
+        "adminTarget": true,
+        "restrictive": false,
+        "statements": [
+          "DO $rebase_companion$ BEGIN IF EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = 'public' AND p.tablename = 'categories' AND p.policyname = 'categories_default_admin_write_delete_ar_e93c2898' AND NOT (p.cmd = 'DELETE' AND p.permissive = 'PERMISSIVE' AND p.roles = ARRAY['rebase_admin_request']::name[] AND COALESCE(p.qual, 'true') = 'true' AND COALESCE(p.with_check, 'true') = 'true')) THEN EXECUTE 'DROP POLICY \"categories_default_admin_write_delete_ar_e93c2898\" ON \"public\".\"categories\"'; END IF; END $rebase_companion$;",
+          "DROP POLICY IF EXISTS \"categories_default_admin_write_delete\" ON \"public\".\"categories\";",
+          "CREATE POLICY \"categories_default_admin_write_delete\" ON \"public\".\"categories\" AS PERMISSIVE FOR DELETE TO \"rebase_admin\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "table": "orders",
+    "qualified": "public.orders",
+    "enableRls": "ALTER TABLE \"public\".\"orders\" ENABLE ROW LEVEL SECURITY;",
+    "policyStatements": [
+      "DO $rebase_companion$ BEGIN IF EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = 'public' AND p.tablename = 'orders' AND p.policyname = 'orders_all_c924b8e_ar_5255f6d1' AND NOT (p.cmd = 'ALL' AND p.permissive = 'PERMISSIVE' AND p.roles = ARRAY['rebase_admin_request']::name[] AND COALESCE(p.qual, 'true') = 'true' AND COALESCE(p.with_check, 'true') = 'true')) THEN EXECUTE 'DROP POLICY \"orders_all_c924b8e_ar_5255f6d1\" ON \"public\".\"orders\"'; END IF; END $rebase_companion$;",
+      "DROP POLICY IF EXISTS \"orders_all_c924b8e\" ON \"public\".\"orders\";",
+      "CREATE POLICY \"orders_all_c924b8e\" ON \"public\".\"orders\" AS PERMISSIVE FOR ALL TO \"rebase_admin\" USING ((SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])) WITH CHECK ((SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin']));",
+      "DO $rebase_companion$ BEGIN IF EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = 'public' AND p.tablename = 'orders' AND p.policyname = 'orders_default_admin_read_ar_5735bf44' AND NOT (p.cmd = 'SELECT' AND p.permissive = 'PERMISSIVE' AND p.roles = ARRAY['rebase_admin_request']::name[] AND COALESCE(p.qual, 'true') = 'true' AND COALESCE(p.with_check, 'true') = 'true')) THEN EXECUTE 'DROP POLICY \"orders_default_admin_read_ar_5735bf44\" ON \"public\".\"orders\"'; END IF; END $rebase_companion$;",
+      "DROP POLICY IF EXISTS \"orders_default_admin_read\" ON \"public\".\"orders\";",
+      "CREATE POLICY \"orders_default_admin_read\" ON \"public\".\"orders\" AS PERMISSIVE FOR SELECT TO \"rebase_admin\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DO $rebase_companion$ BEGIN IF EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = 'public' AND p.tablename = 'orders' AND p.policyname = 'orders_default_admin_write_insert_ar_875ffecc' AND NOT (p.cmd = 'INSERT' AND p.permissive = 'PERMISSIVE' AND p.roles = ARRAY['rebase_admin_request']::name[] AND COALESCE(p.qual, 'true') = 'true' AND COALESCE(p.with_check, 'true') = 'true')) THEN EXECUTE 'DROP POLICY \"orders_default_admin_write_insert_ar_875ffecc\" ON \"public\".\"orders\"'; END IF; END $rebase_companion$;",
+      "DROP POLICY IF EXISTS \"orders_default_admin_write_insert\" ON \"public\".\"orders\";",
+      "CREATE POLICY \"orders_default_admin_write_insert\" ON \"public\".\"orders\" AS PERMISSIVE FOR INSERT TO \"rebase_admin\" WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DO $rebase_companion$ BEGIN IF EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = 'public' AND p.tablename = 'orders' AND p.policyname = 'orders_default_admin_write_update_ar_f65d77e2' AND NOT (p.cmd = 'UPDATE' AND p.permissive = 'PERMISSIVE' AND p.roles = ARRAY['rebase_admin_request']::name[] AND COALESCE(p.qual, 'true') = 'true' AND COALESCE(p.with_check, 'true') = 'true')) THEN EXECUTE 'DROP POLICY \"orders_default_admin_write_update_ar_f65d77e2\" ON \"public\".\"orders\"'; END IF; END $rebase_companion$;",
+      "DROP POLICY IF EXISTS \"orders_default_admin_write_update\" ON \"public\".\"orders\";",
+      "CREATE POLICY \"orders_default_admin_write_update\" ON \"public\".\"orders\" AS PERMISSIVE FOR UPDATE TO \"rebase_admin\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))) WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DO $rebase_companion$ BEGIN IF EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = 'public' AND p.tablename = 'orders' AND p.policyname = 'orders_default_admin_write_delete_ar_b4874a4a' AND NOT (p.cmd = 'DELETE' AND p.permissive = 'PERMISSIVE' AND p.roles = ARRAY['rebase_admin_request']::name[] AND COALESCE(p.qual, 'true') = 'true' AND COALESCE(p.with_check, 'true') = 'true')) THEN EXECUTE 'DROP POLICY \"orders_default_admin_write_delete_ar_b4874a4a\" ON \"public\".\"orders\"'; END IF; END $rebase_companion$;",
+      "DROP POLICY IF EXISTS \"orders_default_admin_write_delete\" ON \"public\".\"orders\";",
+      "CREATE POLICY \"orders_default_admin_write_delete\" ON \"public\".\"orders\" AS PERMISSIVE FOR DELETE TO \"rebase_admin\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+    ],
+    "policies": [
+      {
+        "name": "orders_all_c924b8e",
+        "adminTarget": true,
+        "restrictive": false,
+        "statements": [
+          "DO $rebase_companion$ BEGIN IF EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = 'public' AND p.tablename = 'orders' AND p.policyname = 'orders_all_c924b8e_ar_5255f6d1' AND NOT (p.cmd = 'ALL' AND p.permissive = 'PERMISSIVE' AND p.roles = ARRAY['rebase_admin_request']::name[] AND COALESCE(p.qual, 'true') = 'true' AND COALESCE(p.with_check, 'true') = 'true')) THEN EXECUTE 'DROP POLICY \"orders_all_c924b8e_ar_5255f6d1\" ON \"public\".\"orders\"'; END IF; END $rebase_companion$;",
+          "DROP POLICY IF EXISTS \"orders_all_c924b8e\" ON \"public\".\"orders\";",
+          "CREATE POLICY \"orders_all_c924b8e\" ON \"public\".\"orders\" AS PERMISSIVE FOR ALL TO \"rebase_admin\" USING ((SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])) WITH CHECK ((SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin']));"
+        ]
+      },
+      {
+        "name": "orders_default_admin_read",
+        "adminTarget": true,
+        "restrictive": false,
+        "statements": [
+          "DO $rebase_companion$ BEGIN IF EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = 'public' AND p.tablename = 'orders' AND p.policyname = 'orders_default_admin_read_ar_5735bf44' AND NOT (p.cmd = 'SELECT' AND p.permissive = 'PERMISSIVE' AND p.roles = ARRAY['rebase_admin_request']::name[] AND COALESCE(p.qual, 'true') = 'true' AND COALESCE(p.with_check, 'true') = 'true')) THEN EXECUTE 'DROP POLICY \"orders_default_admin_read_ar_5735bf44\" ON \"public\".\"orders\"'; END IF; END $rebase_companion$;",
+          "DROP POLICY IF EXISTS \"orders_default_admin_read\" ON \"public\".\"orders\";",
+          "CREATE POLICY \"orders_default_admin_read\" ON \"public\".\"orders\" AS PERMISSIVE FOR SELECT TO \"rebase_admin\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "orders_default_admin_write_insert",
+        "adminTarget": true,
+        "restrictive": false,
+        "statements": [
+          "DO $rebase_companion$ BEGIN IF EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = 'public' AND p.tablename = 'orders' AND p.policyname = 'orders_default_admin_write_insert_ar_875ffecc' AND NOT (p.cmd = 'INSERT' AND p.permissive = 'PERMISSIVE' AND p.roles = ARRAY['rebase_admin_request']::name[] AND COALESCE(p.qual, 'true') = 'true' AND COALESCE(p.with_check, 'true') = 'true')) THEN EXECUTE 'DROP POLICY \"orders_default_admin_write_insert_ar_875ffecc\" ON \"public\".\"orders\"'; END IF; END $rebase_companion$;",
+          "DROP POLICY IF EXISTS \"orders_default_admin_write_insert\" ON \"public\".\"orders\";",
+          "CREATE POLICY \"orders_default_admin_write_insert\" ON \"public\".\"orders\" AS PERMISSIVE FOR INSERT TO \"rebase_admin\" WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "orders_default_admin_write_update",
+        "adminTarget": true,
+        "restrictive": false,
+        "statements": [
+          "DO $rebase_companion$ BEGIN IF EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = 'public' AND p.tablename = 'orders' AND p.policyname = 'orders_default_admin_write_update_ar_f65d77e2' AND NOT (p.cmd = 'UPDATE' AND p.permissive = 'PERMISSIVE' AND p.roles = ARRAY['rebase_admin_request']::name[] AND COALESCE(p.qual, 'true') = 'true' AND COALESCE(p.with_check, 'true') = 'true')) THEN EXECUTE 'DROP POLICY \"orders_default_admin_write_update_ar_f65d77e2\" ON \"public\".\"orders\"'; END IF; END $rebase_companion$;",
+          "DROP POLICY IF EXISTS \"orders_default_admin_write_update\" ON \"public\".\"orders\";",
+          "CREATE POLICY \"orders_default_admin_write_update\" ON \"public\".\"orders\" AS PERMISSIVE FOR UPDATE TO \"rebase_admin\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))) WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "orders_default_admin_write_delete",
+        "adminTarget": true,
+        "restrictive": false,
+        "statements": [
+          "DO $rebase_companion$ BEGIN IF EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = 'public' AND p.tablename = 'orders' AND p.policyname = 'orders_default_admin_write_delete_ar_b4874a4a' AND NOT (p.cmd = 'DELETE' AND p.permissive = 'PERMISSIVE' AND p.roles = ARRAY['rebase_admin_request']::name[] AND COALESCE(p.qual, 'true') = 'true' AND COALESCE(p.with_check, 'true') = 'true')) THEN EXECUTE 'DROP POLICY \"orders_default_admin_write_delete_ar_b4874a4a\" ON \"public\".\"orders\"'; END IF; END $rebase_companion$;",
+          "DROP POLICY IF EXISTS \"orders_default_admin_write_delete\" ON \"public\".\"orders\";",
+          "CREATE POLICY \"orders_default_admin_write_delete\" ON \"public\".\"orders\" AS PERMISSIVE FOR DELETE TO \"rebase_admin\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "table": "products",
+    "qualified": "public.products",
+    "enableRls": "ALTER TABLE \"public\".\"products\" ENABLE ROW LEVEL SECURITY;",
+    "policyStatements": [
+      "DO $rebase_companion$ BEGIN IF EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = 'public' AND p.tablename = 'products' AND p.policyname = 'products_all_c924b8e_ar_55a9e73b' AND NOT (p.cmd = 'ALL' AND p.permissive = 'PERMISSIVE' AND p.roles = ARRAY['rebase_admin_request']::name[] AND COALESCE(p.qual, 'true') = 'true' AND COALESCE(p.with_check, 'true') = 'true')) THEN EXECUTE 'DROP POLICY \"products_all_c924b8e_ar_55a9e73b\" ON \"public\".\"products\"'; END IF; END $rebase_companion$;",
+      "DROP POLICY IF EXISTS \"products_all_c924b8e\" ON \"public\".\"products\";",
+      "CREATE POLICY \"products_all_c924b8e\" ON \"public\".\"products\" AS PERMISSIVE FOR ALL TO \"rebase_admin\" USING ((SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])) WITH CHECK ((SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin']));",
+      "DO $rebase_companion$ BEGIN IF EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = 'public' AND p.tablename = 'products' AND p.policyname = 'products_default_admin_read_ar_cd6a5cf2' AND NOT (p.cmd = 'SELECT' AND p.permissive = 'PERMISSIVE' AND p.roles = ARRAY['rebase_admin_request']::name[] AND COALESCE(p.qual, 'true') = 'true' AND COALESCE(p.with_check, 'true') = 'true')) THEN EXECUTE 'DROP POLICY \"products_default_admin_read_ar_cd6a5cf2\" ON \"public\".\"products\"'; END IF; END $rebase_companion$;",
+      "DROP POLICY IF EXISTS \"products_default_admin_read\" ON \"public\".\"products\";",
+      "CREATE POLICY \"products_default_admin_read\" ON \"public\".\"products\" AS PERMISSIVE FOR SELECT TO \"rebase_admin\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DO $rebase_companion$ BEGIN IF EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = 'public' AND p.tablename = 'products' AND p.policyname = 'products_default_admin_write_insert_ar_7be54415' AND NOT (p.cmd = 'INSERT' AND p.permissive = 'PERMISSIVE' AND p.roles = ARRAY['rebase_admin_request']::name[] AND COALESCE(p.qual, 'true') = 'true' AND COALESCE(p.with_check, 'true') = 'true')) THEN EXECUTE 'DROP POLICY \"products_default_admin_write_insert_ar_7be54415\" ON \"public\".\"products\"'; END IF; END $rebase_companion$;",
+      "DROP POLICY IF EXISTS \"products_default_admin_write_insert\" ON \"public\".\"products\";",
+      "CREATE POLICY \"products_default_admin_write_insert\" ON \"public\".\"products\" AS PERMISSIVE FOR INSERT TO \"rebase_admin\" WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DO $rebase_companion$ BEGIN IF EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = 'public' AND p.tablename = 'products' AND p.policyname = 'products_default_admin_write_update_ar_0abfb972' AND NOT (p.cmd = 'UPDATE' AND p.permissive = 'PERMISSIVE' AND p.roles = ARRAY['rebase_admin_request']::name[] AND COALESCE(p.qual, 'true') = 'true' AND COALESCE(p.with_check, 'true') = 'true')) THEN EXECUTE 'DROP POLICY \"products_default_admin_write_update_ar_0abfb972\" ON \"public\".\"products\"'; END IF; END $rebase_companion$;",
+      "DROP POLICY IF EXISTS \"products_default_admin_write_update\" ON \"public\".\"products\";",
+      "CREATE POLICY \"products_default_admin_write_update\" ON \"public\".\"products\" AS PERMISSIVE FOR UPDATE TO \"rebase_admin\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))) WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DO $rebase_companion$ BEGIN IF EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = 'public' AND p.tablename = 'products' AND p.policyname = 'products_default_admin_write_delete_ar_810b2bb6' AND NOT (p.cmd = 'DELETE' AND p.permissive = 'PERMISSIVE' AND p.roles = ARRAY['rebase_admin_request']::name[] AND COALESCE(p.qual, 'true') = 'true' AND COALESCE(p.with_check, 'true') = 'true')) THEN EXECUTE 'DROP POLICY \"products_default_admin_write_delete_ar_810b2bb6\" ON \"public\".\"products\"'; END IF; END $rebase_companion$;",
+      "DROP POLICY IF EXISTS \"products_default_admin_write_delete\" ON \"public\".\"products\";",
+      "CREATE POLICY \"products_default_admin_write_delete\" ON \"public\".\"products\" AS PERMISSIVE FOR DELETE TO \"rebase_admin\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+    ],
+    "policies": [
+      {
+        "name": "products_all_c924b8e",
+        "adminTarget": true,
+        "restrictive": false,
+        "statements": [
+          "DO $rebase_companion$ BEGIN IF EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = 'public' AND p.tablename = 'products' AND p.policyname = 'products_all_c924b8e_ar_55a9e73b' AND NOT (p.cmd = 'ALL' AND p.permissive = 'PERMISSIVE' AND p.roles = ARRAY['rebase_admin_request']::name[] AND COALESCE(p.qual, 'true') = 'true' AND COALESCE(p.with_check, 'true') = 'true')) THEN EXECUTE 'DROP POLICY \"products_all_c924b8e_ar_55a9e73b\" ON \"public\".\"products\"'; END IF; END $rebase_companion$;",
+          "DROP POLICY IF EXISTS \"products_all_c924b8e\" ON \"public\".\"products\";",
+          "CREATE POLICY \"products_all_c924b8e\" ON \"public\".\"products\" AS PERMISSIVE FOR ALL TO \"rebase_admin\" USING ((SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])) WITH CHECK ((SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin']));"
+        ]
+      },
+      {
+        "name": "products_default_admin_read",
+        "adminTarget": true,
+        "restrictive": false,
+        "statements": [
+          "DO $rebase_companion$ BEGIN IF EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = 'public' AND p.tablename = 'products' AND p.policyname = 'products_default_admin_read_ar_cd6a5cf2' AND NOT (p.cmd = 'SELECT' AND p.permissive = 'PERMISSIVE' AND p.roles = ARRAY['rebase_admin_request']::name[] AND COALESCE(p.qual, 'true') = 'true' AND COALESCE(p.with_check, 'true') = 'true')) THEN EXECUTE 'DROP POLICY \"products_default_admin_read_ar_cd6a5cf2\" ON \"public\".\"products\"'; END IF; END $rebase_companion$;",
+          "DROP POLICY IF EXISTS \"products_default_admin_read\" ON \"public\".\"products\";",
+          "CREATE POLICY \"products_default_admin_read\" ON \"public\".\"products\" AS PERMISSIVE FOR SELECT TO \"rebase_admin\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "products_default_admin_write_insert",
+        "adminTarget": true,
+        "restrictive": false,
+        "statements": [
+          "DO $rebase_companion$ BEGIN IF EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = 'public' AND p.tablename = 'products' AND p.policyname = 'products_default_admin_write_insert_ar_7be54415' AND NOT (p.cmd = 'INSERT' AND p.permissive = 'PERMISSIVE' AND p.roles = ARRAY['rebase_admin_request']::name[] AND COALESCE(p.qual, 'true') = 'true' AND COALESCE(p.with_check, 'true') = 'true')) THEN EXECUTE 'DROP POLICY \"products_default_admin_write_insert_ar_7be54415\" ON \"public\".\"products\"'; END IF; END $rebase_companion$;",
+          "DROP POLICY IF EXISTS \"products_default_admin_write_insert\" ON \"public\".\"products\";",
+          "CREATE POLICY \"products_default_admin_write_insert\" ON \"public\".\"products\" AS PERMISSIVE FOR INSERT TO \"rebase_admin\" WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "products_default_admin_write_update",
+        "adminTarget": true,
+        "restrictive": false,
+        "statements": [
+          "DO $rebase_companion$ BEGIN IF EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = 'public' AND p.tablename = 'products' AND p.policyname = 'products_default_admin_write_update_ar_0abfb972' AND NOT (p.cmd = 'UPDATE' AND p.permissive = 'PERMISSIVE' AND p.roles = ARRAY['rebase_admin_request']::name[] AND COALESCE(p.qual, 'true') = 'true' AND COALESCE(p.with_check, 'true') = 'true')) THEN EXECUTE 'DROP POLICY \"products_default_admin_write_update_ar_0abfb972\" ON \"public\".\"products\"'; END IF; END $rebase_companion$;",
+          "DROP POLICY IF EXISTS \"products_default_admin_write_update\" ON \"public\".\"products\";",
+          "CREATE POLICY \"products_default_admin_write_update\" ON \"public\".\"products\" AS PERMISSIVE FOR UPDATE TO \"rebase_admin\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))) WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "products_default_admin_write_delete",
+        "adminTarget": true,
+        "restrictive": false,
+        "statements": [
+          "DO $rebase_companion$ BEGIN IF EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = 'public' AND p.tablename = 'products' AND p.policyname = 'products_default_admin_write_delete_ar_810b2bb6' AND NOT (p.cmd = 'DELETE' AND p.permissive = 'PERMISSIVE' AND p.roles = ARRAY['rebase_admin_request']::name[] AND COALESCE(p.qual, 'true') = 'true' AND COALESCE(p.with_check, 'true') = 'true')) THEN EXECUTE 'DROP POLICY \"products_default_admin_write_delete_ar_810b2bb6\" ON \"public\".\"products\"'; END IF; END $rebase_companion$;",
+          "DROP POLICY IF EXISTS \"products_default_admin_write_delete\" ON \"public\".\"products\";",
+          "CREATE POLICY \"products_default_admin_write_delete\" ON \"public\".\"products\" AS PERMISSIVE FOR DELETE TO \"rebase_admin\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      }
+    ]
+  },
+  {
+    "schema": "rebase",
+    "table": "users",
+    "qualified": "rebase.users",
+    "enableRls": "ALTER TABLE \"rebase\".\"users\" ENABLE ROW LEVEL SECURITY;",
+    "policyStatements": [
+      "DO $rebase_companion$ BEGIN IF EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = 'rebase' AND p.tablename = 'users' AND p.policyname = 'users_select_5f32f06_ar_c118f1a5' AND NOT (p.cmd = 'SELECT' AND p.permissive = 'PERMISSIVE' AND p.roles = ARRAY['rebase_admin_request']::name[] AND COALESCE(p.qual, 'true') = 'true' AND COALESCE(p.with_check, 'true') = 'true')) THEN EXECUTE 'DROP POLICY \"users_select_5f32f06_ar_c118f1a5\" ON \"rebase\".\"users\"'; END IF; END $rebase_companion$;",
+      "DROP POLICY IF EXISTS \"users_select_5f32f06\" ON \"rebase\".\"users\";",
+      "CREATE POLICY \"users_select_5f32f06\" ON \"rebase\".\"users\" AS PERMISSIVE FOR SELECT TO \"rebase_admin\" USING ((SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin']));",
+      "DO $rebase_companion$ BEGIN IF EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = 'rebase' AND p.tablename = 'users' AND p.policyname = 'users_insert_3561e70_0_ar_256f49d5' AND NOT (p.cmd = 'INSERT' AND p.permissive = 'PERMISSIVE' AND p.roles = ARRAY['rebase_admin_request']::name[] AND COALESCE(p.qual, 'true') = 'true' AND COALESCE(p.with_check, 'true') = 'true')) THEN EXECUTE 'DROP POLICY \"users_insert_3561e70_0_ar_256f49d5\" ON \"rebase\".\"users\"'; END IF; END $rebase_companion$;",
+      "DROP POLICY IF EXISTS \"users_insert_3561e70_0\" ON \"rebase\".\"users\";",
+      "CREATE POLICY \"users_insert_3561e70_0\" ON \"rebase\".\"users\" AS PERMISSIVE FOR INSERT TO \"rebase_admin\" WITH CHECK ((SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin']));",
+      "DO $rebase_companion$ BEGIN IF EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = 'rebase' AND p.tablename = 'users' AND p.policyname = 'users_update_3561e70_1_ar_5be2f8fb' AND NOT (p.cmd = 'UPDATE' AND p.permissive = 'PERMISSIVE' AND p.roles = ARRAY['rebase_admin_request']::name[] AND COALESCE(p.qual, 'true') = 'true' AND COALESCE(p.with_check, 'true') = 'true')) THEN EXECUTE 'DROP POLICY \"users_update_3561e70_1_ar_5be2f8fb\" ON \"rebase\".\"users\"'; END IF; END $rebase_companion$;",
+      "DROP POLICY IF EXISTS \"users_update_3561e70_1\" ON \"rebase\".\"users\";",
+      "CREATE POLICY \"users_update_3561e70_1\" ON \"rebase\".\"users\" AS PERMISSIVE FOR UPDATE TO \"rebase_admin\" USING ((SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])) WITH CHECK ((SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin']));",
+      "DO $rebase_companion$ BEGIN IF EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = 'rebase' AND p.tablename = 'users' AND p.policyname = 'users_delete_3561e70_2_ar_40c56324' AND NOT (p.cmd = 'DELETE' AND p.permissive = 'PERMISSIVE' AND p.roles = ARRAY['rebase_admin_request']::name[] AND COALESCE(p.qual, 'true') = 'true' AND COALESCE(p.with_check, 'true') = 'true')) THEN EXECUTE 'DROP POLICY \"users_delete_3561e70_2_ar_40c56324\" ON \"rebase\".\"users\"'; END IF; END $rebase_companion$;",
+      "DROP POLICY IF EXISTS \"users_delete_3561e70_2\" ON \"rebase\".\"users\";",
+      "CREATE POLICY \"users_delete_3561e70_2\" ON \"rebase\".\"users\" AS PERMISSIVE FOR DELETE TO \"rebase_admin\" USING ((SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin']));",
+      "DO $rebase_companion$ BEGIN IF EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = 'rebase' AND p.tablename = 'users' AND p.policyname = 'users_default_admin_read_ar_b3a52ae4' AND NOT (p.cmd = 'SELECT' AND p.permissive = 'PERMISSIVE' AND p.roles = ARRAY['rebase_admin_request']::name[] AND COALESCE(p.qual, 'true') = 'true' AND COALESCE(p.with_check, 'true') = 'true')) THEN EXECUTE 'DROP POLICY \"users_default_admin_read_ar_b3a52ae4\" ON \"rebase\".\"users\"'; END IF; END $rebase_companion$;",
+      "DROP POLICY IF EXISTS \"users_default_admin_read\" ON \"rebase\".\"users\";",
+      "CREATE POLICY \"users_default_admin_read\" ON \"rebase\".\"users\" AS PERMISSIVE FOR SELECT TO \"rebase_admin\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DO $rebase_companion$ BEGIN IF EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = 'rebase' AND p.tablename = 'users' AND p.policyname = 'users_default_admin_write_insert_ar_f5b0fae5' AND NOT (p.cmd = 'INSERT' AND p.permissive = 'PERMISSIVE' AND p.roles = ARRAY['rebase_admin_request']::name[] AND COALESCE(p.qual, 'true') = 'true' AND COALESCE(p.with_check, 'true') = 'true')) THEN EXECUTE 'DROP POLICY \"users_default_admin_write_insert_ar_f5b0fae5\" ON \"rebase\".\"users\"'; END IF; END $rebase_companion$;",
+      "DROP POLICY IF EXISTS \"users_default_admin_write_insert\" ON \"rebase\".\"users\";",
+      "CREATE POLICY \"users_default_admin_write_insert\" ON \"rebase\".\"users\" AS PERMISSIVE FOR INSERT TO \"rebase_admin\" WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DO $rebase_companion$ BEGIN IF EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = 'rebase' AND p.tablename = 'users' AND p.policyname = 'users_default_admin_write_update_ar_687e5ca3' AND NOT (p.cmd = 'UPDATE' AND p.permissive = 'PERMISSIVE' AND p.roles = ARRAY['rebase_admin_request']::name[] AND COALESCE(p.qual, 'true') = 'true' AND COALESCE(p.with_check, 'true') = 'true')) THEN EXECUTE 'DROP POLICY \"users_default_admin_write_update_ar_687e5ca3\" ON \"rebase\".\"users\"'; END IF; END $rebase_companion$;",
+      "DROP POLICY IF EXISTS \"users_default_admin_write_update\" ON \"rebase\".\"users\";",
+      "CREATE POLICY \"users_default_admin_write_update\" ON \"rebase\".\"users\" AS PERMISSIVE FOR UPDATE TO \"rebase_admin\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))) WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DO $rebase_companion$ BEGIN IF EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = 'rebase' AND p.tablename = 'users' AND p.policyname = 'users_default_admin_write_delete_ar_7e609e9b' AND NOT (p.cmd = 'DELETE' AND p.permissive = 'PERMISSIVE' AND p.roles = ARRAY['rebase_admin_request']::name[] AND COALESCE(p.qual, 'true') = 'true' AND COALESCE(p.with_check, 'true') = 'true')) THEN EXECUTE 'DROP POLICY \"users_default_admin_write_delete_ar_7e609e9b\" ON \"rebase\".\"users\"'; END IF; END $rebase_companion$;",
+      "DROP POLICY IF EXISTS \"users_default_admin_write_delete\" ON \"rebase\".\"users\";",
+      "CREATE POLICY \"users_default_admin_write_delete\" ON \"rebase\".\"users\" AS PERMISSIVE FOR DELETE TO \"rebase_admin\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DROP POLICY IF EXISTS \"users_default_self_read_ar_28580e2e\" ON \"rebase\".\"users\";",
+      "DROP POLICY IF EXISTS \"users_default_self_read\" ON \"rebase\".\"users\";",
+      "CREATE POLICY \"users_default_self_read\" ON \"rebase\".\"users\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((id)::text = (SELECT rebase.uid()));",
+      "DROP POLICY IF EXISTS \"users_require_admin_write_insert_ar_aca793c0\" ON \"rebase\".\"users\";",
+      "DROP POLICY IF EXISTS \"users_require_admin_write_insert\" ON \"rebase\".\"users\";",
+      "CREATE POLICY \"users_require_admin_write_insert\" ON \"rebase\".\"users\" AS RESTRICTIVE FOR INSERT TO \"public\" WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DROP POLICY IF EXISTS \"users_require_admin_write_update_ar_34881a30\" ON \"rebase\".\"users\";",
+      "DROP POLICY IF EXISTS \"users_require_admin_write_update\" ON \"rebase\".\"users\";",
+      "CREATE POLICY \"users_require_admin_write_update\" ON \"rebase\".\"users\" AS RESTRICTIVE FOR UPDATE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))) WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));",
+      "DROP POLICY IF EXISTS \"users_require_admin_write_delete_ar_8591c9fe\" ON \"rebase\".\"users\";",
+      "DROP POLICY IF EXISTS \"users_require_admin_write_delete\" ON \"rebase\".\"users\";",
+      "CREATE POLICY \"users_require_admin_write_delete\" ON \"rebase\".\"users\" AS RESTRICTIVE FOR DELETE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+    ],
+    "policies": [
+      {
+        "name": "users_select_5f32f06",
+        "adminTarget": true,
+        "restrictive": false,
+        "statements": [
+          "DO $rebase_companion$ BEGIN IF EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = 'rebase' AND p.tablename = 'users' AND p.policyname = 'users_select_5f32f06_ar_c118f1a5' AND NOT (p.cmd = 'SELECT' AND p.permissive = 'PERMISSIVE' AND p.roles = ARRAY['rebase_admin_request']::name[] AND COALESCE(p.qual, 'true') = 'true' AND COALESCE(p.with_check, 'true') = 'true')) THEN EXECUTE 'DROP POLICY \"users_select_5f32f06_ar_c118f1a5\" ON \"rebase\".\"users\"'; END IF; END $rebase_companion$;",
+          "DROP POLICY IF EXISTS \"users_select_5f32f06\" ON \"rebase\".\"users\";",
+          "CREATE POLICY \"users_select_5f32f06\" ON \"rebase\".\"users\" AS PERMISSIVE FOR SELECT TO \"rebase_admin\" USING ((SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin']));"
+        ]
+      },
+      {
+        "name": "users_insert_3561e70_0",
+        "adminTarget": true,
+        "restrictive": false,
+        "statements": [
+          "DO $rebase_companion$ BEGIN IF EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = 'rebase' AND p.tablename = 'users' AND p.policyname = 'users_insert_3561e70_0_ar_256f49d5' AND NOT (p.cmd = 'INSERT' AND p.permissive = 'PERMISSIVE' AND p.roles = ARRAY['rebase_admin_request']::name[] AND COALESCE(p.qual, 'true') = 'true' AND COALESCE(p.with_check, 'true') = 'true')) THEN EXECUTE 'DROP POLICY \"users_insert_3561e70_0_ar_256f49d5\" ON \"rebase\".\"users\"'; END IF; END $rebase_companion$;",
+          "DROP POLICY IF EXISTS \"users_insert_3561e70_0\" ON \"rebase\".\"users\";",
+          "CREATE POLICY \"users_insert_3561e70_0\" ON \"rebase\".\"users\" AS PERMISSIVE FOR INSERT TO \"rebase_admin\" WITH CHECK ((SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin']));"
+        ]
+      },
+      {
+        "name": "users_update_3561e70_1",
+        "adminTarget": true,
+        "restrictive": false,
+        "statements": [
+          "DO $rebase_companion$ BEGIN IF EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = 'rebase' AND p.tablename = 'users' AND p.policyname = 'users_update_3561e70_1_ar_5be2f8fb' AND NOT (p.cmd = 'UPDATE' AND p.permissive = 'PERMISSIVE' AND p.roles = ARRAY['rebase_admin_request']::name[] AND COALESCE(p.qual, 'true') = 'true' AND COALESCE(p.with_check, 'true') = 'true')) THEN EXECUTE 'DROP POLICY \"users_update_3561e70_1_ar_5be2f8fb\" ON \"rebase\".\"users\"'; END IF; END $rebase_companion$;",
+          "DROP POLICY IF EXISTS \"users_update_3561e70_1\" ON \"rebase\".\"users\";",
+          "CREATE POLICY \"users_update_3561e70_1\" ON \"rebase\".\"users\" AS PERMISSIVE FOR UPDATE TO \"rebase_admin\" USING ((SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])) WITH CHECK ((SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin']));"
+        ]
+      },
+      {
+        "name": "users_delete_3561e70_2",
+        "adminTarget": true,
+        "restrictive": false,
+        "statements": [
+          "DO $rebase_companion$ BEGIN IF EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = 'rebase' AND p.tablename = 'users' AND p.policyname = 'users_delete_3561e70_2_ar_40c56324' AND NOT (p.cmd = 'DELETE' AND p.permissive = 'PERMISSIVE' AND p.roles = ARRAY['rebase_admin_request']::name[] AND COALESCE(p.qual, 'true') = 'true' AND COALESCE(p.with_check, 'true') = 'true')) THEN EXECUTE 'DROP POLICY \"users_delete_3561e70_2_ar_40c56324\" ON \"rebase\".\"users\"'; END IF; END $rebase_companion$;",
+          "DROP POLICY IF EXISTS \"users_delete_3561e70_2\" ON \"rebase\".\"users\";",
+          "CREATE POLICY \"users_delete_3561e70_2\" ON \"rebase\".\"users\" AS PERMISSIVE FOR DELETE TO \"rebase_admin\" USING ((SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin']));"
+        ]
+      },
+      {
+        "name": "users_default_admin_read",
+        "adminTarget": true,
+        "restrictive": false,
+        "statements": [
+          "DO $rebase_companion$ BEGIN IF EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = 'rebase' AND p.tablename = 'users' AND p.policyname = 'users_default_admin_read_ar_b3a52ae4' AND NOT (p.cmd = 'SELECT' AND p.permissive = 'PERMISSIVE' AND p.roles = ARRAY['rebase_admin_request']::name[] AND COALESCE(p.qual, 'true') = 'true' AND COALESCE(p.with_check, 'true') = 'true')) THEN EXECUTE 'DROP POLICY \"users_default_admin_read_ar_b3a52ae4\" ON \"rebase\".\"users\"'; END IF; END $rebase_companion$;",
+          "DROP POLICY IF EXISTS \"users_default_admin_read\" ON \"rebase\".\"users\";",
+          "CREATE POLICY \"users_default_admin_read\" ON \"rebase\".\"users\" AS PERMISSIVE FOR SELECT TO \"rebase_admin\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "users_default_admin_write_insert",
+        "adminTarget": true,
+        "restrictive": false,
+        "statements": [
+          "DO $rebase_companion$ BEGIN IF EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = 'rebase' AND p.tablename = 'users' AND p.policyname = 'users_default_admin_write_insert_ar_f5b0fae5' AND NOT (p.cmd = 'INSERT' AND p.permissive = 'PERMISSIVE' AND p.roles = ARRAY['rebase_admin_request']::name[] AND COALESCE(p.qual, 'true') = 'true' AND COALESCE(p.with_check, 'true') = 'true')) THEN EXECUTE 'DROP POLICY \"users_default_admin_write_insert_ar_f5b0fae5\" ON \"rebase\".\"users\"'; END IF; END $rebase_companion$;",
+          "DROP POLICY IF EXISTS \"users_default_admin_write_insert\" ON \"rebase\".\"users\";",
+          "CREATE POLICY \"users_default_admin_write_insert\" ON \"rebase\".\"users\" AS PERMISSIVE FOR INSERT TO \"rebase_admin\" WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "users_default_admin_write_update",
+        "adminTarget": true,
+        "restrictive": false,
+        "statements": [
+          "DO $rebase_companion$ BEGIN IF EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = 'rebase' AND p.tablename = 'users' AND p.policyname = 'users_default_admin_write_update_ar_687e5ca3' AND NOT (p.cmd = 'UPDATE' AND p.permissive = 'PERMISSIVE' AND p.roles = ARRAY['rebase_admin_request']::name[] AND COALESCE(p.qual, 'true') = 'true' AND COALESCE(p.with_check, 'true') = 'true')) THEN EXECUTE 'DROP POLICY \"users_default_admin_write_update_ar_687e5ca3\" ON \"rebase\".\"users\"'; END IF; END $rebase_companion$;",
+          "DROP POLICY IF EXISTS \"users_default_admin_write_update\" ON \"rebase\".\"users\";",
+          "CREATE POLICY \"users_default_admin_write_update\" ON \"rebase\".\"users\" AS PERMISSIVE FOR UPDATE TO \"rebase_admin\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))) WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "users_default_admin_write_delete",
+        "adminTarget": true,
+        "restrictive": false,
+        "statements": [
+          "DO $rebase_companion$ BEGIN IF EXISTS (SELECT 1 FROM pg_policies p WHERE p.schemaname = 'rebase' AND p.tablename = 'users' AND p.policyname = 'users_default_admin_write_delete_ar_7e609e9b' AND NOT (p.cmd = 'DELETE' AND p.permissive = 'PERMISSIVE' AND p.roles = ARRAY['rebase_admin_request']::name[] AND COALESCE(p.qual, 'true') = 'true' AND COALESCE(p.with_check, 'true') = 'true')) THEN EXECUTE 'DROP POLICY \"users_default_admin_write_delete_ar_7e609e9b\" ON \"rebase\".\"users\"'; END IF; END $rebase_companion$;",
+          "DROP POLICY IF EXISTS \"users_default_admin_write_delete\" ON \"rebase\".\"users\";",
+          "CREATE POLICY \"users_default_admin_write_delete\" ON \"rebase\".\"users\" AS PERMISSIVE FOR DELETE TO \"rebase_admin\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ]
+      },
+      {
+        "name": "users_default_self_read",
+        "adminTarget": false,
+        "restrictive": false,
+        "statements": [
+          "DROP POLICY IF EXISTS \"users_default_self_read_ar_28580e2e\" ON \"rebase\".\"users\";",
+          "DROP POLICY IF EXISTS \"users_default_self_read\" ON \"rebase\".\"users\";",
+          "CREATE POLICY \"users_default_self_read\" ON \"rebase\".\"users\" AS PERMISSIVE FOR SELECT TO \"public\" USING ((id)::text = (SELECT rebase.uid()));"
+        ]
+      },
+      {
+        "name": "users_require_admin_write_insert",
+        "adminTarget": false,
+        "restrictive": true,
+        "statements": [
+          "DROP POLICY IF EXISTS \"users_require_admin_write_insert_ar_aca793c0\" ON \"rebase\".\"users\";",
+          "DROP POLICY IF EXISTS \"users_require_admin_write_insert\" ON \"rebase\".\"users\";",
+          "CREATE POLICY \"users_require_admin_write_insert\" ON \"rebase\".\"users\" AS RESTRICTIVE FOR INSERT TO \"public\" WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ],
+        "denying": [
+          "DROP POLICY IF EXISTS \"users_require_admin_write_insert\" ON \"rebase\".\"users\";",
+          "CREATE POLICY \"users_require_admin_write_insert\" ON \"rebase\".\"users\" AS RESTRICTIVE FOR INSERT TO \"public\" WITH CHECK (false);"
+        ]
+      },
+      {
+        "name": "users_require_admin_write_update",
+        "adminTarget": false,
+        "restrictive": true,
+        "statements": [
+          "DROP POLICY IF EXISTS \"users_require_admin_write_update_ar_34881a30\" ON \"rebase\".\"users\";",
+          "DROP POLICY IF EXISTS \"users_require_admin_write_update\" ON \"rebase\".\"users\";",
+          "CREATE POLICY \"users_require_admin_write_update\" ON \"rebase\".\"users\" AS RESTRICTIVE FOR UPDATE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))) WITH CHECK ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ],
+        "denying": [
+          "DROP POLICY IF EXISTS \"users_require_admin_write_update\" ON \"rebase\".\"users\";",
+          "CREATE POLICY \"users_require_admin_write_update\" ON \"rebase\".\"users\" AS RESTRICTIVE FOR UPDATE TO \"public\" USING (false) WITH CHECK (false);"
+        ]
+      },
+      {
+        "name": "users_require_admin_write_delete",
+        "adminTarget": false,
+        "restrictive": true,
+        "statements": [
+          "DROP POLICY IF EXISTS \"users_require_admin_write_delete_ar_8591c9fe\" ON \"rebase\".\"users\";",
+          "DROP POLICY IF EXISTS \"users_require_admin_write_delete\" ON \"rebase\".\"users\";",
+          "CREATE POLICY \"users_require_admin_write_delete\" ON \"rebase\".\"users\" AS RESTRICTIVE FOR DELETE TO \"public\" USING ((SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin'])));"
+        ],
+        "denying": [
+          "DROP POLICY IF EXISTS \"users_require_admin_write_delete\" ON \"rebase\".\"users\";",
+          "CREATE POLICY \"users_require_admin_write_delete\" ON \"rebase\".\"users\" AS RESTRICTIVE FOR DELETE TO \"public\" USING (false);"
+        ]
+      }
+    ]
+  }
+]

@@ -1,0 +1,3314 @@
+{
+  "actions": [
+    {
+      "kind": "create-enum",
+      "target": "public.current_relation_members_member_type",
+      "sql": "CREATE TYPE \"public\".\"current_relation_members_member_type\" AS ENUM ('Node', 'Way', 'Relation');"
+    },
+    {
+      "kind": "create-enum",
+      "target": "public.diary_comments_body_format",
+      "sql": "CREATE TYPE \"public\".\"diary_comments_body_format\" AS ENUM ('html', 'markdown', 'text');"
+    },
+    {
+      "kind": "create-enum",
+      "target": "public.diary_entries_body_format",
+      "sql": "CREATE TYPE \"public\".\"diary_entries_body_format\" AS ENUM ('html', 'markdown', 'text');"
+    },
+    {
+      "kind": "create-enum",
+      "target": "public.gpx_files_visibility",
+      "sql": "CREATE TYPE \"public\".\"gpx_files_visibility\" AS ENUM ('private', 'public', 'trackable', 'identifiable');"
+    },
+    {
+      "kind": "create-enum",
+      "target": "public.issues_status",
+      "sql": "CREATE TYPE \"public\".\"issues_status\" AS ENUM ('open', 'ignored', 'resolved');"
+    },
+    {
+      "kind": "create-enum",
+      "target": "public.issues_assigned_role",
+      "sql": "CREATE TYPE \"public\".\"issues_assigned_role\" AS ENUM ('administrator', 'moderator', 'importer');"
+    },
+    {
+      "kind": "create-enum",
+      "target": "public.messages_body_format",
+      "sql": "CREATE TYPE \"public\".\"messages_body_format\" AS ENUM ('html', 'markdown', 'text');"
+    },
+    {
+      "kind": "create-enum",
+      "target": "public.note_comments_event",
+      "sql": "CREATE TYPE \"public\".\"note_comments_event\" AS ENUM ('opened', 'closed', 'reopened', 'commented', 'hidden');"
+    },
+    {
+      "kind": "create-enum",
+      "target": "public.notes_status",
+      "sql": "CREATE TYPE \"public\".\"notes_status\" AS ENUM ('open', 'closed', 'hidden');"
+    },
+    {
+      "kind": "create-enum",
+      "target": "public.redactions_description_format",
+      "sql": "CREATE TYPE \"public\".\"redactions_description_format\" AS ENUM ('html', 'markdown', 'text');"
+    },
+    {
+      "kind": "create-enum",
+      "target": "public.relation_members_member_type",
+      "sql": "CREATE TYPE \"public\".\"relation_members_member_type\" AS ENUM ('Node', 'Way', 'Relation');"
+    },
+    {
+      "kind": "create-enum",
+      "target": "public.user_blocks_reason_format",
+      "sql": "CREATE TYPE \"public\".\"user_blocks_reason_format\" AS ENUM ('html', 'markdown', 'text');"
+    },
+    {
+      "kind": "create-enum",
+      "target": "public.user_roles_role",
+      "sql": "CREATE TYPE \"public\".\"user_roles_role\" AS ENUM ('administrator', 'moderator', 'importer');"
+    },
+    {
+      "kind": "create-enum",
+      "target": "public.users_status",
+      "sql": "CREATE TYPE \"public\".\"users_status\" AS ENUM ('pending', 'active', 'confirmed', 'suspended', 'deleted');"
+    },
+    {
+      "kind": "create-enum",
+      "target": "public.users_description_format",
+      "sql": "CREATE TYPE \"public\".\"users_description_format\" AS ENUM ('html', 'markdown', 'text');"
+    },
+    {
+      "kind": "create-function",
+      "target": "rebase.set_updated_at",
+      "sql": "CREATE OR REPLACE FUNCTION rebase.set_updated_at() RETURNS trigger\nLANGUAGE plpgsql AS $$\nBEGIN\n    NEW := jsonb_populate_record(NEW, jsonb_build_object(TG_ARGV[0], now()));\n    RETURN NEW;\nEND;\n$$;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.acls",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"acls\" (\"id\" BIGSERIAL PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.acls",
+      "sql": "ALTER TABLE \"public\".\"acls\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.active_storage_attachments",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"active_storage_attachments\" (\"id\" BIGSERIAL PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.active_storage_attachments",
+      "sql": "ALTER TABLE \"public\".\"active_storage_attachments\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.active_storage_blobs",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"active_storage_blobs\" (\"id\" BIGSERIAL PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.active_storage_blobs",
+      "sql": "ALTER TABLE \"public\".\"active_storage_blobs\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.active_storage_variant_records",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"active_storage_variant_records\" (\"id\" BIGSERIAL PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.active_storage_variant_records",
+      "sql": "ALTER TABLE \"public\".\"active_storage_variant_records\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.ar_internal_metadata",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"ar_internal_metadata\" (\"key\" TEXT PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.ar_internal_metadata",
+      "sql": "ALTER TABLE \"public\".\"ar_internal_metadata\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.changeset_comments",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"changeset_comments\" (\"id\" SERIAL PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.changeset_comments",
+      "sql": "ALTER TABLE \"public\".\"changeset_comments\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.changeset_tags",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"changeset_tags\" (\"changeset_id\" BIGINT NOT NULL, \"k\" TEXT DEFAULT ''::character varying NOT NULL, PRIMARY KEY (\"changeset_id\", \"k\"));"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.changeset_tags",
+      "sql": "ALTER TABLE \"public\".\"changeset_tags\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.changesets",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"changesets\" (\"id\" BIGSERIAL PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.changesets",
+      "sql": "ALTER TABLE \"public\".\"changesets\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.current_node_tags",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"current_node_tags\" (\"node_id\" BIGINT NOT NULL, \"k\" TEXT DEFAULT ''::character varying NOT NULL, PRIMARY KEY (\"node_id\", \"k\"));"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.current_node_tags",
+      "sql": "ALTER TABLE \"public\".\"current_node_tags\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.current_nodes",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"current_nodes\" (\"id\" BIGSERIAL PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.current_nodes",
+      "sql": "ALTER TABLE \"public\".\"current_nodes\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.current_relation_members",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"current_relation_members\" (\"relation_id\" BIGINT NOT NULL, \"sequence_id\" INTEGER DEFAULT 0 NOT NULL, PRIMARY KEY (\"relation_id\", \"sequence_id\"));"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.current_relation_members",
+      "sql": "ALTER TABLE \"public\".\"current_relation_members\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.current_relation_tags",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"current_relation_tags\" (\"relation_id\" BIGINT NOT NULL, \"k\" TEXT DEFAULT ''::character varying NOT NULL, PRIMARY KEY (\"relation_id\", \"k\"));"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.current_relation_tags",
+      "sql": "ALTER TABLE \"public\".\"current_relation_tags\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.current_relations",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"current_relations\" (\"id\" BIGSERIAL PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.current_relations",
+      "sql": "ALTER TABLE \"public\".\"current_relations\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.current_way_nodes",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"current_way_nodes\" (\"way_id\" BIGINT NOT NULL, \"sequence_id\" BIGINT NOT NULL, PRIMARY KEY (\"way_id\", \"sequence_id\"));"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.current_way_nodes",
+      "sql": "ALTER TABLE \"public\".\"current_way_nodes\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.current_way_tags",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"current_way_tags\" (\"way_id\" BIGINT NOT NULL, \"k\" TEXT DEFAULT ''::character varying NOT NULL, PRIMARY KEY (\"way_id\", \"k\"));"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.current_way_tags",
+      "sql": "ALTER TABLE \"public\".\"current_way_tags\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.current_ways",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"current_ways\" (\"id\" BIGSERIAL PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.current_ways",
+      "sql": "ALTER TABLE \"public\".\"current_ways\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.delayed_jobs",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"delayed_jobs\" (\"id\" BIGSERIAL PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.delayed_jobs",
+      "sql": "ALTER TABLE \"public\".\"delayed_jobs\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.diary_comments",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"diary_comments\" (\"id\" BIGSERIAL PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.diary_comments",
+      "sql": "ALTER TABLE \"public\".\"diary_comments\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.diary_entries",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"diary_entries\" (\"id\" BIGSERIAL PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.diary_entries",
+      "sql": "ALTER TABLE \"public\".\"diary_entries\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.friends",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"friends\" (\"id\" BIGSERIAL PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.friends",
+      "sql": "ALTER TABLE \"public\".\"friends\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.gps_points",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"gps_points\" (\"id\" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.gps_points",
+      "sql": "ALTER TABLE \"public\".\"gps_points\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.gpx_file_tags",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"gpx_file_tags\" (\"id\" BIGSERIAL PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.gpx_file_tags",
+      "sql": "ALTER TABLE \"public\".\"gpx_file_tags\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.gpx_files",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"gpx_files\" (\"id\" BIGSERIAL PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.gpx_files",
+      "sql": "ALTER TABLE \"public\".\"gpx_files\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.issue_comments",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"issue_comments\" (\"id\" SERIAL PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.issue_comments",
+      "sql": "ALTER TABLE \"public\".\"issue_comments\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.issues",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"issues\" (\"id\" SERIAL PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.issues",
+      "sql": "ALTER TABLE \"public\".\"issues\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.languages",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"languages\" (\"code\" TEXT PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.languages",
+      "sql": "ALTER TABLE \"public\".\"languages\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.messages",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"messages\" (\"id\" BIGSERIAL PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.messages",
+      "sql": "ALTER TABLE \"public\".\"messages\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.node_tags",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"node_tags\" (\"node_id\" BIGINT NOT NULL, \"version\" BIGINT NOT NULL, \"k\" TEXT DEFAULT ''::character varying NOT NULL, PRIMARY KEY (\"node_id\", \"version\", \"k\"));"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.node_tags",
+      "sql": "ALTER TABLE \"public\".\"node_tags\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.note_comments",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"note_comments\" (\"id\" BIGSERIAL PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.note_comments",
+      "sql": "ALTER TABLE \"public\".\"note_comments\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.notes",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"notes\" (\"id\" BIGSERIAL PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.notes",
+      "sql": "ALTER TABLE \"public\".\"notes\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.noticed_events",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"noticed_events\" (\"id\" BIGSERIAL PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.noticed_events",
+      "sql": "ALTER TABLE \"public\".\"noticed_events\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.noticed_notifications",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"noticed_notifications\" (\"id\" BIGSERIAL PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.noticed_notifications",
+      "sql": "ALTER TABLE \"public\".\"noticed_notifications\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.oauth_access_grants",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"oauth_access_grants\" (\"id\" BIGSERIAL PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.oauth_access_grants",
+      "sql": "ALTER TABLE \"public\".\"oauth_access_grants\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.oauth_access_tokens",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"oauth_access_tokens\" (\"id\" BIGSERIAL PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.oauth_access_tokens",
+      "sql": "ALTER TABLE \"public\".\"oauth_access_tokens\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.oauth_applications",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"oauth_applications\" (\"id\" BIGSERIAL PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.oauth_applications",
+      "sql": "ALTER TABLE \"public\".\"oauth_applications\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.oauth_openid_requests",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"oauth_openid_requests\" (\"id\" BIGSERIAL PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.oauth_openid_requests",
+      "sql": "ALTER TABLE \"public\".\"oauth_openid_requests\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.redactions",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"redactions\" (\"id\" SERIAL PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.redactions",
+      "sql": "ALTER TABLE \"public\".\"redactions\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.relation_members",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"relation_members\" (\"relation_id\" BIGINT NOT NULL, \"version\" BIGINT DEFAULT 0 NOT NULL, \"sequence_id\" INTEGER DEFAULT 0 NOT NULL, PRIMARY KEY (\"relation_id\", \"version\", \"sequence_id\"));"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.relation_members",
+      "sql": "ALTER TABLE \"public\".\"relation_members\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.relation_tags",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"relation_tags\" (\"relation_id\" BIGINT NOT NULL, \"k\" TEXT DEFAULT ''::character varying NOT NULL, \"version\" BIGINT NOT NULL, PRIMARY KEY (\"relation_id\", \"k\", \"version\"));"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.relation_tags",
+      "sql": "ALTER TABLE \"public\".\"relation_tags\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.reports",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"reports\" (\"id\" SERIAL PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.reports",
+      "sql": "ALTER TABLE \"public\".\"reports\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.schema_migrations",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"schema_migrations\" (\"version\" TEXT PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.schema_migrations",
+      "sql": "ALTER TABLE \"public\".\"schema_migrations\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.social_links",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"social_links\" (\"id\" BIGSERIAL PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.social_links",
+      "sql": "ALTER TABLE \"public\".\"social_links\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.spammy_phrases",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"spammy_phrases\" (\"id\" BIGSERIAL PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.spammy_phrases",
+      "sql": "ALTER TABLE \"public\".\"spammy_phrases\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.user_blocks",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"user_blocks\" (\"id\" SERIAL PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.user_blocks",
+      "sql": "ALTER TABLE \"public\".\"user_blocks\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.user_mutes",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"user_mutes\" (\"id\" BIGSERIAL PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.user_mutes",
+      "sql": "ALTER TABLE \"public\".\"user_mutes\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.user_preferences",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"user_preferences\" (\"user_id\" BIGINT NOT NULL, \"k\" TEXT NOT NULL, PRIMARY KEY (\"user_id\", \"k\"));"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.user_preferences",
+      "sql": "ALTER TABLE \"public\".\"user_preferences\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.user_roles",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"user_roles\" (\"id\" SERIAL PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.user_roles",
+      "sql": "ALTER TABLE \"public\".\"user_roles\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.users",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"users\" (\"id\" BIGSERIAL PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.users",
+      "sql": "ALTER TABLE \"public\".\"users\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.way_nodes",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"way_nodes\" (\"way_id\" BIGINT NOT NULL, \"version\" BIGINT NOT NULL, \"sequence_id\" BIGINT NOT NULL, PRIMARY KEY (\"way_id\", \"version\", \"sequence_id\"));"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.way_nodes",
+      "sql": "ALTER TABLE \"public\".\"way_nodes\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.way_tags",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"way_tags\" (\"way_id\" BIGINT NOT NULL, \"k\" TEXT NOT NULL, \"version\" BIGINT NOT NULL, PRIMARY KEY (\"way_id\", \"k\", \"version\"));"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.way_tags",
+      "sql": "ALTER TABLE \"public\".\"way_tags\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.changesets_subscribers",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"changesets_subscribers\" (\"changeset_id\" BIGINT NOT NULL, \"subscriber_id\" BIGINT NOT NULL, PRIMARY KEY (\"changeset_id\", \"subscriber_id\"));"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.changesets_subscribers",
+      "sql": "ALTER TABLE \"public\".\"changesets_subscribers\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.diary_entry_subscriptions",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"diary_entry_subscriptions\" (\"user_id\" BIGINT NOT NULL, \"diary_entry_id\" BIGINT NOT NULL, PRIMARY KEY (\"user_id\", \"diary_entry_id\"));"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.diary_entry_subscriptions",
+      "sql": "ALTER TABLE \"public\".\"diary_entry_subscriptions\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.note_subscriptions",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"note_subscriptions\" (\"user_id\" BIGINT NOT NULL, \"note_id\" BIGINT NOT NULL, PRIMARY KEY (\"user_id\", \"note_id\"));"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.note_subscriptions",
+      "sql": "ALTER TABLE \"public\".\"note_subscriptions\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.acls.address",
+      "sql": "ALTER TABLE \"public\".\"acls\" ADD COLUMN IF NOT EXISTS \"address\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.acls.k",
+      "sql": "ALTER TABLE \"public\".\"acls\" ADD COLUMN IF NOT EXISTS \"k\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.acls.v",
+      "sql": "ALTER TABLE \"public\".\"acls\" ADD COLUMN IF NOT EXISTS \"v\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.acls.domain",
+      "sql": "ALTER TABLE \"public\".\"acls\" ADD COLUMN IF NOT EXISTS \"domain\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.acls.mx",
+      "sql": "ALTER TABLE \"public\".\"acls\" ADD COLUMN IF NOT EXISTS \"mx\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.active_storage_attachments.name",
+      "sql": "ALTER TABLE \"public\".\"active_storage_attachments\" ADD COLUMN IF NOT EXISTS \"name\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.active_storage_attachments.record_type",
+      "sql": "ALTER TABLE \"public\".\"active_storage_attachments\" ADD COLUMN IF NOT EXISTS \"record_type\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.active_storage_attachments.record_id",
+      "sql": "ALTER TABLE \"public\".\"active_storage_attachments\" ADD COLUMN IF NOT EXISTS \"record_id\" BIGINT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.active_storage_attachments.created_at",
+      "sql": "ALTER TABLE \"public\".\"active_storage_attachments\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.active_storage_blobs.filename",
+      "sql": "ALTER TABLE \"public\".\"active_storage_blobs\" ADD COLUMN IF NOT EXISTS \"filename\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.active_storage_blobs.service_name",
+      "sql": "ALTER TABLE \"public\".\"active_storage_blobs\" ADD COLUMN IF NOT EXISTS \"service_name\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.active_storage_blobs.key",
+      "sql": "ALTER TABLE \"public\".\"active_storage_blobs\" ADD COLUMN IF NOT EXISTS \"key\" TEXT UNIQUE NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.active_storage_blobs.content_type",
+      "sql": "ALTER TABLE \"public\".\"active_storage_blobs\" ADD COLUMN IF NOT EXISTS \"content_type\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.active_storage_blobs.checksum",
+      "sql": "ALTER TABLE \"public\".\"active_storage_blobs\" ADD COLUMN IF NOT EXISTS \"checksum\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.active_storage_blobs.byte_size",
+      "sql": "ALTER TABLE \"public\".\"active_storage_blobs\" ADD COLUMN IF NOT EXISTS \"byte_size\" BIGINT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.active_storage_blobs.metadata",
+      "sql": "ALTER TABLE \"public\".\"active_storage_blobs\" ADD COLUMN IF NOT EXISTS \"metadata\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.active_storage_blobs.created_at",
+      "sql": "ALTER TABLE \"public\".\"active_storage_blobs\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.active_storage_variant_records.variation_digest",
+      "sql": "ALTER TABLE \"public\".\"active_storage_variant_records\" ADD COLUMN IF NOT EXISTS \"variation_digest\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.ar_internal_metadata.value",
+      "sql": "ALTER TABLE \"public\".\"ar_internal_metadata\" ADD COLUMN IF NOT EXISTS \"value\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.ar_internal_metadata.created_at",
+      "sql": "ALTER TABLE \"public\".\"ar_internal_metadata\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.ar_internal_metadata.updated_at",
+      "sql": "ALTER TABLE \"public\".\"ar_internal_metadata\" ADD COLUMN IF NOT EXISTS \"updated_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.changeset_comments.visible",
+      "sql": "ALTER TABLE \"public\".\"changeset_comments\" ADD COLUMN IF NOT EXISTS \"visible\" BOOLEAN NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.changeset_comments.body",
+      "sql": "ALTER TABLE \"public\".\"changeset_comments\" ADD COLUMN IF NOT EXISTS \"body\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.changeset_comments.created_at",
+      "sql": "ALTER TABLE \"public\".\"changeset_comments\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.changeset_tags.v",
+      "sql": "ALTER TABLE \"public\".\"changeset_tags\" ADD COLUMN IF NOT EXISTS \"v\" TEXT DEFAULT '' NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.changesets.min_lat",
+      "sql": "ALTER TABLE \"public\".\"changesets\" ADD COLUMN IF NOT EXISTS \"min_lat\" INTEGER;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.changesets.max_lat",
+      "sql": "ALTER TABLE \"public\".\"changesets\" ADD COLUMN IF NOT EXISTS \"max_lat\" INTEGER;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.changesets.min_lon",
+      "sql": "ALTER TABLE \"public\".\"changesets\" ADD COLUMN IF NOT EXISTS \"min_lon\" INTEGER;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.changesets.max_lon",
+      "sql": "ALTER TABLE \"public\".\"changesets\" ADD COLUMN IF NOT EXISTS \"max_lon\" INTEGER;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.changesets.num_changes",
+      "sql": "ALTER TABLE \"public\".\"changesets\" ADD COLUMN IF NOT EXISTS \"num_changes\" INTEGER DEFAULT 0 NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.changesets.num_created_nodes",
+      "sql": "ALTER TABLE \"public\".\"changesets\" ADD COLUMN IF NOT EXISTS \"num_created_nodes\" INTEGER DEFAULT 0 NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.changesets.num_modified_nodes",
+      "sql": "ALTER TABLE \"public\".\"changesets\" ADD COLUMN IF NOT EXISTS \"num_modified_nodes\" INTEGER DEFAULT 0 NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.changesets.num_deleted_nodes",
+      "sql": "ALTER TABLE \"public\".\"changesets\" ADD COLUMN IF NOT EXISTS \"num_deleted_nodes\" INTEGER DEFAULT 0 NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.changesets.num_created_ways",
+      "sql": "ALTER TABLE \"public\".\"changesets\" ADD COLUMN IF NOT EXISTS \"num_created_ways\" INTEGER DEFAULT 0 NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.changesets.num_modified_ways",
+      "sql": "ALTER TABLE \"public\".\"changesets\" ADD COLUMN IF NOT EXISTS \"num_modified_ways\" INTEGER DEFAULT 0 NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.changesets.num_deleted_ways",
+      "sql": "ALTER TABLE \"public\".\"changesets\" ADD COLUMN IF NOT EXISTS \"num_deleted_ways\" INTEGER DEFAULT 0 NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.changesets.num_created_relations",
+      "sql": "ALTER TABLE \"public\".\"changesets\" ADD COLUMN IF NOT EXISTS \"num_created_relations\" INTEGER DEFAULT 0 NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.changesets.num_modified_relations",
+      "sql": "ALTER TABLE \"public\".\"changesets\" ADD COLUMN IF NOT EXISTS \"num_modified_relations\" INTEGER DEFAULT 0 NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.changesets.num_deleted_relations",
+      "sql": "ALTER TABLE \"public\".\"changesets\" ADD COLUMN IF NOT EXISTS \"num_deleted_relations\" INTEGER DEFAULT 0 NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.changesets.closed_at",
+      "sql": "ALTER TABLE \"public\".\"changesets\" ADD COLUMN IF NOT EXISTS \"closed_at\" TIMESTAMP WITH TIME ZONE NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.changesets.created_at",
+      "sql": "ALTER TABLE \"public\".\"changesets\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.current_node_tags.v",
+      "sql": "ALTER TABLE \"public\".\"current_node_tags\" ADD COLUMN IF NOT EXISTS \"v\" TEXT DEFAULT '' NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.current_nodes.visible",
+      "sql": "ALTER TABLE \"public\".\"current_nodes\" ADD COLUMN IF NOT EXISTS \"visible\" BOOLEAN NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.current_nodes.latitude",
+      "sql": "ALTER TABLE \"public\".\"current_nodes\" ADD COLUMN IF NOT EXISTS \"latitude\" INTEGER NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.current_nodes.longitude",
+      "sql": "ALTER TABLE \"public\".\"current_nodes\" ADD COLUMN IF NOT EXISTS \"longitude\" INTEGER NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.current_nodes.tile",
+      "sql": "ALTER TABLE \"public\".\"current_nodes\" ADD COLUMN IF NOT EXISTS \"tile\" BIGINT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.current_nodes.version",
+      "sql": "ALTER TABLE \"public\".\"current_nodes\" ADD COLUMN IF NOT EXISTS \"version\" BIGINT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.current_nodes.timestamp",
+      "sql": "ALTER TABLE \"public\".\"current_nodes\" ADD COLUMN IF NOT EXISTS \"timestamp\" TIMESTAMP WITH TIME ZONE NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.current_relation_members.member_type",
+      "sql": "ALTER TABLE \"public\".\"current_relation_members\" ADD COLUMN IF NOT EXISTS \"member_type\" \"public\".\"current_relation_members_member_type\" NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.current_relation_members.member_role",
+      "sql": "ALTER TABLE \"public\".\"current_relation_members\" ADD COLUMN IF NOT EXISTS \"member_role\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.current_relation_members.member_id",
+      "sql": "ALTER TABLE \"public\".\"current_relation_members\" ADD COLUMN IF NOT EXISTS \"member_id\" BIGINT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.current_relation_tags.v",
+      "sql": "ALTER TABLE \"public\".\"current_relation_tags\" ADD COLUMN IF NOT EXISTS \"v\" TEXT DEFAULT '' NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.current_relations.visible",
+      "sql": "ALTER TABLE \"public\".\"current_relations\" ADD COLUMN IF NOT EXISTS \"visible\" BOOLEAN NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.current_relations.version",
+      "sql": "ALTER TABLE \"public\".\"current_relations\" ADD COLUMN IF NOT EXISTS \"version\" BIGINT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.current_relations.timestamp",
+      "sql": "ALTER TABLE \"public\".\"current_relations\" ADD COLUMN IF NOT EXISTS \"timestamp\" TIMESTAMP WITH TIME ZONE NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.current_way_tags.v",
+      "sql": "ALTER TABLE \"public\".\"current_way_tags\" ADD COLUMN IF NOT EXISTS \"v\" TEXT DEFAULT '' NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.current_ways.visible",
+      "sql": "ALTER TABLE \"public\".\"current_ways\" ADD COLUMN IF NOT EXISTS \"visible\" BOOLEAN NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.current_ways.version",
+      "sql": "ALTER TABLE \"public\".\"current_ways\" ADD COLUMN IF NOT EXISTS \"version\" BIGINT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.current_ways.timestamp",
+      "sql": "ALTER TABLE \"public\".\"current_ways\" ADD COLUMN IF NOT EXISTS \"timestamp\" TIMESTAMP WITH TIME ZONE NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.delayed_jobs.priority",
+      "sql": "ALTER TABLE \"public\".\"delayed_jobs\" ADD COLUMN IF NOT EXISTS \"priority\" INTEGER DEFAULT 0 NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.delayed_jobs.locked_by",
+      "sql": "ALTER TABLE \"public\".\"delayed_jobs\" ADD COLUMN IF NOT EXISTS \"locked_by\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.delayed_jobs.queue",
+      "sql": "ALTER TABLE \"public\".\"delayed_jobs\" ADD COLUMN IF NOT EXISTS \"queue\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.delayed_jobs.attempts",
+      "sql": "ALTER TABLE \"public\".\"delayed_jobs\" ADD COLUMN IF NOT EXISTS \"attempts\" INTEGER DEFAULT 0 NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.delayed_jobs.run_at",
+      "sql": "ALTER TABLE \"public\".\"delayed_jobs\" ADD COLUMN IF NOT EXISTS \"run_at\" TIMESTAMP WITH TIME ZONE;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.delayed_jobs.locked_at",
+      "sql": "ALTER TABLE \"public\".\"delayed_jobs\" ADD COLUMN IF NOT EXISTS \"locked_at\" TIMESTAMP WITH TIME ZONE;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.delayed_jobs.failed_at",
+      "sql": "ALTER TABLE \"public\".\"delayed_jobs\" ADD COLUMN IF NOT EXISTS \"failed_at\" TIMESTAMP WITH TIME ZONE;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.delayed_jobs.handler",
+      "sql": "ALTER TABLE \"public\".\"delayed_jobs\" ADD COLUMN IF NOT EXISTS \"handler\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.delayed_jobs.last_error",
+      "sql": "ALTER TABLE \"public\".\"delayed_jobs\" ADD COLUMN IF NOT EXISTS \"last_error\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.delayed_jobs.created_at",
+      "sql": "ALTER TABLE \"public\".\"delayed_jobs\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now();"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.delayed_jobs.updated_at",
+      "sql": "ALTER TABLE \"public\".\"delayed_jobs\" ADD COLUMN IF NOT EXISTS \"updated_at\" TIMESTAMP WITH TIME ZONE DEFAULT now();"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.diary_comments.body_format",
+      "sql": "ALTER TABLE \"public\".\"diary_comments\" ADD COLUMN IF NOT EXISTS \"body_format\" \"public\".\"diary_comments_body_format\" DEFAULT 'markdown' NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.diary_comments.visible",
+      "sql": "ALTER TABLE \"public\".\"diary_comments\" ADD COLUMN IF NOT EXISTS \"visible\" BOOLEAN DEFAULT TRUE NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.diary_comments.body",
+      "sql": "ALTER TABLE \"public\".\"diary_comments\" ADD COLUMN IF NOT EXISTS \"body\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.diary_comments.created_at",
+      "sql": "ALTER TABLE \"public\".\"diary_comments\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.diary_comments.updated_at",
+      "sql": "ALTER TABLE \"public\".\"diary_comments\" ADD COLUMN IF NOT EXISTS \"updated_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.diary_entries.title",
+      "sql": "ALTER TABLE \"public\".\"diary_entries\" ADD COLUMN IF NOT EXISTS \"title\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.diary_entries.body_format",
+      "sql": "ALTER TABLE \"public\".\"diary_entries\" ADD COLUMN IF NOT EXISTS \"body_format\" \"public\".\"diary_entries_body_format\" DEFAULT 'markdown' NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.diary_entries.visible",
+      "sql": "ALTER TABLE \"public\".\"diary_entries\" ADD COLUMN IF NOT EXISTS \"visible\" BOOLEAN DEFAULT TRUE NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.diary_entries.latitude",
+      "sql": "ALTER TABLE \"public\".\"diary_entries\" ADD COLUMN IF NOT EXISTS \"latitude\" DOUBLE PRECISION;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.diary_entries.longitude",
+      "sql": "ALTER TABLE \"public\".\"diary_entries\" ADD COLUMN IF NOT EXISTS \"longitude\" DOUBLE PRECISION;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.diary_entries.body",
+      "sql": "ALTER TABLE \"public\".\"diary_entries\" ADD COLUMN IF NOT EXISTS \"body\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.diary_entries.created_at",
+      "sql": "ALTER TABLE \"public\".\"diary_entries\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.diary_entries.updated_at",
+      "sql": "ALTER TABLE \"public\".\"diary_entries\" ADD COLUMN IF NOT EXISTS \"updated_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.friends.created_at",
+      "sql": "ALTER TABLE \"public\".\"friends\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now();"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.gps_points.altitude",
+      "sql": "ALTER TABLE \"public\".\"gps_points\" ADD COLUMN IF NOT EXISTS \"altitude\" DOUBLE PRECISION;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.gps_points.trackid",
+      "sql": "ALTER TABLE \"public\".\"gps_points\" ADD COLUMN IF NOT EXISTS \"trackid\" INTEGER NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.gps_points.latitude",
+      "sql": "ALTER TABLE \"public\".\"gps_points\" ADD COLUMN IF NOT EXISTS \"latitude\" INTEGER NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.gps_points.longitude",
+      "sql": "ALTER TABLE \"public\".\"gps_points\" ADD COLUMN IF NOT EXISTS \"longitude\" INTEGER NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.gps_points.tile",
+      "sql": "ALTER TABLE \"public\".\"gps_points\" ADD COLUMN IF NOT EXISTS \"tile\" BIGINT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.gps_points.timestamp",
+      "sql": "ALTER TABLE \"public\".\"gps_points\" ADD COLUMN IF NOT EXISTS \"timestamp\" TIMESTAMP WITH TIME ZONE;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.gpx_file_tags.tag",
+      "sql": "ALTER TABLE \"public\".\"gpx_file_tags\" ADD COLUMN IF NOT EXISTS \"tag\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.gpx_files.name",
+      "sql": "ALTER TABLE \"public\".\"gpx_files\" ADD COLUMN IF NOT EXISTS \"name\" TEXT DEFAULT '' NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.gpx_files.visibility",
+      "sql": "ALTER TABLE \"public\".\"gpx_files\" ADD COLUMN IF NOT EXISTS \"visibility\" \"public\".\"gpx_files_visibility\" DEFAULT 'public' NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.gpx_files.visible",
+      "sql": "ALTER TABLE \"public\".\"gpx_files\" ADD COLUMN IF NOT EXISTS \"visible\" BOOLEAN DEFAULT TRUE NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.gpx_files.inserted",
+      "sql": "ALTER TABLE \"public\".\"gpx_files\" ADD COLUMN IF NOT EXISTS \"inserted\" BOOLEAN NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.gpx_files.size",
+      "sql": "ALTER TABLE \"public\".\"gpx_files\" ADD COLUMN IF NOT EXISTS \"size\" BIGINT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.gpx_files.latitude",
+      "sql": "ALTER TABLE \"public\".\"gpx_files\" ADD COLUMN IF NOT EXISTS \"latitude\" DOUBLE PRECISION;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.gpx_files.longitude",
+      "sql": "ALTER TABLE \"public\".\"gpx_files\" ADD COLUMN IF NOT EXISTS \"longitude\" DOUBLE PRECISION;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.gpx_files.timestamp",
+      "sql": "ALTER TABLE \"public\".\"gpx_files\" ADD COLUMN IF NOT EXISTS \"timestamp\" TIMESTAMP WITH TIME ZONE NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.gpx_files.description",
+      "sql": "ALTER TABLE \"public\".\"gpx_files\" ADD COLUMN IF NOT EXISTS \"description\" TEXT DEFAULT '' NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.issue_comments.body",
+      "sql": "ALTER TABLE \"public\".\"issue_comments\" ADD COLUMN IF NOT EXISTS \"body\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.issue_comments.created_at",
+      "sql": "ALTER TABLE \"public\".\"issue_comments\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.issue_comments.updated_at",
+      "sql": "ALTER TABLE \"public\".\"issue_comments\" ADD COLUMN IF NOT EXISTS \"updated_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.issues.status",
+      "sql": "ALTER TABLE \"public\".\"issues\" ADD COLUMN IF NOT EXISTS \"status\" \"public\".\"issues_status\" DEFAULT 'open' NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.issues.assigned_role",
+      "sql": "ALTER TABLE \"public\".\"issues\" ADD COLUMN IF NOT EXISTS \"assigned_role\" \"public\".\"issues_assigned_role\" NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.issues.reportable_type",
+      "sql": "ALTER TABLE \"public\".\"issues\" ADD COLUMN IF NOT EXISTS \"reportable_type\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.issues.reportable_id",
+      "sql": "ALTER TABLE \"public\".\"issues\" ADD COLUMN IF NOT EXISTS \"reportable_id\" INTEGER NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.issues.reports_count",
+      "sql": "ALTER TABLE \"public\".\"issues\" ADD COLUMN IF NOT EXISTS \"reports_count\" INTEGER DEFAULT 0;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.issues.resolved_at",
+      "sql": "ALTER TABLE \"public\".\"issues\" ADD COLUMN IF NOT EXISTS \"resolved_at\" TIMESTAMP WITH TIME ZONE;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.issues.created_at",
+      "sql": "ALTER TABLE \"public\".\"issues\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.issues.updated_at",
+      "sql": "ALTER TABLE \"public\".\"issues\" ADD COLUMN IF NOT EXISTS \"updated_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.languages.english_name",
+      "sql": "ALTER TABLE \"public\".\"languages\" ADD COLUMN IF NOT EXISTS \"english_name\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.languages.native_name",
+      "sql": "ALTER TABLE \"public\".\"languages\" ADD COLUMN IF NOT EXISTS \"native_name\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.messages.title",
+      "sql": "ALTER TABLE \"public\".\"messages\" ADD COLUMN IF NOT EXISTS \"title\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.messages.body_format",
+      "sql": "ALTER TABLE \"public\".\"messages\" ADD COLUMN IF NOT EXISTS \"body_format\" \"public\".\"messages_body_format\" DEFAULT 'markdown' NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.messages.message_read",
+      "sql": "ALTER TABLE \"public\".\"messages\" ADD COLUMN IF NOT EXISTS \"message_read\" BOOLEAN DEFAULT FALSE NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.messages.to_user_visible",
+      "sql": "ALTER TABLE \"public\".\"messages\" ADD COLUMN IF NOT EXISTS \"to_user_visible\" BOOLEAN DEFAULT TRUE NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.messages.from_user_visible",
+      "sql": "ALTER TABLE \"public\".\"messages\" ADD COLUMN IF NOT EXISTS \"from_user_visible\" BOOLEAN DEFAULT TRUE NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.messages.muted",
+      "sql": "ALTER TABLE \"public\".\"messages\" ADD COLUMN IF NOT EXISTS \"muted\" BOOLEAN DEFAULT FALSE NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.messages.sent_on",
+      "sql": "ALTER TABLE \"public\".\"messages\" ADD COLUMN IF NOT EXISTS \"sent_on\" TIMESTAMP WITH TIME ZONE NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.messages.body",
+      "sql": "ALTER TABLE \"public\".\"messages\" ADD COLUMN IF NOT EXISTS \"body\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.node_tags.v",
+      "sql": "ALTER TABLE \"public\".\"node_tags\" ADD COLUMN IF NOT EXISTS \"v\" TEXT DEFAULT '' NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.note_comments.event",
+      "sql": "ALTER TABLE \"public\".\"note_comments\" ADD COLUMN IF NOT EXISTS \"event\" \"public\".\"note_comments_event\";"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.note_comments.author_ip",
+      "sql": "ALTER TABLE \"public\".\"note_comments\" ADD COLUMN IF NOT EXISTS \"author_ip\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.note_comments.visible",
+      "sql": "ALTER TABLE \"public\".\"note_comments\" ADD COLUMN IF NOT EXISTS \"visible\" BOOLEAN NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.note_comments.body",
+      "sql": "ALTER TABLE \"public\".\"note_comments\" ADD COLUMN IF NOT EXISTS \"body\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.note_comments.created_at",
+      "sql": "ALTER TABLE \"public\".\"note_comments\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.notes.status",
+      "sql": "ALTER TABLE \"public\".\"notes\" ADD COLUMN IF NOT EXISTS \"status\" \"public\".\"notes_status\" NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.notes.user_ip",
+      "sql": "ALTER TABLE \"public\".\"notes\" ADD COLUMN IF NOT EXISTS \"user_ip\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.notes.latitude",
+      "sql": "ALTER TABLE \"public\".\"notes\" ADD COLUMN IF NOT EXISTS \"latitude\" INTEGER NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.notes.longitude",
+      "sql": "ALTER TABLE \"public\".\"notes\" ADD COLUMN IF NOT EXISTS \"longitude\" INTEGER NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.notes.tile",
+      "sql": "ALTER TABLE \"public\".\"notes\" ADD COLUMN IF NOT EXISTS \"tile\" BIGINT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.notes.closed_at",
+      "sql": "ALTER TABLE \"public\".\"notes\" ADD COLUMN IF NOT EXISTS \"closed_at\" TIMESTAMP WITH TIME ZONE;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.notes.description",
+      "sql": "ALTER TABLE \"public\".\"notes\" ADD COLUMN IF NOT EXISTS \"description\" TEXT DEFAULT '' NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.notes.created_at",
+      "sql": "ALTER TABLE \"public\".\"notes\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.notes.updated_at",
+      "sql": "ALTER TABLE \"public\".\"notes\" ADD COLUMN IF NOT EXISTS \"updated_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.noticed_events.type",
+      "sql": "ALTER TABLE \"public\".\"noticed_events\" ADD COLUMN IF NOT EXISTS \"type\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.noticed_events.record_type",
+      "sql": "ALTER TABLE \"public\".\"noticed_events\" ADD COLUMN IF NOT EXISTS \"record_type\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.noticed_events.record_id",
+      "sql": "ALTER TABLE \"public\".\"noticed_events\" ADD COLUMN IF NOT EXISTS \"record_id\" BIGINT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.noticed_events.notifications_count",
+      "sql": "ALTER TABLE \"public\".\"noticed_events\" ADD COLUMN IF NOT EXISTS \"notifications_count\" INTEGER;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.noticed_events.params",
+      "sql": "ALTER TABLE \"public\".\"noticed_events\" ADD COLUMN IF NOT EXISTS \"params\" JSONB;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.noticed_events.created_at",
+      "sql": "ALTER TABLE \"public\".\"noticed_events\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.noticed_events.updated_at",
+      "sql": "ALTER TABLE \"public\".\"noticed_events\" ADD COLUMN IF NOT EXISTS \"updated_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.noticed_notifications.type",
+      "sql": "ALTER TABLE \"public\".\"noticed_notifications\" ADD COLUMN IF NOT EXISTS \"type\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.noticed_notifications.recipient_type",
+      "sql": "ALTER TABLE \"public\".\"noticed_notifications\" ADD COLUMN IF NOT EXISTS \"recipient_type\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.noticed_notifications.event_id",
+      "sql": "ALTER TABLE \"public\".\"noticed_notifications\" ADD COLUMN IF NOT EXISTS \"event_id\" BIGINT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.noticed_notifications.recipient_id",
+      "sql": "ALTER TABLE \"public\".\"noticed_notifications\" ADD COLUMN IF NOT EXISTS \"recipient_id\" BIGINT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.noticed_notifications.read_at",
+      "sql": "ALTER TABLE \"public\".\"noticed_notifications\" ADD COLUMN IF NOT EXISTS \"read_at\" TIMESTAMP WITH TIME ZONE;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.noticed_notifications.seen_at",
+      "sql": "ALTER TABLE \"public\".\"noticed_notifications\" ADD COLUMN IF NOT EXISTS \"seen_at\" TIMESTAMP WITH TIME ZONE;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.noticed_notifications.created_at",
+      "sql": "ALTER TABLE \"public\".\"noticed_notifications\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.noticed_notifications.updated_at",
+      "sql": "ALTER TABLE \"public\".\"noticed_notifications\" ADD COLUMN IF NOT EXISTS \"updated_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.oauth_access_grants.token",
+      "sql": "ALTER TABLE \"public\".\"oauth_access_grants\" ADD COLUMN IF NOT EXISTS \"token\" TEXT UNIQUE NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.oauth_access_grants.scopes",
+      "sql": "ALTER TABLE \"public\".\"oauth_access_grants\" ADD COLUMN IF NOT EXISTS \"scopes\" TEXT DEFAULT '' NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.oauth_access_grants.code_challenge",
+      "sql": "ALTER TABLE \"public\".\"oauth_access_grants\" ADD COLUMN IF NOT EXISTS \"code_challenge\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.oauth_access_grants.code_challenge_method",
+      "sql": "ALTER TABLE \"public\".\"oauth_access_grants\" ADD COLUMN IF NOT EXISTS \"code_challenge_method\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.oauth_access_grants.expires_in",
+      "sql": "ALTER TABLE \"public\".\"oauth_access_grants\" ADD COLUMN IF NOT EXISTS \"expires_in\" INTEGER NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.oauth_access_grants.revoked_at",
+      "sql": "ALTER TABLE \"public\".\"oauth_access_grants\" ADD COLUMN IF NOT EXISTS \"revoked_at\" TIMESTAMP WITH TIME ZONE;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.oauth_access_grants.redirect_uri",
+      "sql": "ALTER TABLE \"public\".\"oauth_access_grants\" ADD COLUMN IF NOT EXISTS \"redirect_uri\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.oauth_access_grants.created_at",
+      "sql": "ALTER TABLE \"public\".\"oauth_access_grants\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.oauth_access_tokens.token",
+      "sql": "ALTER TABLE \"public\".\"oauth_access_tokens\" ADD COLUMN IF NOT EXISTS \"token\" TEXT UNIQUE NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.oauth_access_tokens.refresh_token",
+      "sql": "ALTER TABLE \"public\".\"oauth_access_tokens\" ADD COLUMN IF NOT EXISTS \"refresh_token\" TEXT UNIQUE;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.oauth_access_tokens.scopes",
+      "sql": "ALTER TABLE \"public\".\"oauth_access_tokens\" ADD COLUMN IF NOT EXISTS \"scopes\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.oauth_access_tokens.previous_refresh_token",
+      "sql": "ALTER TABLE \"public\".\"oauth_access_tokens\" ADD COLUMN IF NOT EXISTS \"previous_refresh_token\" TEXT DEFAULT '' NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.oauth_access_tokens.expires_in",
+      "sql": "ALTER TABLE \"public\".\"oauth_access_tokens\" ADD COLUMN IF NOT EXISTS \"expires_in\" INTEGER;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.oauth_access_tokens.revoked_at",
+      "sql": "ALTER TABLE \"public\".\"oauth_access_tokens\" ADD COLUMN IF NOT EXISTS \"revoked_at\" TIMESTAMP WITH TIME ZONE;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.oauth_access_tokens.created_at",
+      "sql": "ALTER TABLE \"public\".\"oauth_access_tokens\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.oauth_applications.name",
+      "sql": "ALTER TABLE \"public\".\"oauth_applications\" ADD COLUMN IF NOT EXISTS \"name\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.oauth_applications.owner_type",
+      "sql": "ALTER TABLE \"public\".\"oauth_applications\" ADD COLUMN IF NOT EXISTS \"owner_type\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.oauth_applications.uid",
+      "sql": "ALTER TABLE \"public\".\"oauth_applications\" ADD COLUMN IF NOT EXISTS \"uid\" TEXT UNIQUE NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.oauth_applications.secret",
+      "sql": "ALTER TABLE \"public\".\"oauth_applications\" ADD COLUMN IF NOT EXISTS \"secret\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.oauth_applications.scopes",
+      "sql": "ALTER TABLE \"public\".\"oauth_applications\" ADD COLUMN IF NOT EXISTS \"scopes\" TEXT DEFAULT '' NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.oauth_applications.confidential",
+      "sql": "ALTER TABLE \"public\".\"oauth_applications\" ADD COLUMN IF NOT EXISTS \"confidential\" BOOLEAN DEFAULT TRUE NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.oauth_applications.redirect_uri",
+      "sql": "ALTER TABLE \"public\".\"oauth_applications\" ADD COLUMN IF NOT EXISTS \"redirect_uri\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.oauth_applications.created_at",
+      "sql": "ALTER TABLE \"public\".\"oauth_applications\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.oauth_applications.updated_at",
+      "sql": "ALTER TABLE \"public\".\"oauth_applications\" ADD COLUMN IF NOT EXISTS \"updated_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.oauth_openid_requests.nonce",
+      "sql": "ALTER TABLE \"public\".\"oauth_openid_requests\" ADD COLUMN IF NOT EXISTS \"nonce\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.redactions.title",
+      "sql": "ALTER TABLE \"public\".\"redactions\" ADD COLUMN IF NOT EXISTS \"title\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.redactions.description_format",
+      "sql": "ALTER TABLE \"public\".\"redactions\" ADD COLUMN IF NOT EXISTS \"description_format\" \"public\".\"redactions_description_format\" DEFAULT 'markdown' NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.redactions.description",
+      "sql": "ALTER TABLE \"public\".\"redactions\" ADD COLUMN IF NOT EXISTS \"description\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.redactions.created_at",
+      "sql": "ALTER TABLE \"public\".\"redactions\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now();"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.redactions.updated_at",
+      "sql": "ALTER TABLE \"public\".\"redactions\" ADD COLUMN IF NOT EXISTS \"updated_at\" TIMESTAMP WITH TIME ZONE DEFAULT now();"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.relation_members.member_type",
+      "sql": "ALTER TABLE \"public\".\"relation_members\" ADD COLUMN IF NOT EXISTS \"member_type\" \"public\".\"relation_members_member_type\" NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.relation_members.member_role",
+      "sql": "ALTER TABLE \"public\".\"relation_members\" ADD COLUMN IF NOT EXISTS \"member_role\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.relation_members.member_id",
+      "sql": "ALTER TABLE \"public\".\"relation_members\" ADD COLUMN IF NOT EXISTS \"member_id\" BIGINT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.relation_tags.v",
+      "sql": "ALTER TABLE \"public\".\"relation_tags\" ADD COLUMN IF NOT EXISTS \"v\" TEXT DEFAULT '' NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.reports.category",
+      "sql": "ALTER TABLE \"public\".\"reports\" ADD COLUMN IF NOT EXISTS \"category\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.reports.details",
+      "sql": "ALTER TABLE \"public\".\"reports\" ADD COLUMN IF NOT EXISTS \"details\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.reports.created_at",
+      "sql": "ALTER TABLE \"public\".\"reports\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.reports.updated_at",
+      "sql": "ALTER TABLE \"public\".\"reports\" ADD COLUMN IF NOT EXISTS \"updated_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.social_links.url",
+      "sql": "ALTER TABLE \"public\".\"social_links\" ADD COLUMN IF NOT EXISTS \"url\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.social_links.created_at",
+      "sql": "ALTER TABLE \"public\".\"social_links\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.social_links.updated_at",
+      "sql": "ALTER TABLE \"public\".\"social_links\" ADD COLUMN IF NOT EXISTS \"updated_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.spammy_phrases.phrase",
+      "sql": "ALTER TABLE \"public\".\"spammy_phrases\" ADD COLUMN IF NOT EXISTS \"phrase\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.spammy_phrases.created_at",
+      "sql": "ALTER TABLE \"public\".\"spammy_phrases\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.spammy_phrases.updated_at",
+      "sql": "ALTER TABLE \"public\".\"spammy_phrases\" ADD COLUMN IF NOT EXISTS \"updated_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.user_blocks.reason_format",
+      "sql": "ALTER TABLE \"public\".\"user_blocks\" ADD COLUMN IF NOT EXISTS \"reason_format\" \"public\".\"user_blocks_reason_format\" DEFAULT 'markdown' NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.user_blocks.needs_view",
+      "sql": "ALTER TABLE \"public\".\"user_blocks\" ADD COLUMN IF NOT EXISTS \"needs_view\" BOOLEAN DEFAULT FALSE NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.user_blocks.ends_at",
+      "sql": "ALTER TABLE \"public\".\"user_blocks\" ADD COLUMN IF NOT EXISTS \"ends_at\" TIMESTAMP WITH TIME ZONE NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.user_blocks.deactivates_at",
+      "sql": "ALTER TABLE \"public\".\"user_blocks\" ADD COLUMN IF NOT EXISTS \"deactivates_at\" TIMESTAMP WITH TIME ZONE;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.user_blocks.reason",
+      "sql": "ALTER TABLE \"public\".\"user_blocks\" ADD COLUMN IF NOT EXISTS \"reason\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.user_blocks.created_at",
+      "sql": "ALTER TABLE \"public\".\"user_blocks\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now();"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.user_blocks.updated_at",
+      "sql": "ALTER TABLE \"public\".\"user_blocks\" ADD COLUMN IF NOT EXISTS \"updated_at\" TIMESTAMP WITH TIME ZONE DEFAULT now();"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.user_mutes.created_at",
+      "sql": "ALTER TABLE \"public\".\"user_mutes\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.user_mutes.updated_at",
+      "sql": "ALTER TABLE \"public\".\"user_mutes\" ADD COLUMN IF NOT EXISTS \"updated_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.user_preferences.v",
+      "sql": "ALTER TABLE \"public\".\"user_preferences\" ADD COLUMN IF NOT EXISTS \"v\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.user_roles.role",
+      "sql": "ALTER TABLE \"public\".\"user_roles\" ADD COLUMN IF NOT EXISTS \"role\" \"public\".\"user_roles_role\" NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.user_roles.created_at",
+      "sql": "ALTER TABLE \"public\".\"user_roles\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now();"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.user_roles.updated_at",
+      "sql": "ALTER TABLE \"public\".\"user_roles\" ADD COLUMN IF NOT EXISTS \"updated_at\" TIMESTAMP WITH TIME ZONE DEFAULT now();"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.users.display_name",
+      "sql": "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"display_name\" TEXT UNIQUE DEFAULT '' NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.users.home_location_name",
+      "sql": "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"home_location_name\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.users.email",
+      "sql": "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"email\" TEXT UNIQUE NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.users.status",
+      "sql": "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"status\" \"public\".\"users_status\" DEFAULT 'pending' NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.users.description_format",
+      "sql": "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"description_format\" \"public\".\"users_description_format\" DEFAULT 'markdown' NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.users.pass_crypt",
+      "sql": "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"pass_crypt\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.users.pass_salt",
+      "sql": "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"pass_salt\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.users.new_email",
+      "sql": "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"new_email\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.users.languages",
+      "sql": "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"languages\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.users.auth_uid",
+      "sql": "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"auth_uid\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.users.preferred_editor",
+      "sql": "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"preferred_editor\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.users.auth_provider",
+      "sql": "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"auth_provider\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.users.creation_address",
+      "sql": "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"creation_address\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.users.company",
+      "sql": "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"company\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.users.data_public",
+      "sql": "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"data_public\" BOOLEAN DEFAULT FALSE NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.users.email_valid",
+      "sql": "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"email_valid\" BOOLEAN DEFAULT FALSE NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.users.consider_pd",
+      "sql": "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"consider_pd\" BOOLEAN DEFAULT FALSE NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.users.terms_seen",
+      "sql": "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"terms_seen\" BOOLEAN DEFAULT FALSE NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.users.public_heatmap",
+      "sql": "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"public_heatmap\" BOOLEAN DEFAULT TRUE NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.users.home_lat",
+      "sql": "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"home_lat\" DOUBLE PRECISION;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.users.home_lon",
+      "sql": "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"home_lon\" DOUBLE PRECISION;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.users.home_zoom",
+      "sql": "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"home_zoom\" INTEGER DEFAULT 3;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.users.changesets_count",
+      "sql": "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"changesets_count\" INTEGER DEFAULT 0 NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.users.traces_count",
+      "sql": "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"traces_count\" INTEGER DEFAULT 0 NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.users.diary_entries_count",
+      "sql": "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"diary_entries_count\" INTEGER DEFAULT 0 NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.users.home_tile",
+      "sql": "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"home_tile\" BIGINT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.users.diary_comments_count",
+      "sql": "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"diary_comments_count\" INTEGER DEFAULT 0;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.users.note_comments_count",
+      "sql": "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"note_comments_count\" INTEGER DEFAULT 0;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.users.creation_time",
+      "sql": "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"creation_time\" TIMESTAMP WITH TIME ZONE NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.users.terms_agreed",
+      "sql": "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"terms_agreed\" TIMESTAMP WITH TIME ZONE;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.users.tou_agreed",
+      "sql": "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"tou_agreed\" TIMESTAMP WITH TIME ZONE;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.users.description",
+      "sql": "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"description\" TEXT DEFAULT '' NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.users.image_use_gravatar",
+      "sql": "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"image_use_gravatar\" BOOLEAN DEFAULT FALSE NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.way_nodes.node_id",
+      "sql": "ALTER TABLE \"public\".\"way_nodes\" ADD COLUMN IF NOT EXISTS \"node_id\" BIGINT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.way_tags.v",
+      "sql": "ALTER TABLE \"public\".\"way_tags\" ADD COLUMN IF NOT EXISTS \"v\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.active_storage_attachments.blob_id",
+      "sql": "ALTER TABLE \"public\".\"active_storage_attachments\" ADD COLUMN IF NOT EXISTS \"blob_id\" BIGINT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.active_storage_variant_records.blob_id",
+      "sql": "ALTER TABLE \"public\".\"active_storage_variant_records\" ADD COLUMN IF NOT EXISTS \"blob_id\" BIGINT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.changeset_comments.author_id",
+      "sql": "ALTER TABLE \"public\".\"changeset_comments\" ADD COLUMN IF NOT EXISTS \"author_id\" BIGINT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.changeset_comments.changeset_id",
+      "sql": "ALTER TABLE \"public\".\"changeset_comments\" ADD COLUMN IF NOT EXISTS \"changeset_id\" BIGINT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.changesets.user_id",
+      "sql": "ALTER TABLE \"public\".\"changesets\" ADD COLUMN IF NOT EXISTS \"user_id\" BIGINT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.current_nodes.changeset_id",
+      "sql": "ALTER TABLE \"public\".\"current_nodes\" ADD COLUMN IF NOT EXISTS \"changeset_id\" BIGINT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.current_relations.changeset_id",
+      "sql": "ALTER TABLE \"public\".\"current_relations\" ADD COLUMN IF NOT EXISTS \"changeset_id\" BIGINT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.current_way_nodes.node_id",
+      "sql": "ALTER TABLE \"public\".\"current_way_nodes\" ADD COLUMN IF NOT EXISTS \"node_id\" BIGINT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.current_ways.changeset_id",
+      "sql": "ALTER TABLE \"public\".\"current_ways\" ADD COLUMN IF NOT EXISTS \"changeset_id\" BIGINT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.diary_comments.diary_entry_id",
+      "sql": "ALTER TABLE \"public\".\"diary_comments\" ADD COLUMN IF NOT EXISTS \"diary_entry_id\" BIGINT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.diary_comments.user_id",
+      "sql": "ALTER TABLE \"public\".\"diary_comments\" ADD COLUMN IF NOT EXISTS \"user_id\" BIGINT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.diary_entries.language_code",
+      "sql": "ALTER TABLE \"public\".\"diary_entries\" ADD COLUMN IF NOT EXISTS \"language_code\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.diary_entries.user_id",
+      "sql": "ALTER TABLE \"public\".\"diary_entries\" ADD COLUMN IF NOT EXISTS \"user_id\" BIGINT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.friends.friend_user_id",
+      "sql": "ALTER TABLE \"public\".\"friends\" ADD COLUMN IF NOT EXISTS \"friend_user_id\" BIGINT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.friends.user_id",
+      "sql": "ALTER TABLE \"public\".\"friends\" ADD COLUMN IF NOT EXISTS \"user_id\" BIGINT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.gps_points.gpx_id",
+      "sql": "ALTER TABLE \"public\".\"gps_points\" ADD COLUMN IF NOT EXISTS \"gpx_id\" BIGINT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.gpx_file_tags.gpx_id",
+      "sql": "ALTER TABLE \"public\".\"gpx_file_tags\" ADD COLUMN IF NOT EXISTS \"gpx_id\" BIGINT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.gpx_files.user_id",
+      "sql": "ALTER TABLE \"public\".\"gpx_files\" ADD COLUMN IF NOT EXISTS \"user_id\" BIGINT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.issue_comments.issue_id",
+      "sql": "ALTER TABLE \"public\".\"issue_comments\" ADD COLUMN IF NOT EXISTS \"issue_id\" INTEGER NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.issue_comments.user_id",
+      "sql": "ALTER TABLE \"public\".\"issue_comments\" ADD COLUMN IF NOT EXISTS \"user_id\" BIGINT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.issues.reported_user_id",
+      "sql": "ALTER TABLE \"public\".\"issues\" ADD COLUMN IF NOT EXISTS \"reported_user_id\" BIGINT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.issues.resolved_by",
+      "sql": "ALTER TABLE \"public\".\"issues\" ADD COLUMN IF NOT EXISTS \"resolved_by\" BIGINT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.issues.updated_by",
+      "sql": "ALTER TABLE \"public\".\"issues\" ADD COLUMN IF NOT EXISTS \"updated_by\" BIGINT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.messages.from_user_id",
+      "sql": "ALTER TABLE \"public\".\"messages\" ADD COLUMN IF NOT EXISTS \"from_user_id\" BIGINT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.messages.to_user_id",
+      "sql": "ALTER TABLE \"public\".\"messages\" ADD COLUMN IF NOT EXISTS \"to_user_id\" BIGINT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.note_comments.author_id",
+      "sql": "ALTER TABLE \"public\".\"note_comments\" ADD COLUMN IF NOT EXISTS \"author_id\" BIGINT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.note_comments.note_id",
+      "sql": "ALTER TABLE \"public\".\"note_comments\" ADD COLUMN IF NOT EXISTS \"note_id\" BIGINT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.notes.user_id",
+      "sql": "ALTER TABLE \"public\".\"notes\" ADD COLUMN IF NOT EXISTS \"user_id\" BIGINT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.oauth_access_grants.resource_owner_id",
+      "sql": "ALTER TABLE \"public\".\"oauth_access_grants\" ADD COLUMN IF NOT EXISTS \"resource_owner_id\" BIGINT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.oauth_access_grants.application_id",
+      "sql": "ALTER TABLE \"public\".\"oauth_access_grants\" ADD COLUMN IF NOT EXISTS \"application_id\" BIGINT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.oauth_access_tokens.application_id",
+      "sql": "ALTER TABLE \"public\".\"oauth_access_tokens\" ADD COLUMN IF NOT EXISTS \"application_id\" BIGINT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.oauth_access_tokens.resource_owner_id",
+      "sql": "ALTER TABLE \"public\".\"oauth_access_tokens\" ADD COLUMN IF NOT EXISTS \"resource_owner_id\" BIGINT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.oauth_applications.owner_id",
+      "sql": "ALTER TABLE \"public\".\"oauth_applications\" ADD COLUMN IF NOT EXISTS \"owner_id\" BIGINT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.oauth_openid_requests.access_grant_id",
+      "sql": "ALTER TABLE \"public\".\"oauth_openid_requests\" ADD COLUMN IF NOT EXISTS \"access_grant_id\" BIGINT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.redactions.user_id",
+      "sql": "ALTER TABLE \"public\".\"redactions\" ADD COLUMN IF NOT EXISTS \"user_id\" BIGINT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.reports.issue_id",
+      "sql": "ALTER TABLE \"public\".\"reports\" ADD COLUMN IF NOT EXISTS \"issue_id\" INTEGER NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.reports.user_id",
+      "sql": "ALTER TABLE \"public\".\"reports\" ADD COLUMN IF NOT EXISTS \"user_id\" BIGINT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.social_links.user_id",
+      "sql": "ALTER TABLE \"public\".\"social_links\" ADD COLUMN IF NOT EXISTS \"user_id\" BIGINT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.user_blocks.creator_id",
+      "sql": "ALTER TABLE \"public\".\"user_blocks\" ADD COLUMN IF NOT EXISTS \"creator_id\" BIGINT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.user_blocks.revoker_id",
+      "sql": "ALTER TABLE \"public\".\"user_blocks\" ADD COLUMN IF NOT EXISTS \"revoker_id\" BIGINT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.user_blocks.user_id",
+      "sql": "ALTER TABLE \"public\".\"user_blocks\" ADD COLUMN IF NOT EXISTS \"user_id\" BIGINT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.user_mutes.subject_id",
+      "sql": "ALTER TABLE \"public\".\"user_mutes\" ADD COLUMN IF NOT EXISTS \"subject_id\" BIGINT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.user_mutes.owner_id",
+      "sql": "ALTER TABLE \"public\".\"user_mutes\" ADD COLUMN IF NOT EXISTS \"owner_id\" BIGINT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.user_roles.granter_id",
+      "sql": "ALTER TABLE \"public\".\"user_roles\" ADD COLUMN IF NOT EXISTS \"granter_id\" BIGINT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.user_roles.user_id",
+      "sql": "ALTER TABLE \"public\".\"user_roles\" ADD COLUMN IF NOT EXISTS \"user_id\" BIGINT NOT NULL;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.active_storage_attachments.active_storage_attachments_blob_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"active_storage_attachments\" ADD CONSTRAINT \"active_storage_attachments_blob_id_fkey\" FOREIGN KEY (\"blob_id\") REFERENCES \"public\".\"active_storage_blobs\" (\"id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.active_storage_variant_records.active_storage_variant_records_blob_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"active_storage_variant_records\" ADD CONSTRAINT \"active_storage_variant_records_blob_id_fkey\" FOREIGN KEY (\"blob_id\") REFERENCES \"public\".\"active_storage_blobs\" (\"id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.changeset_comments.changeset_comments_author_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"changeset_comments\" ADD CONSTRAINT \"changeset_comments_author_id_fkey\" FOREIGN KEY (\"author_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.changeset_comments.changeset_comments_changeset_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"changeset_comments\" ADD CONSTRAINT \"changeset_comments_changeset_id_fkey\" FOREIGN KEY (\"changeset_id\") REFERENCES \"public\".\"changesets\" (\"id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.changeset_tags.changeset_tags_changeset_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"changeset_tags\" ADD CONSTRAINT \"changeset_tags_changeset_id_fkey\" FOREIGN KEY (\"changeset_id\") REFERENCES \"public\".\"changesets\" (\"id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.changesets.changesets_user_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"changesets\" ADD CONSTRAINT \"changesets_user_id_fkey\" FOREIGN KEY (\"user_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.current_node_tags.current_node_tags_node_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"current_node_tags\" ADD CONSTRAINT \"current_node_tags_node_id_fkey\" FOREIGN KEY (\"node_id\") REFERENCES \"public\".\"current_nodes\" (\"id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.current_nodes.current_nodes_changeset_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"current_nodes\" ADD CONSTRAINT \"current_nodes_changeset_id_fkey\" FOREIGN KEY (\"changeset_id\") REFERENCES \"public\".\"changesets\" (\"id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.current_relation_members.current_relation_members_relation_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"current_relation_members\" ADD CONSTRAINT \"current_relation_members_relation_id_fkey\" FOREIGN KEY (\"relation_id\") REFERENCES \"public\".\"current_relations\" (\"id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.current_relation_tags.current_relation_tags_relation_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"current_relation_tags\" ADD CONSTRAINT \"current_relation_tags_relation_id_fkey\" FOREIGN KEY (\"relation_id\") REFERENCES \"public\".\"current_relations\" (\"id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.current_relations.current_relations_changeset_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"current_relations\" ADD CONSTRAINT \"current_relations_changeset_id_fkey\" FOREIGN KEY (\"changeset_id\") REFERENCES \"public\".\"changesets\" (\"id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.current_way_nodes.current_way_nodes_way_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"current_way_nodes\" ADD CONSTRAINT \"current_way_nodes_way_id_fkey\" FOREIGN KEY (\"way_id\") REFERENCES \"public\".\"current_ways\" (\"id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.current_way_nodes.current_way_nodes_node_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"current_way_nodes\" ADD CONSTRAINT \"current_way_nodes_node_id_fkey\" FOREIGN KEY (\"node_id\") REFERENCES \"public\".\"current_nodes\" (\"id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.current_way_tags.current_way_tags_way_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"current_way_tags\" ADD CONSTRAINT \"current_way_tags_way_id_fkey\" FOREIGN KEY (\"way_id\") REFERENCES \"public\".\"current_ways\" (\"id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.current_ways.current_ways_changeset_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"current_ways\" ADD CONSTRAINT \"current_ways_changeset_id_fkey\" FOREIGN KEY (\"changeset_id\") REFERENCES \"public\".\"changesets\" (\"id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.diary_comments.diary_comments_diary_entry_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"diary_comments\" ADD CONSTRAINT \"diary_comments_diary_entry_id_fkey\" FOREIGN KEY (\"diary_entry_id\") REFERENCES \"public\".\"diary_entries\" (\"id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.diary_comments.diary_comments_user_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"diary_comments\" ADD CONSTRAINT \"diary_comments_user_id_fkey\" FOREIGN KEY (\"user_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.diary_entries.diary_entries_language_code_fkey",
+      "sql": "ALTER TABLE \"public\".\"diary_entries\" ADD CONSTRAINT \"diary_entries_language_code_fkey\" FOREIGN KEY (\"language_code\") REFERENCES \"public\".\"languages\" (\"code\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.diary_entries.diary_entries_user_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"diary_entries\" ADD CONSTRAINT \"diary_entries_user_id_fkey\" FOREIGN KEY (\"user_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.friends.friends_friend_user_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"friends\" ADD CONSTRAINT \"friends_friend_user_id_fkey\" FOREIGN KEY (\"friend_user_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.friends.friends_user_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"friends\" ADD CONSTRAINT \"friends_user_id_fkey\" FOREIGN KEY (\"user_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.gps_points.gps_points_gpx_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"gps_points\" ADD CONSTRAINT \"gps_points_gpx_id_fkey\" FOREIGN KEY (\"gpx_id\") REFERENCES \"public\".\"gpx_files\" (\"id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.gpx_file_tags.gpx_file_tags_gpx_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"gpx_file_tags\" ADD CONSTRAINT \"gpx_file_tags_gpx_id_fkey\" FOREIGN KEY (\"gpx_id\") REFERENCES \"public\".\"gpx_files\" (\"id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.gpx_files.gpx_files_user_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"gpx_files\" ADD CONSTRAINT \"gpx_files_user_id_fkey\" FOREIGN KEY (\"user_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.issue_comments.issue_comments_issue_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"issue_comments\" ADD CONSTRAINT \"issue_comments_issue_id_fkey\" FOREIGN KEY (\"issue_id\") REFERENCES \"public\".\"issues\" (\"id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.issue_comments.issue_comments_user_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"issue_comments\" ADD CONSTRAINT \"issue_comments_user_id_fkey\" FOREIGN KEY (\"user_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.issues.issues_reported_user_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"issues\" ADD CONSTRAINT \"issues_reported_user_id_fkey\" FOREIGN KEY (\"reported_user_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.issues.issues_resolved_by_fkey",
+      "sql": "ALTER TABLE \"public\".\"issues\" ADD CONSTRAINT \"issues_resolved_by_fkey\" FOREIGN KEY (\"resolved_by\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.issues.issues_updated_by_fkey",
+      "sql": "ALTER TABLE \"public\".\"issues\" ADD CONSTRAINT \"issues_updated_by_fkey\" FOREIGN KEY (\"updated_by\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.messages.messages_from_user_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"messages\" ADD CONSTRAINT \"messages_from_user_id_fkey\" FOREIGN KEY (\"from_user_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.messages.messages_to_user_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"messages\" ADD CONSTRAINT \"messages_to_user_id_fkey\" FOREIGN KEY (\"to_user_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.note_comments.note_comments_author_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"note_comments\" ADD CONSTRAINT \"note_comments_author_id_fkey\" FOREIGN KEY (\"author_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.note_comments.note_comments_note_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"note_comments\" ADD CONSTRAINT \"note_comments_note_id_fkey\" FOREIGN KEY (\"note_id\") REFERENCES \"public\".\"notes\" (\"id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.notes.notes_user_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"notes\" ADD CONSTRAINT \"notes_user_id_fkey\" FOREIGN KEY (\"user_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.oauth_access_grants.oauth_access_grants_resource_owner_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"oauth_access_grants\" ADD CONSTRAINT \"oauth_access_grants_resource_owner_id_fkey\" FOREIGN KEY (\"resource_owner_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.oauth_access_grants.oauth_access_grants_application_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"oauth_access_grants\" ADD CONSTRAINT \"oauth_access_grants_application_id_fkey\" FOREIGN KEY (\"application_id\") REFERENCES \"public\".\"oauth_applications\" (\"id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.oauth_access_tokens.oauth_access_tokens_application_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"oauth_access_tokens\" ADD CONSTRAINT \"oauth_access_tokens_application_id_fkey\" FOREIGN KEY (\"application_id\") REFERENCES \"public\".\"oauth_applications\" (\"id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.oauth_access_tokens.oauth_access_tokens_resource_owner_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"oauth_access_tokens\" ADD CONSTRAINT \"oauth_access_tokens_resource_owner_id_fkey\" FOREIGN KEY (\"resource_owner_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.oauth_applications.oauth_applications_owner_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"oauth_applications\" ADD CONSTRAINT \"oauth_applications_owner_id_fkey\" FOREIGN KEY (\"owner_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.oauth_openid_requests.oauth_openid_requests_access_grant_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"oauth_openid_requests\" ADD CONSTRAINT \"oauth_openid_requests_access_grant_id_fkey\" FOREIGN KEY (\"access_grant_id\") REFERENCES \"public\".\"oauth_access_grants\" (\"id\") ON DELETE CASCADE;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.redactions.redactions_user_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"redactions\" ADD CONSTRAINT \"redactions_user_id_fkey\" FOREIGN KEY (\"user_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.reports.reports_issue_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"reports\" ADD CONSTRAINT \"reports_issue_id_fkey\" FOREIGN KEY (\"issue_id\") REFERENCES \"public\".\"issues\" (\"id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.reports.reports_user_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"reports\" ADD CONSTRAINT \"reports_user_id_fkey\" FOREIGN KEY (\"user_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.social_links.social_links_user_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"social_links\" ADD CONSTRAINT \"social_links_user_id_fkey\" FOREIGN KEY (\"user_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.user_blocks.user_blocks_creator_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"user_blocks\" ADD CONSTRAINT \"user_blocks_creator_id_fkey\" FOREIGN KEY (\"creator_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.user_blocks.user_blocks_revoker_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"user_blocks\" ADD CONSTRAINT \"user_blocks_revoker_id_fkey\" FOREIGN KEY (\"revoker_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.user_blocks.user_blocks_user_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"user_blocks\" ADD CONSTRAINT \"user_blocks_user_id_fkey\" FOREIGN KEY (\"user_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.user_mutes.user_mutes_subject_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"user_mutes\" ADD CONSTRAINT \"user_mutes_subject_id_fkey\" FOREIGN KEY (\"subject_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.user_mutes.user_mutes_owner_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"user_mutes\" ADD CONSTRAINT \"user_mutes_owner_id_fkey\" FOREIGN KEY (\"owner_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.user_preferences.user_preferences_user_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"user_preferences\" ADD CONSTRAINT \"user_preferences_user_id_fkey\" FOREIGN KEY (\"user_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.user_roles.user_roles_granter_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"user_roles\" ADD CONSTRAINT \"user_roles_granter_id_fkey\" FOREIGN KEY (\"granter_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.user_roles.user_roles_user_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"user_roles\" ADD CONSTRAINT \"user_roles_user_id_fkey\" FOREIGN KEY (\"user_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.changesets_subscribers.changesets_subscribers_changeset_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"changesets_subscribers\" ADD CONSTRAINT \"changesets_subscribers_changeset_id_fkey\" FOREIGN KEY (\"changeset_id\") REFERENCES \"public\".\"changesets\" (\"id\") ON DELETE CASCADE;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.changesets_subscribers.changesets_subscribers_subscriber_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"changesets_subscribers\" ADD CONSTRAINT \"changesets_subscribers_subscriber_id_fkey\" FOREIGN KEY (\"subscriber_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE CASCADE;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.diary_entry_subscriptions.diary_entry_subscriptions_user_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"diary_entry_subscriptions\" ADD CONSTRAINT \"diary_entry_subscriptions_user_id_fkey\" FOREIGN KEY (\"user_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE CASCADE;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.diary_entry_subscriptions.diary_entry_subscriptions_diary_entry_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"diary_entry_subscriptions\" ADD CONSTRAINT \"diary_entry_subscriptions_diary_entry_id_fkey\" FOREIGN KEY (\"diary_entry_id\") REFERENCES \"public\".\"diary_entries\" (\"id\") ON DELETE CASCADE;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.note_subscriptions.note_subscriptions_user_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"note_subscriptions\" ADD CONSTRAINT \"note_subscriptions_user_id_fkey\" FOREIGN KEY (\"user_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE CASCADE;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.note_subscriptions.note_subscriptions_note_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"note_subscriptions\" ADD CONSTRAINT \"note_subscriptions_note_id_fkey\" FOREIGN KEY (\"note_id\") REFERENCES \"public\".\"notes\" (\"id\") ON DELETE CASCADE;"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.active_storage_attachments",
+      "sql": "CREATE INDEX IF NOT EXISTS \"active_storage_attachments_blob_id_ix_db5bb8d\" ON \"public\".\"active_storage_attachments\" (\"blob_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.active_storage_variant_records",
+      "sql": "CREATE INDEX IF NOT EXISTS \"active_storage_variant_records_blob_id_ix_342d4e1\" ON \"public\".\"active_storage_variant_records\" (\"blob_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.changeset_comments",
+      "sql": "CREATE INDEX IF NOT EXISTS \"changeset_comments_author_id_ix_3721669\" ON \"public\".\"changeset_comments\" (\"author_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.changeset_comments",
+      "sql": "CREATE INDEX IF NOT EXISTS \"changeset_comments_changeset_id_ix_99cde2a\" ON \"public\".\"changeset_comments\" (\"changeset_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.changesets",
+      "sql": "CREATE INDEX IF NOT EXISTS \"changesets_user_id_ix_1458a3e\" ON \"public\".\"changesets\" (\"user_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.changesets_subscribers",
+      "sql": "CREATE INDEX IF NOT EXISTS \"changesets_subscribers_subscriber_id_ix_daf651d\" ON \"public\".\"changesets_subscribers\" (\"subscriber_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.current_nodes",
+      "sql": "CREATE INDEX IF NOT EXISTS \"current_nodes_changeset_id_ix_4fee58b\" ON \"public\".\"current_nodes\" (\"changeset_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.current_relations",
+      "sql": "CREATE INDEX IF NOT EXISTS \"current_relations_changeset_id_ix_fd09fe9\" ON \"public\".\"current_relations\" (\"changeset_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.current_way_nodes",
+      "sql": "CREATE INDEX IF NOT EXISTS \"current_way_nodes_node_id_ix_9e94892\" ON \"public\".\"current_way_nodes\" (\"node_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.current_ways",
+      "sql": "CREATE INDEX IF NOT EXISTS \"current_ways_changeset_id_ix_8250725\" ON \"public\".\"current_ways\" (\"changeset_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.diary_comments",
+      "sql": "CREATE INDEX IF NOT EXISTS \"diary_comments_diary_entry_id_ix_eddeaa3\" ON \"public\".\"diary_comments\" (\"diary_entry_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.diary_comments",
+      "sql": "CREATE INDEX IF NOT EXISTS \"diary_comments_user_id_ix_0f12c36\" ON \"public\".\"diary_comments\" (\"user_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.diary_entries",
+      "sql": "CREATE INDEX IF NOT EXISTS \"diary_entries_language_code_ix_49947aa\" ON \"public\".\"diary_entries\" (\"language_code\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.diary_entries",
+      "sql": "CREATE INDEX IF NOT EXISTS \"diary_entries_user_id_ix_8926e6a\" ON \"public\".\"diary_entries\" (\"user_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.diary_entry_subscriptions",
+      "sql": "CREATE INDEX IF NOT EXISTS \"diary_entry_subscriptions_diary_entry_id_ix_d7a9562\" ON \"public\".\"diary_entry_subscriptions\" (\"diary_entry_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.friends",
+      "sql": "CREATE INDEX IF NOT EXISTS \"friends_friend_user_id_ix_77f33fc\" ON \"public\".\"friends\" (\"friend_user_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.friends",
+      "sql": "CREATE INDEX IF NOT EXISTS \"friends_user_id_ix_f474b61\" ON \"public\".\"friends\" (\"user_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.gps_points",
+      "sql": "CREATE INDEX IF NOT EXISTS \"gps_points_gpx_id_ix_b949bd0\" ON \"public\".\"gps_points\" (\"gpx_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.gpx_file_tags",
+      "sql": "CREATE INDEX IF NOT EXISTS \"gpx_file_tags_gpx_id_ix_d0f8aa6\" ON \"public\".\"gpx_file_tags\" (\"gpx_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.gpx_files",
+      "sql": "CREATE INDEX IF NOT EXISTS \"gpx_files_user_id_ix_2ec0176\" ON \"public\".\"gpx_files\" (\"user_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.issue_comments",
+      "sql": "CREATE INDEX IF NOT EXISTS \"issue_comments_issue_id_ix_5b7fbbe\" ON \"public\".\"issue_comments\" (\"issue_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.issue_comments",
+      "sql": "CREATE INDEX IF NOT EXISTS \"issue_comments_user_id_ix_b723e17\" ON \"public\".\"issue_comments\" (\"user_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.issues",
+      "sql": "CREATE INDEX IF NOT EXISTS \"issues_reported_user_id_ix_337ce99\" ON \"public\".\"issues\" (\"reported_user_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.issues",
+      "sql": "CREATE INDEX IF NOT EXISTS \"issues_resolved_by_ix_883aafa\" ON \"public\".\"issues\" (\"resolved_by\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.issues",
+      "sql": "CREATE INDEX IF NOT EXISTS \"issues_updated_by_ix_038ad45\" ON \"public\".\"issues\" (\"updated_by\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.messages",
+      "sql": "CREATE INDEX IF NOT EXISTS \"messages_from_user_id_ix_f6abc8e\" ON \"public\".\"messages\" (\"from_user_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.messages",
+      "sql": "CREATE INDEX IF NOT EXISTS \"messages_to_user_id_ix_c075af6\" ON \"public\".\"messages\" (\"to_user_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.note_comments",
+      "sql": "CREATE INDEX IF NOT EXISTS \"note_comments_author_id_ix_d1c7437\" ON \"public\".\"note_comments\" (\"author_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.note_comments",
+      "sql": "CREATE INDEX IF NOT EXISTS \"note_comments_note_id_ix_61cf7bb\" ON \"public\".\"note_comments\" (\"note_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.note_subscriptions",
+      "sql": "CREATE INDEX IF NOT EXISTS \"note_subscriptions_note_id_ix_cf042e5\" ON \"public\".\"note_subscriptions\" (\"note_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.notes",
+      "sql": "CREATE INDEX IF NOT EXISTS \"notes_user_id_ix_136082d\" ON \"public\".\"notes\" (\"user_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.oauth_access_grants",
+      "sql": "CREATE INDEX IF NOT EXISTS \"oauth_access_grants_application_id_ix_ae81e09\" ON \"public\".\"oauth_access_grants\" (\"application_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.oauth_access_grants",
+      "sql": "CREATE INDEX IF NOT EXISTS \"oauth_access_grants_resource_owner_id_ix_59a715b\" ON \"public\".\"oauth_access_grants\" (\"resource_owner_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.oauth_access_tokens",
+      "sql": "CREATE INDEX IF NOT EXISTS \"oauth_access_tokens_application_id_ix_5e2eae2\" ON \"public\".\"oauth_access_tokens\" (\"application_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.oauth_access_tokens",
+      "sql": "CREATE INDEX IF NOT EXISTS \"oauth_access_tokens_resource_owner_id_ix_3b0b64a\" ON \"public\".\"oauth_access_tokens\" (\"resource_owner_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.oauth_applications",
+      "sql": "CREATE INDEX IF NOT EXISTS \"oauth_applications_owner_id_ix_adcb474\" ON \"public\".\"oauth_applications\" (\"owner_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.oauth_openid_requests",
+      "sql": "CREATE INDEX IF NOT EXISTS \"oauth_openid_requests_access_grant_id_ix_4e19019\" ON \"public\".\"oauth_openid_requests\" (\"access_grant_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.redactions",
+      "sql": "CREATE INDEX IF NOT EXISTS \"redactions_user_id_ix_7f1f299\" ON \"public\".\"redactions\" (\"user_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.reports",
+      "sql": "CREATE INDEX IF NOT EXISTS \"reports_issue_id_ix_1ebe41f\" ON \"public\".\"reports\" (\"issue_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.reports",
+      "sql": "CREATE INDEX IF NOT EXISTS \"reports_user_id_ix_41aff1a\" ON \"public\".\"reports\" (\"user_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.social_links",
+      "sql": "CREATE INDEX IF NOT EXISTS \"social_links_user_id_ix_bf99792\" ON \"public\".\"social_links\" (\"user_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.user_blocks",
+      "sql": "CREATE INDEX IF NOT EXISTS \"user_blocks_creator_id_ix_049c761\" ON \"public\".\"user_blocks\" (\"creator_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.user_blocks",
+      "sql": "CREATE INDEX IF NOT EXISTS \"user_blocks_revoker_id_ix_0dc7867\" ON \"public\".\"user_blocks\" (\"revoker_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.user_blocks",
+      "sql": "CREATE INDEX IF NOT EXISTS \"user_blocks_user_id_ix_f06a72a\" ON \"public\".\"user_blocks\" (\"user_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.user_mutes",
+      "sql": "CREATE INDEX IF NOT EXISTS \"user_mutes_owner_id_ix_9cd15ee\" ON \"public\".\"user_mutes\" (\"owner_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.user_mutes",
+      "sql": "CREATE INDEX IF NOT EXISTS \"user_mutes_subject_id_ix_33a2a21\" ON \"public\".\"user_mutes\" (\"subject_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.user_roles",
+      "sql": "CREATE INDEX IF NOT EXISTS \"user_roles_granter_id_ix_d8f7900\" ON \"public\".\"user_roles\" (\"granter_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.user_roles",
+      "sql": "CREATE INDEX IF NOT EXISTS \"user_roles_user_id_ix_efdb825\" ON \"public\".\"user_roles\" (\"user_id\");"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "public.ar_internal_metadata.ar_internal_metadata_updated_at_touch",
+      "sql": "DROP TRIGGER IF EXISTS \"ar_internal_metadata_updated_at_touch\" ON \"public\".\"ar_internal_metadata\";"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "public.ar_internal_metadata.ar_internal_metadata_updated_at_touch",
+      "sql": "CREATE TRIGGER \"ar_internal_metadata_updated_at_touch\" BEFORE UPDATE ON \"public\".\"ar_internal_metadata\" FOR EACH ROW EXECUTE FUNCTION rebase.set_updated_at('updated_at');"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "public.delayed_jobs.delayed_jobs_updated_at_touch",
+      "sql": "DROP TRIGGER IF EXISTS \"delayed_jobs_updated_at_touch\" ON \"public\".\"delayed_jobs\";"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "public.delayed_jobs.delayed_jobs_updated_at_touch",
+      "sql": "CREATE TRIGGER \"delayed_jobs_updated_at_touch\" BEFORE UPDATE ON \"public\".\"delayed_jobs\" FOR EACH ROW EXECUTE FUNCTION rebase.set_updated_at('updated_at');"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "public.diary_comments.diary_comments_updated_at_touch",
+      "sql": "DROP TRIGGER IF EXISTS \"diary_comments_updated_at_touch\" ON \"public\".\"diary_comments\";"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "public.diary_comments.diary_comments_updated_at_touch",
+      "sql": "CREATE TRIGGER \"diary_comments_updated_at_touch\" BEFORE UPDATE ON \"public\".\"diary_comments\" FOR EACH ROW EXECUTE FUNCTION rebase.set_updated_at('updated_at');"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "public.diary_entries.diary_entries_updated_at_touch",
+      "sql": "DROP TRIGGER IF EXISTS \"diary_entries_updated_at_touch\" ON \"public\".\"diary_entries\";"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "public.diary_entries.diary_entries_updated_at_touch",
+      "sql": "CREATE TRIGGER \"diary_entries_updated_at_touch\" BEFORE UPDATE ON \"public\".\"diary_entries\" FOR EACH ROW EXECUTE FUNCTION rebase.set_updated_at('updated_at');"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "public.issue_comments.issue_comments_updated_at_touch",
+      "sql": "DROP TRIGGER IF EXISTS \"issue_comments_updated_at_touch\" ON \"public\".\"issue_comments\";"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "public.issue_comments.issue_comments_updated_at_touch",
+      "sql": "CREATE TRIGGER \"issue_comments_updated_at_touch\" BEFORE UPDATE ON \"public\".\"issue_comments\" FOR EACH ROW EXECUTE FUNCTION rebase.set_updated_at('updated_at');"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "public.issues.issues_updated_at_touch",
+      "sql": "DROP TRIGGER IF EXISTS \"issues_updated_at_touch\" ON \"public\".\"issues\";"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "public.issues.issues_updated_at_touch",
+      "sql": "CREATE TRIGGER \"issues_updated_at_touch\" BEFORE UPDATE ON \"public\".\"issues\" FOR EACH ROW EXECUTE FUNCTION rebase.set_updated_at('updated_at');"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "public.notes.notes_updated_at_touch",
+      "sql": "DROP TRIGGER IF EXISTS \"notes_updated_at_touch\" ON \"public\".\"notes\";"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "public.notes.notes_updated_at_touch",
+      "sql": "CREATE TRIGGER \"notes_updated_at_touch\" BEFORE UPDATE ON \"public\".\"notes\" FOR EACH ROW EXECUTE FUNCTION rebase.set_updated_at('updated_at');"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "public.noticed_events.noticed_events_updated_at_touch",
+      "sql": "DROP TRIGGER IF EXISTS \"noticed_events_updated_at_touch\" ON \"public\".\"noticed_events\";"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "public.noticed_events.noticed_events_updated_at_touch",
+      "sql": "CREATE TRIGGER \"noticed_events_updated_at_touch\" BEFORE UPDATE ON \"public\".\"noticed_events\" FOR EACH ROW EXECUTE FUNCTION rebase.set_updated_at('updated_at');"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "public.noticed_notifications.noticed_notifications_updated_at_touch",
+      "sql": "DROP TRIGGER IF EXISTS \"noticed_notifications_updated_at_touch\" ON \"public\".\"noticed_notifications\";"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "public.noticed_notifications.noticed_notifications_updated_at_touch",
+      "sql": "CREATE TRIGGER \"noticed_notifications_updated_at_touch\" BEFORE UPDATE ON \"public\".\"noticed_notifications\" FOR EACH ROW EXECUTE FUNCTION rebase.set_updated_at('updated_at');"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "public.oauth_applications.oauth_applications_updated_at_touch",
+      "sql": "DROP TRIGGER IF EXISTS \"oauth_applications_updated_at_touch\" ON \"public\".\"oauth_applications\";"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "public.oauth_applications.oauth_applications_updated_at_touch",
+      "sql": "CREATE TRIGGER \"oauth_applications_updated_at_touch\" BEFORE UPDATE ON \"public\".\"oauth_applications\" FOR EACH ROW EXECUTE FUNCTION rebase.set_updated_at('updated_at');"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "public.redactions.redactions_updated_at_touch",
+      "sql": "DROP TRIGGER IF EXISTS \"redactions_updated_at_touch\" ON \"public\".\"redactions\";"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "public.redactions.redactions_updated_at_touch",
+      "sql": "CREATE TRIGGER \"redactions_updated_at_touch\" BEFORE UPDATE ON \"public\".\"redactions\" FOR EACH ROW EXECUTE FUNCTION rebase.set_updated_at('updated_at');"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "public.reports.reports_updated_at_touch",
+      "sql": "DROP TRIGGER IF EXISTS \"reports_updated_at_touch\" ON \"public\".\"reports\";"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "public.reports.reports_updated_at_touch",
+      "sql": "CREATE TRIGGER \"reports_updated_at_touch\" BEFORE UPDATE ON \"public\".\"reports\" FOR EACH ROW EXECUTE FUNCTION rebase.set_updated_at('updated_at');"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "public.social_links.social_links_updated_at_touch",
+      "sql": "DROP TRIGGER IF EXISTS \"social_links_updated_at_touch\" ON \"public\".\"social_links\";"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "public.social_links.social_links_updated_at_touch",
+      "sql": "CREATE TRIGGER \"social_links_updated_at_touch\" BEFORE UPDATE ON \"public\".\"social_links\" FOR EACH ROW EXECUTE FUNCTION rebase.set_updated_at('updated_at');"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "public.spammy_phrases.spammy_phrases_updated_at_touch",
+      "sql": "DROP TRIGGER IF EXISTS \"spammy_phrases_updated_at_touch\" ON \"public\".\"spammy_phrases\";"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "public.spammy_phrases.spammy_phrases_updated_at_touch",
+      "sql": "CREATE TRIGGER \"spammy_phrases_updated_at_touch\" BEFORE UPDATE ON \"public\".\"spammy_phrases\" FOR EACH ROW EXECUTE FUNCTION rebase.set_updated_at('updated_at');"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "public.user_blocks.user_blocks_updated_at_touch",
+      "sql": "DROP TRIGGER IF EXISTS \"user_blocks_updated_at_touch\" ON \"public\".\"user_blocks\";"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "public.user_blocks.user_blocks_updated_at_touch",
+      "sql": "CREATE TRIGGER \"user_blocks_updated_at_touch\" BEFORE UPDATE ON \"public\".\"user_blocks\" FOR EACH ROW EXECUTE FUNCTION rebase.set_updated_at('updated_at');"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "public.user_mutes.user_mutes_updated_at_touch",
+      "sql": "DROP TRIGGER IF EXISTS \"user_mutes_updated_at_touch\" ON \"public\".\"user_mutes\";"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "public.user_mutes.user_mutes_updated_at_touch",
+      "sql": "CREATE TRIGGER \"user_mutes_updated_at_touch\" BEFORE UPDATE ON \"public\".\"user_mutes\" FOR EACH ROW EXECUTE FUNCTION rebase.set_updated_at('updated_at');"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "public.user_roles.user_roles_updated_at_touch",
+      "sql": "DROP TRIGGER IF EXISTS \"user_roles_updated_at_touch\" ON \"public\".\"user_roles\";"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "public.user_roles.user_roles_updated_at_touch",
+      "sql": "CREATE TRIGGER \"user_roles_updated_at_touch\" BEFORE UPDATE ON \"public\".\"user_roles\" FOR EACH ROW EXECUTE FUNCTION rebase.set_updated_at('updated_at');"
+    }
+  ],
+  "statements": [
+    "CREATE TYPE \"public\".\"current_relation_members_member_type\" AS ENUM ('Node', 'Way', 'Relation');",
+    "CREATE TYPE \"public\".\"diary_comments_body_format\" AS ENUM ('html', 'markdown', 'text');",
+    "CREATE TYPE \"public\".\"diary_entries_body_format\" AS ENUM ('html', 'markdown', 'text');",
+    "CREATE TYPE \"public\".\"gpx_files_visibility\" AS ENUM ('private', 'public', 'trackable', 'identifiable');",
+    "CREATE TYPE \"public\".\"issues_status\" AS ENUM ('open', 'ignored', 'resolved');",
+    "CREATE TYPE \"public\".\"issues_assigned_role\" AS ENUM ('administrator', 'moderator', 'importer');",
+    "CREATE TYPE \"public\".\"messages_body_format\" AS ENUM ('html', 'markdown', 'text');",
+    "CREATE TYPE \"public\".\"note_comments_event\" AS ENUM ('opened', 'closed', 'reopened', 'commented', 'hidden');",
+    "CREATE TYPE \"public\".\"notes_status\" AS ENUM ('open', 'closed', 'hidden');",
+    "CREATE TYPE \"public\".\"redactions_description_format\" AS ENUM ('html', 'markdown', 'text');",
+    "CREATE TYPE \"public\".\"relation_members_member_type\" AS ENUM ('Node', 'Way', 'Relation');",
+    "CREATE TYPE \"public\".\"user_blocks_reason_format\" AS ENUM ('html', 'markdown', 'text');",
+    "CREATE TYPE \"public\".\"user_roles_role\" AS ENUM ('administrator', 'moderator', 'importer');",
+    "CREATE TYPE \"public\".\"users_status\" AS ENUM ('pending', 'active', 'confirmed', 'suspended', 'deleted');",
+    "CREATE TYPE \"public\".\"users_description_format\" AS ENUM ('html', 'markdown', 'text');",
+    "CREATE OR REPLACE FUNCTION rebase.set_updated_at() RETURNS trigger\nLANGUAGE plpgsql AS $$\nBEGIN\n    NEW := jsonb_populate_record(NEW, jsonb_build_object(TG_ARGV[0], now()));\n    RETURN NEW;\nEND;\n$$;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"acls\" (\"id\" BIGSERIAL PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"acls\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"active_storage_attachments\" (\"id\" BIGSERIAL PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"active_storage_attachments\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"active_storage_blobs\" (\"id\" BIGSERIAL PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"active_storage_blobs\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"active_storage_variant_records\" (\"id\" BIGSERIAL PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"active_storage_variant_records\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"ar_internal_metadata\" (\"key\" TEXT PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"ar_internal_metadata\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"changeset_comments\" (\"id\" SERIAL PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"changeset_comments\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"changeset_tags\" (\"changeset_id\" BIGINT NOT NULL, \"k\" TEXT DEFAULT ''::character varying NOT NULL, PRIMARY KEY (\"changeset_id\", \"k\"));",
+    "ALTER TABLE \"public\".\"changeset_tags\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"changesets\" (\"id\" BIGSERIAL PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"changesets\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"current_node_tags\" (\"node_id\" BIGINT NOT NULL, \"k\" TEXT DEFAULT ''::character varying NOT NULL, PRIMARY KEY (\"node_id\", \"k\"));",
+    "ALTER TABLE \"public\".\"current_node_tags\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"current_nodes\" (\"id\" BIGSERIAL PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"current_nodes\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"current_relation_members\" (\"relation_id\" BIGINT NOT NULL, \"sequence_id\" INTEGER DEFAULT 0 NOT NULL, PRIMARY KEY (\"relation_id\", \"sequence_id\"));",
+    "ALTER TABLE \"public\".\"current_relation_members\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"current_relation_tags\" (\"relation_id\" BIGINT NOT NULL, \"k\" TEXT DEFAULT ''::character varying NOT NULL, PRIMARY KEY (\"relation_id\", \"k\"));",
+    "ALTER TABLE \"public\".\"current_relation_tags\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"current_relations\" (\"id\" BIGSERIAL PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"current_relations\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"current_way_nodes\" (\"way_id\" BIGINT NOT NULL, \"sequence_id\" BIGINT NOT NULL, PRIMARY KEY (\"way_id\", \"sequence_id\"));",
+    "ALTER TABLE \"public\".\"current_way_nodes\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"current_way_tags\" (\"way_id\" BIGINT NOT NULL, \"k\" TEXT DEFAULT ''::character varying NOT NULL, PRIMARY KEY (\"way_id\", \"k\"));",
+    "ALTER TABLE \"public\".\"current_way_tags\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"current_ways\" (\"id\" BIGSERIAL PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"current_ways\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"delayed_jobs\" (\"id\" BIGSERIAL PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"delayed_jobs\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"diary_comments\" (\"id\" BIGSERIAL PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"diary_comments\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"diary_entries\" (\"id\" BIGSERIAL PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"diary_entries\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"friends\" (\"id\" BIGSERIAL PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"friends\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"gps_points\" (\"id\" TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text);",
+    "ALTER TABLE \"public\".\"gps_points\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"gpx_file_tags\" (\"id\" BIGSERIAL PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"gpx_file_tags\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"gpx_files\" (\"id\" BIGSERIAL PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"gpx_files\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"issue_comments\" (\"id\" SERIAL PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"issue_comments\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"issues\" (\"id\" SERIAL PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"issues\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"languages\" (\"code\" TEXT PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"languages\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"messages\" (\"id\" BIGSERIAL PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"messages\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"node_tags\" (\"node_id\" BIGINT NOT NULL, \"version\" BIGINT NOT NULL, \"k\" TEXT DEFAULT ''::character varying NOT NULL, PRIMARY KEY (\"node_id\", \"version\", \"k\"));",
+    "ALTER TABLE \"public\".\"node_tags\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"note_comments\" (\"id\" BIGSERIAL PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"note_comments\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"notes\" (\"id\" BIGSERIAL PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"notes\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"noticed_events\" (\"id\" BIGSERIAL PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"noticed_events\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"noticed_notifications\" (\"id\" BIGSERIAL PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"noticed_notifications\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"oauth_access_grants\" (\"id\" BIGSERIAL PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"oauth_access_grants\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"oauth_access_tokens\" (\"id\" BIGSERIAL PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"oauth_access_tokens\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"oauth_applications\" (\"id\" BIGSERIAL PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"oauth_applications\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"oauth_openid_requests\" (\"id\" BIGSERIAL PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"oauth_openid_requests\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"redactions\" (\"id\" SERIAL PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"redactions\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"relation_members\" (\"relation_id\" BIGINT NOT NULL, \"version\" BIGINT DEFAULT 0 NOT NULL, \"sequence_id\" INTEGER DEFAULT 0 NOT NULL, PRIMARY KEY (\"relation_id\", \"version\", \"sequence_id\"));",
+    "ALTER TABLE \"public\".\"relation_members\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"relation_tags\" (\"relation_id\" BIGINT NOT NULL, \"k\" TEXT DEFAULT ''::character varying NOT NULL, \"version\" BIGINT NOT NULL, PRIMARY KEY (\"relation_id\", \"k\", \"version\"));",
+    "ALTER TABLE \"public\".\"relation_tags\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"reports\" (\"id\" SERIAL PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"reports\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"schema_migrations\" (\"version\" TEXT PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"schema_migrations\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"social_links\" (\"id\" BIGSERIAL PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"social_links\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"spammy_phrases\" (\"id\" BIGSERIAL PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"spammy_phrases\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"user_blocks\" (\"id\" SERIAL PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"user_blocks\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"user_mutes\" (\"id\" BIGSERIAL PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"user_mutes\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"user_preferences\" (\"user_id\" BIGINT NOT NULL, \"k\" TEXT NOT NULL, PRIMARY KEY (\"user_id\", \"k\"));",
+    "ALTER TABLE \"public\".\"user_preferences\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"user_roles\" (\"id\" SERIAL PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"user_roles\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"users\" (\"id\" BIGSERIAL PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"users\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"way_nodes\" (\"way_id\" BIGINT NOT NULL, \"version\" BIGINT NOT NULL, \"sequence_id\" BIGINT NOT NULL, PRIMARY KEY (\"way_id\", \"version\", \"sequence_id\"));",
+    "ALTER TABLE \"public\".\"way_nodes\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"way_tags\" (\"way_id\" BIGINT NOT NULL, \"k\" TEXT NOT NULL, \"version\" BIGINT NOT NULL, PRIMARY KEY (\"way_id\", \"k\", \"version\"));",
+    "ALTER TABLE \"public\".\"way_tags\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"changesets_subscribers\" (\"changeset_id\" BIGINT NOT NULL, \"subscriber_id\" BIGINT NOT NULL, PRIMARY KEY (\"changeset_id\", \"subscriber_id\"));",
+    "ALTER TABLE \"public\".\"changesets_subscribers\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"diary_entry_subscriptions\" (\"user_id\" BIGINT NOT NULL, \"diary_entry_id\" BIGINT NOT NULL, PRIMARY KEY (\"user_id\", \"diary_entry_id\"));",
+    "ALTER TABLE \"public\".\"diary_entry_subscriptions\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"note_subscriptions\" (\"user_id\" BIGINT NOT NULL, \"note_id\" BIGINT NOT NULL, PRIMARY KEY (\"user_id\", \"note_id\"));",
+    "ALTER TABLE \"public\".\"note_subscriptions\" ENABLE ROW LEVEL SECURITY;",
+    "ALTER TABLE \"public\".\"acls\" ADD COLUMN IF NOT EXISTS \"address\" TEXT;",
+    "ALTER TABLE \"public\".\"acls\" ADD COLUMN IF NOT EXISTS \"k\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"acls\" ADD COLUMN IF NOT EXISTS \"v\" TEXT;",
+    "ALTER TABLE \"public\".\"acls\" ADD COLUMN IF NOT EXISTS \"domain\" TEXT;",
+    "ALTER TABLE \"public\".\"acls\" ADD COLUMN IF NOT EXISTS \"mx\" TEXT;",
+    "ALTER TABLE \"public\".\"active_storage_attachments\" ADD COLUMN IF NOT EXISTS \"name\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"active_storage_attachments\" ADD COLUMN IF NOT EXISTS \"record_type\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"active_storage_attachments\" ADD COLUMN IF NOT EXISTS \"record_id\" BIGINT NOT NULL;",
+    "ALTER TABLE \"public\".\"active_storage_attachments\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;",
+    "ALTER TABLE \"public\".\"active_storage_blobs\" ADD COLUMN IF NOT EXISTS \"filename\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"active_storage_blobs\" ADD COLUMN IF NOT EXISTS \"service_name\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"active_storage_blobs\" ADD COLUMN IF NOT EXISTS \"key\" TEXT UNIQUE NOT NULL;",
+    "ALTER TABLE \"public\".\"active_storage_blobs\" ADD COLUMN IF NOT EXISTS \"content_type\" TEXT;",
+    "ALTER TABLE \"public\".\"active_storage_blobs\" ADD COLUMN IF NOT EXISTS \"checksum\" TEXT;",
+    "ALTER TABLE \"public\".\"active_storage_blobs\" ADD COLUMN IF NOT EXISTS \"byte_size\" BIGINT NOT NULL;",
+    "ALTER TABLE \"public\".\"active_storage_blobs\" ADD COLUMN IF NOT EXISTS \"metadata\" TEXT;",
+    "ALTER TABLE \"public\".\"active_storage_blobs\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;",
+    "ALTER TABLE \"public\".\"active_storage_variant_records\" ADD COLUMN IF NOT EXISTS \"variation_digest\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"ar_internal_metadata\" ADD COLUMN IF NOT EXISTS \"value\" TEXT;",
+    "ALTER TABLE \"public\".\"ar_internal_metadata\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;",
+    "ALTER TABLE \"public\".\"ar_internal_metadata\" ADD COLUMN IF NOT EXISTS \"updated_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;",
+    "ALTER TABLE \"public\".\"changeset_comments\" ADD COLUMN IF NOT EXISTS \"visible\" BOOLEAN NOT NULL;",
+    "ALTER TABLE \"public\".\"changeset_comments\" ADD COLUMN IF NOT EXISTS \"body\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"changeset_comments\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;",
+    "ALTER TABLE \"public\".\"changeset_tags\" ADD COLUMN IF NOT EXISTS \"v\" TEXT DEFAULT '' NOT NULL;",
+    "ALTER TABLE \"public\".\"changesets\" ADD COLUMN IF NOT EXISTS \"min_lat\" INTEGER;",
+    "ALTER TABLE \"public\".\"changesets\" ADD COLUMN IF NOT EXISTS \"max_lat\" INTEGER;",
+    "ALTER TABLE \"public\".\"changesets\" ADD COLUMN IF NOT EXISTS \"min_lon\" INTEGER;",
+    "ALTER TABLE \"public\".\"changesets\" ADD COLUMN IF NOT EXISTS \"max_lon\" INTEGER;",
+    "ALTER TABLE \"public\".\"changesets\" ADD COLUMN IF NOT EXISTS \"num_changes\" INTEGER DEFAULT 0 NOT NULL;",
+    "ALTER TABLE \"public\".\"changesets\" ADD COLUMN IF NOT EXISTS \"num_created_nodes\" INTEGER DEFAULT 0 NOT NULL;",
+    "ALTER TABLE \"public\".\"changesets\" ADD COLUMN IF NOT EXISTS \"num_modified_nodes\" INTEGER DEFAULT 0 NOT NULL;",
+    "ALTER TABLE \"public\".\"changesets\" ADD COLUMN IF NOT EXISTS \"num_deleted_nodes\" INTEGER DEFAULT 0 NOT NULL;",
+    "ALTER TABLE \"public\".\"changesets\" ADD COLUMN IF NOT EXISTS \"num_created_ways\" INTEGER DEFAULT 0 NOT NULL;",
+    "ALTER TABLE \"public\".\"changesets\" ADD COLUMN IF NOT EXISTS \"num_modified_ways\" INTEGER DEFAULT 0 NOT NULL;",
+    "ALTER TABLE \"public\".\"changesets\" ADD COLUMN IF NOT EXISTS \"num_deleted_ways\" INTEGER DEFAULT 0 NOT NULL;",
+    "ALTER TABLE \"public\".\"changesets\" ADD COLUMN IF NOT EXISTS \"num_created_relations\" INTEGER DEFAULT 0 NOT NULL;",
+    "ALTER TABLE \"public\".\"changesets\" ADD COLUMN IF NOT EXISTS \"num_modified_relations\" INTEGER DEFAULT 0 NOT NULL;",
+    "ALTER TABLE \"public\".\"changesets\" ADD COLUMN IF NOT EXISTS \"num_deleted_relations\" INTEGER DEFAULT 0 NOT NULL;",
+    "ALTER TABLE \"public\".\"changesets\" ADD COLUMN IF NOT EXISTS \"closed_at\" TIMESTAMP WITH TIME ZONE NOT NULL;",
+    "ALTER TABLE \"public\".\"changesets\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;",
+    "ALTER TABLE \"public\".\"current_node_tags\" ADD COLUMN IF NOT EXISTS \"v\" TEXT DEFAULT '' NOT NULL;",
+    "ALTER TABLE \"public\".\"current_nodes\" ADD COLUMN IF NOT EXISTS \"visible\" BOOLEAN NOT NULL;",
+    "ALTER TABLE \"public\".\"current_nodes\" ADD COLUMN IF NOT EXISTS \"latitude\" INTEGER NOT NULL;",
+    "ALTER TABLE \"public\".\"current_nodes\" ADD COLUMN IF NOT EXISTS \"longitude\" INTEGER NOT NULL;",
+    "ALTER TABLE \"public\".\"current_nodes\" ADD COLUMN IF NOT EXISTS \"tile\" BIGINT NOT NULL;",
+    "ALTER TABLE \"public\".\"current_nodes\" ADD COLUMN IF NOT EXISTS \"version\" BIGINT NOT NULL;",
+    "ALTER TABLE \"public\".\"current_nodes\" ADD COLUMN IF NOT EXISTS \"timestamp\" TIMESTAMP WITH TIME ZONE NOT NULL;",
+    "ALTER TABLE \"public\".\"current_relation_members\" ADD COLUMN IF NOT EXISTS \"member_type\" \"public\".\"current_relation_members_member_type\" NOT NULL;",
+    "ALTER TABLE \"public\".\"current_relation_members\" ADD COLUMN IF NOT EXISTS \"member_role\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"current_relation_members\" ADD COLUMN IF NOT EXISTS \"member_id\" BIGINT NOT NULL;",
+    "ALTER TABLE \"public\".\"current_relation_tags\" ADD COLUMN IF NOT EXISTS \"v\" TEXT DEFAULT '' NOT NULL;",
+    "ALTER TABLE \"public\".\"current_relations\" ADD COLUMN IF NOT EXISTS \"visible\" BOOLEAN NOT NULL;",
+    "ALTER TABLE \"public\".\"current_relations\" ADD COLUMN IF NOT EXISTS \"version\" BIGINT NOT NULL;",
+    "ALTER TABLE \"public\".\"current_relations\" ADD COLUMN IF NOT EXISTS \"timestamp\" TIMESTAMP WITH TIME ZONE NOT NULL;",
+    "ALTER TABLE \"public\".\"current_way_tags\" ADD COLUMN IF NOT EXISTS \"v\" TEXT DEFAULT '' NOT NULL;",
+    "ALTER TABLE \"public\".\"current_ways\" ADD COLUMN IF NOT EXISTS \"visible\" BOOLEAN NOT NULL;",
+    "ALTER TABLE \"public\".\"current_ways\" ADD COLUMN IF NOT EXISTS \"version\" BIGINT NOT NULL;",
+    "ALTER TABLE \"public\".\"current_ways\" ADD COLUMN IF NOT EXISTS \"timestamp\" TIMESTAMP WITH TIME ZONE NOT NULL;",
+    "ALTER TABLE \"public\".\"delayed_jobs\" ADD COLUMN IF NOT EXISTS \"priority\" INTEGER DEFAULT 0 NOT NULL;",
+    "ALTER TABLE \"public\".\"delayed_jobs\" ADD COLUMN IF NOT EXISTS \"locked_by\" TEXT;",
+    "ALTER TABLE \"public\".\"delayed_jobs\" ADD COLUMN IF NOT EXISTS \"queue\" TEXT;",
+    "ALTER TABLE \"public\".\"delayed_jobs\" ADD COLUMN IF NOT EXISTS \"attempts\" INTEGER DEFAULT 0 NOT NULL;",
+    "ALTER TABLE \"public\".\"delayed_jobs\" ADD COLUMN IF NOT EXISTS \"run_at\" TIMESTAMP WITH TIME ZONE;",
+    "ALTER TABLE \"public\".\"delayed_jobs\" ADD COLUMN IF NOT EXISTS \"locked_at\" TIMESTAMP WITH TIME ZONE;",
+    "ALTER TABLE \"public\".\"delayed_jobs\" ADD COLUMN IF NOT EXISTS \"failed_at\" TIMESTAMP WITH TIME ZONE;",
+    "ALTER TABLE \"public\".\"delayed_jobs\" ADD COLUMN IF NOT EXISTS \"handler\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"delayed_jobs\" ADD COLUMN IF NOT EXISTS \"last_error\" TEXT;",
+    "ALTER TABLE \"public\".\"delayed_jobs\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now();",
+    "ALTER TABLE \"public\".\"delayed_jobs\" ADD COLUMN IF NOT EXISTS \"updated_at\" TIMESTAMP WITH TIME ZONE DEFAULT now();",
+    "ALTER TABLE \"public\".\"diary_comments\" ADD COLUMN IF NOT EXISTS \"body_format\" \"public\".\"diary_comments_body_format\" DEFAULT 'markdown' NOT NULL;",
+    "ALTER TABLE \"public\".\"diary_comments\" ADD COLUMN IF NOT EXISTS \"visible\" BOOLEAN DEFAULT TRUE NOT NULL;",
+    "ALTER TABLE \"public\".\"diary_comments\" ADD COLUMN IF NOT EXISTS \"body\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"diary_comments\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;",
+    "ALTER TABLE \"public\".\"diary_comments\" ADD COLUMN IF NOT EXISTS \"updated_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;",
+    "ALTER TABLE \"public\".\"diary_entries\" ADD COLUMN IF NOT EXISTS \"title\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"diary_entries\" ADD COLUMN IF NOT EXISTS \"body_format\" \"public\".\"diary_entries_body_format\" DEFAULT 'markdown' NOT NULL;",
+    "ALTER TABLE \"public\".\"diary_entries\" ADD COLUMN IF NOT EXISTS \"visible\" BOOLEAN DEFAULT TRUE NOT NULL;",
+    "ALTER TABLE \"public\".\"diary_entries\" ADD COLUMN IF NOT EXISTS \"latitude\" DOUBLE PRECISION;",
+    "ALTER TABLE \"public\".\"diary_entries\" ADD COLUMN IF NOT EXISTS \"longitude\" DOUBLE PRECISION;",
+    "ALTER TABLE \"public\".\"diary_entries\" ADD COLUMN IF NOT EXISTS \"body\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"diary_entries\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;",
+    "ALTER TABLE \"public\".\"diary_entries\" ADD COLUMN IF NOT EXISTS \"updated_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;",
+    "ALTER TABLE \"public\".\"friends\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now();",
+    "ALTER TABLE \"public\".\"gps_points\" ADD COLUMN IF NOT EXISTS \"altitude\" DOUBLE PRECISION;",
+    "ALTER TABLE \"public\".\"gps_points\" ADD COLUMN IF NOT EXISTS \"trackid\" INTEGER NOT NULL;",
+    "ALTER TABLE \"public\".\"gps_points\" ADD COLUMN IF NOT EXISTS \"latitude\" INTEGER NOT NULL;",
+    "ALTER TABLE \"public\".\"gps_points\" ADD COLUMN IF NOT EXISTS \"longitude\" INTEGER NOT NULL;",
+    "ALTER TABLE \"public\".\"gps_points\" ADD COLUMN IF NOT EXISTS \"tile\" BIGINT;",
+    "ALTER TABLE \"public\".\"gps_points\" ADD COLUMN IF NOT EXISTS \"timestamp\" TIMESTAMP WITH TIME ZONE;",
+    "ALTER TABLE \"public\".\"gpx_file_tags\" ADD COLUMN IF NOT EXISTS \"tag\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"gpx_files\" ADD COLUMN IF NOT EXISTS \"name\" TEXT DEFAULT '' NOT NULL;",
+    "ALTER TABLE \"public\".\"gpx_files\" ADD COLUMN IF NOT EXISTS \"visibility\" \"public\".\"gpx_files_visibility\" DEFAULT 'public' NOT NULL;",
+    "ALTER TABLE \"public\".\"gpx_files\" ADD COLUMN IF NOT EXISTS \"visible\" BOOLEAN DEFAULT TRUE NOT NULL;",
+    "ALTER TABLE \"public\".\"gpx_files\" ADD COLUMN IF NOT EXISTS \"inserted\" BOOLEAN NOT NULL;",
+    "ALTER TABLE \"public\".\"gpx_files\" ADD COLUMN IF NOT EXISTS \"size\" BIGINT;",
+    "ALTER TABLE \"public\".\"gpx_files\" ADD COLUMN IF NOT EXISTS \"latitude\" DOUBLE PRECISION;",
+    "ALTER TABLE \"public\".\"gpx_files\" ADD COLUMN IF NOT EXISTS \"longitude\" DOUBLE PRECISION;",
+    "ALTER TABLE \"public\".\"gpx_files\" ADD COLUMN IF NOT EXISTS \"timestamp\" TIMESTAMP WITH TIME ZONE NOT NULL;",
+    "ALTER TABLE \"public\".\"gpx_files\" ADD COLUMN IF NOT EXISTS \"description\" TEXT DEFAULT '' NOT NULL;",
+    "ALTER TABLE \"public\".\"issue_comments\" ADD COLUMN IF NOT EXISTS \"body\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"issue_comments\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;",
+    "ALTER TABLE \"public\".\"issue_comments\" ADD COLUMN IF NOT EXISTS \"updated_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;",
+    "ALTER TABLE \"public\".\"issues\" ADD COLUMN IF NOT EXISTS \"status\" \"public\".\"issues_status\" DEFAULT 'open' NOT NULL;",
+    "ALTER TABLE \"public\".\"issues\" ADD COLUMN IF NOT EXISTS \"assigned_role\" \"public\".\"issues_assigned_role\" NOT NULL;",
+    "ALTER TABLE \"public\".\"issues\" ADD COLUMN IF NOT EXISTS \"reportable_type\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"issues\" ADD COLUMN IF NOT EXISTS \"reportable_id\" INTEGER NOT NULL;",
+    "ALTER TABLE \"public\".\"issues\" ADD COLUMN IF NOT EXISTS \"reports_count\" INTEGER DEFAULT 0;",
+    "ALTER TABLE \"public\".\"issues\" ADD COLUMN IF NOT EXISTS \"resolved_at\" TIMESTAMP WITH TIME ZONE;",
+    "ALTER TABLE \"public\".\"issues\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;",
+    "ALTER TABLE \"public\".\"issues\" ADD COLUMN IF NOT EXISTS \"updated_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;",
+    "ALTER TABLE \"public\".\"languages\" ADD COLUMN IF NOT EXISTS \"english_name\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"languages\" ADD COLUMN IF NOT EXISTS \"native_name\" TEXT;",
+    "ALTER TABLE \"public\".\"messages\" ADD COLUMN IF NOT EXISTS \"title\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"messages\" ADD COLUMN IF NOT EXISTS \"body_format\" \"public\".\"messages_body_format\" DEFAULT 'markdown' NOT NULL;",
+    "ALTER TABLE \"public\".\"messages\" ADD COLUMN IF NOT EXISTS \"message_read\" BOOLEAN DEFAULT FALSE NOT NULL;",
+    "ALTER TABLE \"public\".\"messages\" ADD COLUMN IF NOT EXISTS \"to_user_visible\" BOOLEAN DEFAULT TRUE NOT NULL;",
+    "ALTER TABLE \"public\".\"messages\" ADD COLUMN IF NOT EXISTS \"from_user_visible\" BOOLEAN DEFAULT TRUE NOT NULL;",
+    "ALTER TABLE \"public\".\"messages\" ADD COLUMN IF NOT EXISTS \"muted\" BOOLEAN DEFAULT FALSE NOT NULL;",
+    "ALTER TABLE \"public\".\"messages\" ADD COLUMN IF NOT EXISTS \"sent_on\" TIMESTAMP WITH TIME ZONE NOT NULL;",
+    "ALTER TABLE \"public\".\"messages\" ADD COLUMN IF NOT EXISTS \"body\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"node_tags\" ADD COLUMN IF NOT EXISTS \"v\" TEXT DEFAULT '' NOT NULL;",
+    "ALTER TABLE \"public\".\"note_comments\" ADD COLUMN IF NOT EXISTS \"event\" \"public\".\"note_comments_event\";",
+    "ALTER TABLE \"public\".\"note_comments\" ADD COLUMN IF NOT EXISTS \"author_ip\" TEXT;",
+    "ALTER TABLE \"public\".\"note_comments\" ADD COLUMN IF NOT EXISTS \"visible\" BOOLEAN NOT NULL;",
+    "ALTER TABLE \"public\".\"note_comments\" ADD COLUMN IF NOT EXISTS \"body\" TEXT;",
+    "ALTER TABLE \"public\".\"note_comments\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;",
+    "ALTER TABLE \"public\".\"notes\" ADD COLUMN IF NOT EXISTS \"status\" \"public\".\"notes_status\" NOT NULL;",
+    "ALTER TABLE \"public\".\"notes\" ADD COLUMN IF NOT EXISTS \"user_ip\" TEXT;",
+    "ALTER TABLE \"public\".\"notes\" ADD COLUMN IF NOT EXISTS \"latitude\" INTEGER NOT NULL;",
+    "ALTER TABLE \"public\".\"notes\" ADD COLUMN IF NOT EXISTS \"longitude\" INTEGER NOT NULL;",
+    "ALTER TABLE \"public\".\"notes\" ADD COLUMN IF NOT EXISTS \"tile\" BIGINT NOT NULL;",
+    "ALTER TABLE \"public\".\"notes\" ADD COLUMN IF NOT EXISTS \"closed_at\" TIMESTAMP WITH TIME ZONE;",
+    "ALTER TABLE \"public\".\"notes\" ADD COLUMN IF NOT EXISTS \"description\" TEXT DEFAULT '' NOT NULL;",
+    "ALTER TABLE \"public\".\"notes\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;",
+    "ALTER TABLE \"public\".\"notes\" ADD COLUMN IF NOT EXISTS \"updated_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;",
+    "ALTER TABLE \"public\".\"noticed_events\" ADD COLUMN IF NOT EXISTS \"type\" TEXT;",
+    "ALTER TABLE \"public\".\"noticed_events\" ADD COLUMN IF NOT EXISTS \"record_type\" TEXT;",
+    "ALTER TABLE \"public\".\"noticed_events\" ADD COLUMN IF NOT EXISTS \"record_id\" BIGINT;",
+    "ALTER TABLE \"public\".\"noticed_events\" ADD COLUMN IF NOT EXISTS \"notifications_count\" INTEGER;",
+    "ALTER TABLE \"public\".\"noticed_events\" ADD COLUMN IF NOT EXISTS \"params\" JSONB;",
+    "ALTER TABLE \"public\".\"noticed_events\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;",
+    "ALTER TABLE \"public\".\"noticed_events\" ADD COLUMN IF NOT EXISTS \"updated_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;",
+    "ALTER TABLE \"public\".\"noticed_notifications\" ADD COLUMN IF NOT EXISTS \"type\" TEXT;",
+    "ALTER TABLE \"public\".\"noticed_notifications\" ADD COLUMN IF NOT EXISTS \"recipient_type\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"noticed_notifications\" ADD COLUMN IF NOT EXISTS \"event_id\" BIGINT NOT NULL;",
+    "ALTER TABLE \"public\".\"noticed_notifications\" ADD COLUMN IF NOT EXISTS \"recipient_id\" BIGINT NOT NULL;",
+    "ALTER TABLE \"public\".\"noticed_notifications\" ADD COLUMN IF NOT EXISTS \"read_at\" TIMESTAMP WITH TIME ZONE;",
+    "ALTER TABLE \"public\".\"noticed_notifications\" ADD COLUMN IF NOT EXISTS \"seen_at\" TIMESTAMP WITH TIME ZONE;",
+    "ALTER TABLE \"public\".\"noticed_notifications\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;",
+    "ALTER TABLE \"public\".\"noticed_notifications\" ADD COLUMN IF NOT EXISTS \"updated_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;",
+    "ALTER TABLE \"public\".\"oauth_access_grants\" ADD COLUMN IF NOT EXISTS \"token\" TEXT UNIQUE NOT NULL;",
+    "ALTER TABLE \"public\".\"oauth_access_grants\" ADD COLUMN IF NOT EXISTS \"scopes\" TEXT DEFAULT '' NOT NULL;",
+    "ALTER TABLE \"public\".\"oauth_access_grants\" ADD COLUMN IF NOT EXISTS \"code_challenge\" TEXT;",
+    "ALTER TABLE \"public\".\"oauth_access_grants\" ADD COLUMN IF NOT EXISTS \"code_challenge_method\" TEXT;",
+    "ALTER TABLE \"public\".\"oauth_access_grants\" ADD COLUMN IF NOT EXISTS \"expires_in\" INTEGER NOT NULL;",
+    "ALTER TABLE \"public\".\"oauth_access_grants\" ADD COLUMN IF NOT EXISTS \"revoked_at\" TIMESTAMP WITH TIME ZONE;",
+    "ALTER TABLE \"public\".\"oauth_access_grants\" ADD COLUMN IF NOT EXISTS \"redirect_uri\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"oauth_access_grants\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;",
+    "ALTER TABLE \"public\".\"oauth_access_tokens\" ADD COLUMN IF NOT EXISTS \"token\" TEXT UNIQUE NOT NULL;",
+    "ALTER TABLE \"public\".\"oauth_access_tokens\" ADD COLUMN IF NOT EXISTS \"refresh_token\" TEXT UNIQUE;",
+    "ALTER TABLE \"public\".\"oauth_access_tokens\" ADD COLUMN IF NOT EXISTS \"scopes\" TEXT;",
+    "ALTER TABLE \"public\".\"oauth_access_tokens\" ADD COLUMN IF NOT EXISTS \"previous_refresh_token\" TEXT DEFAULT '' NOT NULL;",
+    "ALTER TABLE \"public\".\"oauth_access_tokens\" ADD COLUMN IF NOT EXISTS \"expires_in\" INTEGER;",
+    "ALTER TABLE \"public\".\"oauth_access_tokens\" ADD COLUMN IF NOT EXISTS \"revoked_at\" TIMESTAMP WITH TIME ZONE;",
+    "ALTER TABLE \"public\".\"oauth_access_tokens\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;",
+    "ALTER TABLE \"public\".\"oauth_applications\" ADD COLUMN IF NOT EXISTS \"name\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"oauth_applications\" ADD COLUMN IF NOT EXISTS \"owner_type\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"oauth_applications\" ADD COLUMN IF NOT EXISTS \"uid\" TEXT UNIQUE NOT NULL;",
+    "ALTER TABLE \"public\".\"oauth_applications\" ADD COLUMN IF NOT EXISTS \"secret\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"oauth_applications\" ADD COLUMN IF NOT EXISTS \"scopes\" TEXT DEFAULT '' NOT NULL;",
+    "ALTER TABLE \"public\".\"oauth_applications\" ADD COLUMN IF NOT EXISTS \"confidential\" BOOLEAN DEFAULT TRUE NOT NULL;",
+    "ALTER TABLE \"public\".\"oauth_applications\" ADD COLUMN IF NOT EXISTS \"redirect_uri\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"oauth_applications\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;",
+    "ALTER TABLE \"public\".\"oauth_applications\" ADD COLUMN IF NOT EXISTS \"updated_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;",
+    "ALTER TABLE \"public\".\"oauth_openid_requests\" ADD COLUMN IF NOT EXISTS \"nonce\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"redactions\" ADD COLUMN IF NOT EXISTS \"title\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"redactions\" ADD COLUMN IF NOT EXISTS \"description_format\" \"public\".\"redactions_description_format\" DEFAULT 'markdown' NOT NULL;",
+    "ALTER TABLE \"public\".\"redactions\" ADD COLUMN IF NOT EXISTS \"description\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"redactions\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now();",
+    "ALTER TABLE \"public\".\"redactions\" ADD COLUMN IF NOT EXISTS \"updated_at\" TIMESTAMP WITH TIME ZONE DEFAULT now();",
+    "ALTER TABLE \"public\".\"relation_members\" ADD COLUMN IF NOT EXISTS \"member_type\" \"public\".\"relation_members_member_type\" NOT NULL;",
+    "ALTER TABLE \"public\".\"relation_members\" ADD COLUMN IF NOT EXISTS \"member_role\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"relation_members\" ADD COLUMN IF NOT EXISTS \"member_id\" BIGINT NOT NULL;",
+    "ALTER TABLE \"public\".\"relation_tags\" ADD COLUMN IF NOT EXISTS \"v\" TEXT DEFAULT '' NOT NULL;",
+    "ALTER TABLE \"public\".\"reports\" ADD COLUMN IF NOT EXISTS \"category\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"reports\" ADD COLUMN IF NOT EXISTS \"details\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"reports\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;",
+    "ALTER TABLE \"public\".\"reports\" ADD COLUMN IF NOT EXISTS \"updated_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;",
+    "ALTER TABLE \"public\".\"social_links\" ADD COLUMN IF NOT EXISTS \"url\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"social_links\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;",
+    "ALTER TABLE \"public\".\"social_links\" ADD COLUMN IF NOT EXISTS \"updated_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;",
+    "ALTER TABLE \"public\".\"spammy_phrases\" ADD COLUMN IF NOT EXISTS \"phrase\" TEXT;",
+    "ALTER TABLE \"public\".\"spammy_phrases\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;",
+    "ALTER TABLE \"public\".\"spammy_phrases\" ADD COLUMN IF NOT EXISTS \"updated_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;",
+    "ALTER TABLE \"public\".\"user_blocks\" ADD COLUMN IF NOT EXISTS \"reason_format\" \"public\".\"user_blocks_reason_format\" DEFAULT 'markdown' NOT NULL;",
+    "ALTER TABLE \"public\".\"user_blocks\" ADD COLUMN IF NOT EXISTS \"needs_view\" BOOLEAN DEFAULT FALSE NOT NULL;",
+    "ALTER TABLE \"public\".\"user_blocks\" ADD COLUMN IF NOT EXISTS \"ends_at\" TIMESTAMP WITH TIME ZONE NOT NULL;",
+    "ALTER TABLE \"public\".\"user_blocks\" ADD COLUMN IF NOT EXISTS \"deactivates_at\" TIMESTAMP WITH TIME ZONE;",
+    "ALTER TABLE \"public\".\"user_blocks\" ADD COLUMN IF NOT EXISTS \"reason\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"user_blocks\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now();",
+    "ALTER TABLE \"public\".\"user_blocks\" ADD COLUMN IF NOT EXISTS \"updated_at\" TIMESTAMP WITH TIME ZONE DEFAULT now();",
+    "ALTER TABLE \"public\".\"user_mutes\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;",
+    "ALTER TABLE \"public\".\"user_mutes\" ADD COLUMN IF NOT EXISTS \"updated_at\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;",
+    "ALTER TABLE \"public\".\"user_preferences\" ADD COLUMN IF NOT EXISTS \"v\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"user_roles\" ADD COLUMN IF NOT EXISTS \"role\" \"public\".\"user_roles_role\" NOT NULL;",
+    "ALTER TABLE \"public\".\"user_roles\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now();",
+    "ALTER TABLE \"public\".\"user_roles\" ADD COLUMN IF NOT EXISTS \"updated_at\" TIMESTAMP WITH TIME ZONE DEFAULT now();",
+    "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"display_name\" TEXT UNIQUE DEFAULT '' NOT NULL;",
+    "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"home_location_name\" TEXT;",
+    "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"email\" TEXT UNIQUE NOT NULL;",
+    "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"status\" \"public\".\"users_status\" DEFAULT 'pending' NOT NULL;",
+    "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"description_format\" \"public\".\"users_description_format\" DEFAULT 'markdown' NOT NULL;",
+    "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"pass_crypt\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"pass_salt\" TEXT;",
+    "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"new_email\" TEXT;",
+    "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"languages\" TEXT;",
+    "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"auth_uid\" TEXT;",
+    "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"preferred_editor\" TEXT;",
+    "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"auth_provider\" TEXT;",
+    "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"creation_address\" TEXT;",
+    "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"company\" TEXT;",
+    "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"data_public\" BOOLEAN DEFAULT FALSE NOT NULL;",
+    "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"email_valid\" BOOLEAN DEFAULT FALSE NOT NULL;",
+    "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"consider_pd\" BOOLEAN DEFAULT FALSE NOT NULL;",
+    "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"terms_seen\" BOOLEAN DEFAULT FALSE NOT NULL;",
+    "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"public_heatmap\" BOOLEAN DEFAULT TRUE NOT NULL;",
+    "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"home_lat\" DOUBLE PRECISION;",
+    "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"home_lon\" DOUBLE PRECISION;",
+    "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"home_zoom\" INTEGER DEFAULT 3;",
+    "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"changesets_count\" INTEGER DEFAULT 0 NOT NULL;",
+    "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"traces_count\" INTEGER DEFAULT 0 NOT NULL;",
+    "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"diary_entries_count\" INTEGER DEFAULT 0 NOT NULL;",
+    "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"home_tile\" BIGINT;",
+    "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"diary_comments_count\" INTEGER DEFAULT 0;",
+    "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"note_comments_count\" INTEGER DEFAULT 0;",
+    "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"creation_time\" TIMESTAMP WITH TIME ZONE NOT NULL;",
+    "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"terms_agreed\" TIMESTAMP WITH TIME ZONE;",
+    "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"tou_agreed\" TIMESTAMP WITH TIME ZONE;",
+    "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"description\" TEXT DEFAULT '' NOT NULL;",
+    "ALTER TABLE \"public\".\"users\" ADD COLUMN IF NOT EXISTS \"image_use_gravatar\" BOOLEAN DEFAULT FALSE NOT NULL;",
+    "ALTER TABLE \"public\".\"way_nodes\" ADD COLUMN IF NOT EXISTS \"node_id\" BIGINT NOT NULL;",
+    "ALTER TABLE \"public\".\"way_tags\" ADD COLUMN IF NOT EXISTS \"v\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"active_storage_attachments\" ADD COLUMN IF NOT EXISTS \"blob_id\" BIGINT NOT NULL;",
+    "ALTER TABLE \"public\".\"active_storage_variant_records\" ADD COLUMN IF NOT EXISTS \"blob_id\" BIGINT NOT NULL;",
+    "ALTER TABLE \"public\".\"changeset_comments\" ADD COLUMN IF NOT EXISTS \"author_id\" BIGINT NOT NULL;",
+    "ALTER TABLE \"public\".\"changeset_comments\" ADD COLUMN IF NOT EXISTS \"changeset_id\" BIGINT NOT NULL;",
+    "ALTER TABLE \"public\".\"changesets\" ADD COLUMN IF NOT EXISTS \"user_id\" BIGINT NOT NULL;",
+    "ALTER TABLE \"public\".\"current_nodes\" ADD COLUMN IF NOT EXISTS \"changeset_id\" BIGINT NOT NULL;",
+    "ALTER TABLE \"public\".\"current_relations\" ADD COLUMN IF NOT EXISTS \"changeset_id\" BIGINT NOT NULL;",
+    "ALTER TABLE \"public\".\"current_way_nodes\" ADD COLUMN IF NOT EXISTS \"node_id\" BIGINT NOT NULL;",
+    "ALTER TABLE \"public\".\"current_ways\" ADD COLUMN IF NOT EXISTS \"changeset_id\" BIGINT NOT NULL;",
+    "ALTER TABLE \"public\".\"diary_comments\" ADD COLUMN IF NOT EXISTS \"diary_entry_id\" BIGINT NOT NULL;",
+    "ALTER TABLE \"public\".\"diary_comments\" ADD COLUMN IF NOT EXISTS \"user_id\" BIGINT NOT NULL;",
+    "ALTER TABLE \"public\".\"diary_entries\" ADD COLUMN IF NOT EXISTS \"language_code\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"diary_entries\" ADD COLUMN IF NOT EXISTS \"user_id\" BIGINT NOT NULL;",
+    "ALTER TABLE \"public\".\"friends\" ADD COLUMN IF NOT EXISTS \"friend_user_id\" BIGINT NOT NULL;",
+    "ALTER TABLE \"public\".\"friends\" ADD COLUMN IF NOT EXISTS \"user_id\" BIGINT NOT NULL;",
+    "ALTER TABLE \"public\".\"gps_points\" ADD COLUMN IF NOT EXISTS \"gpx_id\" BIGINT NOT NULL;",
+    "ALTER TABLE \"public\".\"gpx_file_tags\" ADD COLUMN IF NOT EXISTS \"gpx_id\" BIGINT NOT NULL;",
+    "ALTER TABLE \"public\".\"gpx_files\" ADD COLUMN IF NOT EXISTS \"user_id\" BIGINT NOT NULL;",
+    "ALTER TABLE \"public\".\"issue_comments\" ADD COLUMN IF NOT EXISTS \"issue_id\" INTEGER NOT NULL;",
+    "ALTER TABLE \"public\".\"issue_comments\" ADD COLUMN IF NOT EXISTS \"user_id\" BIGINT NOT NULL;",
+    "ALTER TABLE \"public\".\"issues\" ADD COLUMN IF NOT EXISTS \"reported_user_id\" BIGINT;",
+    "ALTER TABLE \"public\".\"issues\" ADD COLUMN IF NOT EXISTS \"resolved_by\" BIGINT;",
+    "ALTER TABLE \"public\".\"issues\" ADD COLUMN IF NOT EXISTS \"updated_by\" BIGINT;",
+    "ALTER TABLE \"public\".\"messages\" ADD COLUMN IF NOT EXISTS \"from_user_id\" BIGINT NOT NULL;",
+    "ALTER TABLE \"public\".\"messages\" ADD COLUMN IF NOT EXISTS \"to_user_id\" BIGINT NOT NULL;",
+    "ALTER TABLE \"public\".\"note_comments\" ADD COLUMN IF NOT EXISTS \"author_id\" BIGINT;",
+    "ALTER TABLE \"public\".\"note_comments\" ADD COLUMN IF NOT EXISTS \"note_id\" BIGINT NOT NULL;",
+    "ALTER TABLE \"public\".\"notes\" ADD COLUMN IF NOT EXISTS \"user_id\" BIGINT;",
+    "ALTER TABLE \"public\".\"oauth_access_grants\" ADD COLUMN IF NOT EXISTS \"resource_owner_id\" BIGINT NOT NULL;",
+    "ALTER TABLE \"public\".\"oauth_access_grants\" ADD COLUMN IF NOT EXISTS \"application_id\" BIGINT NOT NULL;",
+    "ALTER TABLE \"public\".\"oauth_access_tokens\" ADD COLUMN IF NOT EXISTS \"application_id\" BIGINT NOT NULL;",
+    "ALTER TABLE \"public\".\"oauth_access_tokens\" ADD COLUMN IF NOT EXISTS \"resource_owner_id\" BIGINT;",
+    "ALTER TABLE \"public\".\"oauth_applications\" ADD COLUMN IF NOT EXISTS \"owner_id\" BIGINT NOT NULL;",
+    "ALTER TABLE \"public\".\"oauth_openid_requests\" ADD COLUMN IF NOT EXISTS \"access_grant_id\" BIGINT NOT NULL;",
+    "ALTER TABLE \"public\".\"redactions\" ADD COLUMN IF NOT EXISTS \"user_id\" BIGINT NOT NULL;",
+    "ALTER TABLE \"public\".\"reports\" ADD COLUMN IF NOT EXISTS \"issue_id\" INTEGER NOT NULL;",
+    "ALTER TABLE \"public\".\"reports\" ADD COLUMN IF NOT EXISTS \"user_id\" BIGINT NOT NULL;",
+    "ALTER TABLE \"public\".\"social_links\" ADD COLUMN IF NOT EXISTS \"user_id\" BIGINT NOT NULL;",
+    "ALTER TABLE \"public\".\"user_blocks\" ADD COLUMN IF NOT EXISTS \"creator_id\" BIGINT NOT NULL;",
+    "ALTER TABLE \"public\".\"user_blocks\" ADD COLUMN IF NOT EXISTS \"revoker_id\" BIGINT;",
+    "ALTER TABLE \"public\".\"user_blocks\" ADD COLUMN IF NOT EXISTS \"user_id\" BIGINT NOT NULL;",
+    "ALTER TABLE \"public\".\"user_mutes\" ADD COLUMN IF NOT EXISTS \"subject_id\" BIGINT NOT NULL;",
+    "ALTER TABLE \"public\".\"user_mutes\" ADD COLUMN IF NOT EXISTS \"owner_id\" BIGINT NOT NULL;",
+    "ALTER TABLE \"public\".\"user_roles\" ADD COLUMN IF NOT EXISTS \"granter_id\" BIGINT NOT NULL;",
+    "ALTER TABLE \"public\".\"user_roles\" ADD COLUMN IF NOT EXISTS \"user_id\" BIGINT NOT NULL;",
+    "ALTER TABLE \"public\".\"active_storage_attachments\" ADD CONSTRAINT \"active_storage_attachments_blob_id_fkey\" FOREIGN KEY (\"blob_id\") REFERENCES \"public\".\"active_storage_blobs\" (\"id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"active_storage_variant_records\" ADD CONSTRAINT \"active_storage_variant_records_blob_id_fkey\" FOREIGN KEY (\"blob_id\") REFERENCES \"public\".\"active_storage_blobs\" (\"id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"changeset_comments\" ADD CONSTRAINT \"changeset_comments_author_id_fkey\" FOREIGN KEY (\"author_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"changeset_comments\" ADD CONSTRAINT \"changeset_comments_changeset_id_fkey\" FOREIGN KEY (\"changeset_id\") REFERENCES \"public\".\"changesets\" (\"id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"changeset_tags\" ADD CONSTRAINT \"changeset_tags_changeset_id_fkey\" FOREIGN KEY (\"changeset_id\") REFERENCES \"public\".\"changesets\" (\"id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"changesets\" ADD CONSTRAINT \"changesets_user_id_fkey\" FOREIGN KEY (\"user_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"current_node_tags\" ADD CONSTRAINT \"current_node_tags_node_id_fkey\" FOREIGN KEY (\"node_id\") REFERENCES \"public\".\"current_nodes\" (\"id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"current_nodes\" ADD CONSTRAINT \"current_nodes_changeset_id_fkey\" FOREIGN KEY (\"changeset_id\") REFERENCES \"public\".\"changesets\" (\"id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"current_relation_members\" ADD CONSTRAINT \"current_relation_members_relation_id_fkey\" FOREIGN KEY (\"relation_id\") REFERENCES \"public\".\"current_relations\" (\"id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"current_relation_tags\" ADD CONSTRAINT \"current_relation_tags_relation_id_fkey\" FOREIGN KEY (\"relation_id\") REFERENCES \"public\".\"current_relations\" (\"id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"current_relations\" ADD CONSTRAINT \"current_relations_changeset_id_fkey\" FOREIGN KEY (\"changeset_id\") REFERENCES \"public\".\"changesets\" (\"id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"current_way_nodes\" ADD CONSTRAINT \"current_way_nodes_way_id_fkey\" FOREIGN KEY (\"way_id\") REFERENCES \"public\".\"current_ways\" (\"id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"current_way_nodes\" ADD CONSTRAINT \"current_way_nodes_node_id_fkey\" FOREIGN KEY (\"node_id\") REFERENCES \"public\".\"current_nodes\" (\"id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"current_way_tags\" ADD CONSTRAINT \"current_way_tags_way_id_fkey\" FOREIGN KEY (\"way_id\") REFERENCES \"public\".\"current_ways\" (\"id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"current_ways\" ADD CONSTRAINT \"current_ways_changeset_id_fkey\" FOREIGN KEY (\"changeset_id\") REFERENCES \"public\".\"changesets\" (\"id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"diary_comments\" ADD CONSTRAINT \"diary_comments_diary_entry_id_fkey\" FOREIGN KEY (\"diary_entry_id\") REFERENCES \"public\".\"diary_entries\" (\"id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"diary_comments\" ADD CONSTRAINT \"diary_comments_user_id_fkey\" FOREIGN KEY (\"user_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"diary_entries\" ADD CONSTRAINT \"diary_entries_language_code_fkey\" FOREIGN KEY (\"language_code\") REFERENCES \"public\".\"languages\" (\"code\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"diary_entries\" ADD CONSTRAINT \"diary_entries_user_id_fkey\" FOREIGN KEY (\"user_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"friends\" ADD CONSTRAINT \"friends_friend_user_id_fkey\" FOREIGN KEY (\"friend_user_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"friends\" ADD CONSTRAINT \"friends_user_id_fkey\" FOREIGN KEY (\"user_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"gps_points\" ADD CONSTRAINT \"gps_points_gpx_id_fkey\" FOREIGN KEY (\"gpx_id\") REFERENCES \"public\".\"gpx_files\" (\"id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"gpx_file_tags\" ADD CONSTRAINT \"gpx_file_tags_gpx_id_fkey\" FOREIGN KEY (\"gpx_id\") REFERENCES \"public\".\"gpx_files\" (\"id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"gpx_files\" ADD CONSTRAINT \"gpx_files_user_id_fkey\" FOREIGN KEY (\"user_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"issue_comments\" ADD CONSTRAINT \"issue_comments_issue_id_fkey\" FOREIGN KEY (\"issue_id\") REFERENCES \"public\".\"issues\" (\"id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"issue_comments\" ADD CONSTRAINT \"issue_comments_user_id_fkey\" FOREIGN KEY (\"user_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"issues\" ADD CONSTRAINT \"issues_reported_user_id_fkey\" FOREIGN KEY (\"reported_user_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"issues\" ADD CONSTRAINT \"issues_resolved_by_fkey\" FOREIGN KEY (\"resolved_by\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"issues\" ADD CONSTRAINT \"issues_updated_by_fkey\" FOREIGN KEY (\"updated_by\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"messages\" ADD CONSTRAINT \"messages_from_user_id_fkey\" FOREIGN KEY (\"from_user_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"messages\" ADD CONSTRAINT \"messages_to_user_id_fkey\" FOREIGN KEY (\"to_user_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"note_comments\" ADD CONSTRAINT \"note_comments_author_id_fkey\" FOREIGN KEY (\"author_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"note_comments\" ADD CONSTRAINT \"note_comments_note_id_fkey\" FOREIGN KEY (\"note_id\") REFERENCES \"public\".\"notes\" (\"id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"notes\" ADD CONSTRAINT \"notes_user_id_fkey\" FOREIGN KEY (\"user_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"oauth_access_grants\" ADD CONSTRAINT \"oauth_access_grants_resource_owner_id_fkey\" FOREIGN KEY (\"resource_owner_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"oauth_access_grants\" ADD CONSTRAINT \"oauth_access_grants_application_id_fkey\" FOREIGN KEY (\"application_id\") REFERENCES \"public\".\"oauth_applications\" (\"id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"oauth_access_tokens\" ADD CONSTRAINT \"oauth_access_tokens_application_id_fkey\" FOREIGN KEY (\"application_id\") REFERENCES \"public\".\"oauth_applications\" (\"id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"oauth_access_tokens\" ADD CONSTRAINT \"oauth_access_tokens_resource_owner_id_fkey\" FOREIGN KEY (\"resource_owner_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"oauth_applications\" ADD CONSTRAINT \"oauth_applications_owner_id_fkey\" FOREIGN KEY (\"owner_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"oauth_openid_requests\" ADD CONSTRAINT \"oauth_openid_requests_access_grant_id_fkey\" FOREIGN KEY (\"access_grant_id\") REFERENCES \"public\".\"oauth_access_grants\" (\"id\") ON DELETE CASCADE;",
+    "ALTER TABLE \"public\".\"redactions\" ADD CONSTRAINT \"redactions_user_id_fkey\" FOREIGN KEY (\"user_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"reports\" ADD CONSTRAINT \"reports_issue_id_fkey\" FOREIGN KEY (\"issue_id\") REFERENCES \"public\".\"issues\" (\"id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"reports\" ADD CONSTRAINT \"reports_user_id_fkey\" FOREIGN KEY (\"user_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"social_links\" ADD CONSTRAINT \"social_links_user_id_fkey\" FOREIGN KEY (\"user_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"user_blocks\" ADD CONSTRAINT \"user_blocks_creator_id_fkey\" FOREIGN KEY (\"creator_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"user_blocks\" ADD CONSTRAINT \"user_blocks_revoker_id_fkey\" FOREIGN KEY (\"revoker_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"user_blocks\" ADD CONSTRAINT \"user_blocks_user_id_fkey\" FOREIGN KEY (\"user_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"user_mutes\" ADD CONSTRAINT \"user_mutes_subject_id_fkey\" FOREIGN KEY (\"subject_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"user_mutes\" ADD CONSTRAINT \"user_mutes_owner_id_fkey\" FOREIGN KEY (\"owner_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"user_preferences\" ADD CONSTRAINT \"user_preferences_user_id_fkey\" FOREIGN KEY (\"user_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"user_roles\" ADD CONSTRAINT \"user_roles_granter_id_fkey\" FOREIGN KEY (\"granter_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"user_roles\" ADD CONSTRAINT \"user_roles_user_id_fkey\" FOREIGN KEY (\"user_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"changesets_subscribers\" ADD CONSTRAINT \"changesets_subscribers_changeset_id_fkey\" FOREIGN KEY (\"changeset_id\") REFERENCES \"public\".\"changesets\" (\"id\") ON DELETE CASCADE;",
+    "ALTER TABLE \"public\".\"changesets_subscribers\" ADD CONSTRAINT \"changesets_subscribers_subscriber_id_fkey\" FOREIGN KEY (\"subscriber_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE CASCADE;",
+    "ALTER TABLE \"public\".\"diary_entry_subscriptions\" ADD CONSTRAINT \"diary_entry_subscriptions_user_id_fkey\" FOREIGN KEY (\"user_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE CASCADE;",
+    "ALTER TABLE \"public\".\"diary_entry_subscriptions\" ADD CONSTRAINT \"diary_entry_subscriptions_diary_entry_id_fkey\" FOREIGN KEY (\"diary_entry_id\") REFERENCES \"public\".\"diary_entries\" (\"id\") ON DELETE CASCADE;",
+    "ALTER TABLE \"public\".\"note_subscriptions\" ADD CONSTRAINT \"note_subscriptions_user_id_fkey\" FOREIGN KEY (\"user_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE CASCADE;",
+    "ALTER TABLE \"public\".\"note_subscriptions\" ADD CONSTRAINT \"note_subscriptions_note_id_fkey\" FOREIGN KEY (\"note_id\") REFERENCES \"public\".\"notes\" (\"id\") ON DELETE CASCADE;",
+    "CREATE INDEX IF NOT EXISTS \"active_storage_attachments_blob_id_ix_db5bb8d\" ON \"public\".\"active_storage_attachments\" (\"blob_id\");",
+    "CREATE INDEX IF NOT EXISTS \"active_storage_variant_records_blob_id_ix_342d4e1\" ON \"public\".\"active_storage_variant_records\" (\"blob_id\");",
+    "CREATE INDEX IF NOT EXISTS \"changeset_comments_author_id_ix_3721669\" ON \"public\".\"changeset_comments\" (\"author_id\");",
+    "CREATE INDEX IF NOT EXISTS \"changeset_comments_changeset_id_ix_99cde2a\" ON \"public\".\"changeset_comments\" (\"changeset_id\");",
+    "CREATE INDEX IF NOT EXISTS \"changesets_user_id_ix_1458a3e\" ON \"public\".\"changesets\" (\"user_id\");",
+    "CREATE INDEX IF NOT EXISTS \"changesets_subscribers_subscriber_id_ix_daf651d\" ON \"public\".\"changesets_subscribers\" (\"subscriber_id\");",
+    "CREATE INDEX IF NOT EXISTS \"current_nodes_changeset_id_ix_4fee58b\" ON \"public\".\"current_nodes\" (\"changeset_id\");",
+    "CREATE INDEX IF NOT EXISTS \"current_relations_changeset_id_ix_fd09fe9\" ON \"public\".\"current_relations\" (\"changeset_id\");",
+    "CREATE INDEX IF NOT EXISTS \"current_way_nodes_node_id_ix_9e94892\" ON \"public\".\"current_way_nodes\" (\"node_id\");",
+    "CREATE INDEX IF NOT EXISTS \"current_ways_changeset_id_ix_8250725\" ON \"public\".\"current_ways\" (\"changeset_id\");",
+    "CREATE INDEX IF NOT EXISTS \"diary_comments_diary_entry_id_ix_eddeaa3\" ON \"public\".\"diary_comments\" (\"diary_entry_id\");",
+    "CREATE INDEX IF NOT EXISTS \"diary_comments_user_id_ix_0f12c36\" ON \"public\".\"diary_comments\" (\"user_id\");",
+    "CREATE INDEX IF NOT EXISTS \"diary_entries_language_code_ix_49947aa\" ON \"public\".\"diary_entries\" (\"language_code\");",
+    "CREATE INDEX IF NOT EXISTS \"diary_entries_user_id_ix_8926e6a\" ON \"public\".\"diary_entries\" (\"user_id\");",
+    "CREATE INDEX IF NOT EXISTS \"diary_entry_subscriptions_diary_entry_id_ix_d7a9562\" ON \"public\".\"diary_entry_subscriptions\" (\"diary_entry_id\");",
+    "CREATE INDEX IF NOT EXISTS \"friends_friend_user_id_ix_77f33fc\" ON \"public\".\"friends\" (\"friend_user_id\");",
+    "CREATE INDEX IF NOT EXISTS \"friends_user_id_ix_f474b61\" ON \"public\".\"friends\" (\"user_id\");",
+    "CREATE INDEX IF NOT EXISTS \"gps_points_gpx_id_ix_b949bd0\" ON \"public\".\"gps_points\" (\"gpx_id\");",
+    "CREATE INDEX IF NOT EXISTS \"gpx_file_tags_gpx_id_ix_d0f8aa6\" ON \"public\".\"gpx_file_tags\" (\"gpx_id\");",
+    "CREATE INDEX IF NOT EXISTS \"gpx_files_user_id_ix_2ec0176\" ON \"public\".\"gpx_files\" (\"user_id\");",
+    "CREATE INDEX IF NOT EXISTS \"issue_comments_issue_id_ix_5b7fbbe\" ON \"public\".\"issue_comments\" (\"issue_id\");",
+    "CREATE INDEX IF NOT EXISTS \"issue_comments_user_id_ix_b723e17\" ON \"public\".\"issue_comments\" (\"user_id\");",
+    "CREATE INDEX IF NOT EXISTS \"issues_reported_user_id_ix_337ce99\" ON \"public\".\"issues\" (\"reported_user_id\");",
+    "CREATE INDEX IF NOT EXISTS \"issues_resolved_by_ix_883aafa\" ON \"public\".\"issues\" (\"resolved_by\");",
+    "CREATE INDEX IF NOT EXISTS \"issues_updated_by_ix_038ad45\" ON \"public\".\"issues\" (\"updated_by\");",
+    "CREATE INDEX IF NOT EXISTS \"messages_from_user_id_ix_f6abc8e\" ON \"public\".\"messages\" (\"from_user_id\");",
+    "CREATE INDEX IF NOT EXISTS \"messages_to_user_id_ix_c075af6\" ON \"public\".\"messages\" (\"to_user_id\");",
+    "CREATE INDEX IF NOT EXISTS \"note_comments_author_id_ix_d1c7437\" ON \"public\".\"note_comments\" (\"author_id\");",
+    "CREATE INDEX IF NOT EXISTS \"note_comments_note_id_ix_61cf7bb\" ON \"public\".\"note_comments\" (\"note_id\");",
+    "CREATE INDEX IF NOT EXISTS \"note_subscriptions_note_id_ix_cf042e5\" ON \"public\".\"note_subscriptions\" (\"note_id\");",
+    "CREATE INDEX IF NOT EXISTS \"notes_user_id_ix_136082d\" ON \"public\".\"notes\" (\"user_id\");",
+    "CREATE INDEX IF NOT EXISTS \"oauth_access_grants_application_id_ix_ae81e09\" ON \"public\".\"oauth_access_grants\" (\"application_id\");",
+    "CREATE INDEX IF NOT EXISTS \"oauth_access_grants_resource_owner_id_ix_59a715b\" ON \"public\".\"oauth_access_grants\" (\"resource_owner_id\");",
+    "CREATE INDEX IF NOT EXISTS \"oauth_access_tokens_application_id_ix_5e2eae2\" ON \"public\".\"oauth_access_tokens\" (\"application_id\");",
+    "CREATE INDEX IF NOT EXISTS \"oauth_access_tokens_resource_owner_id_ix_3b0b64a\" ON \"public\".\"oauth_access_tokens\" (\"resource_owner_id\");",
+    "CREATE INDEX IF NOT EXISTS \"oauth_applications_owner_id_ix_adcb474\" ON \"public\".\"oauth_applications\" (\"owner_id\");",
+    "CREATE INDEX IF NOT EXISTS \"oauth_openid_requests_access_grant_id_ix_4e19019\" ON \"public\".\"oauth_openid_requests\" (\"access_grant_id\");",
+    "CREATE INDEX IF NOT EXISTS \"redactions_user_id_ix_7f1f299\" ON \"public\".\"redactions\" (\"user_id\");",
+    "CREATE INDEX IF NOT EXISTS \"reports_issue_id_ix_1ebe41f\" ON \"public\".\"reports\" (\"issue_id\");",
+    "CREATE INDEX IF NOT EXISTS \"reports_user_id_ix_41aff1a\" ON \"public\".\"reports\" (\"user_id\");",
+    "CREATE INDEX IF NOT EXISTS \"social_links_user_id_ix_bf99792\" ON \"public\".\"social_links\" (\"user_id\");",
+    "CREATE INDEX IF NOT EXISTS \"user_blocks_creator_id_ix_049c761\" ON \"public\".\"user_blocks\" (\"creator_id\");",
+    "CREATE INDEX IF NOT EXISTS \"user_blocks_revoker_id_ix_0dc7867\" ON \"public\".\"user_blocks\" (\"revoker_id\");",
+    "CREATE INDEX IF NOT EXISTS \"user_blocks_user_id_ix_f06a72a\" ON \"public\".\"user_blocks\" (\"user_id\");",
+    "CREATE INDEX IF NOT EXISTS \"user_mutes_owner_id_ix_9cd15ee\" ON \"public\".\"user_mutes\" (\"owner_id\");",
+    "CREATE INDEX IF NOT EXISTS \"user_mutes_subject_id_ix_33a2a21\" ON \"public\".\"user_mutes\" (\"subject_id\");",
+    "CREATE INDEX IF NOT EXISTS \"user_roles_granter_id_ix_d8f7900\" ON \"public\".\"user_roles\" (\"granter_id\");",
+    "CREATE INDEX IF NOT EXISTS \"user_roles_user_id_ix_efdb825\" ON \"public\".\"user_roles\" (\"user_id\");",
+    "DROP TRIGGER IF EXISTS \"ar_internal_metadata_updated_at_touch\" ON \"public\".\"ar_internal_metadata\";",
+    "CREATE TRIGGER \"ar_internal_metadata_updated_at_touch\" BEFORE UPDATE ON \"public\".\"ar_internal_metadata\" FOR EACH ROW EXECUTE FUNCTION rebase.set_updated_at('updated_at');",
+    "DROP TRIGGER IF EXISTS \"delayed_jobs_updated_at_touch\" ON \"public\".\"delayed_jobs\";",
+    "CREATE TRIGGER \"delayed_jobs_updated_at_touch\" BEFORE UPDATE ON \"public\".\"delayed_jobs\" FOR EACH ROW EXECUTE FUNCTION rebase.set_updated_at('updated_at');",
+    "DROP TRIGGER IF EXISTS \"diary_comments_updated_at_touch\" ON \"public\".\"diary_comments\";",
+    "CREATE TRIGGER \"diary_comments_updated_at_touch\" BEFORE UPDATE ON \"public\".\"diary_comments\" FOR EACH ROW EXECUTE FUNCTION rebase.set_updated_at('updated_at');",
+    "DROP TRIGGER IF EXISTS \"diary_entries_updated_at_touch\" ON \"public\".\"diary_entries\";",
+    "CREATE TRIGGER \"diary_entries_updated_at_touch\" BEFORE UPDATE ON \"public\".\"diary_entries\" FOR EACH ROW EXECUTE FUNCTION rebase.set_updated_at('updated_at');",
+    "DROP TRIGGER IF EXISTS \"issue_comments_updated_at_touch\" ON \"public\".\"issue_comments\";",
+    "CREATE TRIGGER \"issue_comments_updated_at_touch\" BEFORE UPDATE ON \"public\".\"issue_comments\" FOR EACH ROW EXECUTE FUNCTION rebase.set_updated_at('updated_at');",
+    "DROP TRIGGER IF EXISTS \"issues_updated_at_touch\" ON \"public\".\"issues\";",
+    "CREATE TRIGGER \"issues_updated_at_touch\" BEFORE UPDATE ON \"public\".\"issues\" FOR EACH ROW EXECUTE FUNCTION rebase.set_updated_at('updated_at');",
+    "DROP TRIGGER IF EXISTS \"notes_updated_at_touch\" ON \"public\".\"notes\";",
+    "CREATE TRIGGER \"notes_updated_at_touch\" BEFORE UPDATE ON \"public\".\"notes\" FOR EACH ROW EXECUTE FUNCTION rebase.set_updated_at('updated_at');",
+    "DROP TRIGGER IF EXISTS \"noticed_events_updated_at_touch\" ON \"public\".\"noticed_events\";",
+    "CREATE TRIGGER \"noticed_events_updated_at_touch\" BEFORE UPDATE ON \"public\".\"noticed_events\" FOR EACH ROW EXECUTE FUNCTION rebase.set_updated_at('updated_at');",
+    "DROP TRIGGER IF EXISTS \"noticed_notifications_updated_at_touch\" ON \"public\".\"noticed_notifications\";",
+    "CREATE TRIGGER \"noticed_notifications_updated_at_touch\" BEFORE UPDATE ON \"public\".\"noticed_notifications\" FOR EACH ROW EXECUTE FUNCTION rebase.set_updated_at('updated_at');",
+    "DROP TRIGGER IF EXISTS \"oauth_applications_updated_at_touch\" ON \"public\".\"oauth_applications\";",
+    "CREATE TRIGGER \"oauth_applications_updated_at_touch\" BEFORE UPDATE ON \"public\".\"oauth_applications\" FOR EACH ROW EXECUTE FUNCTION rebase.set_updated_at('updated_at');",
+    "DROP TRIGGER IF EXISTS \"redactions_updated_at_touch\" ON \"public\".\"redactions\";",
+    "CREATE TRIGGER \"redactions_updated_at_touch\" BEFORE UPDATE ON \"public\".\"redactions\" FOR EACH ROW EXECUTE FUNCTION rebase.set_updated_at('updated_at');",
+    "DROP TRIGGER IF EXISTS \"reports_updated_at_touch\" ON \"public\".\"reports\";",
+    "CREATE TRIGGER \"reports_updated_at_touch\" BEFORE UPDATE ON \"public\".\"reports\" FOR EACH ROW EXECUTE FUNCTION rebase.set_updated_at('updated_at');",
+    "DROP TRIGGER IF EXISTS \"social_links_updated_at_touch\" ON \"public\".\"social_links\";",
+    "CREATE TRIGGER \"social_links_updated_at_touch\" BEFORE UPDATE ON \"public\".\"social_links\" FOR EACH ROW EXECUTE FUNCTION rebase.set_updated_at('updated_at');",
+    "DROP TRIGGER IF EXISTS \"spammy_phrases_updated_at_touch\" ON \"public\".\"spammy_phrases\";",
+    "CREATE TRIGGER \"spammy_phrases_updated_at_touch\" BEFORE UPDATE ON \"public\".\"spammy_phrases\" FOR EACH ROW EXECUTE FUNCTION rebase.set_updated_at('updated_at');",
+    "DROP TRIGGER IF EXISTS \"user_blocks_updated_at_touch\" ON \"public\".\"user_blocks\";",
+    "CREATE TRIGGER \"user_blocks_updated_at_touch\" BEFORE UPDATE ON \"public\".\"user_blocks\" FOR EACH ROW EXECUTE FUNCTION rebase.set_updated_at('updated_at');",
+    "DROP TRIGGER IF EXISTS \"user_mutes_updated_at_touch\" ON \"public\".\"user_mutes\";",
+    "CREATE TRIGGER \"user_mutes_updated_at_touch\" BEFORE UPDATE ON \"public\".\"user_mutes\" FOR EACH ROW EXECUTE FUNCTION rebase.set_updated_at('updated_at');",
+    "DROP TRIGGER IF EXISTS \"user_roles_updated_at_touch\" ON \"public\".\"user_roles\";",
+    "CREATE TRIGGER \"user_roles_updated_at_touch\" BEFORE UPDATE ON \"public\".\"user_roles\" FOR EACH ROW EXECUTE FUNCTION rebase.set_updated_at('updated_at');"
+  ],
+  "legacyForeignKeys": [],
+  "searchDrift": [],
+  "searchAdopted": [],
+  "vectorIndexSkipped": [],
+  "withheldConstraints": [],
+  "columnTypeDrift": [],
+  "orphanedRequiredColumns": [],
+  "deferredIndexes": []
+}

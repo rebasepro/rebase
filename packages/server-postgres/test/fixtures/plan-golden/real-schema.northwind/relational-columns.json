@@ -1,0 +1,166 @@
+[
+  {
+    "schema": "public",
+    "table": "employees",
+    "column": "reports_to",
+    "type": "INTEGER",
+    "required": false,
+    "foreignKey": {
+      "schema": "public",
+      "table": "employees",
+      "column": "reports_to",
+      "targetSchema": "public",
+      "targetTable": "employees",
+      "targetColumn": "employee_id",
+      "onDelete": "no action",
+      "constraintName": "employees_reports_to_fkey",
+      "sql": "ALTER TABLE \"public\".\"employees\" ADD CONSTRAINT \"employees_reports_to_fkey\" FOREIGN KEY (\"reports_to\") REFERENCES \"public\".\"employees\" (\"employee_id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "order_details",
+    "column": "order_id",
+    "type": "INTEGER",
+    "required": true,
+    "columnOwnedByProperty": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "order_details",
+      "column": "order_id",
+      "targetSchema": "public",
+      "targetTable": "orders",
+      "targetColumn": "order_id",
+      "onDelete": "no action",
+      "constraintName": "order_details_order_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"order_details\" ADD CONSTRAINT \"order_details_order_id_fkey\" FOREIGN KEY (\"order_id\") REFERENCES \"public\".\"orders\" (\"order_id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "order_details",
+    "column": "product_id",
+    "type": "INTEGER",
+    "required": true,
+    "columnOwnedByProperty": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "order_details",
+      "column": "product_id",
+      "targetSchema": "public",
+      "targetTable": "products",
+      "targetColumn": "product_id",
+      "onDelete": "no action",
+      "constraintName": "order_details_product_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"order_details\" ADD CONSTRAINT \"order_details_product_id_fkey\" FOREIGN KEY (\"product_id\") REFERENCES \"public\".\"products\" (\"product_id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "orders",
+    "column": "customer_id",
+    "type": "VARCHAR(5)",
+    "required": false,
+    "foreignKey": {
+      "schema": "public",
+      "table": "orders",
+      "column": "customer_id",
+      "targetSchema": "public",
+      "targetTable": "customers",
+      "targetColumn": "customer_id",
+      "onDelete": "no action",
+      "constraintName": "orders_customer_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"orders\" ADD CONSTRAINT \"orders_customer_id_fkey\" FOREIGN KEY (\"customer_id\") REFERENCES \"public\".\"customers\" (\"customer_id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "orders",
+    "column": "employee_id",
+    "type": "INTEGER",
+    "required": false,
+    "foreignKey": {
+      "schema": "public",
+      "table": "orders",
+      "column": "employee_id",
+      "targetSchema": "public",
+      "targetTable": "employees",
+      "targetColumn": "employee_id",
+      "onDelete": "no action",
+      "constraintName": "orders_employee_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"orders\" ADD CONSTRAINT \"orders_employee_id_fkey\" FOREIGN KEY (\"employee_id\") REFERENCES \"public\".\"employees\" (\"employee_id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "orders",
+    "column": "ship_via",
+    "type": "INTEGER",
+    "required": false,
+    "foreignKey": {
+      "schema": "public",
+      "table": "orders",
+      "column": "ship_via",
+      "targetSchema": "public",
+      "targetTable": "shippers",
+      "targetColumn": "shipper_id",
+      "onDelete": "no action",
+      "constraintName": "orders_ship_via_fkey",
+      "sql": "ALTER TABLE \"public\".\"orders\" ADD CONSTRAINT \"orders_ship_via_fkey\" FOREIGN KEY (\"ship_via\") REFERENCES \"public\".\"shippers\" (\"shipper_id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "products",
+    "column": "category_id",
+    "type": "INTEGER",
+    "required": false,
+    "foreignKey": {
+      "schema": "public",
+      "table": "products",
+      "column": "category_id",
+      "targetSchema": "public",
+      "targetTable": "categories",
+      "targetColumn": "category_id",
+      "onDelete": "no action",
+      "constraintName": "products_category_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"products\" ADD CONSTRAINT \"products_category_id_fkey\" FOREIGN KEY (\"category_id\") REFERENCES \"public\".\"categories\" (\"category_id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "products",
+    "column": "supplier_id",
+    "type": "INTEGER",
+    "required": false,
+    "foreignKey": {
+      "schema": "public",
+      "table": "products",
+      "column": "supplier_id",
+      "targetSchema": "public",
+      "targetTable": "suppliers",
+      "targetColumn": "supplier_id",
+      "onDelete": "no action",
+      "constraintName": "products_supplier_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"products\" ADD CONSTRAINT \"products_supplier_id_fkey\" FOREIGN KEY (\"supplier_id\") REFERENCES \"public\".\"suppliers\" (\"supplier_id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "territories",
+    "column": "region_id",
+    "type": "INTEGER",
+    "required": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "territories",
+      "column": "region_id",
+      "targetSchema": "public",
+      "targetTable": "region",
+      "targetColumn": "region_id",
+      "onDelete": "no action",
+      "constraintName": "territories_region_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"territories\" ADD CONSTRAINT \"territories_region_id_fkey\" FOREIGN KEY (\"region_id\") REFERENCES \"public\".\"region\" (\"region_id\") ON DELETE NO ACTION"
+    }
+  }
+]

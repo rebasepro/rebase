@@ -1,0 +1,80 @@
+[
+  {
+    "schema": "public",
+    "table": "film_actor",
+    "columns": [
+      {
+        "name": "actor_id",
+        "type": "INTEGER"
+      },
+      {
+        "name": "film_id",
+        "type": "INTEGER"
+      }
+    ],
+    "createTable": "CREATE TABLE IF NOT EXISTS \"public\".\"film_actor\" (\"actor_id\" INTEGER NOT NULL, \"film_id\" INTEGER NOT NULL, PRIMARY KEY (\"actor_id\", \"film_id\"));",
+    "foreignKeys": [
+      {
+        "schema": "public",
+        "table": "film_actor",
+        "column": "actor_id",
+        "targetSchema": "public",
+        "targetTable": "actor",
+        "targetColumn": "actor_id",
+        "onDelete": "CASCADE",
+        "constraintName": "film_actor_actor_id_fkey",
+        "sql": "ALTER TABLE \"public\".\"film_actor\" ADD CONSTRAINT \"film_actor_actor_id_fkey\" FOREIGN KEY (\"actor_id\") REFERENCES \"public\".\"actor\" (\"actor_id\") ON DELETE CASCADE"
+      },
+      {
+        "schema": "public",
+        "table": "film_actor",
+        "column": "film_id",
+        "targetSchema": "public",
+        "targetTable": "film",
+        "targetColumn": "film_id",
+        "onDelete": "CASCADE",
+        "constraintName": "film_actor_film_id_fkey",
+        "sql": "ALTER TABLE \"public\".\"film_actor\" ADD CONSTRAINT \"film_actor_film_id_fkey\" FOREIGN KEY (\"film_id\") REFERENCES \"public\".\"film\" (\"film_id\") ON DELETE CASCADE"
+      }
+    ]
+  },
+  {
+    "schema": "public",
+    "table": "film_category",
+    "columns": [
+      {
+        "name": "film_id",
+        "type": "INTEGER"
+      },
+      {
+        "name": "category_id",
+        "type": "INTEGER"
+      }
+    ],
+    "createTable": "CREATE TABLE IF NOT EXISTS \"public\".\"film_category\" (\"film_id\" INTEGER NOT NULL, \"category_id\" INTEGER NOT NULL, PRIMARY KEY (\"film_id\", \"category_id\"));",
+    "foreignKeys": [
+      {
+        "schema": "public",
+        "table": "film_category",
+        "column": "film_id",
+        "targetSchema": "public",
+        "targetTable": "film",
+        "targetColumn": "film_id",
+        "onDelete": "CASCADE",
+        "constraintName": "film_category_film_id_fkey",
+        "sql": "ALTER TABLE \"public\".\"film_category\" ADD CONSTRAINT \"film_category_film_id_fkey\" FOREIGN KEY (\"film_id\") REFERENCES \"public\".\"film\" (\"film_id\") ON DELETE CASCADE"
+      },
+      {
+        "schema": "public",
+        "table": "film_category",
+        "column": "category_id",
+        "targetSchema": "public",
+        "targetTable": "category",
+        "targetColumn": "category_id",
+        "onDelete": "CASCADE",
+        "constraintName": "film_category_category_id_fkey",
+        "sql": "ALTER TABLE \"public\".\"film_category\" ADD CONSTRAINT \"film_category_category_id_fkey\" FOREIGN KEY (\"category_id\") REFERENCES \"public\".\"category\" (\"category_id\") ON DELETE CASCADE"
+      }
+    ]
+  }
+]

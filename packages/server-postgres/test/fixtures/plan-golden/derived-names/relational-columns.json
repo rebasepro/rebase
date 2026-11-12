@@ -1,0 +1,92 @@
+[
+  {
+    "schema": "public",
+    "table": "books",
+    "column": "shelf_ref",
+    "type": "INTEGER",
+    "required": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "books",
+      "column": "shelf_ref",
+      "targetSchema": "public",
+      "targetTable": "shelves",
+      "targetColumn": "id",
+      "onDelete": "RESTRICT",
+      "constraintName": "books_shelf_ref_fkey",
+      "sql": "ALTER TABLE \"public\".\"books\" ADD CONSTRAINT \"books_shelf_ref_fkey\" FOREIGN KEY (\"shelf_ref\") REFERENCES \"public\".\"shelves\" (\"id\") ON DELETE RESTRICT"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "extremely_long_collection_slug_for_identifier_truncation",
+    "column": "corresponding_organizational_unit_id",
+    "type": "UUID",
+    "required": false,
+    "foreignKey": {
+      "schema": "public",
+      "table": "extremely_long_collection_slug_for_identifier_truncation",
+      "column": "corresponding_organizational_unit_id",
+      "targetSchema": "public",
+      "targetTable": "categories",
+      "targetColumn": "id",
+      "onDelete": "SET NULL",
+      "constraintName": "extremely_long_collection_slug_for_identifier_truncation_corres",
+      "sql": "ALTER TABLE \"public\".\"extremely_long_collection_slug_for_identifier_truncation\" ADD CONSTRAINT \"extremely_long_collection_slug_for_identifier_truncation_corres\" FOREIGN KEY (\"corresponding_organizational_unit_id\") REFERENCES \"public\".\"categories\" (\"id\") ON DELETE SET NULL"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "pinned_names",
+    "column": "explicit_category_key",
+    "type": "UUID",
+    "required": false,
+    "foreignKey": {
+      "schema": "public",
+      "table": "pinned_names",
+      "column": "explicit_category_key",
+      "targetSchema": "public",
+      "targetTable": "categories",
+      "targetColumn": "id",
+      "onDelete": "SET NULL",
+      "constraintName": "pinned_names_explicit_category_key_fkey",
+      "sql": "ALTER TABLE \"public\".\"pinned_names\" ADD CONSTRAINT \"pinned_names_explicit_category_key_fkey\" FOREIGN KEY (\"explicit_category_key\") REFERENCES \"public\".\"categories\" (\"id\") ON DELETE SET NULL"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "products",
+    "column": "primary_category_id",
+    "type": "UUID",
+    "required": false,
+    "foreignKey": {
+      "schema": "public",
+      "table": "products",
+      "column": "primary_category_id",
+      "targetSchema": "public",
+      "targetTable": "categories",
+      "targetColumn": "id",
+      "onDelete": "SET NULL",
+      "constraintName": "products_primary_category_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"products\" ADD CONSTRAINT \"products_primary_category_id_fkey\" FOREIGN KEY (\"primary_category_id\") REFERENCES \"public\".\"categories\" (\"id\") ON DELETE SET NULL"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "products",
+    "column": "supplier",
+    "type": "UUID",
+    "required": false,
+    "foreignKey": {
+      "schema": "public",
+      "table": "products",
+      "column": "supplier",
+      "targetSchema": "public",
+      "targetTable": "suppliers",
+      "targetColumn": "id",
+      "onDelete": "SET NULL",
+      "constraintName": "products_supplier_fkey",
+      "sql": "ALTER TABLE \"public\".\"products\" ADD CONSTRAINT \"products_supplier_fkey\" FOREIGN KEY (\"supplier\") REFERENCES \"public\".\"suppliers\" (\"id\") ON DELETE SET NULL"
+    }
+  }
+]

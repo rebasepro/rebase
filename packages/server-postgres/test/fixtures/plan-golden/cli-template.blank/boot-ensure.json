@@ -1,0 +1,146 @@
+{
+  "actions": [
+    {
+      "kind": "create-function",
+      "target": "rebase.set_updated_at",
+      "sql": "CREATE OR REPLACE FUNCTION rebase.set_updated_at() RETURNS trigger\nLANGUAGE plpgsql AS $$\nBEGIN\n    NEW := jsonb_populate_record(NEW, jsonb_build_object(TG_ARGV[0], now()));\n    RETURN NEW;\nEND;\n$$;"
+    },
+    {
+      "kind": "create-table",
+      "target": "rebase.users",
+      "sql": "CREATE TABLE IF NOT EXISTS \"rebase\".\"users\" (\"id\" UUID PRIMARY KEY DEFAULT gen_random_uuid());"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "rebase.users",
+      "sql": "ALTER TABLE \"rebase\".\"users\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "add-column",
+      "target": "rebase.users.email",
+      "sql": "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"email\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "rebase.users.display_name",
+      "sql": "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"display_name\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "rebase.users.photo_url",
+      "sql": "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"photo_url\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "rebase.users.roles",
+      "sql": "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"roles\" TEXT[] DEFAULT '{}' NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "rebase.users.password_hash",
+      "sql": "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"password_hash\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "rebase.users.email_verified",
+      "sql": "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"email_verified\" BOOLEAN DEFAULT FALSE NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "rebase.users.email_verification_token",
+      "sql": "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"email_verification_token\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "rebase.users.email_verification_sent_at",
+      "sql": "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"email_verification_sent_at\" TIMESTAMP WITH TIME ZONE;"
+    },
+    {
+      "kind": "add-column",
+      "target": "rebase.users.metadata",
+      "sql": "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"metadata\" JSONB DEFAULT '{}' NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "rebase.users.created_at",
+      "sql": "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "rebase.users.updated_at",
+      "sql": "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"updated_at\" TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "rebase.users.is_anonymous",
+      "sql": "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"is_anonymous\" BOOLEAN DEFAULT FALSE NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "rebase.users.tokens_valid_after",
+      "sql": "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"tokens_valid_after\" TIMESTAMP WITH TIME ZONE;"
+    },
+    {
+      "kind": "add-column",
+      "target": "rebase.users.disabled_at",
+      "sql": "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"disabled_at\" TIMESTAMP WITH TIME ZONE;"
+    },
+    {
+      "kind": "add-column",
+      "target": "rebase.users.pending_email",
+      "sql": "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"pending_email\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "rebase.users.email_change_token",
+      "sql": "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"email_change_token\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "rebase.users.email_change_sent_at",
+      "sql": "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"email_change_sent_at\" TIMESTAMP WITH TIME ZONE;"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "rebase.users.users_updated_at_touch",
+      "sql": "DROP TRIGGER IF EXISTS \"users_updated_at_touch\" ON \"rebase\".\"users\";"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "rebase.users.users_updated_at_touch",
+      "sql": "CREATE TRIGGER \"users_updated_at_touch\" BEFORE UPDATE ON \"rebase\".\"users\" FOR EACH ROW EXECUTE FUNCTION rebase.set_updated_at('updated_at');"
+    }
+  ],
+  "statements": [
+    "CREATE OR REPLACE FUNCTION rebase.set_updated_at() RETURNS trigger\nLANGUAGE plpgsql AS $$\nBEGIN\n    NEW := jsonb_populate_record(NEW, jsonb_build_object(TG_ARGV[0], now()));\n    RETURN NEW;\nEND;\n$$;",
+    "CREATE TABLE IF NOT EXISTS \"rebase\".\"users\" (\"id\" UUID PRIMARY KEY DEFAULT gen_random_uuid());",
+    "ALTER TABLE \"rebase\".\"users\" ENABLE ROW LEVEL SECURITY;",
+    "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"email\" TEXT NOT NULL;",
+    "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"display_name\" TEXT;",
+    "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"photo_url\" TEXT;",
+    "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"roles\" TEXT[] DEFAULT '{}' NOT NULL;",
+    "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"password_hash\" TEXT;",
+    "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"email_verified\" BOOLEAN DEFAULT FALSE NOT NULL;",
+    "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"email_verification_token\" TEXT;",
+    "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"email_verification_sent_at\" TIMESTAMP WITH TIME ZONE;",
+    "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"metadata\" JSONB DEFAULT '{}' NOT NULL;",
+    "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL;",
+    "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"updated_at\" TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL;",
+    "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"is_anonymous\" BOOLEAN DEFAULT FALSE NOT NULL;",
+    "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"tokens_valid_after\" TIMESTAMP WITH TIME ZONE;",
+    "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"disabled_at\" TIMESTAMP WITH TIME ZONE;",
+    "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"pending_email\" TEXT;",
+    "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"email_change_token\" TEXT;",
+    "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"email_change_sent_at\" TIMESTAMP WITH TIME ZONE;",
+    "DROP TRIGGER IF EXISTS \"users_updated_at_touch\" ON \"rebase\".\"users\";",
+    "CREATE TRIGGER \"users_updated_at_touch\" BEFORE UPDATE ON \"rebase\".\"users\" FOR EACH ROW EXECUTE FUNCTION rebase.set_updated_at('updated_at');"
+  ],
+  "legacyForeignKeys": [],
+  "searchDrift": [],
+  "searchAdopted": [],
+  "vectorIndexSkipped": [],
+  "withheldConstraints": [],
+  "columnTypeDrift": [],
+  "orphanedRequiredColumns": [],
+  "deferredIndexes": []
+}

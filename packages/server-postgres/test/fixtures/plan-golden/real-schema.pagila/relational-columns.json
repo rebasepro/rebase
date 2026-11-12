@@ -1,0 +1,257 @@
+[
+  {
+    "schema": "public",
+    "table": "address",
+    "column": "city_id",
+    "type": "INTEGER",
+    "required": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "address",
+      "column": "city_id",
+      "targetSchema": "public",
+      "targetTable": "city",
+      "targetColumn": "city_id",
+      "onDelete": "RESTRICT",
+      "constraintName": "address_city_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"address\" ADD CONSTRAINT \"address_city_id_fkey\" FOREIGN KEY (\"city_id\") REFERENCES \"public\".\"city\" (\"city_id\") ON DELETE RESTRICT"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "city",
+    "column": "country_id",
+    "type": "INTEGER",
+    "required": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "city",
+      "column": "country_id",
+      "targetSchema": "public",
+      "targetTable": "country",
+      "targetColumn": "country_id",
+      "onDelete": "RESTRICT",
+      "constraintName": "city_country_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"city\" ADD CONSTRAINT \"city_country_id_fkey\" FOREIGN KEY (\"country_id\") REFERENCES \"public\".\"country\" (\"country_id\") ON DELETE RESTRICT"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "customer",
+    "column": "address_id",
+    "type": "INTEGER",
+    "required": true,
+    "legacyColumn": "addres_id",
+    "foreignKey": {
+      "schema": "public",
+      "table": "customer",
+      "column": "address_id",
+      "targetSchema": "public",
+      "targetTable": "address",
+      "targetColumn": "address_id",
+      "onDelete": "RESTRICT",
+      "constraintName": "customer_address_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"customer\" ADD CONSTRAINT \"customer_address_id_fkey\" FOREIGN KEY (\"address_id\") REFERENCES \"public\".\"address\" (\"address_id\") ON DELETE RESTRICT"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "customer",
+    "column": "store_id",
+    "type": "INTEGER",
+    "required": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "customer",
+      "column": "store_id",
+      "targetSchema": "public",
+      "targetTable": "store",
+      "targetColumn": "store_id",
+      "onDelete": "RESTRICT",
+      "constraintName": "customer_store_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"customer\" ADD CONSTRAINT \"customer_store_id_fkey\" FOREIGN KEY (\"store_id\") REFERENCES \"public\".\"store\" (\"store_id\") ON DELETE RESTRICT"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "film",
+    "column": "language_id",
+    "type": "INTEGER",
+    "required": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "film",
+      "column": "language_id",
+      "targetSchema": "public",
+      "targetTable": "language",
+      "targetColumn": "language_id",
+      "onDelete": "RESTRICT",
+      "constraintName": "film_language_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"film\" ADD CONSTRAINT \"film_language_id_fkey\" FOREIGN KEY (\"language_id\") REFERENCES \"public\".\"language\" (\"language_id\") ON DELETE RESTRICT"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "film",
+    "column": "original_language_id",
+    "type": "INTEGER",
+    "required": false,
+    "foreignKey": {
+      "schema": "public",
+      "table": "film",
+      "column": "original_language_id",
+      "targetSchema": "public",
+      "targetTable": "language",
+      "targetColumn": "language_id",
+      "onDelete": "restrict",
+      "constraintName": "film_original_language_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"film\" ADD CONSTRAINT \"film_original_language_id_fkey\" FOREIGN KEY (\"original_language_id\") REFERENCES \"public\".\"language\" (\"language_id\") ON DELETE RESTRICT"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "inventory",
+    "column": "film_id",
+    "type": "INTEGER",
+    "required": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "inventory",
+      "column": "film_id",
+      "targetSchema": "public",
+      "targetTable": "film",
+      "targetColumn": "film_id",
+      "onDelete": "RESTRICT",
+      "constraintName": "inventory_film_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"inventory\" ADD CONSTRAINT \"inventory_film_id_fkey\" FOREIGN KEY (\"film_id\") REFERENCES \"public\".\"film\" (\"film_id\") ON DELETE RESTRICT"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "inventory",
+    "column": "store_id",
+    "type": "INTEGER",
+    "required": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "inventory",
+      "column": "store_id",
+      "targetSchema": "public",
+      "targetTable": "store",
+      "targetColumn": "store_id",
+      "onDelete": "RESTRICT",
+      "constraintName": "inventory_store_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"inventory\" ADD CONSTRAINT \"inventory_store_id_fkey\" FOREIGN KEY (\"store_id\") REFERENCES \"public\".\"store\" (\"store_id\") ON DELETE RESTRICT"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "rental",
+    "column": "customer_id",
+    "type": "INTEGER",
+    "required": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "rental",
+      "column": "customer_id",
+      "targetSchema": "public",
+      "targetTable": "customer",
+      "targetColumn": "customer_id",
+      "onDelete": "RESTRICT",
+      "constraintName": "rental_customer_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"rental\" ADD CONSTRAINT \"rental_customer_id_fkey\" FOREIGN KEY (\"customer_id\") REFERENCES \"public\".\"customer\" (\"customer_id\") ON DELETE RESTRICT"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "rental",
+    "column": "inventory_id",
+    "type": "INTEGER",
+    "required": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "rental",
+      "column": "inventory_id",
+      "targetSchema": "public",
+      "targetTable": "inventory",
+      "targetColumn": "inventory_id",
+      "onDelete": "RESTRICT",
+      "constraintName": "rental_inventory_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"rental\" ADD CONSTRAINT \"rental_inventory_id_fkey\" FOREIGN KEY (\"inventory_id\") REFERENCES \"public\".\"inventory\" (\"inventory_id\") ON DELETE RESTRICT"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "rental",
+    "column": "staff_id",
+    "type": "INTEGER",
+    "required": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "rental",
+      "column": "staff_id",
+      "targetSchema": "public",
+      "targetTable": "staff",
+      "targetColumn": "staff_id",
+      "onDelete": "RESTRICT",
+      "constraintName": "rental_staff_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"rental\" ADD CONSTRAINT \"rental_staff_id_fkey\" FOREIGN KEY (\"staff_id\") REFERENCES \"public\".\"staff\" (\"staff_id\") ON DELETE RESTRICT"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "staff",
+    "column": "address_id",
+    "type": "INTEGER",
+    "required": true,
+    "legacyColumn": "addres_id",
+    "foreignKey": {
+      "schema": "public",
+      "table": "staff",
+      "column": "address_id",
+      "targetSchema": "public",
+      "targetTable": "address",
+      "targetColumn": "address_id",
+      "onDelete": "RESTRICT",
+      "constraintName": "staff_address_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"staff\" ADD CONSTRAINT \"staff_address_id_fkey\" FOREIGN KEY (\"address_id\") REFERENCES \"public\".\"address\" (\"address_id\") ON DELETE RESTRICT"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "staff",
+    "column": "store_id",
+    "type": "INTEGER",
+    "required": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "staff",
+      "column": "store_id",
+      "targetSchema": "public",
+      "targetTable": "store",
+      "targetColumn": "store_id",
+      "onDelete": "no action",
+      "constraintName": "staff_store_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"staff\" ADD CONSTRAINT \"staff_store_id_fkey\" FOREIGN KEY (\"store_id\") REFERENCES \"public\".\"store\" (\"store_id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "store",
+    "column": "address_id",
+    "type": "INTEGER",
+    "required": true,
+    "legacyColumn": "addres_id",
+    "foreignKey": {
+      "schema": "public",
+      "table": "store",
+      "column": "address_id",
+      "targetSchema": "public",
+      "targetTable": "address",
+      "targetColumn": "address_id",
+      "onDelete": "RESTRICT",
+      "constraintName": "store_address_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"store\" ADD CONSTRAINT \"store_address_id_fkey\" FOREIGN KEY (\"address_id\") REFERENCES \"public\".\"address\" (\"address_id\") ON DELETE RESTRICT"
+    }
+  }
+]

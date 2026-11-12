@@ -1,0 +1,770 @@
+{
+  "actions": [
+    {
+      "kind": "create-table",
+      "target": "public.categories",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"categories\" (\"category_id\" INTEGER PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.categories",
+      "sql": "ALTER TABLE \"public\".\"categories\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.customer_demographics",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"customer_demographics\" (\"customer_type_id\" VARCHAR(5) PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.customer_demographics",
+      "sql": "ALTER TABLE \"public\".\"customer_demographics\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.customers",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"customers\" (\"customer_id\" VARCHAR(5) PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.customers",
+      "sql": "ALTER TABLE \"public\".\"customers\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.employees",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"employees\" (\"employee_id\" INTEGER PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.employees",
+      "sql": "ALTER TABLE \"public\".\"employees\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.order_details",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"order_details\" (\"order_id\" INTEGER NOT NULL, \"product_id\" INTEGER NOT NULL, PRIMARY KEY (\"order_id\", \"product_id\"));"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.order_details",
+      "sql": "ALTER TABLE \"public\".\"order_details\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.orders",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"orders\" (\"order_id\" INTEGER PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.orders",
+      "sql": "ALTER TABLE \"public\".\"orders\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.products",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"products\" (\"product_id\" INTEGER PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.products",
+      "sql": "ALTER TABLE \"public\".\"products\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.region",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"region\" (\"region_id\" INTEGER PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.region",
+      "sql": "ALTER TABLE \"public\".\"region\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.shippers",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"shippers\" (\"shipper_id\" INTEGER PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.shippers",
+      "sql": "ALTER TABLE \"public\".\"shippers\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.suppliers",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"suppliers\" (\"supplier_id\" INTEGER PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.suppliers",
+      "sql": "ALTER TABLE \"public\".\"suppliers\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.territories",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"territories\" (\"territory_id\" VARCHAR(20) PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.territories",
+      "sql": "ALTER TABLE \"public\".\"territories\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.us_states",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"us_states\" (\"state_id\" INTEGER PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.us_states",
+      "sql": "ALTER TABLE \"public\".\"us_states\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.customer_customer_demo",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"customer_customer_demo\" (\"customer_id\" VARCHAR(5) NOT NULL, \"customer_type_id\" VARCHAR(5) NOT NULL, PRIMARY KEY (\"customer_id\", \"customer_type_id\"));"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.customer_customer_demo",
+      "sql": "ALTER TABLE \"public\".\"customer_customer_demo\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.employee_territories",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"employee_territories\" (\"employee_id\" INTEGER NOT NULL, \"territory_id\" VARCHAR(20) NOT NULL, PRIMARY KEY (\"employee_id\", \"territory_id\"));"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.employee_territories",
+      "sql": "ALTER TABLE \"public\".\"employee_territories\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.categories.category_name",
+      "sql": "ALTER TABLE \"public\".\"categories\" ADD COLUMN IF NOT EXISTS \"category_name\" VARCHAR(15) NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.categories.description",
+      "sql": "ALTER TABLE \"public\".\"categories\" ADD COLUMN IF NOT EXISTS \"description\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.categories.picture",
+      "sql": "ALTER TABLE \"public\".\"categories\" ADD COLUMN IF NOT EXISTS \"picture\" BYTEA;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.customer_demographics.customer_desc",
+      "sql": "ALTER TABLE \"public\".\"customer_demographics\" ADD COLUMN IF NOT EXISTS \"customer_desc\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.customers.company_name",
+      "sql": "ALTER TABLE \"public\".\"customers\" ADD COLUMN IF NOT EXISTS \"company_name\" VARCHAR(40) NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.customers.contact_name",
+      "sql": "ALTER TABLE \"public\".\"customers\" ADD COLUMN IF NOT EXISTS \"contact_name\" VARCHAR(30);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.customers.contact_title",
+      "sql": "ALTER TABLE \"public\".\"customers\" ADD COLUMN IF NOT EXISTS \"contact_title\" VARCHAR(30);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.customers.phone",
+      "sql": "ALTER TABLE \"public\".\"customers\" ADD COLUMN IF NOT EXISTS \"phone\" VARCHAR(24);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.customers.address",
+      "sql": "ALTER TABLE \"public\".\"customers\" ADD COLUMN IF NOT EXISTS \"address\" VARCHAR(60);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.customers.city",
+      "sql": "ALTER TABLE \"public\".\"customers\" ADD COLUMN IF NOT EXISTS \"city\" VARCHAR(15);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.customers.region",
+      "sql": "ALTER TABLE \"public\".\"customers\" ADD COLUMN IF NOT EXISTS \"region\" VARCHAR(15);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.customers.postal_code",
+      "sql": "ALTER TABLE \"public\".\"customers\" ADD COLUMN IF NOT EXISTS \"postal_code\" VARCHAR(10);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.customers.country",
+      "sql": "ALTER TABLE \"public\".\"customers\" ADD COLUMN IF NOT EXISTS \"country\" VARCHAR(15);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.customers.fax",
+      "sql": "ALTER TABLE \"public\".\"customers\" ADD COLUMN IF NOT EXISTS \"fax\" VARCHAR(24);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.employees.title",
+      "sql": "ALTER TABLE \"public\".\"employees\" ADD COLUMN IF NOT EXISTS \"title\" VARCHAR(30);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.employees.title_of_courtesy",
+      "sql": "ALTER TABLE \"public\".\"employees\" ADD COLUMN IF NOT EXISTS \"title_of_courtesy\" VARCHAR(25);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.employees.first_name",
+      "sql": "ALTER TABLE \"public\".\"employees\" ADD COLUMN IF NOT EXISTS \"first_name\" VARCHAR(10) NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.employees.last_name",
+      "sql": "ALTER TABLE \"public\".\"employees\" ADD COLUMN IF NOT EXISTS \"last_name\" VARCHAR(20) NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.employees.address",
+      "sql": "ALTER TABLE \"public\".\"employees\" ADD COLUMN IF NOT EXISTS \"address\" VARCHAR(60);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.employees.city",
+      "sql": "ALTER TABLE \"public\".\"employees\" ADD COLUMN IF NOT EXISTS \"city\" VARCHAR(15);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.employees.region",
+      "sql": "ALTER TABLE \"public\".\"employees\" ADD COLUMN IF NOT EXISTS \"region\" VARCHAR(15);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.employees.postal_code",
+      "sql": "ALTER TABLE \"public\".\"employees\" ADD COLUMN IF NOT EXISTS \"postal_code\" VARCHAR(10);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.employees.country",
+      "sql": "ALTER TABLE \"public\".\"employees\" ADD COLUMN IF NOT EXISTS \"country\" VARCHAR(15);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.employees.home_phone",
+      "sql": "ALTER TABLE \"public\".\"employees\" ADD COLUMN IF NOT EXISTS \"home_phone\" VARCHAR(24);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.employees.extension",
+      "sql": "ALTER TABLE \"public\".\"employees\" ADD COLUMN IF NOT EXISTS \"extension\" VARCHAR(4);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.employees.birth_date",
+      "sql": "ALTER TABLE \"public\".\"employees\" ADD COLUMN IF NOT EXISTS \"birth_date\" DATE;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.employees.hire_date",
+      "sql": "ALTER TABLE \"public\".\"employees\" ADD COLUMN IF NOT EXISTS \"hire_date\" DATE;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.employees.notes",
+      "sql": "ALTER TABLE \"public\".\"employees\" ADD COLUMN IF NOT EXISTS \"notes\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.employees.photo_path",
+      "sql": "ALTER TABLE \"public\".\"employees\" ADD COLUMN IF NOT EXISTS \"photo_path\" VARCHAR(255);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.employees.photo",
+      "sql": "ALTER TABLE \"public\".\"employees\" ADD COLUMN IF NOT EXISTS \"photo\" BYTEA;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.order_details.unit_price",
+      "sql": "ALTER TABLE \"public\".\"order_details\" ADD COLUMN IF NOT EXISTS \"unit_price\" REAL NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.order_details.quantity",
+      "sql": "ALTER TABLE \"public\".\"order_details\" ADD COLUMN IF NOT EXISTS \"quantity\" INTEGER NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.order_details.discount",
+      "sql": "ALTER TABLE \"public\".\"order_details\" ADD COLUMN IF NOT EXISTS \"discount\" REAL NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.orders.ship_name",
+      "sql": "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"ship_name\" VARCHAR(40);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.orders.ship_address",
+      "sql": "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"ship_address\" VARCHAR(60);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.orders.ship_city",
+      "sql": "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"ship_city\" VARCHAR(15);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.orders.ship_region",
+      "sql": "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"ship_region\" VARCHAR(15);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.orders.ship_postal_code",
+      "sql": "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"ship_postal_code\" VARCHAR(10);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.orders.ship_country",
+      "sql": "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"ship_country\" VARCHAR(15);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.orders.freight",
+      "sql": "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"freight\" REAL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.orders.order_date",
+      "sql": "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"order_date\" DATE;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.orders.required_date",
+      "sql": "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"required_date\" DATE;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.orders.shipped_date",
+      "sql": "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"shipped_date\" DATE;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.products.product_name",
+      "sql": "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"product_name\" VARCHAR(40) NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.products.quantity_per_unit",
+      "sql": "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"quantity_per_unit\" VARCHAR(20);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.products.unit_price",
+      "sql": "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"unit_price\" REAL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.products.units_in_stock",
+      "sql": "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"units_in_stock\" INTEGER;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.products.units_on_order",
+      "sql": "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"units_on_order\" INTEGER;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.products.reorder_level",
+      "sql": "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"reorder_level\" INTEGER;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.products.discontinued",
+      "sql": "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"discontinued\" INTEGER NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.region.region_description",
+      "sql": "ALTER TABLE \"public\".\"region\" ADD COLUMN IF NOT EXISTS \"region_description\" VARCHAR(60) NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.shippers.company_name",
+      "sql": "ALTER TABLE \"public\".\"shippers\" ADD COLUMN IF NOT EXISTS \"company_name\" VARCHAR(40) NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.shippers.phone",
+      "sql": "ALTER TABLE \"public\".\"shippers\" ADD COLUMN IF NOT EXISTS \"phone\" VARCHAR(24);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.suppliers.company_name",
+      "sql": "ALTER TABLE \"public\".\"suppliers\" ADD COLUMN IF NOT EXISTS \"company_name\" VARCHAR(40) NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.suppliers.contact_name",
+      "sql": "ALTER TABLE \"public\".\"suppliers\" ADD COLUMN IF NOT EXISTS \"contact_name\" VARCHAR(30);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.suppliers.contact_title",
+      "sql": "ALTER TABLE \"public\".\"suppliers\" ADD COLUMN IF NOT EXISTS \"contact_title\" VARCHAR(30);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.suppliers.phone",
+      "sql": "ALTER TABLE \"public\".\"suppliers\" ADD COLUMN IF NOT EXISTS \"phone\" VARCHAR(24);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.suppliers.address",
+      "sql": "ALTER TABLE \"public\".\"suppliers\" ADD COLUMN IF NOT EXISTS \"address\" VARCHAR(60);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.suppliers.city",
+      "sql": "ALTER TABLE \"public\".\"suppliers\" ADD COLUMN IF NOT EXISTS \"city\" VARCHAR(15);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.suppliers.region",
+      "sql": "ALTER TABLE \"public\".\"suppliers\" ADD COLUMN IF NOT EXISTS \"region\" VARCHAR(15);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.suppliers.postal_code",
+      "sql": "ALTER TABLE \"public\".\"suppliers\" ADD COLUMN IF NOT EXISTS \"postal_code\" VARCHAR(10);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.suppliers.country",
+      "sql": "ALTER TABLE \"public\".\"suppliers\" ADD COLUMN IF NOT EXISTS \"country\" VARCHAR(15);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.suppliers.fax",
+      "sql": "ALTER TABLE \"public\".\"suppliers\" ADD COLUMN IF NOT EXISTS \"fax\" VARCHAR(24);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.suppliers.homepage",
+      "sql": "ALTER TABLE \"public\".\"suppliers\" ADD COLUMN IF NOT EXISTS \"homepage\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.territories.territory_description",
+      "sql": "ALTER TABLE \"public\".\"territories\" ADD COLUMN IF NOT EXISTS \"territory_description\" VARCHAR(60) NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.us_states.state_name",
+      "sql": "ALTER TABLE \"public\".\"us_states\" ADD COLUMN IF NOT EXISTS \"state_name\" VARCHAR(100);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.us_states.state_abbr",
+      "sql": "ALTER TABLE \"public\".\"us_states\" ADD COLUMN IF NOT EXISTS \"state_abbr\" VARCHAR(2);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.us_states.state_region",
+      "sql": "ALTER TABLE \"public\".\"us_states\" ADD COLUMN IF NOT EXISTS \"state_region\" VARCHAR(50);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.employees.reports_to",
+      "sql": "ALTER TABLE \"public\".\"employees\" ADD COLUMN IF NOT EXISTS \"reports_to\" INTEGER;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.orders.customer_id",
+      "sql": "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"customer_id\" VARCHAR(5);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.orders.employee_id",
+      "sql": "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"employee_id\" INTEGER;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.orders.ship_via",
+      "sql": "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"ship_via\" INTEGER;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.products.category_id",
+      "sql": "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"category_id\" INTEGER;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.products.supplier_id",
+      "sql": "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"supplier_id\" INTEGER;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.territories.region_id",
+      "sql": "ALTER TABLE \"public\".\"territories\" ADD COLUMN IF NOT EXISTS \"region_id\" INTEGER NOT NULL;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.employees.employees_reports_to_fkey",
+      "sql": "ALTER TABLE \"public\".\"employees\" ADD CONSTRAINT \"employees_reports_to_fkey\" FOREIGN KEY (\"reports_to\") REFERENCES \"public\".\"employees\" (\"employee_id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.order_details.order_details_order_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"order_details\" ADD CONSTRAINT \"order_details_order_id_fkey\" FOREIGN KEY (\"order_id\") REFERENCES \"public\".\"orders\" (\"order_id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.order_details.order_details_product_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"order_details\" ADD CONSTRAINT \"order_details_product_id_fkey\" FOREIGN KEY (\"product_id\") REFERENCES \"public\".\"products\" (\"product_id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.orders.orders_customer_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"orders\" ADD CONSTRAINT \"orders_customer_id_fkey\" FOREIGN KEY (\"customer_id\") REFERENCES \"public\".\"customers\" (\"customer_id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.orders.orders_employee_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"orders\" ADD CONSTRAINT \"orders_employee_id_fkey\" FOREIGN KEY (\"employee_id\") REFERENCES \"public\".\"employees\" (\"employee_id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.orders.orders_ship_via_fkey",
+      "sql": "ALTER TABLE \"public\".\"orders\" ADD CONSTRAINT \"orders_ship_via_fkey\" FOREIGN KEY (\"ship_via\") REFERENCES \"public\".\"shippers\" (\"shipper_id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.products.products_category_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"products\" ADD CONSTRAINT \"products_category_id_fkey\" FOREIGN KEY (\"category_id\") REFERENCES \"public\".\"categories\" (\"category_id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.products.products_supplier_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"products\" ADD CONSTRAINT \"products_supplier_id_fkey\" FOREIGN KEY (\"supplier_id\") REFERENCES \"public\".\"suppliers\" (\"supplier_id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.territories.territories_region_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"territories\" ADD CONSTRAINT \"territories_region_id_fkey\" FOREIGN KEY (\"region_id\") REFERENCES \"public\".\"region\" (\"region_id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.customer_customer_demo.customer_customer_demo_customer_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"customer_customer_demo\" ADD CONSTRAINT \"customer_customer_demo_customer_id_fkey\" FOREIGN KEY (\"customer_id\") REFERENCES \"public\".\"customers\" (\"customer_id\") ON DELETE CASCADE;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.customer_customer_demo.customer_customer_demo_customer_type_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"customer_customer_demo\" ADD CONSTRAINT \"customer_customer_demo_customer_type_id_fkey\" FOREIGN KEY (\"customer_type_id\") REFERENCES \"public\".\"customer_demographics\" (\"customer_type_id\") ON DELETE CASCADE;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.employee_territories.employee_territories_employee_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"employee_territories\" ADD CONSTRAINT \"employee_territories_employee_id_fkey\" FOREIGN KEY (\"employee_id\") REFERENCES \"public\".\"employees\" (\"employee_id\") ON DELETE CASCADE;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.employee_territories.employee_territories_territory_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"employee_territories\" ADD CONSTRAINT \"employee_territories_territory_id_fkey\" FOREIGN KEY (\"territory_id\") REFERENCES \"public\".\"territories\" (\"territory_id\") ON DELETE CASCADE;"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.customer_customer_demo",
+      "sql": "CREATE INDEX IF NOT EXISTS \"customer_customer_demo_customer_type_id_ix_696549f\" ON \"public\".\"customer_customer_demo\" (\"customer_type_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.employee_territories",
+      "sql": "CREATE INDEX IF NOT EXISTS \"employee_territories_territory_id_ix_609d28b\" ON \"public\".\"employee_territories\" (\"territory_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.employees",
+      "sql": "CREATE INDEX IF NOT EXISTS \"employees_reports_to_ix_56def75\" ON \"public\".\"employees\" (\"reports_to\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.order_details",
+      "sql": "CREATE INDEX IF NOT EXISTS \"order_details_product_id_ix_3f60913\" ON \"public\".\"order_details\" (\"product_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.orders",
+      "sql": "CREATE INDEX IF NOT EXISTS \"orders_customer_id_ix_f0b5d92\" ON \"public\".\"orders\" (\"customer_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.orders",
+      "sql": "CREATE INDEX IF NOT EXISTS \"orders_employee_id_ix_d3de9b4\" ON \"public\".\"orders\" (\"employee_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.orders",
+      "sql": "CREATE INDEX IF NOT EXISTS \"orders_ship_via_ix_ca90713\" ON \"public\".\"orders\" (\"ship_via\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.products",
+      "sql": "CREATE INDEX IF NOT EXISTS \"products_category_id_ix_066548f\" ON \"public\".\"products\" (\"category_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.products",
+      "sql": "CREATE INDEX IF NOT EXISTS \"products_supplier_id_ix_ea7ba57\" ON \"public\".\"products\" (\"supplier_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.territories",
+      "sql": "CREATE INDEX IF NOT EXISTS \"territories_region_id_ix_f2519bb\" ON \"public\".\"territories\" (\"region_id\");"
+    }
+  ],
+  "statements": [
+    "CREATE TABLE IF NOT EXISTS \"public\".\"categories\" (\"category_id\" INTEGER PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"categories\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"customer_demographics\" (\"customer_type_id\" VARCHAR(5) PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"customer_demographics\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"customers\" (\"customer_id\" VARCHAR(5) PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"customers\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"employees\" (\"employee_id\" INTEGER PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"employees\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"order_details\" (\"order_id\" INTEGER NOT NULL, \"product_id\" INTEGER NOT NULL, PRIMARY KEY (\"order_id\", \"product_id\"));",
+    "ALTER TABLE \"public\".\"order_details\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"orders\" (\"order_id\" INTEGER PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"orders\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"products\" (\"product_id\" INTEGER PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"products\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"region\" (\"region_id\" INTEGER PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"region\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"shippers\" (\"shipper_id\" INTEGER PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"shippers\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"suppliers\" (\"supplier_id\" INTEGER PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"suppliers\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"territories\" (\"territory_id\" VARCHAR(20) PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"territories\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"us_states\" (\"state_id\" INTEGER PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"us_states\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"customer_customer_demo\" (\"customer_id\" VARCHAR(5) NOT NULL, \"customer_type_id\" VARCHAR(5) NOT NULL, PRIMARY KEY (\"customer_id\", \"customer_type_id\"));",
+    "ALTER TABLE \"public\".\"customer_customer_demo\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"employee_territories\" (\"employee_id\" INTEGER NOT NULL, \"territory_id\" VARCHAR(20) NOT NULL, PRIMARY KEY (\"employee_id\", \"territory_id\"));",
+    "ALTER TABLE \"public\".\"employee_territories\" ENABLE ROW LEVEL SECURITY;",
+    "ALTER TABLE \"public\".\"categories\" ADD COLUMN IF NOT EXISTS \"category_name\" VARCHAR(15) NOT NULL;",
+    "ALTER TABLE \"public\".\"categories\" ADD COLUMN IF NOT EXISTS \"description\" TEXT;",
+    "ALTER TABLE \"public\".\"categories\" ADD COLUMN IF NOT EXISTS \"picture\" BYTEA;",
+    "ALTER TABLE \"public\".\"customer_demographics\" ADD COLUMN IF NOT EXISTS \"customer_desc\" TEXT;",
+    "ALTER TABLE \"public\".\"customers\" ADD COLUMN IF NOT EXISTS \"company_name\" VARCHAR(40) NOT NULL;",
+    "ALTER TABLE \"public\".\"customers\" ADD COLUMN IF NOT EXISTS \"contact_name\" VARCHAR(30);",
+    "ALTER TABLE \"public\".\"customers\" ADD COLUMN IF NOT EXISTS \"contact_title\" VARCHAR(30);",
+    "ALTER TABLE \"public\".\"customers\" ADD COLUMN IF NOT EXISTS \"phone\" VARCHAR(24);",
+    "ALTER TABLE \"public\".\"customers\" ADD COLUMN IF NOT EXISTS \"address\" VARCHAR(60);",
+    "ALTER TABLE \"public\".\"customers\" ADD COLUMN IF NOT EXISTS \"city\" VARCHAR(15);",
+    "ALTER TABLE \"public\".\"customers\" ADD COLUMN IF NOT EXISTS \"region\" VARCHAR(15);",
+    "ALTER TABLE \"public\".\"customers\" ADD COLUMN IF NOT EXISTS \"postal_code\" VARCHAR(10);",
+    "ALTER TABLE \"public\".\"customers\" ADD COLUMN IF NOT EXISTS \"country\" VARCHAR(15);",
+    "ALTER TABLE \"public\".\"customers\" ADD COLUMN IF NOT EXISTS \"fax\" VARCHAR(24);",
+    "ALTER TABLE \"public\".\"employees\" ADD COLUMN IF NOT EXISTS \"title\" VARCHAR(30);",
+    "ALTER TABLE \"public\".\"employees\" ADD COLUMN IF NOT EXISTS \"title_of_courtesy\" VARCHAR(25);",
+    "ALTER TABLE \"public\".\"employees\" ADD COLUMN IF NOT EXISTS \"first_name\" VARCHAR(10) NOT NULL;",
+    "ALTER TABLE \"public\".\"employees\" ADD COLUMN IF NOT EXISTS \"last_name\" VARCHAR(20) NOT NULL;",
+    "ALTER TABLE \"public\".\"employees\" ADD COLUMN IF NOT EXISTS \"address\" VARCHAR(60);",
+    "ALTER TABLE \"public\".\"employees\" ADD COLUMN IF NOT EXISTS \"city\" VARCHAR(15);",
+    "ALTER TABLE \"public\".\"employees\" ADD COLUMN IF NOT EXISTS \"region\" VARCHAR(15);",
+    "ALTER TABLE \"public\".\"employees\" ADD COLUMN IF NOT EXISTS \"postal_code\" VARCHAR(10);",
+    "ALTER TABLE \"public\".\"employees\" ADD COLUMN IF NOT EXISTS \"country\" VARCHAR(15);",
+    "ALTER TABLE \"public\".\"employees\" ADD COLUMN IF NOT EXISTS \"home_phone\" VARCHAR(24);",
+    "ALTER TABLE \"public\".\"employees\" ADD COLUMN IF NOT EXISTS \"extension\" VARCHAR(4);",
+    "ALTER TABLE \"public\".\"employees\" ADD COLUMN IF NOT EXISTS \"birth_date\" DATE;",
+    "ALTER TABLE \"public\".\"employees\" ADD COLUMN IF NOT EXISTS \"hire_date\" DATE;",
+    "ALTER TABLE \"public\".\"employees\" ADD COLUMN IF NOT EXISTS \"notes\" TEXT;",
+    "ALTER TABLE \"public\".\"employees\" ADD COLUMN IF NOT EXISTS \"photo_path\" VARCHAR(255);",
+    "ALTER TABLE \"public\".\"employees\" ADD COLUMN IF NOT EXISTS \"photo\" BYTEA;",
+    "ALTER TABLE \"public\".\"order_details\" ADD COLUMN IF NOT EXISTS \"unit_price\" REAL NOT NULL;",
+    "ALTER TABLE \"public\".\"order_details\" ADD COLUMN IF NOT EXISTS \"quantity\" INTEGER NOT NULL;",
+    "ALTER TABLE \"public\".\"order_details\" ADD COLUMN IF NOT EXISTS \"discount\" REAL NOT NULL;",
+    "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"ship_name\" VARCHAR(40);",
+    "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"ship_address\" VARCHAR(60);",
+    "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"ship_city\" VARCHAR(15);",
+    "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"ship_region\" VARCHAR(15);",
+    "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"ship_postal_code\" VARCHAR(10);",
+    "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"ship_country\" VARCHAR(15);",
+    "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"freight\" REAL;",
+    "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"order_date\" DATE;",
+    "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"required_date\" DATE;",
+    "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"shipped_date\" DATE;",
+    "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"product_name\" VARCHAR(40) NOT NULL;",
+    "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"quantity_per_unit\" VARCHAR(20);",
+    "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"unit_price\" REAL;",
+    "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"units_in_stock\" INTEGER;",
+    "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"units_on_order\" INTEGER;",
+    "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"reorder_level\" INTEGER;",
+    "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"discontinued\" INTEGER NOT NULL;",
+    "ALTER TABLE \"public\".\"region\" ADD COLUMN IF NOT EXISTS \"region_description\" VARCHAR(60) NOT NULL;",
+    "ALTER TABLE \"public\".\"shippers\" ADD COLUMN IF NOT EXISTS \"company_name\" VARCHAR(40) NOT NULL;",
+    "ALTER TABLE \"public\".\"shippers\" ADD COLUMN IF NOT EXISTS \"phone\" VARCHAR(24);",
+    "ALTER TABLE \"public\".\"suppliers\" ADD COLUMN IF NOT EXISTS \"company_name\" VARCHAR(40) NOT NULL;",
+    "ALTER TABLE \"public\".\"suppliers\" ADD COLUMN IF NOT EXISTS \"contact_name\" VARCHAR(30);",
+    "ALTER TABLE \"public\".\"suppliers\" ADD COLUMN IF NOT EXISTS \"contact_title\" VARCHAR(30);",
+    "ALTER TABLE \"public\".\"suppliers\" ADD COLUMN IF NOT EXISTS \"phone\" VARCHAR(24);",
+    "ALTER TABLE \"public\".\"suppliers\" ADD COLUMN IF NOT EXISTS \"address\" VARCHAR(60);",
+    "ALTER TABLE \"public\".\"suppliers\" ADD COLUMN IF NOT EXISTS \"city\" VARCHAR(15);",
+    "ALTER TABLE \"public\".\"suppliers\" ADD COLUMN IF NOT EXISTS \"region\" VARCHAR(15);",
+    "ALTER TABLE \"public\".\"suppliers\" ADD COLUMN IF NOT EXISTS \"postal_code\" VARCHAR(10);",
+    "ALTER TABLE \"public\".\"suppliers\" ADD COLUMN IF NOT EXISTS \"country\" VARCHAR(15);",
+    "ALTER TABLE \"public\".\"suppliers\" ADD COLUMN IF NOT EXISTS \"fax\" VARCHAR(24);",
+    "ALTER TABLE \"public\".\"suppliers\" ADD COLUMN IF NOT EXISTS \"homepage\" TEXT;",
+    "ALTER TABLE \"public\".\"territories\" ADD COLUMN IF NOT EXISTS \"territory_description\" VARCHAR(60) NOT NULL;",
+    "ALTER TABLE \"public\".\"us_states\" ADD COLUMN IF NOT EXISTS \"state_name\" VARCHAR(100);",
+    "ALTER TABLE \"public\".\"us_states\" ADD COLUMN IF NOT EXISTS \"state_abbr\" VARCHAR(2);",
+    "ALTER TABLE \"public\".\"us_states\" ADD COLUMN IF NOT EXISTS \"state_region\" VARCHAR(50);",
+    "ALTER TABLE \"public\".\"employees\" ADD COLUMN IF NOT EXISTS \"reports_to\" INTEGER;",
+    "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"customer_id\" VARCHAR(5);",
+    "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"employee_id\" INTEGER;",
+    "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"ship_via\" INTEGER;",
+    "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"category_id\" INTEGER;",
+    "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"supplier_id\" INTEGER;",
+    "ALTER TABLE \"public\".\"territories\" ADD COLUMN IF NOT EXISTS \"region_id\" INTEGER NOT NULL;",
+    "ALTER TABLE \"public\".\"employees\" ADD CONSTRAINT \"employees_reports_to_fkey\" FOREIGN KEY (\"reports_to\") REFERENCES \"public\".\"employees\" (\"employee_id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"order_details\" ADD CONSTRAINT \"order_details_order_id_fkey\" FOREIGN KEY (\"order_id\") REFERENCES \"public\".\"orders\" (\"order_id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"order_details\" ADD CONSTRAINT \"order_details_product_id_fkey\" FOREIGN KEY (\"product_id\") REFERENCES \"public\".\"products\" (\"product_id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"orders\" ADD CONSTRAINT \"orders_customer_id_fkey\" FOREIGN KEY (\"customer_id\") REFERENCES \"public\".\"customers\" (\"customer_id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"orders\" ADD CONSTRAINT \"orders_employee_id_fkey\" FOREIGN KEY (\"employee_id\") REFERENCES \"public\".\"employees\" (\"employee_id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"orders\" ADD CONSTRAINT \"orders_ship_via_fkey\" FOREIGN KEY (\"ship_via\") REFERENCES \"public\".\"shippers\" (\"shipper_id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"products\" ADD CONSTRAINT \"products_category_id_fkey\" FOREIGN KEY (\"category_id\") REFERENCES \"public\".\"categories\" (\"category_id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"products\" ADD CONSTRAINT \"products_supplier_id_fkey\" FOREIGN KEY (\"supplier_id\") REFERENCES \"public\".\"suppliers\" (\"supplier_id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"territories\" ADD CONSTRAINT \"territories_region_id_fkey\" FOREIGN KEY (\"region_id\") REFERENCES \"public\".\"region\" (\"region_id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"customer_customer_demo\" ADD CONSTRAINT \"customer_customer_demo_customer_id_fkey\" FOREIGN KEY (\"customer_id\") REFERENCES \"public\".\"customers\" (\"customer_id\") ON DELETE CASCADE;",
+    "ALTER TABLE \"public\".\"customer_customer_demo\" ADD CONSTRAINT \"customer_customer_demo_customer_type_id_fkey\" FOREIGN KEY (\"customer_type_id\") REFERENCES \"public\".\"customer_demographics\" (\"customer_type_id\") ON DELETE CASCADE;",
+    "ALTER TABLE \"public\".\"employee_territories\" ADD CONSTRAINT \"employee_territories_employee_id_fkey\" FOREIGN KEY (\"employee_id\") REFERENCES \"public\".\"employees\" (\"employee_id\") ON DELETE CASCADE;",
+    "ALTER TABLE \"public\".\"employee_territories\" ADD CONSTRAINT \"employee_territories_territory_id_fkey\" FOREIGN KEY (\"territory_id\") REFERENCES \"public\".\"territories\" (\"territory_id\") ON DELETE CASCADE;",
+    "CREATE INDEX IF NOT EXISTS \"customer_customer_demo_customer_type_id_ix_696549f\" ON \"public\".\"customer_customer_demo\" (\"customer_type_id\");",
+    "CREATE INDEX IF NOT EXISTS \"employee_territories_territory_id_ix_609d28b\" ON \"public\".\"employee_territories\" (\"territory_id\");",
+    "CREATE INDEX IF NOT EXISTS \"employees_reports_to_ix_56def75\" ON \"public\".\"employees\" (\"reports_to\");",
+    "CREATE INDEX IF NOT EXISTS \"order_details_product_id_ix_3f60913\" ON \"public\".\"order_details\" (\"product_id\");",
+    "CREATE INDEX IF NOT EXISTS \"orders_customer_id_ix_f0b5d92\" ON \"public\".\"orders\" (\"customer_id\");",
+    "CREATE INDEX IF NOT EXISTS \"orders_employee_id_ix_d3de9b4\" ON \"public\".\"orders\" (\"employee_id\");",
+    "CREATE INDEX IF NOT EXISTS \"orders_ship_via_ix_ca90713\" ON \"public\".\"orders\" (\"ship_via\");",
+    "CREATE INDEX IF NOT EXISTS \"products_category_id_ix_066548f\" ON \"public\".\"products\" (\"category_id\");",
+    "CREATE INDEX IF NOT EXISTS \"products_supplier_id_ix_ea7ba57\" ON \"public\".\"products\" (\"supplier_id\");",
+    "CREATE INDEX IF NOT EXISTS \"territories_region_id_ix_f2519bb\" ON \"public\".\"territories\" (\"region_id\");"
+  ],
+  "legacyForeignKeys": [],
+  "searchDrift": [],
+  "searchAdopted": [],
+  "vectorIndexSkipped": [],
+  "withheldConstraints": [],
+  "columnTypeDrift": [],
+  "orphanedRequiredColumns": [],
+  "deferredIndexes": []
+}

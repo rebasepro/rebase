@@ -1,0 +1,110 @@
+[
+  {
+    "schema": "public",
+    "table": "order_items",
+    "column": "order_id",
+    "type": "UUID",
+    "required": false,
+    "foreignKey": {
+      "schema": "public",
+      "table": "order_items",
+      "column": "order_id",
+      "targetSchema": "public",
+      "targetTable": "orders",
+      "targetColumn": "id",
+      "onDelete": "cascade",
+      "constraintName": "order_items_order_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"order_items\" ADD CONSTRAINT \"order_items_order_id_fkey\" FOREIGN KEY (\"order_id\") REFERENCES \"public\".\"orders\" (\"id\") ON DELETE CASCADE"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "order_items",
+    "column": "product_id",
+    "type": "UUID",
+    "required": false,
+    "foreignKey": {
+      "schema": "public",
+      "table": "order_items",
+      "column": "product_id",
+      "targetSchema": "public",
+      "targetTable": "products",
+      "targetColumn": "id",
+      "onDelete": "restrict",
+      "constraintName": "order_items_product_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"order_items\" ADD CONSTRAINT \"order_items_product_id_fkey\" FOREIGN KEY (\"product_id\") REFERENCES \"public\".\"products\" (\"id\") ON DELETE RESTRICT"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "orders",
+    "column": "customer_id",
+    "type": "UUID",
+    "required": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "orders",
+      "column": "customer_id",
+      "targetSchema": "public",
+      "targetTable": "customers",
+      "targetColumn": "id",
+      "onDelete": "RESTRICT",
+      "constraintName": "orders_customer_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"orders\" ADD CONSTRAINT \"orders_customer_id_fkey\" FOREIGN KEY (\"customer_id\") REFERENCES \"public\".\"customers\" (\"id\") ON DELETE RESTRICT"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "posts",
+    "column": "author_id",
+    "type": "UUID",
+    "required": false,
+    "foreignKey": {
+      "schema": "public",
+      "table": "posts",
+      "column": "author_id",
+      "targetSchema": "public",
+      "targetTable": "authors",
+      "targetColumn": "id",
+      "onDelete": "SET NULL",
+      "constraintName": "posts_author_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"posts\" ADD CONSTRAINT \"posts_author_id_fkey\" FOREIGN KEY (\"author_id\") REFERENCES \"public\".\"authors\" (\"id\") ON DELETE SET NULL"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "product_locales",
+    "column": "product_id",
+    "type": "UUID",
+    "required": false,
+    "foreignKey": {
+      "schema": "public",
+      "table": "product_locales",
+      "column": "product_id",
+      "targetSchema": "public",
+      "targetTable": "products",
+      "targetColumn": "id",
+      "onDelete": "SET NULL",
+      "constraintName": "product_locales_product_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"product_locales\" ADD CONSTRAINT \"product_locales_product_id_fkey\" FOREIGN KEY (\"product_id\") REFERENCES \"public\".\"products\" (\"id\") ON DELETE SET NULL"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "tickets",
+    "column": "customer_id",
+    "type": "UUID",
+    "required": false,
+    "foreignKey": {
+      "schema": "public",
+      "table": "tickets",
+      "column": "customer_id",
+      "targetSchema": "public",
+      "targetTable": "customers",
+      "targetColumn": "id",
+      "onDelete": "SET NULL",
+      "constraintName": "tickets_customer_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"tickets\" ADD CONSTRAINT \"tickets_customer_id_fkey\" FOREIGN KEY (\"customer_id\") REFERENCES \"public\".\"customers\" (\"id\") ON DELETE SET NULL"
+    }
+  }
+]

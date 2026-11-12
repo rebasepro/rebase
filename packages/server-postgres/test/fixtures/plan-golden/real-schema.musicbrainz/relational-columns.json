@@ -1,0 +1,242 @@
+[
+  {
+    "schema": "public",
+    "table": "area",
+    "column": "type",
+    "type": "INTEGER",
+    "required": false,
+    "foreignKey": {
+      "schema": "public",
+      "table": "area",
+      "column": "type",
+      "targetSchema": "public",
+      "targetTable": "area_type",
+      "targetColumn": "id",
+      "onDelete": "no action",
+      "constraintName": "area_type_fkey",
+      "sql": "ALTER TABLE \"public\".\"area\" ADD CONSTRAINT \"area_type_fkey\" FOREIGN KEY (\"type\") REFERENCES \"public\".\"area_type\" (\"id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "area_tag",
+    "column": "area",
+    "type": "INTEGER",
+    "required": true,
+    "columnOwnedByProperty": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "area_tag",
+      "column": "area",
+      "targetSchema": "public",
+      "targetTable": "area",
+      "targetColumn": "id",
+      "onDelete": "no action",
+      "constraintName": "area_tag_area_fkey",
+      "sql": "ALTER TABLE \"public\".\"area_tag\" ADD CONSTRAINT \"area_tag_area_fkey\" FOREIGN KEY (\"area\") REFERENCES \"public\".\"area\" (\"id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "area_tag",
+    "column": "tag",
+    "type": "INTEGER",
+    "required": true,
+    "columnOwnedByProperty": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "area_tag",
+      "column": "tag",
+      "targetSchema": "public",
+      "targetTable": "tag",
+      "targetColumn": "id",
+      "onDelete": "no action",
+      "constraintName": "area_tag_tag_fkey",
+      "sql": "ALTER TABLE \"public\".\"area_tag\" ADD CONSTRAINT \"area_tag_tag_fkey\" FOREIGN KEY (\"tag\") REFERENCES \"public\".\"tag\" (\"id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "area_tag_raw",
+    "column": "area",
+    "type": "INTEGER",
+    "required": true,
+    "columnOwnedByProperty": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "area_tag_raw",
+      "column": "area",
+      "targetSchema": "public",
+      "targetTable": "area",
+      "targetColumn": "id",
+      "onDelete": "no action",
+      "constraintName": "area_tag_raw_area_fkey",
+      "sql": "ALTER TABLE \"public\".\"area_tag_raw\" ADD CONSTRAINT \"area_tag_raw_area_fkey\" FOREIGN KEY (\"area\") REFERENCES \"public\".\"area\" (\"id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "area_tag_raw",
+    "column": "editor",
+    "type": "INTEGER",
+    "required": true,
+    "columnOwnedByProperty": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "area_tag_raw",
+      "column": "editor",
+      "targetSchema": "public",
+      "targetTable": "editor",
+      "targetColumn": "id",
+      "onDelete": "no action",
+      "constraintName": "area_tag_raw_editor_fkey",
+      "sql": "ALTER TABLE \"public\".\"area_tag_raw\" ADD CONSTRAINT \"area_tag_raw_editor_fkey\" FOREIGN KEY (\"editor\") REFERENCES \"public\".\"editor\" (\"id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "area_tag_raw",
+    "column": "tag",
+    "type": "INTEGER",
+    "required": true,
+    "columnOwnedByProperty": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "area_tag_raw",
+      "column": "tag",
+      "targetSchema": "public",
+      "targetTable": "tag",
+      "targetColumn": "id",
+      "onDelete": "no action",
+      "constraintName": "area_tag_raw_tag_fkey",
+      "sql": "ALTER TABLE \"public\".\"area_tag_raw\" ADD CONSTRAINT \"area_tag_raw_tag_fkey\" FOREIGN KEY (\"tag\") REFERENCES \"public\".\"tag\" (\"id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "area_type",
+    "column": "parent",
+    "type": "INTEGER",
+    "required": false,
+    "foreignKey": {
+      "schema": "public",
+      "table": "area_type",
+      "column": "parent",
+      "targetSchema": "public",
+      "targetTable": "area_type",
+      "targetColumn": "id",
+      "onDelete": "no action",
+      "constraintName": "area_type_parent_fkey",
+      "sql": "ALTER TABLE \"public\".\"area_type\" ADD CONSTRAINT \"area_type_parent_fkey\" FOREIGN KEY (\"parent\") REFERENCES \"public\".\"area_type\" (\"id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "artist",
+    "column": "area",
+    "type": "INTEGER",
+    "required": false,
+    "foreignKey": {
+      "schema": "public",
+      "table": "artist",
+      "column": "area",
+      "targetSchema": "public",
+      "targetTable": "area",
+      "targetColumn": "id",
+      "onDelete": "no action",
+      "constraintName": "artist_area_fkey",
+      "sql": "ALTER TABLE \"public\".\"artist\" ADD CONSTRAINT \"artist_area_fkey\" FOREIGN KEY (\"area\") REFERENCES \"public\".\"area\" (\"id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "artist",
+    "column": "begin_area",
+    "type": "INTEGER",
+    "required": false,
+    "foreignKey": {
+      "schema": "public",
+      "table": "artist",
+      "column": "begin_area",
+      "targetSchema": "public",
+      "targetTable": "area",
+      "targetColumn": "id",
+      "onDelete": "no action",
+      "constraintName": "artist_begin_area_fkey",
+      "sql": "ALTER TABLE \"public\".\"artist\" ADD CONSTRAINT \"artist_begin_area_fkey\" FOREIGN KEY (\"begin_area\") REFERENCES \"public\".\"area\" (\"id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "artist",
+    "column": "end_area",
+    "type": "INTEGER",
+    "required": false,
+    "foreignKey": {
+      "schema": "public",
+      "table": "artist",
+      "column": "end_area",
+      "targetSchema": "public",
+      "targetTable": "area",
+      "targetColumn": "id",
+      "onDelete": "no action",
+      "constraintName": "artist_end_area_fkey",
+      "sql": "ALTER TABLE \"public\".\"artist\" ADD CONSTRAINT \"artist_end_area_fkey\" FOREIGN KEY (\"end_area\") REFERENCES \"public\".\"area\" (\"id\") ON DELETE NO ACTION"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "artist_credit_name",
+    "column": "artist",
+    "type": "INTEGER",
+    "required": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "artist_credit_name",
+      "column": "artist",
+      "targetSchema": "public",
+      "targetTable": "artist",
+      "targetColumn": "id",
+      "onDelete": "cascade",
+      "constraintName": "artist_credit_name_artist_fkey",
+      "sql": "ALTER TABLE \"public\".\"artist_credit_name\" ADD CONSTRAINT \"artist_credit_name_artist_fkey\" FOREIGN KEY (\"artist\") REFERENCES \"public\".\"artist\" (\"id\") ON DELETE CASCADE"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "artist_credit_name",
+    "column": "artist_credit",
+    "type": "INTEGER",
+    "required": true,
+    "columnOwnedByProperty": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "artist_credit_name",
+      "column": "artist_credit",
+      "targetSchema": "public",
+      "targetTable": "artist_credit",
+      "targetColumn": "id",
+      "onDelete": "cascade",
+      "constraintName": "artist_credit_name_artist_credit_fkey",
+      "sql": "ALTER TABLE \"public\".\"artist_credit_name\" ADD CONSTRAINT \"artist_credit_name_artist_credit_fkey\" FOREIGN KEY (\"artist_credit\") REFERENCES \"public\".\"artist_credit\" (\"id\") ON DELETE CASCADE"
+    }
+  },
+  {
+    "schema": "public",
+    "table": "editor",
+    "column": "area",
+    "type": "INTEGER",
+    "required": false,
+    "foreignKey": {
+      "schema": "public",
+      "table": "editor",
+      "column": "area",
+      "targetSchema": "public",
+      "targetTable": "area",
+      "targetColumn": "id",
+      "onDelete": "no action",
+      "constraintName": "editor_area_fkey",
+      "sql": "ALTER TABLE \"public\".\"editor\" ADD CONSTRAINT \"editor_area_fkey\" FOREIGN KEY (\"area\") REFERENCES \"public\".\"area\" (\"id\") ON DELETE NO ACTION"
+    }
+  }
+]

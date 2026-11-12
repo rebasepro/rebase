@@ -1,0 +1,198 @@
+{
+  "schemas": [
+    "rebase"
+  ],
+  "declaredSchemas": [],
+  "enums": [],
+  "tables": [
+    {
+      "schema": "public",
+      "table": "products",
+      "qualified": "public.products",
+      "varName": "products",
+      "kind": "collection",
+      "slug": "products",
+      "columns": [
+        {
+          "key": "id",
+          "column": "id",
+          "type": {
+            "kind": "text"
+          },
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "default": {
+            "kind": "sql",
+            "expression": "gen_random_uuid()::text"
+          },
+          "source": {
+            "kind": "implicit-id",
+            "slug": "products"
+          }
+        },
+        {
+          "key": "name",
+          "column": "name",
+          "type": {
+            "kind": "text"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "name",
+            "slug": "products"
+          }
+        },
+        {
+          "key": "price",
+          "column": "price",
+          "type": {
+            "kind": "numeric"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "price",
+            "slug": "products"
+          }
+        },
+        {
+          "key": "active",
+          "column": "active",
+          "type": {
+            "kind": "boolean"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "default": {
+            "kind": "literal",
+            "value": true,
+            "sql": "TRUE"
+          },
+          "source": {
+            "kind": "property",
+            "propName": "active",
+            "slug": "products"
+          }
+        },
+        {
+          "key": "createdAt",
+          "column": "created_at",
+          "type": {
+            "kind": "timestamptz"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "default": {
+            "kind": "sql",
+            "expression": "now()"
+          },
+          "source": {
+            "kind": "property",
+            "propName": "createdAt",
+            "slug": "products"
+          }
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [],
+      "vector": {
+        "specs": [],
+        "skipped": []
+      },
+      "vectorColumns": [],
+      "policies": [
+        {
+          "name": "products_default_admin_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "products_default_admin_read",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "products_default_admin_read_ar_cd6a5cf2",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "products_default_admin_write_insert",
+          "operation": "insert",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": null,
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "products_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "products_default_admin_write_insert_ar_7be54415",
+            "using": null,
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "products_default_admin_write_update",
+          "operation": "update",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "products_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "products_default_admin_write_update_ar_0abfb972",
+            "using": "true",
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "products_default_admin_write_delete",
+          "operation": "delete",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "products_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "products_default_admin_write_delete_ar_810b2bb6",
+            "using": "true",
+            "withCheck": null
+          }
+        }
+      ],
+      "triggers": [],
+      "auth": false
+    }
+  ],
+  "views": [],
+  "relations": [],
+  "extensions": [],
+  "functions": [],
+  "options": {
+    "databaseExtensions": []
+  }
+}

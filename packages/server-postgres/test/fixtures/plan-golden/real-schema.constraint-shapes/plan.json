@@ -1,0 +1,786 @@
+{
+  "schemas": [
+    "rebase"
+  ],
+  "declaredSchemas": [],
+  "enums": [
+    {
+      "schema": "public",
+      "name": "constraint_shapes_status",
+      "qualified": "public.constraint_shapes_status",
+      "varName": "constraintShapesStatus",
+      "labels": [
+        "draft",
+        "published",
+        "archived"
+      ]
+    },
+    {
+      "schema": "public",
+      "name": "constraint_shapes_tier",
+      "qualified": "public.constraint_shapes_tier",
+      "varName": "constraintShapesTier",
+      "labels": [
+        "free",
+        "pro",
+        "enterprise"
+      ]
+    },
+    {
+      "schema": "public",
+      "name": "constraint_shapes_visibility",
+      "qualified": "public.constraint_shapes_visibility",
+      "varName": "constraintShapesVisibility",
+      "labels": [
+        "public",
+        "private"
+      ]
+    },
+    {
+      "schema": "public",
+      "name": "constraint_shapes_pinned_kind",
+      "qualified": "public.constraint_shapes_pinned_kind",
+      "varName": "constraintShapesPinnedKind",
+      "labels": [
+        "only-one"
+      ]
+    },
+    {
+      "schema": "public",
+      "name": "constraint_shapes_apostrophe_set",
+      "qualified": "public.constraint_shapes_apostrophe_set",
+      "varName": "constraintShapesApostropheSet",
+      "labels": [
+        "it's",
+        "won't"
+      ]
+    }
+  ],
+  "tables": [
+    {
+      "schema": "public",
+      "table": "constraint_shapes",
+      "qualified": "public.constraint_shapes",
+      "varName": "constraintShapes",
+      "kind": "collection",
+      "slug": "constraint_shapes",
+      "columns": [
+        {
+          "key": "id",
+          "column": "id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "id",
+            "slug": "constraint_shapes"
+          }
+        },
+        {
+          "key": "email",
+          "column": "email",
+          "type": {
+            "kind": "text"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "email",
+            "slug": "constraint_shapes"
+          }
+        },
+        {
+          "key": "slug",
+          "column": "slug",
+          "type": {
+            "kind": "text"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "slug",
+            "slug": "constraint_shapes"
+          }
+        },
+        {
+          "key": "code",
+          "column": "code",
+          "type": {
+            "kind": "text"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "code",
+            "slug": "constraint_shapes"
+          }
+        },
+        {
+          "key": "status",
+          "column": "status",
+          "type": {
+            "kind": "enum",
+            "schema": "public",
+            "name": "constraint_shapes_status",
+            "varName": "constraintShapesStatus",
+            "labels": [
+              "draft",
+              "published",
+              "archived"
+            ]
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "status",
+            "slug": "constraint_shapes"
+          }
+        },
+        {
+          "key": "tier",
+          "column": "tier",
+          "type": {
+            "kind": "enum",
+            "schema": "public",
+            "name": "constraint_shapes_tier",
+            "varName": "constraintShapesTier",
+            "labels": [
+              "free",
+              "pro",
+              "enterprise"
+            ]
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "tier",
+            "slug": "constraint_shapes"
+          }
+        },
+        {
+          "key": "search",
+          "column": "search",
+          "type": {
+            "kind": "text"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "search",
+            "slug": "constraint_shapes"
+          }
+        },
+        {
+          "key": "price",
+          "column": "price",
+          "type": {
+            "kind": "numeric"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "price",
+            "slug": "constraint_shapes"
+          }
+        },
+        {
+          "key": "discount",
+          "column": "discount",
+          "type": {
+            "kind": "real"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "discount",
+            "slug": "constraint_shapes"
+          }
+        },
+        {
+          "key": "quantity",
+          "column": "quantity",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "quantity",
+            "slug": "constraint_shapes"
+          }
+        },
+        {
+          "key": "rating",
+          "column": "rating",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "rating",
+            "slug": "constraint_shapes"
+          }
+        },
+        {
+          "key": "temperature",
+          "column": "temperature",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "temperature",
+            "slug": "constraint_shapes"
+          }
+        },
+        {
+          "key": "exactCount",
+          "column": "exact_count",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "exactCount",
+            "slug": "constraint_shapes"
+          }
+        },
+        {
+          "key": "percent",
+          "column": "percent",
+          "type": {
+            "kind": "numeric",
+            "precision": 5,
+            "scale": 2
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "percent",
+            "slug": "constraint_shapes"
+          }
+        },
+        {
+          "key": "startDay",
+          "column": "start_day",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "startDay",
+            "slug": "constraint_shapes"
+          }
+        },
+        {
+          "key": "endDay",
+          "column": "end_day",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "endDay",
+            "slug": "constraint_shapes"
+          }
+        },
+        {
+          "key": "eitherWay",
+          "column": "either_way",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "eitherWay",
+            "slug": "constraint_shapes"
+          }
+        },
+        {
+          "key": "computedTotal",
+          "column": "computed_total",
+          "type": {
+            "kind": "numeric"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "computedTotal",
+            "slug": "constraint_shapes"
+          }
+        },
+        {
+          "key": "visibility",
+          "column": "visibility",
+          "type": {
+            "kind": "enum",
+            "schema": "public",
+            "name": "constraint_shapes_visibility",
+            "varName": "constraintShapesVisibility",
+            "labels": [
+              "public",
+              "private"
+            ]
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "visibility",
+            "slug": "constraint_shapes"
+          }
+        },
+        {
+          "key": "pinnedKind",
+          "column": "pinned_kind",
+          "type": {
+            "kind": "enum",
+            "schema": "public",
+            "name": "constraint_shapes_pinned_kind",
+            "varName": "constraintShapesPinnedKind",
+            "labels": [
+              "only-one"
+            ]
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "pinnedKind",
+            "slug": "constraint_shapes"
+          }
+        },
+        {
+          "key": "apostropheSet",
+          "column": "apostrophe_set",
+          "type": {
+            "kind": "enum",
+            "schema": "public",
+            "name": "constraint_shapes_apostrophe_set",
+            "varName": "constraintShapesApostropheSet",
+            "labels": [
+              "it's",
+              "won't"
+            ]
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "apostropheSet",
+            "slug": "constraint_shapes"
+          }
+        },
+        {
+          "key": "fixedLen",
+          "column": "fixed_len",
+          "type": {
+            "kind": "text"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "fixedLen",
+            "slug": "constraint_shapes"
+          }
+        },
+        {
+          "key": "notReserved",
+          "column": "not_reserved",
+          "type": {
+            "kind": "text"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "notReserved",
+            "slug": "constraint_shapes"
+          }
+        },
+        {
+          "key": "emailUnique",
+          "column": "email_unique",
+          "type": {
+            "kind": "text"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": true,
+          "source": {
+            "kind": "property",
+            "propName": "emailUnique",
+            "slug": "constraint_shapes"
+          }
+        },
+        {
+          "key": "payload",
+          "column": "payload",
+          "type": {
+            "kind": "jsonb"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "payload",
+            "slug": "constraint_shapes"
+          }
+        },
+        {
+          "key": "createdAt",
+          "column": "created_at",
+          "type": {
+            "kind": "timestamptz"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": {
+            "kind": "sql",
+            "expression": "now()"
+          },
+          "source": {
+            "kind": "property",
+            "propName": "createdAt",
+            "slug": "constraint_shapes"
+          }
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [],
+      "vector": {
+        "specs": [],
+        "skipped": []
+      },
+      "vectorColumns": [],
+      "policies": [
+        {
+          "name": "constraint_shapes_default_admin_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "constraint_shapes_default_admin_read",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "constraint_shapes_default_admin_read_ar_69c60494",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "constraint_shapes_default_admin_write_insert",
+          "operation": "insert",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": null,
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "constraint_shapes_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "constraint_shapes_default_admin_write_insert_ar_bfbab573",
+            "using": null,
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "constraint_shapes_default_admin_write_update",
+          "operation": "update",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "constraint_shapes_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "constraint_shapes_default_admin_write_update_ar_3b489c42",
+            "using": "true",
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "constraint_shapes_default_admin_write_delete",
+          "operation": "delete",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "constraint_shapes_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "constraint_shapes_default_admin_write_delete_ar_4afd3c56",
+            "using": "true",
+            "withCheck": null
+          }
+        }
+      ],
+      "triggers": [],
+      "auth": false
+    },
+    {
+      "schema": "public",
+      "table": "constraint_shapes_child",
+      "qualified": "public.constraint_shapes_child",
+      "varName": "constraintShapesChild",
+      "kind": "collection",
+      "slug": "constraint_shapes_child",
+      "columns": [
+        {
+          "key": "id",
+          "column": "id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "id",
+            "slug": "constraint_shapes_child"
+          }
+        },
+        {
+          "key": "parentId",
+          "column": "parent_id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": {
+            "schema": "public",
+            "table": "constraint_shapes_child",
+            "column": "parent_id",
+            "targetSchema": "public",
+            "targetTable": "constraint_shapes",
+            "targetColumn": "id",
+            "onDelete": "cascade",
+            "constraintName": "constraint_shapes_child_parent_id_fkey",
+            "sql": "ALTER TABLE \"public\".\"constraint_shapes_child\" ADD CONSTRAINT \"constraint_shapes_child_parent_id_fkey\" FOREIGN KEY (\"parent_id\") REFERENCES \"public\".\"constraint_shapes\" (\"id\") ON DELETE CASCADE"
+          },
+          "source": {
+            "kind": "relation",
+            "propName": "parent",
+            "slug": "constraint_shapes_child"
+          }
+        },
+        {
+          "key": "note",
+          "column": "note",
+          "type": {
+            "kind": "text"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "note",
+            "slug": "constraint_shapes_child"
+          }
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "indexes": [
+        {
+          "schema": "public",
+          "table": "constraint_shapes_child",
+          "method": "btree",
+          "unique": false,
+          "keys": [
+            {
+              "column": "parent_id",
+              "direction": "asc",
+              "nulls": "last"
+            }
+          ],
+          "include": [],
+          "predicate": null,
+          "reason": "Derived for a foreign key: Postgres indexes the key a constraint points at, never the column holding it.",
+          "indexName": "constraint_shapes_child_parent_id_ix_d373065",
+          "derived": "foreign-key"
+        }
+      ],
+      "vector": {
+        "specs": [],
+        "skipped": []
+      },
+      "vectorColumns": [],
+      "policies": [
+        {
+          "name": "constraint_shapes_child_default_admin_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "constraint_shapes_child_default_admin_read",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "constraint_shapes_child_default_admin_read_ar_252706db",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "constraint_shapes_child_default_admin_write_insert",
+          "operation": "insert",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": null,
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "constraint_shapes_child_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "constraint_shapes_child_default_admin_write_insert_ar_b75d3ab4",
+            "using": null,
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "constraint_shapes_child_default_admin_write_update",
+          "operation": "update",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "constraint_shapes_child_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "constraint_shapes_child_default_admin_write_update_ar_09155eb8",
+            "using": "true",
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "constraint_shapes_child_default_admin_write_delete",
+          "operation": "delete",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "constraint_shapes_child_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "constraint_shapes_child_default_admin_write_delete_ar_68681330",
+            "using": "true",
+            "withCheck": null
+          }
+        }
+      ],
+      "triggers": [],
+      "auth": false
+    }
+  ],
+  "views": [],
+  "relations": [
+    {
+      "tableVar": "constraintShapes",
+      "key": "constraint_shapes_child",
+      "kind": "many",
+      "targetVar": "constraintShapesChild",
+      "relationName": "constraint_shapes_child_parentId"
+    },
+    {
+      "tableVar": "constraintShapesChild",
+      "key": "parent",
+      "kind": "one",
+      "targetVar": "constraintShapes",
+      "relationName": "constraint_shapes_child_parentId",
+      "fields": [
+        "parentId"
+      ],
+      "references": [
+        "id"
+      ]
+    }
+  ],
+  "extensions": [],
+  "functions": [],
+  "options": {
+    "databaseExtensions": []
+  }
+}

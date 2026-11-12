@@ -1,0 +1,37 @@
+[
+  {
+    "id": "property-matrix.empty_enum",
+    "messagePattern": "empty `enum`",
+    "message": "Property \"enumEmpty\" of collection \"empty_enum\" declares an empty `enum`. A Postgres enum type needs at least one label — `CREATE TYPE … AS ENUM ()` is not valid SQL — so the column would reference a type nothing creates. List the values, or drop the `enum` for a plain column."
+  },
+  {
+    "id": "property-matrix.empty_enum_num",
+    "messagePattern": "empty `enum`",
+    "message": "Property \"enumEmpty\" of collection \"empty_enum_num\" declares an empty `enum`. A Postgres enum type needs at least one label — `CREATE TYPE … AS ENUM ()` is not valid SQL — so the column would reference a type nothing creates. List the values, or drop the `enum` for a plain column."
+  },
+  {
+    "id": "property-matrix.str_id_cuid",
+    "messagePattern": "cuid",
+    "message": "Property \"id\" of collection \"str_id_cuid\" uses `isId: \"cuid\"`, which Postgres cannot honour: the generated default calls a `cuid()` function that Rebase has never created, so every insert relying on it fails. Use `isId: \"uuid\"`, or give the strategy as SQL — ``isId: \"sql`my_id()`\"`` — and create that function in a migration."
+  },
+  {
+    "id": "property-matrix.str_id_increment",
+    "messagePattern": "`isId: \"increment\"` needs a number property",
+    "message": "Property \"id\" of collection \"str_id_increment\" is a string property, and `isId: \"increment\"` needs a number property. Make the key `type: \"number\"`, or use `isId: \"uuid\"` for a string key."
+  },
+  {
+    "id": "property-matrix.num_id_uuid",
+    "messagePattern": "`isId: \"uuid\"` needs a string property",
+    "message": "Property \"id\" of collection \"num_id_uuid\" is a number property, and `isId: \"uuid\"` needs a string property. Make the key `type: \"string\"`, or use `isId: \"increment\"` for a number key."
+  },
+  {
+    "id": "property-matrix.link_into_composite",
+    "messagePattern": "cannot reference a composite key",
+    "message": "relation \"link_into_composite.translation\" points at collection \"company_translations\", whose primary key spans 2 columns (\"id\", \"locale\"). A foreign key is one column and cannot reference a composite key. Point the link at a collection with a single-column key, or reach these rows with a `via` relation, whose `joinPath` compares every key column."
+  },
+  {
+    "id": "property-matrix.link-into-composite-set",
+    "messagePattern": "relation \"link_into_composite\\.translation\" points at collection \"company_translations\", whose primary key spans 2 columns \\(\"id\", \"locale\"\\)",
+    "message": "relation \"link_into_composite.translation\" points at collection \"company_translations\", whose primary key spans 2 columns (\"id\", \"locale\"). A foreign key is one column and cannot reference a composite key. Point the link at a collection with a single-column key, or reach these rows with a `via` relation, whose `joinPath` compares every key column."
+  }
+]

@@ -1,0 +1,8 @@
+{
+  "search": [],
+  "vector": [],
+  "triggers": [
+    "public.projects.projects_keep_tenant",
+    "public.tasks.tasks_keep_tenant"
+  ]
+}

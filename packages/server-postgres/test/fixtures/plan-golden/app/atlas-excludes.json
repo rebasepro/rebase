@@ -1,0 +1,16 @@
+{
+  "search": [
+    "public.posts.search_vector",
+    "public.posts.posts_search_vector_gin"
+  ],
+  "vector": [],
+  "triggers": [
+    "public.customers.customers_updated_at_touch",
+    "public.exercises.exercises_updated_at_touch",
+    "public.orders.orders_updated_at_touch",
+    "public.posts.posts_updated_at_touch",
+    "public.products.products_updated_at_touch",
+    "public.tickets.tickets_updated_at_touch",
+    "rebase.users.users_updated_at_touch"
+  ]
+}

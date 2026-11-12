@@ -1,0 +1,584 @@
+{
+  "actions": [
+    {
+      "kind": "create-table",
+      "target": "public.album",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"album\" (\"album_id\" INTEGER PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.album",
+      "sql": "ALTER TABLE \"public\".\"album\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.artist",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"artist\" (\"artist_id\" INTEGER PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.artist",
+      "sql": "ALTER TABLE \"public\".\"artist\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.customer",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"customer\" (\"customer_id\" INTEGER PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.customer",
+      "sql": "ALTER TABLE \"public\".\"customer\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.employee",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"employee\" (\"employee_id\" INTEGER PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.employee",
+      "sql": "ALTER TABLE \"public\".\"employee\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.genre",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"genre\" (\"genre_id\" INTEGER PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.genre",
+      "sql": "ALTER TABLE \"public\".\"genre\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.invoice",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"invoice\" (\"invoice_id\" INTEGER PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.invoice",
+      "sql": "ALTER TABLE \"public\".\"invoice\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.invoice_line",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"invoice_line\" (\"invoice_line_id\" INTEGER PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.invoice_line",
+      "sql": "ALTER TABLE \"public\".\"invoice_line\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.media_type",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"media_type\" (\"media_type_id\" INTEGER PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.media_type",
+      "sql": "ALTER TABLE \"public\".\"media_type\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.playlist",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"playlist\" (\"playlist_id\" INTEGER PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.playlist",
+      "sql": "ALTER TABLE \"public\".\"playlist\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.track",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"track\" (\"track_id\" INTEGER PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.track",
+      "sql": "ALTER TABLE \"public\".\"track\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.playlist_track",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"playlist_track\" (\"playlist_id\" INTEGER NOT NULL, \"track_id\" INTEGER NOT NULL, PRIMARY KEY (\"playlist_id\", \"track_id\"));"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.playlist_track",
+      "sql": "ALTER TABLE \"public\".\"playlist_track\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.album.title",
+      "sql": "ALTER TABLE \"public\".\"album\" ADD COLUMN IF NOT EXISTS \"title\" VARCHAR(160) NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.artist.name",
+      "sql": "ALTER TABLE \"public\".\"artist\" ADD COLUMN IF NOT EXISTS \"name\" VARCHAR(120);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.customer.first_name",
+      "sql": "ALTER TABLE \"public\".\"customer\" ADD COLUMN IF NOT EXISTS \"first_name\" VARCHAR(40) NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.customer.last_name",
+      "sql": "ALTER TABLE \"public\".\"customer\" ADD COLUMN IF NOT EXISTS \"last_name\" VARCHAR(20) NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.customer.email",
+      "sql": "ALTER TABLE \"public\".\"customer\" ADD COLUMN IF NOT EXISTS \"email\" VARCHAR(60) NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.customer.phone",
+      "sql": "ALTER TABLE \"public\".\"customer\" ADD COLUMN IF NOT EXISTS \"phone\" VARCHAR(24);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.customer.state",
+      "sql": "ALTER TABLE \"public\".\"customer\" ADD COLUMN IF NOT EXISTS \"state\" VARCHAR(40);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.customer.company",
+      "sql": "ALTER TABLE \"public\".\"customer\" ADD COLUMN IF NOT EXISTS \"company\" VARCHAR(80);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.customer.address",
+      "sql": "ALTER TABLE \"public\".\"customer\" ADD COLUMN IF NOT EXISTS \"address\" VARCHAR(70);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.customer.city",
+      "sql": "ALTER TABLE \"public\".\"customer\" ADD COLUMN IF NOT EXISTS \"city\" VARCHAR(40);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.customer.country",
+      "sql": "ALTER TABLE \"public\".\"customer\" ADD COLUMN IF NOT EXISTS \"country\" VARCHAR(40);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.customer.postal_code",
+      "sql": "ALTER TABLE \"public\".\"customer\" ADD COLUMN IF NOT EXISTS \"postal_code\" VARCHAR(10);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.customer.fax",
+      "sql": "ALTER TABLE \"public\".\"customer\" ADD COLUMN IF NOT EXISTS \"fax\" VARCHAR(24);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.employee.title",
+      "sql": "ALTER TABLE \"public\".\"employee\" ADD COLUMN IF NOT EXISTS \"title\" VARCHAR(30);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.employee.first_name",
+      "sql": "ALTER TABLE \"public\".\"employee\" ADD COLUMN IF NOT EXISTS \"first_name\" VARCHAR(20) NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.employee.last_name",
+      "sql": "ALTER TABLE \"public\".\"employee\" ADD COLUMN IF NOT EXISTS \"last_name\" VARCHAR(20) NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.employee.email",
+      "sql": "ALTER TABLE \"public\".\"employee\" ADD COLUMN IF NOT EXISTS \"email\" VARCHAR(60);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.employee.phone",
+      "sql": "ALTER TABLE \"public\".\"employee\" ADD COLUMN IF NOT EXISTS \"phone\" VARCHAR(24);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.employee.state",
+      "sql": "ALTER TABLE \"public\".\"employee\" ADD COLUMN IF NOT EXISTS \"state\" VARCHAR(40);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.employee.address",
+      "sql": "ALTER TABLE \"public\".\"employee\" ADD COLUMN IF NOT EXISTS \"address\" VARCHAR(70);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.employee.city",
+      "sql": "ALTER TABLE \"public\".\"employee\" ADD COLUMN IF NOT EXISTS \"city\" VARCHAR(40);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.employee.country",
+      "sql": "ALTER TABLE \"public\".\"employee\" ADD COLUMN IF NOT EXISTS \"country\" VARCHAR(40);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.employee.postal_code",
+      "sql": "ALTER TABLE \"public\".\"employee\" ADD COLUMN IF NOT EXISTS \"postal_code\" VARCHAR(10);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.employee.fax",
+      "sql": "ALTER TABLE \"public\".\"employee\" ADD COLUMN IF NOT EXISTS \"fax\" VARCHAR(24);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.employee.birth_date",
+      "sql": "ALTER TABLE \"public\".\"employee\" ADD COLUMN IF NOT EXISTS \"birth_date\" TIMESTAMP WITH TIME ZONE;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.employee.hire_date",
+      "sql": "ALTER TABLE \"public\".\"employee\" ADD COLUMN IF NOT EXISTS \"hire_date\" TIMESTAMP WITH TIME ZONE;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.genre.name",
+      "sql": "ALTER TABLE \"public\".\"genre\" ADD COLUMN IF NOT EXISTS \"name\" VARCHAR(120);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.invoice.billing_address",
+      "sql": "ALTER TABLE \"public\".\"invoice\" ADD COLUMN IF NOT EXISTS \"billing_address\" VARCHAR(70);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.invoice.billing_city",
+      "sql": "ALTER TABLE \"public\".\"invoice\" ADD COLUMN IF NOT EXISTS \"billing_city\" VARCHAR(40);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.invoice.billing_state",
+      "sql": "ALTER TABLE \"public\".\"invoice\" ADD COLUMN IF NOT EXISTS \"billing_state\" VARCHAR(40);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.invoice.billing_country",
+      "sql": "ALTER TABLE \"public\".\"invoice\" ADD COLUMN IF NOT EXISTS \"billing_country\" VARCHAR(40);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.invoice.billing_postal_code",
+      "sql": "ALTER TABLE \"public\".\"invoice\" ADD COLUMN IF NOT EXISTS \"billing_postal_code\" VARCHAR(10);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.invoice.total",
+      "sql": "ALTER TABLE \"public\".\"invoice\" ADD COLUMN IF NOT EXISTS \"total\" NUMERIC(10, 2) NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.invoice.invoice_date",
+      "sql": "ALTER TABLE \"public\".\"invoice\" ADD COLUMN IF NOT EXISTS \"invoice_date\" TIMESTAMP WITH TIME ZONE NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.invoice_line.unit_price",
+      "sql": "ALTER TABLE \"public\".\"invoice_line\" ADD COLUMN IF NOT EXISTS \"unit_price\" NUMERIC(10, 2) NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.invoice_line.quantity",
+      "sql": "ALTER TABLE \"public\".\"invoice_line\" ADD COLUMN IF NOT EXISTS \"quantity\" INTEGER NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.media_type.name",
+      "sql": "ALTER TABLE \"public\".\"media_type\" ADD COLUMN IF NOT EXISTS \"name\" VARCHAR(120);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.playlist.name",
+      "sql": "ALTER TABLE \"public\".\"playlist\" ADD COLUMN IF NOT EXISTS \"name\" VARCHAR(120);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.track.name",
+      "sql": "ALTER TABLE \"public\".\"track\" ADD COLUMN IF NOT EXISTS \"name\" VARCHAR(200) NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.track.composer",
+      "sql": "ALTER TABLE \"public\".\"track\" ADD COLUMN IF NOT EXISTS \"composer\" VARCHAR(220);"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.track.milliseconds",
+      "sql": "ALTER TABLE \"public\".\"track\" ADD COLUMN IF NOT EXISTS \"milliseconds\" INTEGER NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.track.bytes",
+      "sql": "ALTER TABLE \"public\".\"track\" ADD COLUMN IF NOT EXISTS \"bytes\" INTEGER;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.track.unit_price",
+      "sql": "ALTER TABLE \"public\".\"track\" ADD COLUMN IF NOT EXISTS \"unit_price\" NUMERIC(10, 2) NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.album.artist_id",
+      "sql": "ALTER TABLE \"public\".\"album\" ADD COLUMN IF NOT EXISTS \"artist_id\" INTEGER NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.customer.support_rep_id",
+      "sql": "ALTER TABLE \"public\".\"customer\" ADD COLUMN IF NOT EXISTS \"support_rep_id\" INTEGER;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.employee.reports_to",
+      "sql": "ALTER TABLE \"public\".\"employee\" ADD COLUMN IF NOT EXISTS \"reports_to\" INTEGER;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.invoice.customer_id",
+      "sql": "ALTER TABLE \"public\".\"invoice\" ADD COLUMN IF NOT EXISTS \"customer_id\" INTEGER NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.invoice_line.invoice_id",
+      "sql": "ALTER TABLE \"public\".\"invoice_line\" ADD COLUMN IF NOT EXISTS \"invoice_id\" INTEGER NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.invoice_line.track_id",
+      "sql": "ALTER TABLE \"public\".\"invoice_line\" ADD COLUMN IF NOT EXISTS \"track_id\" INTEGER NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.track.album_id",
+      "sql": "ALTER TABLE \"public\".\"track\" ADD COLUMN IF NOT EXISTS \"album_id\" INTEGER;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.track.genre_id",
+      "sql": "ALTER TABLE \"public\".\"track\" ADD COLUMN IF NOT EXISTS \"genre_id\" INTEGER;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.track.media_type_id",
+      "sql": "ALTER TABLE \"public\".\"track\" ADD COLUMN IF NOT EXISTS \"media_type_id\" INTEGER NOT NULL;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.album.album_artist_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"album\" ADD CONSTRAINT \"album_artist_id_fkey\" FOREIGN KEY (\"artist_id\") REFERENCES \"public\".\"artist\" (\"artist_id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.customer.customer_support_rep_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"customer\" ADD CONSTRAINT \"customer_support_rep_id_fkey\" FOREIGN KEY (\"support_rep_id\") REFERENCES \"public\".\"employee\" (\"employee_id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.employee.employee_reports_to_fkey",
+      "sql": "ALTER TABLE \"public\".\"employee\" ADD CONSTRAINT \"employee_reports_to_fkey\" FOREIGN KEY (\"reports_to\") REFERENCES \"public\".\"employee\" (\"employee_id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.invoice.invoice_customer_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"invoice\" ADD CONSTRAINT \"invoice_customer_id_fkey\" FOREIGN KEY (\"customer_id\") REFERENCES \"public\".\"customer\" (\"customer_id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.invoice_line.invoice_line_invoice_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"invoice_line\" ADD CONSTRAINT \"invoice_line_invoice_id_fkey\" FOREIGN KEY (\"invoice_id\") REFERENCES \"public\".\"invoice\" (\"invoice_id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.invoice_line.invoice_line_track_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"invoice_line\" ADD CONSTRAINT \"invoice_line_track_id_fkey\" FOREIGN KEY (\"track_id\") REFERENCES \"public\".\"track\" (\"track_id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.track.track_album_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"track\" ADD CONSTRAINT \"track_album_id_fkey\" FOREIGN KEY (\"album_id\") REFERENCES \"public\".\"album\" (\"album_id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.track.track_genre_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"track\" ADD CONSTRAINT \"track_genre_id_fkey\" FOREIGN KEY (\"genre_id\") REFERENCES \"public\".\"genre\" (\"genre_id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.track.track_media_type_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"track\" ADD CONSTRAINT \"track_media_type_id_fkey\" FOREIGN KEY (\"media_type_id\") REFERENCES \"public\".\"media_type\" (\"media_type_id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.playlist_track.playlist_track_playlist_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"playlist_track\" ADD CONSTRAINT \"playlist_track_playlist_id_fkey\" FOREIGN KEY (\"playlist_id\") REFERENCES \"public\".\"playlist\" (\"playlist_id\") ON DELETE CASCADE;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.playlist_track.playlist_track_track_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"playlist_track\" ADD CONSTRAINT \"playlist_track_track_id_fkey\" FOREIGN KEY (\"track_id\") REFERENCES \"public\".\"track\" (\"track_id\") ON DELETE CASCADE;"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.album",
+      "sql": "CREATE INDEX IF NOT EXISTS \"album_artist_id_ix_5499864\" ON \"public\".\"album\" (\"artist_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.customer",
+      "sql": "CREATE INDEX IF NOT EXISTS \"customer_support_rep_id_ix_43d7c5d\" ON \"public\".\"customer\" (\"support_rep_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.employee",
+      "sql": "CREATE INDEX IF NOT EXISTS \"employee_reports_to_ix_531204f\" ON \"public\".\"employee\" (\"reports_to\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.invoice",
+      "sql": "CREATE INDEX IF NOT EXISTS \"invoice_customer_id_ix_37cc663\" ON \"public\".\"invoice\" (\"customer_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.invoice_line",
+      "sql": "CREATE INDEX IF NOT EXISTS \"invoice_line_invoice_id_ix_93092bf\" ON \"public\".\"invoice_line\" (\"invoice_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.invoice_line",
+      "sql": "CREATE INDEX IF NOT EXISTS \"invoice_line_track_id_ix_3625da6\" ON \"public\".\"invoice_line\" (\"track_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.playlist_track",
+      "sql": "CREATE INDEX IF NOT EXISTS \"playlist_track_track_id_ix_20780e1\" ON \"public\".\"playlist_track\" (\"track_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.track",
+      "sql": "CREATE INDEX IF NOT EXISTS \"track_album_id_ix_991533a\" ON \"public\".\"track\" (\"album_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.track",
+      "sql": "CREATE INDEX IF NOT EXISTS \"track_genre_id_ix_4509985\" ON \"public\".\"track\" (\"genre_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.track",
+      "sql": "CREATE INDEX IF NOT EXISTS \"track_media_type_id_ix_09f4bc3\" ON \"public\".\"track\" (\"media_type_id\");"
+    }
+  ],
+  "statements": [
+    "CREATE TABLE IF NOT EXISTS \"public\".\"album\" (\"album_id\" INTEGER PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"album\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"artist\" (\"artist_id\" INTEGER PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"artist\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"customer\" (\"customer_id\" INTEGER PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"customer\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"employee\" (\"employee_id\" INTEGER PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"employee\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"genre\" (\"genre_id\" INTEGER PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"genre\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"invoice\" (\"invoice_id\" INTEGER PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"invoice\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"invoice_line\" (\"invoice_line_id\" INTEGER PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"invoice_line\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"media_type\" (\"media_type_id\" INTEGER PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"media_type\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"playlist\" (\"playlist_id\" INTEGER PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"playlist\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"track\" (\"track_id\" INTEGER PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"track\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"playlist_track\" (\"playlist_id\" INTEGER NOT NULL, \"track_id\" INTEGER NOT NULL, PRIMARY KEY (\"playlist_id\", \"track_id\"));",
+    "ALTER TABLE \"public\".\"playlist_track\" ENABLE ROW LEVEL SECURITY;",
+    "ALTER TABLE \"public\".\"album\" ADD COLUMN IF NOT EXISTS \"title\" VARCHAR(160) NOT NULL;",
+    "ALTER TABLE \"public\".\"artist\" ADD COLUMN IF NOT EXISTS \"name\" VARCHAR(120);",
+    "ALTER TABLE \"public\".\"customer\" ADD COLUMN IF NOT EXISTS \"first_name\" VARCHAR(40) NOT NULL;",
+    "ALTER TABLE \"public\".\"customer\" ADD COLUMN IF NOT EXISTS \"last_name\" VARCHAR(20) NOT NULL;",
+    "ALTER TABLE \"public\".\"customer\" ADD COLUMN IF NOT EXISTS \"email\" VARCHAR(60) NOT NULL;",
+    "ALTER TABLE \"public\".\"customer\" ADD COLUMN IF NOT EXISTS \"phone\" VARCHAR(24);",
+    "ALTER TABLE \"public\".\"customer\" ADD COLUMN IF NOT EXISTS \"state\" VARCHAR(40);",
+    "ALTER TABLE \"public\".\"customer\" ADD COLUMN IF NOT EXISTS \"company\" VARCHAR(80);",
+    "ALTER TABLE \"public\".\"customer\" ADD COLUMN IF NOT EXISTS \"address\" VARCHAR(70);",
+    "ALTER TABLE \"public\".\"customer\" ADD COLUMN IF NOT EXISTS \"city\" VARCHAR(40);",
+    "ALTER TABLE \"public\".\"customer\" ADD COLUMN IF NOT EXISTS \"country\" VARCHAR(40);",
+    "ALTER TABLE \"public\".\"customer\" ADD COLUMN IF NOT EXISTS \"postal_code\" VARCHAR(10);",
+    "ALTER TABLE \"public\".\"customer\" ADD COLUMN IF NOT EXISTS \"fax\" VARCHAR(24);",
+    "ALTER TABLE \"public\".\"employee\" ADD COLUMN IF NOT EXISTS \"title\" VARCHAR(30);",
+    "ALTER TABLE \"public\".\"employee\" ADD COLUMN IF NOT EXISTS \"first_name\" VARCHAR(20) NOT NULL;",
+    "ALTER TABLE \"public\".\"employee\" ADD COLUMN IF NOT EXISTS \"last_name\" VARCHAR(20) NOT NULL;",
+    "ALTER TABLE \"public\".\"employee\" ADD COLUMN IF NOT EXISTS \"email\" VARCHAR(60);",
+    "ALTER TABLE \"public\".\"employee\" ADD COLUMN IF NOT EXISTS \"phone\" VARCHAR(24);",
+    "ALTER TABLE \"public\".\"employee\" ADD COLUMN IF NOT EXISTS \"state\" VARCHAR(40);",
+    "ALTER TABLE \"public\".\"employee\" ADD COLUMN IF NOT EXISTS \"address\" VARCHAR(70);",
+    "ALTER TABLE \"public\".\"employee\" ADD COLUMN IF NOT EXISTS \"city\" VARCHAR(40);",
+    "ALTER TABLE \"public\".\"employee\" ADD COLUMN IF NOT EXISTS \"country\" VARCHAR(40);",
+    "ALTER TABLE \"public\".\"employee\" ADD COLUMN IF NOT EXISTS \"postal_code\" VARCHAR(10);",
+    "ALTER TABLE \"public\".\"employee\" ADD COLUMN IF NOT EXISTS \"fax\" VARCHAR(24);",
+    "ALTER TABLE \"public\".\"employee\" ADD COLUMN IF NOT EXISTS \"birth_date\" TIMESTAMP WITH TIME ZONE;",
+    "ALTER TABLE \"public\".\"employee\" ADD COLUMN IF NOT EXISTS \"hire_date\" TIMESTAMP WITH TIME ZONE;",
+    "ALTER TABLE \"public\".\"genre\" ADD COLUMN IF NOT EXISTS \"name\" VARCHAR(120);",
+    "ALTER TABLE \"public\".\"invoice\" ADD COLUMN IF NOT EXISTS \"billing_address\" VARCHAR(70);",
+    "ALTER TABLE \"public\".\"invoice\" ADD COLUMN IF NOT EXISTS \"billing_city\" VARCHAR(40);",
+    "ALTER TABLE \"public\".\"invoice\" ADD COLUMN IF NOT EXISTS \"billing_state\" VARCHAR(40);",
+    "ALTER TABLE \"public\".\"invoice\" ADD COLUMN IF NOT EXISTS \"billing_country\" VARCHAR(40);",
+    "ALTER TABLE \"public\".\"invoice\" ADD COLUMN IF NOT EXISTS \"billing_postal_code\" VARCHAR(10);",
+    "ALTER TABLE \"public\".\"invoice\" ADD COLUMN IF NOT EXISTS \"total\" NUMERIC(10, 2) NOT NULL;",
+    "ALTER TABLE \"public\".\"invoice\" ADD COLUMN IF NOT EXISTS \"invoice_date\" TIMESTAMP WITH TIME ZONE NOT NULL;",
+    "ALTER TABLE \"public\".\"invoice_line\" ADD COLUMN IF NOT EXISTS \"unit_price\" NUMERIC(10, 2) NOT NULL;",
+    "ALTER TABLE \"public\".\"invoice_line\" ADD COLUMN IF NOT EXISTS \"quantity\" INTEGER NOT NULL;",
+    "ALTER TABLE \"public\".\"media_type\" ADD COLUMN IF NOT EXISTS \"name\" VARCHAR(120);",
+    "ALTER TABLE \"public\".\"playlist\" ADD COLUMN IF NOT EXISTS \"name\" VARCHAR(120);",
+    "ALTER TABLE \"public\".\"track\" ADD COLUMN IF NOT EXISTS \"name\" VARCHAR(200) NOT NULL;",
+    "ALTER TABLE \"public\".\"track\" ADD COLUMN IF NOT EXISTS \"composer\" VARCHAR(220);",
+    "ALTER TABLE \"public\".\"track\" ADD COLUMN IF NOT EXISTS \"milliseconds\" INTEGER NOT NULL;",
+    "ALTER TABLE \"public\".\"track\" ADD COLUMN IF NOT EXISTS \"bytes\" INTEGER;",
+    "ALTER TABLE \"public\".\"track\" ADD COLUMN IF NOT EXISTS \"unit_price\" NUMERIC(10, 2) NOT NULL;",
+    "ALTER TABLE \"public\".\"album\" ADD COLUMN IF NOT EXISTS \"artist_id\" INTEGER NOT NULL;",
+    "ALTER TABLE \"public\".\"customer\" ADD COLUMN IF NOT EXISTS \"support_rep_id\" INTEGER;",
+    "ALTER TABLE \"public\".\"employee\" ADD COLUMN IF NOT EXISTS \"reports_to\" INTEGER;",
+    "ALTER TABLE \"public\".\"invoice\" ADD COLUMN IF NOT EXISTS \"customer_id\" INTEGER NOT NULL;",
+    "ALTER TABLE \"public\".\"invoice_line\" ADD COLUMN IF NOT EXISTS \"invoice_id\" INTEGER NOT NULL;",
+    "ALTER TABLE \"public\".\"invoice_line\" ADD COLUMN IF NOT EXISTS \"track_id\" INTEGER NOT NULL;",
+    "ALTER TABLE \"public\".\"track\" ADD COLUMN IF NOT EXISTS \"album_id\" INTEGER;",
+    "ALTER TABLE \"public\".\"track\" ADD COLUMN IF NOT EXISTS \"genre_id\" INTEGER;",
+    "ALTER TABLE \"public\".\"track\" ADD COLUMN IF NOT EXISTS \"media_type_id\" INTEGER NOT NULL;",
+    "ALTER TABLE \"public\".\"album\" ADD CONSTRAINT \"album_artist_id_fkey\" FOREIGN KEY (\"artist_id\") REFERENCES \"public\".\"artist\" (\"artist_id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"customer\" ADD CONSTRAINT \"customer_support_rep_id_fkey\" FOREIGN KEY (\"support_rep_id\") REFERENCES \"public\".\"employee\" (\"employee_id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"employee\" ADD CONSTRAINT \"employee_reports_to_fkey\" FOREIGN KEY (\"reports_to\") REFERENCES \"public\".\"employee\" (\"employee_id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"invoice\" ADD CONSTRAINT \"invoice_customer_id_fkey\" FOREIGN KEY (\"customer_id\") REFERENCES \"public\".\"customer\" (\"customer_id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"invoice_line\" ADD CONSTRAINT \"invoice_line_invoice_id_fkey\" FOREIGN KEY (\"invoice_id\") REFERENCES \"public\".\"invoice\" (\"invoice_id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"invoice_line\" ADD CONSTRAINT \"invoice_line_track_id_fkey\" FOREIGN KEY (\"track_id\") REFERENCES \"public\".\"track\" (\"track_id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"track\" ADD CONSTRAINT \"track_album_id_fkey\" FOREIGN KEY (\"album_id\") REFERENCES \"public\".\"album\" (\"album_id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"track\" ADD CONSTRAINT \"track_genre_id_fkey\" FOREIGN KEY (\"genre_id\") REFERENCES \"public\".\"genre\" (\"genre_id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"track\" ADD CONSTRAINT \"track_media_type_id_fkey\" FOREIGN KEY (\"media_type_id\") REFERENCES \"public\".\"media_type\" (\"media_type_id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"playlist_track\" ADD CONSTRAINT \"playlist_track_playlist_id_fkey\" FOREIGN KEY (\"playlist_id\") REFERENCES \"public\".\"playlist\" (\"playlist_id\") ON DELETE CASCADE;",
+    "ALTER TABLE \"public\".\"playlist_track\" ADD CONSTRAINT \"playlist_track_track_id_fkey\" FOREIGN KEY (\"track_id\") REFERENCES \"public\".\"track\" (\"track_id\") ON DELETE CASCADE;",
+    "CREATE INDEX IF NOT EXISTS \"album_artist_id_ix_5499864\" ON \"public\".\"album\" (\"artist_id\");",
+    "CREATE INDEX IF NOT EXISTS \"customer_support_rep_id_ix_43d7c5d\" ON \"public\".\"customer\" (\"support_rep_id\");",
+    "CREATE INDEX IF NOT EXISTS \"employee_reports_to_ix_531204f\" ON \"public\".\"employee\" (\"reports_to\");",
+    "CREATE INDEX IF NOT EXISTS \"invoice_customer_id_ix_37cc663\" ON \"public\".\"invoice\" (\"customer_id\");",
+    "CREATE INDEX IF NOT EXISTS \"invoice_line_invoice_id_ix_93092bf\" ON \"public\".\"invoice_line\" (\"invoice_id\");",
+    "CREATE INDEX IF NOT EXISTS \"invoice_line_track_id_ix_3625da6\" ON \"public\".\"invoice_line\" (\"track_id\");",
+    "CREATE INDEX IF NOT EXISTS \"playlist_track_track_id_ix_20780e1\" ON \"public\".\"playlist_track\" (\"track_id\");",
+    "CREATE INDEX IF NOT EXISTS \"track_album_id_ix_991533a\" ON \"public\".\"track\" (\"album_id\");",
+    "CREATE INDEX IF NOT EXISTS \"track_genre_id_ix_4509985\" ON \"public\".\"track\" (\"genre_id\");",
+    "CREATE INDEX IF NOT EXISTS \"track_media_type_id_ix_09f4bc3\" ON \"public\".\"track\" (\"media_type_id\");"
+  ],
+  "legacyForeignKeys": [],
+  "searchDrift": [],
+  "searchAdopted": [],
+  "vectorIndexSkipped": [],
+  "withheldConstraints": [],
+  "columnTypeDrift": [],
+  "orphanedRequiredColumns": [],
+  "deferredIndexes": []
+}

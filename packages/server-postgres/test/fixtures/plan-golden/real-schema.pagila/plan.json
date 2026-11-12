@@ -1,0 +1,3565 @@
+{
+  "schemas": [
+    "rebase"
+  ],
+  "declaredSchemas": [],
+  "enums": [
+    {
+      "schema": "public",
+      "name": "film_rating",
+      "qualified": "public.film_rating",
+      "varName": "filmRating",
+      "labels": [
+        "G",
+        "PG",
+        "PG-13",
+        "R",
+        "NC-17"
+      ]
+    }
+  ],
+  "tables": [
+    {
+      "schema": "public",
+      "table": "actor",
+      "qualified": "public.actor",
+      "varName": "actor",
+      "kind": "collection",
+      "slug": "actor",
+      "columns": [
+        {
+          "key": "actorId",
+          "column": "actor_id",
+          "type": {
+            "kind": "serial"
+          },
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "actorId",
+            "slug": "actor"
+          }
+        },
+        {
+          "key": "firstName",
+          "column": "first_name",
+          "type": {
+            "kind": "text"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "firstName",
+            "slug": "actor"
+          }
+        },
+        {
+          "key": "lastName",
+          "column": "last_name",
+          "type": {
+            "kind": "text"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "lastName",
+            "slug": "actor"
+          }
+        },
+        {
+          "key": "lastUpdate",
+          "column": "last_update",
+          "type": {
+            "kind": "timestamptz"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": {
+            "kind": "sql",
+            "expression": "now()"
+          },
+          "source": {
+            "kind": "property",
+            "propName": "lastUpdate",
+            "slug": "actor"
+          }
+        }
+      ],
+      "primaryKey": [
+        "actor_id"
+      ],
+      "indexes": [],
+      "vector": {
+        "specs": [],
+        "skipped": []
+      },
+      "vectorColumns": [],
+      "policies": [
+        {
+          "name": "actor_default_admin_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "actor_default_admin_read",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "actor_default_admin_read_ar_9a530c7e",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "actor_default_admin_write_insert",
+          "operation": "insert",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": null,
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "actor_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "actor_default_admin_write_insert_ar_ff38b750",
+            "using": null,
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "actor_default_admin_write_update",
+          "operation": "update",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "actor_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "actor_default_admin_write_update_ar_b5051ddf",
+            "using": "true",
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "actor_default_admin_write_delete",
+          "operation": "delete",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "actor_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "actor_default_admin_write_delete_ar_c335f2fc",
+            "using": "true",
+            "withCheck": null
+          }
+        }
+      ],
+      "triggers": [],
+      "auth": false
+    },
+    {
+      "schema": "public",
+      "table": "film_actor",
+      "qualified": "public.film_actor",
+      "varName": "filmActor",
+      "kind": "junction",
+      "declaringSlugs": [
+        "actor",
+        "film"
+      ],
+      "columns": [
+        {
+          "key": "actor_id",
+          "column": "actor_id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": {
+            "schema": "public",
+            "table": "film_actor",
+            "column": "actor_id",
+            "targetSchema": "public",
+            "targetTable": "actor",
+            "targetColumn": "actor_id",
+            "onDelete": "CASCADE",
+            "constraintName": "film_actor_actor_id_fkey",
+            "sql": "ALTER TABLE \"public\".\"film_actor\" ADD CONSTRAINT \"film_actor_actor_id_fkey\" FOREIGN KEY (\"actor_id\") REFERENCES \"public\".\"actor\" (\"actor_id\") ON DELETE CASCADE"
+          },
+          "source": {
+            "kind": "junction-key"
+          }
+        },
+        {
+          "key": "film_id",
+          "column": "film_id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": {
+            "schema": "public",
+            "table": "film_actor",
+            "column": "film_id",
+            "targetSchema": "public",
+            "targetTable": "film",
+            "targetColumn": "film_id",
+            "onDelete": "CASCADE",
+            "constraintName": "film_actor_film_id_fkey",
+            "sql": "ALTER TABLE \"public\".\"film_actor\" ADD CONSTRAINT \"film_actor_film_id_fkey\" FOREIGN KEY (\"film_id\") REFERENCES \"public\".\"film\" (\"film_id\") ON DELETE CASCADE"
+          },
+          "source": {
+            "kind": "junction-key"
+          }
+        }
+      ],
+      "primaryKey": [
+        "actor_id",
+        "film_id"
+      ],
+      "indexes": [
+        {
+          "schema": "public",
+          "table": "film_actor",
+          "method": "btree",
+          "unique": false,
+          "keys": [
+            {
+              "column": "film_id",
+              "direction": "asc",
+              "nulls": "last"
+            }
+          ],
+          "include": [],
+          "predicate": null,
+          "reason": "Derived for a foreign key: Postgres indexes the key a constraint points at, never the column holding it.",
+          "indexName": "film_actor_film_id_ix_c6e4954",
+          "derived": "foreign-key"
+        }
+      ],
+      "vectorColumns": [],
+      "policies": [
+        {
+          "name": "film_actor_default_admin_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "film_actor_default_admin_read",
+          "injected": false,
+          "adminRequestCompanion": {
+            "name": "film_actor_default_admin_read_ar_c6ba0773",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "film_actor_default_admin_write_insert",
+          "operation": "insert",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": null,
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "film_actor_default_admin_write",
+          "injected": false,
+          "adminRequestCompanion": {
+            "name": "film_actor_default_admin_write_insert_ar_e91e6f38",
+            "using": null,
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "film_actor_default_admin_write_update",
+          "operation": "update",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "film_actor_default_admin_write",
+          "injected": false,
+          "adminRequestCompanion": {
+            "name": "film_actor_default_admin_write_update_ar_771cefae",
+            "using": "true",
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "film_actor_default_admin_write_delete",
+          "operation": "delete",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "film_actor_default_admin_write",
+          "injected": false,
+          "adminRequestCompanion": {
+            "name": "film_actor_default_admin_write_delete_ar_a237dd74",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "film_actor_default_edge_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "public"
+          ],
+          "using": "(EXISTS (SELECT 1 FROM \"public\".\"actor\" \"_ex0\" WHERE \"_ex0\".actor_id = \"public\".\"film_actor\".actor_id)) AND (EXISTS (SELECT 1 FROM \"public\".\"film\" \"_ex1\" WHERE \"_ex1\".film_id = \"public\".\"film_actor\".film_id))",
+          "withCheck": null,
+          "ruleKey": "film_actor_default_edge_read",
+          "injected": false
+        }
+      ],
+      "triggers": [],
+      "auth": false
+    },
+    {
+      "schema": "public",
+      "table": "address",
+      "qualified": "public.address",
+      "varName": "address",
+      "kind": "collection",
+      "slug": "address",
+      "columns": [
+        {
+          "key": "addressId",
+          "column": "address_id",
+          "type": {
+            "kind": "serial"
+          },
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "addressId",
+            "slug": "address"
+          }
+        },
+        {
+          "key": "phone",
+          "column": "phone",
+          "type": {
+            "kind": "text"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "phone",
+            "slug": "address"
+          }
+        },
+        {
+          "key": "lastUpdate",
+          "column": "last_update",
+          "type": {
+            "kind": "timestamptz"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": {
+            "kind": "sql",
+            "expression": "now()"
+          },
+          "source": {
+            "kind": "property",
+            "propName": "lastUpdate",
+            "slug": "address"
+          }
+        },
+        {
+          "key": "cityId",
+          "column": "city_id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": {
+            "schema": "public",
+            "table": "address",
+            "column": "city_id",
+            "targetSchema": "public",
+            "targetTable": "city",
+            "targetColumn": "city_id",
+            "onDelete": "RESTRICT",
+            "constraintName": "address_city_id_fkey",
+            "sql": "ALTER TABLE \"public\".\"address\" ADD CONSTRAINT \"address_city_id_fkey\" FOREIGN KEY (\"city_id\") REFERENCES \"public\".\"city\" (\"city_id\") ON DELETE RESTRICT"
+          },
+          "source": {
+            "kind": "relation",
+            "propName": "city",
+            "slug": "address"
+          }
+        },
+        {
+          "key": "address",
+          "column": "address",
+          "type": {
+            "kind": "text"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "address",
+            "slug": "address"
+          }
+        },
+        {
+          "key": "address2",
+          "column": "address2",
+          "type": {
+            "kind": "text"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "address2",
+            "slug": "address"
+          }
+        },
+        {
+          "key": "district",
+          "column": "district",
+          "type": {
+            "kind": "text"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "district",
+            "slug": "address"
+          }
+        },
+        {
+          "key": "postalCode",
+          "column": "postal_code",
+          "type": {
+            "kind": "text"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "postalCode",
+            "slug": "address"
+          }
+        }
+      ],
+      "primaryKey": [
+        "address_id"
+      ],
+      "indexes": [
+        {
+          "schema": "public",
+          "table": "address",
+          "method": "btree",
+          "unique": false,
+          "keys": [
+            {
+              "column": "city_id",
+              "direction": "asc",
+              "nulls": "last"
+            }
+          ],
+          "include": [],
+          "predicate": null,
+          "reason": "Derived for a foreign key: Postgres indexes the key a constraint points at, never the column holding it.",
+          "indexName": "address_city_id_ix_3dd7bdc",
+          "derived": "foreign-key"
+        }
+      ],
+      "vector": {
+        "specs": [],
+        "skipped": []
+      },
+      "vectorColumns": [],
+      "policies": [
+        {
+          "name": "address_default_admin_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "address_default_admin_read",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "address_default_admin_read_ar_e8d9ab8d",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "address_default_admin_write_insert",
+          "operation": "insert",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": null,
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "address_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "address_default_admin_write_insert_ar_dea415e5",
+            "using": null,
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "address_default_admin_write_update",
+          "operation": "update",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "address_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "address_default_admin_write_update_ar_fb98cef7",
+            "using": "true",
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "address_default_admin_write_delete",
+          "operation": "delete",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "address_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "address_default_admin_write_delete_ar_fe7535a8",
+            "using": "true",
+            "withCheck": null
+          }
+        }
+      ],
+      "triggers": [],
+      "auth": false
+    },
+    {
+      "schema": "public",
+      "table": "category",
+      "qualified": "public.category",
+      "varName": "category",
+      "kind": "collection",
+      "slug": "category",
+      "columns": [
+        {
+          "key": "categoryId",
+          "column": "category_id",
+          "type": {
+            "kind": "serial"
+          },
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "categoryId",
+            "slug": "category"
+          }
+        },
+        {
+          "key": "name",
+          "column": "name",
+          "type": {
+            "kind": "text"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "name",
+            "slug": "category"
+          }
+        },
+        {
+          "key": "lastUpdate",
+          "column": "last_update",
+          "type": {
+            "kind": "timestamptz"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": {
+            "kind": "sql",
+            "expression": "now()"
+          },
+          "source": {
+            "kind": "property",
+            "propName": "lastUpdate",
+            "slug": "category"
+          }
+        }
+      ],
+      "primaryKey": [
+        "category_id"
+      ],
+      "indexes": [],
+      "vector": {
+        "specs": [],
+        "skipped": []
+      },
+      "vectorColumns": [],
+      "policies": [
+        {
+          "name": "category_default_admin_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "category_default_admin_read",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "category_default_admin_read_ar_7f5f5f22",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "category_default_admin_write_insert",
+          "operation": "insert",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": null,
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "category_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "category_default_admin_write_insert_ar_34aa56cc",
+            "using": null,
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "category_default_admin_write_update",
+          "operation": "update",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "category_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "category_default_admin_write_update_ar_5c2fc1af",
+            "using": "true",
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "category_default_admin_write_delete",
+          "operation": "delete",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "category_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "category_default_admin_write_delete_ar_f77af9cf",
+            "using": "true",
+            "withCheck": null
+          }
+        }
+      ],
+      "triggers": [],
+      "auth": false
+    },
+    {
+      "schema": "public",
+      "table": "city",
+      "qualified": "public.city",
+      "varName": "city",
+      "kind": "collection",
+      "slug": "city",
+      "columns": [
+        {
+          "key": "cityId",
+          "column": "city_id",
+          "type": {
+            "kind": "serial"
+          },
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "cityId",
+            "slug": "city"
+          }
+        },
+        {
+          "key": "lastUpdate",
+          "column": "last_update",
+          "type": {
+            "kind": "timestamptz"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": {
+            "kind": "sql",
+            "expression": "now()"
+          },
+          "source": {
+            "kind": "property",
+            "propName": "lastUpdate",
+            "slug": "city"
+          }
+        },
+        {
+          "key": "countryId",
+          "column": "country_id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": {
+            "schema": "public",
+            "table": "city",
+            "column": "country_id",
+            "targetSchema": "public",
+            "targetTable": "country",
+            "targetColumn": "country_id",
+            "onDelete": "RESTRICT",
+            "constraintName": "city_country_id_fkey",
+            "sql": "ALTER TABLE \"public\".\"city\" ADD CONSTRAINT \"city_country_id_fkey\" FOREIGN KEY (\"country_id\") REFERENCES \"public\".\"country\" (\"country_id\") ON DELETE RESTRICT"
+          },
+          "source": {
+            "kind": "relation",
+            "propName": "country",
+            "slug": "city"
+          }
+        },
+        {
+          "key": "city",
+          "column": "city",
+          "type": {
+            "kind": "text"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "city",
+            "slug": "city"
+          }
+        }
+      ],
+      "primaryKey": [
+        "city_id"
+      ],
+      "indexes": [
+        {
+          "schema": "public",
+          "table": "city",
+          "method": "btree",
+          "unique": false,
+          "keys": [
+            {
+              "column": "country_id",
+              "direction": "asc",
+              "nulls": "last"
+            }
+          ],
+          "include": [],
+          "predicate": null,
+          "reason": "Derived for a foreign key: Postgres indexes the key a constraint points at, never the column holding it.",
+          "indexName": "city_country_id_ix_263e15e",
+          "derived": "foreign-key"
+        }
+      ],
+      "vector": {
+        "specs": [],
+        "skipped": []
+      },
+      "vectorColumns": [],
+      "policies": [
+        {
+          "name": "city_default_admin_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "city_default_admin_read",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "city_default_admin_read_ar_fcf99dfd",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "city_default_admin_write_insert",
+          "operation": "insert",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": null,
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "city_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "city_default_admin_write_insert_ar_6982c3df",
+            "using": null,
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "city_default_admin_write_update",
+          "operation": "update",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "city_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "city_default_admin_write_update_ar_42b06990",
+            "using": "true",
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "city_default_admin_write_delete",
+          "operation": "delete",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "city_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "city_default_admin_write_delete_ar_7ebd1170",
+            "using": "true",
+            "withCheck": null
+          }
+        }
+      ],
+      "triggers": [],
+      "auth": false
+    },
+    {
+      "schema": "public",
+      "table": "country",
+      "qualified": "public.country",
+      "varName": "country",
+      "kind": "collection",
+      "slug": "country",
+      "columns": [
+        {
+          "key": "countryId",
+          "column": "country_id",
+          "type": {
+            "kind": "serial"
+          },
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "countryId",
+            "slug": "country"
+          }
+        },
+        {
+          "key": "lastUpdate",
+          "column": "last_update",
+          "type": {
+            "kind": "timestamptz"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": {
+            "kind": "sql",
+            "expression": "now()"
+          },
+          "source": {
+            "kind": "property",
+            "propName": "lastUpdate",
+            "slug": "country"
+          }
+        },
+        {
+          "key": "country",
+          "column": "country",
+          "type": {
+            "kind": "text"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "country",
+            "slug": "country"
+          }
+        }
+      ],
+      "primaryKey": [
+        "country_id"
+      ],
+      "indexes": [],
+      "vector": {
+        "specs": [],
+        "skipped": []
+      },
+      "vectorColumns": [],
+      "policies": [
+        {
+          "name": "country_default_admin_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "country_default_admin_read",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "country_default_admin_read_ar_9c02ab16",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "country_default_admin_write_insert",
+          "operation": "insert",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": null,
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "country_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "country_default_admin_write_insert_ar_c488b9fc",
+            "using": null,
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "country_default_admin_write_update",
+          "operation": "update",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "country_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "country_default_admin_write_update_ar_748363fc",
+            "using": "true",
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "country_default_admin_write_delete",
+          "operation": "delete",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "country_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "country_default_admin_write_delete_ar_b6a1c0ad",
+            "using": "true",
+            "withCheck": null
+          }
+        }
+      ],
+      "triggers": [],
+      "auth": false
+    },
+    {
+      "schema": "public",
+      "table": "customer",
+      "qualified": "public.customer",
+      "varName": "customer",
+      "kind": "collection",
+      "slug": "customer",
+      "columns": [
+        {
+          "key": "customerId",
+          "column": "customer_id",
+          "type": {
+            "kind": "serial"
+          },
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "customerId",
+            "slug": "customer"
+          }
+        },
+        {
+          "key": "firstName",
+          "column": "first_name",
+          "type": {
+            "kind": "text"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "firstName",
+            "slug": "customer"
+          }
+        },
+        {
+          "key": "lastName",
+          "column": "last_name",
+          "type": {
+            "kind": "text"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "lastName",
+            "slug": "customer"
+          }
+        },
+        {
+          "key": "email",
+          "column": "email",
+          "type": {
+            "kind": "text"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "email",
+            "slug": "customer"
+          }
+        },
+        {
+          "key": "uuid",
+          "column": "uuid",
+          "type": {
+            "kind": "uuid"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": true,
+          "default": {
+            "kind": "sql",
+            "expression": "uuidv7()"
+          },
+          "source": {
+            "kind": "property",
+            "propName": "uuid",
+            "slug": "customer"
+          }
+        },
+        {
+          "key": "activebool",
+          "column": "activebool",
+          "type": {
+            "kind": "boolean"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": {
+            "kind": "literal",
+            "value": true,
+            "sql": "TRUE"
+          },
+          "source": {
+            "kind": "property",
+            "propName": "activebool",
+            "slug": "customer"
+          }
+        },
+        {
+          "key": "active",
+          "column": "active",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "active",
+            "slug": "customer"
+          }
+        },
+        {
+          "key": "createDate",
+          "column": "create_date",
+          "type": {
+            "kind": "date"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": {
+            "kind": "sql",
+            "expression": "CURRENT_DATE"
+          },
+          "source": {
+            "kind": "property",
+            "propName": "createDate",
+            "slug": "customer"
+          }
+        },
+        {
+          "key": "lastUpdate",
+          "column": "last_update",
+          "type": {
+            "kind": "timestamptz"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "default": {
+            "kind": "sql",
+            "expression": "now()"
+          },
+          "source": {
+            "kind": "property",
+            "propName": "lastUpdate",
+            "slug": "customer"
+          }
+        },
+        {
+          "key": "addressId",
+          "column": "address_id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "legacyColumn": "addres_id",
+          "foreignKey": {
+            "schema": "public",
+            "table": "customer",
+            "column": "address_id",
+            "targetSchema": "public",
+            "targetTable": "address",
+            "targetColumn": "address_id",
+            "onDelete": "RESTRICT",
+            "constraintName": "customer_address_id_fkey",
+            "sql": "ALTER TABLE \"public\".\"customer\" ADD CONSTRAINT \"customer_address_id_fkey\" FOREIGN KEY (\"address_id\") REFERENCES \"public\".\"address\" (\"address_id\") ON DELETE RESTRICT"
+          },
+          "source": {
+            "kind": "relation",
+            "propName": "address",
+            "slug": "customer"
+          }
+        },
+        {
+          "key": "storeId",
+          "column": "store_id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": {
+            "schema": "public",
+            "table": "customer",
+            "column": "store_id",
+            "targetSchema": "public",
+            "targetTable": "store",
+            "targetColumn": "store_id",
+            "onDelete": "RESTRICT",
+            "constraintName": "customer_store_id_fkey",
+            "sql": "ALTER TABLE \"public\".\"customer\" ADD CONSTRAINT \"customer_store_id_fkey\" FOREIGN KEY (\"store_id\") REFERENCES \"public\".\"store\" (\"store_id\") ON DELETE RESTRICT"
+          },
+          "source": {
+            "kind": "relation",
+            "propName": "store",
+            "slug": "customer"
+          }
+        }
+      ],
+      "primaryKey": [
+        "customer_id"
+      ],
+      "indexes": [
+        {
+          "schema": "public",
+          "table": "customer",
+          "method": "btree",
+          "unique": false,
+          "keys": [
+            {
+              "column": "address_id",
+              "direction": "asc",
+              "nulls": "last"
+            }
+          ],
+          "include": [],
+          "predicate": null,
+          "reason": "Derived for a foreign key: Postgres indexes the key a constraint points at, never the column holding it.",
+          "indexName": "customer_address_id_ix_2c19cf9",
+          "derived": "foreign-key"
+        },
+        {
+          "schema": "public",
+          "table": "customer",
+          "method": "btree",
+          "unique": false,
+          "keys": [
+            {
+              "column": "store_id",
+              "direction": "asc",
+              "nulls": "last"
+            }
+          ],
+          "include": [],
+          "predicate": null,
+          "reason": "Derived for a foreign key: Postgres indexes the key a constraint points at, never the column holding it.",
+          "indexName": "customer_store_id_ix_4ec4ecf",
+          "derived": "foreign-key"
+        }
+      ],
+      "vector": {
+        "specs": [],
+        "skipped": []
+      },
+      "vectorColumns": [],
+      "policies": [
+        {
+          "name": "customer_default_admin_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "customer_default_admin_read",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "customer_default_admin_read_ar_4a5726a7",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "customer_default_admin_write_insert",
+          "operation": "insert",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": null,
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "customer_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "customer_default_admin_write_insert_ar_8c1a3fc8",
+            "using": null,
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "customer_default_admin_write_update",
+          "operation": "update",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "customer_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "customer_default_admin_write_update_ar_3aff00e6",
+            "using": "true",
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "customer_default_admin_write_delete",
+          "operation": "delete",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "customer_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "customer_default_admin_write_delete_ar_b92cc853",
+            "using": "true",
+            "withCheck": null
+          }
+        }
+      ],
+      "triggers": [],
+      "auth": false
+    },
+    {
+      "schema": "public",
+      "table": "film",
+      "qualified": "public.film",
+      "varName": "film",
+      "kind": "collection",
+      "slug": "film",
+      "columns": [
+        {
+          "key": "filmId",
+          "column": "film_id",
+          "type": {
+            "kind": "serial"
+          },
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "filmId",
+            "slug": "film"
+          }
+        },
+        {
+          "key": "title",
+          "column": "title",
+          "type": {
+            "kind": "text"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "title",
+            "slug": "film"
+          }
+        },
+        {
+          "key": "rating",
+          "column": "rating",
+          "type": {
+            "kind": "enum",
+            "schema": "public",
+            "name": "film_rating",
+            "varName": "filmRating",
+            "labels": [
+              "G",
+              "PG",
+              "PG-13",
+              "R",
+              "NC-17"
+            ]
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "default": {
+            "kind": "literal",
+            "value": "G",
+            "sql": "'G'"
+          },
+          "source": {
+            "kind": "property",
+            "propName": "rating",
+            "slug": "film"
+          }
+        },
+        {
+          "key": "fulltext",
+          "column": "fulltext",
+          "type": {
+            "kind": "text"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "fulltext",
+            "slug": "film"
+          }
+        },
+        {
+          "key": "releaseYear",
+          "column": "release_year",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "releaseYear",
+            "slug": "film"
+          }
+        },
+        {
+          "key": "rentalDuration",
+          "column": "rental_duration",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": {
+            "kind": "literal",
+            "value": 3,
+            "sql": "3"
+          },
+          "source": {
+            "kind": "property",
+            "propName": "rentalDuration",
+            "slug": "film"
+          }
+        },
+        {
+          "key": "rentalRate",
+          "column": "rental_rate",
+          "type": {
+            "kind": "numeric",
+            "precision": 4,
+            "scale": 2
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": {
+            "kind": "literal",
+            "value": 4.99,
+            "sql": "4.99"
+          },
+          "source": {
+            "kind": "property",
+            "propName": "rentalRate",
+            "slug": "film"
+          }
+        },
+        {
+          "key": "length",
+          "column": "length",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "length",
+            "slug": "film"
+          }
+        },
+        {
+          "key": "replacementCost",
+          "column": "replacement_cost",
+          "type": {
+            "kind": "numeric",
+            "precision": 5,
+            "scale": 2
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": {
+            "kind": "literal",
+            "value": 19.99,
+            "sql": "19.99"
+          },
+          "source": {
+            "kind": "property",
+            "propName": "replacementCost",
+            "slug": "film"
+          }
+        },
+        {
+          "key": "lengthHours",
+          "column": "length_hours",
+          "type": {
+            "kind": "numeric"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "lengthHours",
+            "slug": "film"
+          }
+        },
+        {
+          "key": "lastUpdate",
+          "column": "last_update",
+          "type": {
+            "kind": "timestamptz"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": {
+            "kind": "sql",
+            "expression": "now()"
+          },
+          "source": {
+            "kind": "property",
+            "propName": "lastUpdate",
+            "slug": "film"
+          }
+        },
+        {
+          "key": "languageId",
+          "column": "language_id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": {
+            "schema": "public",
+            "table": "film",
+            "column": "language_id",
+            "targetSchema": "public",
+            "targetTable": "language",
+            "targetColumn": "language_id",
+            "onDelete": "RESTRICT",
+            "constraintName": "film_language_id_fkey",
+            "sql": "ALTER TABLE \"public\".\"film\" ADD CONSTRAINT \"film_language_id_fkey\" FOREIGN KEY (\"language_id\") REFERENCES \"public\".\"language\" (\"language_id\") ON DELETE RESTRICT"
+          },
+          "source": {
+            "kind": "relation",
+            "propName": "language",
+            "slug": "film"
+          }
+        },
+        {
+          "key": "originalLanguageId",
+          "column": "original_language_id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": {
+            "schema": "public",
+            "table": "film",
+            "column": "original_language_id",
+            "targetSchema": "public",
+            "targetTable": "language",
+            "targetColumn": "language_id",
+            "onDelete": "restrict",
+            "constraintName": "film_original_language_id_fkey",
+            "sql": "ALTER TABLE \"public\".\"film\" ADD CONSTRAINT \"film_original_language_id_fkey\" FOREIGN KEY (\"original_language_id\") REFERENCES \"public\".\"language\" (\"language_id\") ON DELETE RESTRICT"
+          },
+          "source": {
+            "kind": "relation",
+            "propName": "originalLanguage",
+            "slug": "film"
+          }
+        },
+        {
+          "key": "description",
+          "column": "description",
+          "type": {
+            "kind": "text"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "description",
+            "slug": "film"
+          }
+        },
+        {
+          "key": "specialFeatures",
+          "column": "special_features",
+          "type": {
+            "kind": "array",
+            "of": {
+              "kind": "text"
+            }
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "specialFeatures",
+            "slug": "film"
+          }
+        }
+      ],
+      "primaryKey": [
+        "film_id"
+      ],
+      "indexes": [
+        {
+          "schema": "public",
+          "table": "film",
+          "method": "btree",
+          "unique": false,
+          "keys": [
+            {
+              "column": "language_id",
+              "direction": "asc",
+              "nulls": "last"
+            }
+          ],
+          "include": [],
+          "predicate": null,
+          "reason": "Derived for a foreign key: Postgres indexes the key a constraint points at, never the column holding it.",
+          "indexName": "film_language_id_ix_1f2724b",
+          "derived": "foreign-key"
+        },
+        {
+          "schema": "public",
+          "table": "film",
+          "method": "btree",
+          "unique": false,
+          "keys": [
+            {
+              "column": "original_language_id",
+              "direction": "asc",
+              "nulls": "last"
+            }
+          ],
+          "include": [],
+          "predicate": null,
+          "reason": "Derived for a foreign key: Postgres indexes the key a constraint points at, never the column holding it.",
+          "indexName": "film_original_language_id_ix_3d90cc8",
+          "derived": "foreign-key"
+        }
+      ],
+      "vector": {
+        "specs": [],
+        "skipped": []
+      },
+      "vectorColumns": [],
+      "policies": [
+        {
+          "name": "film_default_admin_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "film_default_admin_read",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "film_default_admin_read_ar_139f6558",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "film_default_admin_write_insert",
+          "operation": "insert",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": null,
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "film_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "film_default_admin_write_insert_ar_be569f8d",
+            "using": null,
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "film_default_admin_write_update",
+          "operation": "update",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "film_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "film_default_admin_write_update_ar_3667b51d",
+            "using": "true",
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "film_default_admin_write_delete",
+          "operation": "delete",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "film_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "film_default_admin_write_delete_ar_57f430b0",
+            "using": "true",
+            "withCheck": null
+          }
+        }
+      ],
+      "triggers": [],
+      "auth": false
+    },
+    {
+      "schema": "public",
+      "table": "film_category",
+      "qualified": "public.film_category",
+      "varName": "filmCategory",
+      "kind": "junction",
+      "declaringSlugs": [
+        "film"
+      ],
+      "columns": [
+        {
+          "key": "film_id",
+          "column": "film_id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": {
+            "schema": "public",
+            "table": "film_category",
+            "column": "film_id",
+            "targetSchema": "public",
+            "targetTable": "film",
+            "targetColumn": "film_id",
+            "onDelete": "CASCADE",
+            "constraintName": "film_category_film_id_fkey",
+            "sql": "ALTER TABLE \"public\".\"film_category\" ADD CONSTRAINT \"film_category_film_id_fkey\" FOREIGN KEY (\"film_id\") REFERENCES \"public\".\"film\" (\"film_id\") ON DELETE CASCADE"
+          },
+          "source": {
+            "kind": "junction-key"
+          }
+        },
+        {
+          "key": "category_id",
+          "column": "category_id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": {
+            "schema": "public",
+            "table": "film_category",
+            "column": "category_id",
+            "targetSchema": "public",
+            "targetTable": "category",
+            "targetColumn": "category_id",
+            "onDelete": "CASCADE",
+            "constraintName": "film_category_category_id_fkey",
+            "sql": "ALTER TABLE \"public\".\"film_category\" ADD CONSTRAINT \"film_category_category_id_fkey\" FOREIGN KEY (\"category_id\") REFERENCES \"public\".\"category\" (\"category_id\") ON DELETE CASCADE"
+          },
+          "source": {
+            "kind": "junction-key"
+          }
+        }
+      ],
+      "primaryKey": [
+        "film_id",
+        "category_id"
+      ],
+      "indexes": [
+        {
+          "schema": "public",
+          "table": "film_category",
+          "method": "btree",
+          "unique": false,
+          "keys": [
+            {
+              "column": "category_id",
+              "direction": "asc",
+              "nulls": "last"
+            }
+          ],
+          "include": [],
+          "predicate": null,
+          "reason": "Derived for a foreign key: Postgres indexes the key a constraint points at, never the column holding it.",
+          "indexName": "film_category_category_id_ix_c009fce",
+          "derived": "foreign-key"
+        }
+      ],
+      "vectorColumns": [],
+      "policies": [
+        {
+          "name": "film_category_default_admin_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "film_category_default_admin_read",
+          "injected": false,
+          "adminRequestCompanion": {
+            "name": "film_category_default_admin_read_ar_1ff5aa38",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "film_category_default_admin_write_insert",
+          "operation": "insert",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": null,
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "film_category_default_admin_write",
+          "injected": false,
+          "adminRequestCompanion": {
+            "name": "film_category_default_admin_write_insert_ar_03786dfd",
+            "using": null,
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "film_category_default_admin_write_update",
+          "operation": "update",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "film_category_default_admin_write",
+          "injected": false,
+          "adminRequestCompanion": {
+            "name": "film_category_default_admin_write_update_ar_72e376fb",
+            "using": "true",
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "film_category_default_admin_write_delete",
+          "operation": "delete",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "film_category_default_admin_write",
+          "injected": false,
+          "adminRequestCompanion": {
+            "name": "film_category_default_admin_write_delete_ar_961bcab9",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "film_category_default_edge_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "public"
+          ],
+          "using": "(EXISTS (SELECT 1 FROM \"public\".\"film\" \"_ex0\" WHERE \"_ex0\".film_id = \"public\".\"film_category\".film_id)) AND (EXISTS (SELECT 1 FROM \"public\".\"category\" \"_ex1\" WHERE \"_ex1\".category_id = \"public\".\"film_category\".category_id))",
+          "withCheck": null,
+          "ruleKey": "film_category_default_edge_read",
+          "injected": false
+        }
+      ],
+      "triggers": [],
+      "auth": false
+    },
+    {
+      "schema": "public",
+      "table": "inventory",
+      "qualified": "public.inventory",
+      "varName": "inventory",
+      "kind": "collection",
+      "slug": "inventory",
+      "columns": [
+        {
+          "key": "inventoryId",
+          "column": "inventory_id",
+          "type": {
+            "kind": "serial"
+          },
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "inventoryId",
+            "slug": "inventory"
+          }
+        },
+        {
+          "key": "lastUpdate",
+          "column": "last_update",
+          "type": {
+            "kind": "timestamptz"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": {
+            "kind": "sql",
+            "expression": "now()"
+          },
+          "source": {
+            "kind": "property",
+            "propName": "lastUpdate",
+            "slug": "inventory"
+          }
+        },
+        {
+          "key": "filmId",
+          "column": "film_id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": {
+            "schema": "public",
+            "table": "inventory",
+            "column": "film_id",
+            "targetSchema": "public",
+            "targetTable": "film",
+            "targetColumn": "film_id",
+            "onDelete": "RESTRICT",
+            "constraintName": "inventory_film_id_fkey",
+            "sql": "ALTER TABLE \"public\".\"inventory\" ADD CONSTRAINT \"inventory_film_id_fkey\" FOREIGN KEY (\"film_id\") REFERENCES \"public\".\"film\" (\"film_id\") ON DELETE RESTRICT"
+          },
+          "source": {
+            "kind": "relation",
+            "propName": "film",
+            "slug": "inventory"
+          }
+        },
+        {
+          "key": "storeId",
+          "column": "store_id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": {
+            "schema": "public",
+            "table": "inventory",
+            "column": "store_id",
+            "targetSchema": "public",
+            "targetTable": "store",
+            "targetColumn": "store_id",
+            "onDelete": "RESTRICT",
+            "constraintName": "inventory_store_id_fkey",
+            "sql": "ALTER TABLE \"public\".\"inventory\" ADD CONSTRAINT \"inventory_store_id_fkey\" FOREIGN KEY (\"store_id\") REFERENCES \"public\".\"store\" (\"store_id\") ON DELETE RESTRICT"
+          },
+          "source": {
+            "kind": "relation",
+            "propName": "store",
+            "slug": "inventory"
+          }
+        }
+      ],
+      "primaryKey": [
+        "inventory_id"
+      ],
+      "indexes": [
+        {
+          "schema": "public",
+          "table": "inventory",
+          "method": "btree",
+          "unique": false,
+          "keys": [
+            {
+              "column": "film_id",
+              "direction": "asc",
+              "nulls": "last"
+            }
+          ],
+          "include": [],
+          "predicate": null,
+          "reason": "Derived for a foreign key: Postgres indexes the key a constraint points at, never the column holding it.",
+          "indexName": "inventory_film_id_ix_37dbbb5",
+          "derived": "foreign-key"
+        },
+        {
+          "schema": "public",
+          "table": "inventory",
+          "method": "btree",
+          "unique": false,
+          "keys": [
+            {
+              "column": "store_id",
+              "direction": "asc",
+              "nulls": "last"
+            }
+          ],
+          "include": [],
+          "predicate": null,
+          "reason": "Derived for a foreign key: Postgres indexes the key a constraint points at, never the column holding it.",
+          "indexName": "inventory_store_id_ix_c895c65",
+          "derived": "foreign-key"
+        }
+      ],
+      "vector": {
+        "specs": [],
+        "skipped": []
+      },
+      "vectorColumns": [],
+      "policies": [
+        {
+          "name": "inventory_default_admin_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "inventory_default_admin_read",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "inventory_default_admin_read_ar_6aa1a38a",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "inventory_default_admin_write_insert",
+          "operation": "insert",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": null,
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "inventory_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "inventory_default_admin_write_insert_ar_1b12aa95",
+            "using": null,
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "inventory_default_admin_write_update",
+          "operation": "update",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "inventory_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "inventory_default_admin_write_update_ar_87182846",
+            "using": "true",
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "inventory_default_admin_write_delete",
+          "operation": "delete",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "inventory_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "inventory_default_admin_write_delete_ar_e81114d9",
+            "using": "true",
+            "withCheck": null
+          }
+        }
+      ],
+      "triggers": [],
+      "auth": false
+    },
+    {
+      "schema": "public",
+      "table": "language",
+      "qualified": "public.language",
+      "varName": "language",
+      "kind": "collection",
+      "slug": "language",
+      "columns": [
+        {
+          "key": "languageId",
+          "column": "language_id",
+          "type": {
+            "kind": "serial"
+          },
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "languageId",
+            "slug": "language"
+          }
+        },
+        {
+          "key": "name",
+          "column": "name",
+          "type": {
+            "kind": "text"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "name",
+            "slug": "language"
+          }
+        },
+        {
+          "key": "lastUpdate",
+          "column": "last_update",
+          "type": {
+            "kind": "timestamptz"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": {
+            "kind": "sql",
+            "expression": "now()"
+          },
+          "source": {
+            "kind": "property",
+            "propName": "lastUpdate",
+            "slug": "language"
+          }
+        }
+      ],
+      "primaryKey": [
+        "language_id"
+      ],
+      "indexes": [],
+      "vector": {
+        "specs": [],
+        "skipped": []
+      },
+      "vectorColumns": [],
+      "policies": [
+        {
+          "name": "language_default_admin_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "language_default_admin_read",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "language_default_admin_read_ar_013ec54b",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "language_default_admin_write_insert",
+          "operation": "insert",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": null,
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "language_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "language_default_admin_write_insert_ar_79232def",
+            "using": null,
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "language_default_admin_write_update",
+          "operation": "update",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "language_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "language_default_admin_write_update_ar_4fd55c6a",
+            "using": "true",
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "language_default_admin_write_delete",
+          "operation": "delete",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "language_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "language_default_admin_write_delete_ar_40c62a25",
+            "using": "true",
+            "withCheck": null
+          }
+        }
+      ],
+      "triggers": [],
+      "auth": false
+    },
+    {
+      "schema": "public",
+      "table": "rental",
+      "qualified": "public.rental",
+      "varName": "rental",
+      "kind": "collection",
+      "slug": "rental",
+      "columns": [
+        {
+          "key": "rentalId",
+          "column": "rental_id",
+          "type": {
+            "kind": "serial"
+          },
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "rentalId",
+            "slug": "rental"
+          }
+        },
+        {
+          "key": "uuid",
+          "column": "uuid",
+          "type": {
+            "kind": "uuid"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": true,
+          "default": {
+            "kind": "sql",
+            "expression": "uuidv7()"
+          },
+          "source": {
+            "kind": "property",
+            "propName": "uuid",
+            "slug": "rental"
+          }
+        },
+        {
+          "key": "rentalDate",
+          "column": "rental_date",
+          "type": {
+            "kind": "timestamptz"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "rentalDate",
+            "slug": "rental"
+          }
+        },
+        {
+          "key": "returnDate",
+          "column": "return_date",
+          "type": {
+            "kind": "timestamptz"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "returnDate",
+            "slug": "rental"
+          }
+        },
+        {
+          "key": "lastUpdate",
+          "column": "last_update",
+          "type": {
+            "kind": "timestamptz"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": {
+            "kind": "sql",
+            "expression": "now()"
+          },
+          "source": {
+            "kind": "property",
+            "propName": "lastUpdate",
+            "slug": "rental"
+          }
+        },
+        {
+          "key": "customerId",
+          "column": "customer_id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": {
+            "schema": "public",
+            "table": "rental",
+            "column": "customer_id",
+            "targetSchema": "public",
+            "targetTable": "customer",
+            "targetColumn": "customer_id",
+            "onDelete": "RESTRICT",
+            "constraintName": "rental_customer_id_fkey",
+            "sql": "ALTER TABLE \"public\".\"rental\" ADD CONSTRAINT \"rental_customer_id_fkey\" FOREIGN KEY (\"customer_id\") REFERENCES \"public\".\"customer\" (\"customer_id\") ON DELETE RESTRICT"
+          },
+          "source": {
+            "kind": "relation",
+            "propName": "customer",
+            "slug": "rental"
+          }
+        },
+        {
+          "key": "inventoryId",
+          "column": "inventory_id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": {
+            "schema": "public",
+            "table": "rental",
+            "column": "inventory_id",
+            "targetSchema": "public",
+            "targetTable": "inventory",
+            "targetColumn": "inventory_id",
+            "onDelete": "RESTRICT",
+            "constraintName": "rental_inventory_id_fkey",
+            "sql": "ALTER TABLE \"public\".\"rental\" ADD CONSTRAINT \"rental_inventory_id_fkey\" FOREIGN KEY (\"inventory_id\") REFERENCES \"public\".\"inventory\" (\"inventory_id\") ON DELETE RESTRICT"
+          },
+          "source": {
+            "kind": "relation",
+            "propName": "inventory",
+            "slug": "rental"
+          }
+        },
+        {
+          "key": "staffId",
+          "column": "staff_id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": {
+            "schema": "public",
+            "table": "rental",
+            "column": "staff_id",
+            "targetSchema": "public",
+            "targetTable": "staff",
+            "targetColumn": "staff_id",
+            "onDelete": "RESTRICT",
+            "constraintName": "rental_staff_id_fkey",
+            "sql": "ALTER TABLE \"public\".\"rental\" ADD CONSTRAINT \"rental_staff_id_fkey\" FOREIGN KEY (\"staff_id\") REFERENCES \"public\".\"staff\" (\"staff_id\") ON DELETE RESTRICT"
+          },
+          "source": {
+            "kind": "relation",
+            "propName": "staff",
+            "slug": "rental"
+          }
+        }
+      ],
+      "primaryKey": [
+        "rental_id"
+      ],
+      "indexes": [
+        {
+          "schema": "public",
+          "table": "rental",
+          "method": "btree",
+          "unique": false,
+          "keys": [
+            {
+              "column": "customer_id",
+              "direction": "asc",
+              "nulls": "last"
+            }
+          ],
+          "include": [],
+          "predicate": null,
+          "reason": "Derived for a foreign key: Postgres indexes the key a constraint points at, never the column holding it.",
+          "indexName": "rental_customer_id_ix_8bb3897",
+          "derived": "foreign-key"
+        },
+        {
+          "schema": "public",
+          "table": "rental",
+          "method": "btree",
+          "unique": false,
+          "keys": [
+            {
+              "column": "inventory_id",
+              "direction": "asc",
+              "nulls": "last"
+            }
+          ],
+          "include": [],
+          "predicate": null,
+          "reason": "Derived for a foreign key: Postgres indexes the key a constraint points at, never the column holding it.",
+          "indexName": "rental_inventory_id_ix_a847b96",
+          "derived": "foreign-key"
+        },
+        {
+          "schema": "public",
+          "table": "rental",
+          "method": "btree",
+          "unique": false,
+          "keys": [
+            {
+              "column": "staff_id",
+              "direction": "asc",
+              "nulls": "last"
+            }
+          ],
+          "include": [],
+          "predicate": null,
+          "reason": "Derived for a foreign key: Postgres indexes the key a constraint points at, never the column holding it.",
+          "indexName": "rental_staff_id_ix_714ab52",
+          "derived": "foreign-key"
+        }
+      ],
+      "vector": {
+        "specs": [],
+        "skipped": []
+      },
+      "vectorColumns": [],
+      "policies": [
+        {
+          "name": "rental_default_admin_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "rental_default_admin_read",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "rental_default_admin_read_ar_e024c8a9",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "rental_default_admin_write_insert",
+          "operation": "insert",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": null,
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "rental_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "rental_default_admin_write_insert_ar_b4135dbb",
+            "using": null,
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "rental_default_admin_write_update",
+          "operation": "update",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "rental_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "rental_default_admin_write_update_ar_fc6fe651",
+            "using": "true",
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "rental_default_admin_write_delete",
+          "operation": "delete",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "rental_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "rental_default_admin_write_delete_ar_e2c7a96e",
+            "using": "true",
+            "withCheck": null
+          }
+        }
+      ],
+      "triggers": [],
+      "auth": false
+    },
+    {
+      "schema": "public",
+      "table": "staff",
+      "qualified": "public.staff",
+      "varName": "staff",
+      "kind": "collection",
+      "slug": "staff",
+      "columns": [
+        {
+          "key": "staffId",
+          "column": "staff_id",
+          "type": {
+            "kind": "serial"
+          },
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "staffId",
+            "slug": "staff"
+          }
+        },
+        {
+          "key": "firstName",
+          "column": "first_name",
+          "type": {
+            "kind": "text"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "firstName",
+            "slug": "staff"
+          }
+        },
+        {
+          "key": "lastName",
+          "column": "last_name",
+          "type": {
+            "kind": "text"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "lastName",
+            "slug": "staff"
+          }
+        },
+        {
+          "key": "username",
+          "column": "username",
+          "type": {
+            "kind": "text"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "username",
+            "slug": "staff"
+          }
+        },
+        {
+          "key": "email",
+          "column": "email",
+          "type": {
+            "kind": "text"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "email",
+            "slug": "staff"
+          }
+        },
+        {
+          "key": "active",
+          "column": "active",
+          "type": {
+            "kind": "boolean"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": {
+            "kind": "literal",
+            "value": true,
+            "sql": "TRUE"
+          },
+          "source": {
+            "kind": "property",
+            "propName": "active",
+            "slug": "staff"
+          }
+        },
+        {
+          "key": "lastUpdate",
+          "column": "last_update",
+          "type": {
+            "kind": "timestamptz"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": {
+            "kind": "sql",
+            "expression": "now()"
+          },
+          "source": {
+            "kind": "property",
+            "propName": "lastUpdate",
+            "slug": "staff"
+          }
+        },
+        {
+          "key": "addressId",
+          "column": "address_id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "legacyColumn": "addres_id",
+          "foreignKey": {
+            "schema": "public",
+            "table": "staff",
+            "column": "address_id",
+            "targetSchema": "public",
+            "targetTable": "address",
+            "targetColumn": "address_id",
+            "onDelete": "RESTRICT",
+            "constraintName": "staff_address_id_fkey",
+            "sql": "ALTER TABLE \"public\".\"staff\" ADD CONSTRAINT \"staff_address_id_fkey\" FOREIGN KEY (\"address_id\") REFERENCES \"public\".\"address\" (\"address_id\") ON DELETE RESTRICT"
+          },
+          "source": {
+            "kind": "relation",
+            "propName": "address",
+            "slug": "staff"
+          }
+        },
+        {
+          "key": "storeId",
+          "column": "store_id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": {
+            "schema": "public",
+            "table": "staff",
+            "column": "store_id",
+            "targetSchema": "public",
+            "targetTable": "store",
+            "targetColumn": "store_id",
+            "onDelete": "no action",
+            "constraintName": "staff_store_id_fkey",
+            "sql": "ALTER TABLE \"public\".\"staff\" ADD CONSTRAINT \"staff_store_id_fkey\" FOREIGN KEY (\"store_id\") REFERENCES \"public\".\"store\" (\"store_id\") ON DELETE NO ACTION"
+          },
+          "source": {
+            "kind": "relation",
+            "propName": "store",
+            "slug": "staff"
+          }
+        },
+        {
+          "key": "password",
+          "column": "password",
+          "type": {
+            "kind": "text"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "password",
+            "slug": "staff"
+          }
+        },
+        {
+          "key": "picture",
+          "column": "picture",
+          "type": {
+            "kind": "bytea"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "picture",
+            "slug": "staff"
+          }
+        }
+      ],
+      "primaryKey": [
+        "staff_id"
+      ],
+      "indexes": [
+        {
+          "schema": "public",
+          "table": "staff",
+          "method": "btree",
+          "unique": false,
+          "keys": [
+            {
+              "column": "address_id",
+              "direction": "asc",
+              "nulls": "last"
+            }
+          ],
+          "include": [],
+          "predicate": null,
+          "reason": "Derived for a foreign key: Postgres indexes the key a constraint points at, never the column holding it.",
+          "indexName": "staff_address_id_ix_f7d5f95",
+          "derived": "foreign-key"
+        },
+        {
+          "schema": "public",
+          "table": "staff",
+          "method": "btree",
+          "unique": false,
+          "keys": [
+            {
+              "column": "store_id",
+              "direction": "asc",
+              "nulls": "last"
+            }
+          ],
+          "include": [],
+          "predicate": null,
+          "reason": "Derived for a foreign key: Postgres indexes the key a constraint points at, never the column holding it.",
+          "indexName": "staff_store_id_ix_68981bf",
+          "derived": "foreign-key"
+        }
+      ],
+      "vector": {
+        "specs": [],
+        "skipped": []
+      },
+      "vectorColumns": [],
+      "policies": [
+        {
+          "name": "staff_default_admin_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "staff_default_admin_read",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "staff_default_admin_read_ar_b0a57e03",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "staff_default_admin_write_insert",
+          "operation": "insert",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": null,
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "staff_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "staff_default_admin_write_insert_ar_07fb08ef",
+            "using": null,
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "staff_default_admin_write_update",
+          "operation": "update",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "staff_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "staff_default_admin_write_update_ar_625a56af",
+            "using": "true",
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "staff_default_admin_write_delete",
+          "operation": "delete",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "staff_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "staff_default_admin_write_delete_ar_b48815c4",
+            "using": "true",
+            "withCheck": null
+          }
+        }
+      ],
+      "triggers": [],
+      "auth": false
+    },
+    {
+      "schema": "public",
+      "table": "store",
+      "qualified": "public.store",
+      "varName": "store",
+      "kind": "collection",
+      "slug": "store",
+      "columns": [
+        {
+          "key": "storeId",
+          "column": "store_id",
+          "type": {
+            "kind": "serial"
+          },
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "storeId",
+            "slug": "store"
+          }
+        },
+        {
+          "key": "managerStaffId",
+          "column": "manager_staff_id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": true,
+          "source": {
+            "kind": "property",
+            "propName": "managerStaffId",
+            "slug": "store"
+          }
+        },
+        {
+          "key": "lastUpdate",
+          "column": "last_update",
+          "type": {
+            "kind": "timestamptz"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "default": {
+            "kind": "sql",
+            "expression": "now()"
+          },
+          "source": {
+            "kind": "property",
+            "propName": "lastUpdate",
+            "slug": "store"
+          }
+        },
+        {
+          "key": "addressId",
+          "column": "address_id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "legacyColumn": "addres_id",
+          "foreignKey": {
+            "schema": "public",
+            "table": "store",
+            "column": "address_id",
+            "targetSchema": "public",
+            "targetTable": "address",
+            "targetColumn": "address_id",
+            "onDelete": "RESTRICT",
+            "constraintName": "store_address_id_fkey",
+            "sql": "ALTER TABLE \"public\".\"store\" ADD CONSTRAINT \"store_address_id_fkey\" FOREIGN KEY (\"address_id\") REFERENCES \"public\".\"address\" (\"address_id\") ON DELETE RESTRICT"
+          },
+          "source": {
+            "kind": "relation",
+            "propName": "address",
+            "slug": "store"
+          }
+        }
+      ],
+      "primaryKey": [
+        "store_id"
+      ],
+      "indexes": [
+        {
+          "schema": "public",
+          "table": "store",
+          "method": "btree",
+          "unique": false,
+          "keys": [
+            {
+              "column": "address_id",
+              "direction": "asc",
+              "nulls": "last"
+            }
+          ],
+          "include": [],
+          "predicate": null,
+          "reason": "Derived for a foreign key: Postgres indexes the key a constraint points at, never the column holding it.",
+          "indexName": "store_address_id_ix_ed1824e",
+          "derived": "foreign-key"
+        }
+      ],
+      "vector": {
+        "specs": [],
+        "skipped": []
+      },
+      "vectorColumns": [],
+      "policies": [
+        {
+          "name": "store_default_admin_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "store_default_admin_read",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "store_default_admin_read_ar_7c7faa8c",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "store_default_admin_write_insert",
+          "operation": "insert",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": null,
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "store_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "store_default_admin_write_insert_ar_b7acbc67",
+            "using": null,
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "store_default_admin_write_update",
+          "operation": "update",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "store_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "store_default_admin_write_update_ar_8c0dfdc7",
+            "using": "true",
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "store_default_admin_write_delete",
+          "operation": "delete",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "store_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "store_default_admin_write_delete_ar_3191fd70",
+            "using": "true",
+            "withCheck": null
+          }
+        }
+      ],
+      "triggers": [],
+      "auth": false
+    }
+  ],
+  "views": [],
+  "relations": [
+    {
+      "tableVar": "actor",
+      "key": "film",
+      "kind": "many",
+      "targetVar": "filmActor",
+      "relationName": "film"
+    },
+    {
+      "tableVar": "filmActor",
+      "key": "actor_id",
+      "kind": "one",
+      "targetVar": "actor",
+      "relationName": "film",
+      "fields": [
+        "actor_id"
+      ],
+      "references": [
+        "actorId"
+      ]
+    },
+    {
+      "tableVar": "filmActor",
+      "key": "film_id",
+      "kind": "one",
+      "targetVar": "film",
+      "relationName": "actor",
+      "fields": [
+        "film_id"
+      ],
+      "references": [
+        "filmId"
+      ]
+    },
+    {
+      "tableVar": "address",
+      "key": "customer",
+      "kind": "many",
+      "targetVar": "customer",
+      "relationName": "customer_addressId"
+    },
+    {
+      "tableVar": "address",
+      "key": "staff",
+      "kind": "many",
+      "targetVar": "staff",
+      "relationName": "staff_addressId"
+    },
+    {
+      "tableVar": "address",
+      "key": "store",
+      "kind": "many",
+      "targetVar": "store",
+      "relationName": "store_addressId"
+    },
+    {
+      "tableVar": "address",
+      "key": "city",
+      "kind": "one",
+      "targetVar": "city",
+      "relationName": "address_cityId",
+      "fields": [
+        "cityId"
+      ],
+      "references": [
+        "cityId"
+      ]
+    },
+    {
+      "tableVar": "city",
+      "key": "address",
+      "kind": "many",
+      "targetVar": "address",
+      "relationName": "address_cityId"
+    },
+    {
+      "tableVar": "city",
+      "key": "country",
+      "kind": "one",
+      "targetVar": "country",
+      "relationName": "city_countryId",
+      "fields": [
+        "countryId"
+      ],
+      "references": [
+        "countryId"
+      ]
+    },
+    {
+      "tableVar": "country",
+      "key": "city",
+      "kind": "many",
+      "targetVar": "city",
+      "relationName": "city_countryId"
+    },
+    {
+      "tableVar": "customer",
+      "key": "rental",
+      "kind": "many",
+      "targetVar": "rental",
+      "relationName": "rental_customerId"
+    },
+    {
+      "tableVar": "customer",
+      "key": "address",
+      "kind": "one",
+      "targetVar": "address",
+      "relationName": "customer_addressId",
+      "fields": [
+        "addressId"
+      ],
+      "references": [
+        "addressId"
+      ]
+    },
+    {
+      "tableVar": "customer",
+      "key": "store",
+      "kind": "one",
+      "targetVar": "store",
+      "relationName": "customer_storeId",
+      "fields": [
+        "storeId"
+      ],
+      "references": [
+        "storeId"
+      ]
+    },
+    {
+      "tableVar": "film",
+      "key": "inventory",
+      "kind": "many",
+      "targetVar": "inventory",
+      "relationName": "inventory_filmId"
+    },
+    {
+      "tableVar": "film",
+      "key": "actor",
+      "kind": "many",
+      "targetVar": "filmActor",
+      "relationName": "actor"
+    },
+    {
+      "tableVar": "film",
+      "key": "category",
+      "kind": "many",
+      "targetVar": "filmCategory",
+      "relationName": "category"
+    },
+    {
+      "tableVar": "film",
+      "key": "language",
+      "kind": "one",
+      "targetVar": "language",
+      "relationName": "film_languageId",
+      "fields": [
+        "languageId"
+      ],
+      "references": [
+        "languageId"
+      ]
+    },
+    {
+      "tableVar": "film",
+      "key": "originalLanguage",
+      "kind": "one",
+      "targetVar": "language",
+      "relationName": "film_originalLanguageId",
+      "fields": [
+        "originalLanguageId"
+      ],
+      "references": [
+        "languageId"
+      ]
+    },
+    {
+      "tableVar": "filmCategory",
+      "key": "film_id",
+      "kind": "one",
+      "targetVar": "film",
+      "relationName": "category",
+      "fields": [
+        "film_id"
+      ],
+      "references": [
+        "filmId"
+      ]
+    },
+    {
+      "tableVar": "filmCategory",
+      "key": "category_id",
+      "kind": "one",
+      "targetVar": "category",
+      "relationName": "film_category_category_id",
+      "fields": [
+        "category_id"
+      ],
+      "references": [
+        "categoryId"
+      ]
+    },
+    {
+      "tableVar": "inventory",
+      "key": "rental",
+      "kind": "many",
+      "targetVar": "rental",
+      "relationName": "rental_inventoryId"
+    },
+    {
+      "tableVar": "inventory",
+      "key": "film",
+      "kind": "one",
+      "targetVar": "film",
+      "relationName": "inventory_filmId",
+      "fields": [
+        "filmId"
+      ],
+      "references": [
+        "filmId"
+      ]
+    },
+    {
+      "tableVar": "inventory",
+      "key": "store",
+      "kind": "one",
+      "targetVar": "store",
+      "relationName": "inventory_storeId",
+      "fields": [
+        "storeId"
+      ],
+      "references": [
+        "storeId"
+      ]
+    },
+    {
+      "tableVar": "language",
+      "key": "film",
+      "kind": "many",
+      "targetVar": "film",
+      "relationName": "film_languageId"
+    },
+    {
+      "tableVar": "language",
+      "key": "film_by_original_language_id",
+      "kind": "many",
+      "targetVar": "film",
+      "relationName": "film_originalLanguageId"
+    },
+    {
+      "tableVar": "rental",
+      "key": "customer",
+      "kind": "one",
+      "targetVar": "customer",
+      "relationName": "rental_customerId",
+      "fields": [
+        "customerId"
+      ],
+      "references": [
+        "customerId"
+      ]
+    },
+    {
+      "tableVar": "rental",
+      "key": "inventory",
+      "kind": "one",
+      "targetVar": "inventory",
+      "relationName": "rental_inventoryId",
+      "fields": [
+        "inventoryId"
+      ],
+      "references": [
+        "inventoryId"
+      ]
+    },
+    {
+      "tableVar": "rental",
+      "key": "staff",
+      "kind": "one",
+      "targetVar": "staff",
+      "relationName": "rental_staffId",
+      "fields": [
+        "staffId"
+      ],
+      "references": [
+        "staffId"
+      ]
+    },
+    {
+      "tableVar": "staff",
+      "key": "rental",
+      "kind": "many",
+      "targetVar": "rental",
+      "relationName": "rental_staffId"
+    },
+    {
+      "tableVar": "staff",
+      "key": "address",
+      "kind": "one",
+      "targetVar": "address",
+      "relationName": "staff_addressId",
+      "fields": [
+        "addressId"
+      ],
+      "references": [
+        "addressId"
+      ]
+    },
+    {
+      "tableVar": "staff",
+      "key": "store",
+      "kind": "one",
+      "targetVar": "store",
+      "relationName": "staff_storeId",
+      "fields": [
+        "storeId"
+      ],
+      "references": [
+        "storeId"
+      ]
+    },
+    {
+      "tableVar": "store",
+      "key": "customer",
+      "kind": "many",
+      "targetVar": "customer",
+      "relationName": "customer_storeId"
+    },
+    {
+      "tableVar": "store",
+      "key": "inventory",
+      "kind": "many",
+      "targetVar": "inventory",
+      "relationName": "inventory_storeId"
+    },
+    {
+      "tableVar": "store",
+      "key": "staff",
+      "kind": "many",
+      "targetVar": "staff",
+      "relationName": "staff_storeId"
+    },
+    {
+      "tableVar": "store",
+      "key": "address",
+      "kind": "one",
+      "targetVar": "address",
+      "relationName": "store_addressId",
+      "fields": [
+        "addressId"
+      ],
+      "references": [
+        "addressId"
+      ]
+    }
+  ],
+  "extensions": [],
+  "functions": [],
+  "options": {
+    "databaseExtensions": []
+  }
+}

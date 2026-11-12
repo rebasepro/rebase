@@ -1,0 +1,17 @@
+{
+  "search": [
+    "public.searched_articles.search_vector",
+    "public.searched_articles.search_vector_text",
+    "public.searched_articles.searched_articles_search_vector_gin",
+    "public.searched_articles.searched_articles_search_vector_text_trgm"
+  ],
+  "vector": [
+    "public.products.embedding",
+    "public.products.products_embedding_hnsw_cosine"
+  ],
+  "triggers": [
+    "public.players_teams.players_teams_changed_at_touch",
+    "public.tenant_documents.tenant_documents_keep_tenant",
+    "public.touched_rows.touched_rows_updated_at_touch"
+  ]
+}

@@ -1,0 +1,20 @@
+[
+  {
+    "schema": "public",
+    "table": "constraint_shapes_child",
+    "column": "parent_id",
+    "type": "INTEGER",
+    "required": true,
+    "foreignKey": {
+      "schema": "public",
+      "table": "constraint_shapes_child",
+      "column": "parent_id",
+      "targetSchema": "public",
+      "targetTable": "constraint_shapes",
+      "targetColumn": "id",
+      "onDelete": "cascade",
+      "constraintName": "constraint_shapes_child_parent_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"constraint_shapes_child\" ADD CONSTRAINT \"constraint_shapes_child_parent_id_fkey\" FOREIGN KEY (\"parent_id\") REFERENCES \"public\".\"constraint_shapes\" (\"id\") ON DELETE CASCADE"
+    }
+  }
+]

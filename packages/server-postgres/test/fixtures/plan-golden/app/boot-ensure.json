@@ -1,0 +1,1250 @@
+{
+  "actions": [
+    {
+      "kind": "create-enum",
+      "target": "public.exercises_difficulty",
+      "sql": "CREATE TYPE \"public\".\"exercises_difficulty\" AS ENUM ('beginner', 'intermediate', 'advanced');"
+    },
+    {
+      "kind": "create-enum",
+      "target": "public.exercises_category",
+      "sql": "CREATE TYPE \"public\".\"exercises_category\" AS ENUM ('strength', 'cardio', 'flexibility', 'balance', 'plyometrics', 'calisthenics');"
+    },
+    {
+      "kind": "create-enum",
+      "target": "public.exercises_status",
+      "sql": "CREATE TYPE \"public\".\"exercises_status\" AS ENUM ('draft', 'published', 'archived');"
+    },
+    {
+      "kind": "create-enum",
+      "target": "public.orders_status",
+      "sql": "CREATE TYPE \"public\".\"orders_status\" AS ENUM ('pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded');"
+    },
+    {
+      "kind": "create-enum",
+      "target": "public.orders_payment_status",
+      "sql": "CREATE TYPE \"public\".\"orders_payment_status\" AS ENUM ('unpaid', 'paid', 'partially_refunded', 'refunded');"
+    },
+    {
+      "kind": "create-enum",
+      "target": "public.orders_currency",
+      "sql": "CREATE TYPE \"public\".\"orders_currency\" AS ENUM ('USD', 'EUR', 'GBP', 'CAD', 'AUD');"
+    },
+    {
+      "kind": "create-enum",
+      "target": "public.posts_status",
+      "sql": "CREATE TYPE \"public\".\"posts_status\" AS ENUM ('draft', 'needs_review', 'published', 'archived');"
+    },
+    {
+      "kind": "create-enum",
+      "target": "public.product_locales_locale",
+      "sql": "CREATE TYPE \"public\".\"product_locales_locale\" AS ENUM ('en', 'es', 'fr', 'de', 'it');"
+    },
+    {
+      "kind": "create-enum",
+      "target": "public.products_category",
+      "sql": "CREATE TYPE \"public\".\"products_category\" AS ENUM ('electronics', 'clothing', 'home_garden', 'sports', 'books', 'food_beverage', 'health_beauty', 'toys');"
+    },
+    {
+      "kind": "create-enum",
+      "target": "public.products_status",
+      "sql": "CREATE TYPE \"public\".\"products_status\" AS ENUM ('draft', 'active', 'archived');"
+    },
+    {
+      "kind": "create-enum",
+      "target": "public.tickets_status",
+      "sql": "CREATE TYPE \"public\".\"tickets_status\" AS ENUM ('open', 'in_progress', 'waiting', 'resolved', 'closed');"
+    },
+    {
+      "kind": "create-enum",
+      "target": "public.tickets_priority",
+      "sql": "CREATE TYPE \"public\".\"tickets_priority\" AS ENUM ('low', 'medium', 'high', 'urgent');"
+    },
+    {
+      "kind": "create-enum",
+      "target": "public.tickets_category",
+      "sql": "CREATE TYPE \"public\".\"tickets_category\" AS ENUM ('bug', 'feature_request', 'question', 'billing', 'account', 'other');"
+    },
+    {
+      "kind": "create-function",
+      "target": "public.rebase_search_text",
+      "sql": "CREATE OR REPLACE FUNCTION public.rebase_search_text(text[]) RETURNS text\n    LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE AS\n    $$ SELECT array_to_string($1, ' ') $$;"
+    },
+    {
+      "kind": "create-function",
+      "target": "public.rebase_search_text",
+      "sql": "CREATE OR REPLACE FUNCTION public.rebase_search_text(jsonb) RETURNS text\n    LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE AS\n    $$ SELECT coalesce(string_agg(v, ' '), '')\n       FROM jsonb_array_elements_text(jsonb_path_query_array($1, 'strict $.**?(@.type() == \"string\")')) AS v $$;"
+    },
+    {
+      "kind": "create-function",
+      "target": "rebase.set_updated_at",
+      "sql": "CREATE OR REPLACE FUNCTION rebase.set_updated_at() RETURNS trigger\nLANGUAGE plpgsql AS $$\nBEGIN\n    NEW := jsonb_populate_record(NEW, jsonb_build_object(TG_ARGV[0], now()));\n    RETURN NEW;\nEND;\n$$;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.authors",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"authors\" (\"id\" UUID PRIMARY KEY DEFAULT gen_random_uuid());"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.authors",
+      "sql": "ALTER TABLE \"public\".\"authors\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.customers",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"customers\" (\"id\" UUID PRIMARY KEY DEFAULT gen_random_uuid());"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.customers",
+      "sql": "ALTER TABLE \"public\".\"customers\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.exercises",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"exercises\" (\"id\" UUID PRIMARY KEY DEFAULT gen_random_uuid());"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.exercises",
+      "sql": "ALTER TABLE \"public\".\"exercises\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.order_items",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"order_items\" (\"id\" UUID PRIMARY KEY DEFAULT gen_random_uuid());"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.order_items",
+      "sql": "ALTER TABLE \"public\".\"order_items\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.orders",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"orders\" (\"id\" UUID PRIMARY KEY DEFAULT gen_random_uuid());"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.orders",
+      "sql": "ALTER TABLE \"public\".\"orders\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.posts",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"posts\" (\"id\" UUID PRIMARY KEY DEFAULT gen_random_uuid());"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.posts",
+      "sql": "ALTER TABLE \"public\".\"posts\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.product_locales",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"product_locales\" (\"id\" UUID PRIMARY KEY DEFAULT gen_random_uuid());"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.product_locales",
+      "sql": "ALTER TABLE \"public\".\"product_locales\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.products",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"products\" (\"id\" UUID PRIMARY KEY DEFAULT gen_random_uuid());"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.products",
+      "sql": "ALTER TABLE \"public\".\"products\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.tags",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"tags\" (\"id\" UUID PRIMARY KEY DEFAULT gen_random_uuid());"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.tags",
+      "sql": "ALTER TABLE \"public\".\"tags\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.tickets",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"tickets\" (\"id\" UUID PRIMARY KEY DEFAULT gen_random_uuid());"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.tickets",
+      "sql": "ALTER TABLE \"public\".\"tickets\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "rebase.users",
+      "sql": "CREATE TABLE IF NOT EXISTS \"rebase\".\"users\" (\"id\" UUID PRIMARY KEY DEFAULT gen_random_uuid());"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "rebase.users",
+      "sql": "ALTER TABLE \"rebase\".\"users\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.posts_tags",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"posts_tags\" (\"post_id\" UUID NOT NULL, \"tag_id\" UUID NOT NULL, PRIMARY KEY (\"post_id\", \"tag_id\"));"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.posts_tags",
+      "sql": "ALTER TABLE \"public\".\"posts_tags\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.authors.name",
+      "sql": "ALTER TABLE \"public\".\"authors\" ADD COLUMN IF NOT EXISTS \"name\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.authors.email",
+      "sql": "ALTER TABLE \"public\".\"authors\" ADD COLUMN IF NOT EXISTS \"email\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.authors.picture",
+      "sql": "ALTER TABLE \"public\".\"authors\" ADD COLUMN IF NOT EXISTS \"picture\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.authors.bio",
+      "sql": "ALTER TABLE \"public\".\"authors\" ADD COLUMN IF NOT EXISTS \"bio\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.authors.twitter",
+      "sql": "ALTER TABLE \"public\".\"authors\" ADD COLUMN IF NOT EXISTS \"twitter\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.authors.github",
+      "sql": "ALTER TABLE \"public\".\"authors\" ADD COLUMN IF NOT EXISTS \"github\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.authors.website",
+      "sql": "ALTER TABLE \"public\".\"authors\" ADD COLUMN IF NOT EXISTS \"website\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.authors.user_id",
+      "sql": "ALTER TABLE \"public\".\"authors\" ADD COLUMN IF NOT EXISTS \"user_id\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.customers.first_name",
+      "sql": "ALTER TABLE \"public\".\"customers\" ADD COLUMN IF NOT EXISTS \"first_name\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.customers.last_name",
+      "sql": "ALTER TABLE \"public\".\"customers\" ADD COLUMN IF NOT EXISTS \"last_name\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.customers.email",
+      "sql": "ALTER TABLE \"public\".\"customers\" ADD COLUMN IF NOT EXISTS \"email\" TEXT UNIQUE NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.customers.phone",
+      "sql": "ALTER TABLE \"public\".\"customers\" ADD COLUMN IF NOT EXISTS \"phone\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.customers.avatar",
+      "sql": "ALTER TABLE \"public\".\"customers\" ADD COLUMN IF NOT EXISTS \"avatar\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.customers.company",
+      "sql": "ALTER TABLE \"public\".\"customers\" ADD COLUMN IF NOT EXISTS \"company\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.customers.is_vip",
+      "sql": "ALTER TABLE \"public\".\"customers\" ADD COLUMN IF NOT EXISTS \"is_vip\" BOOLEAN;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.customers.lifetime_value",
+      "sql": "ALTER TABLE \"public\".\"customers\" ADD COLUMN IF NOT EXISTS \"lifetime_value\" NUMERIC;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.customers.total_orders",
+      "sql": "ALTER TABLE \"public\".\"customers\" ADD COLUMN IF NOT EXISTS \"total_orders\" NUMERIC;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.customers.shipping_address",
+      "sql": "ALTER TABLE \"public\".\"customers\" ADD COLUMN IF NOT EXISTS \"shipping_address\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.customers.billing_address",
+      "sql": "ALTER TABLE \"public\".\"customers\" ADD COLUMN IF NOT EXISTS \"billing_address\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.customers.notes",
+      "sql": "ALTER TABLE \"public\".\"customers\" ADD COLUMN IF NOT EXISTS \"notes\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.customers.created_at",
+      "sql": "ALTER TABLE \"public\".\"customers\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now();"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.customers.updated_at",
+      "sql": "ALTER TABLE \"public\".\"customers\" ADD COLUMN IF NOT EXISTS \"updated_at\" TIMESTAMP WITH TIME ZONE DEFAULT now();"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.exercises.name",
+      "sql": "ALTER TABLE \"public\".\"exercises\" ADD COLUMN IF NOT EXISTS \"name\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.exercises.description",
+      "sql": "ALTER TABLE \"public\".\"exercises\" ADD COLUMN IF NOT EXISTS \"description\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.exercises.images",
+      "sql": "ALTER TABLE \"public\".\"exercises\" ADD COLUMN IF NOT EXISTS \"images\" TEXT[];"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.exercises.video_url",
+      "sql": "ALTER TABLE \"public\".\"exercises\" ADD COLUMN IF NOT EXISTS \"video_url\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.exercises.difficulty",
+      "sql": "ALTER TABLE \"public\".\"exercises\" ADD COLUMN IF NOT EXISTS \"difficulty\" \"public\".\"exercises_difficulty\" DEFAULT 'intermediate' NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.exercises.category",
+      "sql": "ALTER TABLE \"public\".\"exercises\" ADD COLUMN IF NOT EXISTS \"category\" \"public\".\"exercises_category\" NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.exercises.equipment",
+      "sql": "ALTER TABLE \"public\".\"exercises\" ADD COLUMN IF NOT EXISTS \"equipment\" TEXT[];"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.exercises.body_parts",
+      "sql": "ALTER TABLE \"public\".\"exercises\" ADD COLUMN IF NOT EXISTS \"body_parts\" TEXT[];"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.exercises.instructions",
+      "sql": "ALTER TABLE \"public\".\"exercises\" ADD COLUMN IF NOT EXISTS \"instructions\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.exercises.default_reps",
+      "sql": "ALTER TABLE \"public\".\"exercises\" ADD COLUMN IF NOT EXISTS \"default_reps\" NUMERIC;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.exercises.default_sets",
+      "sql": "ALTER TABLE \"public\".\"exercises\" ADD COLUMN IF NOT EXISTS \"default_sets\" NUMERIC;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.exercises.rest_seconds",
+      "sql": "ALTER TABLE \"public\".\"exercises\" ADD COLUMN IF NOT EXISTS \"rest_seconds\" NUMERIC;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.exercises.calories_per_minute",
+      "sql": "ALTER TABLE \"public\".\"exercises\" ADD COLUMN IF NOT EXISTS \"calories_per_minute\" NUMERIC;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.exercises.is_compound",
+      "sql": "ALTER TABLE \"public\".\"exercises\" ADD COLUMN IF NOT EXISTS \"is_compound\" BOOLEAN;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.exercises.is_featured",
+      "sql": "ALTER TABLE \"public\".\"exercises\" ADD COLUMN IF NOT EXISTS \"is_featured\" BOOLEAN;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.exercises.status",
+      "sql": "ALTER TABLE \"public\".\"exercises\" ADD COLUMN IF NOT EXISTS \"status\" \"public\".\"exercises_status\" DEFAULT 'draft' NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.exercises.created_at",
+      "sql": "ALTER TABLE \"public\".\"exercises\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now();"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.exercises.updated_at",
+      "sql": "ALTER TABLE \"public\".\"exercises\" ADD COLUMN IF NOT EXISTS \"updated_at\" TIMESTAMP WITH TIME ZONE DEFAULT now();"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.exercises.order",
+      "sql": "ALTER TABLE \"public\".\"exercises\" ADD COLUMN IF NOT EXISTS \"order\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.order_items.product_name",
+      "sql": "ALTER TABLE \"public\".\"order_items\" ADD COLUMN IF NOT EXISTS \"product_name\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.order_items.sku",
+      "sql": "ALTER TABLE \"public\".\"order_items\" ADD COLUMN IF NOT EXISTS \"sku\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.order_items.quantity",
+      "sql": "ALTER TABLE \"public\".\"order_items\" ADD COLUMN IF NOT EXISTS \"quantity\" NUMERIC NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.order_items.unit_price",
+      "sql": "ALTER TABLE \"public\".\"order_items\" ADD COLUMN IF NOT EXISTS \"unit_price\" NUMERIC;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.order_items.line_total",
+      "sql": "ALTER TABLE \"public\".\"order_items\" ADD COLUMN IF NOT EXISTS \"line_total\" NUMERIC;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.orders.order_number",
+      "sql": "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"order_number\" TEXT UNIQUE NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.orders.status",
+      "sql": "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"status\" \"public\".\"orders_status\" DEFAULT 'pending' NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.orders.payment_status",
+      "sql": "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"payment_status\" \"public\".\"orders_payment_status\" DEFAULT 'unpaid' NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.orders.subtotal",
+      "sql": "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"subtotal\" NUMERIC;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.orders.tax_amount",
+      "sql": "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"tax_amount\" NUMERIC DEFAULT 0;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.orders.shipping_cost",
+      "sql": "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"shipping_cost\" NUMERIC DEFAULT 0;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.orders.discount_amount",
+      "sql": "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"discount_amount\" NUMERIC DEFAULT 0;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.orders.total",
+      "sql": "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"total\" NUMERIC;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.orders.currency",
+      "sql": "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"currency\" \"public\".\"orders_currency\" DEFAULT 'USD';"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.orders.shipping_address",
+      "sql": "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"shipping_address\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.orders.tracking_number",
+      "sql": "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"tracking_number\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.orders.notes",
+      "sql": "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"notes\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.orders.order_date",
+      "sql": "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"order_date\" TIMESTAMP WITH TIME ZONE NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.orders.shipped_date",
+      "sql": "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"shipped_date\" TIMESTAMP WITH TIME ZONE;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.orders.delivered_date",
+      "sql": "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"delivered_date\" TIMESTAMP WITH TIME ZONE;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.orders.created_at",
+      "sql": "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now();"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.orders.updated_at",
+      "sql": "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"updated_at\" TIMESTAMP WITH TIME ZONE DEFAULT now();"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.orders.order",
+      "sql": "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"order\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.posts.title",
+      "sql": "ALTER TABLE \"public\".\"posts\" ADD COLUMN IF NOT EXISTS \"title\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.posts.slug",
+      "sql": "ALTER TABLE \"public\".\"posts\" ADD COLUMN IF NOT EXISTS \"slug\" TEXT UNIQUE NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.posts.hero_image",
+      "sql": "ALTER TABLE \"public\".\"posts\" ADD COLUMN IF NOT EXISTS \"hero_image\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.posts.excerpt",
+      "sql": "ALTER TABLE \"public\".\"posts\" ADD COLUMN IF NOT EXISTS \"excerpt\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.posts.content",
+      "sql": "ALTER TABLE \"public\".\"posts\" ADD COLUMN IF NOT EXISTS \"content\" JSONB;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.posts.status",
+      "sql": "ALTER TABLE \"public\".\"posts\" ADD COLUMN IF NOT EXISTS \"status\" \"public\".\"posts_status\" DEFAULT 'draft' NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.posts.publish_date",
+      "sql": "ALTER TABLE \"public\".\"posts\" ADD COLUMN IF NOT EXISTS \"publish_date\" TIMESTAMP WITH TIME ZONE;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.posts.created_at",
+      "sql": "ALTER TABLE \"public\".\"posts\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now();"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.posts.updated_at",
+      "sql": "ALTER TABLE \"public\".\"posts\" ADD COLUMN IF NOT EXISTS \"updated_at\" TIMESTAMP WITH TIME ZONE DEFAULT now();"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.posts.order",
+      "sql": "ALTER TABLE \"public\".\"posts\" ADD COLUMN IF NOT EXISTS \"order\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.product_locales.locale",
+      "sql": "ALTER TABLE \"public\".\"product_locales\" ADD COLUMN IF NOT EXISTS \"locale\" \"public\".\"product_locales_locale\" NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.product_locales.name",
+      "sql": "ALTER TABLE \"public\".\"product_locales\" ADD COLUMN IF NOT EXISTS \"name\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.product_locales.description",
+      "sql": "ALTER TABLE \"public\".\"product_locales\" ADD COLUMN IF NOT EXISTS \"description\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.products.name",
+      "sql": "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"name\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.products.sku",
+      "sql": "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"sku\" TEXT UNIQUE NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.products.description",
+      "sql": "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"description\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.products.images",
+      "sql": "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"images\" TEXT[];"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.products.available_locales",
+      "sql": "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"available_locales\" TEXT[];"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.products.brand",
+      "sql": "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"brand\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.products.category",
+      "sql": "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"category\" \"public\".\"products_category\" NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.products.price",
+      "sql": "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"price\" NUMERIC NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.products.compare_at_price",
+      "sql": "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"compare_at_price\" NUMERIC;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.products.cost",
+      "sql": "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"cost\" NUMERIC;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.products.stock_quantity",
+      "sql": "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"stock_quantity\" NUMERIC NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.products.low_stock_threshold",
+      "sql": "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"low_stock_threshold\" NUMERIC DEFAULT 10;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.products.weight_grams",
+      "sql": "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"weight_grams\" NUMERIC;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.products.rating",
+      "sql": "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"rating\" NUMERIC;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.products.review_count",
+      "sql": "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"review_count\" NUMERIC;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.products.status",
+      "sql": "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"status\" \"public\".\"products_status\" DEFAULT 'draft' NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.products.is_featured",
+      "sql": "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"is_featured\" BOOLEAN;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.products.created_at",
+      "sql": "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now();"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.products.updated_at",
+      "sql": "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"updated_at\" TIMESTAMP WITH TIME ZONE DEFAULT now();"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.products.order",
+      "sql": "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"order\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.tags.name",
+      "sql": "ALTER TABLE \"public\".\"tags\" ADD COLUMN IF NOT EXISTS \"name\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.tickets.ticket_number",
+      "sql": "ALTER TABLE \"public\".\"tickets\" ADD COLUMN IF NOT EXISTS \"ticket_number\" TEXT UNIQUE NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.tickets.subject",
+      "sql": "ALTER TABLE \"public\".\"tickets\" ADD COLUMN IF NOT EXISTS \"subject\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.tickets.description",
+      "sql": "ALTER TABLE \"public\".\"tickets\" ADD COLUMN IF NOT EXISTS \"description\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.tickets.resolution_notes",
+      "sql": "ALTER TABLE \"public\".\"tickets\" ADD COLUMN IF NOT EXISTS \"resolution_notes\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.tickets.status",
+      "sql": "ALTER TABLE \"public\".\"tickets\" ADD COLUMN IF NOT EXISTS \"status\" \"public\".\"tickets_status\" DEFAULT 'open' NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.tickets.priority",
+      "sql": "ALTER TABLE \"public\".\"tickets\" ADD COLUMN IF NOT EXISTS \"priority\" \"public\".\"tickets_priority\" DEFAULT 'medium' NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.tickets.category",
+      "sql": "ALTER TABLE \"public\".\"tickets\" ADD COLUMN IF NOT EXISTS \"category\" \"public\".\"tickets_category\";"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.tickets.assigned_to",
+      "sql": "ALTER TABLE \"public\".\"tickets\" ADD COLUMN IF NOT EXISTS \"assigned_to\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.tickets.created_at",
+      "sql": "ALTER TABLE \"public\".\"tickets\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now();"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.tickets.updated_at",
+      "sql": "ALTER TABLE \"public\".\"tickets\" ADD COLUMN IF NOT EXISTS \"updated_at\" TIMESTAMP WITH TIME ZONE DEFAULT now();"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.tickets.order",
+      "sql": "ALTER TABLE \"public\".\"tickets\" ADD COLUMN IF NOT EXISTS \"order\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "rebase.users.email",
+      "sql": "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"email\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "rebase.users.display_name",
+      "sql": "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"display_name\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "rebase.users.photo_url",
+      "sql": "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"photo_url\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "rebase.users.roles",
+      "sql": "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"roles\" TEXT[] DEFAULT '{}' NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "rebase.users.password_hash",
+      "sql": "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"password_hash\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "rebase.users.email_verified",
+      "sql": "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"email_verified\" BOOLEAN DEFAULT FALSE NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "rebase.users.email_verification_token",
+      "sql": "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"email_verification_token\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "rebase.users.email_verification_sent_at",
+      "sql": "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"email_verification_sent_at\" TIMESTAMP WITH TIME ZONE;"
+    },
+    {
+      "kind": "add-column",
+      "target": "rebase.users.metadata",
+      "sql": "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"metadata\" JSONB DEFAULT '{}' NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "rebase.users.created_at",
+      "sql": "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "rebase.users.updated_at",
+      "sql": "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"updated_at\" TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "rebase.users.is_anonymous",
+      "sql": "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"is_anonymous\" BOOLEAN DEFAULT FALSE NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "rebase.users.tokens_valid_after",
+      "sql": "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"tokens_valid_after\" TIMESTAMP WITH TIME ZONE;"
+    },
+    {
+      "kind": "add-column",
+      "target": "rebase.users.disabled_at",
+      "sql": "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"disabled_at\" TIMESTAMP WITH TIME ZONE;"
+    },
+    {
+      "kind": "add-column",
+      "target": "rebase.users.pending_email",
+      "sql": "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"pending_email\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "rebase.users.email_change_token",
+      "sql": "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"email_change_token\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "rebase.users.email_change_sent_at",
+      "sql": "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"email_change_sent_at\" TIMESTAMP WITH TIME ZONE;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.posts.search_vector",
+      "sql": "ALTER TABLE \"public\".\"posts\" ADD COLUMN IF NOT EXISTS \"search_vector\" tsvector GENERATED ALWAYS AS (setweight(to_tsvector('english', coalesce(\"title\", '')), 'A') || setweight(to_tsvector('english', coalesce(\"excerpt\", '')), 'C') || setweight(to_tsvector('english', public.rebase_search_text(coalesce(\"content\", '{}'::jsonb))), 'D')) STORED;"
+    },
+    {
+      "kind": "comment-column",
+      "target": "public.posts.search_vector",
+      "sql": "COMMENT ON COLUMN \"public\".\"posts\".\"search_vector\" IS 'rebase:search:v1:fae069ed8fc5ebca';"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.order_items.order_id",
+      "sql": "ALTER TABLE \"public\".\"order_items\" ADD COLUMN IF NOT EXISTS \"order_id\" UUID;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.order_items.product_id",
+      "sql": "ALTER TABLE \"public\".\"order_items\" ADD COLUMN IF NOT EXISTS \"product_id\" UUID;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.orders.customer_id",
+      "sql": "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"customer_id\" UUID NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.posts.author_id",
+      "sql": "ALTER TABLE \"public\".\"posts\" ADD COLUMN IF NOT EXISTS \"author_id\" UUID;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.product_locales.product_id",
+      "sql": "ALTER TABLE \"public\".\"product_locales\" ADD COLUMN IF NOT EXISTS \"product_id\" UUID;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.tickets.customer_id",
+      "sql": "ALTER TABLE \"public\".\"tickets\" ADD COLUMN IF NOT EXISTS \"customer_id\" UUID;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.order_items.order_items_order_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"order_items\" ADD CONSTRAINT \"order_items_order_id_fkey\" FOREIGN KEY (\"order_id\") REFERENCES \"public\".\"orders\" (\"id\") ON DELETE CASCADE;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.order_items.order_items_product_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"order_items\" ADD CONSTRAINT \"order_items_product_id_fkey\" FOREIGN KEY (\"product_id\") REFERENCES \"public\".\"products\" (\"id\") ON DELETE RESTRICT;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.orders.orders_customer_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"orders\" ADD CONSTRAINT \"orders_customer_id_fkey\" FOREIGN KEY (\"customer_id\") REFERENCES \"public\".\"customers\" (\"id\") ON DELETE RESTRICT;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.posts.posts_author_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"posts\" ADD CONSTRAINT \"posts_author_id_fkey\" FOREIGN KEY (\"author_id\") REFERENCES \"public\".\"authors\" (\"id\") ON DELETE SET NULL;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.product_locales.product_locales_product_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"product_locales\" ADD CONSTRAINT \"product_locales_product_id_fkey\" FOREIGN KEY (\"product_id\") REFERENCES \"public\".\"products\" (\"id\") ON DELETE SET NULL;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.tickets.tickets_customer_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"tickets\" ADD CONSTRAINT \"tickets_customer_id_fkey\" FOREIGN KEY (\"customer_id\") REFERENCES \"public\".\"customers\" (\"id\") ON DELETE SET NULL;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.posts_tags.posts_tags_post_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"posts_tags\" ADD CONSTRAINT \"posts_tags_post_id_fkey\" FOREIGN KEY (\"post_id\") REFERENCES \"public\".\"posts\" (\"id\") ON DELETE CASCADE;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.posts_tags.posts_tags_tag_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"posts_tags\" ADD CONSTRAINT \"posts_tags_tag_id_fkey\" FOREIGN KEY (\"tag_id\") REFERENCES \"public\".\"tags\" (\"id\") ON DELETE CASCADE;"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.posts",
+      "sql": "CREATE INDEX IF NOT EXISTS \"posts_search_vector_gin\" ON \"public\".\"posts\" USING GIN (\"search_vector\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.order_items",
+      "sql": "CREATE INDEX IF NOT EXISTS \"order_items_order_id_ix_87f761d\" ON \"public\".\"order_items\" (\"order_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.order_items",
+      "sql": "CREATE INDEX IF NOT EXISTS \"order_items_product_id_ix_630810a\" ON \"public\".\"order_items\" (\"product_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.orders",
+      "sql": "CREATE INDEX IF NOT EXISTS \"orders_customer_id_ix_f0b5d92\" ON \"public\".\"orders\" (\"customer_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.posts",
+      "sql": "CREATE INDEX IF NOT EXISTS \"posts_author_id_ix_00ad191\" ON \"public\".\"posts\" (\"author_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.posts",
+      "sql": "CREATE INDEX IF NOT EXISTS \"posts_publish_date_ix_b949573\" ON \"public\".\"posts\" (\"publish_date\") WHERE \"status\" = 'published';"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.posts",
+      "sql": "CREATE INDEX IF NOT EXISTS \"posts_status_publish_date_ix_ca3aef2\" ON \"public\".\"posts\" (\"status\", \"publish_date\" DESC);"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.posts_tags",
+      "sql": "CREATE INDEX IF NOT EXISTS \"posts_tags_tag_id_ix_d4456f1\" ON \"public\".\"posts_tags\" (\"tag_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.product_locales",
+      "sql": "CREATE INDEX IF NOT EXISTS \"product_locales_product_id_ix_cbc4870\" ON \"public\".\"product_locales\" (\"product_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.tickets",
+      "sql": "CREATE INDEX IF NOT EXISTS \"tickets_customer_id_ix_ff86aa9\" ON \"public\".\"tickets\" (\"customer_id\");"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "public.customers.customers_updated_at_touch",
+      "sql": "DROP TRIGGER IF EXISTS \"customers_updated_at_touch\" ON \"public\".\"customers\";"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "public.customers.customers_updated_at_touch",
+      "sql": "CREATE TRIGGER \"customers_updated_at_touch\" BEFORE UPDATE ON \"public\".\"customers\" FOR EACH ROW EXECUTE FUNCTION rebase.set_updated_at('updated_at');"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "public.exercises.exercises_updated_at_touch",
+      "sql": "DROP TRIGGER IF EXISTS \"exercises_updated_at_touch\" ON \"public\".\"exercises\";"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "public.exercises.exercises_updated_at_touch",
+      "sql": "CREATE TRIGGER \"exercises_updated_at_touch\" BEFORE UPDATE ON \"public\".\"exercises\" FOR EACH ROW EXECUTE FUNCTION rebase.set_updated_at('updated_at');"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "public.orders.orders_updated_at_touch",
+      "sql": "DROP TRIGGER IF EXISTS \"orders_updated_at_touch\" ON \"public\".\"orders\";"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "public.orders.orders_updated_at_touch",
+      "sql": "CREATE TRIGGER \"orders_updated_at_touch\" BEFORE UPDATE ON \"public\".\"orders\" FOR EACH ROW EXECUTE FUNCTION rebase.set_updated_at('updated_at');"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "public.posts.posts_updated_at_touch",
+      "sql": "DROP TRIGGER IF EXISTS \"posts_updated_at_touch\" ON \"public\".\"posts\";"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "public.posts.posts_updated_at_touch",
+      "sql": "CREATE TRIGGER \"posts_updated_at_touch\" BEFORE UPDATE ON \"public\".\"posts\" FOR EACH ROW EXECUTE FUNCTION rebase.set_updated_at('updated_at');"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "public.products.products_updated_at_touch",
+      "sql": "DROP TRIGGER IF EXISTS \"products_updated_at_touch\" ON \"public\".\"products\";"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "public.products.products_updated_at_touch",
+      "sql": "CREATE TRIGGER \"products_updated_at_touch\" BEFORE UPDATE ON \"public\".\"products\" FOR EACH ROW EXECUTE FUNCTION rebase.set_updated_at('updated_at');"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "public.tickets.tickets_updated_at_touch",
+      "sql": "DROP TRIGGER IF EXISTS \"tickets_updated_at_touch\" ON \"public\".\"tickets\";"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "public.tickets.tickets_updated_at_touch",
+      "sql": "CREATE TRIGGER \"tickets_updated_at_touch\" BEFORE UPDATE ON \"public\".\"tickets\" FOR EACH ROW EXECUTE FUNCTION rebase.set_updated_at('updated_at');"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "rebase.users.users_updated_at_touch",
+      "sql": "DROP TRIGGER IF EXISTS \"users_updated_at_touch\" ON \"rebase\".\"users\";"
+    },
+    {
+      "kind": "create-trigger",
+      "target": "rebase.users.users_updated_at_touch",
+      "sql": "CREATE TRIGGER \"users_updated_at_touch\" BEFORE UPDATE ON \"rebase\".\"users\" FOR EACH ROW EXECUTE FUNCTION rebase.set_updated_at('updated_at');"
+    }
+  ],
+  "statements": [
+    "CREATE TYPE \"public\".\"exercises_difficulty\" AS ENUM ('beginner', 'intermediate', 'advanced');",
+    "CREATE TYPE \"public\".\"exercises_category\" AS ENUM ('strength', 'cardio', 'flexibility', 'balance', 'plyometrics', 'calisthenics');",
+    "CREATE TYPE \"public\".\"exercises_status\" AS ENUM ('draft', 'published', 'archived');",
+    "CREATE TYPE \"public\".\"orders_status\" AS ENUM ('pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded');",
+    "CREATE TYPE \"public\".\"orders_payment_status\" AS ENUM ('unpaid', 'paid', 'partially_refunded', 'refunded');",
+    "CREATE TYPE \"public\".\"orders_currency\" AS ENUM ('USD', 'EUR', 'GBP', 'CAD', 'AUD');",
+    "CREATE TYPE \"public\".\"posts_status\" AS ENUM ('draft', 'needs_review', 'published', 'archived');",
+    "CREATE TYPE \"public\".\"product_locales_locale\" AS ENUM ('en', 'es', 'fr', 'de', 'it');",
+    "CREATE TYPE \"public\".\"products_category\" AS ENUM ('electronics', 'clothing', 'home_garden', 'sports', 'books', 'food_beverage', 'health_beauty', 'toys');",
+    "CREATE TYPE \"public\".\"products_status\" AS ENUM ('draft', 'active', 'archived');",
+    "CREATE TYPE \"public\".\"tickets_status\" AS ENUM ('open', 'in_progress', 'waiting', 'resolved', 'closed');",
+    "CREATE TYPE \"public\".\"tickets_priority\" AS ENUM ('low', 'medium', 'high', 'urgent');",
+    "CREATE TYPE \"public\".\"tickets_category\" AS ENUM ('bug', 'feature_request', 'question', 'billing', 'account', 'other');",
+    "CREATE OR REPLACE FUNCTION public.rebase_search_text(text[]) RETURNS text\n    LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE AS\n    $$ SELECT array_to_string($1, ' ') $$;",
+    "CREATE OR REPLACE FUNCTION public.rebase_search_text(jsonb) RETURNS text\n    LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE AS\n    $$ SELECT coalesce(string_agg(v, ' '), '')\n       FROM jsonb_array_elements_text(jsonb_path_query_array($1, 'strict $.**?(@.type() == \"string\")')) AS v $$;",
+    "CREATE OR REPLACE FUNCTION rebase.set_updated_at() RETURNS trigger\nLANGUAGE plpgsql AS $$\nBEGIN\n    NEW := jsonb_populate_record(NEW, jsonb_build_object(TG_ARGV[0], now()));\n    RETURN NEW;\nEND;\n$$;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"authors\" (\"id\" UUID PRIMARY KEY DEFAULT gen_random_uuid());",
+    "ALTER TABLE \"public\".\"authors\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"customers\" (\"id\" UUID PRIMARY KEY DEFAULT gen_random_uuid());",
+    "ALTER TABLE \"public\".\"customers\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"exercises\" (\"id\" UUID PRIMARY KEY DEFAULT gen_random_uuid());",
+    "ALTER TABLE \"public\".\"exercises\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"order_items\" (\"id\" UUID PRIMARY KEY DEFAULT gen_random_uuid());",
+    "ALTER TABLE \"public\".\"order_items\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"orders\" (\"id\" UUID PRIMARY KEY DEFAULT gen_random_uuid());",
+    "ALTER TABLE \"public\".\"orders\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"posts\" (\"id\" UUID PRIMARY KEY DEFAULT gen_random_uuid());",
+    "ALTER TABLE \"public\".\"posts\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"product_locales\" (\"id\" UUID PRIMARY KEY DEFAULT gen_random_uuid());",
+    "ALTER TABLE \"public\".\"product_locales\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"products\" (\"id\" UUID PRIMARY KEY DEFAULT gen_random_uuid());",
+    "ALTER TABLE \"public\".\"products\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"tags\" (\"id\" UUID PRIMARY KEY DEFAULT gen_random_uuid());",
+    "ALTER TABLE \"public\".\"tags\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"tickets\" (\"id\" UUID PRIMARY KEY DEFAULT gen_random_uuid());",
+    "ALTER TABLE \"public\".\"tickets\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"rebase\".\"users\" (\"id\" UUID PRIMARY KEY DEFAULT gen_random_uuid());",
+    "ALTER TABLE \"rebase\".\"users\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"posts_tags\" (\"post_id\" UUID NOT NULL, \"tag_id\" UUID NOT NULL, PRIMARY KEY (\"post_id\", \"tag_id\"));",
+    "ALTER TABLE \"public\".\"posts_tags\" ENABLE ROW LEVEL SECURITY;",
+    "ALTER TABLE \"public\".\"authors\" ADD COLUMN IF NOT EXISTS \"name\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"authors\" ADD COLUMN IF NOT EXISTS \"email\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"authors\" ADD COLUMN IF NOT EXISTS \"picture\" TEXT;",
+    "ALTER TABLE \"public\".\"authors\" ADD COLUMN IF NOT EXISTS \"bio\" TEXT;",
+    "ALTER TABLE \"public\".\"authors\" ADD COLUMN IF NOT EXISTS \"twitter\" TEXT;",
+    "ALTER TABLE \"public\".\"authors\" ADD COLUMN IF NOT EXISTS \"github\" TEXT;",
+    "ALTER TABLE \"public\".\"authors\" ADD COLUMN IF NOT EXISTS \"website\" TEXT;",
+    "ALTER TABLE \"public\".\"authors\" ADD COLUMN IF NOT EXISTS \"user_id\" TEXT;",
+    "ALTER TABLE \"public\".\"customers\" ADD COLUMN IF NOT EXISTS \"first_name\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"customers\" ADD COLUMN IF NOT EXISTS \"last_name\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"customers\" ADD COLUMN IF NOT EXISTS \"email\" TEXT UNIQUE NOT NULL;",
+    "ALTER TABLE \"public\".\"customers\" ADD COLUMN IF NOT EXISTS \"phone\" TEXT;",
+    "ALTER TABLE \"public\".\"customers\" ADD COLUMN IF NOT EXISTS \"avatar\" TEXT;",
+    "ALTER TABLE \"public\".\"customers\" ADD COLUMN IF NOT EXISTS \"company\" TEXT;",
+    "ALTER TABLE \"public\".\"customers\" ADD COLUMN IF NOT EXISTS \"is_vip\" BOOLEAN;",
+    "ALTER TABLE \"public\".\"customers\" ADD COLUMN IF NOT EXISTS \"lifetime_value\" NUMERIC;",
+    "ALTER TABLE \"public\".\"customers\" ADD COLUMN IF NOT EXISTS \"total_orders\" NUMERIC;",
+    "ALTER TABLE \"public\".\"customers\" ADD COLUMN IF NOT EXISTS \"shipping_address\" TEXT;",
+    "ALTER TABLE \"public\".\"customers\" ADD COLUMN IF NOT EXISTS \"billing_address\" TEXT;",
+    "ALTER TABLE \"public\".\"customers\" ADD COLUMN IF NOT EXISTS \"notes\" TEXT;",
+    "ALTER TABLE \"public\".\"customers\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now();",
+    "ALTER TABLE \"public\".\"customers\" ADD COLUMN IF NOT EXISTS \"updated_at\" TIMESTAMP WITH TIME ZONE DEFAULT now();",
+    "ALTER TABLE \"public\".\"exercises\" ADD COLUMN IF NOT EXISTS \"name\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"exercises\" ADD COLUMN IF NOT EXISTS \"description\" TEXT;",
+    "ALTER TABLE \"public\".\"exercises\" ADD COLUMN IF NOT EXISTS \"images\" TEXT[];",
+    "ALTER TABLE \"public\".\"exercises\" ADD COLUMN IF NOT EXISTS \"video_url\" TEXT;",
+    "ALTER TABLE \"public\".\"exercises\" ADD COLUMN IF NOT EXISTS \"difficulty\" \"public\".\"exercises_difficulty\" DEFAULT 'intermediate' NOT NULL;",
+    "ALTER TABLE \"public\".\"exercises\" ADD COLUMN IF NOT EXISTS \"category\" \"public\".\"exercises_category\" NOT NULL;",
+    "ALTER TABLE \"public\".\"exercises\" ADD COLUMN IF NOT EXISTS \"equipment\" TEXT[];",
+    "ALTER TABLE \"public\".\"exercises\" ADD COLUMN IF NOT EXISTS \"body_parts\" TEXT[];",
+    "ALTER TABLE \"public\".\"exercises\" ADD COLUMN IF NOT EXISTS \"instructions\" TEXT;",
+    "ALTER TABLE \"public\".\"exercises\" ADD COLUMN IF NOT EXISTS \"default_reps\" NUMERIC;",
+    "ALTER TABLE \"public\".\"exercises\" ADD COLUMN IF NOT EXISTS \"default_sets\" NUMERIC;",
+    "ALTER TABLE \"public\".\"exercises\" ADD COLUMN IF NOT EXISTS \"rest_seconds\" NUMERIC;",
+    "ALTER TABLE \"public\".\"exercises\" ADD COLUMN IF NOT EXISTS \"calories_per_minute\" NUMERIC;",
+    "ALTER TABLE \"public\".\"exercises\" ADD COLUMN IF NOT EXISTS \"is_compound\" BOOLEAN;",
+    "ALTER TABLE \"public\".\"exercises\" ADD COLUMN IF NOT EXISTS \"is_featured\" BOOLEAN;",
+    "ALTER TABLE \"public\".\"exercises\" ADD COLUMN IF NOT EXISTS \"status\" \"public\".\"exercises_status\" DEFAULT 'draft' NOT NULL;",
+    "ALTER TABLE \"public\".\"exercises\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now();",
+    "ALTER TABLE \"public\".\"exercises\" ADD COLUMN IF NOT EXISTS \"updated_at\" TIMESTAMP WITH TIME ZONE DEFAULT now();",
+    "ALTER TABLE \"public\".\"exercises\" ADD COLUMN IF NOT EXISTS \"order\" TEXT;",
+    "ALTER TABLE \"public\".\"order_items\" ADD COLUMN IF NOT EXISTS \"product_name\" TEXT;",
+    "ALTER TABLE \"public\".\"order_items\" ADD COLUMN IF NOT EXISTS \"sku\" TEXT;",
+    "ALTER TABLE \"public\".\"order_items\" ADD COLUMN IF NOT EXISTS \"quantity\" NUMERIC NOT NULL;",
+    "ALTER TABLE \"public\".\"order_items\" ADD COLUMN IF NOT EXISTS \"unit_price\" NUMERIC;",
+    "ALTER TABLE \"public\".\"order_items\" ADD COLUMN IF NOT EXISTS \"line_total\" NUMERIC;",
+    "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"order_number\" TEXT UNIQUE NOT NULL;",
+    "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"status\" \"public\".\"orders_status\" DEFAULT 'pending' NOT NULL;",
+    "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"payment_status\" \"public\".\"orders_payment_status\" DEFAULT 'unpaid' NOT NULL;",
+    "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"subtotal\" NUMERIC;",
+    "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"tax_amount\" NUMERIC DEFAULT 0;",
+    "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"shipping_cost\" NUMERIC DEFAULT 0;",
+    "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"discount_amount\" NUMERIC DEFAULT 0;",
+    "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"total\" NUMERIC;",
+    "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"currency\" \"public\".\"orders_currency\" DEFAULT 'USD';",
+    "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"shipping_address\" TEXT;",
+    "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"tracking_number\" TEXT;",
+    "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"notes\" TEXT;",
+    "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"order_date\" TIMESTAMP WITH TIME ZONE NOT NULL;",
+    "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"shipped_date\" TIMESTAMP WITH TIME ZONE;",
+    "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"delivered_date\" TIMESTAMP WITH TIME ZONE;",
+    "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now();",
+    "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"updated_at\" TIMESTAMP WITH TIME ZONE DEFAULT now();",
+    "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"order\" TEXT;",
+    "ALTER TABLE \"public\".\"posts\" ADD COLUMN IF NOT EXISTS \"title\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"posts\" ADD COLUMN IF NOT EXISTS \"slug\" TEXT UNIQUE NOT NULL;",
+    "ALTER TABLE \"public\".\"posts\" ADD COLUMN IF NOT EXISTS \"hero_image\" TEXT;",
+    "ALTER TABLE \"public\".\"posts\" ADD COLUMN IF NOT EXISTS \"excerpt\" TEXT;",
+    "ALTER TABLE \"public\".\"posts\" ADD COLUMN IF NOT EXISTS \"content\" JSONB;",
+    "ALTER TABLE \"public\".\"posts\" ADD COLUMN IF NOT EXISTS \"status\" \"public\".\"posts_status\" DEFAULT 'draft' NOT NULL;",
+    "ALTER TABLE \"public\".\"posts\" ADD COLUMN IF NOT EXISTS \"publish_date\" TIMESTAMP WITH TIME ZONE;",
+    "ALTER TABLE \"public\".\"posts\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now();",
+    "ALTER TABLE \"public\".\"posts\" ADD COLUMN IF NOT EXISTS \"updated_at\" TIMESTAMP WITH TIME ZONE DEFAULT now();",
+    "ALTER TABLE \"public\".\"posts\" ADD COLUMN IF NOT EXISTS \"order\" TEXT;",
+    "ALTER TABLE \"public\".\"product_locales\" ADD COLUMN IF NOT EXISTS \"locale\" \"public\".\"product_locales_locale\" NOT NULL;",
+    "ALTER TABLE \"public\".\"product_locales\" ADD COLUMN IF NOT EXISTS \"name\" TEXT;",
+    "ALTER TABLE \"public\".\"product_locales\" ADD COLUMN IF NOT EXISTS \"description\" TEXT;",
+    "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"name\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"sku\" TEXT UNIQUE NOT NULL;",
+    "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"description\" TEXT;",
+    "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"images\" TEXT[];",
+    "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"available_locales\" TEXT[];",
+    "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"brand\" TEXT;",
+    "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"category\" \"public\".\"products_category\" NOT NULL;",
+    "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"price\" NUMERIC NOT NULL;",
+    "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"compare_at_price\" NUMERIC;",
+    "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"cost\" NUMERIC;",
+    "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"stock_quantity\" NUMERIC NOT NULL;",
+    "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"low_stock_threshold\" NUMERIC DEFAULT 10;",
+    "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"weight_grams\" NUMERIC;",
+    "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"rating\" NUMERIC;",
+    "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"review_count\" NUMERIC;",
+    "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"status\" \"public\".\"products_status\" DEFAULT 'draft' NOT NULL;",
+    "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"is_featured\" BOOLEAN;",
+    "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now();",
+    "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"updated_at\" TIMESTAMP WITH TIME ZONE DEFAULT now();",
+    "ALTER TABLE \"public\".\"products\" ADD COLUMN IF NOT EXISTS \"order\" TEXT;",
+    "ALTER TABLE \"public\".\"tags\" ADD COLUMN IF NOT EXISTS \"name\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"tickets\" ADD COLUMN IF NOT EXISTS \"ticket_number\" TEXT UNIQUE NOT NULL;",
+    "ALTER TABLE \"public\".\"tickets\" ADD COLUMN IF NOT EXISTS \"subject\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"tickets\" ADD COLUMN IF NOT EXISTS \"description\" TEXT;",
+    "ALTER TABLE \"public\".\"tickets\" ADD COLUMN IF NOT EXISTS \"resolution_notes\" TEXT;",
+    "ALTER TABLE \"public\".\"tickets\" ADD COLUMN IF NOT EXISTS \"status\" \"public\".\"tickets_status\" DEFAULT 'open' NOT NULL;",
+    "ALTER TABLE \"public\".\"tickets\" ADD COLUMN IF NOT EXISTS \"priority\" \"public\".\"tickets_priority\" DEFAULT 'medium' NOT NULL;",
+    "ALTER TABLE \"public\".\"tickets\" ADD COLUMN IF NOT EXISTS \"category\" \"public\".\"tickets_category\";",
+    "ALTER TABLE \"public\".\"tickets\" ADD COLUMN IF NOT EXISTS \"assigned_to\" TEXT;",
+    "ALTER TABLE \"public\".\"tickets\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT now();",
+    "ALTER TABLE \"public\".\"tickets\" ADD COLUMN IF NOT EXISTS \"updated_at\" TIMESTAMP WITH TIME ZONE DEFAULT now();",
+    "ALTER TABLE \"public\".\"tickets\" ADD COLUMN IF NOT EXISTS \"order\" TEXT;",
+    "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"email\" TEXT NOT NULL;",
+    "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"display_name\" TEXT;",
+    "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"photo_url\" TEXT;",
+    "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"roles\" TEXT[] DEFAULT '{}' NOT NULL;",
+    "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"password_hash\" TEXT;",
+    "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"email_verified\" BOOLEAN DEFAULT FALSE NOT NULL;",
+    "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"email_verification_token\" TEXT;",
+    "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"email_verification_sent_at\" TIMESTAMP WITH TIME ZONE;",
+    "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"metadata\" JSONB DEFAULT '{}' NOT NULL;",
+    "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"created_at\" TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL;",
+    "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"updated_at\" TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL;",
+    "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"is_anonymous\" BOOLEAN DEFAULT FALSE NOT NULL;",
+    "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"tokens_valid_after\" TIMESTAMP WITH TIME ZONE;",
+    "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"disabled_at\" TIMESTAMP WITH TIME ZONE;",
+    "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"pending_email\" TEXT;",
+    "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"email_change_token\" TEXT;",
+    "ALTER TABLE \"rebase\".\"users\" ADD COLUMN IF NOT EXISTS \"email_change_sent_at\" TIMESTAMP WITH TIME ZONE;",
+    "ALTER TABLE \"public\".\"posts\" ADD COLUMN IF NOT EXISTS \"search_vector\" tsvector GENERATED ALWAYS AS (setweight(to_tsvector('english', coalesce(\"title\", '')), 'A') || setweight(to_tsvector('english', coalesce(\"excerpt\", '')), 'C') || setweight(to_tsvector('english', public.rebase_search_text(coalesce(\"content\", '{}'::jsonb))), 'D')) STORED;",
+    "COMMENT ON COLUMN \"public\".\"posts\".\"search_vector\" IS 'rebase:search:v1:fae069ed8fc5ebca';",
+    "ALTER TABLE \"public\".\"order_items\" ADD COLUMN IF NOT EXISTS \"order_id\" UUID;",
+    "ALTER TABLE \"public\".\"order_items\" ADD COLUMN IF NOT EXISTS \"product_id\" UUID;",
+    "ALTER TABLE \"public\".\"orders\" ADD COLUMN IF NOT EXISTS \"customer_id\" UUID NOT NULL;",
+    "ALTER TABLE \"public\".\"posts\" ADD COLUMN IF NOT EXISTS \"author_id\" UUID;",
+    "ALTER TABLE \"public\".\"product_locales\" ADD COLUMN IF NOT EXISTS \"product_id\" UUID;",
+    "ALTER TABLE \"public\".\"tickets\" ADD COLUMN IF NOT EXISTS \"customer_id\" UUID;",
+    "ALTER TABLE \"public\".\"order_items\" ADD CONSTRAINT \"order_items_order_id_fkey\" FOREIGN KEY (\"order_id\") REFERENCES \"public\".\"orders\" (\"id\") ON DELETE CASCADE;",
+    "ALTER TABLE \"public\".\"order_items\" ADD CONSTRAINT \"order_items_product_id_fkey\" FOREIGN KEY (\"product_id\") REFERENCES \"public\".\"products\" (\"id\") ON DELETE RESTRICT;",
+    "ALTER TABLE \"public\".\"orders\" ADD CONSTRAINT \"orders_customer_id_fkey\" FOREIGN KEY (\"customer_id\") REFERENCES \"public\".\"customers\" (\"id\") ON DELETE RESTRICT;",
+    "ALTER TABLE \"public\".\"posts\" ADD CONSTRAINT \"posts_author_id_fkey\" FOREIGN KEY (\"author_id\") REFERENCES \"public\".\"authors\" (\"id\") ON DELETE SET NULL;",
+    "ALTER TABLE \"public\".\"product_locales\" ADD CONSTRAINT \"product_locales_product_id_fkey\" FOREIGN KEY (\"product_id\") REFERENCES \"public\".\"products\" (\"id\") ON DELETE SET NULL;",
+    "ALTER TABLE \"public\".\"tickets\" ADD CONSTRAINT \"tickets_customer_id_fkey\" FOREIGN KEY (\"customer_id\") REFERENCES \"public\".\"customers\" (\"id\") ON DELETE SET NULL;",
+    "ALTER TABLE \"public\".\"posts_tags\" ADD CONSTRAINT \"posts_tags_post_id_fkey\" FOREIGN KEY (\"post_id\") REFERENCES \"public\".\"posts\" (\"id\") ON DELETE CASCADE;",
+    "ALTER TABLE \"public\".\"posts_tags\" ADD CONSTRAINT \"posts_tags_tag_id_fkey\" FOREIGN KEY (\"tag_id\") REFERENCES \"public\".\"tags\" (\"id\") ON DELETE CASCADE;",
+    "CREATE INDEX IF NOT EXISTS \"posts_search_vector_gin\" ON \"public\".\"posts\" USING GIN (\"search_vector\");",
+    "CREATE INDEX IF NOT EXISTS \"order_items_order_id_ix_87f761d\" ON \"public\".\"order_items\" (\"order_id\");",
+    "CREATE INDEX IF NOT EXISTS \"order_items_product_id_ix_630810a\" ON \"public\".\"order_items\" (\"product_id\");",
+    "CREATE INDEX IF NOT EXISTS \"orders_customer_id_ix_f0b5d92\" ON \"public\".\"orders\" (\"customer_id\");",
+    "CREATE INDEX IF NOT EXISTS \"posts_author_id_ix_00ad191\" ON \"public\".\"posts\" (\"author_id\");",
+    "CREATE INDEX IF NOT EXISTS \"posts_publish_date_ix_b949573\" ON \"public\".\"posts\" (\"publish_date\") WHERE \"status\" = 'published';",
+    "CREATE INDEX IF NOT EXISTS \"posts_status_publish_date_ix_ca3aef2\" ON \"public\".\"posts\" (\"status\", \"publish_date\" DESC);",
+    "CREATE INDEX IF NOT EXISTS \"posts_tags_tag_id_ix_d4456f1\" ON \"public\".\"posts_tags\" (\"tag_id\");",
+    "CREATE INDEX IF NOT EXISTS \"product_locales_product_id_ix_cbc4870\" ON \"public\".\"product_locales\" (\"product_id\");",
+    "CREATE INDEX IF NOT EXISTS \"tickets_customer_id_ix_ff86aa9\" ON \"public\".\"tickets\" (\"customer_id\");",
+    "DROP TRIGGER IF EXISTS \"customers_updated_at_touch\" ON \"public\".\"customers\";",
+    "CREATE TRIGGER \"customers_updated_at_touch\" BEFORE UPDATE ON \"public\".\"customers\" FOR EACH ROW EXECUTE FUNCTION rebase.set_updated_at('updated_at');",
+    "DROP TRIGGER IF EXISTS \"exercises_updated_at_touch\" ON \"public\".\"exercises\";",
+    "CREATE TRIGGER \"exercises_updated_at_touch\" BEFORE UPDATE ON \"public\".\"exercises\" FOR EACH ROW EXECUTE FUNCTION rebase.set_updated_at('updated_at');",
+    "DROP TRIGGER IF EXISTS \"orders_updated_at_touch\" ON \"public\".\"orders\";",
+    "CREATE TRIGGER \"orders_updated_at_touch\" BEFORE UPDATE ON \"public\".\"orders\" FOR EACH ROW EXECUTE FUNCTION rebase.set_updated_at('updated_at');",
+    "DROP TRIGGER IF EXISTS \"posts_updated_at_touch\" ON \"public\".\"posts\";",
+    "CREATE TRIGGER \"posts_updated_at_touch\" BEFORE UPDATE ON \"public\".\"posts\" FOR EACH ROW EXECUTE FUNCTION rebase.set_updated_at('updated_at');",
+    "DROP TRIGGER IF EXISTS \"products_updated_at_touch\" ON \"public\".\"products\";",
+    "CREATE TRIGGER \"products_updated_at_touch\" BEFORE UPDATE ON \"public\".\"products\" FOR EACH ROW EXECUTE FUNCTION rebase.set_updated_at('updated_at');",
+    "DROP TRIGGER IF EXISTS \"tickets_updated_at_touch\" ON \"public\".\"tickets\";",
+    "CREATE TRIGGER \"tickets_updated_at_touch\" BEFORE UPDATE ON \"public\".\"tickets\" FOR EACH ROW EXECUTE FUNCTION rebase.set_updated_at('updated_at');",
+    "DROP TRIGGER IF EXISTS \"users_updated_at_touch\" ON \"rebase\".\"users\";",
+    "CREATE TRIGGER \"users_updated_at_touch\" BEFORE UPDATE ON \"rebase\".\"users\" FOR EACH ROW EXECUTE FUNCTION rebase.set_updated_at('updated_at');"
+  ],
+  "legacyForeignKeys": [],
+  "searchDrift": [],
+  "searchAdopted": [],
+  "vectorIndexSkipped": [],
+  "withheldConstraints": [],
+  "columnTypeDrift": [],
+  "orphanedRequiredColumns": [],
+  "deferredIndexes": []
+}

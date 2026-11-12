@@ -1,0 +1,788 @@
+{
+  "actions": [
+    {
+      "kind": "create-enum",
+      "target": "public.film_rating",
+      "sql": "CREATE TYPE \"public\".\"film_rating\" AS ENUM ('G', 'PG', 'PG-13', 'R', 'NC-17');"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.actor",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"actor\" (\"actor_id\" SERIAL PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.actor",
+      "sql": "ALTER TABLE \"public\".\"actor\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.address",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"address\" (\"address_id\" SERIAL PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.address",
+      "sql": "ALTER TABLE \"public\".\"address\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.category",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"category\" (\"category_id\" SERIAL PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.category",
+      "sql": "ALTER TABLE \"public\".\"category\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.city",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"city\" (\"city_id\" SERIAL PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.city",
+      "sql": "ALTER TABLE \"public\".\"city\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.country",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"country\" (\"country_id\" SERIAL PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.country",
+      "sql": "ALTER TABLE \"public\".\"country\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.customer",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"customer\" (\"customer_id\" SERIAL PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.customer",
+      "sql": "ALTER TABLE \"public\".\"customer\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.film",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"film\" (\"film_id\" SERIAL PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.film",
+      "sql": "ALTER TABLE \"public\".\"film\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.inventory",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"inventory\" (\"inventory_id\" SERIAL PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.inventory",
+      "sql": "ALTER TABLE \"public\".\"inventory\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.language",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"language\" (\"language_id\" SERIAL PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.language",
+      "sql": "ALTER TABLE \"public\".\"language\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.rental",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"rental\" (\"rental_id\" SERIAL PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.rental",
+      "sql": "ALTER TABLE \"public\".\"rental\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.staff",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"staff\" (\"staff_id\" SERIAL PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.staff",
+      "sql": "ALTER TABLE \"public\".\"staff\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.store",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"store\" (\"store_id\" SERIAL PRIMARY KEY);"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.store",
+      "sql": "ALTER TABLE \"public\".\"store\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.film_actor",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"film_actor\" (\"actor_id\" INTEGER NOT NULL, \"film_id\" INTEGER NOT NULL, PRIMARY KEY (\"actor_id\", \"film_id\"));"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.film_actor",
+      "sql": "ALTER TABLE \"public\".\"film_actor\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "create-table",
+      "target": "public.film_category",
+      "sql": "CREATE TABLE IF NOT EXISTS \"public\".\"film_category\" (\"film_id\" INTEGER NOT NULL, \"category_id\" INTEGER NOT NULL, PRIMARY KEY (\"film_id\", \"category_id\"));"
+    },
+    {
+      "kind": "enable-rls",
+      "target": "public.film_category",
+      "sql": "ALTER TABLE \"public\".\"film_category\" ENABLE ROW LEVEL SECURITY;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.actor.first_name",
+      "sql": "ALTER TABLE \"public\".\"actor\" ADD COLUMN IF NOT EXISTS \"first_name\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.actor.last_name",
+      "sql": "ALTER TABLE \"public\".\"actor\" ADD COLUMN IF NOT EXISTS \"last_name\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.actor.last_update",
+      "sql": "ALTER TABLE \"public\".\"actor\" ADD COLUMN IF NOT EXISTS \"last_update\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.address.phone",
+      "sql": "ALTER TABLE \"public\".\"address\" ADD COLUMN IF NOT EXISTS \"phone\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.address.last_update",
+      "sql": "ALTER TABLE \"public\".\"address\" ADD COLUMN IF NOT EXISTS \"last_update\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.address.address",
+      "sql": "ALTER TABLE \"public\".\"address\" ADD COLUMN IF NOT EXISTS \"address\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.address.address2",
+      "sql": "ALTER TABLE \"public\".\"address\" ADD COLUMN IF NOT EXISTS \"address2\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.address.district",
+      "sql": "ALTER TABLE \"public\".\"address\" ADD COLUMN IF NOT EXISTS \"district\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.address.postal_code",
+      "sql": "ALTER TABLE \"public\".\"address\" ADD COLUMN IF NOT EXISTS \"postal_code\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.category.name",
+      "sql": "ALTER TABLE \"public\".\"category\" ADD COLUMN IF NOT EXISTS \"name\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.category.last_update",
+      "sql": "ALTER TABLE \"public\".\"category\" ADD COLUMN IF NOT EXISTS \"last_update\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.city.last_update",
+      "sql": "ALTER TABLE \"public\".\"city\" ADD COLUMN IF NOT EXISTS \"last_update\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.city.city",
+      "sql": "ALTER TABLE \"public\".\"city\" ADD COLUMN IF NOT EXISTS \"city\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.country.last_update",
+      "sql": "ALTER TABLE \"public\".\"country\" ADD COLUMN IF NOT EXISTS \"last_update\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.country.country",
+      "sql": "ALTER TABLE \"public\".\"country\" ADD COLUMN IF NOT EXISTS \"country\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.customer.first_name",
+      "sql": "ALTER TABLE \"public\".\"customer\" ADD COLUMN IF NOT EXISTS \"first_name\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.customer.last_name",
+      "sql": "ALTER TABLE \"public\".\"customer\" ADD COLUMN IF NOT EXISTS \"last_name\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.customer.email",
+      "sql": "ALTER TABLE \"public\".\"customer\" ADD COLUMN IF NOT EXISTS \"email\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.customer.uuid",
+      "sql": "ALTER TABLE \"public\".\"customer\" ADD COLUMN IF NOT EXISTS \"uuid\" UUID UNIQUE DEFAULT uuidv7() NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.customer.activebool",
+      "sql": "ALTER TABLE \"public\".\"customer\" ADD COLUMN IF NOT EXISTS \"activebool\" BOOLEAN DEFAULT TRUE NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.customer.active",
+      "sql": "ALTER TABLE \"public\".\"customer\" ADD COLUMN IF NOT EXISTS \"active\" INTEGER;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.customer.create_date",
+      "sql": "ALTER TABLE \"public\".\"customer\" ADD COLUMN IF NOT EXISTS \"create_date\" DATE DEFAULT CURRENT_DATE NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.customer.last_update",
+      "sql": "ALTER TABLE \"public\".\"customer\" ADD COLUMN IF NOT EXISTS \"last_update\" TIMESTAMP WITH TIME ZONE DEFAULT now();"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.film.title",
+      "sql": "ALTER TABLE \"public\".\"film\" ADD COLUMN IF NOT EXISTS \"title\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.film.rating",
+      "sql": "ALTER TABLE \"public\".\"film\" ADD COLUMN IF NOT EXISTS \"rating\" \"public\".\"film_rating\" DEFAULT 'G';"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.film.fulltext",
+      "sql": "ALTER TABLE \"public\".\"film\" ADD COLUMN IF NOT EXISTS \"fulltext\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.film.release_year",
+      "sql": "ALTER TABLE \"public\".\"film\" ADD COLUMN IF NOT EXISTS \"release_year\" INTEGER;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.film.rental_duration",
+      "sql": "ALTER TABLE \"public\".\"film\" ADD COLUMN IF NOT EXISTS \"rental_duration\" INTEGER DEFAULT 3 NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.film.rental_rate",
+      "sql": "ALTER TABLE \"public\".\"film\" ADD COLUMN IF NOT EXISTS \"rental_rate\" NUMERIC(4, 2) DEFAULT 4.99 NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.film.length",
+      "sql": "ALTER TABLE \"public\".\"film\" ADD COLUMN IF NOT EXISTS \"length\" INTEGER;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.film.replacement_cost",
+      "sql": "ALTER TABLE \"public\".\"film\" ADD COLUMN IF NOT EXISTS \"replacement_cost\" NUMERIC(5, 2) DEFAULT 19.99 NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.film.length_hours",
+      "sql": "ALTER TABLE \"public\".\"film\" ADD COLUMN IF NOT EXISTS \"length_hours\" NUMERIC;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.film.last_update",
+      "sql": "ALTER TABLE \"public\".\"film\" ADD COLUMN IF NOT EXISTS \"last_update\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.film.description",
+      "sql": "ALTER TABLE \"public\".\"film\" ADD COLUMN IF NOT EXISTS \"description\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.film.special_features",
+      "sql": "ALTER TABLE \"public\".\"film\" ADD COLUMN IF NOT EXISTS \"special_features\" TEXT[];"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.inventory.last_update",
+      "sql": "ALTER TABLE \"public\".\"inventory\" ADD COLUMN IF NOT EXISTS \"last_update\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.language.name",
+      "sql": "ALTER TABLE \"public\".\"language\" ADD COLUMN IF NOT EXISTS \"name\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.language.last_update",
+      "sql": "ALTER TABLE \"public\".\"language\" ADD COLUMN IF NOT EXISTS \"last_update\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.rental.uuid",
+      "sql": "ALTER TABLE \"public\".\"rental\" ADD COLUMN IF NOT EXISTS \"uuid\" UUID UNIQUE DEFAULT uuidv7() NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.rental.rental_date",
+      "sql": "ALTER TABLE \"public\".\"rental\" ADD COLUMN IF NOT EXISTS \"rental_date\" TIMESTAMP WITH TIME ZONE NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.rental.return_date",
+      "sql": "ALTER TABLE \"public\".\"rental\" ADD COLUMN IF NOT EXISTS \"return_date\" TIMESTAMP WITH TIME ZONE;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.rental.last_update",
+      "sql": "ALTER TABLE \"public\".\"rental\" ADD COLUMN IF NOT EXISTS \"last_update\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.staff.first_name",
+      "sql": "ALTER TABLE \"public\".\"staff\" ADD COLUMN IF NOT EXISTS \"first_name\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.staff.last_name",
+      "sql": "ALTER TABLE \"public\".\"staff\" ADD COLUMN IF NOT EXISTS \"last_name\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.staff.username",
+      "sql": "ALTER TABLE \"public\".\"staff\" ADD COLUMN IF NOT EXISTS \"username\" TEXT NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.staff.email",
+      "sql": "ALTER TABLE \"public\".\"staff\" ADD COLUMN IF NOT EXISTS \"email\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.staff.active",
+      "sql": "ALTER TABLE \"public\".\"staff\" ADD COLUMN IF NOT EXISTS \"active\" BOOLEAN DEFAULT TRUE NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.staff.last_update",
+      "sql": "ALTER TABLE \"public\".\"staff\" ADD COLUMN IF NOT EXISTS \"last_update\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.staff.password",
+      "sql": "ALTER TABLE \"public\".\"staff\" ADD COLUMN IF NOT EXISTS \"password\" TEXT;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.staff.picture",
+      "sql": "ALTER TABLE \"public\".\"staff\" ADD COLUMN IF NOT EXISTS \"picture\" BYTEA;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.store.manager_staff_id",
+      "sql": "ALTER TABLE \"public\".\"store\" ADD COLUMN IF NOT EXISTS \"manager_staff_id\" INTEGER UNIQUE NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.store.last_update",
+      "sql": "ALTER TABLE \"public\".\"store\" ADD COLUMN IF NOT EXISTS \"last_update\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.address.city_id",
+      "sql": "ALTER TABLE \"public\".\"address\" ADD COLUMN IF NOT EXISTS \"city_id\" INTEGER NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.city.country_id",
+      "sql": "ALTER TABLE \"public\".\"city\" ADD COLUMN IF NOT EXISTS \"country_id\" INTEGER NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.customer.address_id",
+      "sql": "ALTER TABLE \"public\".\"customer\" ADD COLUMN IF NOT EXISTS \"address_id\" INTEGER NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.customer.store_id",
+      "sql": "ALTER TABLE \"public\".\"customer\" ADD COLUMN IF NOT EXISTS \"store_id\" INTEGER NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.film.language_id",
+      "sql": "ALTER TABLE \"public\".\"film\" ADD COLUMN IF NOT EXISTS \"language_id\" INTEGER NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.film.original_language_id",
+      "sql": "ALTER TABLE \"public\".\"film\" ADD COLUMN IF NOT EXISTS \"original_language_id\" INTEGER;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.inventory.film_id",
+      "sql": "ALTER TABLE \"public\".\"inventory\" ADD COLUMN IF NOT EXISTS \"film_id\" INTEGER NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.inventory.store_id",
+      "sql": "ALTER TABLE \"public\".\"inventory\" ADD COLUMN IF NOT EXISTS \"store_id\" INTEGER NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.rental.customer_id",
+      "sql": "ALTER TABLE \"public\".\"rental\" ADD COLUMN IF NOT EXISTS \"customer_id\" INTEGER NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.rental.inventory_id",
+      "sql": "ALTER TABLE \"public\".\"rental\" ADD COLUMN IF NOT EXISTS \"inventory_id\" INTEGER NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.rental.staff_id",
+      "sql": "ALTER TABLE \"public\".\"rental\" ADD COLUMN IF NOT EXISTS \"staff_id\" INTEGER NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.staff.address_id",
+      "sql": "ALTER TABLE \"public\".\"staff\" ADD COLUMN IF NOT EXISTS \"address_id\" INTEGER NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.staff.store_id",
+      "sql": "ALTER TABLE \"public\".\"staff\" ADD COLUMN IF NOT EXISTS \"store_id\" INTEGER NOT NULL;"
+    },
+    {
+      "kind": "add-column",
+      "target": "public.store.address_id",
+      "sql": "ALTER TABLE \"public\".\"store\" ADD COLUMN IF NOT EXISTS \"address_id\" INTEGER NOT NULL;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.address.address_city_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"address\" ADD CONSTRAINT \"address_city_id_fkey\" FOREIGN KEY (\"city_id\") REFERENCES \"public\".\"city\" (\"city_id\") ON DELETE RESTRICT;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.city.city_country_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"city\" ADD CONSTRAINT \"city_country_id_fkey\" FOREIGN KEY (\"country_id\") REFERENCES \"public\".\"country\" (\"country_id\") ON DELETE RESTRICT;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.customer.customer_address_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"customer\" ADD CONSTRAINT \"customer_address_id_fkey\" FOREIGN KEY (\"address_id\") REFERENCES \"public\".\"address\" (\"address_id\") ON DELETE RESTRICT;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.customer.customer_store_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"customer\" ADD CONSTRAINT \"customer_store_id_fkey\" FOREIGN KEY (\"store_id\") REFERENCES \"public\".\"store\" (\"store_id\") ON DELETE RESTRICT;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.film.film_language_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"film\" ADD CONSTRAINT \"film_language_id_fkey\" FOREIGN KEY (\"language_id\") REFERENCES \"public\".\"language\" (\"language_id\") ON DELETE RESTRICT;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.film.film_original_language_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"film\" ADD CONSTRAINT \"film_original_language_id_fkey\" FOREIGN KEY (\"original_language_id\") REFERENCES \"public\".\"language\" (\"language_id\") ON DELETE RESTRICT;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.inventory.inventory_film_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"inventory\" ADD CONSTRAINT \"inventory_film_id_fkey\" FOREIGN KEY (\"film_id\") REFERENCES \"public\".\"film\" (\"film_id\") ON DELETE RESTRICT;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.inventory.inventory_store_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"inventory\" ADD CONSTRAINT \"inventory_store_id_fkey\" FOREIGN KEY (\"store_id\") REFERENCES \"public\".\"store\" (\"store_id\") ON DELETE RESTRICT;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.rental.rental_customer_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"rental\" ADD CONSTRAINT \"rental_customer_id_fkey\" FOREIGN KEY (\"customer_id\") REFERENCES \"public\".\"customer\" (\"customer_id\") ON DELETE RESTRICT;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.rental.rental_inventory_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"rental\" ADD CONSTRAINT \"rental_inventory_id_fkey\" FOREIGN KEY (\"inventory_id\") REFERENCES \"public\".\"inventory\" (\"inventory_id\") ON DELETE RESTRICT;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.rental.rental_staff_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"rental\" ADD CONSTRAINT \"rental_staff_id_fkey\" FOREIGN KEY (\"staff_id\") REFERENCES \"public\".\"staff\" (\"staff_id\") ON DELETE RESTRICT;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.staff.staff_address_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"staff\" ADD CONSTRAINT \"staff_address_id_fkey\" FOREIGN KEY (\"address_id\") REFERENCES \"public\".\"address\" (\"address_id\") ON DELETE RESTRICT;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.staff.staff_store_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"staff\" ADD CONSTRAINT \"staff_store_id_fkey\" FOREIGN KEY (\"store_id\") REFERENCES \"public\".\"store\" (\"store_id\") ON DELETE NO ACTION;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.store.store_address_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"store\" ADD CONSTRAINT \"store_address_id_fkey\" FOREIGN KEY (\"address_id\") REFERENCES \"public\".\"address\" (\"address_id\") ON DELETE RESTRICT;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.film_actor.film_actor_actor_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"film_actor\" ADD CONSTRAINT \"film_actor_actor_id_fkey\" FOREIGN KEY (\"actor_id\") REFERENCES \"public\".\"actor\" (\"actor_id\") ON DELETE CASCADE;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.film_actor.film_actor_film_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"film_actor\" ADD CONSTRAINT \"film_actor_film_id_fkey\" FOREIGN KEY (\"film_id\") REFERENCES \"public\".\"film\" (\"film_id\") ON DELETE CASCADE;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.film_category.film_category_film_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"film_category\" ADD CONSTRAINT \"film_category_film_id_fkey\" FOREIGN KEY (\"film_id\") REFERENCES \"public\".\"film\" (\"film_id\") ON DELETE CASCADE;"
+    },
+    {
+      "kind": "add-constraint",
+      "target": "public.film_category.film_category_category_id_fkey",
+      "sql": "ALTER TABLE \"public\".\"film_category\" ADD CONSTRAINT \"film_category_category_id_fkey\" FOREIGN KEY (\"category_id\") REFERENCES \"public\".\"category\" (\"category_id\") ON DELETE CASCADE;"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.address",
+      "sql": "CREATE INDEX IF NOT EXISTS \"address_city_id_ix_3dd7bdc\" ON \"public\".\"address\" (\"city_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.city",
+      "sql": "CREATE INDEX IF NOT EXISTS \"city_country_id_ix_263e15e\" ON \"public\".\"city\" (\"country_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.customer",
+      "sql": "CREATE INDEX IF NOT EXISTS \"customer_address_id_ix_2c19cf9\" ON \"public\".\"customer\" (\"address_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.customer",
+      "sql": "CREATE INDEX IF NOT EXISTS \"customer_store_id_ix_4ec4ecf\" ON \"public\".\"customer\" (\"store_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.film",
+      "sql": "CREATE INDEX IF NOT EXISTS \"film_language_id_ix_1f2724b\" ON \"public\".\"film\" (\"language_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.film",
+      "sql": "CREATE INDEX IF NOT EXISTS \"film_original_language_id_ix_3d90cc8\" ON \"public\".\"film\" (\"original_language_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.film_actor",
+      "sql": "CREATE INDEX IF NOT EXISTS \"film_actor_film_id_ix_c6e4954\" ON \"public\".\"film_actor\" (\"film_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.film_category",
+      "sql": "CREATE INDEX IF NOT EXISTS \"film_category_category_id_ix_c009fce\" ON \"public\".\"film_category\" (\"category_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.inventory",
+      "sql": "CREATE INDEX IF NOT EXISTS \"inventory_film_id_ix_37dbbb5\" ON \"public\".\"inventory\" (\"film_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.inventory",
+      "sql": "CREATE INDEX IF NOT EXISTS \"inventory_store_id_ix_c895c65\" ON \"public\".\"inventory\" (\"store_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.rental",
+      "sql": "CREATE INDEX IF NOT EXISTS \"rental_customer_id_ix_8bb3897\" ON \"public\".\"rental\" (\"customer_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.rental",
+      "sql": "CREATE INDEX IF NOT EXISTS \"rental_inventory_id_ix_a847b96\" ON \"public\".\"rental\" (\"inventory_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.rental",
+      "sql": "CREATE INDEX IF NOT EXISTS \"rental_staff_id_ix_714ab52\" ON \"public\".\"rental\" (\"staff_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.staff",
+      "sql": "CREATE INDEX IF NOT EXISTS \"staff_address_id_ix_f7d5f95\" ON \"public\".\"staff\" (\"address_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.staff",
+      "sql": "CREATE INDEX IF NOT EXISTS \"staff_store_id_ix_68981bf\" ON \"public\".\"staff\" (\"store_id\");"
+    },
+    {
+      "kind": "create-index",
+      "target": "public.store",
+      "sql": "CREATE INDEX IF NOT EXISTS \"store_address_id_ix_ed1824e\" ON \"public\".\"store\" (\"address_id\");"
+    }
+  ],
+  "statements": [
+    "CREATE TYPE \"public\".\"film_rating\" AS ENUM ('G', 'PG', 'PG-13', 'R', 'NC-17');",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"actor\" (\"actor_id\" SERIAL PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"actor\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"address\" (\"address_id\" SERIAL PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"address\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"category\" (\"category_id\" SERIAL PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"category\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"city\" (\"city_id\" SERIAL PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"city\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"country\" (\"country_id\" SERIAL PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"country\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"customer\" (\"customer_id\" SERIAL PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"customer\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"film\" (\"film_id\" SERIAL PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"film\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"inventory\" (\"inventory_id\" SERIAL PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"inventory\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"language\" (\"language_id\" SERIAL PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"language\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"rental\" (\"rental_id\" SERIAL PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"rental\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"staff\" (\"staff_id\" SERIAL PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"staff\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"store\" (\"store_id\" SERIAL PRIMARY KEY);",
+    "ALTER TABLE \"public\".\"store\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"film_actor\" (\"actor_id\" INTEGER NOT NULL, \"film_id\" INTEGER NOT NULL, PRIMARY KEY (\"actor_id\", \"film_id\"));",
+    "ALTER TABLE \"public\".\"film_actor\" ENABLE ROW LEVEL SECURITY;",
+    "CREATE TABLE IF NOT EXISTS \"public\".\"film_category\" (\"film_id\" INTEGER NOT NULL, \"category_id\" INTEGER NOT NULL, PRIMARY KEY (\"film_id\", \"category_id\"));",
+    "ALTER TABLE \"public\".\"film_category\" ENABLE ROW LEVEL SECURITY;",
+    "ALTER TABLE \"public\".\"actor\" ADD COLUMN IF NOT EXISTS \"first_name\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"actor\" ADD COLUMN IF NOT EXISTS \"last_name\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"actor\" ADD COLUMN IF NOT EXISTS \"last_update\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;",
+    "ALTER TABLE \"public\".\"address\" ADD COLUMN IF NOT EXISTS \"phone\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"address\" ADD COLUMN IF NOT EXISTS \"last_update\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;",
+    "ALTER TABLE \"public\".\"address\" ADD COLUMN IF NOT EXISTS \"address\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"address\" ADD COLUMN IF NOT EXISTS \"address2\" TEXT;",
+    "ALTER TABLE \"public\".\"address\" ADD COLUMN IF NOT EXISTS \"district\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"address\" ADD COLUMN IF NOT EXISTS \"postal_code\" TEXT;",
+    "ALTER TABLE \"public\".\"category\" ADD COLUMN IF NOT EXISTS \"name\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"category\" ADD COLUMN IF NOT EXISTS \"last_update\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;",
+    "ALTER TABLE \"public\".\"city\" ADD COLUMN IF NOT EXISTS \"last_update\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;",
+    "ALTER TABLE \"public\".\"city\" ADD COLUMN IF NOT EXISTS \"city\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"country\" ADD COLUMN IF NOT EXISTS \"last_update\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;",
+    "ALTER TABLE \"public\".\"country\" ADD COLUMN IF NOT EXISTS \"country\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"customer\" ADD COLUMN IF NOT EXISTS \"first_name\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"customer\" ADD COLUMN IF NOT EXISTS \"last_name\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"customer\" ADD COLUMN IF NOT EXISTS \"email\" TEXT;",
+    "ALTER TABLE \"public\".\"customer\" ADD COLUMN IF NOT EXISTS \"uuid\" UUID UNIQUE DEFAULT uuidv7() NOT NULL;",
+    "ALTER TABLE \"public\".\"customer\" ADD COLUMN IF NOT EXISTS \"activebool\" BOOLEAN DEFAULT TRUE NOT NULL;",
+    "ALTER TABLE \"public\".\"customer\" ADD COLUMN IF NOT EXISTS \"active\" INTEGER;",
+    "ALTER TABLE \"public\".\"customer\" ADD COLUMN IF NOT EXISTS \"create_date\" DATE DEFAULT CURRENT_DATE NOT NULL;",
+    "ALTER TABLE \"public\".\"customer\" ADD COLUMN IF NOT EXISTS \"last_update\" TIMESTAMP WITH TIME ZONE DEFAULT now();",
+    "ALTER TABLE \"public\".\"film\" ADD COLUMN IF NOT EXISTS \"title\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"film\" ADD COLUMN IF NOT EXISTS \"rating\" \"public\".\"film_rating\" DEFAULT 'G';",
+    "ALTER TABLE \"public\".\"film\" ADD COLUMN IF NOT EXISTS \"fulltext\" TEXT;",
+    "ALTER TABLE \"public\".\"film\" ADD COLUMN IF NOT EXISTS \"release_year\" INTEGER;",
+    "ALTER TABLE \"public\".\"film\" ADD COLUMN IF NOT EXISTS \"rental_duration\" INTEGER DEFAULT 3 NOT NULL;",
+    "ALTER TABLE \"public\".\"film\" ADD COLUMN IF NOT EXISTS \"rental_rate\" NUMERIC(4, 2) DEFAULT 4.99 NOT NULL;",
+    "ALTER TABLE \"public\".\"film\" ADD COLUMN IF NOT EXISTS \"length\" INTEGER;",
+    "ALTER TABLE \"public\".\"film\" ADD COLUMN IF NOT EXISTS \"replacement_cost\" NUMERIC(5, 2) DEFAULT 19.99 NOT NULL;",
+    "ALTER TABLE \"public\".\"film\" ADD COLUMN IF NOT EXISTS \"length_hours\" NUMERIC;",
+    "ALTER TABLE \"public\".\"film\" ADD COLUMN IF NOT EXISTS \"last_update\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;",
+    "ALTER TABLE \"public\".\"film\" ADD COLUMN IF NOT EXISTS \"description\" TEXT;",
+    "ALTER TABLE \"public\".\"film\" ADD COLUMN IF NOT EXISTS \"special_features\" TEXT[];",
+    "ALTER TABLE \"public\".\"inventory\" ADD COLUMN IF NOT EXISTS \"last_update\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;",
+    "ALTER TABLE \"public\".\"language\" ADD COLUMN IF NOT EXISTS \"name\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"language\" ADD COLUMN IF NOT EXISTS \"last_update\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;",
+    "ALTER TABLE \"public\".\"rental\" ADD COLUMN IF NOT EXISTS \"uuid\" UUID UNIQUE DEFAULT uuidv7() NOT NULL;",
+    "ALTER TABLE \"public\".\"rental\" ADD COLUMN IF NOT EXISTS \"rental_date\" TIMESTAMP WITH TIME ZONE NOT NULL;",
+    "ALTER TABLE \"public\".\"rental\" ADD COLUMN IF NOT EXISTS \"return_date\" TIMESTAMP WITH TIME ZONE;",
+    "ALTER TABLE \"public\".\"rental\" ADD COLUMN IF NOT EXISTS \"last_update\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;",
+    "ALTER TABLE \"public\".\"staff\" ADD COLUMN IF NOT EXISTS \"first_name\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"staff\" ADD COLUMN IF NOT EXISTS \"last_name\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"staff\" ADD COLUMN IF NOT EXISTS \"username\" TEXT NOT NULL;",
+    "ALTER TABLE \"public\".\"staff\" ADD COLUMN IF NOT EXISTS \"email\" TEXT;",
+    "ALTER TABLE \"public\".\"staff\" ADD COLUMN IF NOT EXISTS \"active\" BOOLEAN DEFAULT TRUE NOT NULL;",
+    "ALTER TABLE \"public\".\"staff\" ADD COLUMN IF NOT EXISTS \"last_update\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;",
+    "ALTER TABLE \"public\".\"staff\" ADD COLUMN IF NOT EXISTS \"password\" TEXT;",
+    "ALTER TABLE \"public\".\"staff\" ADD COLUMN IF NOT EXISTS \"picture\" BYTEA;",
+    "ALTER TABLE \"public\".\"store\" ADD COLUMN IF NOT EXISTS \"manager_staff_id\" INTEGER UNIQUE NOT NULL;",
+    "ALTER TABLE \"public\".\"store\" ADD COLUMN IF NOT EXISTS \"last_update\" TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL;",
+    "ALTER TABLE \"public\".\"address\" ADD COLUMN IF NOT EXISTS \"city_id\" INTEGER NOT NULL;",
+    "ALTER TABLE \"public\".\"city\" ADD COLUMN IF NOT EXISTS \"country_id\" INTEGER NOT NULL;",
+    "ALTER TABLE \"public\".\"customer\" ADD COLUMN IF NOT EXISTS \"address_id\" INTEGER NOT NULL;",
+    "ALTER TABLE \"public\".\"customer\" ADD COLUMN IF NOT EXISTS \"store_id\" INTEGER NOT NULL;",
+    "ALTER TABLE \"public\".\"film\" ADD COLUMN IF NOT EXISTS \"language_id\" INTEGER NOT NULL;",
+    "ALTER TABLE \"public\".\"film\" ADD COLUMN IF NOT EXISTS \"original_language_id\" INTEGER;",
+    "ALTER TABLE \"public\".\"inventory\" ADD COLUMN IF NOT EXISTS \"film_id\" INTEGER NOT NULL;",
+    "ALTER TABLE \"public\".\"inventory\" ADD COLUMN IF NOT EXISTS \"store_id\" INTEGER NOT NULL;",
+    "ALTER TABLE \"public\".\"rental\" ADD COLUMN IF NOT EXISTS \"customer_id\" INTEGER NOT NULL;",
+    "ALTER TABLE \"public\".\"rental\" ADD COLUMN IF NOT EXISTS \"inventory_id\" INTEGER NOT NULL;",
+    "ALTER TABLE \"public\".\"rental\" ADD COLUMN IF NOT EXISTS \"staff_id\" INTEGER NOT NULL;",
+    "ALTER TABLE \"public\".\"staff\" ADD COLUMN IF NOT EXISTS \"address_id\" INTEGER NOT NULL;",
+    "ALTER TABLE \"public\".\"staff\" ADD COLUMN IF NOT EXISTS \"store_id\" INTEGER NOT NULL;",
+    "ALTER TABLE \"public\".\"store\" ADD COLUMN IF NOT EXISTS \"address_id\" INTEGER NOT NULL;",
+    "ALTER TABLE \"public\".\"address\" ADD CONSTRAINT \"address_city_id_fkey\" FOREIGN KEY (\"city_id\") REFERENCES \"public\".\"city\" (\"city_id\") ON DELETE RESTRICT;",
+    "ALTER TABLE \"public\".\"city\" ADD CONSTRAINT \"city_country_id_fkey\" FOREIGN KEY (\"country_id\") REFERENCES \"public\".\"country\" (\"country_id\") ON DELETE RESTRICT;",
+    "ALTER TABLE \"public\".\"customer\" ADD CONSTRAINT \"customer_address_id_fkey\" FOREIGN KEY (\"address_id\") REFERENCES \"public\".\"address\" (\"address_id\") ON DELETE RESTRICT;",
+    "ALTER TABLE \"public\".\"customer\" ADD CONSTRAINT \"customer_store_id_fkey\" FOREIGN KEY (\"store_id\") REFERENCES \"public\".\"store\" (\"store_id\") ON DELETE RESTRICT;",
+    "ALTER TABLE \"public\".\"film\" ADD CONSTRAINT \"film_language_id_fkey\" FOREIGN KEY (\"language_id\") REFERENCES \"public\".\"language\" (\"language_id\") ON DELETE RESTRICT;",
+    "ALTER TABLE \"public\".\"film\" ADD CONSTRAINT \"film_original_language_id_fkey\" FOREIGN KEY (\"original_language_id\") REFERENCES \"public\".\"language\" (\"language_id\") ON DELETE RESTRICT;",
+    "ALTER TABLE \"public\".\"inventory\" ADD CONSTRAINT \"inventory_film_id_fkey\" FOREIGN KEY (\"film_id\") REFERENCES \"public\".\"film\" (\"film_id\") ON DELETE RESTRICT;",
+    "ALTER TABLE \"public\".\"inventory\" ADD CONSTRAINT \"inventory_store_id_fkey\" FOREIGN KEY (\"store_id\") REFERENCES \"public\".\"store\" (\"store_id\") ON DELETE RESTRICT;",
+    "ALTER TABLE \"public\".\"rental\" ADD CONSTRAINT \"rental_customer_id_fkey\" FOREIGN KEY (\"customer_id\") REFERENCES \"public\".\"customer\" (\"customer_id\") ON DELETE RESTRICT;",
+    "ALTER TABLE \"public\".\"rental\" ADD CONSTRAINT \"rental_inventory_id_fkey\" FOREIGN KEY (\"inventory_id\") REFERENCES \"public\".\"inventory\" (\"inventory_id\") ON DELETE RESTRICT;",
+    "ALTER TABLE \"public\".\"rental\" ADD CONSTRAINT \"rental_staff_id_fkey\" FOREIGN KEY (\"staff_id\") REFERENCES \"public\".\"staff\" (\"staff_id\") ON DELETE RESTRICT;",
+    "ALTER TABLE \"public\".\"staff\" ADD CONSTRAINT \"staff_address_id_fkey\" FOREIGN KEY (\"address_id\") REFERENCES \"public\".\"address\" (\"address_id\") ON DELETE RESTRICT;",
+    "ALTER TABLE \"public\".\"staff\" ADD CONSTRAINT \"staff_store_id_fkey\" FOREIGN KEY (\"store_id\") REFERENCES \"public\".\"store\" (\"store_id\") ON DELETE NO ACTION;",
+    "ALTER TABLE \"public\".\"store\" ADD CONSTRAINT \"store_address_id_fkey\" FOREIGN KEY (\"address_id\") REFERENCES \"public\".\"address\" (\"address_id\") ON DELETE RESTRICT;",
+    "ALTER TABLE \"public\".\"film_actor\" ADD CONSTRAINT \"film_actor_actor_id_fkey\" FOREIGN KEY (\"actor_id\") REFERENCES \"public\".\"actor\" (\"actor_id\") ON DELETE CASCADE;",
+    "ALTER TABLE \"public\".\"film_actor\" ADD CONSTRAINT \"film_actor_film_id_fkey\" FOREIGN KEY (\"film_id\") REFERENCES \"public\".\"film\" (\"film_id\") ON DELETE CASCADE;",
+    "ALTER TABLE \"public\".\"film_category\" ADD CONSTRAINT \"film_category_film_id_fkey\" FOREIGN KEY (\"film_id\") REFERENCES \"public\".\"film\" (\"film_id\") ON DELETE CASCADE;",
+    "ALTER TABLE \"public\".\"film_category\" ADD CONSTRAINT \"film_category_category_id_fkey\" FOREIGN KEY (\"category_id\") REFERENCES \"public\".\"category\" (\"category_id\") ON DELETE CASCADE;",
+    "CREATE INDEX IF NOT EXISTS \"address_city_id_ix_3dd7bdc\" ON \"public\".\"address\" (\"city_id\");",
+    "CREATE INDEX IF NOT EXISTS \"city_country_id_ix_263e15e\" ON \"public\".\"city\" (\"country_id\");",
+    "CREATE INDEX IF NOT EXISTS \"customer_address_id_ix_2c19cf9\" ON \"public\".\"customer\" (\"address_id\");",
+    "CREATE INDEX IF NOT EXISTS \"customer_store_id_ix_4ec4ecf\" ON \"public\".\"customer\" (\"store_id\");",
+    "CREATE INDEX IF NOT EXISTS \"film_language_id_ix_1f2724b\" ON \"public\".\"film\" (\"language_id\");",
+    "CREATE INDEX IF NOT EXISTS \"film_original_language_id_ix_3d90cc8\" ON \"public\".\"film\" (\"original_language_id\");",
+    "CREATE INDEX IF NOT EXISTS \"film_actor_film_id_ix_c6e4954\" ON \"public\".\"film_actor\" (\"film_id\");",
+    "CREATE INDEX IF NOT EXISTS \"film_category_category_id_ix_c009fce\" ON \"public\".\"film_category\" (\"category_id\");",
+    "CREATE INDEX IF NOT EXISTS \"inventory_film_id_ix_37dbbb5\" ON \"public\".\"inventory\" (\"film_id\");",
+    "CREATE INDEX IF NOT EXISTS \"inventory_store_id_ix_c895c65\" ON \"public\".\"inventory\" (\"store_id\");",
+    "CREATE INDEX IF NOT EXISTS \"rental_customer_id_ix_8bb3897\" ON \"public\".\"rental\" (\"customer_id\");",
+    "CREATE INDEX IF NOT EXISTS \"rental_inventory_id_ix_a847b96\" ON \"public\".\"rental\" (\"inventory_id\");",
+    "CREATE INDEX IF NOT EXISTS \"rental_staff_id_ix_714ab52\" ON \"public\".\"rental\" (\"staff_id\");",
+    "CREATE INDEX IF NOT EXISTS \"staff_address_id_ix_f7d5f95\" ON \"public\".\"staff\" (\"address_id\");",
+    "CREATE INDEX IF NOT EXISTS \"staff_store_id_ix_68981bf\" ON \"public\".\"staff\" (\"store_id\");",
+    "CREATE INDEX IF NOT EXISTS \"store_address_id_ix_ed1824e\" ON \"public\".\"store\" (\"address_id\");"
+  ],
+  "legacyForeignKeys": [],
+  "searchDrift": [],
+  "searchAdopted": [],
+  "vectorIndexSkipped": [],
+  "withheldConstraints": [],
+  "columnTypeDrift": [],
+  "orphanedRequiredColumns": [],
+  "deferredIndexes": []
+}

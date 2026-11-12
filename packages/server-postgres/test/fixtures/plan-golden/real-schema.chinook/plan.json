@@ -1,0 +1,2598 @@
+{
+  "schemas": [
+    "rebase"
+  ],
+  "declaredSchemas": [],
+  "enums": [],
+  "tables": [
+    {
+      "schema": "public",
+      "table": "album",
+      "qualified": "public.album",
+      "varName": "album",
+      "kind": "collection",
+      "slug": "album",
+      "columns": [
+        {
+          "key": "albumId",
+          "column": "album_id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "albumId",
+            "slug": "album"
+          }
+        },
+        {
+          "key": "title",
+          "column": "title",
+          "type": {
+            "kind": "varchar",
+            "length": 160
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "title",
+            "slug": "album"
+          }
+        },
+        {
+          "key": "artistId",
+          "column": "artist_id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": {
+            "schema": "public",
+            "table": "album",
+            "column": "artist_id",
+            "targetSchema": "public",
+            "targetTable": "artist",
+            "targetColumn": "artist_id",
+            "onDelete": "no action",
+            "constraintName": "album_artist_id_fkey",
+            "sql": "ALTER TABLE \"public\".\"album\" ADD CONSTRAINT \"album_artist_id_fkey\" FOREIGN KEY (\"artist_id\") REFERENCES \"public\".\"artist\" (\"artist_id\") ON DELETE NO ACTION"
+          },
+          "source": {
+            "kind": "relation",
+            "propName": "artist",
+            "slug": "album"
+          }
+        }
+      ],
+      "primaryKey": [
+        "album_id"
+      ],
+      "indexes": [
+        {
+          "schema": "public",
+          "table": "album",
+          "method": "btree",
+          "unique": false,
+          "keys": [
+            {
+              "column": "artist_id",
+              "direction": "asc",
+              "nulls": "last"
+            }
+          ],
+          "include": [],
+          "predicate": null,
+          "reason": "Derived for a foreign key: Postgres indexes the key a constraint points at, never the column holding it.",
+          "indexName": "album_artist_id_ix_5499864",
+          "derived": "foreign-key"
+        }
+      ],
+      "vector": {
+        "specs": [],
+        "skipped": []
+      },
+      "vectorColumns": [],
+      "policies": [
+        {
+          "name": "album_default_admin_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "album_default_admin_read",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "album_default_admin_read_ar_fc61d2cc",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "album_default_admin_write_insert",
+          "operation": "insert",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": null,
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "album_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "album_default_admin_write_insert_ar_bc169a3f",
+            "using": null,
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "album_default_admin_write_update",
+          "operation": "update",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "album_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "album_default_admin_write_update_ar_87f424f9",
+            "using": "true",
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "album_default_admin_write_delete",
+          "operation": "delete",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "album_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "album_default_admin_write_delete_ar_e4ba3923",
+            "using": "true",
+            "withCheck": null
+          }
+        }
+      ],
+      "triggers": [],
+      "auth": false
+    },
+    {
+      "schema": "public",
+      "table": "artist",
+      "qualified": "public.artist",
+      "varName": "artist",
+      "kind": "collection",
+      "slug": "artist",
+      "columns": [
+        {
+          "key": "artistId",
+          "column": "artist_id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "artistId",
+            "slug": "artist"
+          }
+        },
+        {
+          "key": "name",
+          "column": "name",
+          "type": {
+            "kind": "varchar",
+            "length": 120
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "name",
+            "slug": "artist"
+          }
+        }
+      ],
+      "primaryKey": [
+        "artist_id"
+      ],
+      "indexes": [],
+      "vector": {
+        "specs": [],
+        "skipped": []
+      },
+      "vectorColumns": [],
+      "policies": [
+        {
+          "name": "artist_default_admin_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "artist_default_admin_read",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "artist_default_admin_read_ar_4e15dd0a",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "artist_default_admin_write_insert",
+          "operation": "insert",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": null,
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "artist_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "artist_default_admin_write_insert_ar_e2915928",
+            "using": null,
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "artist_default_admin_write_update",
+          "operation": "update",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "artist_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "artist_default_admin_write_update_ar_fb4e51cd",
+            "using": "true",
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "artist_default_admin_write_delete",
+          "operation": "delete",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "artist_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "artist_default_admin_write_delete_ar_c3308fe7",
+            "using": "true",
+            "withCheck": null
+          }
+        }
+      ],
+      "triggers": [],
+      "auth": false
+    },
+    {
+      "schema": "public",
+      "table": "customer",
+      "qualified": "public.customer",
+      "varName": "customer",
+      "kind": "collection",
+      "slug": "customer",
+      "columns": [
+        {
+          "key": "customerId",
+          "column": "customer_id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "customerId",
+            "slug": "customer"
+          }
+        },
+        {
+          "key": "firstName",
+          "column": "first_name",
+          "type": {
+            "kind": "varchar",
+            "length": 40
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "firstName",
+            "slug": "customer"
+          }
+        },
+        {
+          "key": "lastName",
+          "column": "last_name",
+          "type": {
+            "kind": "varchar",
+            "length": 20
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "lastName",
+            "slug": "customer"
+          }
+        },
+        {
+          "key": "email",
+          "column": "email",
+          "type": {
+            "kind": "varchar",
+            "length": 60
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "email",
+            "slug": "customer"
+          }
+        },
+        {
+          "key": "phone",
+          "column": "phone",
+          "type": {
+            "kind": "varchar",
+            "length": 24
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "phone",
+            "slug": "customer"
+          }
+        },
+        {
+          "key": "state",
+          "column": "state",
+          "type": {
+            "kind": "varchar",
+            "length": 40
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "state",
+            "slug": "customer"
+          }
+        },
+        {
+          "key": "company",
+          "column": "company",
+          "type": {
+            "kind": "varchar",
+            "length": 80
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "company",
+            "slug": "customer"
+          }
+        },
+        {
+          "key": "address",
+          "column": "address",
+          "type": {
+            "kind": "varchar",
+            "length": 70
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "address",
+            "slug": "customer"
+          }
+        },
+        {
+          "key": "city",
+          "column": "city",
+          "type": {
+            "kind": "varchar",
+            "length": 40
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "city",
+            "slug": "customer"
+          }
+        },
+        {
+          "key": "country",
+          "column": "country",
+          "type": {
+            "kind": "varchar",
+            "length": 40
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "country",
+            "slug": "customer"
+          }
+        },
+        {
+          "key": "postalCode",
+          "column": "postal_code",
+          "type": {
+            "kind": "varchar",
+            "length": 10
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "postalCode",
+            "slug": "customer"
+          }
+        },
+        {
+          "key": "fax",
+          "column": "fax",
+          "type": {
+            "kind": "varchar",
+            "length": 24
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "fax",
+            "slug": "customer"
+          }
+        },
+        {
+          "key": "supportRepId",
+          "column": "support_rep_id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": {
+            "schema": "public",
+            "table": "customer",
+            "column": "support_rep_id",
+            "targetSchema": "public",
+            "targetTable": "employee",
+            "targetColumn": "employee_id",
+            "onDelete": "no action",
+            "constraintName": "customer_support_rep_id_fkey",
+            "sql": "ALTER TABLE \"public\".\"customer\" ADD CONSTRAINT \"customer_support_rep_id_fkey\" FOREIGN KEY (\"support_rep_id\") REFERENCES \"public\".\"employee\" (\"employee_id\") ON DELETE NO ACTION"
+          },
+          "source": {
+            "kind": "relation",
+            "propName": "supportRep",
+            "slug": "customer"
+          }
+        }
+      ],
+      "primaryKey": [
+        "customer_id"
+      ],
+      "indexes": [
+        {
+          "schema": "public",
+          "table": "customer",
+          "method": "btree",
+          "unique": false,
+          "keys": [
+            {
+              "column": "support_rep_id",
+              "direction": "asc",
+              "nulls": "last"
+            }
+          ],
+          "include": [],
+          "predicate": null,
+          "reason": "Derived for a foreign key: Postgres indexes the key a constraint points at, never the column holding it.",
+          "indexName": "customer_support_rep_id_ix_43d7c5d",
+          "derived": "foreign-key"
+        }
+      ],
+      "vector": {
+        "specs": [],
+        "skipped": []
+      },
+      "vectorColumns": [],
+      "policies": [
+        {
+          "name": "customer_default_admin_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "customer_default_admin_read",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "customer_default_admin_read_ar_4a5726a7",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "customer_default_admin_write_insert",
+          "operation": "insert",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": null,
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "customer_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "customer_default_admin_write_insert_ar_8c1a3fc8",
+            "using": null,
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "customer_default_admin_write_update",
+          "operation": "update",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "customer_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "customer_default_admin_write_update_ar_3aff00e6",
+            "using": "true",
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "customer_default_admin_write_delete",
+          "operation": "delete",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "customer_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "customer_default_admin_write_delete_ar_b92cc853",
+            "using": "true",
+            "withCheck": null
+          }
+        }
+      ],
+      "triggers": [],
+      "auth": false
+    },
+    {
+      "schema": "public",
+      "table": "employee",
+      "qualified": "public.employee",
+      "varName": "employee",
+      "kind": "collection",
+      "slug": "employee",
+      "columns": [
+        {
+          "key": "employeeId",
+          "column": "employee_id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "employeeId",
+            "slug": "employee"
+          }
+        },
+        {
+          "key": "title",
+          "column": "title",
+          "type": {
+            "kind": "varchar",
+            "length": 30
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "title",
+            "slug": "employee"
+          }
+        },
+        {
+          "key": "firstName",
+          "column": "first_name",
+          "type": {
+            "kind": "varchar",
+            "length": 20
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "firstName",
+            "slug": "employee"
+          }
+        },
+        {
+          "key": "lastName",
+          "column": "last_name",
+          "type": {
+            "kind": "varchar",
+            "length": 20
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "lastName",
+            "slug": "employee"
+          }
+        },
+        {
+          "key": "email",
+          "column": "email",
+          "type": {
+            "kind": "varchar",
+            "length": 60
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "email",
+            "slug": "employee"
+          }
+        },
+        {
+          "key": "phone",
+          "column": "phone",
+          "type": {
+            "kind": "varchar",
+            "length": 24
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "phone",
+            "slug": "employee"
+          }
+        },
+        {
+          "key": "state",
+          "column": "state",
+          "type": {
+            "kind": "varchar",
+            "length": 40
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "state",
+            "slug": "employee"
+          }
+        },
+        {
+          "key": "address",
+          "column": "address",
+          "type": {
+            "kind": "varchar",
+            "length": 70
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "address",
+            "slug": "employee"
+          }
+        },
+        {
+          "key": "city",
+          "column": "city",
+          "type": {
+            "kind": "varchar",
+            "length": 40
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "city",
+            "slug": "employee"
+          }
+        },
+        {
+          "key": "country",
+          "column": "country",
+          "type": {
+            "kind": "varchar",
+            "length": 40
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "country",
+            "slug": "employee"
+          }
+        },
+        {
+          "key": "postalCode",
+          "column": "postal_code",
+          "type": {
+            "kind": "varchar",
+            "length": 10
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "postalCode",
+            "slug": "employee"
+          }
+        },
+        {
+          "key": "fax",
+          "column": "fax",
+          "type": {
+            "kind": "varchar",
+            "length": 24
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "fax",
+            "slug": "employee"
+          }
+        },
+        {
+          "key": "birthDate",
+          "column": "birth_date",
+          "type": {
+            "kind": "timestamptz"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "birthDate",
+            "slug": "employee"
+          }
+        },
+        {
+          "key": "hireDate",
+          "column": "hire_date",
+          "type": {
+            "kind": "timestamptz"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "hireDate",
+            "slug": "employee"
+          }
+        },
+        {
+          "key": "reportsTo",
+          "column": "reports_to",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": {
+            "schema": "public",
+            "table": "employee",
+            "column": "reports_to",
+            "targetSchema": "public",
+            "targetTable": "employee",
+            "targetColumn": "employee_id",
+            "onDelete": "no action",
+            "constraintName": "employee_reports_to_fkey",
+            "sql": "ALTER TABLE \"public\".\"employee\" ADD CONSTRAINT \"employee_reports_to_fkey\" FOREIGN KEY (\"reports_to\") REFERENCES \"public\".\"employee\" (\"employee_id\") ON DELETE NO ACTION"
+          },
+          "source": {
+            "kind": "relation",
+            "propName": "reportsTo",
+            "slug": "employee"
+          }
+        }
+      ],
+      "primaryKey": [
+        "employee_id"
+      ],
+      "indexes": [
+        {
+          "schema": "public",
+          "table": "employee",
+          "method": "btree",
+          "unique": false,
+          "keys": [
+            {
+              "column": "reports_to",
+              "direction": "asc",
+              "nulls": "last"
+            }
+          ],
+          "include": [],
+          "predicate": null,
+          "reason": "Derived for a foreign key: Postgres indexes the key a constraint points at, never the column holding it.",
+          "indexName": "employee_reports_to_ix_531204f",
+          "derived": "foreign-key"
+        }
+      ],
+      "vector": {
+        "specs": [],
+        "skipped": []
+      },
+      "vectorColumns": [],
+      "policies": [
+        {
+          "name": "employee_default_admin_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "employee_default_admin_read",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "employee_default_admin_read_ar_ca30f4b1",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "employee_default_admin_write_insert",
+          "operation": "insert",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": null,
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "employee_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "employee_default_admin_write_insert_ar_c650855f",
+            "using": null,
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "employee_default_admin_write_update",
+          "operation": "update",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "employee_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "employee_default_admin_write_update_ar_ec53321c",
+            "using": "true",
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "employee_default_admin_write_delete",
+          "operation": "delete",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "employee_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "employee_default_admin_write_delete_ar_6d1776a3",
+            "using": "true",
+            "withCheck": null
+          }
+        }
+      ],
+      "triggers": [],
+      "auth": false
+    },
+    {
+      "schema": "public",
+      "table": "genre",
+      "qualified": "public.genre",
+      "varName": "genre",
+      "kind": "collection",
+      "slug": "genre",
+      "columns": [
+        {
+          "key": "genreId",
+          "column": "genre_id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "genreId",
+            "slug": "genre"
+          }
+        },
+        {
+          "key": "name",
+          "column": "name",
+          "type": {
+            "kind": "varchar",
+            "length": 120
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "name",
+            "slug": "genre"
+          }
+        }
+      ],
+      "primaryKey": [
+        "genre_id"
+      ],
+      "indexes": [],
+      "vector": {
+        "specs": [],
+        "skipped": []
+      },
+      "vectorColumns": [],
+      "policies": [
+        {
+          "name": "genre_default_admin_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "genre_default_admin_read",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "genre_default_admin_read_ar_6501bfa9",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "genre_default_admin_write_insert",
+          "operation": "insert",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": null,
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "genre_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "genre_default_admin_write_insert_ar_dec96e42",
+            "using": null,
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "genre_default_admin_write_update",
+          "operation": "update",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "genre_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "genre_default_admin_write_update_ar_deab697a",
+            "using": "true",
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "genre_default_admin_write_delete",
+          "operation": "delete",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "genre_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "genre_default_admin_write_delete_ar_8f60a940",
+            "using": "true",
+            "withCheck": null
+          }
+        }
+      ],
+      "triggers": [],
+      "auth": false
+    },
+    {
+      "schema": "public",
+      "table": "invoice",
+      "qualified": "public.invoice",
+      "varName": "invoice",
+      "kind": "collection",
+      "slug": "invoice",
+      "columns": [
+        {
+          "key": "invoiceId",
+          "column": "invoice_id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "invoiceId",
+            "slug": "invoice"
+          }
+        },
+        {
+          "key": "billingAddress",
+          "column": "billing_address",
+          "type": {
+            "kind": "varchar",
+            "length": 70
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "billingAddress",
+            "slug": "invoice"
+          }
+        },
+        {
+          "key": "billingCity",
+          "column": "billing_city",
+          "type": {
+            "kind": "varchar",
+            "length": 40
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "billingCity",
+            "slug": "invoice"
+          }
+        },
+        {
+          "key": "billingState",
+          "column": "billing_state",
+          "type": {
+            "kind": "varchar",
+            "length": 40
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "billingState",
+            "slug": "invoice"
+          }
+        },
+        {
+          "key": "billingCountry",
+          "column": "billing_country",
+          "type": {
+            "kind": "varchar",
+            "length": 40
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "billingCountry",
+            "slug": "invoice"
+          }
+        },
+        {
+          "key": "billingPostalCode",
+          "column": "billing_postal_code",
+          "type": {
+            "kind": "varchar",
+            "length": 10
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "billingPostalCode",
+            "slug": "invoice"
+          }
+        },
+        {
+          "key": "total",
+          "column": "total",
+          "type": {
+            "kind": "numeric",
+            "precision": 10,
+            "scale": 2
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "total",
+            "slug": "invoice"
+          }
+        },
+        {
+          "key": "invoiceDate",
+          "column": "invoice_date",
+          "type": {
+            "kind": "timestamptz"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "invoiceDate",
+            "slug": "invoice"
+          }
+        },
+        {
+          "key": "customerId",
+          "column": "customer_id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": {
+            "schema": "public",
+            "table": "invoice",
+            "column": "customer_id",
+            "targetSchema": "public",
+            "targetTable": "customer",
+            "targetColumn": "customer_id",
+            "onDelete": "no action",
+            "constraintName": "invoice_customer_id_fkey",
+            "sql": "ALTER TABLE \"public\".\"invoice\" ADD CONSTRAINT \"invoice_customer_id_fkey\" FOREIGN KEY (\"customer_id\") REFERENCES \"public\".\"customer\" (\"customer_id\") ON DELETE NO ACTION"
+          },
+          "source": {
+            "kind": "relation",
+            "propName": "customer",
+            "slug": "invoice"
+          }
+        }
+      ],
+      "primaryKey": [
+        "invoice_id"
+      ],
+      "indexes": [
+        {
+          "schema": "public",
+          "table": "invoice",
+          "method": "btree",
+          "unique": false,
+          "keys": [
+            {
+              "column": "customer_id",
+              "direction": "asc",
+              "nulls": "last"
+            }
+          ],
+          "include": [],
+          "predicate": null,
+          "reason": "Derived for a foreign key: Postgres indexes the key a constraint points at, never the column holding it.",
+          "indexName": "invoice_customer_id_ix_37cc663",
+          "derived": "foreign-key"
+        }
+      ],
+      "vector": {
+        "specs": [],
+        "skipped": []
+      },
+      "vectorColumns": [],
+      "policies": [
+        {
+          "name": "invoice_default_admin_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "invoice_default_admin_read",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "invoice_default_admin_read_ar_a6d065bc",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "invoice_default_admin_write_insert",
+          "operation": "insert",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": null,
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "invoice_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "invoice_default_admin_write_insert_ar_f7d16cad",
+            "using": null,
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "invoice_default_admin_write_update",
+          "operation": "update",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "invoice_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "invoice_default_admin_write_update_ar_8735659f",
+            "using": "true",
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "invoice_default_admin_write_delete",
+          "operation": "delete",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "invoice_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "invoice_default_admin_write_delete_ar_d5adaf00",
+            "using": "true",
+            "withCheck": null
+          }
+        }
+      ],
+      "triggers": [],
+      "auth": false
+    },
+    {
+      "schema": "public",
+      "table": "invoice_line",
+      "qualified": "public.invoice_line",
+      "varName": "invoiceLine",
+      "kind": "collection",
+      "slug": "invoice_line",
+      "columns": [
+        {
+          "key": "invoiceLineId",
+          "column": "invoice_line_id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "invoiceLineId",
+            "slug": "invoice_line"
+          }
+        },
+        {
+          "key": "unitPrice",
+          "column": "unit_price",
+          "type": {
+            "kind": "numeric",
+            "precision": 10,
+            "scale": 2
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "unitPrice",
+            "slug": "invoice_line"
+          }
+        },
+        {
+          "key": "quantity",
+          "column": "quantity",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "quantity",
+            "slug": "invoice_line"
+          }
+        },
+        {
+          "key": "invoiceId",
+          "column": "invoice_id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": {
+            "schema": "public",
+            "table": "invoice_line",
+            "column": "invoice_id",
+            "targetSchema": "public",
+            "targetTable": "invoice",
+            "targetColumn": "invoice_id",
+            "onDelete": "no action",
+            "constraintName": "invoice_line_invoice_id_fkey",
+            "sql": "ALTER TABLE \"public\".\"invoice_line\" ADD CONSTRAINT \"invoice_line_invoice_id_fkey\" FOREIGN KEY (\"invoice_id\") REFERENCES \"public\".\"invoice\" (\"invoice_id\") ON DELETE NO ACTION"
+          },
+          "source": {
+            "kind": "relation",
+            "propName": "invoice",
+            "slug": "invoice_line"
+          }
+        },
+        {
+          "key": "trackId",
+          "column": "track_id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": {
+            "schema": "public",
+            "table": "invoice_line",
+            "column": "track_id",
+            "targetSchema": "public",
+            "targetTable": "track",
+            "targetColumn": "track_id",
+            "onDelete": "no action",
+            "constraintName": "invoice_line_track_id_fkey",
+            "sql": "ALTER TABLE \"public\".\"invoice_line\" ADD CONSTRAINT \"invoice_line_track_id_fkey\" FOREIGN KEY (\"track_id\") REFERENCES \"public\".\"track\" (\"track_id\") ON DELETE NO ACTION"
+          },
+          "source": {
+            "kind": "relation",
+            "propName": "track",
+            "slug": "invoice_line"
+          }
+        }
+      ],
+      "primaryKey": [
+        "invoice_line_id"
+      ],
+      "indexes": [
+        {
+          "schema": "public",
+          "table": "invoice_line",
+          "method": "btree",
+          "unique": false,
+          "keys": [
+            {
+              "column": "invoice_id",
+              "direction": "asc",
+              "nulls": "last"
+            }
+          ],
+          "include": [],
+          "predicate": null,
+          "reason": "Derived for a foreign key: Postgres indexes the key a constraint points at, never the column holding it.",
+          "indexName": "invoice_line_invoice_id_ix_93092bf",
+          "derived": "foreign-key"
+        },
+        {
+          "schema": "public",
+          "table": "invoice_line",
+          "method": "btree",
+          "unique": false,
+          "keys": [
+            {
+              "column": "track_id",
+              "direction": "asc",
+              "nulls": "last"
+            }
+          ],
+          "include": [],
+          "predicate": null,
+          "reason": "Derived for a foreign key: Postgres indexes the key a constraint points at, never the column holding it.",
+          "indexName": "invoice_line_track_id_ix_3625da6",
+          "derived": "foreign-key"
+        }
+      ],
+      "vector": {
+        "specs": [],
+        "skipped": []
+      },
+      "vectorColumns": [],
+      "policies": [
+        {
+          "name": "invoice_line_default_admin_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "invoice_line_default_admin_read",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "invoice_line_default_admin_read_ar_8f4ad2fc",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "invoice_line_default_admin_write_insert",
+          "operation": "insert",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": null,
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "invoice_line_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "invoice_line_default_admin_write_insert_ar_9c6cd110",
+            "using": null,
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "invoice_line_default_admin_write_update",
+          "operation": "update",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "invoice_line_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "invoice_line_default_admin_write_update_ar_c0710114",
+            "using": "true",
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "invoice_line_default_admin_write_delete",
+          "operation": "delete",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "invoice_line_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "invoice_line_default_admin_write_delete_ar_3462d936",
+            "using": "true",
+            "withCheck": null
+          }
+        }
+      ],
+      "triggers": [],
+      "auth": false
+    },
+    {
+      "schema": "public",
+      "table": "media_type",
+      "qualified": "public.media_type",
+      "varName": "mediaType",
+      "kind": "collection",
+      "slug": "media_type",
+      "columns": [
+        {
+          "key": "mediaTypeId",
+          "column": "media_type_id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "mediaTypeId",
+            "slug": "media_type"
+          }
+        },
+        {
+          "key": "name",
+          "column": "name",
+          "type": {
+            "kind": "varchar",
+            "length": 120
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "name",
+            "slug": "media_type"
+          }
+        }
+      ],
+      "primaryKey": [
+        "media_type_id"
+      ],
+      "indexes": [],
+      "vector": {
+        "specs": [],
+        "skipped": []
+      },
+      "vectorColumns": [],
+      "policies": [
+        {
+          "name": "media_type_default_admin_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "media_type_default_admin_read",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "media_type_default_admin_read_ar_2b8aeca4",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "media_type_default_admin_write_insert",
+          "operation": "insert",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": null,
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "media_type_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "media_type_default_admin_write_insert_ar_a2b6cee7",
+            "using": null,
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "media_type_default_admin_write_update",
+          "operation": "update",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "media_type_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "media_type_default_admin_write_update_ar_d85b01a7",
+            "using": "true",
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "media_type_default_admin_write_delete",
+          "operation": "delete",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "media_type_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "media_type_default_admin_write_delete_ar_ad24a58e",
+            "using": "true",
+            "withCheck": null
+          }
+        }
+      ],
+      "triggers": [],
+      "auth": false
+    },
+    {
+      "schema": "public",
+      "table": "playlist",
+      "qualified": "public.playlist",
+      "varName": "playlist",
+      "kind": "collection",
+      "slug": "playlist",
+      "columns": [
+        {
+          "key": "playlistId",
+          "column": "playlist_id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "playlistId",
+            "slug": "playlist"
+          }
+        },
+        {
+          "key": "name",
+          "column": "name",
+          "type": {
+            "kind": "varchar",
+            "length": 120
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "name",
+            "slug": "playlist"
+          }
+        }
+      ],
+      "primaryKey": [
+        "playlist_id"
+      ],
+      "indexes": [],
+      "vector": {
+        "specs": [],
+        "skipped": []
+      },
+      "vectorColumns": [],
+      "policies": [
+        {
+          "name": "playlist_default_admin_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "playlist_default_admin_read",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "playlist_default_admin_read_ar_4c6be38b",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "playlist_default_admin_write_insert",
+          "operation": "insert",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": null,
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "playlist_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "playlist_default_admin_write_insert_ar_8b087691",
+            "using": null,
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "playlist_default_admin_write_update",
+          "operation": "update",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "playlist_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "playlist_default_admin_write_update_ar_a75cb333",
+            "using": "true",
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "playlist_default_admin_write_delete",
+          "operation": "delete",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "playlist_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "playlist_default_admin_write_delete_ar_e7341f60",
+            "using": "true",
+            "withCheck": null
+          }
+        }
+      ],
+      "triggers": [],
+      "auth": false
+    },
+    {
+      "schema": "public",
+      "table": "playlist_track",
+      "qualified": "public.playlist_track",
+      "varName": "playlistTrack",
+      "kind": "junction",
+      "declaringSlugs": [
+        "playlist",
+        "track"
+      ],
+      "columns": [
+        {
+          "key": "playlist_id",
+          "column": "playlist_id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": {
+            "schema": "public",
+            "table": "playlist_track",
+            "column": "playlist_id",
+            "targetSchema": "public",
+            "targetTable": "playlist",
+            "targetColumn": "playlist_id",
+            "onDelete": "CASCADE",
+            "constraintName": "playlist_track_playlist_id_fkey",
+            "sql": "ALTER TABLE \"public\".\"playlist_track\" ADD CONSTRAINT \"playlist_track_playlist_id_fkey\" FOREIGN KEY (\"playlist_id\") REFERENCES \"public\".\"playlist\" (\"playlist_id\") ON DELETE CASCADE"
+          },
+          "source": {
+            "kind": "junction-key"
+          }
+        },
+        {
+          "key": "track_id",
+          "column": "track_id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": {
+            "schema": "public",
+            "table": "playlist_track",
+            "column": "track_id",
+            "targetSchema": "public",
+            "targetTable": "track",
+            "targetColumn": "track_id",
+            "onDelete": "CASCADE",
+            "constraintName": "playlist_track_track_id_fkey",
+            "sql": "ALTER TABLE \"public\".\"playlist_track\" ADD CONSTRAINT \"playlist_track_track_id_fkey\" FOREIGN KEY (\"track_id\") REFERENCES \"public\".\"track\" (\"track_id\") ON DELETE CASCADE"
+          },
+          "source": {
+            "kind": "junction-key"
+          }
+        }
+      ],
+      "primaryKey": [
+        "playlist_id",
+        "track_id"
+      ],
+      "indexes": [
+        {
+          "schema": "public",
+          "table": "playlist_track",
+          "method": "btree",
+          "unique": false,
+          "keys": [
+            {
+              "column": "track_id",
+              "direction": "asc",
+              "nulls": "last"
+            }
+          ],
+          "include": [],
+          "predicate": null,
+          "reason": "Derived for a foreign key: Postgres indexes the key a constraint points at, never the column holding it.",
+          "indexName": "playlist_track_track_id_ix_20780e1",
+          "derived": "foreign-key"
+        }
+      ],
+      "vectorColumns": [],
+      "policies": [
+        {
+          "name": "playlist_track_default_admin_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "playlist_track_default_admin_read",
+          "injected": false,
+          "adminRequestCompanion": {
+            "name": "playlist_track_default_admin_read_ar_4e27c1e4",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "playlist_track_default_admin_write_insert",
+          "operation": "insert",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": null,
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "playlist_track_default_admin_write",
+          "injected": false,
+          "adminRequestCompanion": {
+            "name": "playlist_track_default_admin_write_insert_ar_9f7d3821",
+            "using": null,
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "playlist_track_default_admin_write_update",
+          "operation": "update",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "playlist_track_default_admin_write",
+          "injected": false,
+          "adminRequestCompanion": {
+            "name": "playlist_track_default_admin_write_update_ar_91d65ca1",
+            "using": "true",
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "playlist_track_default_admin_write_delete",
+          "operation": "delete",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "playlist_track_default_admin_write",
+          "injected": false,
+          "adminRequestCompanion": {
+            "name": "playlist_track_default_admin_write_delete_ar_b806a871",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "playlist_track_default_edge_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "public"
+          ],
+          "using": "(EXISTS (SELECT 1 FROM \"public\".\"playlist\" \"_ex0\" WHERE \"_ex0\".playlist_id = \"public\".\"playlist_track\".playlist_id)) AND (EXISTS (SELECT 1 FROM \"public\".\"track\" \"_ex1\" WHERE \"_ex1\".track_id = \"public\".\"playlist_track\".track_id))",
+          "withCheck": null,
+          "ruleKey": "playlist_track_default_edge_read",
+          "injected": false
+        }
+      ],
+      "triggers": [],
+      "auth": false
+    },
+    {
+      "schema": "public",
+      "table": "track",
+      "qualified": "public.track",
+      "varName": "track",
+      "kind": "collection",
+      "slug": "track",
+      "columns": [
+        {
+          "key": "trackId",
+          "column": "track_id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "trackId",
+            "slug": "track"
+          }
+        },
+        {
+          "key": "name",
+          "column": "name",
+          "type": {
+            "kind": "varchar",
+            "length": 200
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "name",
+            "slug": "track"
+          }
+        },
+        {
+          "key": "composer",
+          "column": "composer",
+          "type": {
+            "kind": "varchar",
+            "length": 220
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "composer",
+            "slug": "track"
+          }
+        },
+        {
+          "key": "milliseconds",
+          "column": "milliseconds",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "milliseconds",
+            "slug": "track"
+          }
+        },
+        {
+          "key": "bytes",
+          "column": "bytes",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "bytes",
+            "slug": "track"
+          }
+        },
+        {
+          "key": "unitPrice",
+          "column": "unit_price",
+          "type": {
+            "kind": "numeric",
+            "precision": 10,
+            "scale": 2
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "source": {
+            "kind": "property",
+            "propName": "unitPrice",
+            "slug": "track"
+          }
+        },
+        {
+          "key": "albumId",
+          "column": "album_id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": {
+            "schema": "public",
+            "table": "track",
+            "column": "album_id",
+            "targetSchema": "public",
+            "targetTable": "album",
+            "targetColumn": "album_id",
+            "onDelete": "no action",
+            "constraintName": "track_album_id_fkey",
+            "sql": "ALTER TABLE \"public\".\"track\" ADD CONSTRAINT \"track_album_id_fkey\" FOREIGN KEY (\"album_id\") REFERENCES \"public\".\"album\" (\"album_id\") ON DELETE NO ACTION"
+          },
+          "source": {
+            "kind": "relation",
+            "propName": "album",
+            "slug": "track"
+          }
+        },
+        {
+          "key": "genreId",
+          "column": "genre_id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": {
+            "schema": "public",
+            "table": "track",
+            "column": "genre_id",
+            "targetSchema": "public",
+            "targetTable": "genre",
+            "targetColumn": "genre_id",
+            "onDelete": "no action",
+            "constraintName": "track_genre_id_fkey",
+            "sql": "ALTER TABLE \"public\".\"track\" ADD CONSTRAINT \"track_genre_id_fkey\" FOREIGN KEY (\"genre_id\") REFERENCES \"public\".\"genre\" (\"genre_id\") ON DELETE NO ACTION"
+          },
+          "source": {
+            "kind": "relation",
+            "propName": "genre",
+            "slug": "track"
+          }
+        },
+        {
+          "key": "mediaTypeId",
+          "column": "media_type_id",
+          "type": {
+            "kind": "integer"
+          },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "foreignKey": {
+            "schema": "public",
+            "table": "track",
+            "column": "media_type_id",
+            "targetSchema": "public",
+            "targetTable": "media_type",
+            "targetColumn": "media_type_id",
+            "onDelete": "no action",
+            "constraintName": "track_media_type_id_fkey",
+            "sql": "ALTER TABLE \"public\".\"track\" ADD CONSTRAINT \"track_media_type_id_fkey\" FOREIGN KEY (\"media_type_id\") REFERENCES \"public\".\"media_type\" (\"media_type_id\") ON DELETE NO ACTION"
+          },
+          "source": {
+            "kind": "relation",
+            "propName": "mediaType",
+            "slug": "track"
+          }
+        }
+      ],
+      "primaryKey": [
+        "track_id"
+      ],
+      "indexes": [
+        {
+          "schema": "public",
+          "table": "track",
+          "method": "btree",
+          "unique": false,
+          "keys": [
+            {
+              "column": "album_id",
+              "direction": "asc",
+              "nulls": "last"
+            }
+          ],
+          "include": [],
+          "predicate": null,
+          "reason": "Derived for a foreign key: Postgres indexes the key a constraint points at, never the column holding it.",
+          "indexName": "track_album_id_ix_991533a",
+          "derived": "foreign-key"
+        },
+        {
+          "schema": "public",
+          "table": "track",
+          "method": "btree",
+          "unique": false,
+          "keys": [
+            {
+              "column": "genre_id",
+              "direction": "asc",
+              "nulls": "last"
+            }
+          ],
+          "include": [],
+          "predicate": null,
+          "reason": "Derived for a foreign key: Postgres indexes the key a constraint points at, never the column holding it.",
+          "indexName": "track_genre_id_ix_4509985",
+          "derived": "foreign-key"
+        },
+        {
+          "schema": "public",
+          "table": "track",
+          "method": "btree",
+          "unique": false,
+          "keys": [
+            {
+              "column": "media_type_id",
+              "direction": "asc",
+              "nulls": "last"
+            }
+          ],
+          "include": [],
+          "predicate": null,
+          "reason": "Derived for a foreign key: Postgres indexes the key a constraint points at, never the column holding it.",
+          "indexName": "track_media_type_id_ix_09f4bc3",
+          "derived": "foreign-key"
+        }
+      ],
+      "vector": {
+        "specs": [],
+        "skipped": []
+      },
+      "vectorColumns": [],
+      "policies": [
+        {
+          "name": "track_default_admin_read",
+          "operation": "select",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "track_default_admin_read",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "track_default_admin_read_ar_73775448",
+            "using": "true",
+            "withCheck": null
+          }
+        },
+        {
+          "name": "track_default_admin_write_insert",
+          "operation": "insert",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": null,
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "track_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "track_default_admin_write_insert_ar_27891d31",
+            "using": null,
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "track_default_admin_write_update",
+          "operation": "update",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "ruleKey": "track_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "track_default_admin_write_update_ar_a481eea9",
+            "using": "true",
+            "withCheck": "true"
+          }
+        },
+        {
+          "name": "track_default_admin_write_delete",
+          "operation": "delete",
+          "mode": "permissive",
+          "roles": [
+            "rebase_admin"
+          ],
+          "adminTarget": true,
+          "using": "(SELECT (rebase.uid() IS NULL) OR (string_to_array(rebase.roles(), ',') && ARRAY['admin']))",
+          "withCheck": null,
+          "ruleKey": "track_default_admin_write",
+          "injected": true,
+          "adminRequestCompanion": {
+            "name": "track_default_admin_write_delete_ar_6126d9c9",
+            "using": "true",
+            "withCheck": null
+          }
+        }
+      ],
+      "triggers": [],
+      "auth": false
+    }
+  ],
+  "views": [],
+  "relations": [
+    {
+      "tableVar": "album",
+      "key": "track",
+      "kind": "many",
+      "targetVar": "track",
+      "relationName": "track_albumId"
+    },
+    {
+      "tableVar": "album",
+      "key": "artist",
+      "kind": "one",
+      "targetVar": "artist",
+      "relationName": "album_artistId",
+      "fields": [
+        "artistId"
+      ],
+      "references": [
+        "artistId"
+      ]
+    },
+    {
+      "tableVar": "artist",
+      "key": "album",
+      "kind": "many",
+      "targetVar": "album",
+      "relationName": "album_artistId"
+    },
+    {
+      "tableVar": "customer",
+      "key": "invoice",
+      "kind": "many",
+      "targetVar": "invoice",
+      "relationName": "invoice_customerId"
+    },
+    {
+      "tableVar": "customer",
+      "key": "supportRep",
+      "kind": "one",
+      "targetVar": "employee",
+      "relationName": "customer_supportRepId",
+      "fields": [
+        "supportRepId"
+      ],
+      "references": [
+        "employeeId"
+      ]
+    },
+    {
+      "tableVar": "employee",
+      "key": "customer",
+      "kind": "many",
+      "targetVar": "customer",
+      "relationName": "customer_supportRepId"
+    },
+    {
+      "tableVar": "employee",
+      "key": "employee",
+      "kind": "many",
+      "targetVar": "employee",
+      "relationName": "employee_reportsTo"
+    },
+    {
+      "tableVar": "employee",
+      "key": "reportsTo",
+      "kind": "one",
+      "targetVar": "employee",
+      "relationName": "employee_reportsTo",
+      "fields": [
+        "reportsTo"
+      ],
+      "references": [
+        "employeeId"
+      ]
+    },
+    {
+      "tableVar": "genre",
+      "key": "track",
+      "kind": "many",
+      "targetVar": "track",
+      "relationName": "track_genreId"
+    },
+    {
+      "tableVar": "invoice",
+      "key": "invoice_line",
+      "kind": "many",
+      "targetVar": "invoiceLine",
+      "relationName": "invoice_line_invoiceId"
+    },
+    {
+      "tableVar": "invoice",
+      "key": "customer",
+      "kind": "one",
+      "targetVar": "customer",
+      "relationName": "invoice_customerId",
+      "fields": [
+        "customerId"
+      ],
+      "references": [
+        "customerId"
+      ]
+    },
+    {
+      "tableVar": "invoiceLine",
+      "key": "invoice",
+      "kind": "one",
+      "targetVar": "invoice",
+      "relationName": "invoice_line_invoiceId",
+      "fields": [
+        "invoiceId"
+      ],
+      "references": [
+        "invoiceId"
+      ]
+    },
+    {
+      "tableVar": "invoiceLine",
+      "key": "track",
+      "kind": "one",
+      "targetVar": "track",
+      "relationName": "invoice_line_trackId",
+      "fields": [
+        "trackId"
+      ],
+      "references": [
+        "trackId"
+      ]
+    },
+    {
+      "tableVar": "mediaType",
+      "key": "track",
+      "kind": "many",
+      "targetVar": "track",
+      "relationName": "track_mediaTypeId"
+    },
+    {
+      "tableVar": "playlist",
+      "key": "track",
+      "kind": "many",
+      "targetVar": "playlistTrack",
+      "relationName": "track"
+    },
+    {
+      "tableVar": "playlistTrack",
+      "key": "playlist_id",
+      "kind": "one",
+      "targetVar": "playlist",
+      "relationName": "track",
+      "fields": [
+        "playlist_id"
+      ],
+      "references": [
+        "playlistId"
+      ]
+    },
+    {
+      "tableVar": "playlistTrack",
+      "key": "track_id",
+      "kind": "one",
+      "targetVar": "track",
+      "relationName": "playlist",
+      "fields": [
+        "track_id"
+      ],
+      "references": [
+        "trackId"
+      ]
+    },
+    {
+      "tableVar": "track",
+      "key": "invoice_line",
+      "kind": "many",
+      "targetVar": "invoiceLine",
+      "relationName": "invoice_line_trackId"
+    },
+    {
+      "tableVar": "track",
+      "key": "playlist",
+      "kind": "many",
+      "targetVar": "playlistTrack",
+      "relationName": "playlist"
+    },
+    {
+      "tableVar": "track",
+      "key": "album",
+      "kind": "one",
+      "targetVar": "album",
+      "relationName": "track_albumId",
+      "fields": [
+        "albumId"
+      ],
+      "references": [
+        "albumId"
+      ]
+    },
+    {
+      "tableVar": "track",
+      "key": "genre",
+      "kind": "one",
+      "targetVar": "genre",
+      "relationName": "track_genreId",
+      "fields": [
+        "genreId"
+      ],
+      "references": [
+        "genreId"
+      ]
+    },
+    {
+      "tableVar": "track",
+      "key": "mediaType",
+      "kind": "one",
+      "targetVar": "mediaType",
+      "relationName": "track_mediaTypeId",
+      "fields": [
+        "mediaTypeId"
+      ],
+      "references": [
+        "mediaTypeId"
+      ]
+    }
+  ],
+  "extensions": [],
+  "functions": [],
+  "options": {
+    "databaseExtensions": []
+  }
+}
