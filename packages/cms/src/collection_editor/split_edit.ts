@@ -46,6 +46,7 @@ import type {
 import { isRedactedSecurityRule, isUiTablePreferences, rulePatches } from "@rebasepro/types";
 import { enumValueLabel } from "@rebasepro/utils";
 import type { AdminCollection, FIELD_CUSTOMIZATION_KEYS, TABLE_CUSTOMIZATION_KEYS } from "@rebasepro/cms-types";
+import { SplitEditError } from "./split_edit_error";
 import {
     PropertyNotAColumnError,
     wireColumnFromProperty,
@@ -62,6 +63,8 @@ type AssertNever<T extends never = never> = T;
 type _TablePreferencesAreCustomizations = AssertNever<Exclude<typeof UI_PREFERENCE_TABLE_KEYS[number], typeof TABLE_CUSTOMIZATION_KEYS[number]>>;
 /** Every field preference is a field customization key. */
 type _FieldPreferencesAreCustomizations = AssertNever<Exclude<typeof UI_PREFERENCE_FIELD_KEYS[number], typeof FIELD_CUSTOMIZATION_KEYS[number]>>;
+
+export { SplitEditError };
 
 // ── The result ──────────────────────────────────────────────────────────────
 
@@ -81,29 +84,6 @@ export interface SplitEdit {
      * before sending a schema edit with this set.
      */
     detachesInheritedRules?: true;
-}
-
-/**
- * Why an edit cannot be split into a schema edit and a presentation delta.
- *
- * - `MIGRATION_REQUIRED` — the slug, the SQL table or the database changed:
- *   that moves data, which is a migration.
- * - `NOT_A_COLUMN` — a property has no column equivalent on a table.
- * - `REDACTED_RULES` — the caller was served rules it may not read, so it may
- *   not write them back.
- * - `NO_PRIMARY_KEY` — a new table has an `id` field that is not its primary key.
- * - `EXTERNAL_COLLECTION` — the collection is not a table of this backend:
- *   it is defined in the frontend, which the schema editor does not write.
- */
-export class SplitEditError extends Error {
-    constructor(
-        readonly code: "MIGRATION_REQUIRED" | "NOT_A_COLUMN" | "REDACTED_RULES" | "NO_PRIMARY_KEY" | "EXTERNAL_COLLECTION",
-        message: string,
-        readonly key?: string
-    ) {
-        super(message);
-        this.name = "SplitEditError";
-    }
 }
 
 /** What {@link splitEdit} reads. */
@@ -662,9 +642,4 @@ export function splitEdit({ before, after, table }: SplitEditInput): SplitEdit {
 /** Whether a split edit writes nothing. */
 export function isEmptyEdit(edit: SplitEdit): boolean {
     return edit.schema.length === 0 && Object.keys(edit.presentation).length === 0;
-}
-
-/** The delete of a table, as the operation it is. The SQL table and its rows stay. */
-export function deleteTableEdit(slug: string): TablePatch[] {
-    return [{ op: "deleteTable", table: slug }];
 }

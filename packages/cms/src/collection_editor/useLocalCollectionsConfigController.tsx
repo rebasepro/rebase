@@ -17,7 +17,8 @@ import type { PostgresProperty, Property } from "@rebasepro/types";
 import { DEFAULT_API_PATH } from "@rebasepro/app";
 import { useLiveSchemaEditing } from "./useLiveSchemaEditing";
 import { LiveSchemaError, type SchemaEditProblem } from "./liveSchemaClient";
-import { deleteTableEdit, splitEdit, SplitEditError, type SplitEdit } from "./split_edit";
+import type { SplitEdit } from "./split_edit";
+import { SplitEditError } from "./split_edit_error";
 import { useDetachRulesConfirmation } from "./useDetachRulesConfirmation";
 
 /**
@@ -325,6 +326,9 @@ export function useLocalCollectionsConfigController(
     const save = async (slug: string, after: AdminCollection, before?: AdminCollection): Promise<void> => {
         const loaded = before ?? findCollection(slug);
         assertTable(loaded, slug);
+        // Loaded with the first save: the boot path of every admin session
+        // builds this controller, and most sessions never save a table.
+        const { splitEdit } = await import("./split_edit");
         await commit(splitEdit({ before: loaded, after, table: tablesBySlug.get(slug) }));
     };
 
@@ -401,7 +405,7 @@ export function useLocalCollectionsConfigController(
         // table and its rows stay, and the plan says so.
         deleteCollection: async ({ id }: DeleteCollectionParams) => {
             assertTable(findCollection(id), id);
-            await writeSchema(id, deleteTableEdit(id));
+            await writeSchema(id, [{ op: "deleteTable", table: id }]);
         },
         applyTablePatches: async (table: string, patches: TablePatch[]) => {
             await writeSchema(table, patches);

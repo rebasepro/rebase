@@ -3,7 +3,7 @@ import { Alert, Button, Typography } from "@rebasepro/ui";
 import { ErrorView, useTranslation } from "@rebasepro/app";
 
 import { SchemaEditRefused } from "../../useLocalCollectionsConfigController";
-import { SplitEditError } from "../../split_edit";
+import { SplitEditError } from "../../split_edit_error";
 import type { SchemaEditProblem } from "../../liveSchemaClient";
 
 /**

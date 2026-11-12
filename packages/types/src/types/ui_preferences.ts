@@ -223,10 +223,10 @@ const expect = (ok: (value: unknown) => boolean, what: string): Check => (value,
 };
 const oneOf = (...allowed: readonly (string | number | boolean)[]): Check =>
     expect(value => allowed.some(a => a === value), allowed.map(a => JSON.stringify(a)).join(" | "));
-const boolean = expect(value => typeof value === "boolean", "a boolean");
-const string = expect(value => typeof value === "string", "a string");
-const stringList = expect(isStringList, "a list of strings");
-const positiveNumber = expect(value => typeof value === "number" && Number.isFinite(value) && value > 0, "a positive number");
+const boolean = /*#__PURE__*/ expect(value => typeof value === "boolean", "a boolean");
+const string = /*#__PURE__*/ expect(value => typeof value === "string", "a string");
+const stringList = /*#__PURE__*/ expect(isStringList, "a list of strings");
+const positiveNumber = /*#__PURE__*/ expect(value => typeof value === "number" && Number.isFinite(value) && value > 0, "a positive number");
 
 function isJson(value: unknown, depth = 0): boolean {
     if (depth > 32) return false;
@@ -261,7 +261,18 @@ const fieldMap: Check = (value, path, out) => {
     for (const [key, field] of Object.entries(value)) fieldProblems(field, `${path}.${key}`, out);
 };
 
-const FIELD_CHECKS: Readonly<Record<typeof UI_PREFERENCE_FIELD_KEYS[number], Check>> = {
+/**
+ * The checks, built on first use: module-level calls would keep this file in
+ * every bundle that imports `@rebasepro/types`, whether it validates a
+ * preference or not.
+ */
+let builtChecks: { field: Readonly<Record<typeof UI_PREFERENCE_FIELD_KEYS[number], Check>>; table: Readonly<Record<typeof UI_PREFERENCE_TABLE_KEYS[number], Check>> } | undefined;
+function checks(): NonNullable<typeof builtChecks> {
+    builtChecks ??= { field: fieldChecks(), table: tableChecks() };
+    return builtChecks;
+}
+
+const fieldChecks = (): Readonly<Record<typeof UI_PREFERENCE_FIELD_KEYS[number], Check>> => ({
     name: string,
     hidden: boolean,
     hiddenInForm: boolean,
@@ -293,9 +304,9 @@ const FIELD_CHECKS: Readonly<Record<typeof UI_PREFERENCE_FIELD_KEYS[number], Che
     conditions: expect(value => isRecord(value) && isJson(value), "an object of JSON-logic rules"),
     fields: fieldMap,
     of: (value, path, out) => fieldProblems(value, path, out)
-};
+});
 
-const TABLE_CHECKS: Readonly<Record<typeof UI_PREFERENCE_TABLE_KEYS[number], Check>> = {
+const tableChecks = (): Readonly<Record<typeof UI_PREFERENCE_TABLE_KEYS[number], Check>> => ({
     name: string,
     singularName: string,
     icon: string,
@@ -337,7 +348,7 @@ const TABLE_CHECKS: Readonly<Record<typeof UI_PREFERENCE_TABLE_KEYS[number], Che
     entityViews: stringList,
     customViews: stringList,
     fields: fieldMap
-};
+});
 
 const FILTER_OPS: readonly string[] = [
     "<", "<=", "==", "!=", ">=", ">", "array-contains", "in", "not-in", "array-contains-any", "array-contains-all",
@@ -369,7 +380,7 @@ function fieldProblems(value: unknown, path: string, out: UiPreferenceProblem[])
             continue;
         }
         if (entry === undefined) continue;
-        FIELD_CHECKS[key](entry, `${path}.${key}`, out);
+        checks().field[key](entry, `${path}.${key}`, out);
     }
 }
 
@@ -389,7 +400,7 @@ export function uiTablePreferencesProblems(value: unknown): UiPreferenceProblem[
             continue;
         }
         if (entry === undefined) continue;
-        TABLE_CHECKS[key](entry, key, out);
+        checks().table[key](entry, key, out);
     }
     return out;
 }
