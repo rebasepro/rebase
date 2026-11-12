@@ -25,6 +25,18 @@ This package provides the full Firebase integration layer for Rebase. It include
 
 ## Key Exports
 
+### Collections
+
+| Export | Description |
+|---|---|
+| `defineFirestoreCollection` | The way to declare a Firestore collection: `fields` (every Firestore property key, plus `required: true` and, on a reference, `target: "<collection slug>"` on any data source), `path`, `dataSource`, `subcollections`, `admin`. The document type is inferred from the fields |
+| `FIRESTORE_CAPABILITIES` / `registerFirestoreCapabilities` | What the admin may offer on a Firestore collection (subcollections, no relations, no LIKE filters). Registered when the package is evaluated |
+
+A `reference` field whose `target` lives on another data source (a Postgres
+table's collection) is stored in the document as the target's id, a string,
+and previewed and picked through that data source. A reference within the same
+Firestore database is stored as a `DocumentReference`, as before.
+
 ### Components
 
 | Export | Description |
@@ -39,6 +51,7 @@ This package provides the full Firebase integration layer for Rebase. It include
 |---|---|
 | `useInitialiseFirebase` | Initializes the Firebase app from config |
 | `useFirebaseAuthController` | Manages Firebase Auth state (sign-in, sign-out, user) |
+| `useFirestoreDataSource` | The memoised `<Rebase dataSources>` entry for a Firestore source: `useFirestoreDataSource({ key: "firestore", firebaseApp })` |
 | `useFirestoreDriver` | Creates a Firestore-backed `DataDriver` for CRUD and realtime listeners |
 | `useFirebaseStorageSource` | Provides file upload/download via Firebase Storage |
 | `useAppCheck` | Enables Firebase App Check verification |

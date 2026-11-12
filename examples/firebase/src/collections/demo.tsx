@@ -1,20 +1,17 @@
-import { defineCollection } from "@rebasepro/common";
+import { defineFirestoreCollection } from "@rebasepro/firebase";
 
 // This is a demo collection with many of the available properties
-export const demoCollection = defineCollection({
-    engine: "firestore",
+export const demoCollection = defineFirestoreCollection({
     slug: "demo",
     name: "Demo collection",
     description: "This is a demo collection with many of the **available properties**",
-    properties: {
+    fields: {
 
         // string property with validation
         name: {
             type: "string",
             name: "Name",
-            validation: {
-                required: true
-            }
+            required: true
         },
 
         // simple boolean
@@ -229,7 +226,7 @@ export const demoCollection = defineCollection({
                         of: {
                             type: "reference",
                             name: "Product",
-                            path: "products"
+                            target: "products"
                         }
                     }
                 }

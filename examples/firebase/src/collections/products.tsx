@@ -1,4 +1,4 @@
-import { defineCollection } from "@rebasepro/common";
+import { defineFirestoreCollection } from "@rebasepro/firebase";
 
 /**
  * Product categories enum matching the Rebase demo data.
@@ -43,12 +43,11 @@ const categories = {
  * Locale subcollection for product translations.
  * Each product can have localized content stored as subcollections.
  */
-const localeCollection = defineCollection({
-    engine: "firestore",
+const localeCollection = defineFirestoreCollection({
     slug: "locales",
     name: "Locales",
     singularName: "Locale",
-    properties: {
+    fields: {
         name: {
             type: "string",
             name: "Name"
@@ -72,21 +71,18 @@ const localeCollection = defineCollection({
  * - Nested map for publisher info
  * - Locale subcollections for i18n
  */
-export const productsCollection = defineCollection({
-    engine: "firestore",
+export const productsCollection = defineFirestoreCollection({
     slug: "products",
     name: "Products",
     singularName: "Product",
     description: "List of the products currently sold in our shop",
     subcollections: () => [localeCollection],
-    properties: {
+    fields: {
         name: {
             type: "string",
             name: "Name",
             description: "Name of this product",
-            validation: {
-                required: true
-            }
+            required: true
         },
         category: {
             type: "string",
@@ -138,9 +134,7 @@ export const productsCollection = defineCollection({
                 { id: "EUR", label: "Euros", color: "blue" },
                 { id: "DOL", label: "Dollars", color: "green" }
             ],
-            validation: {
-                required: true
-            }
+            required: true
         },
         public: {
             type: "boolean",
@@ -150,9 +144,7 @@ export const productsCollection = defineCollection({
         brand: {
             type: "string",
             name: "Brand",
-            validation: {
-                required: true
-            }
+            required: true
         },
         description: {
             type: "string",
@@ -171,7 +163,7 @@ export const productsCollection = defineCollection({
             of: {
                 type: "reference",
                 name: "Product",
-                path: "products"
+                target: "products"
             }
         },
         publisher: {

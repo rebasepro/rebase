@@ -1,4 +1,4 @@
-import { defineCollection } from "@rebasepro/common";
+import { defineFirestoreCollection } from "@rebasepro/firebase";
 
 /**
  * Blog collection – mirrors the Rebase demo `blog` Firestore collection.
@@ -12,16 +12,15 @@ import { defineCollection } from "@rebasepro/common";
  * - Tags array
  * - Initial filter showing only published entries by default
  */
-export const blogCollection = defineCollection({
-    engine: "firestore",
+export const blogCollection = defineFirestoreCollection({
     slug: "blog",
     name: "Blog",
     singularName: "Blog entry",
     description: "A collection of blog entries",
-    properties: {
+    fields: {
         name: {
             name: "Name",
-            validation: { required: true },
+            required: true,
             type: "string"
         },
         header_image: {
@@ -38,7 +37,7 @@ export const blogCollection = defineCollection({
         content: {
             name: "Content",
             description: "Content blocks for the blog entry",
-            validation: { required: true },
+            required: true,
             type: "array",
             oneOf: {
                 typeField: "type",
@@ -76,7 +75,7 @@ export const blogCollection = defineCollection({
                         of: {
                             type: "reference",
                             name: "Product",
-                            path: "products"
+                            target: "products"
                         }
                     }
                 }
@@ -89,7 +88,7 @@ export const blogCollection = defineCollection({
         },
         status: {
             name: "Status",
-            validation: { required: true },
+            required: true,
             type: "string",
             enum: {
                 published: "Published",

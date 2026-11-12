@@ -1,4 +1,4 @@
-import { defineCollection } from "@rebasepro/common";
+import { defineFirestoreCollection } from "@rebasepro/firebase";
 
 /**
  * Users collection – mirrors the Rebase demo `users` Firestore collection.
@@ -8,13 +8,12 @@ import { defineCollection } from "@rebasepro/common";
  * - Cross-collection references (related_users → users, liked_products → products)
  * - Nested map for profile picture URLs (large + thumbnail)
  */
-export const usersCollection = defineCollection({
-    engine: "firestore",
+export const usersCollection = defineFirestoreCollection({
     slug: "users",
     name: "Users",
     singularName: "User",
     description: "Registered users",
-    properties: {
+    fields: {
         first_name: {
             name: "First name",
             type: "string"
@@ -38,7 +37,7 @@ export const usersCollection = defineCollection({
             of: {
                 type: "reference",
                 name: "User",
-                path: "users"
+                target: "users"
             }
         },
         liked_products: {
@@ -48,7 +47,7 @@ export const usersCollection = defineCollection({
             of: {
                 type: "reference",
                 name: "Product",
-                path: "products"
+                target: "products"
             }
         },
         picture: {
