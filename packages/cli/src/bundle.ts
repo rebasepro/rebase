@@ -21,7 +21,6 @@ import chalk from "chalk";
 import {
     BUNDLE_FORMAT_VERSION,
     RUNTIME_CONTRACT_VERSION,
-    computeSchemaVersion,
     findStorageSuffixCollision,
     parseEnvBoolean,
     type CollectionConfig,
@@ -1355,7 +1354,7 @@ export function composeBundleManifest(input: ComposeManifestInput): RebaseBundle
         app: input.appName,
         kind: "backend",
         entry: input.entry,
-        collections: [...input.collectionSlugs].sort(),
+        tables: [...input.collectionSlugs].sort(),
         ...(input.functions.length > 0 ? { functions: input.functions } : {}),
         hooks: {
             native: input.nativeModules.length > 0,
@@ -1606,22 +1605,19 @@ stdio: toolStdio(options.quietStdout) });
     const manifest = composeBundleManifest({
         runtimeRange: options.runtimeRange,
         builtAgainst: resolveServerVersion(projectRoot),
-        // A build with no config directory genuinely does not know the schema —
-        // collections are introspected from the live database at boot. Recording
-        // a version here would stamp the hash of an empty list, and the runtime
-        // would then serve that as the identity of whatever it actually found.
-        // Empty means "ask the runtime", which is the honest answer.
-        schemaVersion: paths.hasCollections ? computeSchemaVersion(collections) : "",
+        // The schema version is computed from table descriptors now, and this
+        // build still compiles the legacy config package (see `paths` above):
+        // there are no descriptors to hash yet, so it records none — "ask the
+        // runtime". The format-3 runtime refuses this bundle's `tables` (a
+        // config/collections directory) with the codemod, which is the truth
+        // about a legacy project until this build moves onto backend/schema.
+        schemaVersion: "",
         appName,
         entry: {
-            config: paths.hasConfig ? relative(paths.config) : undefined,
-            collections: paths.hasCollections ? relative(path.join(paths.config, "collections")) : undefined,
+            tables: paths.hasCollections ? relative(path.join(paths.config, "collections")) : undefined,
             functions: relative(paths.functions),
             crons: relative(paths.crons),
-            schema: relative(schemaOut),
-            usersCollection: paths.hasCollections
-                ? relative(path.join(paths.config, `${paths.usersCollection}.js`))
-                : undefined
+            schema: relative(schemaOut)
         },
         collectionSlugs: collections
             .map(collection => collection.slug)
