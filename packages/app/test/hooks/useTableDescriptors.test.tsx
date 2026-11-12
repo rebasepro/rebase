@@ -9,10 +9,11 @@
 import React from "react";
 import { describe, expect, it, jest } from "@jest/globals";
 import { act, render, renderHook, waitFor } from "@testing-library/react";
-import { AuthControllerContext, RebaseClientInstanceContext } from "@rebasepro/app";
 import type { AuthController } from "@rebasepro/cms-types";
 import { RebaseApiError } from "@rebasepro/types";
 import type { SchemaAPI, TableDescriptor, User } from "@rebasepro/types";
+import { AuthControllerContext } from "../../src/contexts/AuthControllerContext";
+import { RebaseClientInstanceContext } from "../../src/contexts/RebaseClientInstanceContext";
 import { useTableDescriptors } from "../../src/hooks/useTableDescriptors";
 import type { TableDescriptorsState } from "../../src/hooks/useTableDescriptors";
 
@@ -104,7 +105,7 @@ describe("useTableDescriptors", () => {
     it("asks nothing for nobody signed in", () => {
         const { schema, tables } = fakeSchema(async () => [table("posts")]);
         const { hook } = harness(schema, auth(null));
-        expect(hook.result.current).toMatchObject({ status: "ready", tables: [], unavailable: false });
+        expect(hook.result.current).toMatchObject({ status: "ready", tables: [], unavailable: false, unavailableReason: undefined });
         expect(tables).not.toHaveBeenCalled();
     });
 
@@ -217,12 +218,21 @@ describe("useTableDescriptors", () => {
         const { schema } = fakeSchema(() => Promise.reject(new RebaseApiError("No tables", { status: 404, code: "SCHEMA_UNAVAILABLE" })));
         const { hook } = harness(schema, auth(user("ana", ["editor"])));
         await waitFor(() => expect(hook.result.current.status).toBe("ready"));
-        expect(hook.result.current).toMatchObject({ unavailable: true, tables: [], error: undefined });
+        expect(hook.result.current).toMatchObject({ unavailable: true, unavailableReason: "no-auth", tables: [], error: undefined });
+    });
+
+    it("tells a server older than the route (the client's wrapped bare 404) from one with no auth", async () => {
+        const bare = new RebaseApiError("Not Found", { status: 404 });
+        const wrapped = new RebaseApiError("This backend does not serve its tables", { status: 404, code: "SCHEMA_UNAVAILABLE", cause: bare });
+        const { schema } = fakeSchema(() => Promise.reject(wrapped));
+        const { hook } = harness(schema, auth(user("ana", ["editor"])));
+        await waitFor(() => expect(hook.result.current.status).toBe("ready"));
+        expect(hook.result.current).toMatchObject({ unavailable: true, unavailableReason: "predates-route", tables: [] });
     });
 
     it("is unavailable, and ready, with a client that has no schema", () => {
         const { hook } = harness(undefined, auth(user("ana", ["editor"])));
-        expect(hook.result.current).toMatchObject({ status: "ready", unavailable: true, tables: [] });
+        expect(hook.result.current).toMatchObject({ status: "ready", unavailable: true, unavailableReason: "no-schema-api", tables: [] });
     });
 
     it("shares one request between two components asking at once", async () => {

@@ -38,6 +38,7 @@ export * from "./ApiConfigContext";
 export * from "./useTranslation";
 export * from "./useNavigationGroupLabel";
 export * from "./useRebaseClient";
+export * from "./useTableDescriptors";
 
 export * from "./useAnalyticsController";
 export * from "./useUserConfigurationPersistence";

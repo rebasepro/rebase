@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useAuthController, useRebaseClient } from "@rebasepro/app";
 import { RebaseApiError } from "@rebasepro/types";
 import type { RebaseClient, SchemaAPI, TableDescriptor } from "@rebasepro/types";
+import { useAuthController } from "./useAuthController";
+import { useRebaseClient } from "./useRebaseClient";
 
 /**
  * Where the tables are: being fetched, here, or not to be had.
@@ -9,6 +10,21 @@ import type { RebaseClient, SchemaAPI, TableDescriptor } from "@rebasepro/types"
  * @group Tables
  */
 export type TableDescriptorsStatus = "loading" | "ready" | "error";
+
+/**
+ * Why a backend serves no tables at all (see {@link TableDescriptorsState.unavailable}).
+ *
+ * - `"no-schema-api"`: the client has no `schema` — it is not a Rebase client,
+ *   or one built before `client.schema` existed.
+ * - `"no-auth"`: the backend answered `404 SCHEMA_UNAVAILABLE` because no
+ *   authentication is configured there, so there is nobody to describe the
+ *   tables to.
+ * - `"predates-route"`: the backend answered a bare `404` — its runtime is
+ *   older than `GET /api/schema/tables` and has to be upgraded.
+ *
+ * @group Tables
+ */
+export type TableDescriptorsUnavailableReason = "no-schema-api" | "no-auth" | "predates-route";
 
 /**
  * The tables `GET /api/schema/tables` serves the signed-in caller.
@@ -31,6 +47,8 @@ export interface TableDescriptorsState {
      * passes its collections itself keeps working.
      */
     unavailable: boolean;
+    /** Which of those it is, when {@link unavailable} is set. */
+    unavailableReason: TableDescriptorsUnavailableReason | undefined;
     /**
      * Ask again. What is shown stays until the answer arrives; with an `ETag`
      * the server answers an unchanged schema with a `304`.
@@ -38,7 +56,11 @@ export interface TableDescriptorsState {
     reload: () => void;
 }
 
-/** Options of {@link useTableDescriptors}. */
+/**
+ * Options of {@link useTableDescriptors}.
+ *
+ * @group Tables
+ */
 export interface UseTableDescriptorsOptions {
     /** `false` asks for nothing and answers no tables, ready. Default `true`. */
     enabled?: boolean;
@@ -72,6 +94,16 @@ function asError(error: unknown): Error {
     return error instanceof Error ? error : new Error(String(error));
 }
 
+/**
+ * Which kind of "no tables here" a `SCHEMA_UNAVAILABLE` rejection is. The
+ * client answers a bare `404` (a server older than the route) with its own
+ * `SCHEMA_UNAVAILABLE` error carrying the original response as `cause`; the
+ * server's own refusal (no auth configured) carries none.
+ */
+function unavailableReasonOf(error: RebaseApiError): TableDescriptorsUnavailableReason {
+    return error.cause instanceof RebaseApiError ? "predates-route" : "no-auth";
+}
+
 /** What the hook last learned, and for which caller and reload. */
 interface Settled {
     /** The caller (and reload) this answer belongs to. */
@@ -79,13 +111,15 @@ interface Settled {
     tables: readonly TableDescriptor[];
     status: "ready" | "error";
     error: Error | undefined;
-    unavailable: boolean;
+    unavailableReason: TableDescriptorsUnavailableReason | undefined;
 }
 
 /**
  * The tables the backend serves the signed-in caller, from
  * `client.schema.tables()` — what `<RebaseCMS>` projects into its default
- * collections.
+ * collections and what every schema-aware Studio view renders from. It lives
+ * here, in the runtime both register into, so Studio reads the tables with or
+ * without a CMS on the page.
  *
  * - Nothing is asked until the auth controller knows who is signed in. The
  *   answer is redacted per caller, so it is asked again whenever the signed-in
@@ -95,7 +129,8 @@ interface Settled {
  * - Nobody signed in: no request, no tables, `"ready"`. The route answers only
  *   signed-in callers.
  * - A backend that serves no tables (`SCHEMA_UNAVAILABLE`, or a client with no
- *   `schema`) is `"ready"` with `unavailable` set, not an error.
+ *   `schema`) is `"ready"` with `unavailable` set, not an error;
+ *   `unavailableReason` says which.
  * - `reload()` asks again for the same caller and keeps showing the current
  *   tables until the answer arrives.
  *
@@ -134,12 +169,12 @@ export function useTableDescriptors(options: UseTableDescriptorsOptions = {}): T
         let current = true;
         fetchTables(schema, identity).then(
             tables => {
-                if (current) setSettled({ identity, tables, status: "ready", error: undefined, unavailable: false });
+                if (current) setSettled({ identity, tables, status: "ready", error: undefined, unavailableReason: undefined });
             },
             (error: unknown) => {
                 if (!current) return;
                 if (error instanceof RebaseApiError && error.code === SCHEMA_UNAVAILABLE) {
-                    setSettled({ identity, tables: NO_TABLES, status: "ready", error: undefined, unavailable: true });
+                    setSettled({ identity, tables: NO_TABLES, status: "ready", error: undefined, unavailableReason: unavailableReasonOf(error) });
                     return;
                 }
                 setSettled(previous => ({
@@ -148,7 +183,7 @@ export function useTableDescriptors(options: UseTableDescriptorsOptions = {}): T
                     tables: previous && sameCaller(previous.identity, identity) ? previous.tables : NO_TABLES,
                     status: "error",
                     error: asError(error),
-                    unavailable: false
+                    unavailableReason: undefined
                 }));
             }
         );
@@ -158,18 +193,24 @@ export function useTableDescriptors(options: UseTableDescriptorsOptions = {}): T
     }, [active, schema, identity]);
 
     return useMemo<TableDescriptorsState>(() => {
-        if (!enabled) return { tables: NO_TABLES, status: "ready", error: undefined, unavailable: false, reload };
-        if (schema === undefined) return { tables: NO_TABLES, status: "ready", error: undefined, unavailable: true, reload };
-        if (caller === undefined) return { tables: NO_TABLES, status: "loading", error: undefined, unavailable: false, reload };
-        if (caller === null) return { tables: NO_TABLES, status: "ready", error: undefined, unavailable: false, reload };
+        const state = (
+            tables: readonly TableDescriptor[],
+            status: TableDescriptorsStatus,
+            error: Error | undefined,
+            unavailableReason: TableDescriptorsUnavailableReason | undefined
+        ): TableDescriptorsState => ({ tables, status, error, unavailable: unavailableReason !== undefined, unavailableReason, reload });
+        if (!enabled) return state(NO_TABLES, "ready", undefined, undefined);
+        if (schema === undefined) return state(NO_TABLES, "ready", undefined, "no-schema-api");
+        if (caller === undefined) return state(NO_TABLES, "loading", undefined, undefined);
+        if (caller === null) return state(NO_TABLES, "ready", undefined, undefined);
         if (settled && settled.identity === identity) {
-            return { tables: settled.tables, status: settled.status, error: settled.error, unavailable: settled.unavailable, reload };
+            return state(settled.tables, settled.status, settled.error, settled.unavailableReason);
         }
         // Reloading for the same caller: what they were shown stays.
         if (settled && identity !== undefined && sameCaller(settled.identity, identity)) {
-            return { tables: settled.tables, status: settled.status, error: settled.error, unavailable: settled.unavailable, reload };
+            return state(settled.tables, settled.status, settled.error, settled.unavailableReason);
         }
-        return { tables: NO_TABLES, status: "loading", error: undefined, unavailable: false, reload };
+        return state(NO_TABLES, "loading", undefined, undefined);
     }, [enabled, schema, caller, settled, identity, reload]);
 }
 

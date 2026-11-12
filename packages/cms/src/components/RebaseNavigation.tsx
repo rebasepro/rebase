@@ -15,6 +15,7 @@ import {
     CustomizationControllerContext,
     RebaseDataContext,
     useRebaseEmbedHost,
+    useTableDescriptors,
     useTranslation
 } from "@rebasepro/app";
 import { buildRoutedRebaseData, resolveDataSource } from "@rebasepro/common";
@@ -35,7 +36,6 @@ import { useBuildUrlController } from "../hooks/navigation/useBuildUrlController
 import { useBuildCollectionRegistryController } from "../hooks/navigation/useBuildCollectionRegistryController";
 import { composeCollectionsInput } from "../hooks/navigation/compose_collections_input";
 import { registeredCollection } from "../hooks/navigation/registered_collection";
-import { useTableDescriptors } from "../hooks/useTableDescriptors";
 
 import { CollectionRegistryContext } from "../hooks/navigation/contexts/CollectionRegistryContext";
 import { UrlContext } from "../hooks/navigation/contexts/UrlContext";
