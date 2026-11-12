@@ -44,6 +44,7 @@ import type {
     UI_PREFERENCE_TABLE_KEYS
 } from "@rebasepro/types";
 import { isRedactedSecurityRule, isUiTablePreferences, rulePatches } from "@rebasepro/types";
+import { enumValueLabel } from "@rebasepro/utils";
 import type { AdminCollection, FIELD_CUSTOMIZATION_KEYS, TABLE_CUSTOMIZATION_KEYS } from "@rebasepro/cms-types";
 import {
     PropertyNotAColumnError,
@@ -90,7 +91,7 @@ export interface SplitEdit {
  * - `NOT_A_COLUMN` — a property has no column equivalent on a table.
  * - `REDACTED_RULES` — the caller was served rules it may not read, so it may
  *   not write them back.
- * - `NO_PRIMARY_KEY` — a new table names no primary key.
+ * - `NO_PRIMARY_KEY` — a new table has an `id` field that is not its primary key.
  * - `EXTERNAL_COLLECTION` — the collection is not a table of this backend:
  *   it is defined in the frontend, which the schema editor does not write.
  */
@@ -326,7 +327,10 @@ function fieldDelta(before: UiFieldPreferences, after: UiFieldPreferences): UiFi
     if (after.enumLabels) {
         const labels: NonNullable<UiFieldPreferences["enumLabels"]> = {};
         for (const [value, label] of Object.entries(after.enumLabels)) {
-            if (!sameValue(before.enumLabels?.[value], label)) labels[value] = label;
+            if (sameValue(before.enumLabels?.[value], label)) continue;
+            // A new value labelled as the panel would label it anyway is not a preference.
+            if (before.enumLabels?.[value] === undefined && isDefaultLabel(value, label)) continue;
+            labels[value] = label;
         }
         if (Object.keys(labels).length > 0) out.enumLabels = labels;
     }
@@ -337,6 +341,28 @@ function fieldDelta(before: UiFieldPreferences, after: UiFieldPreferences): UiFi
         out.enumOrder = after.enumOrder;
     }
     return out;
+}
+
+/** Whether an enum label says only what the projector would say for the value: its prettified id, no colour. */
+function isDefaultLabel(value: string, label: string | { label: string; color?: string; disabled?: boolean }): boolean {
+    return typeof label === "string" ? label === enumValueLabel(value) : false;
+}
+
+/**
+ * The presentation of a field the edit adds: what it states, less what the
+ * panel derives anyway — a new enum's values carry their own order, and a
+ * label that is the prettified value is the projector's.
+ */
+function newFieldPresentation(property: Property): UiFieldPreferences {
+    const field = fieldPresentationOf(property);
+    delete field.enumOrder;
+    if (field.enumLabels) {
+        for (const [value, label] of Object.entries(field.enumLabels)) {
+            if (isDefaultLabel(value, label)) delete field.enumLabels[value];
+        }
+        if (Object.keys(field.enumLabels).length === 0) delete field.enumLabels;
+    }
+    return field;
 }
 
 /** `out[key] = after[key]` when it differs from `before[key]`, for a key both objects share by type. */
@@ -490,8 +516,18 @@ function createTable(after: AdminCollection): TablePatch {
     const columns: Record<string, WireColumnDef> = {};
     for (const [key, property] of columnsOf(after)) columns[key] = wireOf(key, property, served);
     if (!Object.values(columns).some(column => column.primaryKey)) {
-        throw new SplitEditError("NO_PRIMARY_KEY", `The new table "${after.slug}" has no primary key. Mark one field as its id.`);
+        // A table needs a primary key, and a new one from a template or a
+        // blank form usually names none: it gets the scaffold's own, a uuid
+        // `id` the database fills.
+        if (columns.id !== undefined) {
+            throw new SplitEditError("NO_PRIMARY_KEY", `The new table "${after.slug}" has a field "id" that is not its primary key. Mark it, or another field, as the id.`, "id");
+        }
+        return createTableWith(after, { id: { type: { kind: "uuid" }, primaryKey: true, notNull: true, default: { kind: "random-uuid" } }, ...columns });
     }
+    return createTableWith(after, columns);
+}
+
+function createTableWith(after: AdminCollection, columns: Record<string, WireColumnDef>): TablePatch {
     const relations: Record<string, WireRelation> = {};
     for (const [name, entry] of relationsOf(after)) relations[name] = wireRelationOf(name, entry, new Map());
     const rules = (after.securityRules ?? []).filter(rule => !isRedactedSecurityRule(rule));
@@ -537,9 +573,7 @@ export function splitEdit({ before, after, table }: SplitEditInput): SplitEdit {
         const presentation = tablePresentationOf(after);
         const fields: NonNullable<UiTablePreferences["fields"]> = {};
         for (const [key, property] of Object.entries(after.properties ?? {})) {
-            const field = fieldPresentationOf(property);
-            // A new enum's labels are written with its values; only real overrides are presentation.
-            delete field.enumOrder;
+            const field = newFieldPresentation(property);
             if (Object.keys(field).length > 0) fields[key] = field;
         }
         if (Object.keys(fields).length > 0) presentation.fields = fields;
@@ -617,8 +651,7 @@ export function splitEdit({ before, after, table }: SplitEditInput): SplitEdit {
     const fields: NonNullable<UiTablePreferences["fields"]> = {};
     for (const [key, property] of Object.entries(after.properties ?? {})) {
         const previous = before.properties?.[key];
-        const delta = previous ? fieldDelta(fieldPresentationOf(previous), fieldPresentationOf(property)) : fieldPresentationOf(property);
-        if (!previous) delete delta.enumOrder;
+        const delta = previous ? fieldDelta(fieldPresentationOf(previous), fieldPresentationOf(property)) : newFieldPresentation(property);
         if (Object.keys(delta).length > 0) fields[key] = delta;
     }
     if (Object.keys(fields).length > 0) presentation.fields = fields;
