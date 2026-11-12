@@ -72,6 +72,7 @@ describe("rebase verify: table definitions", () => {
         expect(report.steps.map(s => [s.id, s.status])).toEqual([
             ["schema", "passed"],
             ["rls", "passed"],
+            ["cms", "skipped"],
             ["migrations", "skipped"],
             ["live", "skipped"]
         ]);

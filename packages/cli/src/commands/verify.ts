@@ -10,7 +10,7 @@
  * Claude Code hook (written by `rebase init` and `rebase skills --hooks`) runs
  * this after each edit to a schema file, and CI runs it on every push.
  *
- * Four steps, each reported on its own:
+ * Five steps, each reported on its own:
  *
  * 1. **Table definitions** — `backend/schema` loads and compiles through
  *    `loadBackendSchema`, the loader the backend boots from, so every problem
@@ -19,10 +19,15 @@
  *    `organization_id` / `tenant_id` column whose rules (its own, or the
  *    `defaultRls` it inherits) let a role read every row regardless of it.
  *    `rls` itself is mandatory, so "no rules at all" is a step-1 error now.
- * 3. **Migration freshness** — whether `drizzle/migrations` still builds the
+ * 3. **CMS customizations** — every `customizeTable(...)` under
+ *    `frontend/src/cms`, read statically (`verify-cms.ts`): a slug no table
+ *    declares, a field that is not a column or relation of its table, a
+ *    required column kept off the form, one table customized twice. A
+ *    project without `frontend/src/cms` (headless) skips it.
+ * 4. **Migration freshness** — whether `drizzle/migrations` still builds the
  *    tables and columns the schema declares (offline), and with `--live`
  *    whether the database has applied every migration.
- * 4. **Live RLS audit** — with `--live`, the `@rebasepro/rls-check` catalogue
+ * 5. **Live RLS audit** — with `--live`, the `@rebasepro/rls-check` catalogue
  *    against the project's database, resolved as `db *` resolves it (the
  *    managed one unless something names another).
  *
@@ -43,6 +48,7 @@ import { failAsJson, findBackendDir, getActiveBackendPlugin, readEnvFile, requir
 import { SCHEMA_DIR_FLAG_HELP, missingSchemaDir, refuseRemovedCollectionsFlag } from "../utils/path-flags";
 import { resolveSchemaDir } from "../utils/schema-dir";
 import { loadProjectSchema, type ModuleAliases, type ProjectSchema } from "../utils/project-schema";
+import { checkCmsCustomizations } from "./verify-cms";
 
 /** The flags `rebase verify` takes. */
 export const VERIFY_FLAGS = {
@@ -64,7 +70,7 @@ const VERIFY_FLAG_HELP: Record<string, string> = {
     "--docker": "With --live: use the database from docker compose, starting it if needed"
 };
 
-export type VerifyStepId = "schema" | "rls" | "migrations" | "live";
+export type VerifyStepId = "schema" | "rls" | "cms" | "migrations" | "live";
 
 export interface VerifyFinding {
     step: VerifyStepId;
@@ -78,6 +84,8 @@ export interface VerifyFinding {
     table?: string;
     /** The file to open, relative to the project root. */
     file?: string;
+    /** The line in {@link file}, when the finding points at one. */
+    line?: number;
     /** Dotted path into the table definition — `posts.rls[0]`, `posts.author`. */
     path?: string;
 }
@@ -122,6 +130,7 @@ export interface VerifyOptions {
 const STEP_TITLES: Record<VerifyStepId, string> = {
     schema: "Table definitions",
     rls: "RLS coverage",
+    cms: "CMS customizations",
     migrations: "Migration freshness",
     live: "Live RLS audit"
 };
@@ -591,12 +600,12 @@ function settle(step: VerifyStep, findings: VerifyFinding[]): VerifyStep {
  */
 export async function runVerify(options: VerifyOptions): Promise<VerifyReport> {
     const findings: VerifyFinding[] = [];
-    const steps: VerifyStep[] = (["schema", "rls", "migrations", "live"] as const).map(id => ({
+    const steps: VerifyStep[] = (["schema", "rls", "cms", "migrations", "live"] as const).map(id => ({
         id,
         title: STEP_TITLES[id],
         status: "passed"
     }));
-    const [schemaStep, rlsStep, migrationsStep, liveStep] = steps;
+    const [schemaStep, rlsStep, cmsStep, migrationsStep, liveStep] = steps;
     const schemaDir = path.relative(options.projectRoot, options.schemaDir) || ".";
     const skipAll = (detail: string): VerifyReport => {
         for (const step of steps) {
@@ -623,9 +632,19 @@ export async function runVerify(options: VerifyOptions): Promise<VerifyReport> {
         schemaStep.detail = `${tables} table${tables === 1 ? "" : "s"}, compiled as the backend boots them`;
         rlsStep.detail = `${tables} table${tables === 1 ? "" : "s"}`;
         findings.push(...checkRls(verified));
+        const cms = await checkCmsCustomizations(options.projectRoot, verified.descriptors);
+        if (cms.directories.length === 0) {
+            cmsStep.status = "skipped";
+            cmsStep.detail = "no frontend/src/cms";
+        } else {
+            cmsStep.detail = `${cms.customizations} customization${cms.customizations === 1 ? "" : "s"} in ${cms.directories.join(", ")}, read without running them`;
+            for (const finding of cms.findings) findings.push({ step: "cms", ...finding });
+        }
     } else {
-        rlsStep.status = "skipped";
-        rlsStep.detail = "fix the table definitions first";
+        for (const step of [rlsStep, cmsStep]) {
+            step.status = "skipped";
+            step.detail = "fix the table definitions first";
+        }
     }
 
     // The database the live steps read, once it is known to answer. Under
@@ -690,7 +709,8 @@ export async function runVerify(options: VerifyOptions): Promise<VerifyReport> {
 
 function printFinding(finding: VerifyFinding): void {
     const mark = finding.severity === "error" ? chalk.red("✗") : chalk.yellow("!");
-    const where = [finding.file, finding.path].filter(Boolean).join(" → ");
+    const file = finding.file && finding.line !== undefined ? `${finding.file}:${finding.line}` : finding.file;
+    const where = [file, finding.path].filter(Boolean).join(" → ");
     console.log(`  ${mark} ${where ? `${chalk.bold(where)}  ` : ""}${finding.message}`);
     if (finding.fix) console.log(chalk.gray(`      fix: ${finding.fix}`));
 }
@@ -741,8 +761,9 @@ ${Object.entries(VERIFY_FLAG_HELP).map(([flag, help]) => `  ${chalk.blue(flag.pa
 ${chalk.green.bold("Steps")}
   1. Table definitions     backend/schema loads and compiles as the backend boots it
   2. RLS coverage          owner and tenant columns are filtered on by the rules that read them
-  3. Migration freshness   drizzle/migrations builds every declared table and column
-  4. Live RLS audit        with --live: the rls-check catalogue against the project's database
+  3. CMS customizations    frontend/src/cms: each customizeTable names a table, its fields, and a form that can create
+  4. Migration freshness   drizzle/migrations builds every declared table and column
+  5. Live RLS audit        with --live: the rls-check catalogue against the project's database
 
 Exits 1 when any step reports an error; warnings do not fail. Under --live, a
 database that is missing or does not answer is an error. Fast and offline
