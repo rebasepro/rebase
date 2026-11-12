@@ -220,13 +220,12 @@ export default [
             // need a parser this config does not load, so linting the site means
             // linting a third of it and calling that coverage.
             "**/website/**",
-            // The standalone example apps. They each carry their own tsconfig,
-            // so typescript-eslint refuses them outright — "multiple candidate
-            // TSConfigRootDirs are present", a parse error per file rather than
-            // a finding. Fixing that means pinning `tsconfigRootDir` for a
-            // nested project, which changes how every rule resolves types in
-            // the rest of the repository.
-            "**/examples/**",
+            // `examples/*` used to be ignored here: each carries its own
+            // tsconfig, and typescript-eslint refused them ("multiple candidate
+            // TSConfigRootDirs"). `tsconfigRootDir` is pinned below now, so they
+            // parse under this config and are linted with the repo's rules —
+            // `examples/sdk-demo` no longer carries an eslint config of its own,
+            // which ESLint's per-directory lookup would have preferred.
             "**/saas/**",
             // Ad-hoc checkouts of the saas repo alongside it — `saas-sweep`,
             // `saas-<branch>` — which agents make to avoid sharing one HEAD.
@@ -405,7 +404,10 @@ export default [
         files: [
             "packages/utils/src/**/*.{ts,tsx}",
             "packages/common/src/**/*.{ts,tsx}",
-            "packages/server/src/**/*.{ts,tsx}"
+            "packages/server/src/**/*.{ts,tsx}",
+            // What a reader copies first: an `any` in an example becomes an
+            // `any` in their project.
+            "examples/**/*.{ts,tsx}"
         ],
         rules: {
             "@typescript-eslint/no-explicit-any": "error"

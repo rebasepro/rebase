@@ -63,6 +63,21 @@ signOut };
 }
 
 // ===== Table Hook =====
+/**
+ * A row of whichever table is open. The demo browses tables it has no
+ * generated types for, so a row is the SDK's open shape: column key to value.
+ */
+export type Row = Record<string, unknown>;
+
+/**
+ * A row's primary key. Every table the demo browses keys on `id`; a value of
+ * any other type is shown and sent as its string form.
+ */
+export function rowId(row: Row): string | number {
+  const id = row.id;
+  return typeof id === "number" ? id : String(id);
+}
+
 type FindParams = NonNullable<Parameters<ReturnType<typeof client.data.table>["find"]>[0]>;
 
 /**
@@ -77,7 +92,7 @@ export function useTable(
   slug: string,
   options?: { limit?: number; page?: number; orderBy?: FindParams["orderBy"]; where?: FindParams["where"] }
 ) {
-  const [data, setData] = useState<any[]>([]);
+  const [data, setData] = useState<Row[]>([]);
   const [meta, setMeta] = useState({ total: 0,
 limit: 20,
 offset: 0,

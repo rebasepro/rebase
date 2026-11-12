@@ -1,7 +1,12 @@
 import { useState, useCallback, useEffect } from "react";
 import "./index.css";
-import { useAuth, useTable, useOfflineStatus } from "./hooks";
+import { useAuth, useTable, useOfflineStatus, rowId, type Row } from "./hooks";
 import { client, isNetworkDown, onNetworkChange, setNetworkDown } from "./client";
+
+/** What to show for a caught error: its message, or `fallback` when it has none. */
+function errorMessage(err: unknown, fallback: string): string {
+  return err instanceof Error && err.message ? err.message : fallback;
+}
 
 // ===== Logo =====
 // The real Rebase mark — copied verbatim from the console's RebaseLogo.tsx.
@@ -118,8 +123,8 @@ function AuthScreen({ onAuth }: { onAuth: () => void }) {
         await signUp(email, password, name);
       }
       onAuth();
-    } catch (err: any) {
-      setError(err?.message || "Authentication failed");
+    } catch (err) {
+      setError(errorMessage(err, "Authentication failed"));
     } finally {
       setLoading(false);
     }
@@ -303,7 +308,7 @@ function TableView({ slug, label }: { slug: string; label: string }) {
   const [page, setPage] = useState(1);
   const { data, meta, loading, fromCache, hasPendingWrites, refetch } = useTable(slug, { limit: 15,
 page });
-  const [editingEntity, setEditingEntity] = useState<any>(null);
+  const [editingEntity, setEditingEntity] = useState<Row | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [toasts, setToasts] = useState<{ id: number; message: string; type: "success" | "error" }[]>([]);
 
@@ -326,12 +331,12 @@ type }]);
       await client.data.table(slug).delete(id);
       toast("Record deleted");
       refetch();
-    } catch (err: any) {
-      toast(err.message, "error");
+    } catch (err) {
+      toast(errorMessage(err, "Request failed"), "error");
     }
   };
 
-  const handleSave = async (values: Record<string, any>, id?: string | number) => {
+  const handleSave = async (values: Row, id?: string | number) => {
     try {
       if (id !== undefined) {
         await client.data.table(slug).update(id, values);
@@ -343,8 +348,8 @@ type }]);
       setEditingEntity(null);
       setShowCreate(false);
       refetch();
-    } catch (err: any) {
-      toast(err.message, "error");
+    } catch (err) {
+      toast(errorMessage(err, "Request failed"), "error");
     }
   };
 
@@ -391,15 +396,15 @@ type }]);
               </tr>
             )}
             {!loading && data.map((row) => (
-              <tr key={row.id}>
-                <td className="cell-id">{row.id}</td>
+              <tr key={rowId(row)}>
+                <td className="cell-id">{rowId(row)}</td>
                 {columns.map((col) => (
                   <td key={col}>{renderCellValue(row[col], col)}</td>
                 ))}
                 <td>
                   <div className="btn-group">
                     <button className="btn btn-secondary btn-sm" onClick={() => setEditingEntity(row)}>Edit</button>
-                    <button className="btn btn-danger btn-sm" onClick={() => handleDelete(row.id)}>✕</button>
+                    <button className="btn btn-danger btn-sm" onClick={() => handleDelete(rowId(row))}>✕</button>
                   </div>
                 </td>
               </tr>
@@ -431,7 +436,7 @@ type }]);
   );
 }
 
-function renderCellValue(value: any, col: string): React.ReactNode {
+function renderCellValue(value: unknown, col: string): React.ReactNode {
   if (value === null || value === undefined) return <span style={{ color: "var(--text-muted)" }}>—</span>;
   if (typeof value === "boolean") return value ? "✓ Yes" : "✗ No";
   if (col === "status" && typeof value === "string") {
@@ -450,13 +455,13 @@ function EntityDialog({
   onSave,
   onClose
 }: {
-  row: any | null;
+  row: Row | null;
   slug: string;
   columns: string[];
-  onSave: (values: Record<string, any>, id?: string | number) => Promise<void>;
+  onSave: (values: Row, id?: string | number) => Promise<void>;
   onClose: () => void;
 }) {
-  const [values, setValues] = useState<Record<string, any>>(() => {
+  const [values, setValues] = useState<Row>(() => {
     if (!row) return {};
     const editable = { ...row };
     delete editable.id;
@@ -467,7 +472,7 @@ function EntityDialog({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
-    await onSave(values, row?.id);
+    await onSave(values, row ? rowId(row) : undefined);
     setSaving(false);
   };
 
@@ -475,7 +480,7 @@ function EntityDialog({
     <div className="dialog-overlay" onClick={onClose}>
       <div className="dialog" onClick={(e) => e.stopPropagation()}>
         <div className="dialog-header">
-          <h3 className="dialog-title">{row ? `Edit #${row.id}` : `New ${slug}`}</h3>
+          <h3 className="dialog-title">{row ? `Edit #${rowId(row)}` : `New ${slug}`}</h3>
           <button className="btn btn-icon btn-secondary" onClick={onClose}>✕</button>
         </div>
         <form onSubmit={handleSubmit}>
@@ -496,7 +501,7 @@ function EntityDialog({
                 ) : col === "content" || col === "bio" ? (
                   <textarea
                     className="form-textarea"
-                    value={values[col] ?? ""}
+                    value={String(values[col] ?? "")}
                     onChange={(e) => setValues({ ...values,
 [col]: e.target.value })}
                     rows={4}
@@ -505,7 +510,7 @@ function EntityDialog({
                   <input
                     className="form-input"
                     type="text"
-                    value={values[col] ?? ""}
+                    value={String(values[col] ?? "")}
                     onChange={(e) => setValues({ ...values,
 [col]: e.target.value })}
                     placeholder={col}
