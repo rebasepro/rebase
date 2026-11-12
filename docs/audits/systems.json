@@ -626,10 +626,6 @@
   ],
   "unowned": [
     {
-      "path": "packages/server-mongo/**",
-      "why": "Mongo is out of scope until it is asked for again; its open findings are listed in docs/bug-classes.md."
-    },
-    {
       "path": "packages/firebase/**",
       "why": "Legacy compatibility package with no new surface; audited 2026-08-08 (audit-map unit 44)."
     }
