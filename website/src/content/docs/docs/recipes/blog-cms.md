@@ -76,8 +76,8 @@ export const articles = defineTable("articles", {
         coverImage:  col.storage({ path: "articles/covers/", accept: ["image/*"] }),
         content:     col.text(),
         excerpt:     col.text().validate({ max: 300 }),
-        publishedAt: col.timestamptz(),
-        createdAt:   col.timestamptz().onCreateNow(),
+        publishedAt: col.timestamp({ withTimezone: true }),
+        createdAt:   col.timestamp({ withTimezone: true }).onCreateNow(),
         // The signed-in user who created the article, stamped by the server.
         // `author` is the byline; this is who may keep editing the draft.
         createdBy:   col.text().onCreateUser(),

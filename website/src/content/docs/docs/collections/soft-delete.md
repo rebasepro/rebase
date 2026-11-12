@@ -21,7 +21,7 @@ export const invoices = defineTable("invoices", {
     columns: {
         id:        col.uuid().primaryKey().defaultRandom(),
         reference: col.text().notNull(),
-        deletedAt: col.timestamptz(),
+        deletedAt: col.timestamp({ withTimezone: true }),
     },
     softDelete: true,
     rls: "admin-only",

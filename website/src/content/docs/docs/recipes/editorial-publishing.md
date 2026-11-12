@@ -80,8 +80,8 @@ export const posts = defineTable("posts", {
         title:       col.text().notNull(),
         slug:        col.text().notNull().unique(),
         status:      col.enum(["draft", "review", "scheduled", "published", "archived"]).default("draft"),
-        publishAt:   col.timestamptz(),
-        unpublishAt: col.timestamptz(),
+        publishAt:   col.timestamp({ withTimezone: true }),
+        unpublishAt: col.timestamp({ withTimezone: true }),
         summary:     col.text(),
         // Content blocks: each entry names its type and holds that type's content.
         body: col.jsonb(json.array(json.oneOf({
@@ -375,11 +375,11 @@ import { defineTable, col } from "@rebasepro/server/schema";
 
 export const postNotes = defineTable("post_notes", {
     columns: {
-        id:        col.integer().primaryKey().identity(),
+        id:        col.integer().primaryKey().generatedByDefaultAsIdentity(),
         postId:    col.text().notNull(),
         body:      col.text().notNull(),
         createdBy: col.text().onCreateUser(),
-        createdAt: col.timestamptz().onCreateNow(),
+        createdAt: col.timestamp({ withTimezone: true }).onCreateNow(),
     },
     rls: [
         { operations: ["select", "insert"], roles: ["writer", "editor"] },

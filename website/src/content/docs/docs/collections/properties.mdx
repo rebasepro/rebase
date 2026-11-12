@@ -28,14 +28,14 @@ export const products = defineTable("products", {
         supportEmail: col.text().validate({ email: true }),
         website:     col.text().validate({ url: true }),
         category:    col.enum(["electronics", "clothing", "home"]).notNull(),
-        locales:     col.array(col.text().oneOf(["es", "en", "fr"])),
-        price:       col.numeric(10, 2).notNull(),
+        locales:     col.text({ enum: ["es", "en", "fr"] }).array(),
+        price:       col.numeric({ precision: 10, scale: 2 }).notNull(),
         stock:       col.integer().default(0),
         onSale:      col.boolean().default(false),
         launchDay:   col.date(),
-        availableAt: col.timestamptz(),
+        availableAt: col.timestamp({ withTimezone: true }),
         ownerId:     col.uuid().userId(),
-        createdAt:   col.timestamptz().notNull().onCreateNow(),
+        createdAt:   col.timestamp({ withTimezone: true }).notNull().onCreateNow(),
         createdBy:   col.uuid().onCreateUser(),
     },
     rls: "admin-only",
@@ -76,7 +76,7 @@ export const productsCms = customizeTable<typeof products>("products", {
 
 <span class="since-badge" data-since="0.31">Since 0.31</span>
 
-A `col.text()`, `col.varchar(n)`, `col.char(n)` or `col.uuid()` column is a text
+A `col.text()`, `col.varchar({ length })`, `col.char({ length })` or `col.uuid()` column is a text
 input. `varchar(n)` and `char(n)` cap its length at `n`, and `.validate({ min,
 max, length, matches })` adds the rules the form checks before it saves.
 
@@ -105,7 +105,7 @@ preview. `urlPreview` changes only the preview: `true` for a link, or `"image"`,
 A text or uuid column marked `.userId()` holds a user's id, and is a picker of
 the project's users: their names, emails and avatars, offered to whoever may
 write the table. `ownerId` above is one. So is each item of a
-`col.array(col.text().userId())`.
+`col.text().userId().array()`.
 
 `previewAsTag: true` draws the value as a chip outside the form. `clearable:
 true` adds a control that sets it to `null`. `referenceTo: "<slug>"` treats the
@@ -131,7 +131,7 @@ picked. `enumOrder` sets the order values are offered in, and the order of
 kanban columns. Both are checked against the column: a value the column cannot
 hold is a type error.
 
-An array of a closed set, `col.array(col.text().oneOf([...]))`, is a
+An array of a closed set, `col.text({ enum: [...] }).array()`, is a
 multi-select over one `text[]` column. `enumLabels` written on the array apply
 to its items.
 
@@ -165,7 +165,7 @@ A `col.boolean()` is a switch.
 
 <span class="since-badge" data-since="0.31">Since 0.31</span>
 
-A `col.timestamptz()` is a date and time picker, a `col.date()` a date picker and
+A `col.timestamp({ withTimezone: true })` is a date and time picker, a `col.date()` a date picker and
 a `col.time()` a time of day. `mode` switches between `"date"` and
 `"date_time"`, and `timezone` shows and picks the value in a fixed IANA zone
 (`"Europe/Madrid"`) rather than the viewer's.
@@ -195,7 +195,7 @@ the browser are added with `storage` in `customizeTable`. See
 
 <span class="since-badge" data-since="0.31">Since 0.31</span>
 
-A `col.array(inner)` is a repeatable list of the inner field. A `jsonb` column
+An array column (`<item>.array()`) is a repeatable list of the item's field. A `jsonb` column
 with a [`json.*` shape](/docs/schema/json/) is a group of typed fields, lists and
 blocks; one without a shape is a key/value editor. See
 [Arrays and JSON](/docs/collections/arrays-and-maps/).
@@ -216,7 +216,7 @@ See [Relations in the panel](/docs/collections/relations-in-the-admin-panel/).
 
 <span class="since-badge" data-since="0.31">Since 0.31</span>
 
-A `col.geopoint()` is a latitude and longitude field. A `col.vector(dims)` is a
+A `col.geopoint()` is a latitude and longitude field. A `col.vector({ dimensions })` is a
 vector input; `clearable` is its one option. A `col.bytea()` is a binary field,
 read and written as base64. None of them has type-specific options beyond
 those every field takes.

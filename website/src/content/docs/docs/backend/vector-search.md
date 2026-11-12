@@ -24,13 +24,13 @@ export const products = defineTable("products", {
     columns: {
         id:        col.uuid().primaryKey().defaultRandom(),
         name:      col.text().notNull(),
-        embedding: col.vector(1536, { index: { method: "hnsw", metric: ["cosine", "l2"] } }),
+        embedding: col.vector({ dimensions: 1536, index: { method: "hnsw", metric: ["cosine", "l2"] } }),
     },
     rls: [{ operation: "select", access: "authenticated" }],
 });
 ```
 
-`col.vector(dimensions)` is a pgvector `vector(dimensions)` column, read and
+`col.vector({ dimensions })` is a pgvector `vector(dimensions)` column, read and
 written as a `number[]`. It gets an approximate-nearest-neighbour index unless
 `index` says otherwise:
 

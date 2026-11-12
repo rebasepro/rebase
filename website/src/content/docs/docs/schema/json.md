@@ -1,12 +1,12 @@
 ---
 title: JSON documents
 sidebar_label: JSON documents
-description: "Type a jsonb column with col.jsonb<T>(), or give it a shape with json.* so the server validates nested fields, applies defaults and stamps, finds the files a document references and searches inside it."
+description: "Type a jsonb column with col.jsonb().$type<T>(), or give it a shape with json.* so the server validates nested fields, applies defaults and stamps, finds the files a document references and searches inside it."
 ---
 
 <span class="since-badge" data-since="0.31">Since 0.31</span>
 
-A `jsonb` column can be declared two ways. `col.jsonb<T>()` types the document
+A `jsonb` column can be declared two ways. `col.jsonb().$type<T>()` types the document
 for TypeScript and tells the server nothing about it. `col.jsonb(shape)` takes a
 shape built with `json.*`, which types the document the same way and also
 describes it to the server.
@@ -19,7 +19,7 @@ export const pages = defineTable("pages", {
         id: col.uuid().primaryKey().defaultRandom(),
 
         // Typed for TypeScript only.
-        settings: col.jsonb<{ theme?: "light" | "dark"; pinned?: boolean }>(),
+        settings: col.jsonb().$type<{ theme?: "light" | "dark"; pinned?: boolean }>(),
 
         // Typed, and known to the server.
         seo: col.jsonb(json.object({
@@ -44,7 +44,7 @@ With a shape, the server:
   `"seo.title"` (see [Search](/docs/backend/search/)).
 
 The shape is served with the table's descriptor, so the CMS can build a form for
-the document without being told how. `col.jsonb<T>()` gets a generic JSON editor
+the document without being told how. `col.jsonb().$type<T>()` gets a generic JSON editor
 instead.
 
 ## Builders
@@ -147,7 +147,7 @@ way `jsonb` can. Use it only when the exact text matters; otherwise use
 
 A point on Earth has its own column builder, `col.geopoint()`, stored as `jsonb`.
 A list of plain values that Postgres should index is often better as an array
-column: `col.array(col.text())`. Nested lists belong in `jsonb`: `col.array()` of
+column: `col.text().array()`. Nested lists belong in `jsonb`: `.array()` of
 an array is refused.
 
 ## Next steps

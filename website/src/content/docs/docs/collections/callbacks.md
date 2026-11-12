@@ -159,7 +159,7 @@ export const products = defineTable("products", {
     columns: {
         id:    col.uuid().primaryKey().defaultRandom(),
         slug:  col.text().notNull(),
-        price: col.numeric(10, 2).notNull(),
+        price: col.numeric({ precision: 10, scale: 2 }).notNull(),
     },
     rls: "admin-only",
     hooks: {

@@ -58,7 +58,7 @@ export const talents = defineTable("talents", {
         id:            col.uuid().primaryKey().defaultRandom(),
         fullName:      col.text().notNull(),
         bio:           col.text(),
-        interests:     col.array(col.text()),
+        interests:     col.text().array(),
         questionnaire: col.jsonb(json.object({ certifications: json.array(json.string()) }, { additional: true })),
     },
     search: {
@@ -142,7 +142,7 @@ A path starts with a column key.
 | Path | Resolves to | Example |
 |------|-------------|---------|
 | A text column | the column | `"fullName"` |
-| A `col.array(col.text())` column | every element | `"interests"` |
+| A `col.text().array()` column | every element | `"interests"` |
 | A `col.jsonb()` column | every string value in the document | `"questionnaire"` |
 | A path inside a `col.jsonb()` column | every string value at or below that point | `"questionnaire.certifications"` |
 

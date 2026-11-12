@@ -21,8 +21,8 @@ export const posts = defineTable("posts", {
         id:          col.uuid().primaryKey().defaultRandom(),
         title:       col.text().notNull().validate({ min: 3, max: 200 }),
         status:      col.enum(["draft", "published", "archived"]).notNull().default("draft"),
-        publishDate: col.timestamptz(),
-        createdAt:   col.timestamptz().notNull().onCreateNow(),
+        publishDate: col.timestamp({ withTimezone: true }),
+        createdAt:   col.timestamp({ withTimezone: true }).notNull().onCreateNow(),
     },
     relations: {
         author: rel.belongsTo(() => users, { notNull: true }),
@@ -177,13 +177,14 @@ for everything else:
 | SQL table | the name | `table: "blog_posts"` |
 | API slug, SDK accessor, scope target | the name | `slug: "articles"` |
 | Postgres schema | `public` | `schema: "content"` |
-| SQL column of a column | the snake_case of its key | `.column("legacy_name")` |
+| SQL column of a column | the snake_case of its key | the builder's first argument: `col.text("legacy_name")` |
 
 A column's key is its name on the JSON row, in the SDK and in filters and
 sorts. Its SQL name is the snake_case of the key: `publishDate` is the column
-`publish_date`, and `photoURL` is `photo_url`. `.column()` maps a key to any
-other SQL name, which is how a table adopts an existing database's names
-without changing what clients see.
+`publish_date`, and `photoURL` is `photo_url`. A builder's first argument maps
+a key to any other SQL name, as in Drizzle (`col.text("legacy_name")`), which
+is how a table adopts an existing database's names without changing what
+clients see.
 
 `table` and `schema` must be plain SQL identifiers. Two definitions may not
 share a name, a slug or a SQL table. The slug matters beyond the URL: foreign
@@ -221,7 +222,7 @@ export const dailyStats = defineTable("daily_stats", {
 ```
 
 A key column is `NOT NULL` by definition. A `uuid` key usually takes
-`.defaultRandom()`; an integer key takes `.identity()`. A key without a
+`.defaultRandom()`; an integer key takes `.generatedByDefaultAsIdentity()`. A key without a
 default is supplied by the caller on create. A key column cannot be
 `.private()`, and cannot be a `timestamptz` or `time`.
 

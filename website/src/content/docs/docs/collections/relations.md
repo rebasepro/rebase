@@ -212,7 +212,7 @@ export const projects = defineTable("projects", {
             through: "project_members",
             pivot: {
                 role:    col.enum(["owner", "editor", "viewer"]).notNull().default("viewer"),
-                addedAt: col.timestamptz().onCreateNow(),
+                addedAt: col.timestamp({ withTimezone: true }).onCreateNow(),
             },
         }),
     },

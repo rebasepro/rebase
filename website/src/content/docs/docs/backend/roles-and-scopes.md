@@ -91,7 +91,7 @@ export const users = defineAuthTable("users", {
     columns: {
         id:    col.uuid().primaryKey().defaultRandom(),
         email: col.text().notNull().unique(),
-        roles: col.array(col.text().oneOf(["admin", "support", "developer", "editor"])),
+        roles: col.text({ enum: ["admin", "support", "developer", "editor"] }).array(),
     },
     rls: "admin-only",
     auth: {

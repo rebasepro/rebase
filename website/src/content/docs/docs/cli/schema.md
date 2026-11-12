@@ -130,10 +130,12 @@ rebase schema introspect
   `backend/schema/<table>.ts` — one `defineTable` per table — and the
   `backend/schema/index.ts` that exports them (merged into an index that is
   already there)
-- Declares each column with its Postgres type: `col.uuid()`, `col.varchar(n)`,
-  `col.numeric(p, s)`, an enum with its labels and real type name, an array with
-  its element, `col.vector(d)`, identity and serial keys, defaults. A type no
-  builder names becomes `col.custom("<sql type>")`, which Rebase serves as the
+- Declares each column with its Postgres type: `col.uuid()`, `col.varchar({ length })`,
+  `col.numeric({ precision, scale })`, an enum with its labels and real type name
+  (a `pgEnum` when the type is shared), an array as `<item>.array()`,
+  `col.vector({ dimensions })`, identity and serial keys, defaults — spelled as
+  Drizzle spells them. A type no builder names becomes
+  `col.custom({ dataType: "<sql type>" })`, which Rebase serves as the
   driver returns it; `db generate` and `db push` refuse it until the planner
   can plan it
 - Declares the foreign-key column, the `belongsTo` on it and the reverse
@@ -486,7 +488,7 @@ const { data } = await client.data.products.find();
 
 Field names in the generated types are the ones the API serves. A field's wire
 name is its column key, and the API is camelCase throughout: introspection
-writes a `created_at` column as `createdAt: col.timestamptz()`, whose SQL name
+writes a `created_at` column as `createdAt: col.timestamp({ withTimezone: true })`, whose SQL name
 is the snake_case of the key, and serves it as `row.createdAt`. The column
 itself is untouched. The table *accessor* is turned into a property name the
 same way (`my-notes` → `client.data.myNotes`), which is what `tablesDictionary`

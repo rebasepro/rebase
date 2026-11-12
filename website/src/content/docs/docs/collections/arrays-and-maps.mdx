@@ -20,8 +20,8 @@ import { defineTable, col, json } from "@rebasepro/server/schema";
 export const pages = defineTable("pages", {
     columns: {
         id:       col.uuid().primaryKey().defaultRandom(),
-        tags:     col.array(col.text()),
-        settings: col.jsonb<{ theme?: "light" | "dark"; pinned?: boolean }>(),
+        tags:     col.text().array(),
+        settings: col.jsonb().$type<{ theme?: "light" | "dark"; pinned?: boolean }>(),
         address:  col.jsonb(json.object({
             street: json.string().required(),
             city:   json.string(),
@@ -41,13 +41,13 @@ export const pages = defineTable("pages", {
 
 <span class="since-badge" data-since="0.31">Since 0.31</span>
 
-`col.array(inner)` is a repeatable list of the inner column's field: `tags` above
+An array column (`col.text().array()`) is a repeatable list of the item's field: `tags` above
 is a list of text inputs. `.validate({ minItems, maxItems, uniqueItems })` on the
 array sets how many items the form accepts.
 
 <FieldWidgetPreview client:only="react" variant="repeat" />
 
-An array of a closed set, `col.array(col.text().oneOf([...]))`, is a
+An array of a closed set, `col.text({ enum: [...] }).array()`, is a
 multi-select instead; see [closed sets](/docs/collections/properties/#closed-sets-of-values).
 A `col.storage().multiple()` column is a multi-file upload; see
 [File uploads](/docs/collections/file-uploads/#several-files).
@@ -77,7 +77,7 @@ structured field: they are edited as free JSON.
 
 <span class="since-badge" data-since="0.31">Since 0.31</span>
 
-`col.jsonb<T>()` types the document for TypeScript, but `T` is erased when the
+`col.jsonb().$type<T>()` types the document for TypeScript, but `T` is erased when the
 code runs, so the server and the CMS know nothing about it. `settings` above is
 edited as free key/value pairs. Give the column a `json.*` shape when the CMS
 should draw a form for it.
@@ -140,8 +140,8 @@ On a document:
 | `keyValue` | Edit as free key/value pairs, even when the column has a shape. |
 
 `fields`, `fieldOrder` and `previewFields` are typed by the document's keys,
-whether the column is `col.jsonb<T>()` or has a `json.*` shape. On a
-`col.jsonb<T>()` column, though, the CMS has no shape to apply them to: they are
+whether the column is `col.jsonb().$type<T>()` or has a `json.*` shape. On a
+`col.jsonb().$type<T>()` column, though, the CMS has no shape to apply them to: they are
 skipped, with a warning in development. Nested options for a key, a variant or
 an item the document does not have are skipped the same way.
 

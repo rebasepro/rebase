@@ -29,7 +29,7 @@ export const orders = defineTable("orders", {
         reference:      col.text().notNull(),
         sku:            col.text(),
         status:         col.enum(["placed", "shipped", "delivered"]).notNull().default("placed"),
-        placedAt:       col.timestamptz(),
+        placedAt:       col.timestamp({ withTimezone: true }),
         address:        col.text(),
         carrier:        col.text(),
         trackingNumber: col.text(),

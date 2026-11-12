@@ -16,7 +16,7 @@ export const posts = defineTable("posts", {
         id:          col.uuid().primaryKey().defaultRandom(),
         title:       col.text().notNull(),
         status:      col.enum(["draft", "published"]).notNull().default("draft"),
-        publishDate: col.timestamptz(),
+        publishDate: col.timestamp({ withTimezone: true }),
     },
     indexes: [
         {

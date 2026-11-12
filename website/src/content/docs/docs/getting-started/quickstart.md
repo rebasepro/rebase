@@ -145,7 +145,7 @@ export const products = defineTable("products", {
         price:       col.numeric().notNull().validate({ min: 0 }),
         description: col.text(),
         active:      col.boolean().default(true),
-        createdAt:   col.timestamptz().onCreateNow(),
+        createdAt:   col.timestamp({ withTimezone: true }).onCreateNow(),
     },
     // Takes the defaultRls the scaffold's index.ts exports: everyone reads, admins write.
     rls: "inherit",

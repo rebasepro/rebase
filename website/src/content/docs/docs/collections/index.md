@@ -81,24 +81,24 @@ alone (`Status`, `Analysis`, `Address`).
 
 | Column | Field in the form | Notes |
 |---|---|---|
-| `col.text()`, `col.varchar(n)`, `col.char(n)`, `col.uuid()` | text input | `varchar(n)` and `char(n)` cap the length at `n` |
+| `col.text()`, `col.varchar({ length })`, `col.char({ length })`, `col.uuid()` | text input | `varchar` and `char` cap the length |
 | a text column with `.validate({ email: true })` | email input | validated as an email |
 | a text column with `.validate({ url: true })` | URL input, with a link preview | validated as a URL |
-| a text or number column with `.oneOf([...])` | select | one option per value |
+| a text column with `{ enum: [...] }`, a number column with `.oneOf([...])` | select | one option per value |
 | a text or uuid column with `.userId()` | user picker | the value is the user's id |
-| `col.enum([...])` | select, drawn as a coloured chip | one colour per value, seeded by the value itself |
+| `col.enum([...])`, a `pgEnum` column | select, drawn as a coloured chip | one colour per value, seeded by the value itself |
 | `col.smallint()` … `col.bigserial()` | number input | whole numbers only |
-| `col.real()`, `col.doublePrecision()`, `col.numeric(p, s)` | number input | |
+| `col.real()`, `col.doublePrecision()`, `col.numeric({ precision, scale })` | number input | |
 | `col.boolean()` | switch | |
-| `col.timestamptz()` | date and time picker | |
+| `col.timestamp({ withTimezone: true })` | date and time picker | |
 | `col.date()` | date picker | |
 | `col.time()` | time of day | |
 | `col.storage(…)` | upload field with preview | `.multiple()` is a multi-file field |
-| `col.array(inner)` | repeatable list of the inner field | an array of `.oneOf([...])` text is a multi-select |
-| `col.jsonb<T>()`, `col.json<T>()` | key/value editor | the type `T` is erased at runtime |
+| `<item>.array()` | repeatable list of the item's field | an array of `{ enum: [...] }` text is a multi-select |
+| `col.jsonb().$type<T>()`, `col.json().$type<T>()` | key/value editor | the type `T` is erased at runtime |
 | `col.jsonb(json.object({…}))` | a group of typed fields | lists, typed blocks and files inside, from the shape |
 | `col.geopoint()` | latitude and longitude | |
-| `col.vector(dims)` | vector input | |
+| `col.vector({ dimensions })` | vector input | |
 | `col.bytea()` | binary field | base64 on the wire |
 
 An enum value keeps its colour wherever it appears: in the select, on the
@@ -124,12 +124,12 @@ Each column type, its widget, and the options that change it are on
 |---|---|
 | `.notNull()` | required, with the `requiredMessage` of `.validate()` when it has one |
 | `.default(literal)` | a new record opens with that value; still required on edit |
-| `.defaultSql(…)`, `.dbDefault()` | may be left empty on create, for the database to fill |
+| `` .default(sql`…`) ``, `.defaultNow()`, `.dbDefault()` | may be left empty on create, for the database to fill |
 | `.unique()` | the form checks the value is unused before it saves |
-| a generated primary key (`.defaultRandom()`, `.identity()`, a serial) | not editable; a key without a default is typed in on create |
+| a generated primary key (`.defaultRandom()`, `.generatedByDefaultAsIdentity()`, a serial) | not editable; a key without a default is typed in on create |
 | `.onCreateNow()`, `.onUpdateNow()` | read-only, and left out of the default table columns |
 | `.onCreateUser()`, `.onUpdateUser()` | read-only |
-| `.readOnly()`, `.generatedAs(…)` | read-only |
+| `.readOnly()`, `.generatedAlwaysAs(…)` | read-only |
 | the table's `tenant` field | filled by the server on create, and left out of the default table columns; still editable for a caller who may write it |
 | `.private()` | never served, so never shown |
 

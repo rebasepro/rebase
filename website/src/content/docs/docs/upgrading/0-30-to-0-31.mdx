@@ -92,6 +92,18 @@ or a project outside git is refused too, so the migration is one reviewable
 diff. `--json` prints the whole report for a script or an agent. See
 [`rebase migrate`](/docs/cli/#rebase-migrate) and [Tables](/docs/schema/).
 
+The tables it writes spell their columns as Drizzle's `pg-core` does —
+`col.varchar({ length: 160 })`, `col.timestamp({ withTimezone: true })`,
+`col.text().array()`, `pgEnum(...)`, `` .default(sql`…`) ``,
+`.generatedByDefaultAsIdentity()` — so its output needs nothing more; see
+[Columns](/docs/schema/columns/). A table written by hand against a 0.31
+pre-release in the earlier spellings (`col.timestamptz()`, `col.varchar(160)`,
+`col.array(col.text())`, `col.enum(values, { name })`, `.defaultSql()`,
+`.identity()`, `.column("…")`) no longer compiles: `tooling/scripts/drizzle-sweep.mts`
+in the Rebase repository converts it, rewriting only the builder chains, and
+with `--verify` proves every converted table compiles to the same descriptor
+(`npx tsx drizzle-sweep.mts --verify backend/schema`).
+
 The `sdk-calls` pass that follows also rewrites rule sources:
 `existsIn({ collection })` and `membership: { collection }` become `table`
 (section 123); `--skip-sdk-calls` skips that too. What is left to you is

@@ -16,15 +16,15 @@ import { defineTable, col } from "@rebasepro/server/schema";
 export const products = defineTable("products", {
     columns: {
         id:        col.uuid().primaryKey().defaultRandom(),
-        sku:       col.varchar(32).notNull().unique(),
+        sku:       col.varchar({ length: 32 }).notNull().unique(),
         name:      col.text().notNull().validate({ min: 2, max: 120, trim: true }),
-        price:     col.numeric(10, 2).notNull().validate({ min: 0 }),
+        price:     col.numeric({ precision: 10, scale: 2 }).notNull().validate({ min: 0 }),
         status:    col.enum(["draft", "active", "retired"]).notNull().default("draft"),
-        tags:      col.array(col.text()).validate({ maxItems: 10 }),
+        tags:      col.text().array().validate({ maxItems: 10 }),
         photo:     col.storage({ path: "products/", accept: ["image/*"], maxBytes: "5MB" }),
         createdBy: col.uuid().onCreateUser().readOnly(),
-        createdAt: col.timestamptz().notNull().onCreateNow(),
-        updatedAt: col.timestamptz().notNull().onUpdateNow(),
+        createdAt: col.timestamp({ withTimezone: true }).notNull().onCreateNow(),
+        updatedAt: col.timestamp({ withTimezone: true }).notNull().onUpdateNow(),
     },
     rls: "admin-only",
 });
@@ -33,41 +33,61 @@ export const products = defineTable("products", {
 Builders are immutable: every modifier returns a new builder, so a column can be
 declared once and shared between tables.
 
+After the dot, a column reads like [Drizzle](https://orm.drizzle.team/docs/column-types/pg)'s
+`pg-core`: the same builder names, an optional SQL column name first, then
+Drizzle's config object, then the chain — `col.varchar({ length: 32 })`,
+`col.timestamp({ withTimezone: true })`, `col.text().array()`,
+`` .default(sql`now()`) ``. A Drizzle spelling that would mean something else here
+does not compile, and the error says what to write instead. Two differences to
+keep in mind:
+
+- **A foreign key is a relation.** Declare it under `relations`:
+  `author: rel.belongsTo(() => users, { localKey: "author_id" })`. The
+  relation's key is what `include` names. `.references()` does not exist, and
+  says so. See [Relations](/docs/collections/relations/).
+- **`.defaultNow()` is a database default only**: `DEFAULT now()`, which a client
+  may still override. `.onCreateNow()` is a server [stamp](#stamps): the server
+  writes the time on create, whatever the client sent.
+
 ## Builders
 
 <span class="since-badge" data-since="0.31">Since 0.31</span>
 
 One builder per Postgres type. The wire type is what a client reads in a row and
 sends in a write, and what the SDK and [`InferRow`](/docs/schema/types/) type
-the column as.
+the column as. Every builder takes an optional SQL column name as its first
+argument (`col.text("legacy_title")`); without it the SQL name is the
+snake_case of the key.
 
 | Builder | Postgres type | Wire type | Notes |
 |---|---|---|---|
 | `col.uuid()` | `UUID` | `string` | `.defaultRandom()` for `gen_random_uuid()` |
-| `col.text()` | `TEXT` | `string` | |
-| `col.varchar(n?)` | `VARCHAR(n)` | `string` | `n` defaults to 255 |
-| `col.char(n?)` | `CHAR(n)` | `string` | `n` defaults to 255 |
-| `col.enum(values, { name? })` | a Postgres enum type | the union of `values` | the type is `<table>_<column>` unless `name` sets it; see [Closed value sets](#closed-value-sets) |
+| `col.text()` | `TEXT` | `string` | `col.text({ enum: [...] })` accepts only those values; see [Closed value sets](#closed-value-sets) |
+| `col.varchar({ length })` | `VARCHAR(n)` | `string` | the length is required; takes `enum` too |
+| `col.char({ length })` | `CHAR(n)` | `string` | the length is required; takes `enum` too |
+| `col.enum(values)` | a Postgres enum type, `<table>_<column>` | the union of `values` | see [Closed value sets](#closed-value-sets) |
+| `pgEnum(name, values)`, then `status()` | a named Postgres enum type | the union of `values` | every column of it shares the one type |
 | `col.smallint()` | `SMALLINT` | `number` | |
 | `col.integer()` | `INTEGER` | `number` | |
-| `col.bigint()` | `BIGINT` | `number` | read and written as a JavaScript number |
-| `col.smallserial()` | `SMALLSERIAL` | `number` | has a default; prefer `col.smallint().identity()` in a new schema |
-| `col.serial()` | `SERIAL` | `number` | has a default; prefer `col.integer().identity()` |
-| `col.bigserial()` | `BIGSERIAL` | `number` | has a default; prefer `col.bigint().identity()` |
+| `col.bigint({ mode: "number" })` | `BIGINT` | `number` | read and written as a JavaScript number |
+| `col.smallserial()` | `SMALLSERIAL` | `number` | has a default; prefer `col.smallint().generatedByDefaultAsIdentity()` in a new schema |
+| `col.serial()` | `SERIAL` | `number` | has a default; prefer `col.integer().generatedByDefaultAsIdentity()` |
+| `col.bigserial({ mode: "number" })` | `BIGSERIAL` | `number` | has a default; prefer `col.bigint({ mode: "number" }).generatedByDefaultAsIdentity()` |
 | `col.real()` | `REAL` | `number` | |
 | `col.doublePrecision()` | `DOUBLE PRECISION` | `number` | |
-| `col.numeric(p?, s?)` | `NUMERIC`, `NUMERIC(p)`, `NUMERIC(p, s)` | `number` | a scale needs a precision |
+| `col.numeric({ precision?, scale? })` | `NUMERIC`, `NUMERIC(p)`, `NUMERIC(p, s)` | `number` | a scale needs a precision; `col.decimal()` is the same builder |
 | `col.boolean()` | `BOOLEAN` | `boolean` | |
-| `col.timestamptz()` | `TIMESTAMPTZ` | `string` (ISO 8601) | a write also takes a `Date` |
+| `col.timestamp({ withTimezone: true })` | `TIMESTAMPTZ` | `string` (ISO 8601) | a write also takes a `Date`; a timestamp without time zone is `col.custom({ dataType: "timestamp" })` |
 | `col.date()` | `DATE` | `string` (`YYYY-MM-DD`) | a write also takes a `Date` |
 | `col.time()` | `TIME` | `string` (`HH:MM:SS`) | a write also takes a `Date` |
-| `col.jsonb<T>()` / `col.jsonb(shape)` | `JSONB` | `T`, or the shape's type | see [JSON documents](/docs/schema/json/) |
-| `col.json<T>()` / `col.json(shape)` | `JSON` | `T`, or the shape's type | keeps the text it was given; prefer `jsonb` |
-| `col.array(inner)` | `<inner>[]` | an array of the inner wire type | no arrays of arrays; see [Arrays](#arrays) |
-| `col.vector(dims, { index? })` | `vector(dims)` (pgvector) | `number[]` | an HNSW cosine index unless `index` says otherwise; see [Vector search](/docs/backend/vector-search/) |
+| `col.jsonb()` / `col.jsonb(shape)` | `JSONB` | `unknown` (`.$type<T>()` types it), or the shape's type | see [JSON documents](/docs/schema/json/) |
+| `col.json()` / `col.json(shape)` | `JSON` | as `jsonb` | keeps the text it was given; prefer `jsonb` |
+| `<builder>.array()` | `<inner>[]` | an array of the inner wire type | `col.text().array()`; no arrays of arrays; see [Arrays](#arrays) |
+| `col.vector({ dimensions, index? })` | `vector(dimensions)` (pgvector) | `number[]` | an HNSW cosine index unless `index` says otherwise; see [Vector search](/docs/backend/vector-search/) |
 | `col.bytea()` | `BYTEA` | `string` (base64) | |
 | `col.geopoint()` | `JSONB` | `{ latitude: number; longitude: number }` | |
 | `col.storage(options)` | `TEXT` | `string` (the file's path) | `.multiple()` makes it `TEXT[]`; see [Storage columns](#storage-columns) |
+| `col.custom({ dataType })` | any other Postgres type, verbatim (`"inet"`, `"citext"`) | `string` (`.$type<T>()` types it) | Rebase names the type in DDL and passes values through |
 
 ## Modifiers
 
@@ -82,19 +102,21 @@ sense for; calling one elsewhere is a type error.
 | `.primaryKey()` | every column | part of the primary key, `NOT NULL` | absent from the `Update` type |
 | `.unique()` | every column | single-column `UNIQUE` | a duplicate is a `409` |
 | `.default(value)` | every column | `DEFAULT <value>` | applied by the driver on create too; optional on create |
-| `.defaultSql(expr)` | every column | `DEFAULT <expr>` | optional on create |
+| `` .default(sql`expr`) `` | every column | `DEFAULT <expr>` | optional on create; `sql` is imported beside `col` |
 | `.dbDefault()` | every column | leaves the database's existing default alone | optional on create |
-| `.generatedAs(expr)` | every column | `GENERATED ALWAYS AS (<expr>) STORED` | never writable, by anyone |
-| `.column(name)` | every column | the SQL column name | the key stays the wire name |
+| `` .generatedAlwaysAs(sql`expr`) `` | every column | `GENERATED ALWAYS AS (<expr>) STORED` | never writable, by anyone |
+| `.$type<T>()` | every column | none | types the value for TypeScript only, as in Drizzle |
+| `.array()` | every column | `<type>[]` | see [Arrays](#arrays) |
 | `.readOnly()` | every column | none | client writes refused; absent from `Insert` and `Update` |
 | `.private()` | every column | none | never on the wire, in the SDK or in OpenAPI |
 | `.access({ read?, write? })` | every column | none | per-role read and write; see [Field access](/docs/collections/field-access/) |
 | `.describe(text)` | every column | none | the description in OpenAPI and MCP |
 | `.validate(rules)` | every column | none | checked before every write; rules depend on the type, see [Validation](#validation) |
 | `.transform({ beforeSave?, afterRead? })` | every column | none | field-level hooks; `value` is `T \| null` unless `.notNull()` comes first; see [Table hooks](/docs/collections/callbacks/#field-hooks-transform) |
-| `.oneOf(values)` | text and numeric columns | none | only these values accepted; typed as their union |
+| `.oneOf(values)` | numeric columns | none | only these values accepted; typed as their union (a text column takes `{ enum: [...] }`) |
 | `.defaultRandom()` | `col.uuid()` | `DEFAULT gen_random_uuid()` | optional on create |
-| `.identity()` | `col.smallint()`, `col.integer()`, `col.bigint()` | `GENERATED BY DEFAULT AS IDENTITY` | optional on create |
+| `.generatedByDefaultAsIdentity()` | `col.smallint()`, `col.integer()`, `col.bigint()` | `GENERATED BY DEFAULT AS IDENTITY` | optional on create |
+| `.defaultNow()` | `timestamptz`, `date`, `time` | `DEFAULT now()` | optional on create; a client may still send a value |
 | `.onCreateNow()` | `timestamptz`, `date`, `time` | `DEFAULT now()` | the server stamps the time on create |
 | `.onUpdateNow()` | `timestamptz`, `date`, `time` | `DEFAULT now()` and a `BEFORE UPDATE` trigger | the server stamps the time on create and on every update |
 | `.onCreateUser()` | text columns, `col.uuid()` | none | the server writes the caller's id on create |
@@ -110,17 +132,18 @@ Columns are nullable by default. `.notNull()` and `.primaryKey()` make a column
 `NOT NULL`, and the API then requires it on create unless it has a default. A
 `NOT NULL` column is `T` on a row; any other column is `T | null`.
 
-A default is any of `.default()`, `.defaultSql()`, `.dbDefault()`,
-`.defaultRandom()`, `.identity()`, a stamp, or a serial builder. A column with a
+A default is any of `.default()`, `` .default(sql`…`) ``, `.defaultNow()`,
+`.dbDefault()`, `.defaultRandom()`, `.generatedByDefaultAsIdentity()`, a stamp,
+or a serial builder. A column with a
 default may be left out of a create:
 
 ```ts
-import { defineTable, col } from "@rebasepro/server/schema";
+import { defineTable, col, sql } from "@rebasepro/server/schema";
 
 export const tickets = defineTable("tickets", {
     columns: {
-        id:       col.integer().primaryKey().identity(),
-        code:     col.text().notNull().defaultSql("gen_short_id()"),
+        id:       col.integer().primaryKey().generatedByDefaultAsIdentity(),
+        code:     col.text().notNull().default(sql`gen_short_id()`),
         priority: col.smallint().notNull().default(3),
         legacy:   col.text().dbDefault(),
     },
@@ -132,13 +155,14 @@ export const tickets = defineTable("tickets", {
   by the driver on create, so a row comes out the same whoever inserts it. A
   temporal column also takes a `Date`, stored as its ISO string. An enum
   column's default must be one of its values.
-- **`.defaultSql(expression)`** is evaluated by Postgres. The expression is
-  written into the DDL as is.
+- **`` .default(sql`expression`) ``** is evaluated by Postgres. The expression is
+  written into the DDL as is, so the `sql` tag takes no `${…}`.
+  `.defaultNow()` is `` .default(sql`now()`) ``.
 - **`.dbDefault()`** says the database already holds a default that the schema
   does not state. A create may omit the column, and a schema push does not drop
   the default.
 
-`.generatedAs()` cannot have a default or a stamp: Postgres computes the column
+`.generatedAlwaysAs()` cannot have a default or a stamp: Postgres computes the column
 on every write. A primary-key column cannot be `.private()`.
 
 ## Stamps
@@ -179,7 +203,7 @@ export const tickets = defineTable("tickets", {
         id: col.uuid().primaryKey().defaultRandom(),
         subject: col.text().notNull(),
         assignedTo: col.text().userId().describe("Team member assigned to this ticket"),
-        watchers: col.array(col.text().userId())
+        watchers: col.text().userId().array()
     },
     rls: "admin-only"
 });
@@ -194,7 +218,7 @@ Two things follow from it:
   them.
 
 It works on `col.text()`, `col.varchar()`, `col.char()` and `col.uuid()`,
-on the items of an array (`col.array(col.text().userId())`), and on
+on the items of an array (`col.text().userId().array()`), and on
 `json.string()` inside a [JSON document](/docs/schema/json/). Anywhere else it
 throws when the module loads. It declares no foreign key: write
 `rel.belongsTo(() => users)` when the database should enforce one. To have the
@@ -234,7 +258,7 @@ export const signups = defineTable("signups", {
     columns: {
         id:       col.uuid().primaryKey().defaultRandom(),
         email:    col.text().notNull().validate({ email: true, lowercase: true, trim: true, requiredMessage: "Enter your e-mail address." }),
-        handle:   col.varchar(32).validate({ matches: /^[a-z0-9_]+$/, matchesMessage: "Lower-case letters, digits and _ only." }),
+        handle:   col.varchar({ length: 32 }).validate({ matches: /^[a-z0-9_]+$/, matchesMessage: "Lower-case letters, digits and _ only." }),
         age:      col.smallint().validate({ integer: true, min: 13 }),
         birthday: col.date().validate({ max: "2013-01-01" }),
     },
@@ -242,8 +266,9 @@ export const signups = defineTable("signups", {
 });
 ```
 
-On `col.varchar(n)` and `col.char(n)` the length is enforced by Postgres and by
-the API. A `max` that differs from `n` contradicts it; state the length once.
+On `col.varchar({ length })` and `col.char({ length })` the length is enforced
+by Postgres and by the API. A `max` that differs from it contradicts it; state
+the length once.
 
 ## Closed value sets
 
@@ -251,26 +276,33 @@ the API. A `max` that differs from `n` contradicts it; state the length once.
 
 Two ways to accept only certain values:
 
-- **`col.enum(values)`** creates a Postgres enum type, so the database enforces
-  the set too. The type is named `<table>_<column>`; `{ name }` gives it another
-  name, and two columns naming the same type share it and must list the same
-  values in the same order.
-- **`.oneOf(values)`** on a text or numeric column is checked by the API, with no
-  Postgres type. It is the form for a closed set of numbers, and for an array of
-  known strings: `col.array(col.text().oneOf(["a", "b"]))`.
+- **A Postgres enum type**, so the database enforces the set too.
+  `col.enum(values)` creates one named `<table>_<column>`. A type with a name
+  of your choosing, shared by several columns, is declared once with
+  `pgEnum(name, values)` — as in Drizzle — and called in each column:
+  `postStatus()`. Two declarations of the same name must list the same values
+  in the same order.
+- **A set the API checks**, with no Postgres type: `{ enum: [...] }` on
+  `col.text()`, `col.varchar()` or `col.char()`, and `.oneOf(values)` on a
+  numeric column. It is also the form for an array of known strings:
+  `col.text({ enum: ["a", "b"] }).array()`.
 
-Both type the column as the union of their values: `status` below is
-`"draft" | "published"` on the row, and `rating` is `1 | 2 | 3 | 4 | 5`.
+All of them type the column as the union of their values: `status` below is
+`"draft" | "published"` on the row, `kind` is `"news" | "guide"`, and `rating`
+is `1 | 2 | 3 | 4 | 5`.
 
 ```ts
-import { defineTable, col } from "@rebasepro/server/schema";
+import { defineTable, col, pgEnum } from "@rebasepro/server/schema";
+
+const reviewStatus = pgEnum("review_status", ["draft", "published"]);
 
 export const reviews = defineTable("reviews", {
     columns: {
         id:     col.uuid().primaryKey().defaultRandom(),
-        status: col.enum(["draft", "published"]).notNull().default("draft"),
+        status: reviewStatus().notNull().default("draft"),
+        kind:   col.text({ enum: ["news", "guide"] }),
         rating: col.smallint().notNull().oneOf([1, 2, 3, 4, 5]),
-        labels: col.array(col.text().oneOf(["bug", "praise", "question"])),
+        labels: col.text({ enum: ["bug", "praise", "question"] }).array(),
     },
     rls: "admin-only",
 });
@@ -283,27 +315,32 @@ to the table.
 
 <span class="since-badge" data-since="0.31">Since 0.31</span>
 
-`col.array(inner)` is a Postgres array of the inner column's type:
-`col.array(col.text())` is `TEXT[]`, `col.array(col.integer())` is
-`INTEGER[]`. The inner builder carries the rules for each item: its
-`.validate()`, `.oneOf()`, storage options and `.transform()`. The array's own
-`.validate()` takes `minItems`, `maxItems` and `uniqueItems`.
+`.array()` makes a Postgres array of the column's type, as in Drizzle:
+`col.text().array()` is `TEXT[]`, `col.integer().array()` is `INTEGER[]`. What
+is chained before `.array()` describes each item: its `{ enum }`, `.validate()`,
+`.oneOf()`, storage options and `.transform()`. What comes after it describes
+the array column: its own `.validate()` takes `minItems`, `maxItems` and
+`uniqueItems`.
 
 Modifiers that describe a column (`.notNull()`, a default, `.unique()`,
-`.access()`) go on the array, not on the item. An array of arrays is refused;
-use `col.jsonb()` for nested lists.
+`.access()`) go after `.array()` — `col.text().array().notNull().default([])`;
+before it they do not compile. An array of arrays is refused; use
+`col.jsonb()` for nested lists.
 
 ## Keys, identity and serials
 
 <span class="since-badge" data-since="0.31">Since 0.31</span>
 
-`.identity()` makes an integer column `GENERATED BY DEFAULT AS IDENTITY`. It is
-the form for an integer key in a new schema. The serial builders
-(`col.smallserial()`, `col.serial()`, `col.bigserial()`) exist for schemas that
+`.generatedByDefaultAsIdentity()` makes an integer column `GENERATED BY DEFAULT
+AS IDENTITY`. It is the form for an integer key in a new schema
+(`.generatedAlwaysAsIdentity()` does not compile: Rebase creates identities by
+default only). The serial builders (`col.smallserial()`, `col.serial()`,
+`col.bigserial({ mode: "number" })`) exist for schemas that
 already use them; a column pointing at a serial key is the plain integer of the
 same width. See [Primary keys](/docs/schema/#primary-keys) for composite keys.
 
-`col.bigint()` is read and written as a JavaScript `number`, which is exact up to
+`col.bigint({ mode: "number" })` is read and written as a JavaScript `number`
+(Drizzle's `mode: "bigint"` does not compile), which is exact up to
 2⁵³ − 1. `col.numeric()` is a `number` too, so it carries the precision of a
 double on the wire, whatever precision Postgres stores.
 
@@ -377,9 +414,11 @@ caching the files is [Storage](/docs/backend/storage/).
 
 When the module loads, a builder throws on:
 
-- `col.varchar(n)`, `col.char(n)` or `col.vector(n)` with `n` that is not a
-  positive whole number, and `col.numeric(p, s)` with a scale and no precision;
-- `col.enum([])`, and `col.array()` of an array;
+- `col.varchar()` or `col.char()` without a length; a `length` or `dimensions`
+  that is not a positive whole number, and `col.numeric({ scale })` with no
+  precision;
+- `col.enum([])`, `pgEnum(name, { … })`, and `.array()` of an array;
+- a `sql` default or generated expression with an interpolation;
 - a second, different stamp on one column, and `.oneOf()` with a value that is
   not a string or a number;
 - `.access()` whose `read` or `write` is not a list of non-empty role names;
@@ -387,8 +426,8 @@ When the module loads, a builder throws on:
 
 When the schema is compiled, the table is refused for:
 
-- a default together with `.generatedAs()`, or a stamp together with it;
-- `.identity()` on a non-integer column, `.defaultRandom()` on a non-`uuid`
+- a default together with `.generatedAlwaysAs()`, or a stamp together with it;
+- `.generatedByDefaultAsIdentity()` on a non-integer column, `.defaultRandom()` on a non-`uuid`
   column, a time stamp on a non-temporal column, a user stamp on a column that
   is neither text nor `uuid`;
 - a `.private()` primary key, or a `timestamptz` or `time` primary key;
@@ -400,6 +439,12 @@ When the schema is compiled, the table is refused for:
 - a named enum type given two different lists of values.
 
 Each refusal names the table, the column and what to write instead.
+
+Drizzle spellings that would mean something else here do not compile, and the
+compiler prints what to write: `col.timestamp()` without `withTimezone: true`,
+`.references()`, `.$defaultFn()`, `.$onUpdate()`, `.generatedAlwaysAsIdentity()`,
+`.unique("name")`, `numeric`'s `mode: "string"`, and `col.inet()`, `col.interval()`
+and the other types Rebase names only through `col.custom({ dataType })`.
 
 ## Next steps
 

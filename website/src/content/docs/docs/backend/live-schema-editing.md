@@ -180,7 +180,7 @@ the database cannot be reported as no change. Two edits that look like changes
 and are not refused:
 
 - **Renaming a column's key while keeping its SQL column** (`renameColumn`,
-  which writes `.column("old_name")`) moves no data. It is `safe`; API clients read the new name.
+  which writes the old name as the builder's first argument, `col.text("old_name")`) moves no data. It is `safe`; API clients read the new name.
 - **Setting, changing or dropping a default** binds future writes only. It is
   `safe`, and applied with `ALTER COLUMN … SET DEFAULT` / `DROP DEFAULT`.
 

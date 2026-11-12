@@ -417,7 +417,7 @@ drawn, never what is stored.
 | `of` | field options | The options of each item, for a document that is a list. |
 | `oneOf` | `{ [variant]: field options }` | The options of each variant of a typed block (`json.oneOf`). |
 
-With `col.jsonb<T>()` or a `json.object({…})` shape, `fields` and `fieldOrder`
+With `col.jsonb().$type<T>()` or a `json.object({…})` shape, `fields` and `fieldOrder`
 are typed by the document's keys. See [Arrays and JSON](/docs/collections/arrays-and-maps/).
 
 ### Relations

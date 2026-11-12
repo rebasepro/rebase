@@ -55,7 +55,7 @@ export const orders = defineTable("orders", {
     columns: {
         id:     col.uuid().primaryKey().defaultRandom(),
         status: col.enum(["open", "paid", "shipped"]).notNull().default("open"),
-        total:  col.numeric(10, 2).notNull(),
+        total:  col.numeric({ precision: 10, scale: 2 }).notNull(),
     },
     history: true,
     rls: "admin-only",

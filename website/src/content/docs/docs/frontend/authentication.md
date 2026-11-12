@@ -89,7 +89,7 @@ roles a user may hold as a closed set on that column, in the table declared
 with [`defineAuthTable`](/docs/schema/auth-table/):
 
 ```typescript title="backend/schema/users.ts"
-roles: col.array(col.text().oneOf(["admin", "editor", "viewer"])),
+roles: col.text({ enum: ["admin", "editor", "viewer"] }).array(),
 ```
 
 To add or remove a role, change that list. The labels the panel shows for each

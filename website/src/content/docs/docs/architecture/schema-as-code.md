@@ -95,15 +95,15 @@ Given this table:
 
 <!-- schema-sample: table -->
 ```ts
-import { defineTable, col } from "@rebasepro/server/schema";
+import { defineTable, col, sql } from "@rebasepro/server/schema";
 
 export const products = defineTable("products", {
     columns: {
-        id: col.text().primaryKey().defaultSql("gen_random_uuid()::text"),
+        id: col.text().primaryKey().default(sql`gen_random_uuid()::text`),
         name: col.text().notNull(),
         price: col.numeric(),
         active: col.boolean().default(true),
-        createdAt: col.timestamptz().onCreateNow()
+        createdAt: col.timestamp({ withTimezone: true }).onCreateNow()
     },
     rls: "admin-only"
 });

@@ -19,7 +19,7 @@ const collectionEditorHtml = `<span class="text-primary-light">import</span> { d
   <span class="text-blue-300">columns</span>: {
     <span class="text-blue-300">id</span>:       col.<span class="text-blue-300">uuid</span>().<span class="text-blue-300">primaryKey</span>().<span class="text-blue-300">defaultRandom</span>(),
     <span class="text-blue-300">customer</span>: col.<span class="text-blue-300">text</span>().<span class="text-blue-300">notNull</span>(),
-    <span class="text-blue-300">total</span>:    col.<span class="text-blue-300">numeric</span>(<span class="text-amber-500">10</span>, <span class="text-amber-500">2</span>),
+    <span class="text-blue-300">total</span>:    col.<span class="text-blue-300">numeric</span>({ <span class="text-blue-300">precision</span>: <span class="text-amber-500">10</span>, <span class="text-blue-300">scale</span>: <span class="text-amber-500">2</span> }),
     <span class="text-blue-300">status</span>:   col.<span class="text-blue-300">enum</span>([<span class="text-green-400">"pending"</span>, <span class="text-green-400">"shipped"</span>,
                        <span class="text-green-400">"delivered"</span>]),
   },

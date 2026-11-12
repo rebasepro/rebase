@@ -86,7 +86,7 @@ export const brandsCms = customizeTable<typeof brands>("brands", {
 });
 ```
 
-`brandColor` is a `col.varchar(7)` on the backend. The backend never sees the
+`brandColor` is a `col.varchar({ length: 7 })` on the backend. The backend never sees the
 component, and the frontend imports only the table's type from
 `backend/schema`.
 

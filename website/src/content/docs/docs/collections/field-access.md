@@ -24,10 +24,10 @@ import { defineTable, col } from "@rebasepro/server/schema";
 
 export const staff = defineTable("staff", {
     columns: {
-        id:     col.integer().primaryKey().identity(),
+        id:     col.integer().primaryKey().generatedByDefaultAsIdentity(),
         name:   col.text().notNull(),
         // Read by HR (and admins). Set by nobody through the API.
-        salary: col.numeric(10, 2).access({ read: ["hr"], write: [] }),
+        salary: col.numeric({ precision: 10, scale: 2 }).access({ read: ["hr"], write: [] }),
     },
     rls: [{ operation: "select", access: "public" }],
 });

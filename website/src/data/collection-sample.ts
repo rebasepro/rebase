@@ -19,13 +19,13 @@ export const COLLECTION_CODE_HTML = `<span class="text-primary-light">import</sp
   <span class="text-blue-300">columns</span>: {
     <span class="text-blue-300">id</span>:         col.<span class="text-blue-300">uuid</span>().<span class="text-blue-300">primaryKey</span>().<span class="text-blue-300">defaultRandom</span>(),
     <span class="text-blue-300">name</span>:       col.<span class="text-blue-300">text</span>().<span class="text-blue-300">notNull</span>(),
-    <span class="text-blue-300">category</span>:   col.<span class="text-blue-300">text</span>().<span class="text-blue-300">oneOf</span>([
+    <span class="text-blue-300">category</span>:   col.<span class="text-blue-300">text</span>({ <span class="text-blue-300">enum</span>: [
       <span class="text-green-400">"electronics"</span>, <span class="text-green-400">"fashion"</span>, <span class="text-green-400">"home"</span>,
-    ]),
-    <span class="text-blue-300">price</span>:      col.<span class="text-blue-300">numeric</span>(<span class="text-amber-500">10</span>, <span class="text-amber-500">2</span>),
+    ] }),
+    <span class="text-blue-300">price</span>:      col.<span class="text-blue-300">numeric</span>({ <span class="text-blue-300">precision</span>: <span class="text-amber-500">10</span>, <span class="text-blue-300">scale</span>: <span class="text-amber-500">2</span> }),
     <span class="text-blue-300">in_stock</span>:   col.<span class="text-blue-300">boolean</span>().<span class="text-blue-300">default</span>(<span class="text-primary-light">false</span>),
     <span class="text-blue-300">image_url</span>:  col.<span class="text-blue-300">text</span>().<span class="text-blue-300">validate</span>({ <span class="text-blue-300">url</span>: <span class="text-primary-light">true</span> }),
-    <span class="text-blue-300">created_at</span>: col.<span class="text-blue-300">timestamptz</span>().<span class="text-blue-300">onCreateNow</span>(),
+    <span class="text-blue-300">created_at</span>: col.<span class="text-blue-300">timestamp</span>({ <span class="text-blue-300">withTimezone</span>: <span class="text-primary-light">true</span> }).<span class="text-blue-300">onCreateNow</span>(),
   },
   <span class="text-blue-300">rls</span>: [
     { <span class="text-blue-300">operation</span>: <span class="text-green-400">"select"</span>, <span class="text-blue-300">access</span>: <span class="text-green-400">"public"</span> },

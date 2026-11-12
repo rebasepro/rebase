@@ -204,7 +204,7 @@ export const reports = defineTable("reports", {
         id:        col.uuid().primaryKey().defaultRandom(),
         state:     col.enum(["open", "closed"]).notNull().default("open"),
         public:    col.boolean().notNull().default(false),
-        deletedAt: col.timestamptz(),
+        deletedAt: col.timestamp({ withTimezone: true }),
     },
     rls: [
         // Anyone reads public reports that are not deleted.
@@ -435,10 +435,10 @@ import { defineTable, col } from "@rebasepro/server/schema";
 
 export const staff = defineTable("staff", {
     columns: {
-        id:     col.integer().primaryKey().identity(),
+        id:     col.integer().primaryKey().generatedByDefaultAsIdentity(),
         name:   col.text().notNull(),
         // Everyone the rules let read the row; only HR receives this column.
-        salary: col.numeric(10, 2).access({ read: ["hr"], write: [] }),
+        salary: col.numeric({ precision: 10, scale: 2 }).access({ read: ["hr"], write: [] }),
     },
     rls: [{ operation: "select", access: "authenticated" }],
 });

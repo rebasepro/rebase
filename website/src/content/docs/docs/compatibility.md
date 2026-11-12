@@ -64,7 +64,7 @@ The three ratings mean:
 | Row-level security | Stable | The wedge of the product. `pnpm rls:check` audits a live database against fifteen checks, and the RLS e2e suite runs on every push |
 | Storage | Stable | Local, S3 and GCS. Default-deny in production since 0.17.0, and the scaffold ships an authorize hook |
 | Realtime | **Beta** | Subscriptions are matched by table path only, so N subscribers on one table cost N RLS-scoped refetches per write. That caps a deployment at low hundreds of concurrent subscribers. Correct at any scale; expensive past that one |
-| Vector search (pgvector) | Beta | Every vector column gets an HNSW index for cosine distance by default, tunable per column through `col.vector(dims, { index })` (method, distances, build parameters) or turned off, which leaves an exact scan. pgvector cannot index a column wider than 2,000 dimensions, so those are left unindexed and scan |
+| Vector search (pgvector) | Beta | Every vector column gets an HNSW index for cosine distance by default, tunable per column through `col.vector({ dimensions, index })` (method, distances, build parameters) or turned off, which leaves an exact scan. pgvector cannot index a column wider than 2,000 dimensions, so those are left unindexed and scan |
 | Offline sync | Beta | Mutations carry idempotency keys the server honours, and the data-loss defects found in the July audit are fixed. The conflict model is last-write-wins with no per-field merge |
 | Entity history | Stable | Snapshot-based, gated by its own suite |
 | Functions and crons | Stable | The portable entry point (`@rebasepro/server/functions`) is a versioned contract with its own API-surface section |

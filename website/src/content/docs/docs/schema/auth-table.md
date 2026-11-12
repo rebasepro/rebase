@@ -27,8 +27,8 @@ export const users = defineAuthTable("users", {
         id:          col.uuid().primaryKey().defaultRandom(),
         email:       col.text().notNull().unique(),
         displayName: col.text(),
-        roles:       col.array(col.text().oneOf(["admin", "editor", "support"])),
-        createdAt:   col.timestamptz().notNull().onCreateNow(),
+        roles:       col.text({ enum: ["admin", "editor", "support"] }).array(),
+        createdAt:   col.timestamp({ withTimezone: true }).notNull().onCreateNow(),
     },
     rls: [
         // Editors may list users; everyone reads their own row through the injected policy.
@@ -64,7 +64,7 @@ verification token are private whatever the declaration says, so a read never
 serves them and a client write cannot set them.
 
 A user holds a role when their `roles` column lists it. Declaring the column as
-`col.array(col.text().oneOf([...]))` closes it to the roles you name; leaving
+`col.text({ enum: [...] }).array()` closes it to the roles you name; leaving
 it out keeps it open, since a role exists as soon as a user is given it.
 
 Rules on other tables may name the users table's columns as usual. A rule on

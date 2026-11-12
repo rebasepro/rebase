@@ -21,7 +21,7 @@ const tableCode = `<span class="text-primary-light">export const</span> <span cl
   <span class="text-blue-300">columns</span>: {
     <span class="text-blue-300">reference</span>: col.<span class="text-blue-300">text</span>().<span class="text-blue-300">notNull</span>(),
     <span class="text-blue-300">status</span>:    col.<span class="text-blue-300">enum</span>([<span class="text-green-400">"paid"</span>, <span class="text-green-400">"refunded"</span>]),
-    <span class="text-blue-300">total</span>:     col.<span class="text-blue-300">numeric</span>(<span class="text-amber-500">10</span>, <span class="text-amber-500">2</span>),
+    <span class="text-blue-300">total</span>:     col.<span class="text-blue-300">numeric</span>({ <span class="text-blue-300">precision</span>: <span class="text-amber-500">10</span>, <span class="text-blue-300">scale</span>: <span class="text-amber-500">2</span> }),
     <span class="text-surface-500">// …</span>
   },
   <span class="text-blue-300">rls</span>: <span class="text-green-400">"admin-only"</span>,

@@ -20,7 +20,7 @@ export const posts = defineTable("posts", {
         summary:   col.text(),
         views:     col.integer().notNull().default(0).readOnly(),
         secret:    col.text().private(),
-        createdAt: col.timestamptz().notNull().onCreateNow(),
+        createdAt: col.timestamp({ withTimezone: true }).notNull().onCreateNow(),
     },
     rls: "admin-only",
 });
@@ -52,11 +52,11 @@ key is the key.
 | nullable (the default) | `T \| null` | optional, `T \| null` | optional, `T \| null` |
 | with a default or a stamp | as above | optional | optional |
 | `.primaryKey()` | `T` | as above | absent |
-| `.readOnly()` or `.generatedAs()` | as above | absent | absent |
+| `.readOnly()` or `.generatedAlwaysAs()` | as above | absent | absent |
 | `.private()` | absent | absent | absent |
 
 A temporal column also accepts a `Date` in `InferInsert` and `InferUpdate`, as a
-write does. `.oneOf()` and `col.enum()` narrow `T` to the union of their values,
+write does. `{ enum: [...] }`, `.oneOf()`, `col.enum()` and `pgEnum` narrow `T` to the union of their values,
 and a [JSON shape](/docs/schema/json/) types its document.
 
 `.access()` does not change the types. They are one shape for every caller, and

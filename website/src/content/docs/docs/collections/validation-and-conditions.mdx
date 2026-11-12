@@ -19,10 +19,10 @@ export const events = defineTable("events", {
     columns: {
         id:      col.uuid().primaryKey().defaultRandom(),
         title:   col.text().notNull().validate({ min: 2, max: 200, requiredMessage: "Every event needs a title" }),
-        slug:    col.varchar(80).notNull().unique()
+        slug:    col.varchar({ length: 80 }).notNull().unique()
                      .validate({ matches: "^[a-z0-9-]+$", matchesMessage: "Lowercase letters, digits and hyphens only" }),
         isFree:  col.boolean().notNull().default(false),
-        price:   col.numeric(10, 2).validate({ min: 0 }),
+        price:   col.numeric({ precision: 10, scale: 2 }).validate({ min: 0 }),
         seats:   col.integer().validate({ positive: true }),
     },
     rls: "admin-only",
