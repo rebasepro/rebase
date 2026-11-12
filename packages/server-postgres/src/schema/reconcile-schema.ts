@@ -29,7 +29,7 @@
  */
 import { createHash } from "node:crypto";
 
-import type { CollectionConfig, SchemaReconcileColumn, SchemaReconcilePlan } from "@rebasepro/types";
+import type { CompiledTable, SchemaReconcileColumn, SchemaReconcilePlan } from "@rebasepro/types";
 
 import { planSchema } from "./plan/plan-schema";
 import { diffPlanAgainstCatalogue, type ExistingSchema } from "./plan/diff-plan";
@@ -76,11 +76,11 @@ function undeclaredColumns(
 }
 
 export function planSchemaReconcile(
-    collections: CollectionConfig[],
+    compiledTables: readonly CompiledTable[],
     existing: ExistingSchema,
     options: ReconcileOptions = {}
 ): SchemaReconcilePlan {
-    const plan = planSchema(collections);
+    const plan = planSchema(compiledTables);
     const tables = plan.tables.filter(table => table.kind === "collection" && table.slug);
 
     // Relaxing comes from the converge diff rather than a second reading of
@@ -166,11 +166,11 @@ export function reconcileDigest(statements: string[]): string {
  */
 export async function readReconcileFacts(
     client: Queryable,
-    collections: CollectionConfig[],
+    tables: readonly CompiledTable[],
     options: ReconcileOptions = {}
 ): Promise<SchemaReconcilePlan> {
-    const existing = await readSchemaFactsFor(client, collections);
-    const plan = planSchemaReconcile(collections, existing, options);
+    const existing = await readSchemaFactsFor(client, tables);
+    const plan = planSchemaReconcile(tables, existing, options);
     for (const column of plan.dropped) {
         const [schema, table] = column.table.split(".");
         const { rows } = await client.query<{ n: string | number }>(

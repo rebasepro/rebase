@@ -12,6 +12,7 @@ import {
     readExistingSchema,
     planCollectionSchemaEnsure
 } from "../src/schema/ensure-collection-tables";
+import { compileSet } from "./helpers/plan-tables";
 
 const notes = (bypassRoles?: string[]): CollectionConfig => ({
     slug: "notes",
@@ -46,15 +47,15 @@ describe("tenant immutability is a database trigger", () => {
 
     it("is installed once, and re-created when the bypass roles change", async () => {
         const client = queryable(db);
-        const first = await ensureCollectionTables(client, [notes()]);
+        const first = await ensureCollectionTables(client, compileSet([notes()]));
         expect(first.failures).toEqual([]);
         expect(first.actions.filter(a => a.kind === "create-trigger").map(a => a.sql).join("\n"))
             .toContain("EXECUTE FUNCTION rebase.keep_tenant('org_id', 'admin')");
 
-        const same = planCollectionSchemaEnsure([notes()], await readExistingSchema(client, ["public"]));
+        const same = planCollectionSchemaEnsure(compileSet([notes()]), await readExistingSchema(client, ["public"]));
         expect(same.actions.filter(a => a.kind === "create-trigger")).toEqual([]);
 
-        const changed = planCollectionSchemaEnsure([notes(["admin", "support"])], await readExistingSchema(client, ["public"]));
+        const changed = planCollectionSchemaEnsure(compileSet([notes(["admin", "support"])]), await readExistingSchema(client, ["public"]));
         expect(changed.actions.filter(a => a.kind === "create-trigger").map(a => a.sql))
             .toEqual([
                 "DROP TRIGGER IF EXISTS \"notes_keep_tenant\" ON \"public\".\"notes\";",
@@ -63,7 +64,7 @@ describe("tenant immutability is a database trigger", () => {
     });
 
     it("leaves the owner free to move a row", async () => {
-        await ensureCollectionTables(queryable(db), [notes()]);
+        await ensureCollectionTables(queryable(db), compileSet([notes()]));
         await db.exec("INSERT INTO public.notes (org_id, body) VALUES ('a', 'x')");
         await db.exec("UPDATE public.notes SET org_id = 'b'");
         expect((await db.query<{ org_id: string }>("SELECT org_id FROM public.notes")).rows).toEqual([{ org_id: "b" }]);

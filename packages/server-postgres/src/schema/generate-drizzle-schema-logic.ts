@@ -11,13 +11,13 @@
  * `validation.unique`, and each disagreeing with the other two about something.
  * See `schema/plan/types.ts`.
  */
-import type { CollectionConfig } from "@rebasepro/types";
-import { relationalCollections, sortCollectionsBySlug } from "@rebasepro/common";
+import type { CompiledTable } from "@rebasepro/types";
+import { sortTablesBySlug } from "@rebasepro/common";
 import { planSchema } from "./plan/plan-schema";
 import { renderDrizzleSchema, type DrizzleRenderOptions } from "./plan/render-drizzle";
 
 /**
- * The generated Drizzle schema for a set of collections.
+ * The generated Drizzle schema for a set of tables.
  *
  * Synchronous, and takes an options object. It was `async` with nothing to
  * await and a positional `stripPolicies` boolean — `generateSchema(c, true)`,
@@ -29,13 +29,11 @@ import { renderDrizzleSchema, type DrizzleRenderOptions } from "./plan/render-dr
  * whose file order differed from its slug order was reported stale forever.
  */
 export const generateSchema = (
-    allCollections: CollectionConfig[],
+    tables: readonly CompiledTable[],
     options: DrizzleRenderOptions = {}
 ): string => {
-    // A Firestore collection has no table to generate, and
-    // generating one for it is not merely wasted output: `db push` would create
-    // it, and `rebase doctor` would then report the store the collection
-    // actually reads from as drift.
-    const collections = sortCollectionsBySlug(relationalCollections(allCollections));
-    return renderDrizzleSchema(planSchema(collections), options);
+    // A table another engine stores is left out by the planner itself:
+    // generating it would make `db push` create it, and `rebase doctor` then
+    // report the store it actually reads from as drift.
+    return renderDrizzleSchema(planSchema(sortTablesBySlug(tables)), options);
 };

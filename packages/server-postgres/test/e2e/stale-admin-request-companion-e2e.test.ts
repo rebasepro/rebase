@@ -32,6 +32,7 @@ import { authContextStatement } from "../../src/security/rls-enforcement.js";
 import { resolveRlsSettings } from "../../src/security/rls-settings.js";
 import { generatePostgresPoliciesDdl } from "../../src/schema/generate-postgres-ddl-logic.js";
 import { checkPolicyDrift, dropOrphanedPolicies, dropStaleAdminRequestCompanions } from "../../src/security/policy-drift.js";
+import { compileSet } from "../helpers/plan-tables";
 
 const properties: CollectionConfig["properties"] = {
     id: { name: "ID", type: "number", isId: "increment" },
@@ -92,15 +93,15 @@ describe("a companion follows its rule (E2E)", () => {
 
     /** What `db push` does with policies: `policies.sql`, then its orphan cleanup. */
     async function push(collections: CollectionConfig): Promise<void> {
-        await rebase.sql(generatePostgresPoliciesDdl([collections]));
-        const drift = await checkPolicyDrift(connection.pool, [collections], { adminRoleAvailable: true });
-        await dropOrphanedPolicies(connection.pool, drift, [collections]);
+        await rebase.sql(generatePostgresPoliciesDdl(compileSet([collections])));
+        const drift = await checkPolicyDrift(connection.pool, compileSet([collections]), { adminRoleAvailable: true });
+        await dropOrphanedPolicies(connection.pool, drift, compileSet([collections]));
     }
 
     /** What `db migrate` does: replay `policies.sql`, then sweep stale companions. */
     async function migrate(collections: CollectionConfig): Promise<void> {
-        await rebase.sql(generatePostgresPoliciesDdl([collections]));
-        await dropStaleAdminRequestCompanions(connection.pool, [collections], { adminRoleAvailable: true });
+        await rebase.sql(generatePostgresPoliciesDdl(compileSet([collections])));
+        await dropStaleAdminRequestCompanions(connection.pool, compileSet([collections]), { adminRoleAvailable: true });
     }
 
     async function companions(table = "notes"): Promise<string[]> {
@@ -192,7 +193,7 @@ describe("a companion follows its rule (E2E)", () => {
 
         // A hand migration replaying policies.sql, with no push cleanup, no
         // `db migrate` sweep and no provisioning boot after it.
-        await rebase.sql(generatePostgresPoliciesDdl([opsAfter]));
+        await rebase.sql(generatePostgresPoliciesDdl(compileSet([opsAfter])));
         expect(await companions("ops")).toEqual([]);
         // Nothing grants SELECT now, so nothing is read — and a DELETE … WHERE
         // sees only rows a SELECT policy admits, so none is deleted either.

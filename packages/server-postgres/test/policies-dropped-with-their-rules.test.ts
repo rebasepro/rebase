@@ -3,6 +3,7 @@ import type { CollectionConfig, SecurityRule } from "@rebasepro/types";
 import { describeRulesDropped, ensureCollectionPolicies } from "../src/schema/ensure-collection-policies";
 import type { Queryable } from "../src/schema/ensure-collection-tables";
 import { RLS_BOOTSTRAP_STATEMENTS } from "../src/schema/rls-bootstrap-sql";
+import { compileSet } from "./helpers/plan-tables";
 
 /**
  * Provisioning that drops a collection's every generated rule says so.
@@ -52,11 +53,11 @@ describe("provisioning a collection that lost its rules", () => {
     it("names every generated policy it drops for a collection that now declares none", async () => {
         const { db, queryable } = await database();
         try {
-            await ensureCollectionPolicies(queryable, [posts(DEFAULTS)]);
+            await ensureCollectionPolicies(queryable, compileSet([posts(DEFAULTS)]));
             const generated = (await policyNames(db)).filter(name => /^posts_(select|insert|update|delete|all)_[0-9a-f]{7}/.test(name));
             expect(generated.length).toBeGreaterThan(0);
 
-            const result = await ensureCollectionPolicies(queryable, [posts()]);
+            const result = await ensureCollectionPolicies(queryable, compileSet([posts()]));
 
             expect(result.rulesDropped).toEqual([{ table: "public.posts", policies: generated }]);
             // Dropped all the same: the declared state wins, and the boot warns.
@@ -69,8 +70,8 @@ describe("provisioning a collection that lost its rules", () => {
     it("says nothing when a rule was edited, which supersedes its old policy by design", async () => {
         const { db, queryable } = await database();
         try {
-            await ensureCollectionPolicies(queryable, [posts(DEFAULTS)]);
-            const result = await ensureCollectionPolicies(queryable, [posts([{ operation: "all", ownerField: "author_id" }])]);
+            await ensureCollectionPolicies(queryable, compileSet([posts(DEFAULTS)]));
+            const result = await ensureCollectionPolicies(queryable, compileSet([posts([{ operation: "all", ownerField: "author_id" }])]));
 
             expect(result.orphansDropped).toBeGreaterThan(0);
             expect(result.rulesDropped).toEqual([]);
@@ -82,8 +83,8 @@ describe("provisioning a collection that lost its rules", () => {
     it("says nothing on a boot that changes nothing", async () => {
         const { db, queryable } = await database();
         try {
-            await ensureCollectionPolicies(queryable, [posts()]);
-            expect((await ensureCollectionPolicies(queryable, [posts()])).rulesDropped).toEqual([]);
+            await ensureCollectionPolicies(queryable, compileSet([posts()]));
+            expect((await ensureCollectionPolicies(queryable, compileSet([posts()]))).rulesDropped).toEqual([]);
         } finally {
             await db.close();
         }

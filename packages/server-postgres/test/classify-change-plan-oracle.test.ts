@@ -27,6 +27,7 @@ import { generateSchemaCommit } from "../src/schema/generate-schema-commit";
 import { planSchema } from "../src/schema/plan/plan-schema";
 import { renderPostgresDdl, renderTriggersDdl, renderPgType } from "../src/schema/plan/render-ddl";
 import type { SchemaPlan } from "../src/schema/plan/types";
+import { planCollections } from "./helpers/plan-tables";
 
 type Props = Record<string, unknown>;
 type Verdict = "none" | "safe" | "diverges" | "needs-migration";
@@ -402,8 +403,8 @@ describe("classifying from the plan, attribute by attribute", () => {
     it.each(Object.entries(ROWS))("%s", (_name, row) => {
         const before = world(row.before);
         const after = world(row.after);
-        const beforePlan = planSchema(before);
-        const afterPlan = planSchema(after);
+        const beforePlan = planCollections(before);
+        const afterPlan = planCollections(after);
         const facts = factsFrom(beforePlan, !row.empty);
 
         const result = classifyCollectionChanges(before, after, facts);
@@ -428,14 +429,14 @@ describe("what a default change runs", () => {
     it("sets the new default on a column that had one, which the additive ensure never does", async () => {
         const before = world({ posts: { title: str({ defaultValue: "a" }) } });
         const after = world({ posts: { title: str({ defaultValue: "b" }) } });
-        const commit = await generateSchemaCommit({ before, after, existing: { ...factsFrom(planSchema(before), true), enums: new Set() } });
+        const commit = await generateSchemaCommit({ before, after, existing: { ...factsFrom(planCollections(before), true), enums: new Set() } });
         expect(commit.statements).toContain(`ALTER TABLE "public"."posts" ALTER COLUMN "title" SET DEFAULT 'b';`);
     });
 
     it("drops a default that is no longer declared", async () => {
         const before = world({ posts: { title: str({ defaultValue: "a" }) } });
         const after = world({ posts: { title: str() } });
-        const commit = await generateSchemaCommit({ before, after, existing: { ...factsFrom(planSchema(before), true), enums: new Set() } });
+        const commit = await generateSchemaCommit({ before, after, existing: { ...factsFrom(planCollections(before), true), enums: new Set() } });
         expect(commit.statements).toContain(`ALTER TABLE "public"."posts" ALTER COLUMN "title" DROP DEFAULT;`);
     });
 });

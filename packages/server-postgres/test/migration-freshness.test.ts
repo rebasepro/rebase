@@ -10,6 +10,7 @@
  */
 import type { CollectionConfig } from "@rebasepro/types";
 import { findUnmigratedSchema, replayMigrationTables } from "../src/schema/migration-freshness";
+import { compileSet } from "./helpers/plan-tables";
 
 const notes: CollectionConfig = {
     slug: "notes",
@@ -64,13 +65,13 @@ describe("replayMigrationTables", () => {
 
 describe("findUnmigratedSchema", () => {
     it("names a table no migration creates", () => {
-        expect(findUnmigratedSchema([notes], [])).toEqual([
+        expect(findUnmigratedSchema(compileSet([notes]), [])).toEqual([
             { kind: "missing-table", table: "public.notes", slug: "notes" }
         ]);
     });
 
     it("names a declared column no migration adds, and a dropped one a migration still creates", () => {
-        const changes = findUnmigratedSchema([notes], [INIT]);
+        const changes = findUnmigratedSchema(compileSet([notes]), [INIT]);
         expect(changes).toEqual(expect.arrayContaining([
             { kind: "missing-column", table: "public.notes", column: "body", slug: "notes" },
             { kind: "removed-column", table: "public.notes", column: "legacy", slug: "notes" }
@@ -81,6 +82,6 @@ describe("findUnmigratedSchema", () => {
 
     it("is empty once a migration catches up", () => {
         const caughtUp = `ALTER TABLE "public"."notes" DROP COLUMN "legacy", ADD COLUMN "body" character varying(255) NULL;`;
-        expect(findUnmigratedSchema([notes], [INIT, caughtUp])).toEqual([]);
+        expect(findUnmigratedSchema(compileSet([notes]), [INIT, caughtUp])).toEqual([]);
     });
 });

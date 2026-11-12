@@ -30,6 +30,7 @@ import {
     isPostgresCollectionConfig,
     resolveResourceRefs,
     type CollectionConfig,
+    type CompiledTable,
     type SecurityRule
 } from "@rebasepro/types";
 
@@ -143,17 +144,17 @@ export function writeGolden(set: PlanCorpusSet, outputs: Record<string, string>)
 export const toGoldenJson = toStableJson;
 
 /**
- * Everything the schema pipeline emits for one collection set, by file name —
+ * Everything the schema pipeline emits for one set of compiled tables, by file name —
  * `renderSchemaOutputs` (`src/schema/render-outputs.ts`), which the
  * collections-to-tables codemod also proves a migration with. Planned in slug
  * order, with the planner's environment pinned; an output that throws is
  * recorded as `THROWS: <message>`.
  */
 export function renderAllOutputs(
-    collections: readonly CollectionConfig[],
+    tables: readonly CompiledTable[],
     options: PlanCorpusOptions = {}
 ): Record<string, string> {
-    return renderSchemaOutputs(collections, options);
+    return renderSchemaOutputs(tables, options);
 }
 
 // ── Sets that live in memory ─────────────────────────────────────────────────

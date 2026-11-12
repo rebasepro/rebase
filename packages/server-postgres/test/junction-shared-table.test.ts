@@ -13,6 +13,7 @@
 import type { CollectionConfig } from "@rebasepro/types";
 import { planSchema } from "../src/schema/plan/plan-schema";
 import { planCollectionSchemaEnsure } from "../src/schema/ensure-collection-tables";
+import { compileSet, planCollections } from "./helpers/plan-tables";
 
 const tags: CollectionConfig = {
     slug: "tags",
@@ -36,9 +37,9 @@ describe("a junction table two relations resolve to", () => {
             }
         };
         const refusal = /"posts_tags"[\s\S]*"tags"[\s\S]*"featuredTags"[\s\S]*featured_tag_id/;
-        expect(() => planSchema([posts, tags])).toThrow(refusal);
+        expect(() => planCollections([posts, tags])).toThrow(refusal);
         // Boot plans through the same function, so it refuses the same way.
-        expect(() => planCollectionSchemaEnsure([posts, tags], {
+        expect(() => planCollectionSchemaEnsure(compileSet([posts, tags]), {
             tables: new Map(), enums: new Set(), constraints: new Set()
         })).toThrow(refusal);
     });
@@ -54,7 +55,7 @@ describe("a junction table two relations resolve to", () => {
                 followers: { name: "Followers", type: "relation", relation: { kind: "manyToMany", target: () => people } }
             }
         };
-        expect(() => planSchema([people])).toThrow(/"people_people"/);
+        expect(() => planCollections([people])).toThrow(/"people_people"/);
     });
 
     it("is shared by the two sides of one link", () => {
@@ -74,7 +75,7 @@ describe("a junction table two relations resolve to", () => {
                 posts: { name: "Posts", type: "relation", relation: { kind: "manyToMany", target: () => posts } }
             }
         };
-        const plan = planSchema([posts, taggedTags]);
+        const plan = planCollections([posts, taggedTags]);
         const junction = plan.tables.find(t => t.table === "posts_tags");
         expect(junction?.columns.map(c => c.column)).toEqual(["post_id", "tag_id"]);
     });
@@ -94,7 +95,7 @@ describe("a junction table two relations resolve to", () => {
                 }
             }
         };
-        const plan = planSchema([posts, tags]);
+        const plan = planCollections([posts, tags]);
         const columnsOf = (table: string): string[] | undefined =>
             plan.tables.find(t => t.table === table)?.columns.map(c => c.column);
         expect(columnsOf("posts_tags")).toEqual(["post_id", "tag_id"]);

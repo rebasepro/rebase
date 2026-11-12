@@ -10,7 +10,7 @@
  * blog scaffold.
  *
  * Migrate cannot stamp what the files hold, the way push stamps what it just
- * ran: a migration was written from the collections of its day, and the
+ * ran: a migration was written from the tables of its day, and the
  * database may hold something a later one, or a hand, made since. A stamp
  * there would tell the boot a policy is what the rule makes when it is not, and
  * the boot would never put it right. So each declared policy without a current
@@ -21,7 +21,7 @@
  * stamp, and the boot re-applies its table, as before.
  */
 import chalk from "chalk";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { CompiledTable } from "@rebasepro/types";
 import type { Queryable } from "../security/policy-drift";
 import { withAppClient } from "../cli-helpers";
 import { out, outWarn } from "../cli-output";
@@ -39,13 +39,13 @@ import { loadTables } from "./load-tables";
  */
 export async function stampMigratedPolicies(databaseUrl: string, schemaDir: string, adminRoleAvailable = true): Promise<void> {
     try {
-        const collections = await loadTables(schemaDir);
+        const compiledTables = await loadTables(schemaDir);
         // The rule the boot's connections follow: `search_path=public` unless
         // the URL pins one of its own, in which case this connection has it too.
         const searchPath = pinSearchPath(databaseUrl) === databaseUrl ? undefined : "public";
         const { stamped } = await withAppClient(databaseUrl, client => stampPoliciesStoredAsRendered(
             { query: async (text, values) => ({ rows: (await client.query(text, values)).rows }) },
-            collections,
+            compiledTables,
             { searchPath, adminRoleAvailable }
         ));
         if (stamped > 0) {
@@ -67,14 +67,14 @@ export async function stampMigratedPolicies(databaseUrl: string, schemaDir: stri
  */
 export async function stampPoliciesStoredAsRendered(
     client: Queryable,
-    collections: CollectionConfig[],
+    compiledTables: readonly CompiledTable[],
     options: { searchPath?: string; adminRoleAvailable?: boolean } = {}
 ): Promise<{ stamped: number }> {
     const { adminRoleAvailable } = options;
-    const plans = planCollectionPolicies(collections, { adminRoleAvailable });
+    const plans = planCollectionPolicies(compiledTables, { adminRoleAvailable });
     if (plans.length === 0) return { stamped: 0 };
 
-    const states = await underSearchPath(client, options.searchPath, () => readPolicyStamps(client, collections, { adminRoleAvailable }));
+    const states = await underSearchPath(client, options.searchPath, () => readPolicyStamps(client, compiledTables, { adminRoleAvailable }));
     const unsure: { schema: string; table: string; name: string }[] = [];
     for (const plan of plans) {
         for (const [name, state] of states.get(plan.qualified) ?? []) {
@@ -83,7 +83,7 @@ export async function stampPoliciesStoredAsRendered(
     }
     if (unsure.length === 0) return { stamped: 0 };
 
-    const confirmed = await probeRenderedPolicies(client, collections, unsure, { searchPath: options.searchPath, adminRoleAvailable });
+    const confirmed = await probeRenderedPolicies(client, compiledTables, unsure, { searchPath: options.searchPath, adminRoleAvailable });
     const statements: string[] = [];
     let stamped = 0;
     for (const plan of plans) {
@@ -122,11 +122,11 @@ export async function stampPoliciesStoredAsRendered(
  */
 export async function moveMigratedAdminPoliciesToPublic(
     client: Queryable,
-    collections: CollectionConfig[],
+    compiledTables: readonly CompiledTable[],
     log?: (message: string) => void
 ): Promise<number> {
-    if (!planCollectionPolicies(collections).some(plan => plan.policies.some(policy => policy.adminTarget))) return 0;
-    const outcome = await ensureCollectionPolicies(client, collections, log, { adminRoleAvailable: false });
+    if (!planCollectionPolicies(compiledTables).some(plan => plan.policies.some(policy => policy.adminTarget))) return 0;
+    const outcome = await ensureCollectionPolicies(client, compiledTables, log, { adminRoleAvailable: false });
     if (outcome.failures.length > 0) {
         throw new Error(outcome.failures.map(f => `${f.table}: ${f.error}`).join("; "));
     }

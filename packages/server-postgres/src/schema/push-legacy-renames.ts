@@ -10,7 +10,7 @@
  * could not upgrade an aged database at all. Renaming first — the same
  * metadata-only statement boot runs — leaves Atlas nothing to plan.
  */
-import { declaredDatabaseExtensions, type CollectionConfig } from "@rebasepro/types";
+import { declaredDatabaseExtensions, type CompiledTable } from "@rebasepro/types";
 import { planSchema } from "./plan/plan-schema";
 import { diffPlanAgainstCatalogue, type LegacyForeignKey } from "./plan/diff-plan";
 import { readExistingSchema, type Queryable } from "./ensure-collection-tables";
@@ -20,8 +20,8 @@ export interface LegacyRename extends LegacyForeignKey {
     sql: string;
 }
 
-export async function legacyForeignKeyRenames(client: Queryable, collections: CollectionConfig[]): Promise<LegacyRename[]> {
-    const schema = planSchema(collections, { databaseExtensions: declaredDatabaseExtensions() });
+export async function legacyForeignKeyRenames(client: Queryable, tables: readonly CompiledTable[]): Promise<LegacyRename[]> {
+    const schema = planSchema(tables, { databaseExtensions: declaredDatabaseExtensions() });
     const schemas = Array.from(new Set(schema.tables.map(table => table.schema)));
     const existing = await readExistingSchema(client, schemas, { probeTables: () => [] });
     const plan = diffPlanAgainstCatalogue(schema, existing);

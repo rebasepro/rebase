@@ -1,5 +1,6 @@
 import { CollectionConfig, PostgresCollectionConfig, PostgresProperty } from "@rebasepro/types";
 import { generatePostgresDdl, generatePostgresPoliciesDdl, planRelationalColumns } from "../src/schema/generate-postgres-ddl-logic";
+import { compileSet } from "./helpers/plan-tables";
 
 describe("generatePostgresDdl", () => {
     const cleanDdl = (ddl: string) => {
@@ -24,7 +25,7 @@ describe("generatePostgresDdl", () => {
             }
         ];
 
-        const result = await generatePostgresDdl(collections);
+        const result = await generatePostgresDdl(compileSet(collections));
         const cleanResult = cleanDdl(result);
 
         expect(cleanResult).toContain("CREATE TABLE \"public\".\"products\" (");
@@ -48,7 +49,7 @@ describe("generatePostgresDdl", () => {
             }
         ];
 
-        const result = await generatePostgresDdl(collections);
+        const result = await generatePostgresDdl(compileSet(collections));
         expect(result).toContain("CREATE SCHEMA IF NOT EXISTS \"inventory\";");
         expect(result).toContain("CREATE TABLE \"inventory\".\"products\"");
     });
@@ -68,7 +69,7 @@ describe("generatePostgresDdl", () => {
             }
         ];
 
-        const result = await generatePostgresDdl(collections);
+        const result = await generatePostgresDdl(compileSet(collections));
         expect(result).toContain("CREATE TYPE \"public\".\"orders_status\" AS ENUM ('pending', 'shipped', 'delivered');");
         expect(result).toContain("\"status\" \"public\".\"orders_status\"");
     });
@@ -101,7 +102,7 @@ describe("generatePostgresDdl", () => {
             ]
         };
 
-        const result = await generatePostgresDdl([usersCollection, postsCollection]);
+        const result = await generatePostgresDdl(compileSet([usersCollection, postsCollection]));
         const cleanResult = cleanDdl(result);
 
         expect(cleanResult).toContain("\"author_id\" TEXT");
@@ -137,7 +138,7 @@ describe("generatePostgresDdl", () => {
             ]
         };
 
-        const cleanResult = cleanDdl(await generatePostgresDdl([usersCollection, postsCollection]));
+        const cleanResult = cleanDdl(await generatePostgresDdl(compileSet([usersCollection, postsCollection])));
 
         expect(cleanResult).toContain("\"author_id\" TEXT NOT NULL");
         expect(cleanResult).toContain("ALTER TABLE \"public\".\"posts\" ADD CONSTRAINT \"posts_author_id_fkey\" FOREIGN KEY (\"author_id\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE RESTRICT;");
@@ -168,7 +169,7 @@ describe("generatePostgresDdl", () => {
             ]
         };
 
-        const plans = planRelationalColumns([usersCollection, postsCollection]);
+        const plans = planRelationalColumns(compileSet([usersCollection, postsCollection]));
 
         expect(plans.find(p => p.column === "author_id")?.foreignKey?.sql).toContain("ON DELETE RESTRICT");
         expect(plans.find(p => p.column === "editor_id")?.foreignKey?.sql).toContain("ON DELETE SET NULL");
@@ -199,7 +200,7 @@ describe("generatePostgresDdl", () => {
             }
         };
 
-        const cleanResult = cleanDdl(await generatePostgresDdl([usersCollection, postsCollection]));
+        const cleanResult = cleanDdl(await generatePostgresDdl(compileSet([usersCollection, postsCollection])));
 
         expect(cleanResult).toContain("\"posts_author_fkey\" FOREIGN KEY (\"author\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE RESTRICT;");
         expect(cleanResult).toContain("\"posts_editor_fkey\" FOREIGN KEY (\"editor\") REFERENCES \"public\".\"users\" (\"id\") ON DELETE SET NULL;");
@@ -207,7 +208,7 @@ describe("generatePostgresDdl", () => {
 
         // And the desired state boot-ensure diffs against, or every boot plans
         // a constraint rewrite for the difference.
-        const plans = planRelationalColumns([usersCollection, postsCollection]);
+        const plans = planRelationalColumns(compileSet([usersCollection, postsCollection]));
         expect(plans.find(p => p.column === "author")?.foreignKey?.sql).toContain("ON DELETE RESTRICT");
         expect(plans.find(p => p.column === "editor")?.foreignKey?.sql).toContain("ON DELETE SET NULL");
     });
@@ -243,7 +244,7 @@ describe("generatePostgresDdl", () => {
             }
         };
 
-        const result = await generatePostgresDdl([postsCollection, tagsCollection]);
+        const result = await generatePostgresDdl(compileSet([postsCollection, tagsCollection]));
         const cleanResult = cleanDdl(result);
 
         expect(cleanResult).toContain("CREATE TABLE \"public\".\"posts_to_tags\" (");
@@ -279,7 +280,7 @@ describe("generatePostgresDdl", () => {
             ]
         } as CollectionConfig;
 
-        const result = await generatePostgresDdl([postsCollection, tagsCollection]);
+        const result = await generatePostgresDdl(compileSet([postsCollection, tagsCollection]));
         const cleanResult = cleanDdl(result);
 
         // A junction is a generated table like any other: RLS on, locked
@@ -323,7 +324,7 @@ describe("generatePostgresDdl", () => {
             ]
         };
 
-        const result = generatePostgresPoliciesDdl([postsCollection, tagsCollection]);
+        const result = generatePostgresPoliciesDdl(compileSet([postsCollection, tagsCollection]));
         const cleanResult = cleanDdl(result);
 
         // `rebase db push` applies this file to existing databases — it is the
@@ -357,7 +358,7 @@ describe("generatePostgresDdl", () => {
             }
         ];
 
-        const result = await generatePostgresDdl(collections);
+        const result = await generatePostgresDdl(compileSet(collections));
         const cleanResult = cleanDdl(result);
 
         expect(cleanResult).toContain("\"uuid_id\" UUID PRIMARY KEY DEFAULT gen_random_uuid()");
@@ -384,8 +385,8 @@ describe("generatePostgresDdl", () => {
             }
         ];
 
-        expect(() => generatePostgresDdl(collections)).toThrow(/cuid/);
-        expect(() => generatePostgresDdl(collections)).toThrow(/users_cuid/);
+        expect(() => generatePostgresDdl(compileSet(collections))).toThrow(/cuid/);
+        expect(() => generatePostgresDdl(compileSet(collections))).toThrow(/users_cuid/);
     });
 
     it("should generate RLS policies with ownerField and roles", async () => {
@@ -412,7 +413,7 @@ describe("generatePostgresDdl", () => {
             }
         ];
 
-        const result = await generatePostgresDdl(collections);
+        const result = await generatePostgresDdl(compileSet(collections));
         const cleanResult = cleanDdl(result);
 
         expect(cleanResult).toContain("CREATE POLICY \"posts_select_");
@@ -455,7 +456,7 @@ describe("generatePostgresDdl", () => {
             }
         ];
 
-        const result = await generatePostgresDdl(collections);
+        const result = await generatePostgresDdl(compileSet(collections));
         const cleanResult = cleanDdl(result);
 
         expect(cleanResult).toContain("\"price_int\" INTEGER");
@@ -499,7 +500,7 @@ describe("generatePostgresDdl", () => {
             }
         ];
 
-        const result = await generatePostgresDdl(collections);
+        const result = await generatePostgresDdl(compileSet(collections));
         const cleanResult = cleanDdl(result);
 
         expect(cleanResult).toContain("CREATE POLICY \"restrict_access_select\" ON \"public\".\"documents\" AS RESTRICTIVE FOR SELECT TO \"authenticated\" USING ((owner)::text = (SELECT rebase.uid()))");

@@ -12,7 +12,7 @@ import * as fs from "fs";
 import path from "path";
 import { pathToFileURL } from "url";
 import chalk from "chalk";
-import { CollectionConfig, DEFAULT_DATA_SOURCE_KEY, LEGACY_SCHEMA_VERSION_PREFIX, type TableDescriptor, isPostgresCollectionConfig, Property, NumberProperty, StringProperty, DateProperty, ArrayProperty, MapProperty, RelationProperty, type ResolvedManyToMany, type ResolvedBelongsTo, isManyToMany } from "@rebasepro/types";
+import { CollectionConfig, DEFAULT_DATA_SOURCE_KEY, LEGACY_SCHEMA_VERSION_PREFIX, type CompiledTable, type TableDescriptor, isPostgresCollectionConfig, Property, NumberProperty, StringProperty, DateProperty, ArrayProperty, MapProperty, RelationProperty, type ResolvedManyToMany, type ResolvedBelongsTo, isManyToMany } from "@rebasepro/types";
 import { generateSchema } from "./generate-drizzle-schema-logic";
 import { compareGeneratedDeclarations, describeDeclarationDifferences } from "./generated-schema-staleness";
 import { describeSchemaDifference, readGeneratedSchemaDrift, type SchemaDifference } from "./generated-schema-diff";
@@ -23,6 +23,7 @@ import { generateTypedefs } from "@rebasepro/codegen";
 import { getTableName, resolveCollectionRelations, findRelation, relationalCollections, resolveJunctionSpecs } from "@rebasepro/common";
 import { toPostgresIdentifier, toSnakeCase } from "@rebasepro/utils";
 import { defaultDatabaseSchemaVersion, loadTableSchema } from "./load-tables";
+import { lowerCompiledTables } from "./lowered-tables";
 import { describeMismatch } from "@rebasepro/server";
 // The report is CLI output, not application logging — see cli-output.ts.
 import { out, outError } from "../cli-output";
@@ -200,10 +201,12 @@ export function getExpectedColumnType(prop: Property): string | null {
 // ── Phase 1: Collections ↔ Generated Schema ─────────────────────────────
 
 export async function checkCollectionsVsSchema(
-    collections: CollectionConfig[],
+    tables: readonly CompiledTable[],
     schemaFilePath: string
 ): Promise<DoctorPhase> {
     const issues: DoctorIssue[] = [];
+    // B-PLAN-2 step 6: which tables Postgres stores, from the descriptors.
+    const collections = lowerCompiledTables(tables);
 
     // Check if schema file exists
     if (!fs.existsSync(schemaFilePath)) {
@@ -233,7 +236,7 @@ issues };
         // which is what the reader is about to go looking for — and ignores the
         // formatting and commentary the renderer is free to vary on its own.
         const differences = compareGeneratedDeclarations(
-            generateSchema(postgresCollections),
+            generateSchema(tables),
             await fsPromises.readFile(schemaFilePath, "utf-8")
         );
 
@@ -635,7 +638,7 @@ function defaultSourceCollections(collections: CollectionConfig[]): CollectionCo
 }
 
 export async function checkCollectionsVsDatabase(
-    collections: CollectionConfig[],
+    tables: readonly CompiledTable[],
     databaseUrl: string,
     options: {
         /**
@@ -652,6 +655,8 @@ export async function checkCollectionsVsDatabase(
     } = {}
 ): Promise<DoctorPhase> {
     const issues: DoctorIssue[] = [];
+    // B-PLAN-2 step 6: the comparisons read the descriptors.
+    const collections = lowerCompiledTables(tables);
 
     // Dynamic import to avoid loading pg when not needed
     const pgModule = await import("pg");
@@ -813,7 +818,7 @@ export async function checkCollectionsVsDatabase(
         // other phases name that problem, and these checks stand down.
         let plan: SchemaPlan | undefined;
         try {
-            plan = planSchema(postgresCollections);
+            plan = planSchema(tables);
         } catch {
             plan = undefined;
         }
@@ -1297,7 +1302,7 @@ export async function runDoctor(options: {
     // the policy generator about which tables exist would compare the wrong
     // thing. A schema that does not compile is fatal here as everywhere.
     const loaded = await loadTableSchema(options.schemaDir);
-    const { collections, descriptors } = loaded;
+    const { collections, descriptors, tables } = loaded;
     if (collections.length === 0) {
         outError(chalk.red(`  ✗ No tables found in ${options.schemaDir} (its index.ts exports none).`));
         process.exit(1);
@@ -1307,7 +1312,7 @@ export async function runDoctor(options: {
 
     // Phase 1: Collections ↔ Generated Schema
     out(chalk.gray("  Checking Tables → Generated Schema..."));
-    const collectionsToSchema = await checkCollectionsVsSchema(collections, options.schemaPath);
+    const collectionsToSchema = await checkCollectionsVsSchema(tables, options.schemaPath);
 
     // Phase 2: Collections ↔ Database (only if we have a DATABASE_URL)
     let schemaToDatabase: DoctorPhase;
@@ -1315,7 +1320,7 @@ export async function runDoctor(options: {
         out(chalk.gray("  Checking Tables → Database..."));
         try {
             const generated = await loadGeneratedTables(options.schemaPath);
-            schemaToDatabase = await checkCollectionsVsDatabase(collections, options.databaseUrl, {
+            schemaToDatabase = await checkCollectionsVsDatabase(tables, options.databaseUrl, {
                 generated: generated.tables,
                 schemaVersion: defaultDatabaseSchemaVersion(loaded)
             });

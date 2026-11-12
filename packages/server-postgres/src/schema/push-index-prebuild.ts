@@ -18,7 +18,7 @@
  * Only an index whose columns are already there: a column this push adds is
  * created by Atlas, and its index with it, on a column that holds no values.
  */
-import { declaredDatabaseExtensions, type CollectionConfig } from "@rebasepro/types";
+import { declaredDatabaseExtensions, type CompiledTable } from "@rebasepro/types";
 import { planSchema } from "./plan/plan-schema";
 import { diffPlanAgainstCatalogue, type DeferredIndexBuild } from "./plan/diff-plan";
 import { readExistingSchema, type Queryable } from "./ensure-collection-tables";
@@ -26,9 +26,9 @@ import { readExistingSchema, type Queryable } from "./ensure-collection-tables";
 /** The derived foreign-key indexes a live table lacks (or holds INVALID) whose columns it already has. */
 export async function missingForeignKeyIndexes(
     client: Queryable,
-    collections: CollectionConfig[]
+    tables: readonly CompiledTable[]
 ): Promise<DeferredIndexBuild[]> {
-    const schema = planSchema(collections, { databaseExtensions: declaredDatabaseExtensions() });
+    const schema = planSchema(tables, { databaseExtensions: declaredDatabaseExtensions() });
     const schemas = Array.from(new Set(schema.tables.map(table => table.schema)));
     // No row probes: whether a table holds rows decides only constraints on a
     // column being added, which this does not plan.

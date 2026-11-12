@@ -1,5 +1,5 @@
 /**
- * Enum labels the database holds and the collections no longer declare.
+ * Enum labels the database holds and the tables no longer declare.
  *
  * PostgreSQL has no `ALTER TYPE … DROP VALUE`, and Atlas plans nothing for a
  * removed label — `db push` reported success while the database kept the old
@@ -9,7 +9,7 @@
  * refusal — the push stays what boot would do — but the push says it, with the
  * real way to retire a label.
  */
-import { declaredDatabaseExtensions, type CollectionConfig } from "@rebasepro/types";
+import { declaredDatabaseExtensions, type CompiledTable } from "@rebasepro/types";
 import { planSchema } from "./plan/plan-schema";
 import type { EnumPlan } from "./plan/types";
 import { readExistingSchema, type Queryable } from "./ensure-collection-tables";
@@ -36,9 +36,9 @@ export function findKeptEnumLabels(
     return kept;
 }
 
-/** Plans the collections and reads the catalogue's enum labels. */
-export async function keptEnumLabels(client: Queryable, collections: CollectionConfig[]): Promise<KeptEnumLabels[]> {
-    const plan = planSchema(collections, { databaseExtensions: declaredDatabaseExtensions() });
+/** Plans the tables and reads the catalogue's enum labels. */
+export async function keptEnumLabels(client: Queryable, tables: readonly CompiledTable[]): Promise<KeptEnumLabels[]> {
+    const plan = planSchema(tables, { databaseExtensions: declaredDatabaseExtensions() });
     if (plan.enums.length === 0) return [];
     const schemas = Array.from(new Set(plan.enums.map(e => e.schema)));
     const existing = await readExistingSchema(client, schemas, { probeTables: () => [] });

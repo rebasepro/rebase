@@ -24,6 +24,7 @@ import {
 } from "../src/schema/ensure-collection-tables";
 import { generatePostgresSearchDdl } from "../src/schema/generate-postgres-ddl-logic";
 import { buildSearchColumnSpec, searchColumnStamps } from "../src/schema/search-column";
+import { compileSet } from "./helpers/plan-tables";
 
 const talents = (fields: SearchConfig["fields"], extra: Partial<PostgresCollectionConfig["search"]> = {}): PostgresCollectionConfig => ({
     slug: "talents",
@@ -62,7 +63,7 @@ const empty = (): ExistingSchema => ({
 
 describe("drift between the block and the column it built", () => {
     it("is reported when the recorded fingerprint is another block's", () => {
-        const plan = planCollectionSchemaEnsure([after], withColumn(stampOf(before)));
+        const plan = planCollectionSchemaEnsure(compileSet([after]), withColumn(stampOf(before)));
 
         expect(plan.searchDrift).toHaveLength(1);
         expect(plan.searchDrift[0]).toMatchObject({
@@ -74,7 +75,7 @@ describe("drift between the block and the column it built", () => {
     });
 
     it("is not reported when the block is unchanged", () => {
-        const plan = planCollectionSchemaEnsure([after], withColumn(stampOf(after)));
+        const plan = planCollectionSchemaEnsure(compileSet([after]), withColumn(stampOf(after)));
 
         expect(plan.searchDrift).toEqual([]);
         // And nothing is re-stamped: the comment already says the right thing.
@@ -82,7 +83,7 @@ describe("drift between the block and the column it built", () => {
     });
 
     it("hands the operator the statements that resolve it", () => {
-        const [drift] = planCollectionSchemaEnsure([after], withColumn(stampOf(before))).searchDrift;
+        const [drift] = planCollectionSchemaEnsure(compileSet([after]), withColumn(stampOf(before))).searchDrift;
 
         expect(drift.rebuild[0]).toBe(`ALTER TABLE "public"."talents" DROP COLUMN "search_vector";`);
         expect(drift.rebuild[1]).toContain("ADD COLUMN \"search_vector\" tsvector GENERATED ALWAYS AS (");
@@ -91,7 +92,7 @@ describe("drift between the block and the column it built", () => {
     });
 
     it("keeps the old stamp, since it is the only evidence of what the column holds", () => {
-        const plan = planCollectionSchemaEnsure([after], withColumn(stampOf(before)));
+        const plan = planCollectionSchemaEnsure(compileSet([after]), withColumn(stampOf(before)));
 
         expect(plan.actions.filter(a => a.kind === "comment-column")).toEqual([]);
     });
@@ -124,9 +125,9 @@ describe("drift between the block and the column it built", () => {
             }
         };
 
-        await expect(ensureCollectionTables(client, [after]))
+        await expect(ensureCollectionTables(client, compileSet([after])))
             .rejects.toThrow(/search_vector/);
-        await expect(ensureCollectionTables(client, [after]))
+        await expect(ensureCollectionTables(client, compileSet([after])))
             .rejects.toThrow(/ACCESS EXCLUSIVE/);
         // Nothing was applied: the refusal happens before the first statement.
         expect(applied.filter(sql => /^(ALTER|CREATE|COMMENT)/.test(sql))).toEqual([]);
@@ -135,7 +136,7 @@ describe("drift between the block and the column it built", () => {
 
 describe("stamping", () => {
     it("stamps a column it creates", () => {
-        const plan = planCollectionSchemaEnsure([after], empty());
+        const plan = planCollectionSchemaEnsure(compileSet([after]), empty());
         const comment = plan.actions.find(a => a.kind === "comment-column");
 
         expect(comment!.sql).toContain(`COMMENT ON COLUMN "public"."talents"."search_vector" IS '${stampOf(after)}'`);
@@ -145,7 +146,7 @@ describe("stamping", () => {
     });
 
     it("adopts an unstamped column and says so, rather than assuming it matches", () => {
-        const plan = planCollectionSchemaEnsure([after], withColumn(undefined));
+        const plan = planCollectionSchemaEnsure(compileSet([after]), withColumn(undefined));
 
         expect(plan.searchDrift).toEqual([]);
         expect(plan.searchAdopted).toEqual([{ table: "public.talents", column: "search_vector" }]);
@@ -154,7 +155,7 @@ describe("stamping", () => {
 
     it("fingerprints the fuzzy column separately, so turning `fuzzy` on is not drift", () => {
         const fuzzy = talents(["full_name"], { fuzzy: true });
-        const plan = planCollectionSchemaEnsure([fuzzy], withColumn(stampOf(before)));
+        const plan = planCollectionSchemaEnsure(compileSet([fuzzy]), withColumn(stampOf(before)));
 
         // Same tsvector expression, second column added beside it: additive,
         // and a spec-wide fingerprint would have refused the boot over it.
@@ -165,7 +166,7 @@ describe("stamping", () => {
 
 describe("the generated search.sql", () => {
     it("refuses before altering anything when the database disagrees", () => {
-        const sql = generatePostgresSearchDdl([after]);
+        const sql = generatePostgresSearchDdl(compileSet([after]));
 
         expect(sql).toContain("RAISE EXCEPTION");
         expect(sql.indexOf("RAISE EXCEPTION")).toBeLessThan(sql.indexOf("ADD COLUMN IF NOT EXISTS"));
@@ -173,7 +174,7 @@ describe("the generated search.sql", () => {
     });
 
     it("stamps what it adds, so the next run can compare", () => {
-        const sql = generatePostgresSearchDdl([after]);
+        const sql = generatePostgresSearchDdl(compileSet([after]));
 
         expect(sql).toContain(`COMMENT ON COLUMN "public"."talents"."search_vector" IS '${stampOf(after)}';`);
     });

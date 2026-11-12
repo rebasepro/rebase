@@ -21,6 +21,7 @@ import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
 import { FetchService } from "../src/services/FetchService";
 import type { PgColumnBuilderBase } from "drizzle-orm/pg-core";
+import { compileSet } from "./helpers/plan-tables";
 
 const posts: PostgresCollectionConfig = {
     slug: "posts",
@@ -43,7 +44,7 @@ beforeAll(async () => {
     db = new PGlite();
     await db.waitReady;
     const collection = posts as CollectionConfig;
-    await db.exec(await generatePostgresDdl([collection], { includePolicies: false }));
+    await db.exec(await generatePostgresDdl(compileSet([collection]), { includePolicies: false }));
     await db.query(`INSERT INTO posts (title, content) VALUES ($1, $2), ($3, $4)`, [
         "Admin panels for Postgres", "Generated from the schema you already have.",
         "Release notes", "This one mentions panels only in its body."

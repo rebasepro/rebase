@@ -5,8 +5,10 @@
  * "Before" is the collections exactly as the legacy loader serves them.
  * "After" is `backend/schema` read back through the new pipeline —
  * `loadBackendSchema` (index authority, sibling check, compile) with the CLI's
- * jiti importer, then lowered by `compileLoadedSchema`, the one lowering boot,
- * the runtime and the CLI share. Both go through
+ * jiti importer, compiled by `compileLoadedSchema`, the one compile boot, the
+ * runtime and the CLI share. The planner reads only compiled tables, so
+ * "before" is the legacy collections lifted (`collectionsToTableDefs`, the
+ * codemod's own core) and compiled. Both go through
  * `renderSchemaOutputs`, the renderer the plan-golden corpus is recorded
  * with: DDL under every option, policies, search, vector, triggers, views,
  * the Drizzle schema and the boot plans. A single byte of difference fails.
@@ -51,6 +53,7 @@ export async function verifyMigration(
 ): Promise<VerificationResult> {
     const { renderSchemaOutputs } = await import("@rebasepro/server-postgres");
     const { compileLoadedSchema, loadBackendSchema } = await import("@rebasepro/server");
+    const { collectionsToTableDefs, compileSchema } = await import("@rebasepro/common");
     let after: Record<string, string>;
     try {
         // Exactly as the server reads it: the index is authoritative, a sibling
@@ -58,12 +61,17 @@ export async function verifyMigration(
         // `projectRoot: false` — config/ is still there until the user deletes it.
         const loaded = await loadBackendSchema(schemaDir, { projectRoot: false, importModule });
         if (!loaded.indexFile) throw new Error(`${schemaDir} has no index module.`);
-        const { collections } = compileLoadedSchema(loaded);
-        after = renderSchemaOutputs(collections);
+        after = renderSchemaOutputs(compileLoadedSchema(loaded).tables);
     } catch (error) {
         return { identical: false, compared: 0, differences: [], error: `The migrated schema could not be read back: ${error instanceof Error ? error.message : String(error)}` };
     }
-    const before = renderSchemaOutputs(legacy);
+    let before: Record<string, string>;
+    try {
+        const lifted = collectionsToTableDefs(legacy);
+        before = renderSchemaOutputs(compileSchema(lifted.tables, lifted.defaultRls ? { defaultRls: lifted.defaultRls } : {}));
+    } catch (error) {
+        return { identical: false, compared: 0, differences: [], error: `The legacy collections could not be lifted into tables: ${error instanceof Error ? error.message : String(error)}` };
+    }
     const differences: VerificationResult["differences"] = [];
     const outputs = [...new Set([...Object.keys(before), ...Object.keys(after)])].sort();
     for (const output of outputs) {

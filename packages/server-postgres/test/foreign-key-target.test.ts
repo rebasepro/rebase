@@ -29,6 +29,7 @@ import {
     readExistingSchema,
     type ExistingSchema
 } from "../src/schema/ensure-collection-tables";
+import { compileSet, planCollections } from "./helpers/plan-tables";
 
 /** A primary key whose property key and column differ. */
 const authors: CollectionConfig = {
@@ -140,7 +141,7 @@ const liveForeignKeys = async (db: PGlite): Promise<Map<string, string>> => {
 };
 
 describe("a foreign key references the target's primary-key column", () => {
-    const plan = planSchema([authors, tags, posts]);
+    const plan = planCollections([authors, tags, posts]);
 
     it("names the column, not the property key, on every kind of link", () => {
         expect(column(plan, "posts", "author_id").foreignKey?.targetColumn).toBe("author_id");
@@ -182,7 +183,7 @@ describe("a foreign key references the target's primary-key column", () => {
     it("applies: boot creates every constraint, with no failure recorded", async () => {
         const db = new PGlite();
         try {
-            const outcome = await ensureCollectionTables(asQueryable(db), [authors, tags, posts]);
+            const outcome = await ensureCollectionTables(asQueryable(db), compileSet([authors, tags, posts]));
             expect(outcome.failures).toEqual([]);
             const fks = await liveForeignKeys(db);
             expect(fks.get("posts.posts_author_id_fkey")).toBe("author_id");
@@ -200,14 +201,14 @@ describe("a foreign key references the target's primary-key column", () => {
         // CONSTRAINT` failed with 42703 and a failed constraint is survivable.
         const db = new PGlite();
         try {
-            const aged = planCollectionSchemaEnsure([authors, tags, posts], emptyDb());
+            const aged = planCollectionSchemaEnsure(compileSet([authors, tags, posts]), emptyDb());
             for (const action of aged.actions) {
                 if (action.kind !== "add-constraint") await db.exec(action.sql);
             }
             expect((await liveForeignKeys(db)).size).toBe(0);
 
             const existing = await readExistingSchema(asQueryable(db), ["public"]);
-            const next = planCollectionSchemaEnsure([authors, tags, posts], existing);
+            const next = planCollectionSchemaEnsure(compileSet([authors, tags, posts]), existing);
             expect(next.actions.filter(a => a.kind === "add-constraint").map(a => a.target).sort()).toEqual([
                 "public.posts.posts_author_id_fkey",
                 "public.posts.posts_editor_fkey",
@@ -215,7 +216,7 @@ describe("a foreign key references the target's primary-key column", () => {
                 "public.posts_tags.posts_tags_tag_id_fkey"
             ]);
 
-            const outcome = await ensureCollectionTables(asQueryable(db), [authors, tags, posts]);
+            const outcome = await ensureCollectionTables(asQueryable(db), compileSet([authors, tags, posts]));
             expect(outcome.failures).toEqual([]);
             expect((await liveForeignKeys(db)).size).toBe(4);
         } finally {
@@ -225,7 +226,7 @@ describe("a foreign key references the target's primary-key column", () => {
 });
 
 describe("a column pointing at a key has the key's own type", () => {
-    const plan = planSchema([uuidOrgs, bigOrgs, serialOrgs, codeOrgs, members]);
+    const plan = planCollections([uuidOrgs, bigOrgs, serialOrgs, codeOrgs, members]);
 
     it("follows `columnType`, not only the id strategy", () => {
         expect(column(plan, "members", "org_id").type).toEqual({ kind: "uuid" });
@@ -254,7 +255,7 @@ describe("a column pointing at a key has the key's own type", () => {
                 counter: { name: "Counter", type: "relation", relation: { kind: "belongsTo", target: () => counters } }
             }
         };
-        const identityPlan = planSchema([counters, hits]);
+        const identityPlan = planCollections([counters, hits]);
         expect(column(identityPlan, "counters", "id").type).toEqual({ kind: "integer" });
         expect(column(identityPlan, "hits", "counter_id").type).toEqual({ kind: "integer" });
     });
@@ -263,7 +264,7 @@ describe("a column pointing at a key has the key's own type", () => {
         const db = new PGlite();
         try {
             const outcome = await ensureCollectionTables(
-                asQueryable(db), [uuidOrgs, bigOrgs, serialOrgs, codeOrgs, members]);
+                asQueryable(db), compileSet([uuidOrgs, bigOrgs, serialOrgs, codeOrgs, members]));
             expect(outcome.failures).toEqual([]);
             const fks = await liveForeignKeys(db);
             expect(fks.get("members.members_org_id_fkey")).toBe("id");
@@ -311,7 +312,7 @@ describe("a column pointing at a key has the key's own type", () => {
                 'PRIMARY KEY ("seat_id", "org_id"));'
             );
             const existing = await readExistingSchema(asQueryable(db), ["public"]);
-            const next = planCollectionSchemaEnsure([uuidOrgs, seats], existing);
+            const next = planCollectionSchemaEnsure(compileSet([uuidOrgs, seats]), existing);
             expect(next.columnTypeDrift).toEqual([
                 { table: "public.orgs_seats", column: "org_id", declared: "UUID", actual: "text" },
                 { table: "public.seats", column: "org_id", declared: "UUID", actual: "text" }

@@ -50,7 +50,7 @@ import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 
 import { isTableDef, isViewDef } from "../../packages/types/src/index.ts";
-import { compileTables, lowerTables } from "../../packages/common/src/index.ts";
+import { compileSchema, sortTablesBySlug } from "../../packages/common/src/index.ts";
 import { generateSchema } from "../../packages/server-postgres/src/schema/generate-drizzle-schema-logic.ts";
 import { generatePostgresDdl } from "../../packages/server-postgres/src/schema/generate-postgres-ddl-logic.ts";
 
@@ -107,14 +107,13 @@ const ts = createRequire(import.meta.url)("typescript");
 
 /**
  * Run a page's `table` block as the module a project writes in
- * `backend/schema`, and lower what it exports the way `rebase db generate`
- * does: compiled (so a definition boot refuses is refused here), lowered, in
- * slug order.
+ * `backend/schema`, and compile what it exports the way `rebase db generate`
+ * does (so a definition boot refuses is refused here), in slug order.
  *
  * Written to a scratch file outside the repository and imported, so the
  * builders are the real ones: a sample the builders reject cannot render.
  *
- * @returns {Promise<object[]>} the lowered tables.
+ * @returns {Promise<object[]>} the compiled tables.
  */
 async function tablesFromSample(code, doc) {
     if (/\bdefineCollection\b/.test(code)) {
@@ -132,21 +131,20 @@ async function tablesFromSample(code, doc) {
         const defs = Object.values(mod).filter((value) => isTableDef(value) || isViewDef(value));
         if (defs.length === 0) throw new Error("the `table` block exports no `defineTable`, `defineAuthTable` or `defineView`.");
         const options = mod.defaultRls !== undefined ? { defaultRls: mod.defaultRls } : {};
-        compileTables(defs, options);
-        return lowerTables(defs, options).sort((a, b) => a.slug.localeCompare(b.slug));
+        return sortTablesBySlug(compileSchema(defs, options));
     } finally {
         fs.rmSync(dir, { recursive: true, force: true });
     }
 }
 
 /** What the generators emit for one page's sample tables. */
-async function expectedFor(collections) {
+async function expectedFor(tables) {
     return {
         // The header line the CLI writes into the file is kept, and a
         // `// schema.generated.ts` line above it says which file this is.
-        drizzle: `// schema.generated.ts\n${(await generateSchema(collections)).trimEnd()}\n`,
+        drizzle: `// schema.generated.ts\n${(await generateSchema(tables)).trimEnd()}\n`,
         // Exactly how `generate-postgres-ddl.ts` writes `drizzle/schema.sql`.
-        sql: `${(await generatePostgresDdl(collections, {
+        sql: `${(await generatePostgresDdl(tables, {
             includePolicies: false,
             includeSearch: false,
             includeVector: false

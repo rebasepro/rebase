@@ -120,6 +120,7 @@ export async function runDatabasePreflight(schemaDir: string, databaseUrl?: stri
     }
 
     const { loadTables } = await import("./load-tables");
+    const { lowerCompiledTables } = await import("./lowered-tables");
     const { preflightDatabase } = await import("../security/database-preflight");
     const { readRecordedRequestRoles } = await import("../security/rls-enforcement");
     const { cliRlsSettings } = await import("../security/rls-settings");
@@ -128,7 +129,8 @@ export async function runDatabasePreflight(schemaDir: string, databaseUrl?: stri
     const pool = new Pool({ connectionString: databaseUrl });
     try {
         const run: RawSqlRunner = async (text) => (await pool.query(text)).rows as Record<string, unknown>[];
-        const collections = await loadTables(schemaDir);
+        // B-PLAN-2 step 6: the table list from the descriptors.
+        const collections = lowerCompiledTables(await loadTables(schemaDir));
         // Only the schemas that exist: the SQL a finding carries grants on each
         // one, and a GRANT on a missing schema fails the whole script. A boot
         // grants on the ones it creates itself.

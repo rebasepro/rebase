@@ -5,9 +5,8 @@
  * `db push` and each of its steps, `schema generate`, `schema stale`, the
  * doctor and `console` — calls {@link loadTables}, which reads
  * `backend/schema` through `@rebasepro/server`'s `loadBackendSchema` (the same
- * loader server boot uses) and lowers the definitions into the collection
- * objects the planner reads today (Stage A of the Postgres-first refactor,
- * docs/plans/POSTGRES-FIRST.md Part II D).
+ * loader server boot uses) and compiles the definitions into the
+ * `CompiledTable`s the planner reads (docs/plans/POSTGRES-FIRST.md Part II D).
  *
  * Nothing is ever skipped: a module that fails to import, a definition the
  * loader refuses (no `rls`, `rls: []`, `"inherit"` without `defaultRls`, a
@@ -25,7 +24,7 @@ import { outWarn } from "../cli-output";
 const warnedMissing = new Set<string>();
 
 /**
- * The project's tables, lowered into the planner's input, in slug order.
+ * The project's compiled tables — the planner's input — in slug order.
  *
  * Slug order is part of the contract, not a nicety: `generatePostgresDdl`, the
  * policy generator and the boot planner emit in input order (enums and
@@ -43,8 +42,8 @@ const warnedMissing = new Set<string>();
  *   and key that is wrong, or SchemaLoadError (from `@rebasepro/server`) naming
  *   the file that could not be read.
  */
-export async function loadTables(schemaDir: string): Promise<PostgresCollectionConfig[]> {
-    return (await loadTableSchema(schemaDir)).collections;
+export async function loadTables(schemaDir: string): Promise<CompiledTable[]> {
+    return (await loadTableSchema(schemaDir)).tables;
 }
 
 /**

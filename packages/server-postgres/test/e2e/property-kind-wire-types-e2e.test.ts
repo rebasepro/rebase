@@ -44,6 +44,7 @@ import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
 import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry.js";
 import { FixtureTableRegistry } from "../helpers/tables";
 import { RealtimeService } from "../../src/services/realtimeService.js";
+import { compileSet } from "../helpers/plan-tables";
 
 const wireTypes: CollectionConfig = {
     name: "Wire Types",
@@ -120,7 +121,7 @@ describe("property kinds: the wire value has the generated type (E2E)", () => {
         };
 
         // The runtime's own provisioning, so the column types are a real boot's.
-        await ensureCollectionTables(queryable, [wireTypes]);
+        await ensureCollectionTables(queryable, compileSet([wireTypes]));
 
         const live = await introspectSchema(pool, "public");
         const built = buildDrizzleTablesFromSchema(live.tablesMap, "public");

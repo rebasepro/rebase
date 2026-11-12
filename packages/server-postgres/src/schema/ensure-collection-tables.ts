@@ -24,7 +24,8 @@
 import {
     declaredDatabaseExtensions,
     REBASE_SCHEMA,
-    type CollectionConfig
+    type CollectionConfig,
+    type CompiledTable
 } from "@rebasepro/types";
 import { getTableName, relationalCollections } from "@rebasepro/common";
 import { logger, isConcurrentDdlRace, isDuplicateObjectRace } from "@rebasepro/server";
@@ -33,6 +34,7 @@ import { vectorExtensionHint } from "./vector-index";
 import { planJunctionTables, quoteSqlLiteral } from "./generate-postgres-ddl-logic";
 import { quoteRelation } from "./introspect-db-queries";
 import { planSchema } from "./plan/plan-schema";
+import { lowerCompiledTables } from "./lowered-tables";
 import { renderViewsDdl } from "./plan/render-ddl";
 import type { SchemaPlan } from "./plan/types";
 import {
@@ -182,11 +184,11 @@ function schemaOf(collection: CollectionConfig): string {
  * with no developer in the loop.
  */
 export function planCollectionSchemaEnsure(
-    allCollections: CollectionConfig[],
+    tables: readonly CompiledTable[],
     existing: ExistingSchema,
     options: EnsureOptions = {}
 ): EnsurePlan {
-    const plan = planSchema(allCollections, { databaseExtensions: options.databaseExtensions });
+    const plan = planSchema(tables, { databaseExtensions: options.databaseExtensions });
     return diffPlanAgainstCatalogue(plan, existing, { constraints: options.constraints });
 }
 
@@ -556,10 +558,11 @@ function searchDriftMessage(drift: SearchColumnDrift[]): string {
  */
 export async function readSchemaFactsFor(
     client: Queryable,
-    collections: CollectionConfig[]
+    tables: readonly CompiledTable[]
 ): Promise<ExistingSchema> {
-    const relational = relationalCollections(collections);
-    const junctions = planJunctionTables(relational);
+    // B-PLAN-2 step 6: read the declared tables off the descriptors.
+    const relational = relationalCollections(lowerCompiledTables(tables));
+    const junctions = planJunctionTables(tables);
     const schemas = Array.from(new Set([
         ...relational.map(schemaOf),
         ...junctions.map(junction => junction.schema)
@@ -583,7 +586,7 @@ export async function readSchemaFactsFor(
  */
 export async function ensureCollectionTables(
     client: Queryable,
-    collections: CollectionConfig[],
+    tables: readonly CompiledTable[],
     log?: (message: string) => void,
     options: EnsureOptions = {}
 ): Promise<EnsureOutcome> {
@@ -592,7 +595,7 @@ export async function ensureCollectionTables(
     // registry. By the time boot gets here `loadBundleResourceGraph` has
     // evaluated the project's `resources.ts`, so the declarations are there —
     // and a caller that already knows them can still say so.
-    const schema = planSchema(collections, {
+    const schema = planSchema(tables, {
         databaseExtensions: options.databaseExtensions ?? declaredDatabaseExtensions()
     });
 

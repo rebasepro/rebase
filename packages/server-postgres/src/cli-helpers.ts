@@ -10,7 +10,7 @@ import { COLUMN_TYPES_SQL, type ExistingColumnType } from "./schema/destructive-
 import { UNDECLARABLE_CONSTRAINTS_SQL, undeclaredConstraintExcludes, type ExistingConstraint } from "./schema/undeclarable-constraints";
 import { atlasExcludePattern, excludePatternParts } from "./schema/atlas-exclude";
 import { out, outWarn } from "./cli-output";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { CollectionConfig, CompiledTable } from "@rebasepro/types";
 import { moduleDir as __helpersDirname } from "./module-dir";
 import { generatedSqlDir } from "./generated-sql";
 
@@ -344,7 +344,9 @@ export async function getTableIncludesFromCollections(allCollections: Collection
 }
 
 export async function getTableIncludes(schemaDir: string): Promise<string[]> {
-    return getTableIncludesFromCollections(await tablesIn(schemaDir));
+    // B-PLAN-2 step 6: the include list from the descriptors.
+    const { lowerCompiledTables } = await import("./schema/lowered-tables");
+    return getTableIncludesFromCollections(lowerCompiledTables(await tablesIn(schemaDir)));
 }
 
 /**
@@ -356,7 +358,7 @@ export async function getTableIncludes(schemaDir: string): Promise<string[]> {
  * leave alone — or, for the includes, one it plans to drop. Imported on first
  * use, so a command that never reaches here does not load the server package.
  */
-async function tablesIn(schemaDir: string): Promise<CollectionConfig[]> {
+async function tablesIn(schemaDir: string): Promise<CompiledTable[]> {
     const { loadTables } = await import("./schema/load-tables");
     return loadTables(schemaDir);
 }
@@ -960,9 +962,12 @@ export async function getForeignIndexExcludes(
  * declared alike. Anything Atlas would emit is by definition not foreign.
  */
 async function managedIndexNames(schemaDir: string): Promise<Set<string>> {
-    const collections = await tablesIn(schemaDir);
+    const tables = await tablesIn(schemaDir);
     const { searchExcludePatterns, vectorExcludePatterns } =
         await import("./schema/generate-postgres-ddl-logic");
+    // B-PLAN-2 step 6: the declared indexes from the descriptors.
+    const { lowerCompiledTables } = await import("./schema/lowered-tables");
+    const collections = lowerCompiledTables(tables);
     const { resolveColumnName } = await import("./schema/column-plan-helpers");
     const { buildCollectionIndexPlan } = await import("./schema/collection-index");
 
@@ -974,7 +979,7 @@ async function managedIndexNames(schemaDir: string): Promise<Set<string>> {
     // answer to "is this index one of ours". The doc comment above claimed
     // vector was here long before it was — so an ANN index answered that
     // question with "somebody else's".
-    for (const pattern of [...searchExcludePatterns(collections), ...vectorExcludePatterns(collections)]) {
+    for (const pattern of [...searchExcludePatterns(tables), ...vectorExcludePatterns(tables)]) {
         const object = excludePatternParts(pattern)?.[2];
         if (object !== undefined) names.add(object);
     }

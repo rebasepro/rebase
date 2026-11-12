@@ -5,6 +5,7 @@ import { ensureCollectionPolicies, policyStampSql } from "../src/schema/ensure-c
 import { generatePostgresPoliciesDdl, planCollectionPolicies } from "../src/schema/generate-postgres-ddl-logic";
 import type { Queryable } from "../src/schema/ensure-collection-tables";
 import { RLS_BOOTSTRAP_STATEMENTS } from "../src/schema/rls-bootstrap-sql";
+import { compileSet } from "./helpers/plan-tables";
 
 /**
  * The first boot after a `db push` finds the push's policies current.
@@ -57,8 +58,8 @@ async function database(): Promise<{ db: PGlite; queryable: Queryable; ran: stri
 
 /** What `db push` does: the generated file, and the stamps for what it creates. */
 async function push(queryable: Queryable, collections: CollectionConfig[], searchPath: string | undefined) {
-    const policiesSql = generatePostgresPoliciesDdl(collections);
-    const statements = stampableTables(planCollectionPolicies(collections), policiesSql)
+    const policiesSql = generatePostgresPoliciesDdl(compileSet(collections));
+    const statements = stampableTables(planCollectionPolicies(compileSet(collections)), policiesSql)
         .map(plan => policyStampSql(plan))
         .filter((s): s is string => s !== undefined);
     return applyPoliciesFile(queryable, policiesSql, { statements, searchPath });
@@ -72,7 +73,7 @@ describe("the boot after a db push", () => {
             expect(pushed).toEqual({ stamped: 2, stampError: undefined });
 
             ran.length = 0;
-            const boot = await ensureCollectionPolicies(queryable, [tiers, customers]);
+            const boot = await ensureCollectionPolicies(queryable, compileSet([tiers, customers]));
             expect(ran.filter(text => POLICY_DDL.test(text))).toEqual([]);
             expect(boot).toMatchObject({ policiesApplied: 0, tablesSecured: 2, unchanged: 2, failures: [], deferred: [] });
         } finally {
@@ -92,7 +93,7 @@ describe("the boot after a db push", () => {
             await push(queryable, [tiers, customers], "public");
 
             await db.exec("SET search_path TO public");
-            const boot = await ensureCollectionPolicies(queryable, [tiers, customers]);
+            const boot = await ensureCollectionPolicies(queryable, compileSet([tiers, customers]));
             expect(boot).toMatchObject({ policiesApplied: 0, unchanged: 2 });
         } finally {
             await db.close();
@@ -114,20 +115,20 @@ describe("the boot after a db push", () => {
     }, 30_000);
 
     it("stamps only tables whose statements the file carries verbatim", () => {
-        const plans = planCollectionPolicies([tiers, customers]);
+        const plans = planCollectionPolicies(compileSet([tiers, customers]));
         // A file generated from other rules for `tiers`: its policies are not
         // the ones the plan describes, so a stamp would be a lie.
-        const other = generatePostgresPoliciesDdl([
+        const other = generatePostgresPoliciesDdl(compileSet([
             { ...tiers, securityRules: [{ operation: "select", roles: ["admin"] }] },
             customers
-        ]);
+        ]));
         expect(stampableTables(plans, other).map(plan => plan.table)).toEqual(["customers"]);
     });
 
     it("keeps the policies when a stamp cannot be written", async () => {
         const { db, queryable } = await database();
         try {
-            const policiesSql = generatePostgresPoliciesDdl([tiers]);
+            const policiesSql = generatePostgresPoliciesDdl(compileSet([tiers]));
             const result = await applyPoliciesFile(queryable, policiesSql, { statements: ["SELECT no_such_function()"] });
             expect(result.stamped).toBe(0);
             expect(result.stampError).toMatch(/no_such_function/);
@@ -143,7 +144,7 @@ describe("the boot after a db push", () => {
     it("applies none of the file when one policy fails", async () => {
         const { db, queryable } = await database();
         try {
-            const policiesSql = `${generatePostgresPoliciesDdl([tiers])}\nCREATE POLICY "broken" ON "public"."nowhere" USING (true);`;
+            const policiesSql = `${generatePostgresPoliciesDdl(compileSet([tiers]))}\nCREATE POLICY "broken" ON "public"."nowhere" USING (true);`;
             await expect(applyPoliciesFile(queryable, policiesSql, { statements: [] })).rejects.toThrow(/nowhere/);
             const { rows } = await db.query<{ n: number }>(
                 "SELECT count(*)::int AS n FROM pg_policies WHERE tablename = 'tiers'"

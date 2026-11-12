@@ -14,7 +14,7 @@
  * not change a byte.
  *
  * Where a set cannot be made exact the difference is listed below in
- * {@link ALLOWED_DIFFERENCES}, one entry per (set, output), each with the
+ * `PLAN_GOLDEN_ALLOWED_DIFFERENCES` (`helpers/plan-tables.ts`), one entry per (set, output), each with the
  * reason — never by editing a golden. A set whose collections hold a legacy
  * field the table model cannot say at all is converted after
  * {@link INPUT_ADJUSTMENTS} strips that field, and every adjustment says why
@@ -28,12 +28,12 @@ import path from "node:path";
 
 import {
     collectionsToTableDefs,
-    lowerTables,
+    compileSchema,
     isSchemaDefinitionError
 } from "@rebasepro/common";
 import type { CollectionConfig, Relation } from "@rebasepro/types";
 
-import { INPUT_ADJUSTMENTS, lowerSet, sharedDefaultRules } from "./helpers/plan-tables";
+import { INPUT_ADJUSTMENTS, PLAN_GOLDEN_ALLOWED_DIFFERENCES, PLAN_REFUSAL_ALLOWED_MESSAGES, compileSet, lowerSet, sharedDefaultRules } from "./helpers/plan-tables";
 import {
     PLAN_REFUSALS,
     loadPlanCorpus,
@@ -42,82 +42,6 @@ import {
     type PlanCorpus,
     type PlanCorpusSet
 } from "./helpers/plan-corpus";
-
-/**
- * A (set, output) whose bytes the bridges cannot reproduce, and why. Kept as
- * small as the table model allows; each entry is a finding reported to the
- * coordinator.
- */
-const ALLOWED_DIFFERENCES: { set: string; output: string; reason: string }[] = [];
-
-/**
- * A legacy `reference` property is a column holding the target's key with a
- * `FOREIGN KEY` and nothing else: no index, no relation. The table model
- * creates a constraint only through `rel.belongsTo`, so it lifts to the column
- * plus `rel.belongsTo(target, { localKey, index: false })` named
- * `<key>Relation`. Every DDL file and every policy is identical; what moves:
- * the Drizzle file gains that `one()` relation, the plan records the column's
- * source as a relation (and, where its key is not the camelCase of its SQL
- * name, as a property plus the relation's constraint-only entry), and a
- * reference whose target is not in the set — a plain column now — is added by
- * the boot plan in its scalar pass rather than its link pass.
- */
-const REFERENCE = "a `reference` (FK without index or relation) lifts to a column + `rel.belongsTo({ index: false })` named `<key>Relation`; DDL and policies identical";
-
-/**
- * A `belongsTo` whose foreign key the legacy planner serves under the
- * relation's own key (introspection writes `reportsTo` for a `reports_to`
- * column). A table keeps a column and a relation apart, so the column keeps
- * the key — it is on every row — and the relation is renamed `<key>Relation`,
- * its `localKey` pinned. The DDL is identical; the Drizzle relation's name, the
- * plan's `source.propName` and the include key change.
- */
-const RENAMED = "a relation served under its own FK column's key is renamed `<key>Relation` (column and relation keys must differ); DDL identical";
-
-/**
- * A relation property `required` over a property-owned column that is
- * nullable (introspection marks the relation, not the column). The table
- * model has one answer, the column's; only the OpenAPI document and the SDK
- * read the relation's. The plan's constraint-only entry takes the column's
- * nullability (and `relational-columns.json`, which reports the created
- * column, reads as the goldens do).
- */
-const REQUIRED = "a relation `required` over a nullable property-owned column takes the column's nullability (the plan's constraint-only entry); DDL identical";
-
-/**
- * `str_id_sql_bare` declares `id` with `isId: "gen_random_uuid()::text"`,
- * which is byte for byte the implicit key the planner gives a keyless
- * collection. The table model writes both as the same first column, and
- * lowering reads that column as the implicit key: the Drizzle file lists it
- * last, as it does every implicit key, and the plan's source says
- * `implicit-id`.
- */
-const IMPLICIT_ID = "an explicit `id` key equal to the implicit `gen_random_uuid()::text` key lowers as the implicit key (Drizzle lists it last)";
-
-ALLOWED_DIFFERENCES.push(
-    { set: "derived-names", output: "plan.json", reason: REFERENCE },
-    { set: "derived-names", output: "relational-columns.json", reason: REFERENCE },
-    { set: "derived-names", output: "boot-ensure.json", reason: REFERENCE },
-    { set: "derived-names", output: "schema.generated.ts", reason: REFERENCE },
-    { set: "derived-names", output: "schema.generated.no-policies.ts", reason: REFERENCE },
-    { set: "property-matrix", output: "plan.json", reason: `${REFERENCE}; ${IMPLICIT_ID}` },
-    { set: "property-matrix", output: "relational-columns.json", reason: REFERENCE },
-    { set: "property-matrix", output: "boot-ensure.json", reason: REFERENCE },
-    { set: "property-matrix", output: "schema.generated.ts", reason: `${REFERENCE}; ${IMPLICIT_ID}` },
-    { set: "property-matrix", output: "schema.generated.no-policies.ts", reason: `${REFERENCE}; ${IMPLICIT_ID}` },
-    { set: "real-schema.chinook", output: "plan.json", reason: RENAMED },
-    { set: "real-schema.chinook", output: "schema.generated.ts", reason: RENAMED },
-    { set: "real-schema.chinook", output: "schema.generated.no-policies.ts", reason: RENAMED },
-    { set: "real-schema.musicbrainz", output: "plan.json", reason: `${RENAMED}; ${REQUIRED}` },
-    { set: "real-schema.musicbrainz", output: "schema.generated.ts", reason: RENAMED },
-    { set: "real-schema.musicbrainz", output: "schema.generated.no-policies.ts", reason: RENAMED },
-    { set: "real-schema.northwind", output: "plan.json", reason: `${RENAMED}; ${REQUIRED}` },
-    { set: "real-schema.northwind", output: "schema.generated.ts", reason: RENAMED },
-    { set: "real-schema.northwind", output: "schema.generated.no-policies.ts", reason: RENAMED },
-    { set: "real-schema.openstreetmap", output: "plan.json", reason: `${RENAMED}; ${REQUIRED}` },
-    { set: "real-schema.openstreetmap", output: "schema.generated.ts", reason: RENAMED },
-    { set: "real-schema.openstreetmap", output: "schema.generated.no-policies.ts", reason: RENAMED }
-);
 
 /** A set through both bridges: lifted, then lowered. */
 const throughBridges = lowerSet;
@@ -177,13 +101,13 @@ describe("plan equivalence: lowerTables(collectionsToTableDefs(S)) plans what th
 
     it("reproduces every golden of every set, byte for byte", () => {
         const mismatches: string[] = [];
-        const unusedAllowances = new Set(ALLOWED_DIFFERENCES.map(entry => `${entry.set} ${entry.output}`));
+        const unusedAllowances = new Set(PLAN_GOLDEN_ALLOWED_DIFFERENCES.map(entry => `${entry.set} ${entry.output}`));
         for (const set of corpus.sets) {
             const golden = readGolden(set);
             expect(Object.keys(golden).length).toBeGreaterThan(0);
             let outputs: Record<string, string>;
             try {
-                outputs = renderAllOutputs(throughBridges(adjusted(set)), set.options);
+                outputs = renderAllOutputs(compileSet(adjusted(set)), set.options);
             } catch (error) {
                 mismatches.push(`${set.id}: the bridges refused the set: ${error instanceof Error ? error.message : String(error)}`);
                 continue;
@@ -208,14 +132,15 @@ describe("plan equivalence: lowerTables(collectionsToTableDefs(S)) plans what th
         for (const refusal of PLAN_REFUSALS) {
             let message: string | undefined;
             try {
-                const outputs = renderAllOutputs(throughBridges(refusal.collections), {});
+                const outputs = renderAllOutputs(compileSet(refusal.collections), {});
                 message = outputs["plan.json"]?.startsWith("THROWS: ") ? outputs["plan.json"] : undefined;
             } catch (error) {
                 message = error instanceof Error ? error.message : String(error);
                 if (isSchemaDefinitionError(error)) message = error.problems.map(problem => problem.message).join("\n");
             }
             expect({ id: refusal.id, refused: message !== undefined }).toEqual({ id: refusal.id, refused: true });
-            expect({ id: refusal.id, message }).toEqual({ id: refusal.id, message: expect.stringMatching(refusal.messagePattern) });
+            const pattern = PLAN_REFUSAL_ALLOWED_MESSAGES.find(allowance => allowance.id === refusal.id)?.pattern ?? refusal.messagePattern;
+            expect({ id: refusal.id, message }).toEqual({ id: refusal.id, message: expect.stringMatching(pattern) });
         }
     });
 
@@ -224,8 +149,8 @@ describe("plan equivalence: lowerTables(collectionsToTableDefs(S)) plans what th
             const collections = adjusted(set);
             const defaultSecurityRules = sharedDefaultRules(collections);
             const { tables, defaultRls } = collectionsToTableDefs(collections, defaultSecurityRules ? { defaultSecurityRules } : {});
-            const forward = renderAllOutputs(lowerTables(tables, defaultRls ? { defaultRls } : {}), set.options);
-            const backward = renderAllOutputs(lowerTables(shuffled(tables), defaultRls ? { defaultRls } : {}), set.options);
+            const forward = renderAllOutputs(compileSchema(tables, defaultRls ? { defaultRls } : {}), set.options);
+            const backward = renderAllOutputs(compileSchema(shuffled(tables), defaultRls ? { defaultRls } : {}), set.options);
             expect({ set: set.id, outputs: backward }).toEqual({ set: set.id, outputs: forward });
         }
     });

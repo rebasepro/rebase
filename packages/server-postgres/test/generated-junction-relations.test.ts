@@ -25,6 +25,7 @@ import type { CollectionConfig } from "@rebasepro/types";
 import { planSchema } from "../src/schema/plan/plan-schema";
 import { renderDrizzleSchema } from "../src/schema/plan/render-drizzle";
 import { renderPostgresDdl } from "../src/schema/plan/render-ddl";
+import { planCollections } from "./helpers/plan-tables";
 
 const PACKAGE_ROOT = path.resolve(__dirname, "..");
 
@@ -62,7 +63,7 @@ const queryThroughGenerated = async (
     collections: CollectionConfig[],
     run: (db: ReturnType<typeof drizzle>) => Promise<unknown>
 ): Promise<void> => {
-    const plan = planSchema(collections);
+    const plan = planCollections(collections);
     const generated = loadGenerated(renderDrizzleSchema(plan, { policies: false }));
     const client = new PGlite();
     try {

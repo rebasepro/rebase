@@ -25,6 +25,7 @@ import {
 } from "./generate-postgres-ddl-logic";
 import { planCollectionSchemaEnsure, type ExistingSchema } from "./ensure-collection-tables";
 import { getTableIncludesFromCollections } from "../cli-helpers";
+import { compileSet } from "../../test/helpers/plan-tables";
 
 const sqlCollection: CollectionConfig = {
     name: "Customers",
@@ -72,7 +73,7 @@ const all = [sqlCollection, firestoreCollection, engineOnlyCollection, dataSourc
 
 describe("the Drizzle schema generator", () => {
     it("emits a table for the Postgres collection only", async () => {
-        const schema = await generateSchema(all);
+        const schema = await generateSchema(compileSet(all));
 
         expect(schema).toContain("customers");
         expect(schema).not.toContain("exercises");
@@ -81,14 +82,14 @@ describe("the Drizzle schema generator", () => {
     });
 
     it("does not emit enum types for a document store's fields", async () => {
-        const schema = await generateSchema(all);
+        const schema = await generateSchema(compileSet(all));
         expect(schema).not.toContain("difficulty");
     });
 });
 
 describe("the Postgres DDL generator", () => {
     it("creates no table for a non-SQL collection", async () => {
-        const ddl = await generatePostgresDdl(all, { includePolicies: false });
+        const ddl = await generatePostgresDdl(compileSet(all), { includePolicies: false });
 
         expect(ddl).toContain('CREATE TABLE "public"."customers"');
         expect(ddl).not.toContain("exercises");
@@ -96,10 +97,10 @@ describe("the Postgres DDL generator", () => {
     });
 
     it("plans no RLS for a store that has none", () => {
-        const policies = generatePostgresPoliciesDdl(all);
+        const policies = generatePostgresPoliciesDdl(compileSet(all));
         expect(policies).not.toContain("exercises");
 
-        const plans = planCollectionPolicies(all);
+        const plans = planCollectionPolicies(compileSet(all));
         expect(plans.map(p => p.qualified)).toEqual(["public.customers"]);
     });
 });
@@ -108,7 +109,7 @@ describe("the boot-time schema ensure", () => {
     const empty = (): ExistingSchema => ({ tables: new Map(), enums: new Set() });
 
     it("creates nothing for collections another engine stores", () => {
-        const plan = planCollectionSchemaEnsure(all, empty());
+        const plan = planCollectionSchemaEnsure(compileSet(all), empty());
 
         expect(plan.actions.map(a => a.target)).toEqual(
             expect.arrayContaining(["public.customers"])

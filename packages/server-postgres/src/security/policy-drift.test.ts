@@ -3,6 +3,7 @@ import type { CollectionConfig } from "@rebasepro/types";
 
 import { checkPolicyDrift, parseExpectedPolicies, formatPolicyDrift, hasDrift, dropOrphanedPolicies, isGeneratedPolicyName, type PolicyRef, type Queryable } from "./policy-drift";
 import { generatePostgresPoliciesDdl } from "../schema/generate-postgres-ddl-logic";
+import { compileSet } from "../../test/helpers/plan-tables";
 
 function collection(slug: string): CollectionConfig {
     return {
@@ -80,7 +81,7 @@ function liveRow(p: PolicyRef, overrides: Record<string, unknown> = {}) {
 
 describe("parseExpectedPolicies", () => {
     it("reads the DDL that db push actually applies", () => {
-        const ddl = generatePostgresPoliciesDdl([collection("authors")]);
+        const ddl = generatePostgresPoliciesDdl(compileSet([collection("authors")]));
         const parsed = parseExpectedPolicies(ddl);
 
         expect(parsed.length).toBeGreaterThan(0);
@@ -92,9 +93,9 @@ describe("parseExpectedPolicies", () => {
 describe("checkPolicyDrift", () => {
     it("reports nothing when the database matches the collections", async () => {
         const cols = [collection("authors")];
-        const expected = parseExpectedPolicies(generatePostgresPoliciesDdl(cols));
+        const expected = parseExpectedPolicies(generatePostgresPoliciesDdl(compileSet(cols)));
 
-        const drift = await checkPolicyDrift(dbWith(expected.map((p) => liveRow(p))), cols);
+        const drift = await checkPolicyDrift(dbWith(expected.map((p) => liveRow(p))), compileSet(cols));
 
         expect(hasDrift(drift)).toBe(false);
         expect(formatPolicyDrift(drift)).toBe("");
@@ -106,11 +107,11 @@ describe("checkPolicyDrift", () => {
         // every other check here passes. Before this category the report was
         // empty on a table Postgres was filtering nothing on.
         const cols = [collection("authors")];
-        const expected = parseExpectedPolicies(generatePostgresPoliciesDdl(cols));
+        const expected = parseExpectedPolicies(generatePostgresPoliciesDdl(compileSet(cols)));
 
         const drift = await checkPolicyDrift(
             dbWith(expected.map((p) => liveRow(p)), ["authors"]),
-            cols
+            compileSet(cols)
         );
 
         expect(drift.missing).toHaveLength(0);
@@ -127,7 +128,7 @@ describe("checkPolicyDrift", () => {
         // clauses. Only the `AS` clause differs, and it used to be discarded by
         // the DDL parser and never selected from pg_policies.
         const cols = [restrictiveCollection("ledger")];
-        const expected = parseExpectedPolicies(generatePostgresPoliciesDdl(cols));
+        const expected = parseExpectedPolicies(generatePostgresPoliciesDdl(compileSet(cols)));
         const restrictive = expected.filter((p) => p.mode === "RESTRICTIVE");
         // Guards the test itself: if the generator stops emitting AS RESTRICTIVE
         // this must fail loudly rather than pass by having nothing to compare.
@@ -137,7 +138,7 @@ describe("checkPolicyDrift", () => {
             p.name === restrictive[0].name ? liveRow(p, { permissive: "PERMISSIVE" }) : liveRow(p)
         );
 
-        const drift = await checkPolicyDrift(dbWith(live), cols);
+        const drift = await checkPolicyDrift(dbWith(live), compileSet(cols));
 
         expect(drift.diverged).toHaveLength(1);
         expect(drift.diverged[0].differences.join(" ")).toContain("mode: expected RESTRICTIVE");
@@ -148,11 +149,11 @@ describe("checkPolicyDrift", () => {
         // An older server or a driver that hands back a shape we do not know
         // must not turn into a wall of false positives.
         const cols = [collection("authors")];
-        const expected = parseExpectedPolicies(generatePostgresPoliciesDdl(cols));
+        const expected = parseExpectedPolicies(generatePostgresPoliciesDdl(compileSet(cols)));
 
         const drift = await checkPolicyDrift(
             dbWith(expected.map((p) => liveRow(p, { permissive: null }))),
-            cols
+            compileSet(cols)
         );
 
         expect(drift.diverged).toHaveLength(0);
@@ -160,7 +161,7 @@ describe("checkPolicyDrift", () => {
     });
 
     it("flags a policy the database never received as missing", async () => {
-        const drift = await checkPolicyDrift(dbWith([]), [collection("authors")]);
+        const drift = await checkPolicyDrift(dbWith([]), compileSet([collection("authors")]));
 
         expect(drift.missing.length).toBeGreaterThan(0);
         expect(formatPolicyDrift(drift)).toContain("Missing");
@@ -171,13 +172,13 @@ describe("checkPolicyDrift", () => {
         // The demo's actual bug: test_policy TO authenticated outlived the
         // config that created it, and kept filtering every row.
         const cols = [collection("customers")];
-        const expected = parseExpectedPolicies(generatePostgresPoliciesDdl(cols));
+        const expected = parseExpectedPolicies(generatePostgresPoliciesDdl(compileSet(cols)));
         const live = [
             ...expected.map((p) => liveRow(p)),
             { schemaname: "public", tablename: "customers", policyname: "test_policy", roles: ["authenticated"], cmd: "ALL", qual: "true", with_check: null }
         ];
 
-        const drift = await checkPolicyDrift(dbWith(live), cols);
+        const drift = await checkPolicyDrift(dbWith(live), compileSet(cols));
 
         expect(drift.orphaned).toHaveLength(1);
         expect(drift.orphaned[0]).toMatchObject({ name: "test_policy", roles: ["authenticated"] });
@@ -186,11 +187,11 @@ describe("checkPolicyDrift", () => {
 
     it("flags a policy whose roles were changed underneath it as diverged", async () => {
         const cols = [collection("orders")];
-        const expected = parseExpectedPolicies(generatePostgresPoliciesDdl(cols));
+        const expected = parseExpectedPolicies(generatePostgresPoliciesDdl(compileSet(cols)));
         // Someone re-granted it to a role requests never run as.
         const live = expected.map((p) => liveRow(p, { roles: ["authenticated"] }));
 
-        const drift = await checkPolicyDrift(dbWith(live), cols);
+        const drift = await checkPolicyDrift(dbWith(live), compileSet(cols));
 
         expect(drift.diverged.length).toBeGreaterThan(0);
         expect(drift.diverged[0].differences.join(" ")).toContain("roles");
@@ -202,11 +203,11 @@ describe("checkPolicyDrift", () => {
         // SELECT / {public} / USING NULL: every field this used to compare
         // matched, drift reported zero, and the policy denied 100% of reads.
         const cols = [collection("jobs")];
-        const expected = parseExpectedPolicies(generatePostgresPoliciesDdl(cols));
+        const expected = parseExpectedPolicies(generatePostgresPoliciesDdl(compileSet(cols)));
         const select = expected.find((p) => p.command === "SELECT" && p.roles.includes("public"))!;
         const live = expected.map((p) => (p === select ? liveRow(p, { qual: null }) : liveRow(p)));
 
-        const drift = await checkPolicyDrift(dbWith(live), cols);
+        const drift = await checkPolicyDrift(dbWith(live), compileSet(cols));
 
         expect(drift.diverged).toHaveLength(1);
         expect(drift.diverged[0].differences.join(" ")).toContain("USING: expected an expression, database has none");
@@ -216,12 +217,12 @@ describe("checkPolicyDrift", () => {
         // The reason expression text is not compared: what comes back out of
         // pg_policies never matches what went in.
         const cols = [collection("posts")];
-        const expected = parseExpectedPolicies(generatePostgresPoliciesDdl(cols));
+        const expected = parseExpectedPolicies(generatePostgresPoliciesDdl(compileSet(cols)));
         const live = expected.map((p) => liveRow(p, {
             qual: p.hasUsing ? "((auth.uid() IS NOT NULL) AND ((auth.uid())::text <> 'anonymous'::text))" : null
         }));
 
-        const drift = await checkPolicyDrift(dbWith(live), cols);
+        const drift = await checkPolicyDrift(dbWith(live), compileSet(cols));
 
         expect(hasDrift(drift)).toBe(false);
     });
@@ -232,12 +233,12 @@ describe("checkPolicyDrift", () => {
         // roles, command and clause presence all match the corrected policy, so
         // this is the only signal that catches it.
         const cols = [collection("posts")];
-        const expected = parseExpectedPolicies(generatePostgresPoliciesDdl(cols));
+        const expected = parseExpectedPolicies(generatePostgresPoliciesDdl(compileSet(cols)));
         const live = expected.map((p) => liveRow(p, {
             qual: p.hasUsing ? "(auth.uid() IS NOT NULL)" : null
         }));
 
-        const drift = await checkPolicyDrift(dbWith(live), cols);
+        const drift = await checkPolicyDrift(dbWith(live), compileSet(cols));
 
         expect(drift.insecure.length).toBeGreaterThan(0);
         expect(hasDrift(drift)).toBe(true);
@@ -252,12 +253,12 @@ describe("checkPolicyDrift", () => {
         // NOT NULL` is the only spelling a current release can store. A checker
         // anchored on the pre-1.0 name saw none of it.
         const cols = [collection("posts")];
-        const expected = parseExpectedPolicies(generatePostgresPoliciesDdl(cols));
+        const expected = parseExpectedPolicies(generatePostgresPoliciesDdl(compileSet(cols)));
         const live = expected.map((p) => liveRow(p, {
             qual: p.hasUsing ? "(rebase.uid() IS NOT NULL)" : null
         }));
 
-        const drift = await checkPolicyDrift(dbWith(live), cols);
+        const drift = await checkPolicyDrift(dbWith(live), compileSet(cols));
 
         expect(drift.insecure.length).toBeGreaterThan(0);
         expect(drift.diverged).toHaveLength(0);
@@ -265,13 +266,13 @@ describe("checkPolicyDrift", () => {
 
     it("clears the corrected expression, in either literal spelling", async () => {
         const cols = [collection("posts")];
-        const expected = parseExpectedPolicies(generatePostgresPoliciesDdl(cols));
+        const expected = parseExpectedPolicies(generatePostgresPoliciesDdl(compileSet(cols)));
         for (const fn of ["auth.uid()", "rebase.uid()"]) {
             for (const guard of ["<> 'anonymous'::text", "<> 'anonymous'", "!= 'anonymous'"]) {
                 const live = expected.map((p) => liveRow(p, {
                     qual: p.hasUsing ? `((${fn} IS NOT NULL) AND ((${fn})::text ${guard}))` : null
                 }));
-                const drift = await checkPolicyDrift(dbWith(live), cols);
+                const drift = await checkPolicyDrift(dbWith(live), compileSet(cols));
                 expect(drift.insecure).toHaveLength(0);
             }
         }
@@ -286,7 +287,7 @@ describe("checkPolicyDrift", () => {
      */
     it("clears every spelling Postgres stores for authenticated() and registered()", async () => {
         const cols = [collection("posts")];
-        const expected = parseExpectedPolicies(generatePostgresPoliciesDdl(cols));
+        const expected = parseExpectedPolicies(generatePostgresPoliciesDdl(compileSet(cols)));
         const stored = [
             // Before the initPlan wrapping (and on a database not pushed since).
             "((rebase.uid() IS NOT NULL) AND (rebase.uid() <> ALL (ARRAY['anonymous'::text, 'anon'::text])))",
@@ -301,7 +302,7 @@ describe("checkPolicyDrift", () => {
         ];
         for (const qual of stored) {
             const live = expected.map((p) => liveRow(p, { qual: p.hasUsing ? qual : null }));
-            const drift = await checkPolicyDrift(dbWith(live), cols);
+            const drift = await checkPolicyDrift(dbWith(live), compileSet(cols));
             expect({ qual, insecure: drift.insecure.length }).toEqual({ qual, insecure: 0 });
         }
     });
@@ -311,20 +312,20 @@ describe("checkPolicyDrift", () => {
         // excluding only it leaves the policy open; and a bare null test is the
         // tautology however the call is wrapped.
         const cols = [collection("posts")];
-        const expected = parseExpectedPolicies(generatePostgresPoliciesDdl(cols));
+        const expected = parseExpectedPolicies(generatePostgresPoliciesDdl(compileSet(cols)));
         for (const qual of [
             "((rebase.uid() IS NOT NULL) AND (rebase.uid() <> ALL (ARRAY['anon'::text])))",
             "(( SELECT rebase.uid() AS uid) IS NOT NULL)"
         ]) {
             const live = expected.map((p) => liveRow(p, { qual: p.hasUsing ? qual : null }));
-            const drift = await checkPolicyDrift(dbWith(live), cols);
+            const drift = await checkPolicyDrift(dbWith(live), compileSet(cols));
             expect({ qual, flagged: drift.insecure.length > 0 }).toEqual({ qual, flagged: true });
         }
     });
 
     it("also flags the tautology in a WITH CHECK clause", async () => {
         const cols = [collection("posts")];
-        const expected = parseExpectedPolicies(generatePostgresPoliciesDdl(cols));
+        const expected = parseExpectedPolicies(generatePostgresPoliciesDdl(compileSet(cols)));
         const withCheck = expected.filter((p) => p.hasWithCheck);
         // Asserted rather than assumed: if the generator ever stopped emitting a
         // WITH CHECK for these rules the fixture would carry no tautology at
@@ -335,7 +336,7 @@ describe("checkPolicyDrift", () => {
             with_check: p.hasWithCheck ? "(auth.uid() IS NOT NULL)" : null
         }));
 
-        const drift = await checkPolicyDrift(dbWith(live), cols);
+        const drift = await checkPolicyDrift(dbWith(live), compileSet(cols));
 
         // Every WITH CHECK policy carries the tautology and no USING clause
         // does, so anything flagged here came from the WITH CHECK scan — the
@@ -348,7 +349,7 @@ describe("checkPolicyDrift", () => {
         const cols = [collection("tags")];
         const live = [{ schemaname: "public", tablename: "tags", policyname: "test_policy", roles: "{authenticated,anon}", cmd: "ALL", qual: "true", with_check: null }];
 
-        const drift = await checkPolicyDrift(dbWith(live), cols);
+        const drift = await checkPolicyDrift(dbWith(live), compileSet(cols));
 
         expect(drift.orphaned[0].roles).toEqual(["authenticated", "anon"]);
     });
@@ -360,7 +361,7 @@ describe("checkPolicyDrift", () => {
         // generates default (admin-only) policies.
         const drift = await checkPolicyDrift(
             dbWith([{ schemaname: "public", tablename: "x", policyname: "p", roles: ["public"], cmd: "ALL", qual: "true", with_check: null }]),
-            []
+            compileSet([])
         );
 
         expect(hasDrift(drift)).toBe(false);
@@ -369,7 +370,7 @@ describe("checkPolicyDrift", () => {
     it("still expects the default policies a collection without securityRules generates", async () => {
         const bare: CollectionConfig = { name: "x", slug: "x", table: "x", schema: "public", properties: {} };
 
-        const drift = await checkPolicyDrift(dbWith([]), [bare]);
+        const drift = await checkPolicyDrift(dbWith([]), compileSet([bare]));
 
         // Locked-by-default: absence of rules means admin-only policies, not none.
         expect(drift.missing.length).toBeGreaterThan(0);
@@ -412,16 +413,16 @@ describe("dropOrphanedPolicies", () => {
         // The reported failure: tightening a rule renames its policy, and the
         // permissive original stays live and keeps ORing itself back in.
         const cols = [collection("documents")];
-        const expected = parseExpectedPolicies(generatePostgresPoliciesDdl(cols));
+        const expected = parseExpectedPolicies(generatePostgresPoliciesDdl(compileSet(cols)));
         const stale = {
             schemaname: "public", tablename: "documents", policyname: "documents_insert_dead1ee",
             roles: ["public"], cmd: "INSERT", qual: null, with_check: "true"
         };
         const live = [...expected.map((p) => liveRow(p)), stale];
 
-        const drift = await checkPolicyDrift(dbWith(live), cols);
+        const drift = await checkPolicyDrift(dbWith(live), compileSet(cols));
         const { db, executed } = recordingDb(live);
-        const { dropped, kept } = await dropOrphanedPolicies(db, drift, cols);
+        const { dropped, kept } = await dropOrphanedPolicies(db, drift, compileSet(cols));
 
         expect(dropped).toHaveLength(1);
         expect(dropped[0].name).toBe("documents_insert_dead1ee");
@@ -433,15 +434,15 @@ describe("dropOrphanedPolicies", () => {
 
     it("leaves a hand-written policy alone and reports it instead", async () => {
         const cols = [collection("documents")];
-        const expected = parseExpectedPolicies(generatePostgresPoliciesDdl(cols));
+        const expected = parseExpectedPolicies(generatePostgresPoliciesDdl(compileSet(cols)));
         const live = [
             ...expected.map((p) => liveRow(p)),
             { schemaname: "public", tablename: "documents", policyname: "ops_break_glass", roles: ["public"], cmd: "ALL", qual: "true", with_check: null }
         ];
 
-        const drift = await checkPolicyDrift(dbWith(live), cols);
+        const drift = await checkPolicyDrift(dbWith(live), compileSet(cols));
         const { db, executed } = recordingDb(live);
-        const { dropped, kept } = await dropOrphanedPolicies(db, drift, cols);
+        const { dropped, kept } = await dropOrphanedPolicies(db, drift, compileSet(cols));
 
         expect(dropped).toHaveLength(0);
         expect(kept.map((p) => p.name)).toEqual(["ops_break_glass"]);
@@ -452,15 +453,15 @@ describe("dropOrphanedPolicies", () => {
         // Another application sharing the schema owns this table; a
         // generator-shaped name there is coincidence, not our leftover.
         const cols = [collection("documents")];
-        const expected = parseExpectedPolicies(generatePostgresPoliciesDdl(cols));
+        const expected = parseExpectedPolicies(generatePostgresPoliciesDdl(compileSet(cols)));
         const live = [
             ...expected.map((p) => liveRow(p)),
             { schemaname: "public", tablename: "legacy", policyname: "legacy_select_a1b2c3d", roles: ["public"], cmd: "SELECT", qual: "true", with_check: null }
         ];
 
-        const drift = await checkPolicyDrift(dbWith(live), cols);
+        const drift = await checkPolicyDrift(dbWith(live), compileSet(cols));
         const { db, executed } = recordingDb(live);
-        const { dropped, kept } = await dropOrphanedPolicies(db, drift, cols);
+        const { dropped, kept } = await dropOrphanedPolicies(db, drift, compileSet(cols));
 
         expect(dropped).toHaveLength(0);
         expect(kept.map((p) => p.name)).toEqual(["legacy_select_a1b2c3d"]);
@@ -469,12 +470,12 @@ describe("dropOrphanedPolicies", () => {
 
     it("does nothing when the database already matches", async () => {
         const cols = [collection("documents")];
-        const expected = parseExpectedPolicies(generatePostgresPoliciesDdl(cols));
+        const expected = parseExpectedPolicies(generatePostgresPoliciesDdl(compileSet(cols)));
         const live = expected.map((p) => liveRow(p));
 
-        const drift = await checkPolicyDrift(dbWith(live), cols);
+        const drift = await checkPolicyDrift(dbWith(live), compileSet(cols));
         const { db, executed } = recordingDb(live);
-        const { dropped, kept } = await dropOrphanedPolicies(db, drift, cols);
+        const { dropped, kept } = await dropOrphanedPolicies(db, drift, compileSet(cols));
 
         expect(dropped).toHaveLength(0);
         expect(kept).toHaveLength(0);

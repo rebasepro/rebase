@@ -14,6 +14,7 @@
 import { PGlite } from "@electric-sql/pglite";
 import type { CollectionConfig, PostgresProperties } from "@rebasepro/types";
 import { ensureCollectionTables, type Queryable } from "../src/schema/ensure-collection-tables";
+import { compileSet } from "./helpers/plan-tables";
 
 function makeCollections(n: number): CollectionConfig[] {
     const cols: CollectionConfig[] = [];
@@ -100,9 +101,9 @@ describe("a first boot's new tables", () => {
     it("are built in a handful of transactions", async () => {
         const collections = makeCollections(20);
         const perStatement = emptyDb();
-        await ensureCollectionTables(perStatement.client, collections, undefined, { databaseExtensions: [] });
+        await ensureCollectionTables(perStatement.client, compileSet(collections), undefined, { databaseExtensions: [] });
         const batched = emptyDb();
-        await ensureCollectionTables(batched.client, collections, undefined, { databaseExtensions: [], batchNewTables: true });
+        await ensureCollectionTables(batched.client, compileSet(collections), undefined, { databaseExtensions: [], batchNewTables: true });
 
         // Today's one-per-statement count, for scale, and the batched one.
         expect(perStatement.ddl.length).toBeGreaterThan(250);
@@ -116,8 +117,8 @@ describe("a first boot's new tables", () => {
         const one = new PGlite();
         const many = new PGlite();
         try {
-            await ensureCollectionTables(simpleProtocol(one), collections, undefined, { databaseExtensions: [] });
-            await ensureCollectionTables(simpleProtocol(many), collections, undefined, { databaseExtensions: [], batchNewTables: true });
+            await ensureCollectionTables(simpleProtocol(one), compileSet(collections), undefined, { databaseExtensions: [] });
+            await ensureCollectionTables(simpleProtocol(many), compileSet(collections), undefined, { databaseExtensions: [], batchNewTables: true });
             const expected = await describeSchema(one);
             expect(expected.length).toBeGreaterThan(50);
             expect(await describeSchema(many)).toEqual(expected);
@@ -134,9 +135,9 @@ describe("a first boot's new tables", () => {
         const collections = makeCollections(3);
         const fkFails = (text: string) => (/ADD CONSTRAINT[^\n]*c2_parent_id/.test(text) ? new Error("fk refused") : undefined);
         const batched = emptyDb(fkFails);
-        const outcome = await ensureCollectionTables(batched.client, collections, undefined, { databaseExtensions: [], batchNewTables: true });
+        const outcome = await ensureCollectionTables(batched.client, compileSet(collections), undefined, { databaseExtensions: [], batchNewTables: true });
         const perStatement = emptyDb(fkFails);
-        const expected = await ensureCollectionTables(perStatement.client, collections, undefined, { databaseExtensions: [] });
+        const expected = await ensureCollectionTables(perStatement.client, compileSet(collections), undefined, { databaseExtensions: [] });
 
         expect(outcome.failures.map(f => f.target)).toEqual(expected.failures.map(f => f.target));
         expect(outcome.failures).toHaveLength(1);

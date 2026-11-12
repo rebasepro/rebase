@@ -11,6 +11,7 @@ import type { CollectionConfig } from "@rebasepro/types";
 import { planSchema } from "../../src/schema/plan/plan-schema";
 import { renderColumnDefinition, renderPgType } from "../../src/schema/plan/render-ddl";
 import type { ColumnPlan } from "../../src/schema/plan/types";
+import { planCollections } from "./plan-tables";
 
 /**
  * The planned column a property owns, or `undefined` when it owns none — an
@@ -21,7 +22,7 @@ export const planColumnFor = (
     slug: string,
     propName: string
 ): ColumnPlan | undefined => {
-    const plan = planSchema(collections);
+    const plan = planCollections(collections);
     const table = plan.tables.find(t => t.slug === slug);
     if (!table) throw new Error(`no table planned for collection "${slug}"`);
     return table.columns.find(column => column.source.propName === propName);

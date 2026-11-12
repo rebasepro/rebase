@@ -24,6 +24,7 @@ import type { CollectionConfig } from "@rebasepro/types";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { createPostgresBootstrapper, createPostgresDatabaseConnection, openRebase, type OpenedRebase } from "../../src/index.js";
 import { ensureCollectionTables, type Queryable } from "../../src/schema/ensure-collection-tables.js";
+import { compileSet } from "../helpers/plan-tables";
 
 const songs: CollectionConfig = {
     name: "Songs",
@@ -193,22 +194,22 @@ describe("view collections (E2E)", () => {
     it("leaves an up-to-date view alone, rows and all, and recreates one whose query changed", async () => {
         const client = queryable(admin);
         await admin.query("INSERT INTO public.songs (owner_id, artist, lang) VALUES ('bob', 'Stromae', 'fr')");
-        await ensureCollectionTables(client, [songs, artists(), langs()]);
+        await ensureCollectionTables(client, compileSet([songs, artists(), langs()]));
         // Not recreated, so not recomputed: still the rows of its last refresh.
         expect((await admin.query("SELECT lang FROM public.lang_stats ORDER BY lang")).rows.map(r => r.lang)).toEqual(["en", "es"]);
 
-        await ensureCollectionTables(client, [songs, artists("SELECT upper(artist) AS artist, count(*)::int AS songs FROM songs GROUP BY 1"), langs()]);
+        await ensureCollectionTables(client, compileSet([songs, artists("SELECT upper(artist) AS artist, count(*)::int AS songs FROM songs GROUP BY 1"), langs()]));
         expect((await admin.query("SELECT artist FROM public.artist_stats ORDER BY artist")).rows.map(r => r.artist))
             .toEqual(["BJÖRK", "MUSE", "ROSALÍA", "STROMAE"]);
         await admin.query("DELETE FROM public.songs WHERE artist = 'Stromae'");
-        await ensureCollectionTables(client, [songs, artists(), langs()]);
+        await ensureCollectionTables(client, compileSet([songs, artists(), langs()]));
     });
 
     it("refuses to replace a table with a view", async () => {
         const client = queryable(admin);
         await admin.query("CREATE TABLE public.occupied (id int primary key)");
         const occupying = { ...artists(), slug: "occupying", table: "occupied" } as CollectionConfig;
-        await expect(ensureCollectionTables(client, [songs, occupying])).rejects.toThrow(/will not replace public\.occupied/);
+        await expect(ensureCollectionTables(client, compileSet([songs, occupying]))).rejects.toThrow(/will not replace public\.occupied/);
         expect((await admin.query("SELECT to_regclass('public.occupied')::text AS t")).rows[0].t).toBe("occupied");
     });
 });

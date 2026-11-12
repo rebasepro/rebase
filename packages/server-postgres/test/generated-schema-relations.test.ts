@@ -30,6 +30,7 @@ import { RelationalQueryBuilder } from "drizzle-orm/pg-core/query-builders/query
 import type { CollectionConfig } from "@rebasepro/types";
 
 import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
+import { compileSet } from "./helpers/plan-tables";
 
 const PACKAGE_ROOT = path.resolve(__dirname, "..");
 
@@ -38,7 +39,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 /** The generated module's `tables` and `relations`, merged the way a project passes them to drizzle. */
 async function loadGeneratedSchema(collections: CollectionConfig[]): Promise<Record<string, unknown>> {
-    const source = await generateSchema(collections);
+    const source = await generateSchema(compileSet(collections));
     const dir = fs.mkdtempSync(path.join(PACKAGE_ROOT, ".schema-relations-"));
     try {
         const file = path.join(dir, "schema.generated.ts");

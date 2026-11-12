@@ -36,6 +36,7 @@ import { planCollectionSchemaEnsure, type ExistingSchema } from "../src/schema/e
 import { resolveColumnName } from "../src/schema/column-plan-helpers";
 import { planSchema } from "../src/schema/plan/plan-schema";
 import { everything } from "./fixtures/property-matrix-collections";
+import { compileSet, planCollections } from "./helpers/plan-tables";
 
 // ── The common record ────────────────────────────────────────────────────────
 
@@ -289,9 +290,9 @@ describe("the three emitters agree, column by column", () => {
     let ensure: ReturnType<typeof planCollectionSchemaEnsure>;
 
     beforeAll(() => {
-        drizzle = generateSchema(everything);
-        ddl = generatePostgresDdl(everything);
-        ensure = planCollectionSchemaEnsure(everything, emptyDb(), { databaseExtensions: ["vector"] });
+        drizzle = generateSchema(compileSet(everything));
+        ddl = generatePostgresDdl(compileSet(everything));
+        ensure = planCollectionSchemaEnsure(compileSet(everything), emptyDb(), { databaseExtensions: ["vector"] });
     });
 
     it("on the type, nullability, default, key, uniqueness and foreign key of every property's column", () => {
@@ -305,7 +306,7 @@ describe("the three emitters agree, column by column", () => {
         const disagreements: string[] = [];
         let compared = 0;
 
-        for (const table of planSchema(everything).tables) {
+        for (const table of planCollections(everything).tables) {
             for (const plannedColumn of table.columns) {
                 // A junction's two key columns have their own case below; its
                 // `through.properties` columns are compared here with the rest,
@@ -414,7 +415,7 @@ describe("the three emitters agree, column by column", () => {
         // lives in `triggers.sql` rather than `schema.sql` (a trigger is a
         // function plus a binding, which Atlas does not manage), so the plan is
         // where the three emitters read it from.
-        const junctionPlan = planSchema(everything).tables.find(t => t.table === "org_members")!;
+        const junctionPlan = planCollections(everything).tables.find(t => t.table === "org_members")!;
         expect(junctionPlan.kind).toBe("junction");
         expect(junctionPlan.triggers.map(t => t.name)).toEqual(["org_members_touched_at_touch"]);
         // The two key columns are still the whole primary key: a payload column
@@ -426,7 +427,7 @@ describe("the three emitters agree, column by column", () => {
         // Two `isId` properties used to be two inline keys down every path —
         // `.primaryKey()` twice, `PRIMARY KEY` twice in one CREATE TABLE, and a
         // boot-ensure table created with the first column only.
-        const plan = planSchema(everything).tables.find(t => t.table === "company_translations")!;
+        const plan = planCollections(everything).tables.find(t => t.table === "company_translations")!;
         expect(plan.primaryKey).toEqual(["id", "locale"]);
 
         // db push: the constraint, and both columns NOT NULL rather than keys.

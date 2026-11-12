@@ -47,6 +47,7 @@ import {
     POLICY_SHAPE_ROWS,
     type PolicyShapeCaller
 } from "./fixtures/policy-shapes";
+import { compileSet } from "./helpers/plan-tables";
 
 const RECORDED: Record<string, string[]> = JSON.parse(
     readFileSync(path.join(__dirname, "fixtures", "policy-shapes.recorded.json"), "utf8")
@@ -202,7 +203,7 @@ async function importedFromDatabase(db: PGlite): Promise<string[]> {
     return statements;
 }
 
-const currentPlans = () => planCollectionPolicies(POLICY_SHAPE_COLLECTIONS);
+const currentPlans = () => planCollectionPolicies(compileSet(POLICY_SHAPE_COLLECTIONS));
 const createStatements = (statements: string[]) => statements.filter(s => /^CREATE POLICY/.test(s));
 
 describe("hoisting row-independent policy predicates into initPlans", () => {
@@ -344,7 +345,7 @@ describe("the planner, under the injected baseline policy", () => {
             ALTER TABLE big ENABLE ROW LEVEL SECURITY;
             GRANT SELECT ON big TO ${REBASE_USER_ROLE};
         `);
-        for (const statement of planCollectionPolicies([big])[0].policyStatements) await db.exec(statement);
+        for (const statement of planCollectionPolicies(compileSet([big]))[0].policyStatements) await db.exec(statement);
         await db.exec("ANALYZE big;");
     });
 

@@ -1,6 +1,7 @@
 import { CollectionConfig, PostgresCollectionConfig } from "@rebasepro/types";
 import { generatePostgresPoliciesDdl } from "../src/schema/generate-postgres-ddl-logic";
 import { getEffectiveSecurityRules, getInjectedSecurityRules } from "@rebasepro/common";
+import { compileSet } from "./helpers/plan-tables";
 
 describe("auth collection default RLS policies", () => {
     const adminWrite = "string_to_array(rebase.roles(), ',') && ARRAY['admin']";
@@ -17,7 +18,7 @@ describe("auth collection default RLS policies", () => {
             }
         };
 
-        const ddl = generatePostgresPoliciesDdl([collection]);
+        const ddl = generatePostgresPoliciesDdl(compileSet([collection]));
 
         // No FORCE: user requests run as the non-owner rebase_user role, which
         // plain ENABLE binds; the owner is the trusted server context.
@@ -62,7 +63,7 @@ describe("auth collection default RLS policies", () => {
 
         // The generated SQL AND's the restrictive gate, so a self-update by a
         // non-admin cannot pass — only admins/server can write.
-        const ddl = generatePostgresPoliciesDdl([collection]);
+        const ddl = generatePostgresPoliciesDdl(compileSet([collection]));
         expect(ddl).toContain("AS RESTRICTIVE FOR UPDATE");
     });
 
@@ -80,7 +81,7 @@ describe("auth collection default RLS policies", () => {
         expect(selfRead?.operations).toEqual(["select"]);
 
         // uuid id column must compare against text rebase.uid() via a cast.
-        const ddl = generatePostgresPoliciesDdl([collection]);
+        const ddl = generatePostgresPoliciesDdl(compileSet([collection]));
         expect(ddl).toContain("(id)::text = (SELECT rebase.uid())");
     });
 
@@ -171,7 +172,7 @@ describe("auth collection default RLS policies", () => {
         expect(write?.mode).toBeUndefined();
 
         // Locked by default: only the server context / admins pass.
-        const ddl = generatePostgresPoliciesDdl([collection]);
+        const ddl = generatePostgresPoliciesDdl(compileSet([collection]));
         expect(ddl).not.toContain("FORCE ROW LEVEL SECURITY");
         expect(ddl).toContain("ENABLE ROW LEVEL SECURITY");
         expect(ddl).toContain("FOR INSERT");

@@ -13,6 +13,7 @@ import { PGlite } from "@electric-sql/pglite";
 import type { CollectionConfig } from "@rebasepro/types";
 import { ensureCollectionTables } from "../src/schema/ensure-collection-tables";
 import { checkCollectionsVsDatabase } from "../src/schema/doctor";
+import { compileSet } from "./helpers/plan-tables";
 
 let mockDb: PGlite | undefined;
 jest.mock("pg", () => {
@@ -54,7 +55,7 @@ async function provision(collections: CollectionConfig[]): Promise<PGlite> {
     const db = mockDb!;
     const outcome = await ensureCollectionTables({
         query: async <T = unknown>(sql: string) => ({ rows: (await db.query<T>(sql)).rows })
-    }, collections);
+    }, compileSet(collections));
     expect(outcome.failures).toEqual([]);
     return db;
 }
@@ -78,14 +79,14 @@ describe("the doctor's orphaned-junction check", () => {
     });
 
     const orphans = async (collections: CollectionConfig[]) =>
-        (await checkCollectionsVsDatabase(collections, URL)).issues
+        (await checkCollectionsVsDatabase(compileSet(collections), URL)).issues
             .filter(issue => issue.category === "orphaned_junction");
 
     it("names a hand-made junction between two collection tables, as info, with the DROP shown", async () => {
         const db = await provision([posts, tags]);
         await db.exec(HAND_MADE_JUNCTION);
 
-        const phase = await checkCollectionsVsDatabase([posts, tags], URL);
+        const phase = await checkCollectionsVsDatabase(compileSet([posts, tags]), URL);
         const found = phase.issues.filter(issue => issue.category === "orphaned_junction");
         expect(found).toEqual([expect.objectContaining({
             severity: "info",

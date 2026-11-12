@@ -15,6 +15,7 @@ import { PGlite } from "@electric-sql/pglite";
 import type { CollectionConfig } from "@rebasepro/types";
 import { ensureCollectionTables } from "../src/schema/ensure-collection-tables";
 import { checkCollectionsVsDatabase } from "../src/schema/doctor";
+import { compileSet } from "./helpers/plan-tables";
 
 let mockDb: PGlite | undefined;
 jest.mock("pg", () => {
@@ -66,14 +67,14 @@ describe("the doctor on a collection outside public with a many-to-many", () => 
         const db = mockDb!;
         const outcome = await ensureCollectionTables({
             query: async <T = unknown>(sql: string) => ({ rows: (await db.query<T>(sql)).rows })
-        }, [contacts, tags]);
+        }, compileSet([contacts, tags]));
         expect(outcome.failures).toEqual([]);
         const junction = await db.query<{ schema: string }>(
             "SELECT table_schema AS schema FROM information_schema.tables WHERE table_name = 'contacts_tags'"
         );
         expect(junction.rows).toEqual([{ schema: "public" }]);
 
-        const phase = await checkCollectionsVsDatabase([contacts, tags], "postgres://doctor.test/db");
+        const phase = await checkCollectionsVsDatabase(compileSet([contacts, tags]), "postgres://doctor.test/db");
         const missing = phase.issues.filter(issue => issue.category === "missing_table");
         expect(missing).toEqual([]);
     });
@@ -82,10 +83,10 @@ describe("the doctor on a collection outside public with a many-to-many", () => 
         const db = mockDb!;
         await ensureCollectionTables({
             query: async <T = unknown>(sql: string) => ({ rows: (await db.query<T>(sql)).rows })
-        }, [contacts, tags]);
+        }, compileSet([contacts, tags]));
         await db.exec('DROP TABLE "public"."contacts_tags";');
 
-        const phase = await checkCollectionsVsDatabase([contacts, tags], "postgres://doctor.test/db");
+        const phase = await checkCollectionsVsDatabase(compileSet([contacts, tags]), "postgres://doctor.test/db");
         const missing = phase.issues.filter(issue => issue.category === "missing_table").map(issue => issue.table);
         expect(missing).toEqual(["contacts_tags"]);
     });

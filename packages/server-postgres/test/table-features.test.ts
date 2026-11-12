@@ -15,7 +15,7 @@ import { afterEach, beforeEach, describe, expect, it } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
 import { pgTable, text, uuid } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
-import { compileTables, findRelation, isSchemaDefinitionError, lowerTables, resolveCollectionRelations, type LoweredCollection } from "@rebasepro/common";
+import { compileSchema, compileTables, findRelation, isSchemaDefinitionError, lowerTables, resolveCollectionRelations, type LoweredCollection } from "@rebasepro/common";
 import { col, defineTable, rel, type AnyTableDef } from "@rebasepro/types";
 
 import { planSchema } from "../src/schema/plan/plan-schema";
@@ -40,7 +40,7 @@ function lowered(defs: readonly AnyTableDef[] = TABLE_FEATURES): LoweredCollecti
 }
 
 function planOf(defs: readonly AnyTableDef[] = TABLE_FEATURES): SchemaPlan {
-    return withPinnedPlannerWorld(() => planSchema(lowered(defs), { databaseExtensions: [] }));
+    return withPinnedPlannerWorld(() => planSchema(compileSchema(defs), { databaseExtensions: [] }));
 }
 
 const ddlOf = (defs?: readonly AnyTableDef[]): string =>
@@ -123,9 +123,9 @@ describe("table features: the whole fixture", () => {
 
     it("boots: the boot planner creates every table, and a second boot plans nothing", async () => {
         await db.exec("CREATE SCHEMA IF NOT EXISTS \"rebase\";");
-        const first = await ensureCollectionTables(queryable(db), lowered(), undefined, { databaseExtensions: [] });
+        const first = await ensureCollectionTables(queryable(db), compileSchema(TABLE_FEATURES), undefined, { databaseExtensions: [] });
         expect(first.failures).toEqual([]);
-        const second = await ensureCollectionTables(queryable(db), lowered(), undefined, { databaseExtensions: [] });
+        const second = await ensureCollectionTables(queryable(db), compileSchema(TABLE_FEATURES), undefined, { databaseExtensions: [] });
         expect(second.failures).toEqual([]);
         expect(second.actions.map(action => `${action.kind} ${action.target}`)).toEqual([]);
     });

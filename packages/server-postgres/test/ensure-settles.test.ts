@@ -18,6 +18,7 @@
 import { PGlite } from "@electric-sql/pglite";
 import type { CollectionConfig } from "@rebasepro/types";
 import { ensureCollectionTables, type Queryable } from "../src/schema/ensure-collection-tables";
+import { compileSet } from "./helpers/plan-tables";
 
 const authors: CollectionConfig = {
     slug: "authors",
@@ -76,7 +77,7 @@ describe("the boot ensure settles", () => {
     });
 
     it("plans functions and indexes on the first boot", async () => {
-        const first = await ensureCollectionTables(client, collections, undefined, { databaseExtensions: [] });
+        const first = await ensureCollectionTables(client, compileSet(collections), undefined, { databaseExtensions: [] });
         const kinds = first.actions.map(a => a.kind);
         expect(kinds).toContain("create-function");
         expect(kinds).toContain("create-index");
@@ -84,35 +85,35 @@ describe("the boot ensure settles", () => {
     });
 
     it("plans zero actions on the second boot", async () => {
-        await ensureCollectionTables(client, collections, undefined, { databaseExtensions: [] });
-        const second = await ensureCollectionTables(client, collections, undefined, { databaseExtensions: [] });
+        await ensureCollectionTables(client, compileSet(collections), undefined, { databaseExtensions: [] });
+        const second = await ensureCollectionTables(client, compileSet(collections), undefined, { databaseExtensions: [] });
         expect(second.actions.map(a => `${a.kind} ${a.target}: ${a.sql.split("\n")[0]}`)).toEqual([]);
     });
 
     it("still re-plans a helper function whose body was changed by hand", async () => {
-        await ensureCollectionTables(client, collections, undefined, { databaseExtensions: [] });
+        await ensureCollectionTables(client, compileSet(collections), undefined, { databaseExtensions: [] });
         await db.query(
             "CREATE OR REPLACE FUNCTION public.rebase_search_text(text[]) RETURNS text " +
             "LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE AS $$ SELECT 'tampered' $$"
         );
-        const second = await ensureCollectionTables(client, collections, undefined, { databaseExtensions: [] });
+        const second = await ensureCollectionTables(client, compileSet(collections), undefined, { databaseExtensions: [] });
         expect(second.actions.map(a => a.kind)).toEqual(["create-function"]);
         expect(second.actions[0].sql).toContain("public.rebase_search_text(text[])");
     });
 
     it("still re-plans a helper function whose volatility was changed by hand", async () => {
-        await ensureCollectionTables(client, collections, undefined, { databaseExtensions: [] });
+        await ensureCollectionTables(client, compileSet(collections), undefined, { databaseExtensions: [] });
         await db.query("ALTER FUNCTION rebase.set_updated_at() STRICT");
-        const second = await ensureCollectionTables(client, collections, undefined, { databaseExtensions: [] });
+        const second = await ensureCollectionTables(client, compileSet(collections), undefined, { databaseExtensions: [] });
         expect(second.actions.map(a => `${a.kind} ${a.target}`)).toEqual(["create-function rebase.set_updated_at"]);
     });
 
     it("still re-plans an index that was dropped by hand", async () => {
-        const first = await ensureCollectionTables(client, collections, undefined, { databaseExtensions: [] });
+        const first = await ensureCollectionTables(client, compileSet(collections), undefined, { databaseExtensions: [] });
         const authorIndex = first.actions.find(a => a.kind === "create-index" && /\("author_id"\)/.test(a.sql));
         const name = /INDEX\s+(?:CONCURRENTLY\s+)?IF NOT EXISTS\s+"([^"]+)"/.exec(authorIndex!.sql)![1];
         await db.query(`DROP INDEX "public"."${name}"`);
-        const second = await ensureCollectionTables(client, collections, undefined, { databaseExtensions: [] });
+        const second = await ensureCollectionTables(client, compileSet(collections), undefined, { databaseExtensions: [] });
         // On a table that already exists it goes to the index builder, not
         // the actions — see `test/live-index-builds.test.ts`.
         expect(second.actions).toEqual([]);

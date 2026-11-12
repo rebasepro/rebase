@@ -14,6 +14,7 @@ import {
     readKeptDefaults,
     withKeptDefaults
 } from "../src/schema/push-kept-defaults";
+import { compileSet } from "./helpers/plan-tables";
 
 const items: PostgresCollectionConfig = {
     slug: "items",
@@ -47,7 +48,7 @@ async function defaultsOf(db: PGlite): Promise<Record<string, string | null>> {
 /** A database built from the collections, then given DEFAULTs by somebody else. */
 async function liveDatabase(): Promise<PGlite> {
     const db = new PGlite();
-    await db.exec(generatePostgresDdl([items], { includePolicies: false }));
+    await db.exec(generatePostgresDdl(compileSet([items]), { includePolicies: false }));
     await db.exec(`
         CREATE SEQUENCE items_seqno_seq;
         CREATE FUNCTION my_owner() RETURNS text LANGUAGE sql AS $$ SELECT 'me' $$;
@@ -62,7 +63,7 @@ async function liveDatabase(): Promise<PGlite> {
 
 describe("the DEFAULTs db push keeps for databaseDefault: true", () => {
     it("names the columns declared databaseDefault: true that the planner writes no DEFAULT for", () => {
-        expect(databaseOwnedDefaultColumns([items])).toEqual([
+        expect(databaseOwnedDefaultColumns(compileSet([items]))).toEqual([
             { schema: "public", table: "items", column: "code" },
             { schema: "public", table: "items", column: "ref_code_x" },
             { schema: "public", table: "items", column: "seqno" },
@@ -73,13 +74,13 @@ describe("the DEFAULTs db push keeps for databaseDefault: true", () => {
 
     it("reads nothing for collections without one", () => {
         const plain: CollectionConfig = { ...items, properties: { id: items.properties.id } };
-        expect(databaseOwnedDefaultColumns([plain])).toEqual([]);
+        expect(databaseOwnedDefaultColumns(compileSet([plain]))).toEqual([]);
     });
 
     it("reads the live DEFAULT of those columns, leaving out sequences, the database's own functions and undeclared columns", async () => {
         const db = await liveDatabase();
         try {
-            const kept = await readKeptDefaults(clientOf(db), databaseOwnedDefaultColumns([items]));
+            const kept = await readKeptDefaults(clientOf(db), databaseOwnedDefaultColumns(compileSet([items])));
             expect(kept).toEqual([
                 { schema: "public", table: "items", column: "code", expression: "('X-'::text || (gen_random_uuid())::text)" },
                 { schema: "public", table: "items", column: "ref_code_x", expression: "upper('r'::text)" }
@@ -96,8 +97,8 @@ describe("the DEFAULTs db push keeps for databaseDefault: true", () => {
         const live = await liveDatabase();
         const scratch = new PGlite();
         try {
-            const kept = await readKeptDefaults(clientOf(live), databaseOwnedDefaultColumns([items]));
-            const desired = withKeptDefaults(generatePostgresDdl([items], { includePolicies: false }), kept);
+            const kept = await readKeptDefaults(clientOf(live), databaseOwnedDefaultColumns(compileSet([items])));
+            const desired = withKeptDefaults(generatePostgresDdl(compileSet([items]), { includePolicies: false }), kept);
             expect(desired).toContain('ALTER TABLE "public"."items" ALTER COLUMN "code" SET DEFAULT');
 
             // What Atlas does with `schema.sql`: run it in a scratch database

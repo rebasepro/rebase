@@ -4,6 +4,7 @@ import { generatePostgresDdl } from "../src/schema/generate-postgres-ddl-logic";
 import { planSchema } from "../src/schema/plan/plan-schema";
 import { planColumnFor, planColumnTypeFor } from "./helpers/plan-column";
 import { serializePropertyToServer, parsePropertyFromServer } from "../src/data-transformer";
+import { compileSet, planCollections } from "./helpers/plan-tables";
 
 /**
  * `geopoint` was a first-class property type — in `DataType`, allowed by config
@@ -27,12 +28,12 @@ name: "Location" }
     };
 
     it("puts a jsonb column on the Drizzle table", async () => {
-        const schema = await generateSchema([places]);
+        const schema = await generateSchema(compileSet([places]));
         expect(schema).toContain("location: jsonb(\"location\")");
     });
 
     it("puts a JSONB column in the DDL, matching the documented type", async () => {
-        const ddl = await generatePostgresDdl([places]);
+        const ddl = await generatePostgresDdl(compileSet([places]));
         expect(ddl).toMatch(/"location"\s+JSONB/);
     });
 
@@ -77,8 +78,8 @@ lng: 2.17 }, prop, "location"))
         };
 
         // Once, in the planner, before any renderer is reached.
-        expect(() => planSchema([odd]))
-            .toThrow(/No Postgres column type for property "thing" of type "quaternion"/);
+        expect(() => planCollections([odd]))
+            .toThrow(/odd\.thing: is a quaternion property, which has no column of its own/);
     });
 
     it("still emits no column for a relation that lives on the other table", () => {

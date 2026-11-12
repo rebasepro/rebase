@@ -3,7 +3,7 @@
  * what it wrote, and planning it — so a test can hold the generated project
  * to what the database holds.
  */
-import { lowerTables } from "@rebasepro/common";
+import { compileSchema } from "@rebasepro/common";
 import { col, defineAuthTable, defineTable, defineView, isColumnBuilder, isTableDef, isViewDef, json, rel } from "@rebasepro/types";
 import type { AnyTableDef, AnyViewDef } from "@rebasepro/types";
 import { toSnakeCase } from "@rebasepro/utils";
@@ -132,7 +132,7 @@ export function plannedSchemaOf(planJson: string): PlannedSchema {
 
 /** Plan definitions through the pipeline `db generate` runs, reduced. */
 export function planDefinitions(defs: readonly (AnyTableDef | AnyViewDef)[]): PlannedSchema {
-    const outputs = renderAllOutputs(lowerTables(defs));
+    const outputs = renderAllOutputs(compileSchema(defs));
     const plan = outputs["plan.json"];
     if (plan.startsWith("THROWS:")) throw new Error(plan);
     return plannedSchemaOf(plan);

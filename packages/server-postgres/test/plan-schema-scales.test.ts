@@ -11,6 +11,7 @@
  */
 import type { CollectionConfig, PostgresProperties } from "@rebasepro/types";
 import { planSchema } from "../src/schema/plan/plan-schema";
+import { planCollections } from "./helpers/plan-tables";
 
 /** `n` collections, each with a hasMany to the next (the foreign key on the target's table). */
 function chain(n: number): { collections: CollectionConfig[]; targetCalls: () => number } {
@@ -42,7 +43,7 @@ function chain(n: number): { collections: CollectionConfig[]; targetCalls: () =>
 const targetCallsFor = (n: number): number => {
     const { collections, targetCalls } = chain(n);
     const before = targetCalls();
-    planSchema(collections);
+    planCollections(collections);
     return targetCalls() - before;
 };
 

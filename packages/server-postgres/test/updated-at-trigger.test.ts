@@ -26,6 +26,7 @@ import {
     readExistingSchema,
     planCollectionSchemaEnsure
 } from "../src/schema/ensure-collection-tables";
+import { compileSet } from "./helpers/plan-tables";
 
 const posts: CollectionConfig = {
     slug: "posts",
@@ -61,8 +62,8 @@ describe("`autoValue: \"on_update\"` is a database trigger", () => {
 
     it("bumps the column on a raw UPDATE nothing in Rebase issued", async () => {
         await db.exec('CREATE SCHEMA IF NOT EXISTS "rebase";');
-        await db.exec(generatePostgresDdl([posts], { includePolicies: false }));
-        await db.exec(generatePostgresTriggersDdl([posts]));
+        await db.exec(generatePostgresDdl(compileSet([posts]), { includePolicies: false }));
+        await db.exec(generatePostgresTriggersDdl(compileSet([posts])));
 
         // An old timestamp written straight in, so the assertion cannot pass on
         // the insert's own `now()`.
@@ -82,8 +83,8 @@ describe("`autoValue: \"on_update\"` is a database trigger", () => {
 
     it("leaves a column with no `on_update` alone", async () => {
         await db.exec('CREATE SCHEMA IF NOT EXISTS "rebase";');
-        await db.exec(generatePostgresDdl([posts], { includePolicies: false }));
-        await db.exec(generatePostgresTriggersDdl([posts]));
+        await db.exec(generatePostgresDdl(compileSet([posts]), { includePolicies: false }));
+        await db.exec(generatePostgresTriggersDdl(compileSet([posts])));
 
         await db.exec(
             `INSERT INTO "public"."posts" ("title", "created_at") ` +
@@ -100,7 +101,7 @@ describe("`autoValue: \"on_update\"` is a database trigger", () => {
     it("is installed by the boot-time ensure, and only once", async () => {
         const client = queryable(db);
 
-        const first = await ensureCollectionTables(client, [posts]);
+        const first = await ensureCollectionTables(client, compileSet([posts]));
         expect(first.failures).toEqual([]);
         expect(first.actions.filter(a => a.kind === "create-trigger").length).toBeGreaterThan(0);
 
@@ -116,7 +117,7 @@ describe("`autoValue: \"on_update\"` is a database trigger", () => {
         // every boot. A trigger re-issued each time would work and would report
         // a change on a database that has none.
         const existing = await readExistingSchema(client, ["public"]);
-        const again = planCollectionSchemaEnsure([posts], existing);
+        const again = planCollectionSchemaEnsure(compileSet([posts]), existing);
         expect(again.actions.filter(a => a.kind === "create-trigger")).toEqual([]);
     });
 });
@@ -165,8 +166,8 @@ describe("a junction payload's `on_update` column", () => {
         .sort();
 
     it("gets the same touch trigger from the boot as from `triggers.sql`", () => {
-        const push = triggerNames(generatePostgresTriggersDdl(collections).split(";"));
-        const boot = triggerNames(planCollectionSchemaEnsure(collections, emptyDb).actions
+        const push = triggerNames(generatePostgresTriggersDdl(compileSet(collections)).split(";"));
+        const boot = triggerNames(planCollectionSchemaEnsure(compileSet(collections), emptyDb).actions
             .filter(action => action.kind === "create-trigger")
             .map(action => action.sql));
 
@@ -178,7 +179,7 @@ describe("a junction payload's `on_update` column", () => {
         const db = new PGlite();
         await db.waitReady;
         try {
-            const result = await ensureCollectionTables(queryable(db), collections);
+            const result = await ensureCollectionTables(queryable(db), compileSet(collections));
             expect(result.failures).toEqual([]);
 
             await db.exec(`INSERT INTO "public"."players" ("handle") VALUES ('ada');`);
@@ -193,7 +194,7 @@ describe("a junction payload's `on_update` column", () => {
             expect(new Date(rows.rows[0].changed_at).getUTCFullYear()).toBeGreaterThan(2000);
 
             // And, like every other trigger, planned once.
-            const again = planCollectionSchemaEnsure(collections, await readExistingSchema(queryable(db), ["public"]));
+            const again = planCollectionSchemaEnsure(compileSet(collections), await readExistingSchema(queryable(db), ["public"]));
             expect(again.actions.filter(action => action.kind === "create-trigger")).toEqual([]);
         } finally {
             await db.close();

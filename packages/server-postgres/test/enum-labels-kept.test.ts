@@ -8,6 +8,7 @@ import { PGlite } from "@electric-sql/pglite";
 import type { CollectionConfig } from "@rebasepro/types";
 import type { Queryable } from "../src/schema/ensure-collection-tables";
 import { findKeptEnumLabels, formatKeptEnumLabelsNotice, keptEnumLabels } from "../src/schema/enum-labels-kept";
+import { compileSet } from "./helpers/plan-tables";
 
 const people = (labels: string[]): CollectionConfig => ({
     slug: "people",
@@ -26,7 +27,7 @@ describe("enum labels the database keeps after a collection drops them", () => {
         const client: Queryable = {
             query: async <T,>(text: string) => ({ rows: (await db.query<T>(text)).rows })
         };
-        const kept = await keptEnumLabels(client, [people(["new", "archived"])]);
+        const kept = await keptEnumLabels(client, compileSet([people(["new", "archived"])]));
         expect(kept).toEqual([{ type: "public.people_status", labels: ["old"] }]);
         await db.close();
     });

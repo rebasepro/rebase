@@ -24,6 +24,7 @@ import {
     numEnumRec
 } from "./fixtures/property-matrix-collections";
 import type { CollectionConfig } from "@rebasepro/types";
+import { compileSet, PLAN_REFUSAL_ALLOWED_MESSAGES } from "./helpers/plan-tables";
 
 const emptyDb = (): ExistingSchema => ({ tables: new Map(), enums: new Set(), constraints: new Set() });
 
@@ -32,13 +33,13 @@ describe("a configuration with no correct column is refused by all three emitter
         // Refused before the planner now, in the table model's words where the message moved.
         const because = PLAN_REFUSAL_ALLOWED_MESSAGES.find(moved => moved.id === `property-matrix.${collection.slug}`)?.pattern ?? legacyBecause;
         it(`${collection.slug}`, () => {
-            expect(() => generateSchema([collection])).toThrow(because);
-            expect(() => generatePostgresDdl([collection])).toThrow(because);
-            expect(() => planCollectionSchemaEnsure([collection], emptyDb())).toThrow(because);
+            expect(() => generateSchema(compileSet([collection]))).toThrow(because);
+            expect(() => generatePostgresDdl(compileSet([collection]))).toThrow(because);
+            expect(() => planCollectionSchemaEnsure(compileSet([collection]), emptyDb())).toThrow(because);
         });
 
         it(`${collection.slug} — the message names the collection and the property`, () => {
-            expect(() => generateSchema([collection])).toThrow(collection.slug!);
+            expect(() => generateSchema(compileSet([collection]))).toThrow(collection.slug!);
         });
     }
 });
@@ -53,16 +54,16 @@ describe("a foreign key into a composite primary key is refused by all three emi
     const because = /one column cannot reference a composite key/;
 
     it("naming the link and the key it cannot reference", () => {
-        expect(() => generateSchema(collections)).toThrow(because);
-        expect(() => generatePostgresDdl(collections)).toThrow(because);
-        expect(() => planCollectionSchemaEnsure(collections, emptyDb())).toThrow(because);
+        expect(() => generateSchema(compileSet(collections))).toThrow(because);
+        expect(() => generatePostgresDdl(compileSet(collections))).toThrow(because);
+        expect(() => planCollectionSchemaEnsure(compileSet(collections), emptyDb())).toThrow(because);
     });
 
     it("while the composite key without the link is emitted by all three", () => {
         const accepted = [companies, companyTranslations];
-        expect(() => generateSchema(accepted)).not.toThrow();
-        expect(() => generatePostgresDdl(accepted)).not.toThrow();
-        expect(() => planCollectionSchemaEnsure(accepted, emptyDb())).not.toThrow();
+        expect(() => generateSchema(compileSet(accepted))).not.toThrow();
+        expect(() => generatePostgresDdl(compileSet(accepted))).not.toThrow();
+        expect(() => planCollectionSchemaEnsure(compileSet(accepted), emptyDb())).not.toThrow();
     });
 });
 
@@ -75,24 +76,24 @@ describe("the record form of an enum is read, not thrown on", () => {
     const collections: CollectionConfig[] = [strEnumRec, numEnumRec];
 
     it("by boot-ensure, which is where it crashed", () => {
-        const plan = planCollectionSchemaEnsure(collections, emptyDb());
+        const plan = planCollectionSchemaEnsure(compileSet(collections), emptyDb());
         const enumAction = plan.actions.find(a => a.kind === "create-enum");
         expect(enumAction!.sql).toContain("CREATE TYPE \"public\".\"str_enum_rec_enum_rec\" AS ENUM ('x', 'y');");
     });
 
     it("and by the two generators, in the same order", async () => {
-        expect(await generatePostgresDdl(collections))
+        expect(await generatePostgresDdl(compileSet(collections)))
             .toContain("CREATE TYPE \"public\".\"str_enum_rec_enum_rec\" AS ENUM ('x', 'y');");
-        expect(await generateSchema(collections))
+        expect(await generateSchema(compileSet(collections)))
             .toContain("pgEnum(\"str_enum_rec_enum_rec\", [\"x\", \"y\"])");
     });
 
     it("and a number enum still creates no type at all", async () => {
         // Its column is NUMERIC or INTEGER on every path, so the type all three
         // used to create was referenced by nothing.
-        const plan = planCollectionSchemaEnsure([numEnumRec], emptyDb());
+        const plan = planCollectionSchemaEnsure(compileSet([numEnumRec]), emptyDb());
         expect(plan.actions.filter(a => a.kind === "create-enum")).toEqual([]);
-        expect(await generatePostgresDdl([numEnumRec])).not.toContain("CREATE TYPE");
-        expect(await generateSchema([numEnumRec])).not.toContain("pgEnum(");
+        expect(await generatePostgresDdl(compileSet([numEnumRec]))).not.toContain("CREATE TYPE");
+        expect(await generateSchema(compileSet([numEnumRec]))).not.toContain("pgEnum(");
     });
 });

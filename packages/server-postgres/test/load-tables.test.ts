@@ -20,11 +20,12 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import type { CollectionConfig } from "@rebasepro/types";
+import type { CollectionConfig, CompiledTable } from "@rebasepro/types";
 import {
     collectionsToTableDefs,
     isSchemaDefinitionError,
-    lowerTables,
+    compileSchema,
+    sortTablesBySlug,
     printIndexModule,
     printTableModule,
     type PrintedTableImport
@@ -59,15 +60,15 @@ afterAll(() => {
     for (const dir of scratch.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
 });
 
-/** Everything the generators write for a set of lowered tables, by file. */
-const generatedFiles = async (collections: CollectionConfig[]): Promise<Record<string, string>> => ({
-    "schema.sql": generatePostgresDdl(collections, { includePolicies: false, includeSearch: false, includeVector: false }),
-    "policies.sql": generatePostgresPoliciesDdl(collections),
-    "search.sql": generatePostgresSearchDdl(collections),
-    "vector.sql": generatePostgresVectorDdl(collections, { extensions: FIXTURE_DATABASE_EXTENSIONS }),
-    "triggers.sql": generatePostgresTriggersDdl(collections),
-    "views.sql": generatePostgresViewsDdl(collections),
-    "schema.generated.ts": await generateSchema(collections)
+/** Everything the generators write for a set of compiled tables, by file. */
+const generatedFiles = async (tables: CompiledTable[]): Promise<Record<string, string>> => ({
+    "schema.sql": generatePostgresDdl(tables, { includePolicies: false, includeSearch: false, includeVector: false }),
+    "policies.sql": generatePostgresPoliciesDdl(tables),
+    "search.sql": generatePostgresSearchDdl(tables),
+    "vector.sql": generatePostgresVectorDdl(tables, { extensions: FIXTURE_DATABASE_EXTENSIONS }),
+    "triggers.sql": generatePostgresTriggersDdl(tables),
+    "views.sql": generatePostgresViewsDdl(tables),
+    "schema.generated.ts": await generateSchema(tables)
 });
 
 describe("a backend/schema directory, loaded", () => {
@@ -94,15 +95,14 @@ describe("a backend/schema directory, loaded", () => {
     it("generates exactly what the same definitions lowered in memory generate", async () => {
         const dir = writeFixture();
         const fromDisk = await loadTables(dir);
-        const inMemory = lowerTables(lifted.tables, lifted.defaultRls !== undefined ? { defaultRls: lifted.defaultRls } : {})
-            .sort((a, b) => a.slug.localeCompare(b.slug));
+        const inMemory = sortTablesBySlug(compileSchema(lifted.tables, lifted.defaultRls !== undefined ? { defaultRls: lifted.defaultRls } : {}));
 
-        expect(fromDisk.map(c => c.slug)).toEqual(inMemory.map(c => c.slug));
+        expect(fromDisk.map(t => t.descriptor.slug)).toEqual(inMemory.map(t => t.descriptor.slug));
         expect(await generatedFiles(fromDisk)).toEqual(await generatedFiles(inMemory));
     });
 
     it("hands the tables over in slug order, whatever order the index exports them in", async () => {
-        const slugs = (await loadTables(writeFixture())).map(c => c.slug);
+        const slugs = (await loadTables(writeFixture())).map(t => t.descriptor.slug);
         expect(slugs).toEqual([...slugs].sort((a, b) => a.localeCompare(b)));
         expect(slugs).toHaveLength(lifted.tables.length);
     });

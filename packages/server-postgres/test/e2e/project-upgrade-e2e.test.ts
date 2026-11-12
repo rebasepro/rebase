@@ -53,6 +53,7 @@ import { ensureCollectionPolicies } from "../../src/schema/ensure-collection-pol
 import { ensureAppRole } from "../../src/security/rls-enforcement.js";
 import { PostgresCollectionRegistry } from "../../src/collections/PostgresCollectionRegistry.js";
 import { findRelationDefects, assertRelationsResolve } from "../../src/collections/validate-relations.js";
+import { compileSet } from "../helpers/plan-tables";
 
 const SNAPSHOT_DIR = fileURLToPath(new URL("./project-snapshots", import.meta.url));
 
@@ -201,8 +202,8 @@ describe.each(snapshots)("upgrading a project left by $name", (snapshot) => {
         await ensureAuthTablesExist(drizzle(pool));
         await pool.end();
 
-        await ensureCollectionTables(client, collections);
-        await ensureCollectionPolicies(client, collections);
+        await ensureCollectionTables(client, compileSet(collections));
+        await ensureCollectionPolicies(client, compileSet(collections));
     }, 300_000);
 
     afterAll(async () => {
@@ -217,7 +218,7 @@ describe.each(snapshots)("upgrading a project left by $name", (snapshot) => {
         // forever. That is a real shape — a constraint name past Postgres's
         // 63-byte limit is stored truncated and never matches the derived name
         // it is compared against.
-        const second = await ensureCollectionTables(client, collections);
+        const second = await ensureCollectionTables(client, compileSet(collections));
 
         // Index creations and helper functions included. They used to be
         // excluded because the planner emitted them on every boot and let

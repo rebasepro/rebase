@@ -69,6 +69,7 @@ import {
 import { findRelation, getTableName, resolveCollectionRelations } from "@rebasepro/common";
 import { resolveColumnName } from "./column-plan-helpers";
 import { planSchema } from "./plan/plan-schema";
+import { compileEditedCollections } from "./collection-input";
 import { renderPgType } from "./plan/render-ddl";
 import { typesAgree } from "./column-type-drift";
 import type { ColumnPlan, ForeignKeyPlan, SchemaPlan, TablePlan } from "./plan/types";
@@ -274,7 +275,7 @@ function foreignKeyText(fk: ForeignKeyPlan | undefined): string | undefined {
 /** Plan a collection set, or say why it cannot be planned. */
 function tryPlan(collections: CollectionConfig[]): SchemaPlan | Error {
     try {
-        return planSchema(collections);
+        return planSchema(compileEditedCollections(collections));
     } catch (err) {
         return err instanceof Error ? err : new Error(String(err));
     }

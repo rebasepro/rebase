@@ -10,7 +10,8 @@
  * Drizzle schema and the boot plans. One renderer, so the proof and the
  * corpus can never disagree about what "the same schema" means.
  */
-import { resetDeclaredResources, type CollectionConfig } from "@rebasepro/types";
+import { resetDeclaredResources, type CompiledTable } from "@rebasepro/types";
+import { sortTablesBySlug } from "@rebasepro/common";
 
 import { generateSchema } from "./generate-drizzle-schema-logic";
 import {
@@ -128,15 +129,8 @@ const ddlFileName = (options: { includePolicies: boolean; includeSearch: boolean
 const emptyDatabase = (): ExistingSchema => ({ tables: new Map(), enums: new Set(), constraints: new Set() });
 
 /**
- * The collections in slug order — what `rebase db generate` plans
- * (`generate-files.ts` sorts the loaded collections exactly so).
- */
-const inSlugOrder = (collections: readonly CollectionConfig[]): CollectionConfig[] =>
-    [...collections].sort((a, b) => a.slug.localeCompare(b.slug));
-
-/**
  * What {@link renderSchemaOutputs} is planned with — the inputs besides the
- * collections.
+ * tables.
  *
  * @group Schema
  */
@@ -149,7 +143,7 @@ export interface RenderSchemaOutputsOptions {
 }
 
 /**
- * Everything the schema pipeline emits for one collection set, by file name.
+ * Everything the schema pipeline emits for one set of tables, by file name.
  *
  * - `schema*.sql`: `generatePostgresDdl` under all eight `DdlRenderOptions`
  *   combinations (`schema.sql` is the one `db generate` writes: all three off).
@@ -171,11 +165,11 @@ export interface RenderSchemaOutputsOptions {
  * @group Schema
  */
 export function renderSchemaOutputs(
-    collections: readonly CollectionConfig[],
+    tables: readonly CompiledTable[],
     options: RenderSchemaOutputsOptions = {}
 ): Record<string, string> {
     return withPinnedPlannerWorld(() => {
-        const sorted = inSlugOrder(collections);
+        const sorted = sortTablesBySlug(tables);
         const databaseExtensions = options.databaseExtensions ?? [];
         const files: Record<string, string> = {};
         const emit = (name: string, render: () => string): void => {

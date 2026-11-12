@@ -39,6 +39,7 @@ import {
     type VectorProperty,
     type ColumnDef,
     type ColumnType,
+    type CompiledTable,
     hasForeignKeyOnTarget
 } from "@rebasepro/types";
 import {
@@ -115,6 +116,7 @@ import { SET_UPDATED_AT_FN, setUpdatedAtFunction } from "./updated-at-trigger";
 import { keepTenantFunction, keepTenantTriggerName } from "./tenant-keep-trigger";
 import { DEFAULT_VIEW_ROLES, viewRowsName } from "./view-names";
 import { tableBelongsToOf, tableColumnOf } from "./table-input";
+import { lowerCompiledTables } from "../lowered-tables";
 import type {
     ColumnDefault,
     ColumnPlan,
@@ -926,7 +928,20 @@ const servesView = (collection: CollectionConfig): boolean =>
 
 // ── The planner ──────────────────────────────────────────────────────────────
 
-export function planSchema(allCollections: CollectionConfig[], options: PlanOptions = {}): SchemaPlan {
+/**
+ * Everything a set of tables asks the database for.
+ *
+ * The input is the compiled tables — what `compileSchema` returns and every
+ * door (`loadTables`, boot, the CLI) hands over. Planned in the order given:
+ * the callers sort by slug first, and the generated files keep that order.
+ *
+ * @param compiledTables the compiled tables, in slug order.
+ * @param options the planner's world: the extensions it may install.
+ */
+export function planSchema(compiledTables: readonly CompiledTable[], options: PlanOptions = {}): SchemaPlan {
+    // B-PLAN-2: removed in step 4. The parts of the planner not yet ported to
+    // the descriptor read the tables lowered into the legacy shape.
+    const allCollections: CollectionConfig[] = lowerCompiledTables(compiledTables);
     // Before the filter, deliberately: a `search` block on a collection this
     // engine does not store would otherwise be dropped without a word.
     assertSearchIsPostgresOnly(allCollections);

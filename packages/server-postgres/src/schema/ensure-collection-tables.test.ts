@@ -6,6 +6,7 @@ import {
     type ExistingSchema,
     type Queryable
 } from "./ensure-collection-tables";
+import { compileSet } from "../../test/helpers/plan-tables";
 
 const posts: CollectionConfig = {
     name: "Posts",
@@ -34,7 +35,7 @@ const withTable = (key: string, columns: string[]): ExistingSchema => ({
 
 describe("planning an additive schema ensure", () => {
     it("creates a missing table, its enum type, and its columns in that order", () => {
-        const plan = planCollectionSchemaEnsure([posts], empty());
+        const plan = planCollectionSchemaEnsure(compileSet([posts]), empty());
         const kinds = plan.actions.map(a => a.kind);
 
         // The enum must exist before the column that references it, and the
@@ -45,7 +46,7 @@ describe("planning an additive schema ensure", () => {
     });
 
     it("adds only the columns an existing table is missing", () => {
-        const plan = planCollectionSchemaEnsure([posts], withTable("public.posts", ["id", "title"]));
+        const plan = planCollectionSchemaEnsure(compileSet([posts]), withTable("public.posts", ["id", "title"]));
         const added = plan.actions.filter(a => a.kind === "add-column").map(a => a.target);
 
         expect(added).toContain("public.posts.views");
@@ -61,26 +62,26 @@ describe("planning an additive schema ensure", () => {
             // Current includes the `isId: "uuid"` key's default (f378bab8f).
             columnDefaults: new Set(["public.posts.id"])
         };
-        expect(planCollectionSchemaEnsure([posts], existing).actions).toEqual([]);
+        expect(planCollectionSchemaEnsure(compileSet([posts]), existing).actions).toEqual([]);
     });
 
     it("gives an isId \"uuid\" key the default it is missing, and only then (f378bab8f)", () => {
         const tables = new Map([["public.posts", new Set(["id", "title", "views", "status"])]]);
         const enums = new Set(["public.posts_status"]);
 
-        expect(planCollectionSchemaEnsure([posts], { tables, enums, columnDefaults: new Set() }).actions).toEqual([{
+        expect(planCollectionSchemaEnsure(compileSet([posts]), { tables, enums, columnDefaults: new Set() }).actions).toEqual([{
             kind: "set-default",
             target: "public.posts.id",
             sql: `ALTER TABLE "public"."posts" ALTER COLUMN "id" SET DEFAULT gen_random_uuid();`
         }]);
-        expect(planCollectionSchemaEnsure([posts], {
+        expect(planCollectionSchemaEnsure(compileSet([posts]), {
             tables, enums, columnDefaults: new Set(["public.posts.id"])
         }).actions).toEqual([]);
     });
 
     it("skips an enum type that already exists, since CREATE TYPE has no IF NOT EXISTS", () => {
         const existing: ExistingSchema = { tables: new Map(), enums: new Set(["public.posts_status"]) };
-        const plan = planCollectionSchemaEnsure([posts], existing);
+        const plan = planCollectionSchemaEnsure(compileSet([posts]), existing);
         expect(plan.actions.some(a => a.kind === "create-enum")).toBe(false);
     });
 
@@ -94,7 +95,7 @@ describe("planning an additive schema ensure", () => {
             // write (SET DEFAULT on a uuid key that lacks it) has nothing to do.
             columnDefaults: new Set(["public.posts.id"])
         };
-        const sql = planCollectionSchemaEnsure([posts], existing).statements.join("\n");
+        const sql = planCollectionSchemaEnsure(compileSet([posts]), existing).statements.join("\n");
 
         expect(sql).not.toMatch(/\bDROP\b/i);
         expect(sql).not.toMatch(/\bTRUNCATE\b/i);
@@ -103,7 +104,7 @@ describe("planning an additive schema ensure", () => {
     });
 
     it("never adds a NOT NULL column, which an existing table with rows could not take", () => {
-        const sql = planCollectionSchemaEnsure([posts], withTable("public.posts", ["id"]))
+        const sql = planCollectionSchemaEnsure(compileSet([posts]), withTable("public.posts", ["id"]))
             .statements.join("\n");
         expect(sql).not.toMatch(/NOT NULL/i);
     });
@@ -158,7 +159,7 @@ describe("planning an additive schema ensure", () => {
     };
 
     it("adds a reference column, and the foreign key that makes it one", () => {
-        const plan = planCollectionSchemaEnsure([postsWithAuthor, authors], withTable("public.posts", ["id"]));
+        const plan = planCollectionSchemaEnsure(compileSet([postsWithAuthor, authors]), withTable("public.posts", ["id"]));
 
         expect(plan.actions.some(a => a.kind === "add-column" && a.target === "public.posts.author")).toBe(true);
         const fk = plan.actions.find(a => a.kind === "add-constraint");
@@ -167,7 +168,7 @@ describe("planning an additive schema ensure", () => {
     });
 
     it("orders every constraint after the columns and tables it depends on", () => {
-        const plan = planCollectionSchemaEnsure([postsWithAuthor, authors], empty());
+        const plan = planCollectionSchemaEnsure(compileSet([postsWithAuthor, authors]), empty());
         const kinds = plan.actions.map(a => a.kind);
         expect(kinds.lastIndexOf("add-column")).toBeLessThan(kinds.indexOf("add-constraint"));
         expect(kinds.lastIndexOf("create-table")).toBeLessThan(kinds.indexOf("add-constraint"));
@@ -182,12 +183,12 @@ describe("planning an additive schema ensure", () => {
             enums: new Set(["public.posts_status"]),
             constraints: new Set(["public.posts.posts_author_fkey"])
         };
-        const plan = planCollectionSchemaEnsure([postsWithAuthor, authors], existing);
+        const plan = planCollectionSchemaEnsure(compileSet([postsWithAuthor, authors]), existing);
         expect(plan.actions.some(a => a.kind === "add-constraint")).toBe(false);
     });
 
     it("creates the junction table behind a many-to-many, keyed on both endpoints", () => {
-        const plan = planCollectionSchemaEnsure([postsWithTags, tags], empty());
+        const plan = planCollectionSchemaEnsure(compileSet([postsWithTags, tags]), empty());
         const junction = plan.actions.find(a => a.kind === "create-table" && a.target === "public.posts_tags");
 
         expect(junction).toBeDefined();
@@ -216,7 +217,7 @@ describe("planning an additive schema ensure", () => {
                 "public.posts_tags.posts_tags_tag_id_fkey"
             ])
         };
-        expect(planCollectionSchemaEnsure([postsWithTags, tags], existing).actions).toEqual([]);
+        expect(planCollectionSchemaEnsure(compileSet([postsWithTags, tags]), existing).actions).toEqual([]);
     });
 });
 
@@ -245,7 +246,7 @@ describe("constraints the configuration asks for", () => {
     };
 
     it("adds NOT NULL when the existing table is empty", () => {
-        const plan = planCollectionSchemaEnsure([required], {
+        const plan = planCollectionSchemaEnsure(compileSet([required]), {
             tables: new Map([["public.authors", new Set(["id"])]]),
             enums: new Set(),
             populatedTables: new Set()
@@ -256,7 +257,7 @@ describe("constraints the configuration asks for", () => {
     });
 
     it("withholds NOT NULL when the table holds rows, and says so", () => {
-        const plan = planCollectionSchemaEnsure([required], {
+        const plan = planCollectionSchemaEnsure(compileSet([required]), {
             tables: new Map([["public.authors", new Set(["id"])]]),
             enums: new Set(),
             populatedTables: new Set(["public.authors"])
@@ -275,7 +276,7 @@ describe("constraints the configuration asks for", () => {
         // A hand-built ExistingSchema carries no `populatedTables`. Reading that
         // as "empty" would emit a NOT NULL checked against live data and abort
         // the boot, so absent has to mean populated.
-        const plan = planCollectionSchemaEnsure([required], {
+        const plan = planCollectionSchemaEnsure(compileSet([required]), {
             tables: new Map([["public.authors", new Set(["id"])]]),
             enums: new Set()
         });
@@ -288,7 +289,7 @@ describe("constraints the configuration asks for", () => {
         // `additive` is the boot default. A database adopted by introspection
         // carries NOT NULL on columns the generated collection leaves optional,
         // and converging those unasked would drop constraints nobody edited.
-        const plan = planCollectionSchemaEnsure([optional], {
+        const plan = planCollectionSchemaEnsure(compileSet([optional]), {
             tables: new Map([["public.authors", new Set(["id", "name"])]]),
             enums: new Set(),
             columnDefaults: new Set(["public.authors.id"]),
@@ -299,7 +300,7 @@ describe("constraints the configuration asks for", () => {
     });
 
     it("drops NOT NULL when a reviewed change relaxes the property", () => {
-        const plan = planCollectionSchemaEnsure([optional], {
+        const plan = planCollectionSchemaEnsure(compileSet([optional]), {
             tables: new Map([["public.authors", new Set(["id", "name"])]]),
             enums: new Set(),
             columnDefaults: new Set(["public.authors.id"]),
@@ -314,7 +315,7 @@ describe("constraints the configuration asks for", () => {
     });
 
     it("sets NOT NULL on an existing empty column when the change is reviewed", () => {
-        const plan = planCollectionSchemaEnsure([required], {
+        const plan = planCollectionSchemaEnsure(compileSet([required]), {
             tables: new Map([["public.authors", new Set(["id", "name"])]]),
             enums: new Set(),
             columnDefaults: new Set(["public.authors.id"]),
@@ -329,7 +330,7 @@ describe("constraints the configuration asks for", () => {
     });
 
     it("refuses to set NOT NULL on a populated column, even when reviewed", () => {
-        const plan = planCollectionSchemaEnsure([required], {
+        const plan = planCollectionSchemaEnsure(compileSet([required]), {
             tables: new Map([["public.authors", new Set(["id", "name"])]]),
             enums: new Set(),
             columnDefaults: new Set(["public.authors.id"]),
@@ -362,7 +363,7 @@ describe("applying the plan", () => {
 
     it("creates the schema, reads what exists, then applies", async () => {
         const { client, executed } = fakeClient();
-        const plan = await ensureCollectionTables(client, [posts]);
+        const plan = await ensureCollectionTables(client, compileSet([posts]));
 
         expect(plan.actions.length).toBeGreaterThan(0);
         expect(executed.some(s => s.includes("information_schema.columns"))).toBe(true);
@@ -376,8 +377,8 @@ describe("applying the plan", () => {
                 return { rows: [] as T[] };
             }
         };
-        await expect(ensureCollectionTables(client, [posts])).rejects.toThrow(/permission denied/);
-        await expect(ensureCollectionTables(client, [posts])).rejects.toThrow(/public\.posts/);
+        await expect(ensureCollectionTables(client, compileSet([posts]))).rejects.toThrow(/permission denied/);
+        await expect(ensureCollectionTables(client, compileSet([posts]))).rejects.toThrow(/public\.posts/);
     });
 
     it("does nothing when the database is already current", async () => {
@@ -411,7 +412,7 @@ describe("applying the plan", () => {
                 return { rows: [] as T[] };
             }
         };
-        const plan = await ensureCollectionTables(client, [posts]);
+        const plan = await ensureCollectionTables(client, compileSet([posts]));
         expect(plan.actions).toEqual([]);
     });
 
@@ -443,7 +444,7 @@ describe("applying the plan", () => {
                 return { rows: [] as T[] };
             }
         };
-        const plan = await ensureCollectionTables(client, [posts]);
+        const plan = await ensureCollectionTables(client, compileSet([posts]));
         expect(plan.actions).toEqual([{
             kind: "add-enum-value",
             target: "public.posts_status.published",
@@ -498,7 +499,7 @@ describe("a simultaneous boot", () => {
         // our write. The table exists; everything after it still has to run.
         const { client, executed } = racingClient(/^CREATE TABLE/, pgError("42P07"), { forever: true });
 
-        const plan = await ensureCollectionTables(client, [posts]);
+        const plan = await ensureCollectionTables(client, compileSet([posts]));
 
         expect(plan.actions.length).toBeGreaterThan(0);
         // The proof: statements that come *after* the losing one were attempted.
@@ -514,7 +515,7 @@ describe("a simultaneous boot", () => {
             { forever: true }
         );
 
-        await ensureCollectionTables(client, [posts]);
+        await ensureCollectionTables(client, compileSet([posts]));
 
         expect(executed.some(s => s.startsWith("CREATE TABLE"))).toBe(true);
     });
@@ -524,7 +525,7 @@ describe("a simultaneous boot", () => {
         // statement did nothing at all, so it must actually be run again.
         const { client, executed } = racingClient(/^CREATE TABLE/, pgError("40P01"));
 
-        await ensureCollectionTables(client, [posts]);
+        await ensureCollectionTables(client, compileSet([posts]));
 
         expect(executed.filter(s => s.startsWith("CREATE TABLE")).length).toBeGreaterThan(1);
     });
@@ -541,13 +542,13 @@ describe("a simultaneous boot", () => {
             { forever: true }
         );
 
-        await expect(ensureCollectionTables(client, [posts])).rejects.toThrow(/public\.posts/);
+        await expect(ensureCollectionTables(client, compileSet([posts]))).rejects.toThrow(/public\.posts/);
     });
 
     it("still fails loudly on a permission error", async () => {
         const { client } = racingClient(/^CREATE TABLE/, pgError("42501"), { forever: true });
 
-        await expect(ensureCollectionTables(client, [posts])).rejects.toThrow(/public\.posts/);
+        await expect(ensureCollectionTables(client, compileSet([posts]))).rejects.toThrow(/public\.posts/);
     });
 });
 
@@ -590,7 +591,7 @@ describe("reporting a statement that failed", () => {
             code: "42501"
         }));
 
-        await expect(ensureCollectionTables(client, [posts])).rejects.toThrow(
+        await expect(ensureCollectionTables(client, compileSet([posts]))).rejects.toThrow(
             /permission denied for schema "public" \[42501\]/
         );
     });
@@ -598,7 +599,7 @@ describe("reporting a statement that failed", () => {
     it("does not report the ORM wrapper as the reason", async () => {
         const client = failingClient(wrapped({ message: "some real reason", code: "42501" }));
 
-        const failure = await ensureCollectionTables(client, [posts]).then(() => "", (e: Error) => e.message);
+        const failure = await ensureCollectionTables(client, compileSet([posts])).then(() => "", (e: Error) => e.message);
 
         // `Failed query:` is the wrapper's own text. It named the statement,
         // which the thrown error appends itself, and nothing else — so it
@@ -617,7 +618,7 @@ describe("reporting a statement that failed", () => {
             hint: "Install the extension package."
         }));
 
-        const failure = await ensureCollectionTables(client, [posts]).catch((e: Error) => e.message);
+        const failure = await ensureCollectionTables(client, compileSet([posts])).catch((e: Error) => e.message);
 
         expect(failure).toContain("detail: No such file or directory.");
         expect(failure).toContain("hint: Install the extension package.");
@@ -635,7 +636,7 @@ describe("reporting a statement that failed", () => {
             code: "42704"
         }));
 
-        await expect(ensureCollectionTables(client, [posts])).rejects.toThrow(
+        await expect(ensureCollectionTables(client, compileSet([posts]))).rejects.toThrow(
             /pgvector is not installed on this database/
         );
     });
@@ -645,7 +646,7 @@ describe("reporting a statement that failed", () => {
             cause: new Error("Connection terminated unexpectedly")
         }));
 
-        await expect(ensureCollectionTables(client, [posts])).rejects.toThrow(
+        await expect(ensureCollectionTables(client, compileSet([posts]))).rejects.toThrow(
             /Connection terminated unexpectedly/
         );
     });
@@ -691,7 +692,7 @@ describe("an index that will not build", () => {
     }
 
     it("does not fail the boot, and reports what was lost", async () => {
-        const outcome = await ensureCollectionTables(indexHostileClient(), [indexed]);
+        const outcome = await ensureCollectionTables(indexHostileClient(), compileSet([indexed]));
 
         const failed = outcome.failures.filter(f => f.kind === "create-index");
         expect(failed.length).toBeGreaterThan(0);
@@ -712,12 +713,12 @@ describe("an index that will not build", () => {
                 return { rows: [] as T[] };
             }
         };
-        await ensureCollectionTables(client, [indexed]);
+        await ensureCollectionTables(client, compileSet([indexed]));
         expect(executed.some(s => /CREATE INDEX/i.test(s))).toBe(true);
     });
 
     it("does fail the boot on a UNIQUE index, which is a promise and not a speedup", async () => {
-        await expect(ensureCollectionTables(indexHostileClient(), [uniquely])).rejects.toThrow(
+        await expect(ensureCollectionTables(indexHostileClient(), compileSet([uniquely]))).rejects.toThrow(
             /access method "hnsw" does not exist/
         );
     });
@@ -767,7 +768,7 @@ describe("a connection that turns out to be inside a transaction", () => {
             indexes: [{ on: ["title"], reason: "title lookups" }]
         };
 
-        const outcome = await ensureCollectionTables(client, [indexed]);
+        const outcome = await ensureCollectionTables(client, compileSet([indexed]));
 
         // It was attempted concurrently first — the table is live, so that is
         // the right first choice — and then plainly, and it ended up applied.
@@ -816,31 +817,31 @@ describe("a required column no property declares any more", () => {
     });
 
     it("reports the orphan, with the collection that stopped declaring it", () => {
-        const plan = planCollectionSchemaEnsure([renamed], afterRename());
+        const plan = planCollectionSchemaEnsure(compileSet([renamed]), afterRename());
         expect(plan.orphanedRequiredColumns).toEqual([
             { table: "public.posts", column: "title", slug: "posts" }
         ]);
     });
 
     it("reports it rather than dropping it — nothing destructive is planned", () => {
-        const plan = planCollectionSchemaEnsure([renamed], afterRename());
+        const plan = planCollectionSchemaEnsure(compileSet([renamed]), afterRename());
         expect(plan.statements.join("\n")).not.toMatch(/DROP COLUMN/i);
     });
 
     it("says nothing about a leftover that is nullable, which still accepts writes", () => {
         const existing = afterRename();
         existing.notNullColumns = new Set(["public.posts.id"]);
-        expect(planCollectionSchemaEnsure([renamed], existing).orphanedRequiredColumns).toEqual([]);
+        expect(planCollectionSchemaEnsure(compileSet([renamed]), existing).orphanedRequiredColumns).toEqual([]);
     });
 
     it("says nothing about a leftover with a default, which is filled in for you", () => {
         const existing = afterRename();
         existing.columnDefaults = new Set(["public.posts.id", "public.posts.title"]);
-        expect(planCollectionSchemaEnsure([renamed], existing).orphanedRequiredColumns).toEqual([]);
+        expect(planCollectionSchemaEnsure(compileSet([renamed]), existing).orphanedRequiredColumns).toEqual([]);
     });
 
     it("says nothing about a table this run is creating, which cannot have leftovers", () => {
-        const plan = planCollectionSchemaEnsure([renamed], {
+        const plan = planCollectionSchemaEnsure(compileSet([renamed]), {
             tables: new Map(), enums: new Set(),
             notNullColumns: new Set(), columnDefaults: new Set()
         });
@@ -860,7 +861,7 @@ describe("a required column no property declares any more", () => {
             }
         };
 
-        const plan = planCollectionSchemaEnsure([withRelation, authors], {
+        const plan = planCollectionSchemaEnsure(compileSet([withRelation, authors]), {
             tables: new Map([
                 ["public.posts", new Set(["id", "author_id"])],
                 ["public.authors", new Set(["id"])]
@@ -876,7 +877,7 @@ describe("a required column no property declares any more", () => {
     it("reports nothing when the database's nullability is unknown", () => {
         // Absent reads as "cannot tell", and guessing here would report every
         // column of every table on a driver that does not supply the facts.
-        const plan = planCollectionSchemaEnsure([renamed], {
+        const plan = planCollectionSchemaEnsure(compileSet([renamed]), {
             tables: new Map([["public.posts", new Set(["id", "title", "headline"])]]),
             enums: new Set()
         });

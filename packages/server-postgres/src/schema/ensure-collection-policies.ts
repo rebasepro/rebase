@@ -43,7 +43,7 @@
  * as every boot used to re-apply everything. A boot that changes nothing runs
  * two catalogue reads here, no DDL and takes no table lock. It used to drop and
  * re-create every policy, one ACCESS EXCLUSIVE lock per table: about 1 s at 200
- * collections, and under a `pg_dump` up to the whole retry budget.
+ * tables, and under a `pg_dump` up to the whole retry budget.
  *
  * A policy without a stamp — written by `db push`, by hand, or by a release
  * that predates stamps — counts as different, so the first boot after either
@@ -60,7 +60,7 @@
  * exactly which collection is not yet servable and why.
  */
 import { createHash } from "node:crypto";
-import { REBASE_ADMIN_ROLE, type CollectionConfig } from "@rebasepro/types";
+import { REBASE_ADMIN_ROLE, type CompiledTable } from "@rebasepro/types";
 import { ADMIN_REQUEST_POLICY_SUFFIX, toPostgresIdentifier } from "@rebasepro/utils";
 import { planCollectionPolicies, type CollectionPolicyPlan } from "./generate-postgres-ddl-logic";
 import { isGeneratedPolicyName } from "../security/policy-drift";
@@ -334,12 +334,12 @@ export type PolicyStampState = "current" | "stale" | "unstamped";
  */
 export async function readPolicyStamps(
     client: Queryable,
-    collections: CollectionConfig[],
+    compiledTables: readonly CompiledTable[],
     options: { adminRoleAvailable?: boolean } = {}
 ): Promise<Map<string, Map<string, PolicyStampState>>> {
     // Stamped from the statement the boot or the push rendered: `TO public`
     // for the server-or-admin policies where the admin switch is not live.
-    const plans = planCollectionPolicies(collections, { adminRoleAvailable: options.adminRoleAvailable });
+    const plans = planCollectionPolicies(compiledTables, { adminRoleAvailable: options.adminRoleAvailable });
     const live = await readLivePolicies(client, Array.from(new Set(plans.map(p => p.schema))));
     const states = new Map<string, Map<string, PolicyStampState>>();
     for (const plan of plans) {
@@ -380,12 +380,12 @@ const PROBE_POLICY = "rebase_policy_probe";
  */
 export async function probeRenderedPolicies(
     client: Queryable,
-    collections: CollectionConfig[],
+    compiledTables: readonly CompiledTable[],
     policies: readonly { schema: string; table: string; name: string }[],
     options: { searchPath?: string; adminRoleAvailable?: boolean } = {}
 ): Promise<Map<string, boolean>> {
     const statements = new Map<string, string>();
-    for (const plan of planCollectionPolicies(collections, { adminRoleAvailable: options.adminRoleAvailable })) {
+    for (const plan of planCollectionPolicies(compiledTables, { adminRoleAvailable: options.adminRoleAvailable })) {
         for (const statement of plan.policyStatements) {
             const name = createdPolicyName(statement);
             if (name) statements.set(`${plan.schema}.${plan.table}.${name}`, statement.trim());
@@ -540,7 +540,7 @@ export interface TableLockResult {
 }
 
 /**
- * Switch RLS on for every table the collections declare — each collection's
+ * Switch RLS on for every table the tables declare — each collection's
  * and each junction's — and do nothing else.
  *
  * The first thing `rebase db push` does once Atlas has committed. Atlas cannot
@@ -556,10 +556,10 @@ export interface TableLockResult {
  */
 export async function lockCollectionTables(
     client: Queryable,
-    collections: CollectionConfig[]
+    compiledTables: readonly CompiledTable[]
 ): Promise<TableLockResult> {
     const result: TableLockResult = { locked: 0, unsecured: [] };
-    for (const { plan, rls } of await declaredTablesPresent(client, collections)) {
+    for (const { plan, rls } of await declaredTablesPresent(client, compiledTables)) {
         const lock = await lockTable(client, plan, rls);
         if (lock.locked) {
             result.locked++;
@@ -575,16 +575,16 @@ export async function lockCollectionTables(
  * security on for: those in the database with it off. What `db push
  * --dry-run` lists, read the way the push's lock step reads it.
  */
-export async function tablesRlsWouldEnable(client: Queryable, collections: CollectionConfig[]): Promise<string[]> {
-    return (await declaredTablesPresent(client, collections)).filter(table => !table.rls).map(table => table.plan.qualified);
+export async function tablesRlsWouldEnable(client: Queryable, compiledTables: readonly CompiledTable[]): Promise<string[]> {
+    return (await declaredTablesPresent(client, compiledTables)).filter(table => !table.rls).map(table => table.plan.qualified);
 }
 
 /** Each declared table the database has, with whether its RLS is on. */
 async function declaredTablesPresent(
     client: Queryable,
-    collections: CollectionConfig[]
+    compiledTables: readonly CompiledTable[]
 ): Promise<{ plan: CollectionPolicyPlan; rls: boolean }[]> {
-    const plans = planCollectionPolicies(collections);
+    const plans = planCollectionPolicies(compiledTables);
     if (plans.length === 0) return [];
     const tables = await readTableSecurity(client, Array.from(new Set(plans.map(p => p.schema))));
     return plans.flatMap(plan => {
@@ -651,7 +651,7 @@ type AtomicOutcome =
  */
 export async function ensureCollectionPolicies(
     client: Queryable,
-    collections: CollectionConfig[],
+    compiledTables: readonly CompiledTable[],
     log?: (message: string) => void,
     options: BootLockOptions & {
         /**
@@ -677,7 +677,7 @@ export async function ensureCollectionPolicies(
         orphansDropped: 0, deferred: [], rulesDropped: []
     };
 
-    let plans = planCollectionPolicies(collections, { adminRequestRoleAvailable: options.adminRequestRoleAvailable });
+    let plans = planCollectionPolicies(compiledTables, { adminRequestRoleAvailable: options.adminRequestRoleAvailable });
     if (plans.length === 0) return result;
     // The server-or-admin policies are written `TO rebase_admin`
     // (`rls.adminPolicies: "adminRole"`), and CREATE POLICY refuses a role that
@@ -690,7 +690,7 @@ export async function ensureCollectionPolicies(
     // (`adminRoleAvailable: false`), and gets the same: an existing
     // `rebase_admin` — another project's, a privileged push's — is not enough.
     if (options.adminRoleAvailable === false) {
-        plans = planCollectionPolicies(collections, { adminRoleAvailable: false });
+        plans = planCollectionPolicies(compiledTables, { adminRoleAvailable: false });
     } else if (plans.some(plan => plan.policies.some(policy => policy.adminTarget))) {
         const run = async (text: string) => (await client.query<Record<string, unknown>>(text)).rows;
         const available = await ensureAdminPolicyRole(run).then(() => true, (err: unknown) => {
@@ -698,7 +698,7 @@ export async function ensureCollectionPolicies(
                 "the server-or-admin policies stay TO public, and signed-in users' owner-scoped reads keep scanning");
             return false;
         });
-        if (!available) plans = planCollectionPolicies(collections, { adminRoleAvailable: false });
+        if (!available) plans = planCollectionPolicies(compiledTables, { adminRoleAvailable: false });
     }
     const lock = resolveBootLockOptions(options);
 

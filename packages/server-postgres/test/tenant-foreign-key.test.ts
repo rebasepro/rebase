@@ -21,6 +21,7 @@ import type { CollectionConfig } from "@rebasepro/types";
 import { planSchema } from "../src/schema/plan/plan-schema";
 import { renderPostgresDdl } from "../src/schema/plan/render-ddl";
 import type { ColumnPlan, SchemaPlan } from "../src/schema/plan/types";
+import { planCollections } from "./helpers/plan-tables";
 
 const orgs: CollectionConfig = {
     slug: "orgs",
@@ -48,7 +49,7 @@ describe("the tenant link", () => {
             slug: "projects", table: "projects", name: "Projects", tenant: tenantOn("org"),
             properties: { id: { name: "ID", type: "string", isId: "uuid" }, org: orgLink }
         };
-        const plan = planSchema([orgs, projects]);
+        const plan = planCollections([orgs, projects]);
         expect(rendered(plan, "projects", "org_id")?.nullable).toBe(false);
         expect(fk(plan, "projects", "org_id")).toBe("RESTRICT");
         expect(renderPostgresDdl(plan)).toContain('REFERENCES "public"."orgs" ("id") ON DELETE RESTRICT;');
@@ -62,7 +63,7 @@ describe("the tenant link", () => {
                 org: { ...orgLink, relation: { ...orgLink.relation, onDelete: "cascade" } }
             }
         };
-        expect(fk(planSchema([orgs, projects]), "projects", "org_id")).toBe("cascade");
+        expect(fk(planCollections([orgs, projects]), "projects", "org_id")).toBe("cascade");
     });
 
     it("applies to a `reference` used as the tenant too", () => {
@@ -73,7 +74,7 @@ describe("the tenant link", () => {
                 org: { name: "Org", type: "reference", path: "orgs" }
             }
         };
-        expect(fk(planSchema([orgs, projects]), "projects", "org")).toBe("RESTRICT");
+        expect(fk(planCollections([orgs, projects]), "projects", "org")).toBe("RESTRICT");
     });
 
     it("makes the column NOT NULL when a property declared after the relation owns it", () => {
@@ -85,7 +86,7 @@ describe("the tenant link", () => {
                 orgId: { name: "Org id", type: "string", columnName: "org_id", columnType: "uuid" }
             }
         };
-        const plan = planSchema([orgs, projects]);
+        const plan = planCollections([orgs, projects]);
         expect(rendered(plan, "projects", "org_id")?.nullable).toBe(false);
         expect(fk(plan, "projects", "org_id")).toBe("RESTRICT");
         expect(renderPostgresDdl(plan)).toMatch(/"org_id" UUID NOT NULL/);
@@ -98,7 +99,7 @@ describe("the tenant link", () => {
         };
         const db = new PGlite();
         try {
-            await db.exec(renderPostgresDdl(planSchema([orgs, projects]), { includePolicies: false }));
+            await db.exec(renderPostgresDdl(planCollections([orgs, projects]), { includePolicies: false }));
             await db.exec(
                 "INSERT INTO orgs (id) VALUES ('00000000-0000-0000-0000-000000000001');" +
                 "INSERT INTO projects (org_id) VALUES ('00000000-0000-0000-0000-000000000001');"
@@ -122,7 +123,7 @@ describe("a link whose column a declared property owns", () => {
                 org: { ...orgLink, relation: { ...orgLink.relation, localKey: "org_id" } }
             }
         };
-        expect(fk(planSchema([orgs, projects]), "projects", "org_id")).toBe("RESTRICT");
+        expect(fk(planCollections([orgs, projects]), "projects", "org_id")).toBe("RESTRICT");
     });
 
     it("still sets NULL when nothing makes the column required", () => {
@@ -130,6 +131,6 @@ describe("a link whose column a declared property owns", () => {
             slug: "projects", table: "projects", name: "Projects",
             properties: { id: { name: "ID", type: "string", isId: "uuid" }, org: orgLink }
         };
-        expect(fk(planSchema([orgs, projects]), "projects", "org_id")).toBe("SET NULL");
+        expect(fk(planCollections([orgs, projects]), "projects", "org_id")).toBe("SET NULL");
     });
 });

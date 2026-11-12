@@ -18,6 +18,7 @@ import chalk from "chalk";
 import { getTableName, relationalCollections } from "@rebasepro/common";
 import { isPostgresCollectionConfig, type CollectionConfig } from "@rebasepro/types";
 import { loadTables } from "./load-tables";
+import { lowerCompiledTables } from "./lowered-tables";
 import { buildSearchColumnSpec } from "./search-column";
 
 /** Above this many rows an unindexed search is worth a word. */
@@ -121,8 +122,8 @@ export async function runSearchScaleCheck(schemaDir: string, databaseUrl?: strin
     const { Client } = await import("pg");
     const client = new Client({ connectionString: databaseUrl });
     try {
-        const collections = await loadTables(schemaDir);
-        const candidates = ilikeSearchedCollections(collections);
+        // B-PLAN-2 step 6: the searched columns from the descriptors.
+        const candidates = ilikeSearchedCollections(lowerCompiledTables(await loadTables(schemaDir)));
         if (candidates.length === 0) return;
         await client.connect();
         const estimates = await estimateRowCounts(

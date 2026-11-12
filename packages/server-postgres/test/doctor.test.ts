@@ -7,6 +7,7 @@ import { loadTableSchema } from "../src/schema/load-tables";
 import * as fs from "fs";
 import * as path from "path";
 import { tmpdir } from "os";
+import { compileSet } from "./helpers/plan-tables";
 
 // `runDoctor` loads the tables off disk through `loadTableSchema` (the loader
 // every driver command uses; its own tests read real backend/schema
@@ -39,7 +40,7 @@ describe("Rebase Schema Doctor", () => {
                 properties: { name: { type: "string" } }
             }];
 
-            const result = await checkCollectionsVsSchema(collections, "/nonexistent/path/schema.generated.ts");
+            const result = await checkCollectionsVsSchema(compileSet(collections), "/nonexistent/path/schema.generated.ts");
             expect(result.passed).toBe(false);
             expect(result.issues).toHaveLength(1);
             expect(result.issues[0].category).toBe("schema_stale");
@@ -58,11 +59,11 @@ describe("Rebase Schema Doctor", () => {
             }];
 
             // Generate the expected schema and write to temp file
-            const expectedSchema = await generateSchema(collections);
+            const expectedSchema = await generateSchema(compileSet(collections));
             const schemaPath = await createTempSchemaFile(expectedSchema);
 
             try {
-                const result = await checkCollectionsVsSchema(collections, schemaPath);
+                const result = await checkCollectionsVsSchema(compileSet(collections), schemaPath);
                 expect(result.passed).toBe(true);
                 expect(result.issues).toHaveLength(0);
             } finally {
@@ -89,11 +90,11 @@ describe("Rebase Schema Doctor", () => {
             }];
 
             // Write schema for original, check against updated
-            const originalSchema = await generateSchema(originalCollections);
+            const originalSchema = await generateSchema(compileSet(originalCollections));
             const schemaPath = await createTempSchemaFile(originalSchema);
 
             try {
-                const result = await checkCollectionsVsSchema(updatedCollections, schemaPath);
+                const result = await checkCollectionsVsSchema(compileSet(updatedCollections), schemaPath);
                 expect(result.passed).toBe(false);
                 expect(result.issues.some(i => i.category === "schema_stale")).toBe(true);
             } finally {
@@ -102,7 +103,7 @@ describe("Rebase Schema Doctor", () => {
         });
 
         it("should return error for nonexistent schema file even with empty collections", async () => {
-            const result = await checkCollectionsVsSchema([], "/nonexistent/path");
+            const result = await checkCollectionsVsSchema(compileSet([]), "/nonexistent/path");
             // Schema file doesn't exist → error regardless of collection count
             expect(result.passed).toBe(false);
             expect(result.issues[0].category).toBe("schema_stale");
@@ -216,7 +217,7 @@ inactive: "Inactive" }
         const printed = () => logSpy.mock.calls.map(c => String(c[0] ?? "")).join("\n");
 
         beforeEach(() => {
-            (loadTableSchema as jest.Mock).mockResolvedValue({ collections, descriptors: compileTables(collectionsToTableDefs(collections).tables) });
+            (loadTableSchema as jest.Mock).mockResolvedValue({ collections, descriptors: compileSet(collections).map(table => table.descriptor), tables: compileSet(collections) });
             // The renderer writes the whole drift report to stdout; the counts
             // and the verdict are what is under test, not the noise. It writes
             // through `console.log` rather than `logger.info` deliberately —
@@ -275,7 +276,7 @@ errors: 1 });
         it("does not count a database phase that never ran as passing", async () => {
             const dir = fs.mkdtempSync(path.join(tmpdir(), "doctor-summary-clean-"));
             const schemaPath = path.join(dir, "schema.generated.ts");
-            fs.writeFileSync(schemaPath, await generateSchema(collections), "utf-8");
+            fs.writeFileSync(schemaPath, await generateSchema(compileSet(collections)), "utf-8");
 
             try {
                 const report = await runDoctor({
@@ -313,7 +314,7 @@ errors: 0 });
         it("keeps going when the database refuses the connection, and says why", async () => {
             const dir = fs.mkdtempSync(path.join(tmpdir(), "doctor-unreachable-"));
             const schemaPath = path.join(dir, "schema.generated.ts");
-            fs.writeFileSync(schemaPath, await generateSchema(collections), "utf-8");
+            fs.writeFileSync(schemaPath, await generateSchema(compileSet(collections)), "utf-8");
 
             try {
                 const report = await runDoctor({
@@ -349,7 +350,7 @@ errors: 0 });
             // useless anywhere the database is not to hand.
             const dir = fs.mkdtempSync(path.join(tmpdir(), "doctor-no-url-"));
             const schemaPath = path.join(dir, "schema.generated.ts");
-            fs.writeFileSync(schemaPath, await generateSchema(collections), "utf-8");
+            fs.writeFileSync(schemaPath, await generateSchema(compileSet(collections)), "utf-8");
 
             try {
                 const report = await runDoctor({ schemaDir: dir, schemaPath, sdkPath: path.join(dir, "rebase.d.ts") });
@@ -363,7 +364,7 @@ errors: 0 });
         it("renders the skipped phase as skipped, and never claims everything is in sync", async () => {
             const dir = fs.mkdtempSync(path.join(tmpdir(), "doctor-render-skipped-"));
             const schemaPath = path.join(dir, "schema.generated.ts");
-            fs.writeFileSync(schemaPath, await generateSchema(collections), "utf-8");
+            fs.writeFileSync(schemaPath, await generateSchema(compileSet(collections)), "utf-8");
 
             try {
                 await runDoctor({
@@ -410,7 +411,7 @@ errors: 0 }
         it("never calls a typed SDK that was never generated 'In sync'", async () => {
             const dir = fs.mkdtempSync(path.join(tmpdir(), "doctor-sdk-absent-"));
             const schemaPath = path.join(dir, "schema.generated.ts");
-            fs.writeFileSync(schemaPath, await generateSchema(collections), "utf-8");
+            fs.writeFileSync(schemaPath, await generateSchema(compileSet(collections)), "utf-8");
 
             try {
                 const report = await runDoctor({
@@ -460,11 +461,11 @@ errors: 0 }
             const dir = fs.mkdtempSync(path.join(tmpdir(), "doctor-order-schema-"));
             const schemaPath = path.join(dir, "schema.generated.ts");
             // Written the way `rebase schema generate` writes it: sorted by slug.
-            fs.writeFileSync(schemaPath, await generateSchema([articles, authors]), "utf-8");
+            fs.writeFileSync(schemaPath, await generateSchema(compileSet([articles, authors])), "utf-8");
 
             try {
                 // Checked the way the loader hands them over: readdirSync order.
-                const result = await checkCollectionsVsSchema([authors, articles], schemaPath);
+                const result = await checkCollectionsVsSchema(compileSet([authors, articles]), schemaPath);
                 expect(result.issues).toHaveLength(0);
                 expect(result.passed).toBe(true);
             } finally {

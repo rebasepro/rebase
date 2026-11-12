@@ -1,6 +1,7 @@
 import { CollectionConfig } from "@rebasepro/types";
 import { ensureCollectionPolicies } from "../src/schema/ensure-collection-policies";
 import type { Queryable } from "../src/schema/ensure-collection-tables";
+import { compileSet } from "./helpers/plan-tables";
 
 /**
  * A rule that was tightened must stop granting.
@@ -66,7 +67,7 @@ describe("ensureCollectionPolicies drops orphaned generated policies", () => {
         const stale = "customers_select_0000000";
         const { queryable, ran } = db([stale]);
 
-        const result = await ensureCollectionPolicies(queryable, [customers]);
+        const result = await ensureCollectionPolicies(queryable, compileSet([customers]));
 
         expect(dropsOf(ran)).toContain(stale);
         expect(result.orphansDropped).toBeGreaterThan(0);
@@ -77,7 +78,7 @@ describe("ensureCollectionPolicies drops orphaned generated policies", () => {
         // generated-name shape — the same predicate `db push` uses.
         const { queryable, ran } = db(["tenant_isolation"]);
 
-        const result = await ensureCollectionPolicies(queryable, [customers]);
+        const result = await ensureCollectionPolicies(queryable, compileSet([customers]));
 
         expect(dropsOf(ran)).not.toContain("tenant_isolation");
         expect(result.orphansDropped).toBe(0);
@@ -89,14 +90,14 @@ describe("ensureCollectionPolicies drops orphaned generated policies", () => {
         // policies at all. Learn the names the plan creates, then present a
         // database already holding exactly those and require zero drops.
         const discover = db([]);
-        await ensureCollectionPolicies(discover.queryable, [customers]);
+        await ensureCollectionPolicies(discover.queryable, compileSet([customers]));
         const createdNames = linesOf(discover.ran)
             .filter(s => /^CREATE POLICY/i.test(s))
             .map(s => /"([^"]+)"/.exec(s)![1]);
         expect(createdNames.length).toBeGreaterThan(0);
 
         const second = db(createdNames);
-        const result = await ensureCollectionPolicies(second.queryable, [customers]);
+        const result = await ensureCollectionPolicies(second.queryable, compileSet([customers]));
 
         expect(result.orphansDropped).toBe(0);
     });

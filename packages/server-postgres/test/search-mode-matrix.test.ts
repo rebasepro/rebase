@@ -53,6 +53,7 @@ import { FixtureTableRegistry } from "./helpers/tables";
 import { FetchService } from "../src/services/FetchService";
 import type { PgColumnBuilderBase } from "drizzle-orm/pg-core";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
+import { compileSet } from "./helpers/plan-tables";
 
 /** Five rows, chosen so each query below separates the configurations. */
 const ROWS: [string, string][] = [
@@ -106,7 +107,7 @@ beforeAll(async () => {
     await db.waitReady;
 
     const collections = VARIANTS.map(v => collectionFor(v) as CollectionConfig);
-    await db.exec(await generatePostgresDdl(collections, { includePolicies: false }));
+    await db.exec(await generatePostgresDdl(compileSet(collections), { includePolicies: false }));
 
     for (const v of VARIANTS) {
         for (const [name, cert] of ROWS) {

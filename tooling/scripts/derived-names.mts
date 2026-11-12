@@ -59,6 +59,7 @@ import { fileURLToPath } from "node:url";
 // server-postgres — and the last is a jest suite, which cannot import this
 // script (it awaits at the top level).
 import { FIXTURE, FIXTURE_DATABASE_EXTENSIONS } from "./derived-names-fixture.ts";
+import type { CompiledTable } from "@rebasepro/types";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -345,15 +346,11 @@ interface Rendered {
     legacy: string[];
 }
 
-/** One shape of the fixture, as the planner reads it. */
-type FixtureInput = typeof FIXTURE;
+/** The fixture as the planner reads it: compiled tables. */
+type FixtureInput = CompiledTable[];
 
 /**
  * Run both producers over `fixture` and collect every name they emit.
- *
- * Called twice by {@link render}: once with the legacy collection fixture, once
- * with the same fixture lifted into `defineTable` definitions and lowered back
- * — the path every project takes now that tables live in `backend/schema`.
  */
 async function renderFixture(fixture: FixtureInput): Promise<Rendered> {
 
@@ -458,38 +455,23 @@ const linesOf = ({ surface, legacy }: Rendered): string[] => [...surface.entries
 
 /**
  * The fixture as tables: lifted with `collectionsToTableDefs` (the codemod's
- * own conversion) and lowered with `lowerTables`, exactly as `loadTables`
- * lowers a project's `backend/schema`. Lifted at run time rather than
- * hand-copied, so the twin can never drift from the fixture it shadows.
+ * own conversion) and compiled with `compileSchema`, exactly as `loadTables`
+ * compiles a project's `backend/schema`. Lifted at run time rather than
+ * hand-copied, so the tables can never drift from the fixture they come from.
+ * (The planner reads only compiled tables, so the collection fixture and its
+ * table-shaped twin — once rendered side by side here and required to agree —
+ * are one input now.)
  */
 async function tableShapedFixture(): Promise<FixtureInput> {
-    const { collectionsToTableDefs, lowerTables } = await import("@rebasepro/common");
+    const { collectionsToTableDefs, compileSchema } = await import("@rebasepro/common");
     const lifted = collectionsToTableDefs(FIXTURE);
-    return lowerTables(lifted.tables, lifted.defaultRls !== undefined ? { defaultRls: lifted.defaultRls } : {});
+    return compileSchema(lifted.tables, lifted.defaultRls !== undefined ? { defaultRls: lifted.defaultRls } : {});
 }
 
 export async function render(): Promise<string> {
     await assertResolvesToSource();
 
-    const lines = linesOf(await renderFixture(FIXTURE));
-
-    // The contract has to outlive the collection shape. Every project's tables
-    // now reach the planner through `defineTable` and the lowering, so the
-    // table-shaped twin must name exactly what the collection fixture names —
-    // same identifiers, same producers. When the legacy shape is deleted, the
-    // twin is what renders the baseline, and this check is what says it may.
-    const twin = linesOf(await renderFixture(await tableShapedFixture()));
-    const onlyCollections = lines.filter(line => !twin.includes(line));
-    const onlyTables = twin.filter(line => !lines.includes(line));
-    if (onlyCollections.length > 0 || onlyTables.length > 0) {
-        throw new Error(
-            "The table-shaped fixture (FIXTURE lifted into defineTable and lowered) does not emit the\n" +
-            "surface the collection fixture does. Every derived name must survive the move to tables.\n" +
-            onlyCollections.map(line => `  only from collections: ${line}`).join("\n") +
-            (onlyCollections.length > 0 && onlyTables.length > 0 ? "\n" : "") +
-            onlyTables.map(line => `  only from tables:      ${line}`).join("\n")
-        );
-    }
+    const lines = linesOf(await renderFixture(await tableShapedFixture()));
 
     return [
         "# Derived database identifiers — FROZEN.",
@@ -527,9 +509,10 @@ export async function render(): Promise<string> {
         "# written to `triggers.sql` and never planned by the boot. The boot plans it",
         "# now: an ADDED boot producer on an unchanged name.",
         "#",
-        "# Every line is rendered twice — from the collection fixture and from the",
-        "# same fixture lifted into `defineTable` and lowered (what `backend/schema`",
-        "# goes through) — and the gate refuses to render when the two differ.",
+        "# Every line is rendered from the collection fixture lifted into",
+        "# `defineTable` and compiled — the compiled tables every door hands the",
+        "# planner. (Until 0.31 it was rendered from the collections as well, and",
+        "# the gate refused to render when the two differed; they never did.)",
         "#",
         "# Moved on purpose (2026-11-12): the `<table>_{insert,update,delete}_<sha7>`",
         "# policies of the fixture's bare `access: \"authenticated\"` rule (categories,",

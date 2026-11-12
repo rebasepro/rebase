@@ -1,6 +1,9 @@
 import { CollectionConfig, Relation } from "@rebasepro/types";
 import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
 import { resolveRelation } from "@rebasepro/common";
+import { col, defineTable, rel } from "@rebasepro/types";
+import { compileSchema } from "@rebasepro/common";
+import { compileSet } from "./helpers/plan-tables";
 
 const mockAuthorCollection: CollectionConfig = {
     name: "Author",
@@ -250,7 +253,7 @@ describe("Comprehensive Relations Test Suite", () => {
                 }
             };
 
-            const result = await generateSchema([authorsCollection, booksCollection]);
+            const result = await generateSchema(compileSet([authorsCollection, booksCollection]));
             const cleanResult = cleanSchema(result);
 
             // Should create junction table
@@ -285,7 +288,7 @@ describe("Comprehensive Relations Test Suite", () => {
                 properties: { name: { type: "string" } }
             };
 
-            const result = await generateSchema([usersCollection, rolesCollection, permissionsCollection]);
+            const result = await generateSchema(compileSet([usersCollection, rolesCollection, permissionsCollection]));
             const cleanResult = cleanSchema(result);
 
             // joinPath relations use existing user-controlled tables - no views or Drizzle relations generated
@@ -328,7 +331,7 @@ describe("Comprehensive Relations Test Suite", () => {
                 }
             };
 
-            const result = await generateSchema([authorsCollection, profilesCollection]);
+            const result = await generateSchema(compileSet([authorsCollection, profilesCollection]));
             const cleanResult = cleanSchema(result);
 
             // Should create FK on profiles table
@@ -363,7 +366,7 @@ describe("Comprehensive Relations Test Suite", () => {
                 }
             };
 
-            const result = await generateSchema([categoriesCollection, postsCollection]);
+            const result = await generateSchema(compileSet([categoriesCollection, postsCollection]));
             const cleanResult = cleanSchema(result);
 
             // Should create FK on posts table
@@ -404,7 +407,7 @@ describe("Comprehensive Relations Test Suite", () => {
                 }
             };
 
-            const result = await generateSchema([authorsCollection, publishersCollection, booksCollection]);
+            const result = await generateSchema(compileSet([authorsCollection, publishersCollection, booksCollection]));
             const cleanResult = cleanSchema(result);
 
             // Check owning relation from author to publisher
@@ -443,7 +446,7 @@ validation: { integer: true } },
                 }
             };
 
-            const result = await generateSchema([ordersCollection, customersCollection]);
+            const result = await generateSchema(compileSet([ordersCollection, customersCollection]));
             const cleanResult = cleanSchema(result);
 
             // joinPath relations use existing user-controlled tables - no views generated
@@ -480,7 +483,7 @@ validation: { integer: true } },
                 }
             };
 
-            const result = await generateSchema([usersCollection]);
+            const result = await generateSchema(compileSet([usersCollection]));
             const cleanResult = cleanSchema(result);
 
             // Should handle self-referencing relations
@@ -511,7 +514,7 @@ isId: true },
                 }
             };
 
-            const result = await generateSchema([productsCollection, categoriesCollection]);
+            const result = await generateSchema(compileSet([productsCollection, categoriesCollection]));
             const cleanResult = cleanSchema(result);
 
             // The primary key should be sku
@@ -542,7 +545,7 @@ isId: true },
                 }
             };
 
-            const result = await generateSchema([aCollection, bCollection]);
+            const result = await generateSchema(compileSet([aCollection, bCollection]));
             const cleanResult = cleanSchema(result);
 
             // Should handle circular references without infinite loops
@@ -607,7 +610,7 @@ describe("Shared relationName regression", () => {
             }
         };
 
-        const result = await generateSchema([companiesCollection, jobsCollection]);
+        const result = await generateSchema(compileSet([companiesCollection, jobsCollection]));
         const cleanResult = cleanSchema(result);
 
         // Both sides must use the same deterministic name: jobs_companyId
@@ -657,7 +660,7 @@ describe("Shared relationName regression", () => {
             }
         };
 
-        const result = await generateSchema([usersCollection, profilesCollection]);
+        const result = await generateSchema(compileSet([usersCollection, profilesCollection]));
         const cleanResult = cleanSchema(result);
 
         const expectedSharedName = "profiles_userId";
@@ -711,7 +714,7 @@ describe("Shared relationName regression", () => {
             }
         };
 
-        const cleanResult = cleanSchema(await generateSchema([companiesCollection, billingCollection]));
+        const cleanResult = cleanSchema(await generateSchema(compileSet([companiesCollection, billingCollection])));
 
         // Each names its own foreign key and shares its name with the matching
         // owning side. A bare `one(billingConfigs)` here throws in drizzle:
@@ -742,7 +745,7 @@ describe("Shared relationName regression", () => {
             }
         };
 
-        const cleanResult = cleanSchema(await generateSchema([employeesCollection]));
+        const cleanResult = cleanSchema(await generateSchema(compileSet([employeesCollection])));
 
         // A bare `one(employees)` counts itself as its own counterpart.
         expect(cleanResult).toContain(
@@ -771,7 +774,7 @@ describe("Shared relationName regression", () => {
             properties: { company_ref: { type: "string" } }
         };
 
-        const cleanResult = cleanSchema(await generateSchema([companiesCollection, billingCollection]));
+        const cleanResult = cleanSchema(await generateSchema(compileSet([companiesCollection, billingCollection])));
 
         expect(cleanResult).toContain(
             `"billingConfig": one<typeof billingConfigs, [AnyPgColumn<{ tableName: "companies" }>]>(billingConfigs, { fields: [companies.external_ref], references: [billingConfigs.company_ref], relationName: "billing_configs_company_ref" })`
@@ -815,7 +818,7 @@ describe("Shared relationName regression", () => {
             }
         };
 
-        const result = await generateSchema([companiesCollection, peopleCollection]);
+        const result = await generateSchema(compileSet([companiesCollection, peopleCollection]));
         const allNames = extractRelationNames(result);
 
         // Each pair should have a distinct shared name
@@ -909,7 +912,7 @@ describe("Duplicate relation deduplication regression", () => {
             ]
         };
 
-        const result = await generateSchema([companiesCollection, jobsCollection]);
+        const result = await generateSchema(compileSet([companiesCollection, jobsCollection]));
         const cleanResult = cleanSchema(result);
 
         // The jobs table should have exactly ONE one() entry for company_id
@@ -971,7 +974,7 @@ describe("Duplicate relation deduplication regression", () => {
             ]
         };
 
-        const result = await generateSchema([parentCollection, memberCollection]);
+        const result = await generateSchema(compileSet([parentCollection, memberCollection]));
 
         // team_members table should have exactly one one() definition
         const teamMembersRelBlock = result.match(/export const teamMembersRelations[\s\S]*?\}\)\);/)?.[0] ?? "";
@@ -1030,7 +1033,7 @@ relationName: "recipient" }
             ]
         };
 
-        const result = await generateSchema([usersCollection, messagesCollection]);
+        const result = await generateSchema(compileSet([usersCollection, messagesCollection]));
 
         // messages table should have exactly TWO one() entries (one per FK)
         const messagesRelBlock = result.match(/export const messagesRelations[\s\S]*?\}\)\);/)?.[0] ?? "";
@@ -1045,6 +1048,31 @@ relationName: "recipient" }
 });
 
 describe("columnName vs property key deduplication regression", () => {
+    // Written as tables: the legacy literals declared the FK both as an inline
+    // relation property (`clientId`, `userId`) and as a `relations` entry under
+    // another name, which the table model refuses. A column keeps its key
+    // (`clientId`, SQL `client_id`) and the relation its own name.
+    const clients = defineTable("clients", {
+        columns: { id: col.text().primaryKey(), name: col.text() },
+        relations: { engagements: rel.hasMany(() => engagements, { foreignKey: "client_id" }) },
+        rls: "admin-only"
+    });
+    const engagements = defineTable("engagements", {
+        columns: { id: col.text().primaryKey(), clientId: col.text(), title: col.text() },
+        relations: { client: rel.belongsTo(() => clients, { localKey: "client_id" }) },
+        rls: "admin-only"
+    });
+    const users = defineTable("users", {
+        columns: { id: col.text().primaryKey(), name: col.text() },
+        relations: { profile: rel.hasOne(() => profiles, { foreignKey: "user_id" }) },
+        rls: "admin-only"
+    });
+    const profiles = defineTable("profiles", {
+        columns: { id: col.text().primaryKey(), userId: col.text(), bio: col.text() },
+        relations: { user: rel.belongsTo(() => users, { localKey: "user_id" }) },
+        rls: "admin-only"
+    });
+
     const extractRelationNames = (schema: string): string[] => {
         const matches = schema.match(/relationName:\s*"([^"]+)"/g) ?? [];
         return matches.map(m => m.replace(/relationName:\s*"/, "").replace(/"$/, ""));
@@ -1101,7 +1129,7 @@ describe("columnName vs property key deduplication regression", () => {
             ]
         };
 
-        const result = await generateSchema([clientsCollection, engagementsCollection]);
+        const result = await generateSchema(compileSchema([clients, engagements]));
 
         // engagements should have exactly ONE one() entry for clientId
         const engagementsRelBlock = result.match(/export const engagementsRelations[\s\S]*?\}\)\);/)?.[0] ?? "";
@@ -1162,7 +1190,7 @@ describe("columnName vs property key deduplication regression", () => {
             ]
         };
 
-        const result = await generateSchema([clientsCollection, engagementsCollection]);
+        const result = await generateSchema(compileSchema([clients, engagements]));
 
         // Extract relation names from both sides
         const engagementsRelBlock = result.match(/export const engagementsRelations[\s\S]*?\}\)\);/)?.[0] ?? "";
@@ -1227,7 +1255,7 @@ describe("columnName vs property key deduplication regression", () => {
             ]
         };
 
-        const result = await generateSchema([usersCollection, profilesCollection]);
+        const result = await generateSchema(compileSchema([users, profiles]));
 
         // profiles should have exactly ONE one() entry
         const profilesRelBlock = result.match(/export const profilesRelations[\s\S]*?\}\)\);/)?.[0] ?? "";
@@ -1275,7 +1303,7 @@ describe("columnName vs property key deduplication regression", () => {
             }
         };
 
-        const result = await generateSchema([categoriesCollection, productsCollection]);
+        const result = await generateSchema(compileSet([categoriesCollection, productsCollection]));
 
         // products should get a synthetic one() for category_id
         const productsRelBlock = result.match(/export const productsRelations[\s\S]*?\}\)\);/)?.[0] ?? "";

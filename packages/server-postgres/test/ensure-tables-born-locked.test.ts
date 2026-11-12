@@ -17,6 +17,7 @@ import { PGlite } from "@electric-sql/pglite";
 import type { CollectionConfig } from "@rebasepro/types";
 import { ensureCollectionTables, planCollectionSchemaEnsure, type Queryable } from "../src/schema/ensure-collection-tables";
 import type { ExistingSchema } from "../src/schema/plan/diff-plan";
+import { compileSet } from "./helpers/plan-tables";
 
 const tags: CollectionConfig = {
     slug: "tags",
@@ -45,7 +46,7 @@ const emptyDb = (): ExistingSchema => ({ tables: new Map(), enums: new Set(), co
 
 describe("the boot ensure creates every table locked", () => {
     it("plans ENABLE ROW LEVEL SECURITY immediately after each CREATE TABLE, junctions included", () => {
-        const { actions } = planCollectionSchemaEnsure(collections, emptyDb());
+        const { actions } = planCollectionSchemaEnsure(compileSet(collections), emptyDb());
         const created = actions.filter(a => a.kind === "create-table").map(a => a.target);
         expect(created).toEqual(expect.arrayContaining(["public.secrets", "public.tags"]));
         expect(created.length).toBe(3); // and the junction
@@ -64,7 +65,7 @@ describe("the boot ensure creates every table locked", () => {
     it("plans nothing for a table that already exists", () => {
         const existing = emptyDb();
         for (const table of ["public.secrets", "public.tags"]) existing.tables.set(table, new Set(["id"]));
-        const { actions } = planCollectionSchemaEnsure(collections, existing);
+        const { actions } = planCollectionSchemaEnsure(compileSet(collections), existing);
         expect(actions.filter(a => a.kind === "enable-rls").map(a => a.target))
             .toEqual(actions.filter(a => a.kind === "create-table").map(a => a.target));
         expect(actions.some(a => a.target === "public.secrets" && a.kind === "enable-rls")).toBe(false);
@@ -92,7 +93,7 @@ describe("the boot ensure creates every table locked", () => {
                     return { rows: (await db.query<T>(text)).rows };
                 }
             };
-            await expect(ensureCollectionTables(failing, collections)).rejects.toThrow(/injected/);
+            await expect(ensureCollectionTables(failing, compileSet(collections))).rejects.toThrow(/injected/);
 
             const { rows } = await db.query<{ relname: string; relrowsecurity: boolean }>(
                 `SELECT c.relname, c.relrowsecurity FROM pg_class c

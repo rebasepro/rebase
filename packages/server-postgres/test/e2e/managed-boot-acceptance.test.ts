@@ -46,6 +46,7 @@ import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry.js"
 import { FixtureTableRegistry } from "../helpers/tables";
 import { RealtimeService } from "../../src/services/realtimeService.js";
 import { testUser } from "./test-user.js";
+import { compileSet } from "../helpers/plan-tables";
 
 // ── The bundle's collections, as compiled config — no hand-written DDL ───────
 //
@@ -185,7 +186,7 @@ describe("managed boot: a fresh tenant DB serves data with no db push (E2E)", ()
         await ensureAuthTablesExist(db);
 
         // 2. Tables (boot phase 1). Additive create of the collection tables.
-        await ensureCollectionTables(queryable, collections);
+        await ensureCollectionTables(queryable, compileSet(collections));
 
         // 3. The restricted user role authenticated requests run as, with DML
         //    grants on the tables just created (what initializeDriver does).
@@ -195,7 +196,7 @@ describe("managed boot: a fresh tenant DB serves data with no db push (E2E)", ()
 
         // 4. Policies (boot phase 2 — the code under test). Enables RLS and
         //    applies each collection's securityRules as CREATE POLICY.
-        const applied = await ensureCollectionPolicies(queryable, collections);
+        const applied = await ensureCollectionPolicies(queryable, compileSet(collections));
         expect(applied.failures).toEqual([]);
         // Four declared collections plus the derived `orders_tiers` junction.
         expect(applied.tablesSecured).toBe(5);
@@ -360,11 +361,11 @@ describe("managed boot: a fresh tenant DB serves data with no db push (E2E)", ()
     it("is idempotent: a second boot changes nothing and still serves", async () => {
         // Both phases, as a restart would run them — the table pass must plan no
         // work at all the second time, or every boot would churn the schema.
-        const tablesAgain = await ensureCollectionTables(queryable, collections);
+        const tablesAgain = await ensureCollectionTables(queryable, compileSet(collections));
         expect(tablesAgain.actions).toEqual([]);
         expect(tablesAgain.failures).toEqual([]);
 
-        const again = await ensureCollectionPolicies(queryable, collections);
+        const again = await ensureCollectionPolicies(queryable, compileSet(collections));
         expect(again.failures).toEqual([]);
         expect(again.tablesSecured).toBe(5);
         // Data still reads exactly the same after a second application.

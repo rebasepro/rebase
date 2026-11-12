@@ -28,6 +28,7 @@ import {
 import { generatePostgresDdl } from "../src/schema/generate-postgres-ddl-logic";
 import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
 import { resolveColumnName } from "../src/schema/column-plan-helpers";
+import { compileSet } from "./helpers/plan-tables";
 
 const posts = (indexes: CollectionIndex[], extra: Partial<PostgresCollectionConfig> = {}): PostgresCollectionConfig =>
     ({
@@ -276,7 +277,7 @@ describe("the plan and the generated DDL", () => {
     });
 
     it("reaches schema.sql, and before the foreign keys that may depend on it", async () => {
-        const ddl = await generatePostgresDdl([posts([{ on: ["status"], reason: "dashboard filter" }])] as CollectionConfig[]);
+        const ddl = await generatePostgresDdl(compileSet([posts([{ on: ["status"], reason: "dashboard filter" }])] as CollectionConfig[]));
         expect(ddl).toContain("CREATE INDEX \"posts_status_ix_");
         const indexAt = ddl.indexOf("-- Indexes");
         const fkAt = ddl.indexOf("-- Foreign Key Constraints");
@@ -301,7 +302,7 @@ describe("the plan and the generated DDL", () => {
  */
 describe("the generated Drizzle schema", () => {
     const generated = (indexes: CollectionIndex[], extra: Partial<PostgresCollectionConfig> = {}) =>
-        generateSchema([posts(indexes, extra)]);
+        generateSchema(compileSet([posts(indexes, extra)]));
 
     it("declares each index under the name the other two emitters use", async () => {
         const declared: CollectionIndex[] = [

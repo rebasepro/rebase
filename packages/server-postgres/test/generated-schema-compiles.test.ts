@@ -34,6 +34,7 @@ import ts from "typescript";
 import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
 import { everything, groups } from "./fixtures/property-matrix-collections";
 import type { CollectionConfig } from "@rebasepro/types";
+import { compileSet } from "./helpers/plan-tables";
 
 const PACKAGE_ROOT = path.resolve(__dirname, "..");
 
@@ -71,7 +72,7 @@ const compileDiagnostics = (source: string): string[] => {
 
 describe("the generated Drizzle schema compiles", () => {
     it("for a collection set covering every property option", async () => {
-        const schema = await generateSchema(everything);
+        const schema = await generateSchema(compileSet(everything));
         expect(compileDiagnostics(schema)).toEqual([]);
     }, 60_000);
 
@@ -91,7 +92,7 @@ describe("the generated Drizzle schema compiles", () => {
     ];
 
     it.each(isolated)("for the %s group on its own", async (_name, collections) => {
-        const schema = await generateSchema(collections);
+        const schema = await generateSchema(compileSet(collections));
         expect(compileDiagnostics(schema)).toEqual([]);
     }, 60_000);
 
@@ -100,7 +101,7 @@ describe("the generated Drizzle schema compiles", () => {
     // with this table's key, which is NOT NULL, and drizzle would infer from
     // that a related row that is always there. An author may have no profile.
     it("types a hasOne's related row as possibly absent", async () => {
-        const schema = await generateSchema(groups.relations);
+        const schema = await generateSchema(compileSet(groups.relations));
         const usage = [
             "import { drizzle } from 'drizzle-orm/node-postgres';",
             "const db = drizzle.mock({ schema: { ...tables, ...relations } });",
@@ -125,7 +126,7 @@ describe("the generated Drizzle schema compiles", () => {
     // a type error in the file, and a drizzle builder used without its import —
     // which is the exact shape of four of the six bugs above.
     it("reports a type error, so an empty result means something", async () => {
-        const schema = await generateSchema(groups.uuidOnly);
+        const schema = await generateSchema(compileSet(groups.uuidOnly));
 
         expect(compileDiagnostics(`${schema}\nexport const broken: number = "not a number";\n`))
             .toEqual([expect.stringContaining("TS2322")]);

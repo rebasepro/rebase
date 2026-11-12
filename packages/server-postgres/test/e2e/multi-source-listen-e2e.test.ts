@@ -31,6 +31,7 @@ import { createPostgresDatabaseConnection } from "../../src/connection.js";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
 import { RealtimeService } from "../../src/services/realtimeService.js";
 import { ensureCollectionTables, type Queryable } from "../../src/schema/ensure-collection-tables.js";
+import { compileSet } from "../helpers/plan-tables";
 
 const postsCollection: CollectionConfig = {
     name: "Posts",
@@ -128,8 +129,8 @@ describe("Two data sources, each listening on its own database (E2E)", () => {
 
         defaultConn = createPostgresDatabaseConnection(defaultUrl);
         analyticsConn = createPostgresDatabaseConnection(analyticsUrl);
-        await ensureCollectionTables(queryableFor(defaultConn.pool), [postsCollection]);
-        await ensureCollectionTables(queryableFor(analyticsConn.pool), [eventsCollection]);
+        await ensureCollectionTables(queryableFor(defaultConn.pool), compileSet([postsCollection]));
+        await ensureCollectionTables(queryableFor(analyticsConn.pool), compileSet([eventsCollection]));
 
         defaultClient = new pg.Client({ connectionString: defaultUrl });
         analyticsClient = new pg.Client({ connectionString: analyticsUrl });

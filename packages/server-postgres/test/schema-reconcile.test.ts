@@ -14,6 +14,7 @@
 import { PGlite } from "@electric-sql/pglite";
 import type { CollectionConfig } from "@rebasepro/types";
 import { readReconcileFacts, reconcileDigest } from "../src/schema/reconcile-schema";
+import { compileSet } from "./helpers/plan-tables";
 
 const queryable = (db: PGlite) => ({
     query: async <T = unknown>(sql: string) => {
@@ -59,7 +60,7 @@ describe("planning and applying a schema reconcile", () => {
     });
 
     it("relaxes a column made optional and lists what no property declares, dropping nothing unasked", async () => {
-        const plan = await readReconcileFacts(queryable(db), [voiceCache]);
+        const plan = await readReconcileFacts(queryable(db), compileSet([voiceCache]));
 
         expect(plan.problems).toEqual([]);
         expect(plan.relaxed).toEqual([
@@ -84,7 +85,7 @@ describe("planning and applying a schema reconcile", () => {
         // it is NOT NULL with no default, and the API's insert never names it.
         await expect(db.exec(`INSERT INTO public.voice_cache (text, wav) VALUES ('d', 'w')`)).rejects.toThrow(/legacy_blob/);
 
-        const plan = await readReconcileFacts(queryable(db), [voiceCache]);
+        const plan = await readReconcileFacts(queryable(db), compileSet([voiceCache]));
         for (const statement of plan.statements) await db.exec(statement);
 
         await db.exec(`INSERT INTO public.voice_cache (text) VALUES ('d')`);
@@ -95,18 +96,18 @@ describe("planning and applying a schema reconcile", () => {
 
         // Once relaxed it no longer blocks inserts, so it is only listed, and
         // dropping it later is still the separate, named step.
-        const again = await readReconcileFacts(queryable(db), [voiceCache]);
+        const again = await readReconcileFacts(queryable(db), compileSet([voiceCache]));
         expect(again.statements).toEqual([]);
         expect(again.undeclared).toContainEqual(
             { collection: "voice_cache", table: "public.voice_cache", column: "legacy_blob", blocksInserts: false }
         );
-        const drop = await readReconcileFacts(queryable(db), [voiceCache], { drop: ["voice_cache.legacy_blob"] });
+        const drop = await readReconcileFacts(queryable(db), compileSet([voiceCache]), { drop: ["voice_cache.legacy_blob"] });
         expect(drop.statements).toEqual([`ALTER TABLE "public"."voice_cache" DROP COLUMN "legacy_blob";`]);
         expect(drop.dropped[0].rowsWithValue).toBe(3);
     });
 
     it("drops only the column named, and says how many rows hold data in it", async () => {
-        const plan = await readReconcileFacts(queryable(db), [voiceCache], { drop: ["voice_cache.legacy_blob"] });
+        const plan = await readReconcileFacts(queryable(db), compileSet([voiceCache]), { drop: ["voice_cache.legacy_blob"] });
 
         expect(plan.problems).toEqual([]);
         expect(plan.dropped).toEqual([
@@ -135,12 +136,12 @@ describe("planning and applying a schema reconcile", () => {
         await db.exec(`INSERT INTO public.voice_cache (text, path) VALUES ('d', 'voice/d.wav')`);
 
         // And a second plan has nothing left to do.
-        const again = await readReconcileFacts(queryable(db), [voiceCache]);
+        const again = await readReconcileFacts(queryable(db), compileSet([voiceCache]));
         expect(again.statements).toEqual([]);
     });
 
     it("refuses to drop a column the collection still declares, or one that is not there", async () => {
-        const plan = await readReconcileFacts(queryable(db), [voiceCache], {
+        const plan = await readReconcileFacts(queryable(db), compileSet([voiceCache]), {
             drop: ["voice_cache.wav", "voice_cache.nope", "nobody.legacy_blob", "legacy_blob"]
         });
 
@@ -155,8 +156,8 @@ describe("planning and applying a schema reconcile", () => {
     });
 
     it("gives a different digest to a different plan, so a stale confirmation cannot apply", async () => {
-        const relaxOnly = await readReconcileFacts(queryable(db), [voiceCache]);
-        const withDrop = await readReconcileFacts(queryable(db), [voiceCache], { drop: ["voice_cache.note"] });
+        const relaxOnly = await readReconcileFacts(queryable(db), compileSet([voiceCache]));
+        const withDrop = await readReconcileFacts(queryable(db), compileSet([voiceCache]), { drop: ["voice_cache.note"] });
         expect(relaxOnly.digest).not.toBe(withDrop.digest);
     });
 });

@@ -25,6 +25,7 @@ import {
 } from "../src/schema/generate-schema-commit";
 import { classifyCollectionChanges } from "../src/schema/classify-change";
 import { planCollectionSchemaEnsure } from "../src/schema/ensure-collection-tables";
+import { compileSet } from "./helpers/plan-tables";
 
 const collection = (slug: string, properties: PostgresProperties = {}): CollectionConfig =>
     ({
@@ -39,7 +40,7 @@ const collection = (slug: string, properties: PostgresProperties = {}): Collecti
 const str = (over: Partial<StringProperty> = {}): StringProperty => ({ type: "string", name: "S", ...over });
 
 const planOf = (collections: CollectionConfig[]) =>
-    planCollectionSchemaEnsure(collections, { tables: new Map(), enums: new Set() }).statements;
+    planCollectionSchemaEnsure(compileSet(collections), { tables: new Map(), enums: new Set() }).statements;
 
 describe("additiveStatements — the delta between two ensure plans", () => {
     it("a new collection brings its CREATE TABLE", () => {

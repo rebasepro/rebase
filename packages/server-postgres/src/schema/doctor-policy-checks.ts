@@ -7,8 +7,8 @@
  */
 import path from "path";
 import chalk from "chalk";
-import { CollectionConfig } from "@rebasepro/types";
 import { loadTables } from "./load-tables";
+import { lowerCompiledTables } from "./lowered-tables";
 import { checkPolicyDrift, formatPolicyDrift, hasDrift } from "../security/policy-drift";
 import { validatePolicyPgRoles, warnOnAnonymousGrants } from "../security/rls-enforcement";
 
@@ -54,7 +54,9 @@ export async function runPolicyChecks(schemaDir: string, databaseUrl?: string): 
     const { Pool } = await import("pg");
     const pool = new Pool({ connectionString: databaseUrl });
     try {
-        const collections: CollectionConfig[] = await loadTables(resolvedPath);
+        const tables = await loadTables(resolvedPath);
+        // B-PLAN-2 step 6: the role checks read the rules off the descriptors.
+        const collections = lowerCompiledTables(tables);
 
         // Zero tables is not "no drift", it is nothing to compare. The loader
         // returns `[]` for a directory that does not exist, so the commonest
@@ -101,7 +103,7 @@ export async function runPolicyChecks(schemaDir: string, databaseUrl?: string): 
 
         // Where a boot on this database writes the server-or-admin policies:
         // `TO public` where its admin switch is not live, and that is no drift.
-        const drift = await checkPolicyDrift(pool, collections, { adminRoleAvailable: "detect" });
+        const drift = await checkPolicyDrift(pool, tables, { adminRoleAvailable: "detect" });
         console.log("");
         if (hasDrift(drift)) {
             problems = true;

@@ -24,6 +24,7 @@ import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
 import { planCollectionSchemaEnsure } from "../src/schema/ensure-collection-tables";
 import { buildSearchColumnSpec } from "../src/schema/search-column";
 import { planColumnTypeFor } from "./helpers/plan-column";
+import { compileSet } from "./helpers/plan-tables";
 
 const collection: PostgresCollectionConfig = {
     slug: "talents",
@@ -58,27 +59,27 @@ describe("every generator renders the same search column", () => {
     });
 
     it("the DDL generator emits the spec's expression verbatim", async () => {
-        const ddl = await generatePostgresDdl(collections, { includePolicies: false });
+        const ddl = await generatePostgresDdl(compileSet(collections), { includePolicies: false });
         expect(ddl).toContain(`"search_vector" tsvector GENERATED ALWAYS AS (${spec.expression}) STORED`);
     });
 
     it("the Drizzle schema generator emits the spec's expression verbatim", async () => {
-        const schema = await generateSchema(collections);
+        const schema = await generateSchema(compileSet(collections));
         expect(schema).toContain(spec.expression);
         expect(schema).toContain(`customType({ dataType() { return 'tsvector'; } })("search_vector")`);
         expect(schema).toContain("generatedAlwaysAs");
     });
 
     it("the boot-time ensure adds the same column definition", () => {
-        const plan = planCollectionSchemaEnsure(collections, emptySchema);
+        const plan = planCollectionSchemaEnsure(compileSet(collections), emptySchema);
         const addSearch = plan.actions.find(a => a.kind === "add-column" && a.target.endsWith("search_vector"));
         expect(addSearch).toBeDefined();
         expect(addSearch!.sql).toContain(`tsvector GENERATED ALWAYS AS (${spec.expression}) STORED`);
     });
 
     it("the DDL generator and the ensure agree on the index", async () => {
-        const ddl = await generatePostgresDdl(collections, { includePolicies: false });
-        const plan = planCollectionSchemaEnsure(collections, emptySchema);
+        const ddl = await generatePostgresDdl(compileSet(collections), { includePolicies: false });
+        const plan = planCollectionSchemaEnsure(compileSet(collections), emptySchema);
         const index = plan.actions.find(a => a.kind === "create-index");
 
         expect(ddl).toContain(`USING GIN ("search_vector")`);
@@ -90,7 +91,7 @@ describe("every generator renders the same search column", () => {
 
 describe("the helper functions exist before anything that calls them", () => {
     it("the DDL declares them above the first CREATE TABLE", async () => {
-        const ddl = await generatePostgresDdl(collections, { includePolicies: false });
+        const ddl = await generatePostgresDdl(compileSet(collections), { includePolicies: false });
         const fnAt = ddl.indexOf("CREATE OR REPLACE FUNCTION public.rebase_search_text(text[])");
         const tableAt = ddl.indexOf("CREATE TABLE");
         expect(fnAt).toBeGreaterThan(-1);
@@ -98,13 +99,13 @@ describe("the helper functions exist before anything that calls them", () => {
     });
 
     it("the DDL creates the unaccent extension above the function that uses it", async () => {
-        const ddl = await generatePostgresDdl(collections, { includePolicies: false });
+        const ddl = await generatePostgresDdl(compileSet(collections), { includePolicies: false });
         expect(ddl.indexOf("CREATE EXTENSION IF NOT EXISTS unaccent"))
             .toBeLessThan(ddl.indexOf("rebase_search_unaccent"));
     });
 
     it("the ensure plans them before the column that calls them", () => {
-        const kinds = planCollectionSchemaEnsure(collections, emptySchema).actions.map(a => a.kind);
+        const kinds = planCollectionSchemaEnsure(compileSet(collections), emptySchema).actions.map(a => a.kind);
         const lastFunction = kinds.lastIndexOf("create-function");
         const firstColumn = kinds.indexOf("add-column");
         expect(lastFunction).toBeGreaterThan(-1);
@@ -112,7 +113,7 @@ describe("the helper functions exist before anything that calls them", () => {
     });
 
     it("the ensure plans the extension before the functions", () => {
-        const kinds = planCollectionSchemaEnsure(collections, emptySchema).actions.map(a => a.kind);
+        const kinds = planCollectionSchemaEnsure(compileSet(collections), emptySchema).actions.map(a => a.kind);
         expect(kinds.indexOf("create-extension")).toBeLessThan(kinds.indexOf("create-function"));
     });
 
@@ -128,20 +129,20 @@ describe("the helper functions exist before anything that calls them", () => {
             enums: new Set<string>(),
             constraints: new Set<string>()
         };
-        const plan = planCollectionSchemaEnsure(collections, live);
+        const plan = planCollectionSchemaEnsure(compileSet(collections), live);
         const index = plan.actions.find(a => a.kind === "create-index")!;
         expect(index.sql).toContain("CREATE INDEX CONCURRENTLY");
     });
 
     it("builds plainly on a table it is creating in the same pass", () => {
-        const plan = planCollectionSchemaEnsure(collections, emptySchema);
+        const plan = planCollectionSchemaEnsure(compileSet(collections), emptySchema);
         const index = plan.actions.find(a => a.kind === "create-index")!;
         expect(index.sql).toContain("CREATE INDEX IF NOT EXISTS");
         expect(index.sql).not.toContain("CONCURRENTLY");
     });
 
     it("the ensure plans the index after the column it indexes", () => {
-        const kinds = planCollectionSchemaEnsure(collections, emptySchema).actions.map(a => a.kind);
+        const kinds = planCollectionSchemaEnsure(compileSet(collections), emptySchema).actions.map(a => a.kind);
         expect(kinds.lastIndexOf("add-column")).toBeLessThan(kinds.indexOf("create-index"));
     });
 });
@@ -175,7 +176,7 @@ describe("a collection that has not opted in is untouched", () => {
     }];
 
     it("emits no search column, index, extension or helper in the DDL", async () => {
-        const ddl = await generatePostgresDdl(plain, { includePolicies: false });
+        const ddl = await generatePostgresDdl(compileSet(plain), { includePolicies: false });
         expect(ddl).not.toContain("tsvector");
         expect(ddl).not.toContain("rebase_search_text");
         expect(ddl).not.toContain("CREATE EXTENSION");
@@ -183,11 +184,11 @@ describe("a collection that has not opted in is untouched", () => {
     });
 
     it("emits no customType import in the Drizzle schema", async () => {
-        expect(await generateSchema(plain)).not.toContain("tsvector");
+        expect(await generateSchema(compileSet(plain))).not.toContain("tsvector");
     });
 
     it("plans no search action at boot", () => {
-        const kinds = planCollectionSchemaEnsure(plain, emptySchema).actions.map(a => a.kind);
+        const kinds = planCollectionSchemaEnsure(compileSet(plain), emptySchema).actions.map(a => a.kind);
         expect(kinds).not.toContain("create-function");
         expect(kinds).not.toContain("create-extension");
         expect(kinds).not.toContain("create-index");
@@ -211,7 +212,7 @@ describe("what Atlas is allowed to read", () => {
      * search out of the schema" — it is a split, and both halves are pinned.
      */
     it("keeps functions and extensions out of the Atlas desired state", async () => {
-        const ddl = await generatePostgresDdl([collection], {
+        const ddl = await generatePostgresDdl(compileSet([collection]), {
             includePolicies: false,
             includeSearch: false
         });
@@ -220,7 +221,7 @@ describe("what Atlas is allowed to read", () => {
     });
 
     it("shows Atlas no trace of search at all — not the column, not the index", async () => {
-        const ddl = await generatePostgresDdl([collection], {
+        const ddl = await generatePostgresDdl(compileSet([collection]), {
             includePolicies: false,
             includeSearch: false
         });
@@ -234,7 +235,7 @@ describe("what Atlas is allowed to read", () => {
     });
 
     it("puts the whole apparatus in the file the CLI applies", () => {
-        const sql = generatePostgresSearchDdl([collection]);
+        const sql = generatePostgresSearchDdl(compileSet([collection]));
         expect(sql).toMatch(/CREATE\s+OR\s+REPLACE\s+FUNCTION/i);
         expect(sql).toContain("rebase_search_text");
         expect(sql).toMatch(/CREATE\s+EXTENSION[^\n]*unaccent/i);
@@ -252,11 +253,11 @@ describe("what Atlas is allowed to read", () => {
             name: "Posts",
             properties: { id: { type: "string", isId: "uuid" }, title: { type: "string" } }
         }];
-        expect(generatePostgresSearchDdl(noSearch)).toBe("");
+        expect(generatePostgresSearchDdl(compileSet(noSearch))).toBe("");
     });
 
     it("declares every helper it calls, since nothing else will", () => {
-        const sql = generatePostgresSearchDdl([collection]);
+        const sql = generatePostgresSearchDdl(compileSet([collection]));
         // `search.sql` is applied on its own, against databases that have only
         // ever been touched by Atlas. A helper referenced but not declared here
         // has nowhere else to come from.
@@ -268,7 +269,7 @@ describe("what Atlas is allowed to read", () => {
     });
 
     it("adds the column rather than defining it inline — the table already exists", () => {
-        const sql = generatePostgresSearchDdl([collection]);
+        const sql = generatePostgresSearchDdl(compileSet([collection]));
         expect(sql).toContain(`ALTER TABLE "public"."talents" ADD COLUMN IF NOT EXISTS "${spec.column}"`);
         expect(sql).not.toContain("CREATE TABLE");
     });
@@ -284,14 +285,14 @@ describe("searchExcludePatterns — what Atlas is told to keep its hands off", (
      * stop it reported nothing at all.
      */
     it("qualifies every pattern with the schema", () => {
-        for (const pattern of searchExcludePatterns([collection])) {
+        for (const pattern of searchExcludePatterns(compileSet([collection]))) {
             expect(pattern.split(".")).toHaveLength(3);
             expect(pattern.startsWith("public.")).toBe(true);
         }
     });
 
     it("covers the column and the index — both are absent from the desired state", () => {
-        const patterns = searchExcludePatterns([collection]);
+        const patterns = searchExcludePatterns(compileSet([collection]));
         expect(patterns).toContain(`public.talents.${spec.column}`);
         expect(patterns).toContain(`public.talents.${spec.indexName}`);
     });
@@ -302,24 +303,24 @@ describe("searchExcludePatterns — what Atlas is told to keep its hands off", (
             search: { ...collection.search!, fuzzy: true }
         };
         const fuzzySpec = buildSearchColumnSpec(fuzzy)!;
-        const patterns = searchExcludePatterns([fuzzy]);
+        const patterns = searchExcludePatterns(compileSet([fuzzy]));
         expect(fuzzySpec.fuzzy).toBeDefined();
         expect(patterns).toContain(`public.talents.${fuzzySpec.fuzzy!.column}`);
         expect(patterns).toContain(`public.talents.${fuzzySpec.fuzzy!.indexName}`);
     });
 
     it("is empty for a project that never opted in, so nothing changes for it", () => {
-        expect(searchExcludePatterns([{
+        expect(searchExcludePatterns(compileSet([{
             slug: "posts", table: "posts", name: "Posts",
             properties: { id: { type: "string", isId: "uuid" }, title: { type: "string" } }
-        }])).toEqual([]);
+        }]))).toEqual([]);
     });
 
     it("excludes exactly the objects search.sql creates, and nothing else", () => {
         // The two lists are built independently. If one grows an object the
         // other does not know about, Atlas drops it on the next push.
-        const sql = generatePostgresSearchDdl([collection]);
-        for (const pattern of searchExcludePatterns([collection])) {
+        const sql = generatePostgresSearchDdl(compileSet([collection]));
+        for (const pattern of searchExcludePatterns(compileSet([collection]))) {
             expect(sql).toContain(pattern.split(".")[2]);
         }
     });
@@ -330,7 +331,7 @@ describe("searchColumnDependencies", () => {
         // What the generated expression actually reads, and so what Postgres
         // will refuse to retype underneath it. `questionnaire.certifications`
         // reads the `questionnaire` column, not a column of its own.
-        const dependencies = searchColumnDependencies(collections);
+        const dependencies = searchColumnDependencies(compileSet(collections));
         expect(new Set(dependencies.map(d => d.dependsOn)))
             .toEqual(new Set(["full_name", "interests", "questionnaire"]));
         for (const dependency of dependencies) {
@@ -341,7 +342,7 @@ describe("searchColumnDependencies", () => {
     it("agrees with the spec the DDL is rendered from", () => {
         // The point of deriving from `spec.fields` rather than re-reading the
         // block: one source, so the edges cannot drift from the expression.
-        expect(new Set(searchColumnDependencies(collections).map(d => d.dependsOn)))
+        expect(new Set(searchColumnDependencies(compileSet(collections)).map(d => d.dependsOn)))
             .toEqual(new Set(spec.fields.map(f => f.column)));
     });
 
@@ -349,7 +350,7 @@ describe("searchColumnDependencies", () => {
         const migration = 'ALTER TABLE "public"."talents" ALTER COLUMN "full_name" TYPE text;';
         const conflicts = findGeneratedColumnConflicts(
             parseColumnMutations(migration),
-            searchColumnDependencies(collections)
+            searchColumnDependencies(compileSet(collections))
         );
         expect(conflicts).toEqual([{
             schema: "public",
@@ -360,6 +361,6 @@ describe("searchColumnDependencies", () => {
     });
 
     it("leaves a project with no search block alone", () => {
-        expect(searchColumnDependencies([{ ...collection, search: undefined } as CollectionConfig])).toEqual([]);
+        expect(searchColumnDependencies(compileSet([{ ...collection, search: undefined } as CollectionConfig]))).toEqual([]);
     });
 });

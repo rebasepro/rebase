@@ -29,6 +29,7 @@ import { generatePostgresDdl } from "../src/schema/generate-postgres-ddl-logic";
 import { planSchema } from "../src/schema/plan/plan-schema";
 import { diffPlanAgainstCatalogue, type ExistingSchema } from "../src/schema/plan/diff-plan";
 import { ensureCollectionTables, planCollectionSchemaEnsure } from "../src/schema/ensure-collection-tables";
+import { compileSet, planCollections } from "./helpers/plan-tables";
 
 const notes: PostgresCollectionConfig = {
     slug: "notes",
@@ -59,7 +60,7 @@ const plainNotes: CollectionConfig = {
 
 /** A catalogue holding every table and column the plan wants, and no index. */
 function liveCatalogue(collections: CollectionConfig[]): ExistingSchema {
-    const plan = planSchema(collections, { databaseExtensions: [] });
+    const plan = planCollections(collections, { databaseExtensions: [] });
     const tables = new Map<string, Set<string>>();
     for (const table of plan.tables) {
         const columns = new Set(table.columns.map(column => column.column));
@@ -76,7 +77,7 @@ const indexNameOf = (sql: string): string => /INDEX (?:CONCURRENTLY )?(?:IF NOT 
 
 describe("planning the indexes of a table that already exists", () => {
     const plan = (existing: ExistingSchema, deferLiveIndexes?: boolean) =>
-        diffPlanAgainstCatalogue(planSchema([notes], { databaseExtensions: [] }), existing, { deferLiveIndexes });
+        diffPlanAgainstCatalogue(planCollections([notes], { databaseExtensions: [] }), existing, { deferLiveIndexes });
 
     it("hands every missing one to the builder, concurrently, and plans no index action", () => {
         const result = plan(liveCatalogue([notes]), true);
@@ -117,7 +118,7 @@ describe("planning the indexes of a table that already exists", () => {
     });
 
     it("keeps them actions for the live schema editor, which applies statements as text", () => {
-        const result = planCollectionSchemaEnsure([notes], liveCatalogue([notes]));
+        const result = planCollectionSchemaEnsure(compileSet([notes]), liveCatalogue([notes]));
         const actions = result.actions.filter(a => a.kind === "create-index").map(a => a.sql);
         expect(actions).toHaveLength(4);
         expect(actions.every(sql => /CONCURRENTLY IF NOT EXISTS/.test(sql))).toBe(true);
@@ -143,7 +144,7 @@ describe("building them on a database that already exists", () => {
     /** What `db push` would make of `plainNotes`, with some rows in it. */
     const pushed = async (): Promise<{ db: PGlite; names: string[] }> => {
         const db = new PGlite();
-        await db.exec(generatePostgresDdl([plainNotes], { includePolicies: false }));
+        await db.exec(generatePostgresDdl(compileSet([plainNotes]), { includePolicies: false }));
         await db.exec(
             "INSERT INTO public.notes (id, title, slug) VALUES " +
             "('11111111-1111-1111-1111-111111111111', 'a', 'a'), ('22222222-2222-2222-2222-222222222222', 'b', 'b');"
@@ -158,14 +159,14 @@ describe("building them on a database that already exists", () => {
             await db.exec(`UPDATE pg_index SET indisvalid = false WHERE indexrelid = 'public."${title}"'::regclass`);
             expect((await indexesOf(db))[title]).toBe(false);
 
-            const outcome = await ensureCollectionTables(asQueryable(db), [plainNotes], undefined, { databaseExtensions: [] });
+            const outcome = await ensureCollectionTables(asQueryable(db), compileSet([plainNotes]), undefined, { databaseExtensions: [] });
 
             expect(outcome.deferredIndexes).toEqual([expect.objectContaining({ indexName: title, invalid: true })]);
             expect(outcome.indexBuilds?.built).toEqual([`public.${title}`]);
             expect(await indexesOf(db)).toEqual(Object.fromEntries(names.map(name => [name, true])));
 
             // From then on there is nothing to do.
-            const again = await ensureCollectionTables(asQueryable(db), [plainNotes], undefined, { databaseExtensions: [] });
+            const again = await ensureCollectionTables(asQueryable(db), compileSet([plainNotes]), undefined, { databaseExtensions: [] });
             expect(again.deferredIndexes).toEqual([]);
             expect(again.actions).toEqual([]);
         } finally {
@@ -179,7 +180,7 @@ describe("building them on a database that already exists", () => {
             const gin = names.find(name => name.endsWith("_gin"))!;
             await db.exec(`UPDATE pg_index SET indisvalid = false WHERE indexrelid = 'public."${gin}"'::regclass`);
 
-            const outcome = await ensureCollectionTables(asQueryable(db), [plainNotes], undefined, { databaseExtensions: [] });
+            const outcome = await ensureCollectionTables(asQueryable(db), compileSet([plainNotes]), undefined, { databaseExtensions: [] });
 
             expect(outcome.indexBuilds?.built).toEqual([`public.${gin}`]);
             expect((await indexesOf(db))[gin]).toBe(true);
@@ -193,7 +194,7 @@ describe("building them on a database that already exists", () => {
         try {
             for (const name of names) await db.exec(`DROP INDEX public."${name}"`);
 
-            const outcome = await ensureCollectionTables(asQueryable(db), [plainNotes], undefined, {
+            const outcome = await ensureCollectionTables(asQueryable(db), compileSet([plainNotes]), undefined, {
                 databaseExtensions: [], deferIndexBuilds: true
             });
 
@@ -217,7 +218,7 @@ describe("building them on a database that already exists", () => {
             await db.exec(`DROP INDEX public."${slug}"`);
             await db.exec("UPDATE public.notes SET slug = 'same'");
 
-            await expect(ensureCollectionTables(asQueryable(db), [plainNotes], undefined, {
+            await expect(ensureCollectionTables(asQueryable(db), compileSet([plainNotes]), undefined, {
                 databaseExtensions: [], deferIndexBuilds: true
             })).rejects.toThrow(new RegExp(`${slug}[\\s\\S]*could not create unique index`));
         } finally {

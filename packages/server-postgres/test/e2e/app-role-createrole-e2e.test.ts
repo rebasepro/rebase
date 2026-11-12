@@ -37,6 +37,7 @@ import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry.js"
 import { FixtureTableRegistry } from "../helpers/tables";
 import { RealtimeService } from "../../src/services/realtimeService.js";
 import { testUser } from "./test-user.js";
+import { compileSet } from "../helpers/plan-tables";
 
 const notesCollection: CollectionConfig = {
     name: "Notes",
@@ -84,12 +85,12 @@ describe.each([
         const runSql: RawSqlRunner = async (text) => (await pool.query(text)).rows as Record<string, unknown>[];
 
         await ensureAuthTablesExist(db);
-        await ensureCollectionTables(queryable, [notesCollection]);
+        await ensureCollectionTables(queryable, compileSet([notesCollection]));
         const posture = await detectConnectionPosture(runSql);
         expect(posture.superuser).toBe(false);
         expect(posture.privileged).toBe(true);
         await ensureAppRole(runSql, ["public", "rebase"]);
-        const applied = await ensureCollectionPolicies(queryable, [notesCollection]);
+        const applied = await ensureCollectionPolicies(queryable, compileSet([notesCollection]));
         expect(applied.failures).toEqual([]);
 
         const registry = new FixtureTableRegistry();

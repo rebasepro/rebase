@@ -22,6 +22,7 @@ import {
     readExistingSchema,
     type ExistingSchema
 } from "../src/schema/ensure-collection-tables";
+import { compileSet } from "./helpers/plan-tables";
 
 const authors: CollectionConfig = {
     slug: "authors",
@@ -121,8 +122,8 @@ const constraintNamesIn = (ddl: string): string[] =>
 
 describe("boot-ensure agrees with db push", () => {
     it("names every foreign key exactly as the generator does", async () => {
-        const generated = await generatePostgresDdl(collections);
-        const planned = planCollectionSchemaEnsure(collections, emptyDb())
+        const generated = await generatePostgresDdl(compileSet(collections));
+        const planned = planCollectionSchemaEnsure(compileSet(collections), emptyDb())
             .actions.filter(a => a.kind === "add-constraint")
             .map(a => a.sql);
 
@@ -132,8 +133,8 @@ describe("boot-ensure agrees with db push", () => {
     });
 
     it("gives a junction the same key types the generator gives it", async () => {
-        const generated = await generatePostgresDdl(collections);
-        const junction = planCollectionSchemaEnsure(collections, emptyDb())
+        const generated = await generatePostgresDdl(compileSet(collections));
+        const junction = planCollectionSchemaEnsure(compileSet(collections), emptyDb())
             .actions.find(a => a.kind === "create-table" && a.target === "public.posts_tags");
 
         expect(junction).toBeDefined();
@@ -146,8 +147,8 @@ describe("boot-ensure agrees with db push", () => {
     });
 
     it("plans a column for every column the generator declares", async () => {
-        const generated = await generatePostgresDdl(collections);
-        const plan = planCollectionSchemaEnsure(collections, emptyDb());
+        const generated = await generatePostgresDdl(compileSet(collections));
+        const plan = planCollectionSchemaEnsure(compileSet(collections), emptyDb());
         const plannedColumns = new Set(
             plan.actions.filter(a => a.kind === "add-column").map(a => a.target.split(".").pop()!)
         );
@@ -168,9 +169,9 @@ describe("boot-ensure agrees with db push", () => {
     // builds that push does not render — or the same index under two names —
     // is dropped by the next push and rebuilt by the next boot, forever.
     it("names every index exactly as the generator does, foreign-key indexes included", async () => {
-        const generated = await generatePostgresDdl(collections);
+        const generated = await generatePostgresDdl(compileSet(collections));
         const pushed = [...generated.matchAll(/CREATE (?:UNIQUE )?INDEX "([^"]+)"/g)].map(m => m[1]).sort();
-        const booted = planCollectionSchemaEnsure(collections, emptyDb()).actions
+        const booted = planCollectionSchemaEnsure(compileSet(collections), emptyDb()).actions
             .filter(a => a.kind === "create-index")
             .map(a => /INDEX (?:CONCURRENTLY )?(?:IF NOT EXISTS )?"([^"]+)"/.exec(a.sql)![1])
             .sort();
@@ -187,7 +188,7 @@ describe("boot-ensure agrees with db push", () => {
     });
 
     it("builds a new table's foreign-key index with the table, not concurrently", () => {
-        const plan = planCollectionSchemaEnsure(collections, emptyDb());
+        const plan = planCollectionSchemaEnsure(compileSet(collections), emptyDb());
         const index = plan.actions.find(a => a.kind === "create-index" && a.target === "public.posts_tags")!;
         expect(index.sql).toMatch(/^CREATE INDEX IF NOT EXISTS "posts_tags_tag_id_ix_[0-9a-f]{7}" ON "public"."posts_tags" \("tag_id"\);$/);
         expect(plan.deferredIndexes).toEqual([]);
@@ -209,7 +210,7 @@ describe("boot-ensure agrees with db push", () => {
             indexes: new Set(),
             invalidIndexes: new Set()
         };
-        const plan = planCollectionSchemaEnsure([posts, authors, tags, profiles], live);
+        const plan = planCollectionSchemaEnsure(compileSet([posts, authors, tags, profiles]), live);
 
         expect(plan.actions.filter(a => a.kind === "create-index")).toEqual([]);
         expect(plan.statements.join("\n")).not.toMatch(/_author_id_ix_|_tag_id_ix_/);
@@ -225,11 +226,11 @@ describe("boot-ensure agrees with db push", () => {
 
         // Present and valid: nothing to do. Present and INVALID: rebuilt.
         const name = plan.deferredIndexes[0].indexName;
-        const built = planCollectionSchemaEnsure([posts, authors, tags, profiles], {
+        const built = planCollectionSchemaEnsure(compileSet([posts, authors, tags, profiles]), {
             ...live, indexes: new Set([`public.${name}`])
         });
         expect(built.deferredIndexes.map(d => d.indexName)).not.toContain(name);
-        const husk = planCollectionSchemaEnsure([posts, authors, tags, profiles], {
+        const husk = planCollectionSchemaEnsure(compileSet([posts, authors, tags, profiles]), {
             ...live, indexes: new Set([`public.${name}`]), invalidIndexes: new Set([`public.${name}`])
         });
         expect(husk.deferredIndexes.find(d => d.indexName === name)).toMatchObject({ invalid: true });
@@ -299,8 +300,8 @@ describe("boot-ensure agrees with db push", () => {
         };
 
         it("defines every column exactly as db push defines it", async () => {
-            const fromPush = generatedColumnDefs(await generatePostgresDdl(collections));
-            const fromEnsure = plannedColumnDefs(planCollectionSchemaEnsure(collections, emptyDb()));
+            const fromPush = generatedColumnDefs(await generatePostgresDdl(compileSet(collections)));
+            const fromEnsure = plannedColumnDefs(planCollectionSchemaEnsure(compileSet(collections), emptyDb()));
 
             const disagreements: string[] = [];
             for (const [table, pushColumns] of fromPush) {
@@ -317,8 +318,8 @@ describe("boot-ensure agrees with db push", () => {
         });
 
         it("gives a numeric id the same integer type on both paths", async () => {
-            const fromPush = generatedColumnDefs(await generatePostgresDdl(collections));
-            const fromEnsure = plannedColumnDefs(planCollectionSchemaEnsure(collections, emptyDb()));
+            const fromPush = generatedColumnDefs(await generatePostgresDdl(compileSet(collections)));
+            const fromEnsure = plannedColumnDefs(planCollectionSchemaEnsure(compileSet(collections), emptyDb()));
 
             // Named explicitly because the comparison above would also pass if
             // BOTH paths regressed to BIGSERIAL together — and the FK columns
@@ -329,13 +330,13 @@ describe("boot-ensure agrees with db push", () => {
         });
 
         it("carries validation.required and validation.unique onto a new table", async () => {
-            const fromEnsure = plannedColumnDefs(planCollectionSchemaEnsure(collections, emptyDb()));
+            const fromEnsure = plannedColumnDefs(planCollectionSchemaEnsure(compileSet(collections), emptyDb()));
             expect(fromEnsure.get("public.authors")!.get("name")).toBe("TEXT NOT NULL");
         });
 
         it("makes a required link NOT NULL on both paths, in both spellings", async () => {
-            const fromPush = generatedColumnDefs(await generatePostgresDdl(collections));
-            const fromEnsure = plannedColumnDefs(planCollectionSchemaEnsure(collections, emptyDb()));
+            const fromPush = generatedColumnDefs(await generatePostgresDdl(compileSet(collections)));
+            const fromEnsure = plannedColumnDefs(planCollectionSchemaEnsure(compileSet(collections), emptyDb()));
 
             // Named rather than left to the whole-table comparison above,
             // because this is the class the fixture used not to contain: the
@@ -362,7 +363,7 @@ describe("boot-ensure agrees with db push", () => {
                 constraints: new Set(),
                 populatedTables: new Set(["public.profiles"])
             };
-            const plan = planCollectionSchemaEnsure(collections, populated);
+            const plan = planCollectionSchemaEnsure(compileSet(collections), populated);
             const column = plan.actions.find(a => a.target === "public.profiles.author_id");
             expect(column!.sql).toContain('"author_id" UUID;');
             expect(column!.sql).not.toContain("NOT NULL");
@@ -379,15 +380,15 @@ describe("boot-ensure agrees with db push", () => {
                 enums: new Set(),
                 constraints: new Set()
             };
-            const plan = planCollectionSchemaEnsure(collections, withAuthors);
+            const plan = planCollectionSchemaEnsure(compileSet(collections), withAuthors);
             const name = plan.actions.find(a => a.target === "public.authors.name");
             expect(name!.sql).toContain('"name" TEXT;');
             expect(name!.sql).not.toContain("NOT NULL");
         });
 
         it("gives an auth table the same shape on both paths, including columns the collection omits", async () => {
-            const fromPush = generatedColumnDefs(await generatePostgresDdl(collections));
-            const fromEnsure = plannedColumnDefs(planCollectionSchemaEnsure(collections, emptyDb()));
+            const fromPush = generatedColumnDefs(await generatePostgresDdl(compileSet(collections)));
+            const fromEnsure = plannedColumnDefs(planCollectionSchemaEnsure(compileSet(collections), emptyDb()));
 
             for (const source of [fromPush, fromEnsure]) {
                 const columns = source.get("rebase.users")!;
@@ -501,8 +502,8 @@ describe("boot-ensure agrees with db push", () => {
             const booted = new PGlite();
             try {
                 await bootstrapRls(pushed);
-                await pushed.exec(await generatePostgresDdl(collections));
-                await apply(booted, planCollectionSchemaEnsure(collections, emptyDb()).statements);
+                await pushed.exec(await generatePostgresDdl(compileSet(collections)));
+                await apply(booted, planCollectionSchemaEnsure(compileSet(collections), emptyDb()).statements);
 
                 const fromPush = await liveColumns(pushed, "org_members");
                 const fromBoot = await liveColumns(booted, "org_members");
@@ -527,7 +528,7 @@ describe("boot-ensure agrees with db push", () => {
             try {
                 // A junction created before the payload was declared, holding a
                 // link — so NOT NULL cannot be applied blind.
-                await apply(db, planCollectionSchemaEnsure(before, emptyDb()).statements);
+                await apply(db, planCollectionSchemaEnsure(compileSet(before), emptyDb()).statements);
                 await db.exec(
                     "INSERT INTO public.orgs (id, name) VALUES ('11111111-1111-1111-1111-111111111111', 'Acme');" +
                     "INSERT INTO public.people (id, handle) VALUES ('22222222-2222-2222-2222-222222222222', 'ada');" +
@@ -536,7 +537,7 @@ describe("boot-ensure agrees with db push", () => {
                 );
 
                 const existing = await readExistingSchema(asQueryable(db), ["public", "rebase"]);
-                const plan = planCollectionSchemaEnsure(after, existing);
+                const plan = planCollectionSchemaEnsure(compileSet(after), existing);
                 await apply(db, plan.statements);
 
                 const columns = await liveColumns(db, "org_members");
@@ -630,10 +631,10 @@ describe("a composite primary key, applied to a live database", () => {
         const booted = new PGlite();
         try {
             await withRlsHelpers(pushed);
-            await pushed.exec(await generatePostgresDdl(collections));
+            await pushed.exec(await generatePostgresDdl(compileSet(collections)));
 
             await withRlsHelpers(booted);
-            for (const statement of planCollectionSchemaEnsure(collections, emptyDb()).statements) {
+            for (const statement of planCollectionSchemaEnsure(compileSet(collections), emptyDb()).statements) {
                 await booted.exec(statement);
             }
 
@@ -690,10 +691,10 @@ describe("foreign-key indexes, applied to a live database", () => {
         const booted = new PGlite();
         try {
             await withRlsHelpers(pushed);
-            await pushed.exec(generatePostgresDdl(fixture));
+            await pushed.exec(generatePostgresDdl(compileSet(fixture)));
             await withRlsHelpers(booted);
             const { ensureCollectionTables } = await import("../src/schema/ensure-collection-tables");
-            await ensureCollectionTables(asQueryable(booted), fixture);
+            await ensureCollectionTables(asQueryable(booted), compileSet(fixture));
 
             expect(await indexesOf(booted)).toEqual(await indexesOf(pushed));
             expect((await indexesOf(pushed)).filter(n => /_ix_/.test(n))).toHaveLength(3);
@@ -707,7 +708,7 @@ describe("foreign-key indexes, applied to a live database", () => {
         const db = new PGlite();
         try {
             await withRlsHelpers(db);
-            const ddl = generatePostgresDdl(fixture);
+            const ddl = generatePostgresDdl(compileSet(fixture));
             // The same schema minus the derived indexes: what an older push left.
             const names = derivedNames(ddl);
             expect(names).toHaveLength(3);
@@ -719,7 +720,7 @@ describe("foreign-key indexes, applied to a live database", () => {
             );
 
             const { ensureCollectionTables } = await import("../src/schema/ensure-collection-tables");
-            const first = await ensureCollectionTables(asQueryable(db), fixture);
+            const first = await ensureCollectionTables(asQueryable(db), compileSet(fixture));
             expect(first.actions.filter(a => a.kind === "create-index")).toEqual([]);
             expect(first.deferredIndexes.map(d => d.indexName).sort()).toEqual([...names].sort());
             expect(first.indexBuilds?.built.sort()).toEqual(names.map(n => `public.${n}`).sort());
@@ -730,14 +731,14 @@ describe("foreign-key indexes, applied to a live database", () => {
             await db.exec(`UPDATE pg_index SET indisvalid = false WHERE indexrelid = 'public."${names[0]}"'::regclass`);
             expect(await indexesOf(db)).toContain(`${names[0]} (INVALID)`);
 
-            const second = await ensureCollectionTables(asQueryable(db), fixture);
+            const second = await ensureCollectionTables(asQueryable(db), compileSet(fixture));
             expect(second.deferredIndexes).toEqual([expect.objectContaining({ indexName: names[0], invalid: true })]);
             expect(second.indexBuilds?.built).toEqual([`public.${names[0]}`]);
             expect(await indexesOf(db)).toContain(names[0]);
             expect((await indexesOf(db)).filter(n => n.includes("INVALID"))).toEqual([]);
 
             // And from then on, nothing.
-            const third = await ensureCollectionTables(asQueryable(db), fixture);
+            const third = await ensureCollectionTables(asQueryable(db), compileSet(fixture));
             expect(third.deferredIndexes).toEqual([]);
         } finally {
             await db.close();
@@ -748,12 +749,12 @@ describe("foreign-key indexes, applied to a live database", () => {
         const db = new PGlite();
         try {
             await withRlsHelpers(db);
-            const ddl = generatePostgresDdl(fixture);
+            const ddl = generatePostgresDdl(compileSet(fixture));
             const names = derivedNames(ddl);
             await db.exec(ddl.split("\n").filter(line => !names.some(n => line.includes(`"${n}"`))).join("\n"));
 
             const { ensureCollectionTables } = await import("../src/schema/ensure-collection-tables");
-            const outcome = await ensureCollectionTables(asQueryable(db), fixture, undefined, { deferIndexBuilds: true });
+            const outcome = await ensureCollectionTables(asQueryable(db), compileSet(fixture), undefined, { deferIndexBuilds: true });
             expect(outcome.deferredIndexes).toHaveLength(3);
             expect(outcome.indexBuilds).toBeUndefined();
             expect((await indexesOf(db)).filter(n => n.includes("_ix_"))).toEqual([]);

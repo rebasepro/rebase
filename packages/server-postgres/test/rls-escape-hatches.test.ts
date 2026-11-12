@@ -26,6 +26,7 @@ import { ensureCollectionPolicies, readPolicyStamps } from "../src/schema/ensure
 import { moveMigratedAdminPoliciesToPublic, stampPoliciesStoredAsRendered } from "../src/schema/migrate-policy-stamps";
 import { planPolicyPush } from "../src/schema/push-policy-plan";
 import { checkPolicyDrift, hasDrift } from "../src/security/policy-drift";
+import { compileSet } from "./helpers/plan-tables";
 
 const run = (pg: PGlite) => async (text: string) => (await pg.query<Record<string, unknown>>(text)).rows;
 
@@ -93,17 +94,17 @@ describe("the admin-request companions (rebase_admin_request)", () => {
     it("are planned only where the boot made the role safe, and never written TO public", async () => {
         const { planCollectionPolicies } = await import("../src/schema/generate-postgres-ddl-logic");
         const companionNames = (options: Parameters<typeof planCollectionPolicies>[1]) =>
-            planCollectionPolicies([tasks], options).flatMap((plan) => plan.policies.filter((p) => p.adminRequestTarget).map((p) => p.name));
+            planCollectionPolicies(compileSet([tasks]), options).flatMap((plan) => plan.policies.filter((p) => p.adminRequestTarget).map((p) => p.name));
         expect(companionNames({})).toEqual([]);
         expect(companionNames({ adminRequestRoleAvailable: true })).toHaveLength(4);
         expect(companionNames({ adminRoleAvailable: false, adminRequestRoleAvailable: true })).toEqual([]);
         for (const options of [{}, { adminRoleAvailable: false }, { adminRoleAvailable: false, adminRequestRoleAvailable: true }, { adminRequestRoleAvailable: true }]) {
-            const statements = planCollectionPolicies([tasks], options).flatMap((plan) => plan.policyStatements);
+            const statements = planCollectionPolicies(compileSet([tasks]), options).flatMap((plan) => plan.policyStatements);
             expect(statements.filter((s) => /USING \(true\)/.test(s) && !/TO "rebase_admin_request"/.test(s))).toEqual([]);
         }
         // policies.sql and migrations never create them.
         const { generatePostgresPoliciesDdl } = await import("../src/schema/generate-postgres-ddl-logic");
-        expect(generatePostgresPoliciesDdl([tasks])).not.toMatch(/CREATE POLICY[^;]*rebase_admin_request/);
+        expect(generatePostgresPoliciesDdl(compileSet([tasks]))).not.toMatch(/CREATE POLICY[^;]*rebase_admin_request/);
     });
 
     it("drop the companion of every policy that no longer earns one, wherever policies are written", async () => {
@@ -116,7 +117,7 @@ describe("the admin-request companions (rebase_admin_request)", () => {
                 { name: "admins_select", operation: "select", roles: ["admin"], ownerField: "ownerId" }
             ]
         };
-        const ddl = generatePostgresPoliciesDdl([narrowed]);
+        const ddl = generatePostgresPoliciesDdl(compileSet([narrowed]));
         // Narrowed to admin AND owner, and a plain owner rule: their companions go.
         for (const base of ["admins_select", "owner_select"]) {
             expect(ddl).toContain(`DROP POLICY IF EXISTS "${adminRequestPolicyName(base)}" ON "public"."tasks";`);
@@ -496,7 +497,7 @@ describe("the server-or-admin policies (rls.adminPolicies)", () => {
                 GRANT SELECT ON public.tasks TO rebase_user;
             `);
             const outcome = await ensureCollectionPolicies(
-                { query: <T,>(text: string) => pg.query<T>(text) }, [tasks], undefined, { adminRoleAvailable: adminPoliciesLive }
+                { query: <T,>(text: string) => pg.query<T>(text) }, compileSet([tasks]), undefined, { adminRoleAvailable: adminPoliciesLive }
             );
             expect(outcome.failures).toEqual([]);
             const { rows } = await pg.query<{ roles: string }>(
@@ -505,7 +506,7 @@ describe("the server-or-admin policies (rls.adminPolicies)", () => {
             expect(rows[0].roles).toBe("{rebase_admin}");
             // `doctor` and `db push` read the same answer off the database.
             const client = { query: async <R,>(text: string, values?: unknown[]) => ({ rows: (await pg.query<R>(text, values)).rows }) };
-            expect(hasDrift(await checkPolicyDrift(client, [tasks], { adminRoleAvailable: "detect" }))).toBe(false);
+            expect(hasDrift(await checkPolicyDrift(client, compileSet([tasks]), { adminRoleAvailable: "detect" }))).toBe(false);
             const count = async (auth: { uid: string; roles: string[] }) => {
                 const opening = authContextStatement(auth, request);
                 await pg.query("BEGIN");
@@ -542,7 +543,7 @@ describe("the server-or-admin policies (rls.adminPolicies)", () => {
             `);
             const request = await settleAdminRequestRoles(run(pg), ["public"], resolveRlsSettings(undefined), { provision: true });
             expect(request.adminRoleFor).toBeUndefined();
-            const outcome = await ensureCollectionPolicies({ query: <T,>(text: string) => pg.query<T>(text) }, [tasks]);
+            const outcome = await ensureCollectionPolicies({ query: <T,>(text: string) => pg.query<T>(text) }, compileSet([tasks]));
             expect(outcome.failures).toEqual([]);
             const { rows } = await pg.query<{ roles: string }>(
                 "SELECT roles::text AS roles FROM pg_policies WHERE policyname = 'tasks_default_admin_read'"
@@ -552,10 +553,10 @@ describe("the server-or-admin policies (rls.adminPolicies)", () => {
             // What the boot fell back to is what `doctor` and `db push` expect:
             // no drift, and nothing for the push to replace, on every run.
             const client = { query: async <R,>(text: string, values?: unknown[]) => ({ rows: (await pg.query<R>(text, values)).rows }) };
-            const drift = await checkPolicyDrift(client, [tasks], { adminRoleAvailable: "detect" });
+            const drift = await checkPolicyDrift(client, compileSet([tasks]), { adminRoleAvailable: "detect" });
             expect(drift.diverged).toEqual([]);
             expect(hasDrift(drift)).toBe(false);
-            const plan = await planPolicyPush(client, [tasks], { adminRoleAvailable: "detect" });
+            const plan = await planPolicyPush(client, compileSet([tasks]), { adminRoleAvailable: "detect" });
             expect(plan.replace).toEqual([]);
             expect(plan.create).toEqual([]);
         } finally {
@@ -588,7 +589,7 @@ describe("the server-or-admin policies (rls.adminPolicies)", () => {
                 expect(request.adminRoleFor).toBeUndefined();
                 expect(adminPoliciesLive).toBe(false);
                 const outcome = await ensureCollectionPolicies(
-                    { query: <T,>(text: string) => pg.query<T>(text) }, [tasks], undefined, { adminRoleAvailable: adminPoliciesLive }
+                    { query: <T,>(text: string) => pg.query<T>(text) }, compileSet([tasks]), undefined, { adminRoleAvailable: adminPoliciesLive }
                 );
                 expect(outcome.failures).toEqual([]);
                 const { rows } = await pg.query<{ roles: string }>(
@@ -606,8 +607,8 @@ describe("the server-or-admin policies (rls.adminPolicies)", () => {
                 };
                 // `doctor` and `db push` expect what this boot wrote.
                 const client = { query: async <R,>(text: string, values?: unknown[]) => ({ rows: (await pg.query<R>(text, values)).rows }) };
-                const drift = hasDrift(await checkPolicyDrift(client, [tasks], { adminRoleAvailable: "detect" }));
-                const replace = (await planPolicyPush(client, [tasks], { adminRoleAvailable: "detect" })).replace.length;
+                const drift = hasDrift(await checkPolicyDrift(client, compileSet([tasks]), { adminRoleAvailable: "detect" }));
+                const replace = (await planPolicyPush(client, compileSet([tasks]), { adminRoleAvailable: "detect" })).replace.length;
                 return {
                     roles: rows.map((r) => r.roles),
                     user: await count({ uid: "ada", roles: ["user"] }),
@@ -669,7 +670,7 @@ describe("the server-or-admin policies (rls.adminPolicies)", () => {
                     GRANT SELECT ON public.tasks TO rebase_user;
                 `);
                 const client = { query: async <R,>(text: string, values?: unknown[]) => ({ rows: (await pg.query<R>(text, values)).rows }) };
-                await ensureCollectionPolicies(client, [tasks]);
+                await ensureCollectionPolicies(client, compileSet([tasks]));
                 const roles = async () => (await pg.query<{ roles: string }>(
                     "SELECT DISTINCT roles::text AS roles FROM pg_policies WHERE policyname LIKE 'tasks_default_admin_%'"
                 )).rows.map((r) => r.roles);
@@ -677,14 +678,14 @@ describe("the server-or-admin policies (rls.adminPolicies)", () => {
 
                 const { request, adminPoliciesLive } = await settleAdminSwitch(run(pg), ["public"], resolveRlsSettings(undefined), { provision: false });
                 expect(adminPoliciesLive).toBe(false);
-                expect(await moveMigratedAdminPoliciesToPublic(client, [tasks])).toBeGreaterThan(0);
+                expect(await moveMigratedAdminPoliciesToPublic(client, compileSet([tasks]))).toBeGreaterThan(0);
                 expect(await roles()).toEqual(["{public}"]);
 
-                await stampPoliciesStoredAsRendered(client, [tasks], { adminRoleAvailable: false });
-                const states = [...((await readPolicyStamps(client, [tasks], { adminRoleAvailable: false })).get("public.tasks") ?? new Map()).values()];
+                await stampPoliciesStoredAsRendered(client, compileSet([tasks]), { adminRoleAvailable: false });
+                const states = [...((await readPolicyStamps(client, compileSet([tasks]), { adminRoleAvailable: false })).get("public.tasks") ?? new Map()).values()];
                 expect(states.length).toBeGreaterThan(0);
                 expect(states.every((state) => state === "current")).toBe(true);
-                expect(hasDrift(await checkPolicyDrift(client, [tasks], { adminRoleAvailable: false }))).toBe(false);
+                expect(hasDrift(await checkPolicyDrift(client, compileSet([tasks]), { adminRoleAvailable: false }))).toBe(false);
 
                 const opening = authContextStatement({ uid: "service", roles: ["admin"] }, request);
                 await pg.query("BEGIN");

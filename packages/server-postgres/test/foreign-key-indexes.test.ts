@@ -27,6 +27,7 @@ import { generatePostgresDdl } from "../src/schema/generate-postgres-ddl-logic";
 import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
 import { buildCollectionIndexSpecs, foreignKeyIndexSpec, FOREIGN_KEY_INDEX_REASON } from "../src/schema/collection-index";
 import { resolveColumnName } from "../src/schema/column-plan-helpers";
+import { compileSet, planCollections } from "./helpers/plan-tables";
 
 const authors: CollectionConfig = {
     slug: "authors", table: "authors", name: "Authors",
@@ -84,7 +85,7 @@ const collections = [authors, tags, companies, posts, profiles];
 /** `table → index columns` for every derived foreign-key index in the plan. */
 const derivedIndexes = (all: CollectionConfig[]): Record<string, string[]> => {
     const out: Record<string, string[]> = {};
-    for (const table of planSchema(all).tables) {
+    for (const table of planCollections(all).tables) {
         const derived = table.indexes.filter(spec => spec.derived === "foreign-key");
         if (derived.length > 0) out[table.table] = derived.map(spec => spec.keys.map(k => k.column).join(","));
     }
@@ -92,7 +93,7 @@ const derivedIndexes = (all: CollectionConfig[]): Record<string, string[]> => {
 };
 
 const tableIndexes = (all: CollectionConfig[], table: string) =>
-    planSchema(all).tables.find(t => t.table === table)!.indexes;
+    planCollections(all).tables.find(t => t.table === table)!.indexes;
 
 describe("which columns get a foreign-key index", () => {
     it("indexes every belongsTo key and the junction's target column, and nothing else", () => {
@@ -135,7 +136,7 @@ describe("which columns get a foreign-key index", () => {
         const all = [authors, tags, companies, optedOut, profiles];
 
         expect(derivedIndexes(all).posts).toBeUndefined();
-        const ddl = generatePostgresDdl(all);
+        const ddl = generatePostgresDdl(compileSet(all));
         expect(ddl).toContain('ADD CONSTRAINT "posts_author_id_fkey" FOREIGN KEY ("author_id")');
         expect(ddl).not.toMatch(/INDEX "posts_author_id_ix_[0-9a-f]{7}"/);
         // The junction is the platform's table: no opt-out reaches it.
@@ -237,7 +238,10 @@ describe("never a second index doing one job", () => {
         const all = withPosts({
             properties: {
                 ...posts.properties,
-                authorId: { type: "number", columnName: "author_id" }
+                // An integer, as the key it references is: a foreign key only
+                // holds between columns of one type (the table model refuses a
+                // `numeric` column referencing an `integer` key).
+                authorId: { type: "number", columnName: "author_id", validation: { integer: true } }
             }
         });
         expect(tableIndexes(all, "posts").map(i => i.keys[0].column)).toEqual(["author_id"]);
@@ -265,7 +269,7 @@ describe("the frozen name", () => {
 
 describe("rendered by both db push files", () => {
     it("is in schema.sql, before the constraints", () => {
-        const ddl = generatePostgresDdl(collections);
+        const ddl = generatePostgresDdl(compileSet(collections));
         const index = ddl.indexOf('CREATE INDEX "posts_author_id_ix_');
         expect(index).toBeGreaterThan(-1);
         expect(ddl).toContain('CREATE INDEX "posts_tags_tag_id_ix_d4456f1" ON "public"."posts_tags" ("tag_id");');
@@ -273,7 +277,7 @@ describe("rendered by both db push files", () => {
     });
 
     it("is in schema.generated.ts — junction included — so drizzle-kit would not drop it", () => {
-        const generated = generateSchema(collections);
+        const generated = generateSchema(compileSet(collections));
         expect(generated).toContain('index("posts_author_id_ix_00ad191").on(table.authorId.asc().nullsLast())');
         expect(generated).toContain('index("posts_tags_tag_id_ix_d4456f1").on(table.tag_id.asc().nullsLast())');
     });
@@ -342,7 +346,7 @@ describe("the reads it is for", () => {
 
     it("uses the derived index for a nested listing, its count, an include and a reverse many-to-many", async () => {
         const all = [blogPosts, comments, tags];
-        const ddl = generatePostgresDdl(all);
+        const ddl = generatePostgresDdl(compileSet(all));
         const comment = tableIndexes(all, "comments")[0].indexName;
         const junction = tableIndexes(all, "posts_tags")[0].indexName;
 

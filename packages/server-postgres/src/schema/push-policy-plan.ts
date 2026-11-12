@@ -26,7 +26,7 @@
  * - **Policies dropped and kept:** {@link partitionOrphans}, which is how the
  *   push's reconcile step decides.
  */
-import type { CollectionConfig } from "@rebasepro/types";
+import type { CompiledTable } from "@rebasepro/types";
 import {
     checkPolicyDrift,
     expectedPolicies,
@@ -73,19 +73,19 @@ const UNSTAMPED_DIFFERS = "it carries no stamp of Rebase's, and its rule defines
  */
 export async function planPolicyPush(
     client: Queryable,
-    collections: CollectionConfig[],
+    compiledTables: readonly CompiledTable[],
     options: { searchPath?: string; adminRoleAvailable?: AdminPoliciesExpectation } = {}
 ): Promise<PolicyPushPlan> {
     const adminRoleAvailable = await resolveAdminPolicies(client, options.adminRoleAvailable);
-    const drift = await checkPolicyDrift(client, collections, { adminRoleAvailable });
-    const { dropped, kept } = partitionOrphans(drift, collections);
-    const enableRls = await tablesRlsWouldEnable(client, collections);
-    const stamps = await underSearchPath(client, options.searchPath, () => readPolicyStamps(client, collections, { adminRoleAvailable }));
+    const drift = await checkPolicyDrift(client, compiledTables, { adminRoleAvailable });
+    const { dropped, kept } = partitionOrphans(drift, compiledTables);
+    const enableRls = await tablesRlsWouldEnable(client, compiledTables);
+    const stamps = await underSearchPath(client, options.searchPath, () => readPolicyStamps(client, compiledTables, { adminRoleAvailable }));
 
     const replace = drift.diverged.map(d => ({ policy: d.expected, why: d.differences }));
     const settled = new Set([...drift.missing, ...drift.diverged.map(d => d.expected)].map(keyOf));
     const unsure: { policy: PolicyRef; state: "stale" | "unstamped" }[] = [];
-    for (const policy of expectedPolicies(collections, adminRoleAvailable)) {
+    for (const policy of expectedPolicies(compiledTables, adminRoleAvailable)) {
         if (settled.has(keyOf(policy))) continue;
         const state = stamps.get(`${policy.schema}.${policy.table}`)?.get(policy.name);
         if (state === "stale" || state === "unstamped") unsure.push({ policy, state });
@@ -94,7 +94,7 @@ export async function planPolicyPush(
     // definition that is there? A policy it would re-create exactly is no change.
     const rendersAsStored = unsure.length === 0
         ? new Map<string, boolean>()
-        : await probeRenderedPolicies(client, collections, unsure.map(entry => entry.policy), { searchPath: options.searchPath, adminRoleAvailable });
+        : await probeRenderedPolicies(client, compiledTables, unsure.map(entry => entry.policy), { searchPath: options.searchPath, adminRoleAvailable });
     const unstamped: PolicyRef[] = [];
     for (const { policy, state } of unsure) {
         const same = rendersAsStored.get(keyOf(policy));

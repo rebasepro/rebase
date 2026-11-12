@@ -29,6 +29,7 @@ import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
 import { FixtureTableRegistry } from "./helpers/tables";
 import { fakeRealtimeSocket, type FakeRealtimeSocket } from "./helpers/spg-c-socket";
 import { recordingDb } from "./helpers/spg-c-db";
+import { compileSet } from "./helpers/plan-tables";
 
 // The control case ("a subscription without one still works") has to reach a
 // fetch; the fetch itself is not what this file is about.
@@ -116,13 +117,13 @@ describe("a database without pgvector", () => {
         // Opt-in: the image, the grant and the provider's allow-list are all
         // invisible from inside the connection, so Rebase does not decide this.
         const { ran, client } = clientThat(() => undefined);
-        await ensureCollectionTables(client, [withVector]);
+        await ensureCollectionTables(client, compileSet([withVector]));
         expect(ran.some(s => /CREATE EXTENSION .*vector/i.test(s))).toBe(false);
     });
 
     it("installs it when a database declared it", async () => {
         const { ran, client } = clientThat(() => undefined);
-        await ensureCollectionTables(client, [withVector], undefined, optedIn);
+        await ensureCollectionTables(client, compileSet([withVector]), undefined, optedIn);
         expect(ran.some(s => /CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public/.test(s))).toBe(true);
     });
 
@@ -135,14 +136,14 @@ describe("a database without pgvector", () => {
         const failColumn = () => `type "vector" does not exist`;
         const { client } = clientThat(sql => /ADD COLUMN .*"embedding"/.test(sql) ? failColumn() : undefined);
 
-        await expect(ensureCollectionTables(client, [withVector]))
+        await expect(ensureCollectionTables(client, compileSet([withVector])))
             .rejects.toThrow(/database\(\{ extensions: \["vector"\] \}\)/);
-        await expect(ensureCollectionTables(client, [withVector]))
+        await expect(ensureCollectionTables(client, compileSet([withVector])))
             .rejects.toThrow(/config\/resources\.ts/);
         // And the other way out, for somebody who would rather not grant it.
-        await expect(ensureCollectionTables(client, [withVector]))
+        await expect(ensureCollectionTables(client, compileSet([withVector])))
             .rejects.toThrow(/CREATE EXTENSION vector;/);
-        await expect(ensureCollectionTables(client, [withVector]))
+        await expect(ensureCollectionTables(client, compileSet([withVector])))
             .rejects.toThrow(/pgvector\/pgvector/);
     });
 
@@ -155,9 +156,9 @@ describe("a database without pgvector", () => {
         const { client } = clientThat(sql =>
             /CREATE EXTENSION .*vector/.test(sql) ? `extension "vector" is not available` : undefined);
 
-        await expect(ensureCollectionTables(client, [withVector], undefined, optedIn))
+        await expect(ensureCollectionTables(client, compileSet([withVector]), undefined, optedIn))
             .rejects.toThrow(/pgvector was declared and could not be installed/);
-        await expect(ensureCollectionTables(client, [withVector], undefined, optedIn))
+        await expect(ensureCollectionTables(client, compileSet([withVector]), undefined, optedIn))
             .rejects.not.toThrow(/config\/resources\.ts/);
     });
 
@@ -166,7 +167,7 @@ describe("a database without pgvector", () => {
             /CREATE EXTENSION .*vector/.test(sql)
                 ? "permission denied to create extension \"vector\""
                 : undefined);
-        await expect(ensureCollectionTables(client, [withVector], undefined, optedIn))
+        await expect(ensureCollectionTables(client, compileSet([withVector]), undefined, optedIn))
             .rejects.toThrow(/allowed to run `CREATE EXTENSION vector;`/);
     });
 
@@ -178,9 +179,9 @@ describe("a database without pgvector", () => {
             })
         };
 
-        await expect(ensureCollectionTables(client, [withVector]))
+        await expect(ensureCollectionTables(client, compileSet([withVector])))
             .rejects.toThrow(/permission denied/);
-        await expect(ensureCollectionTables(client, [withVector]))
+        await expect(ensureCollectionTables(client, compileSet([withVector])))
             .rejects.not.toThrow(/pgvector/);
     });
 });

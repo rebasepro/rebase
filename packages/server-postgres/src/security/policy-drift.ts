@@ -1,10 +1,10 @@
 /**
  * Compare the RLS policies a database actually has against the ones the
- * collections describe.
+ * tables describe.
  *
  * Policies live in Postgres; the collection config is only their *source*.
  * Nothing reconciled the two, which is how the demo database served empty
- * collections indefinitely: its policies granted `TO authenticated` (a Supabase
+ * tables indefinitely: its policies granted `TO authenticated` (a Supabase
  * role name) while requests run as `rebase_user`, so RLS filtered every row.
  * The config was later corrected and the database never noticed — an empty
  * table is indistinguishable from a table with no data.
@@ -13,7 +13,7 @@
  * function `db push` uses to write `.rebase/sql/policies.sql`, so this compares
  * against exactly what would be applied rather than a reimplementation.
  */
-import { RLS_UID_SQL, type CollectionConfig } from "@rebasepro/types";
+import { RLS_UID_SQL, type CompiledTable } from "@rebasepro/types";
 import { ADMIN_REQUEST_POLICY_SUFFIX, toPostgresIdentifier } from "@rebasepro/utils";
 
 import { generatePostgresPoliciesDdl, planCollectionPolicies } from "../schema/generate-postgres-ddl-logic";
@@ -75,7 +75,7 @@ export interface PolicyDrift {
      */
     insecure: { policy: PolicyRef; reason: string }[];
     /**
-     * A table the collections describe whose RLS switch is off.
+     * A table the tables describe whose RLS switch is off.
      *
      * `ALTER TABLE posts DISABLE ROW LEVEL SECURITY` leaves every row in
      * `pg_policies` untouched, so before this category every expected policy
@@ -213,7 +213,7 @@ async function readLivePolicies(client: Queryable, schemas: string[]): Promise<P
 }
 
 /**
- * Tables the collections describe whose RLS switch is off.
+ * Tables the tables describe whose RLS switch is off.
  *
  * Read from `pg_class` because `pg_policies` cannot answer it: disabling RLS
  * leaves the policy rows in place, so every other comparison in this file keeps
@@ -318,15 +318,15 @@ export async function resolveAdminPolicies(client: Queryable, expectation: Admin
 }
 
 /**
- * The policies the collections declare, parsed from the DDL `db push` writes —
+ * The policies the tables declare, parsed from the DDL `db push` writes —
  * with the ones the compiler put `TO rebase_admin` read as `TO public` where
  * `adminRoleAvailable` is false, as the boot and the push then write them. A
  * rule that names `rebase_admin` itself keeps it.
  */
-export function expectedPolicies(collections: CollectionConfig[], adminRoleAvailable: boolean): PolicyRef[] {
-    const expected = parseExpectedPolicies(generatePostgresPoliciesDdl(collections));
+export function expectedPolicies(compiledTables: readonly CompiledTable[], adminRoleAvailable: boolean): PolicyRef[] {
+    const expected = parseExpectedPolicies(generatePostgresPoliciesDdl(compiledTables));
     if (adminRoleAvailable) return expected;
-    const moved = new Set(planCollectionPolicies(collections).flatMap(plan =>
+    const moved = new Set(planCollectionPolicies(compiledTables).flatMap(plan =>
         plan.policies.filter(policy => policy.adminTarget).map(policy => `${plan.schema}.${plan.table}.${policy.name}`)));
     return expected.map(p => moved.has(keyOf(p)) ? { ...p, roles: ["public"] } : p);
 }
@@ -336,8 +336,8 @@ export function expectedPolicies(collections: CollectionConfig[], adminRoleAvail
  * `policies.sql`, so not among the expected policies, and not orphans either
  * when they are there in that shape. Keyed `schema.table.name`.
  */
-function adminRequestCompanions(collections: CollectionConfig[]): Map<string, PolicyRef> {
-    const ddl = planCollectionPolicies(collections, { adminRequestRoleAvailable: true })
+function adminRequestCompanions(compiledTables: readonly CompiledTable[]): Map<string, PolicyRef> {
+    const ddl = planCollectionPolicies(compiledTables, { adminRequestRoleAvailable: true })
         .flatMap(plan => plan.policies.filter(policy => policy.adminRequestTarget).flatMap(policy => policy.statements))
         .join("\n");
     return new Map(parseExpectedPolicies(ddl).map(p => [keyOf(p), p]));
@@ -364,16 +364,16 @@ const sameRoles = (a: string[], b: string[]) =>
  */
 export async function checkPolicyDrift(
     client: Queryable,
-    collections: CollectionConfig[],
+    compiledTables: readonly CompiledTable[],
     options: { adminRoleAvailable?: AdminPoliciesExpectation } = {}
 ): Promise<PolicyDrift> {
     const adminLive = await resolveAdminPolicies(client, options.adminRoleAvailable);
-    const expected = expectedPolicies(collections, adminLive);
+    const expected = expectedPolicies(compiledTables, adminLive);
     // A live companion is Rebase's only where a boot could have written it:
     // the admin switch live, and nothing but the admin request roles holding
     // its role. Otherwise it is an orphan — and push drops it.
     const companions = adminLive && await companionsSafe(client)
-        ? adminRequestCompanions(collections)
+        ? adminRequestCompanions(compiledTables)
         : new Map<string, PolicyRef>();
     const schemas = [...new Set(expected.map((p) => p.schema))];
     // Nothing expected means nothing to reconcile against; scanning every
@@ -488,16 +488,16 @@ export interface OrphanCleanup {
 /**
  * Drop the policies an earlier push superseded but never removed.
  *
- * Only touches tables the collections describe — a table with no expected
+ * Only touches tables the tables describe — a table with no expected
  * policy is not ours to reconcile, and scanning by schema alone would sweep up
  * policies belonging to something else sharing the database.
  */
 export async function dropOrphanedPolicies(
     client: Queryable,
     drift: PolicyDrift,
-    collections: CollectionConfig[]
+    compiledTables: readonly CompiledTable[]
 ): Promise<OrphanCleanup> {
-    const { dropped, kept } = partitionOrphans(drift, collections);
+    const { dropped, kept } = partitionOrphans(drift, compiledTables);
     for (const p of dropped) {
         // Identifiers are quoted, and the name came from pg_policies rather than
         // from user input, so it is already a valid identifier.
@@ -510,8 +510,8 @@ export async function dropOrphanedPolicies(
  * Which orphans {@link dropOrphanedPolicies} drops and which it keeps, decided
  * without dropping anything: what `db push --dry-run` lists.
  */
-export function partitionOrphans(drift: PolicyDrift, collections: CollectionConfig[]): OrphanCleanup {
-    const expected = parseExpectedPolicies(generatePostgresPoliciesDdl(collections));
+export function partitionOrphans(drift: PolicyDrift, compiledTables: readonly CompiledTable[]): OrphanCleanup {
+    const expected = parseExpectedPolicies(generatePostgresPoliciesDdl(compiledTables));
     const managed = new Set(expected.map((p) => `${p.schema}.${p.table}`));
 
     const cleanup: OrphanCleanup = { dropped: [], kept: [] };
@@ -539,11 +539,11 @@ export function partitionOrphans(drift: PolicyDrift, collections: CollectionConf
  */
 export async function dropStaleAdminRequestCompanions(
     client: Queryable,
-    collections: CollectionConfig[],
+    compiledTables: readonly CompiledTable[],
     options: { adminRoleAvailable?: AdminPoliciesExpectation } = {}
 ): Promise<PolicyRef[]> {
-    const drift = await checkPolicyDrift(client, collections, options);
-    const stale = partitionOrphans({ ...drift, orphaned: drift.orphaned.filter(p => ADMIN_REQUEST_POLICY_SUFFIX.test(p.name)) }, collections).dropped;
+    const drift = await checkPolicyDrift(client, compiledTables, options);
+    const stale = partitionOrphans({ ...drift, orphaned: drift.orphaned.filter(p => ADMIN_REQUEST_POLICY_SUFFIX.test(p.name)) }, compiledTables).dropped;
     for (const p of stale) {
         await client.query(`DROP POLICY IF EXISTS "${p.name.replace(/"/g, '""')}" ON "${p.schema.replace(/"/g, '""')}"."${p.table.replace(/"/g, '""')}"`);
     }

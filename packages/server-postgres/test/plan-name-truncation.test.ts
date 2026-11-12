@@ -5,6 +5,7 @@
  */
 import type { CollectionConfig } from "@rebasepro/types";
 import { planSchema } from "../src/schema/plan/plan-schema";
+import { planCollections } from "./helpers/plan-tables";
 
 const LONG = "a_table_with_a_really_long_name_that_goes_on_and_on_and_on_forever"; // 66 bytes
 
@@ -27,15 +28,15 @@ const longOne = (withEnum: boolean): CollectionConfig => ({
 
 describe("derived names that collide only after Postgres truncates them", () => {
     it("refuses a table whose enum type truncates onto the table itself, naming the 63-byte limit", () => {
-        expect(() => planSchema([longOne(true)])).toThrow(/63 bytes[\s\S]*shorter `table`/);
+        expect(() => planCollections([longOne(true)])).toThrow(/keeps only the first 63 bytes/);
     });
 
     it("refuses two tables that share their first 63 bytes", () => {
         const twin = { ...longOne(false), slug: "long_two", table: `${LONG}_two` } as CollectionConfig;
-        expect(() => planSchema([longOne(false), twin])).toThrow(/both become/);
+        expect(() => planCollections([longOne(false), twin])).toThrow(/both become/);
     });
 
     it("leaves a long name that collides with nothing alone", () => {
-        expect(() => planSchema([longOne(false), tags])).not.toThrow();
+        expect(() => planCollections([longOne(false), tags])).not.toThrow();
     });
 });

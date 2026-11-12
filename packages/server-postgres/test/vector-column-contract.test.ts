@@ -37,6 +37,7 @@ import {
     buildVectorIndexPlan,
     vectorIndexNames
 } from "../src/schema/vector-index";
+import { compileSet } from "./helpers/plan-tables";
 
 const collection: PostgresCollectionConfig = {
     slug: "listing_observations",
@@ -68,24 +69,24 @@ const carvedOut = { includePolicies: false, includeSearch: false, includeVector:
 
 describe("what Atlas is shown", () => {
     it("carries no VECTOR type, so the dev database is never asked for one", async () => {
-        const ddl = await generatePostgresDdl(collections, carvedOut);
+        const ddl = await generatePostgresDdl(compileSet(collections), carvedOut);
         expect(ddl).not.toMatch(/VECTOR\s*\(/i);
         expect(ddl).not.toContain("description_embedding");
     });
 
     it("carries no ANN index either — it names a column that is no longer there", async () => {
-        const ddl = await generatePostgresDdl(collections, carvedOut);
+        const ddl = await generatePostgresDdl(compileSet(collections), carvedOut);
         expect(ddl).not.toContain(indexName);
         expect(ddl).not.toMatch(/USING (hnsw|ivfflat)/i);
     });
 
     it("never carries CREATE EXTENSION, which Atlas refuses as a paid feature", async () => {
-        const ddl = await generatePostgresDdl(collections, carvedOut);
+        const ddl = await generatePostgresDdl(compileSet(collections), carvedOut);
         expect(ddl).not.toMatch(/CREATE\s+EXTENSION/i);
     });
 
     it("still builds the table, and every column that is not a vector", async () => {
-        const ddl = await generatePostgresDdl(collections, carvedOut);
+        const ddl = await generatePostgresDdl(compileSet(collections), carvedOut);
         expect(ddl).toContain(`CREATE TABLE "public"."listing_observations"`);
         expect(ddl).toContain(`"title"`);
     });
@@ -98,7 +99,7 @@ describe("what Atlas is shown", () => {
      * what a database is supposed to contain.
      */
     it("includes the column when the caller does not ask for the carve-out", async () => {
-        const ddl = await generatePostgresDdl(collections, { includePolicies: false });
+        const ddl = await generatePostgresDdl(compileSet(collections), { includePolicies: false });
         expect(ddl).toContain(`"description_embedding" VECTOR(384)`);
         expect(ddl).toContain(indexName);
     });
@@ -112,13 +113,13 @@ describe("installing pgvector is opt-in", () => {
      * from inside the connection, so it is not Rebase's call to make.
      */
     it("issues no CREATE EXTENSION when no database declared one", () => {
-        expect(generatePostgresVectorDdl(collections)).not.toMatch(/CREATE\s+EXTENSION/i);
+        expect(generatePostgresVectorDdl(compileSet(collections))).not.toMatch(/CREATE\s+EXTENSION/i);
     });
 
     it("says why it did not, where someone chasing the failure will read it", () => {
         // "No CREATE EXTENSION here" is invisible unless it is written down,
         // and the reader of this file is looking for exactly that absence.
-        const sql = generatePostgresVectorDdl(collections);
+        const sql = generatePostgresVectorDdl(compileSet(collections));
         expect(sql).toContain('database({ extensions: ["vector"] })');
         expect(sql).toContain("config/resources.ts");
     });
@@ -127,13 +128,13 @@ describe("installing pgvector is opt-in", () => {
         // A database that already has pgvector, installed by hand, needs
         // nobody's permission. Withholding the column there would break a
         // working project to enforce a formality.
-        const sql = generatePostgresVectorDdl(collections);
+        const sql = generatePostgresVectorDdl(compileSet(collections));
         expect(sql).toContain(`ADD COLUMN IF NOT EXISTS "description_embedding" VECTOR(384)`);
         expect(sql).toContain(indexName);
     });
 
     it("issues it when a database declared it", () => {
-        const sql = generatePostgresVectorDdl(collections, { extensions: ["vector"] });
+        const sql = generatePostgresVectorDdl(compileSet(collections), { extensions: ["vector"] });
         const extension = sql.indexOf("CREATE EXTENSION IF NOT EXISTS vector");
         const column = sql.indexOf("ADD COLUMN IF NOT EXISTS");
         expect(extension).toBeGreaterThanOrEqual(0);
@@ -145,19 +146,19 @@ describe("installing pgvector is opt-in", () => {
         // is named `rebase` — the same as a schema the generator creates. An
         // unqualified CREATE EXTENSION would land there instead. Same trap
         // `searchExtensionStatements` documents for unaccent.
-        expect(generatePostgresVectorDdl(collections, { extensions: ["vector"] }))
+        expect(generatePostgresVectorDdl(compileSet(collections), { extensions: ["vector"] }))
             .toContain("CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public;");
     });
 
     it("is not fooled by a database that declared some other extension", () => {
-        expect(generatePostgresVectorDdl(collections, { extensions: ["postgis", "pg_cron"] }))
+        expect(generatePostgresVectorDdl(compileSet(collections), { extensions: ["postgis", "pg_cron"] }))
             .not.toMatch(/CREATE\s+EXTENSION/i);
     });
 });
 
 describe("the file Rebase applies", () => {
     it("adds the column rather than defining it inline — the table already exists", () => {
-        const sql = generatePostgresVectorDdl(collections);
+        const sql = generatePostgresVectorDdl(compileSet(collections));
         expect(sql).toContain(
             `ALTER TABLE "public"."listing_observations" ADD COLUMN IF NOT EXISTS "description_embedding" VECTOR(384);`
         );
@@ -165,18 +166,18 @@ describe("the file Rebase applies", () => {
     });
 
     it("creates the ANN index the property asked for", () => {
-        expect(generatePostgresVectorDdl(collections)).toContain(`CREATE INDEX IF NOT EXISTS "${indexName}"`);
+        expect(generatePostgresVectorDdl(compileSet(collections))).toContain(`CREATE INDEX IF NOT EXISTS "${indexName}"`);
     });
 
     it("tolerates already being there — it is replayed on every push", () => {
-        const sql = generatePostgresVectorDdl(collections, { extensions: ["vector"] });
+        const sql = generatePostgresVectorDdl(compileSet(collections), { extensions: ["vector"] });
         for (const line of sql.split("\n").filter(l => /^(CREATE|ALTER TABLE)/.test(l))) {
             expect(line).toMatch(/IF NOT EXISTS/i);
         }
     });
 
     it("writes nothing when no collection declares a vector", () => {
-        expect(generatePostgresVectorDdl(noVectors)).toBe("");
+        expect(generatePostgresVectorDdl(compileSet(noVectors))).toBe("");
     });
 
     /**
@@ -196,7 +197,7 @@ describe("the file Rebase applies", () => {
                 }
             }
         }];
-        const sql = generatePostgresVectorDdl(wide);
+        const sql = generatePostgresVectorDdl(compileSet(wide));
         expect(sql).toContain(`ADD COLUMN IF NOT EXISTS "description_embedding" VECTOR(3072)`);
         expect(sql).not.toMatch(/USING hnsw/i);
         expect(sql).toMatch(/-- No ANN index on/);
@@ -215,7 +216,7 @@ describe("the file Rebase applies", () => {
                 }
             }
         }];
-        const sql = generatePostgresVectorDdl(unindexed);
+        const sql = generatePostgresVectorDdl(compileSet(unindexed));
         expect(sql).toContain(`ADD COLUMN IF NOT EXISTS "description_embedding" VECTOR(384)`);
         expect(sql).not.toMatch(/USING (hnsw|ivfflat)/i);
     });
@@ -228,7 +229,7 @@ describe("the file Rebase applies", () => {
      * used to catch this because it owned the column.
      */
     it("guards a changed `dimensions` rather than skipping over it", () => {
-        const sql = generatePostgresVectorDdl(collections);
+        const sql = generatePostgresVectorDdl(compileSet(collections));
         expect(sql).toContain("DO $rebase_vector$");
         expect(sql).toMatch(/atttypmod/);
         expect(sql).toContain("RAISE EXCEPTION");
@@ -253,7 +254,7 @@ describe("the file Rebase applies", () => {
                 }
             }
         }];
-        expect(generatePostgresVectorDdl(constrained)).toContain(
+        expect(generatePostgresVectorDdl(compileSet(constrained))).toContain(
             `ADD COLUMN IF NOT EXISTS "description_embedding" VECTOR(384) UNIQUE NOT NULL;`
         );
     });
@@ -267,7 +268,7 @@ describe("vectorExcludePatterns — what Atlas is told to keep its hands off", (
      * existed to prevent. Same trap `searchExcludePatterns` documents.
      */
     it("qualifies every pattern with the schema", () => {
-        const patterns = vectorExcludePatterns(collections);
+        const patterns = vectorExcludePatterns(compileSet(collections));
         expect(patterns.length).toBeGreaterThan(0);
         for (const pattern of patterns) {
             expect(pattern.split(".")).toHaveLength(3);
@@ -276,7 +277,7 @@ describe("vectorExcludePatterns — what Atlas is told to keep its hands off", (
     });
 
     it("covers the column and the index — both are absent from the desired state", () => {
-        const patterns = vectorExcludePatterns(collections);
+        const patterns = vectorExcludePatterns(compileSet(collections));
         expect(patterns).toContain("public.listing_observations.description_embedding");
         expect(patterns).toContain(`public.listing_observations.${indexName}`);
     });
@@ -289,19 +290,19 @@ describe("vectorExcludePatterns — what Atlas is told to keep its hands off", (
                 descriptionEmbedding: { type: "vector", dimensions: 384, index: false, columnName: "description_embedding" }
             }
         }];
-        expect(vectorExcludePatterns(unindexed))
+        expect(vectorExcludePatterns(compileSet(unindexed)))
             .toEqual(["public.listing_observations.description_embedding"]);
     });
 
     it("is empty for a project that never opted in, so nothing changes for it", () => {
-        expect(vectorExcludePatterns(noVectors)).toEqual([]);
+        expect(vectorExcludePatterns(compileSet(noVectors))).toEqual([]);
     });
 
     it("excludes exactly the objects vector.sql creates, and nothing else", () => {
         // The two lists are built independently. If one grows an object the
         // other does not know about, Atlas drops it on the next push.
-        const sql = generatePostgresVectorDdl(collections);
-        for (const pattern of vectorExcludePatterns(collections)) {
+        const sql = generatePostgresVectorDdl(compileSet(collections));
+        for (const pattern of vectorExcludePatterns(compileSet(collections))) {
             expect(sql).toContain(pattern.split(".")[2]);
         }
     });
@@ -317,7 +318,7 @@ describe("boot provisions what the push provisions", () => {
     const optedIn = { databaseExtensions: ["vector"] } as const;
 
     it("installs pgvector at boot too — the managed runtime never runs a push", () => {
-        const actions = planCollectionSchemaEnsure(collections, emptyDb, optedIn).actions;
+        const actions = planCollectionSchemaEnsure(compileSet(collections), emptyDb, optedIn).actions;
         expect(actions.some(a =>
             a.kind === "create-extension" && /CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public;/.test(a.sql)
         )).toBe(true);
@@ -329,14 +330,14 @@ describe("boot provisions what the push provisions", () => {
      * of them honoured would make the schema depend on which command ran first.
      */
     it("refuses at boot exactly where the push refuses — no declaration, no install", () => {
-        const planned = planCollectionSchemaEnsure(collections, emptyDb).actions
+        const planned = planCollectionSchemaEnsure(compileSet(collections), emptyDb).actions
             .filter(a => a.kind === "create-extension" && a.sql.includes(" vector"));
         expect(planned).toEqual([]);
-        expect(generatePostgresVectorDdl(collections)).not.toMatch(/CREATE\s+EXTENSION/i);
+        expect(generatePostgresVectorDdl(compileSet(collections))).not.toMatch(/CREATE\s+EXTENSION/i);
     });
 
     it("plans the extension before the table that needs the type", () => {
-        const actions = planCollectionSchemaEnsure(collections, emptyDb, optedIn).actions;
+        const actions = planCollectionSchemaEnsure(compileSet(collections), emptyDb, optedIn).actions;
         const extension = actions.findIndex(a => a.kind === "create-extension" && a.sql.includes("vector"));
         const table = actions.findIndex(a => a.kind === "create-table");
         expect(extension).toBeGreaterThanOrEqual(0);
@@ -348,7 +349,7 @@ describe("boot provisions what the push provisions", () => {
             collection,
             { ...collection, slug: "other_observations", table: "other_observations" } as CollectionConfig
         ];
-        const planned = planCollectionSchemaEnsure(two, emptyDb, optedIn).actions
+        const planned = planCollectionSchemaEnsure(compileSet(two), emptyDb, optedIn).actions
             .filter(a => a.kind === "create-extension" && a.sql.includes("vector"));
         expect(planned).toHaveLength(1);
     });
@@ -358,7 +359,7 @@ describe("boot provisions what the push provisions", () => {
         // install pgvector, and Rebase installs it only where the schema needs
         // it. A project that names it and stores no embeddings gets nothing.
         for (const options of [undefined, optedIn]) {
-            const planned = planCollectionSchemaEnsure(noVectors, emptyDb, options).actions
+            const planned = planCollectionSchemaEnsure(compileSet(noVectors), emptyDb, options).actions
                 .filter(a => a.kind === "create-extension" && a.sql.includes(" vector"));
             expect(planned).toEqual([]);
         }
@@ -373,7 +374,7 @@ describe("boot provisions what the push provisions", () => {
             // a plain one needs none. See `buildSearchColumnSpec`.
             search: { fields: ["title"], unaccent: true }
         }];
-        const planned = planCollectionSchemaEnsure(searchable, emptyDb).actions
+        const planned = planCollectionSchemaEnsure(compileSet(searchable), emptyDb).actions
             .filter(a => a.kind === "create-extension");
         expect(planned.length).toBeGreaterThan(0);
         expect(planned.every(a => !a.sql.includes(" vector"))).toBe(true);
@@ -381,9 +382,9 @@ describe("boot provisions what the push provisions", () => {
 
     it("names the same column both producers name", () => {
         const [spec] = buildVectorColumnSpecs(collection, resolveColumnName);
-        const boot = planCollectionSchemaEnsure(collections, emptyDb).actions
+        const boot = planCollectionSchemaEnsure(compileSet(collections), emptyDb).actions
             .find(a => a.sql.includes(`"${spec.column}"`) && a.sql.includes("ADD COLUMN"));
         expect(boot).toBeDefined();
-        expect(generatePostgresVectorDdl(collections)).toContain(`"${spec.column}" VECTOR(${spec.dimensions})`);
+        expect(generatePostgresVectorDdl(compileSet(collections))).toContain(`"${spec.column}" VECTOR(${spec.dimensions})`);
     });
 });

@@ -12,7 +12,7 @@
  * reading of relations, junctions, enums and search — one of three such
  * readings. See `schema/plan/types.ts` for what that cost.
  */
-import { CollectionConfig, REBASE_ADMIN_REQUEST_ROLE, SecurityRule, isPostgresCollectionConfig } from "@rebasepro/types";
+import { CollectionConfig, REBASE_ADMIN_REQUEST_ROLE, SecurityRule, isPostgresCollectionConfig, type CompiledTable } from "@rebasepro/types";
 import { getTableName } from "@rebasepro/common";
 import { planSchema, compileSecurityRule, quoteSqlLiteral, defaultBelongsToOnDelete } from "./plan/plan-schema";
 import {
@@ -69,13 +69,13 @@ export const generatePolicyStatements = (
  * `[object Promise]`.
  */
 export const generatePostgresDdl = (
-    allCollections: CollectionConfig[],
+    tables: readonly CompiledTable[],
     options: DdlRenderOptions = {}
-): string => renderPostgresDdl(planSchema(allCollections), options);
+): string => renderPostgresDdl(planSchema(tables), options);
 
 /** `.rebase/sql/policies.sql` — the RLS policies. Atlas has no model for a policy. */
-export const generatePostgresPoliciesDdl = (allCollections: CollectionConfig[]): string =>
-    renderPoliciesDdl(planSchema(allCollections));
+export const generatePostgresPoliciesDdl = (tables: readonly CompiledTable[]): string =>
+    renderPoliciesDdl(planSchema(tables));
 
 /**
  * `.rebase/sql/search.sql` — everything a `search` block needs, as a file Rebase
@@ -96,8 +96,8 @@ export const generatePostgresPoliciesDdl = (allCollections: CollectionConfig[]):
  *
  * Empty when nothing opted in — the caller writes no file then.
  */
-export const generatePostgresSearchDdl = (allCollections: CollectionConfig[]): string =>
-    renderSearchDdl(planSchema(allCollections));
+export const generatePostgresSearchDdl = (tables: readonly CompiledTable[]): string =>
+    renderSearchDdl(planSchema(tables));
 
 /**
  * Glob patterns telling Atlas to leave the search column and its index alone.
@@ -106,8 +106,8 @@ export const generatePostgresSearchDdl = (allCollections: CollectionConfig[]): s
  * instruction to drop the column — taking the index and the whole search
  * feature with it on the next push.
  */
-export const searchExcludePatterns = (allCollections: CollectionConfig[]): string[] =>
-    searchExcludePatternsOf(planSchema(allCollections));
+export const searchExcludePatterns = (tables: readonly CompiledTable[]): string[] =>
+    searchExcludePatternsOf(planSchema(tables));
 
 /**
  * `.rebase/sql/vector.sql` — the `vector` columns, their ANN indexes and, when a
@@ -121,13 +121,13 @@ export const searchExcludePatterns = (allCollections: CollectionConfig[]): strin
  * have pgvector, and every push dies with `type "vector" does not exist`.
  */
 export const generatePostgresVectorDdl = (
-    allCollections: CollectionConfig[],
+    tables: readonly CompiledTable[],
     options: { extensions?: readonly string[] } = {}
-): string => renderVectorDdl(planSchema(allCollections, { databaseExtensions: options.extensions }));
+): string => renderVectorDdl(planSchema(tables, { databaseExtensions: options.extensions }));
 
 /** @see searchExcludePatterns */
-export const vectorExcludePatterns = (allCollections: CollectionConfig[]): string[] =>
-    vectorExcludePatternsOf(planSchema(allCollections));
+export const vectorExcludePatterns = (tables: readonly CompiledTable[]): string[] =>
+    vectorExcludePatternsOf(planSchema(tables));
 
 /**
  * `.rebase/sql/triggers.sql` — the `BEFORE UPDATE` triggers behind
@@ -137,20 +137,20 @@ export const vectorExcludePatterns = (allCollections: CollectionConfig[]): strin
  * for the first of the two reasons search is. Empty when no property declares
  * `on_update` — the caller writes no file then, and removes a stale one.
  */
-export const generatePostgresTriggersDdl = (allCollections: CollectionConfig[]): string =>
-    renderTriggersDdl(planSchema(allCollections));
+export const generatePostgresTriggersDdl = (tables: readonly CompiledTable[]): string =>
+    renderTriggersDdl(planSchema(tables));
 
 /**
  * `.rebase/sql/views.sql` — the views of the collections that declare `view`,
  * which Atlas's free tier does not manage. Empty when none does — the caller
  * writes no file then, and removes a stale one.
  */
-export const generatePostgresViewsDdl = (allCollections: CollectionConfig[]): string =>
-    renderViewsDdl(planSchema(allCollections));
+export const generatePostgresViewsDdl = (tables: readonly CompiledTable[]): string =>
+    renderViewsDdl(planSchema(tables));
 
 /** @see searchExcludePatterns */
-export const triggerExcludePatterns = (allCollections: CollectionConfig[]): string[] =>
-    triggerExcludePatternsOf(planSchema(allCollections));
+export const triggerExcludePatterns = (tables: readonly CompiledTable[]): string[] =>
+    triggerExcludePatternsOf(planSchema(tables));
 
 // ── Slices of the plan other modules ask for ─────────────────────────────────
 
@@ -191,7 +191,7 @@ export interface JunctionTablePlan {
     foreignKeys: ForeignKeyPlan[];
 }
 
-const planOf = (collections: CollectionConfig[]): SchemaPlan => planSchema(collections);
+const planOf = (tables: readonly CompiledTable[]): SchemaPlan => planSchema(tables);
 
 /**
  * The FK columns the declared collections own — one entry per `relation`
@@ -201,8 +201,8 @@ const planOf = (collections: CollectionConfig[]): SchemaPlan => planSchema(colle
  * the `CREATE TABLE` one, which is how boot-ensure came to add every relation
  * column bare while `db push` made the same column `NOT NULL`.
  */
-export const planRelationalColumns = (allCollections: CollectionConfig[]): RelationalColumnPlan[] => {
-    const plan = planOf(allCollections);
+export const planRelationalColumns = (tables: readonly CompiledTable[]): RelationalColumnPlan[] => {
+    const plan = planOf(tables);
     const out: RelationalColumnPlan[] = [];
     for (const table of plan.tables) {
         if (table.kind !== "collection") continue;
@@ -230,8 +230,8 @@ export const planRelationalColumns = (allCollections: CollectionConfig[]): Relat
  * here always has policies planned for it — a junction with row-level security
  * left off is readable and writable by every signed-in user.
  */
-export const planJunctionTables = (allCollections: CollectionConfig[]): JunctionTablePlan[] =>
-    planOf(allCollections).tables
+export const planJunctionTables = (tables: readonly CompiledTable[]): JunctionTablePlan[] =>
+    planOf(tables).tables
         .filter(table => table.kind === "junction")
         .map(table => ({
             schema: table.schema,
@@ -291,7 +291,7 @@ export interface PolicyApplyPlan {
  * `db push` produce identical RLS from identical collections.
  */
 export const planCollectionPolicies = (
-    allCollections: CollectionConfig[],
+    tables: readonly CompiledTable[],
     options: {
         adminRoleAvailable?: boolean;
         /**
@@ -303,7 +303,7 @@ export const planCollectionPolicies = (
         adminRequestRoleAvailable?: boolean;
     } = {}
 ): CollectionPolicyPlan[] => {
-    const plan = planOf(allCollections);
+    const plan = planOf(tables);
     // Collections first, then the junctions no collection declares.
     const ordered = [
         ...plan.tables.filter(t => t.kind === "collection"),
@@ -369,10 +369,10 @@ export const planCollectionPolicies = (
  * at, which is exactly what the generated expression depends on.
  */
 export const searchColumnDependencies = (
-    allCollections: CollectionConfig[]
+    tables: readonly CompiledTable[]
 ): GeneratedColumnDependency[] => {
     const dependencies: GeneratedColumnDependency[] = [];
-    for (const table of planOf(allCollections).tables) {
+    for (const table of planOf(tables).tables) {
         const spec = table.search;
         if (!spec) continue;
         const generated = [spec.column, ...(spec.fuzzy ? [spec.fuzzy.column] : [])];

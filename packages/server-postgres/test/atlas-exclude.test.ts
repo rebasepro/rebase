@@ -5,6 +5,7 @@ import { searchExcludePatterns, triggerExcludePatterns, vectorExcludePatterns } 
 import { undeclaredConstraintExcludes } from "../src/schema/undeclarable-constraints";
 import { parseExcludePatterns, stripCarvedOutStatements } from "../src/schema/carved-out-migration";
 import { partitionByOwnership } from "../src/schema/generated-column-conflicts";
+import { compileSet } from "./helpers/plan-tables";
 
 /**
  * Every `--exclude` `db push` hands Atlas matches the object it names, whatever
@@ -126,7 +127,7 @@ describe("each exclude list, for a name that is not a glob as it stands", () => 
         ["vector", vectorExcludePatterns],
         ["trigger", triggerExcludePatterns]
     ] as const)("Rebase's own %s objects", (_kind, patternsOf) => {
-        const patterns = patternsOf([oddTable]);
+        const patterns = patternsOf(compileSet([oddTable]));
         expect(patterns.length).toBeGreaterThan(0);
         for (const pattern of patterns) {
             const names = excludePatternParts(pattern);

@@ -14,6 +14,7 @@ import { reconstructSearchBlock } from "../src/schema/introspect-db-search";
 import { readSchemaMetadata } from "../src/schema/introspect-db-queries";
 import { describeTables } from "../src/schema/introspect-tables";
 import { ensureCollectionTables } from "../src/schema/ensure-collection-tables";
+import { compileSet } from "./helpers/plan-tables";
 
 describe("against a real catalogue", () => {
     let db: PGlite;
@@ -47,7 +48,7 @@ describe("against a real catalogue", () => {
                 body: { type: "string" }
             }
         };
-        await ensureCollectionTables(db, [posts]);
+        await ensureCollectionTables(db, compileSet([posts]));
         const metadata = await readSchemaMetadata(db, "public");
         const columns = metadata.columns.filter(c => c.table_name === "posts");
         const comments = new Map(metadata.comments

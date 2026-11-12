@@ -10,6 +10,7 @@ import { planSchema } from "../src/schema/plan/plan-schema";
 import { renderViewsDdl, viewCreateStatements } from "../src/schema/plan/render-ddl";
 import { generatePostgresDdl } from "../src/schema/generate-postgres-ddl-logic";
 import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
+import { compileSet, planCollections } from "./helpers/plan-tables";
 
 const songs: CollectionConfig = {
     slug: "songs", name: "Songs", table: "songs",
@@ -27,7 +28,7 @@ describe("view plans", () => {
     // Declared before the view it reads.
     const top = view("top_artists", "SELECT artist FROM artist_stats ORDER BY artist LIMIT 10", true);
     const stats = view("artist_stats", "SELECT artist FROM songs GROUP BY artist;");
-    const plan = planSchema([songs, top, stats]);
+    const plan = planCollections([songs, top, stats]);
 
     it("plans no table, policy or enum for a view", () => {
         expect(plan.tables.map(table => table.table)).toEqual(["songs"]);
@@ -40,8 +41,8 @@ describe("view plans", () => {
     });
 
     it("hashes the plan, so the same config hashes the same and a changed query does not", () => {
-        expect(planSchema([songs, top, stats]).views.map(v => v.hash)).toEqual(plan.views.map(v => v.hash));
-        const changed = planSchema([songs, top, view("artist_stats", "SELECT lower(artist) AS artist FROM songs GROUP BY 1")]);
+        expect(planCollections([songs, top, stats]).views.map(v => v.hash)).toEqual(plan.views.map(v => v.hash));
+        const changed = planCollections([songs, top, view("artist_stats", "SELECT lower(artist) AS artist FROM songs GROUP BY 1")]);
         expect(changed.views[0].hash).not.toBe(plan.views[0].hash);
         expect(changed.views[1].hash).toBe(plan.views[1].hash);
     });
@@ -66,13 +67,13 @@ describe("view plans", () => {
             indexes: [{ on: ["plays"], reason: "rank by plays" }],
             properties: { artist: { type: "string", name: "Artist", isId: true }, plays: { type: "number", name: "Plays" } }
         };
-        const [top] = planSchema([songs, indexed, view("artist_stats", "SELECT artist FROM songs GROUP BY artist")]).views.filter(v => v.materialized);
+        const [top] = planCollections([songs, indexed, view("artist_stats", "SELECT artist FROM songs GROUP BY artist")]).views.filter(v => v.materialized);
         expect(top.indexes).toEqual([expect.stringMatching(/^CREATE INDEX "[^"]+" ON "public"\."top_artists_rebase_rows" \("plays"\)$/)]);
         expect(viewCreateStatements(top)).toContain(top.indexes[0]);
     });
 
     it("re-gates a materialized view whose roles change", () => {
-        const regated = planSchema([songs, view("top_artists", "SELECT artist FROM artist_stats ORDER BY artist LIMIT 10", true, ["analyst"]), stats]);
+        const regated = planCollections([songs, view("top_artists", "SELECT artist FROM artist_stats ORDER BY artist LIMIT 10", true, ["analyst"]), stats]);
         expect(regated.views[1].hash).not.toBe(plan.views[1].hash);
         expect(viewCreateStatements(regated.views[1])[4]).toContain("ARRAY['analyst']::text[]");
     });
@@ -91,12 +92,12 @@ describe("view plans", () => {
     });
 
     it("quotes a query holding the default dollar tag", () => {
-        const odd = planSchema([songs, view("odd", "SELECT '$rebase_view$' AS artist")]);
+        const odd = planCollections([songs, view("odd", "SELECT '$rebase_view$' AS artist")]);
         expect(renderViewsDdl(odd)).toContain("EXECUTE $rebase_view_1$CREATE VIEW");
     });
 
     it("renders nothing without a view", () => {
-        expect(renderViewsDdl(planSchema([songs]))).toBe("");
+        expect(renderViewsDdl(planCollections([songs]))).toBe("");
     });
 });
 
@@ -127,7 +128,7 @@ describe("links into a view collection", () => {
         }
     };
     const collections = [songs, linked, byArtist];
-    const plan = planSchema(collections);
+    const plan = planCollections(collections);
     const table = (name: string) => plan.tables.find(t => t.table === name);
 
     it("keeps the belongsTo column, with no foreign key into the view", () => {
@@ -145,11 +146,11 @@ describe("links into a view collection", () => {
     });
 
     it("renders no REFERENCES into the view", () => {
-        expect(generatePostgresDdl(collections)).not.toMatch(/REFERENCES "public"\."by_artist"/);
+        expect(generatePostgresDdl(compileSet(collections))).not.toMatch(/REFERENCES "public"\."by_artist"/);
     });
 
     it("generates no drizzle relation naming the view, which the file does not declare", () => {
-        const schema = generateSchema(collections);
+        const schema = generateSchema(compileSet(collections));
         expect(schema).not.toMatch(/\bbyArtist\b/);
         expect(schema).toMatch(/export const tracksSimilar\b/);
     });

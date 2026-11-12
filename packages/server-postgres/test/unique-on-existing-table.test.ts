@@ -21,6 +21,7 @@ import {
     readExistingSchema,
     type ExistingSchema
 } from "../src/schema/ensure-collection-tables";
+import { compileSet } from "./helpers/plan-tables";
 
 const people = (extra: CollectionConfig["properties"] = {}): CollectionConfig => ({
     slug: "people",
@@ -47,7 +48,7 @@ const existingPeople = (populated: boolean | undefined): ExistingSchema => ({
 });
 
 const addColumnSql = (existing: ExistingSchema, collection: CollectionConfig, column: string): string => {
-    const plan = planCollectionSchemaEnsure([collection], existing);
+    const plan = planCollectionSchemaEnsure(compileSet([collection]), existing);
     const action = plan.actions.find(a => a.kind === "add-column" && a.target === `public.people.${column}`);
     if (!action) throw new Error(`no add-column for ${column}`);
     return action.sql;
@@ -63,14 +64,14 @@ describe("a unique column added to a table that already exists", () => {
         const existing = existingPeople(true);
         expect(addColumnSql(existing, people(handle), "handle")).toBe(
             'ALTER TABLE "public"."people" ADD COLUMN IF NOT EXISTS "handle" TEXT UNIQUE;');
-        expect(planCollectionSchemaEnsure([people(handle)], existing).withheldConstraints).toEqual([]);
+        expect(planCollectionSchemaEnsure(compileSet([people(handle)]), existing).withheldConstraints).toEqual([]);
     });
 
     it("is UNIQUE with its default on a table that holds no rows", () => {
         const existing = existingPeople(false);
         expect(addColumnSql(existing, people(tier), "tier")).toBe(
             'ALTER TABLE "public"."people" ADD COLUMN IF NOT EXISTS "tier" TEXT UNIQUE DEFAULT \'free\';');
-        expect(planCollectionSchemaEnsure([people(tier)], existing).withheldConstraints).toEqual([]);
+        expect(planCollectionSchemaEnsure(compileSet([people(tier)]), existing).withheldConstraints).toEqual([]);
     });
 
     it("is withheld, and reported, when a default would give every existing row the same value", () => {
@@ -78,7 +79,7 @@ describe("a unique column added to a table that already exists", () => {
             const existing = existingPeople(populated);
             expect(addColumnSql(existing, people(tier), "tier")).toBe(
                 'ALTER TABLE "public"."people" ADD COLUMN IF NOT EXISTS "tier" TEXT DEFAULT \'free\';');
-            const withheld = planCollectionSchemaEnsure([people(tier)], existing).withheldConstraints;
+            const withheld = planCollectionSchemaEnsure(compileSet([people(tier)]), existing).withheldConstraints;
             expect(withheld).toHaveLength(1);
             expect(withheld[0]).toMatchObject({ target: "public.people.tier", kind: "unique" });
             expect(withheld[0].reason).toMatch(/"free"|default/);
@@ -90,7 +91,7 @@ describe("a unique column added to a table that already exists", () => {
             ...existingPeople(true),
             tables: new Map([["public.people", new Set(["id", "name", "handle"])]])
         };
-        const plan = planCollectionSchemaEnsure([people(handle)], existing);
+        const plan = planCollectionSchemaEnsure(compileSet([people(handle)]), existing);
         expect(plan.actions.filter(a => a.target.startsWith("public.people.handle"))).toEqual([]);
         expect(plan.withheldConstraints).toEqual([]);
     });
@@ -98,10 +99,10 @@ describe("a unique column added to a table that already exists", () => {
     it("holds on a live database: duplicates are refused and an upsert on the column works", async () => {
         const db = new PGlite();
         try {
-            await ensureCollectionTables(asQueryable(db), [people()]);
+            await ensureCollectionTables(asQueryable(db), compileSet([people()]));
             await db.exec("INSERT INTO public.people (name) VALUES ('Ada'), ('Grace');");
 
-            const outcome = await ensureCollectionTables(asQueryable(db), [people(handle)]);
+            const outcome = await ensureCollectionTables(asQueryable(db), compileSet([people(handle)]));
             expect(outcome.failures).toEqual([]);
 
             await db.exec("INSERT INTO public.people (name, handle) VALUES ('Alan', 'alan');");
@@ -120,11 +121,11 @@ describe("a unique column added to a table that already exists", () => {
     it("says so at boot when it is withheld, and the boot still succeeds", async () => {
         const db = new PGlite();
         try {
-            await ensureCollectionTables(asQueryable(db), [people()]);
+            await ensureCollectionTables(asQueryable(db), compileSet([people()]));
             await db.exec("INSERT INTO public.people (name) VALUES ('Ada'), ('Grace');");
 
             const said: string[] = [];
-            const outcome = await ensureCollectionTables(asQueryable(db), [people(tier)], m => said.push(m));
+            const outcome = await ensureCollectionTables(asQueryable(db), compileSet([people(tier)]), m => said.push(m));
             expect(outcome.failures).toEqual([]);
             expect(said.some(m => m.startsWith('No UNIQUE on "public.people.tier"'))).toBe(true);
 

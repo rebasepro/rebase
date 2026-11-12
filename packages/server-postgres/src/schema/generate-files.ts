@@ -62,8 +62,8 @@ export async function writeDrizzleSchema(options: GenerateFileOptions): Promise<
     try {
         // Shared with the runtime and the doctor (`loadTables`), in slug order so
         // the output does not depend on the index's export order.
-        const collections = await loadTables(options.schemaDir);
-        const schemaContent = generateSchema(collections);
+        const tables = await loadTables(options.schemaDir);
+        const schemaContent = generateSchema(tables);
 
         if (options.outputPath) {
             await fsPromises.mkdir(path.dirname(options.outputPath), { recursive: true });
@@ -127,24 +127,24 @@ export async function writePostgresDdl(options: GenerateFileOptions): Promise<vo
         // `rebase resources` and the boot loader assume.
         await loadDeclaredResources(path.dirname(resolvedPath));
 
-        const collections = await loadTables(resolvedPath);
+        const tables = await loadTables(resolvedPath);
 
         // `schema.sql` is Atlas's desired state, and it carries neither the RLS
         // policies, nor the search apparatus, nor the vector columns: Atlas
         // manages none of them, and in the search and vector cases cannot. All
         // three are written beside it and applied by the CLI in their own right.
-        const ddlContent = generatePostgresDdl(collections, {
+        const ddlContent = generatePostgresDdl(tables, {
             includePolicies: false,
             includeSearch: false,
             includeVector: false
         });
-        const policiesContent = generatePostgresPoliciesDdl(collections);
-        const searchContent = generatePostgresSearchDdl(collections);
-        const vectorContent = generatePostgresVectorDdl(collections, {
+        const policiesContent = generatePostgresPoliciesDdl(tables);
+        const searchContent = generatePostgresSearchDdl(tables);
+        const vectorContent = generatePostgresVectorDdl(tables, {
             extensions: declaredDatabaseExtensions()
         });
-        const triggersContent = generatePostgresTriggersDdl(collections);
-        const viewsContent = generatePostgresViewsDdl(collections);
+        const triggersContent = generatePostgresTriggersDdl(tables);
+        const viewsContent = generatePostgresViewsDdl(tables);
 
         const outputPath = options.outputPath;
         if (outputPath) {

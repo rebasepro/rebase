@@ -11,6 +11,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { CollectionConfig, PostgresCollectionConfig } from "@rebasepro/types";
 import { ensureCollectionTables, type Queryable } from "../src/schema/ensure-collection-tables";
 import { missingForeignKeyIndexes } from "../src/schema/push-index-prebuild";
+import { compileSet } from "./helpers/plan-tables";
 
 const authors: CollectionConfig = {
     slug: "authors", table: "authors", name: "Authors",
@@ -48,13 +49,13 @@ describe("missingForeignKeyIndexes", () => {
     it("names the derived index an existing table lacks", async () => {
         const { db, queryable } = await database();
         try {
-            await ensureCollectionTables(queryable, [authors, posts]);
+            await ensureCollectionTables(queryable, compileSet([authors, posts]));
             const name = await derivedIndexOnPosts(db);
             expect(name).toBeDefined();
             // A table from before the release that derived it.
             await db.exec(`DROP INDEX "public"."${name}"`);
 
-            const missing = await missingForeignKeyIndexes(queryable, [authors, posts]);
+            const missing = await missingForeignKeyIndexes(queryable, compileSet([authors, posts]));
             expect(missing.map(m => [m.table, m.indexName])).toEqual([["posts", name]]);
             expect(missing[0].sql).toMatch(/^CREATE INDEX CONCURRENTLY IF NOT EXISTS/);
         } finally {
@@ -65,8 +66,8 @@ describe("missingForeignKeyIndexes", () => {
     it("names nothing when the index is there", async () => {
         const { db, queryable } = await database();
         try {
-            await ensureCollectionTables(queryable, [authors, posts]);
-            expect(await missingForeignKeyIndexes(queryable, [authors, posts])).toEqual([]);
+            await ensureCollectionTables(queryable, compileSet([authors, posts]));
+            expect(await missingForeignKeyIndexes(queryable, compileSet([authors, posts]))).toEqual([]);
         } finally {
             await db.close();
         }
@@ -75,8 +76,8 @@ describe("missingForeignKeyIndexes", () => {
     it("leaves a table the push creates to Atlas, which creates its index with it", async () => {
         const { db, queryable } = await database();
         try {
-            await ensureCollectionTables(queryable, [authors]);
-            expect(await missingForeignKeyIndexes(queryable, [authors, posts])).toEqual([]);
+            await ensureCollectionTables(queryable, compileSet([authors]));
+            expect(await missingForeignKeyIndexes(queryable, compileSet([authors, posts]))).toEqual([]);
         } finally {
             await db.close();
         }
@@ -85,10 +86,10 @@ describe("missingForeignKeyIndexes", () => {
     it("leaves a column the push adds to Atlas: there is nothing to build the index over yet", async () => {
         const { db, queryable } = await database();
         try {
-            await ensureCollectionTables(queryable, [authors, posts]);
+            await ensureCollectionTables(queryable, compileSet([authors, posts]));
             const name = await derivedIndexOnPosts(db);
             await db.exec(`DROP INDEX "public"."${name}"; ALTER TABLE "public"."posts" DROP COLUMN "author_id";`);
-            expect(await missingForeignKeyIndexes(queryable, [authors, posts])).toEqual([]);
+            expect(await missingForeignKeyIndexes(queryable, compileSet([authors, posts]))).toEqual([]);
         } finally {
             await db.close();
         }
@@ -98,12 +99,12 @@ describe("missingForeignKeyIndexes", () => {
         const { db, queryable } = await database();
         try {
             const indexed: CollectionConfig = { ...posts, indexes: [{ on: ["title"], reason: "list by title" }] };
-            await ensureCollectionTables(queryable, [authors, indexed]);
+            await ensureCollectionTables(queryable, compileSet([authors, indexed]));
             const { rows } = await db.query<{ name: string }>(
                 "SELECT indexname AS name FROM pg_indexes WHERE tablename = 'posts' AND indexname LIKE 'posts_title_ix_%'"
             );
             await db.exec(`DROP INDEX "public"."${rows[0].name}"`);
-            expect(await missingForeignKeyIndexes(queryable, [authors, indexed])).toEqual([]);
+            expect(await missingForeignKeyIndexes(queryable, compileSet([authors, indexed]))).toEqual([]);
         } finally {
             await db.close();
         }

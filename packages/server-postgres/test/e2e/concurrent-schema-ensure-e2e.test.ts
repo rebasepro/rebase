@@ -27,6 +27,7 @@ import type { PostgresCollectionConfig } from "@rebasepro/types";
 
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { ensureCollectionTables, type Queryable } from "../../src/schema/ensure-collection-tables.js";
+import { compileSet } from "../helpers/plan-tables";
 
 /** Enough collections, columns and enums that a plan has many steps to lose. */
 function collections(): PostgresCollectionConfig[] {
@@ -113,7 +114,7 @@ describe.each(MODES)("five instances booting into one empty database, $label", (
         const instances = await Promise.all(Array.from({ length: INSTANCES }, () => instance(database)));
 
         const results = await Promise.allSettled(
-            instances.map(client => ensureCollectionTables(client, configs, undefined, options))
+            instances.map(client => ensureCollectionTables(client, compileSet(configs), undefined, options))
         );
 
         const rejected = results.filter(r => r.status === "rejected");
@@ -156,7 +157,7 @@ describe.each(MODES)("five instances booting into one empty database, $label", (
         // than treat the existing schema as a race it lost.
         const client = await instance(database);
 
-        const plan = await ensureCollectionTables(client, collections(), undefined, options);
+        const plan = await ensureCollectionTables(client, compileSet(collections()), undefined, options);
 
         expect(plan.actions).toEqual([]);
     }, 120_000);

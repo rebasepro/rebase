@@ -23,6 +23,7 @@ import {
     planCollectionSchemaEnsure,
     type ExistingSchema
 } from "../src/schema/ensure-collection-tables";
+import { compileSet, planCollections } from "./helpers/plan-tables";
 
 /** `customer_subscription_billing_events_payment_processor_status_code` is 66 bytes. */
 const billingEvents = (labels: string[]): CollectionConfig => ({
@@ -50,7 +51,7 @@ describe("an enum type whose derived name is longer than 63 bytes", () => {
             enumValues: new Map([[`public.${TRUNCATED}`, ["pending", "settled"]]]),
             constraints: new Set()
         };
-        const plan = planCollectionSchemaEnsure([billingEvents(["pending", "settled", "refunded"])], existing);
+        const plan = planCollectionSchemaEnsure(compileSet([billingEvents(["pending", "settled", "refunded"])]), existing);
         const enumActions = plan.actions.filter(a => a.kind === "create-enum" || a.kind === "add-enum-value");
         expect(enumActions.map(a => a.kind)).toEqual(["add-enum-value"]);
         expect(enumActions[0].sql).toContain("ADD VALUE IF NOT EXISTS 'refunded'");
@@ -59,9 +60,9 @@ describe("an enum type whose derived name is longer than 63 bytes", () => {
     it("gains a label added after the first boot", async () => {
         const db = new PGlite();
         try {
-            await ensureCollectionTables(asQueryable(db), [billingEvents(["pending", "settled"])]);
+            await ensureCollectionTables(asQueryable(db), compileSet([billingEvents(["pending", "settled"])]));
             const second = await ensureCollectionTables(
-                asQueryable(db), [billingEvents(["pending", "settled", "refunded"])]);
+                asQueryable(db), compileSet([billingEvents(["pending", "settled", "refunded"])]));
             expect(second.failures).toEqual([]);
 
             const { rows } = await db.query<{ typname: string; labels: string[] }>(
@@ -98,9 +99,9 @@ describe("two columns whose enum types derive the same name", () => {
     };
 
     it("are refused, naming both properties and the type", () => {
-        expect(() => planSchema([orders, orderItems])).toThrow(/"public"\."orders_item_status"/);
-        expect(() => planSchema([orders, orderItems])).toThrow(/"itemStatus" of collection "orders"/);
-        expect(() => planSchema([orders, orderItems])).toThrow(/"status" of collection "orders_item"/);
+        expect(() => planCollections([orders, orderItems])).toThrow(/"public"\."orders_item_status"/);
+        expect(() => planCollections([orders, orderItems])).toThrow(/enum type of "orders\.itemStatus"/);
+        expect(() => planCollections([orders, orderItems])).toThrow(/orders_item\.status: the enum type/);
     });
 
     it("are refused when only the truncated names coincide", () => {
@@ -116,21 +117,17 @@ describe("two columns whose enum types derive the same name", () => {
         // Two different tables and columns, 66 bytes each, sharing their first 63.
         const first = long("customer_subscription_billing_events", "payment_processor_status_code");
         const other = long("customer_subscription_billing_events_payment", "processor_status_count");
-        expect(() => planSchema([first])).not.toThrow();
-        expect(() => planSchema([first, other])).toThrow(new RegExp(`"public"\\."${TRUNCATED}"`));
+        expect(() => planCollections([first])).not.toThrow();
+        expect(() => planCollections([first, other])).toThrow(new RegExp(`"public"\\."${TRUNCATED}"`));
     });
 
-    it("are not a collision when they are the same column, declared twice", () => {
-        // Two collections over one table — a filtered view, say — share the
-        // column and so share its type.
-        const drafts: CollectionConfig = { ...orders, slug: "draft_orders", name: "Draft orders" };
-        const plan = planSchema([orders, drafts]);
-        expect(plan.enums.map(e => e.qualified)).toEqual(["public.orders_item_status"]);
-    });
+    // ("Two collections over one table share its enum type" was a case here.
+    // The table model has one definition per table — `compileTables` refuses a
+    // second one — so there is no second declaration left to share with.)
 
     it("are not a collision in two different schemas", () => {
         const archived: CollectionConfig = { ...orderItems, slug: "archived_items", schema: "archive" };
-        const plan = planSchema([orders, archived]);
+        const plan = planCollections([orders, archived]);
         expect(plan.enums.map(e => e.qualified).sort())
             .toEqual(["archive.orders_item_status", "public.orders_item_status"]);
     });

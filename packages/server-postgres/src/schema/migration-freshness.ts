@@ -19,7 +19,7 @@
  * Policies are not compared: the runtime applies a collection's policies at
  * boot whether or not a migration carries them.
  */
-import type { CollectionConfig } from "@rebasepro/types";
+import type { CompiledTable } from "@rebasepro/types";
 import { planSchema } from "./plan/plan-schema";
 
 /** One difference between the collections and what the migrations build. */
@@ -238,8 +238,8 @@ export function replayMigrationTables(migrations: readonly string[]): Map<string
 }
 
 /**
- * What the collections declare that the migrations do not build, and what the
- * migrations still build that the collections dropped.
+ * What the tables declare that the migrations do not build, and what the
+ * migrations still build that the tables dropped.
  *
  * `migrations` are the contents of every `.sql` file in the migrations
  * directory, in file-name order — Atlas's order. An empty list is a project
@@ -249,10 +249,10 @@ export function replayMigrationTables(migrations: readonly string[]): Map<string
  * Throws what {@link planSchema} throws for a configuration it cannot plan.
  */
 export function findUnmigratedSchema(
-    collections: CollectionConfig[],
+    tables: readonly CompiledTable[],
     migrations: readonly string[]
 ): UnmigratedChange[] {
-    const plan = planSchema(collections);
+    const plan = planSchema(tables);
     const migrated = replayMigrationTables(migrations);
     const changes: UnmigratedChange[] = [];
 

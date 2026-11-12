@@ -28,6 +28,7 @@ import type { CollectionConfig } from "@rebasepro/types";
 import { planSchema } from "../src/schema/plan/plan-schema";
 import { refused } from "./fixtures/property-matrix-collections";
 import { everything } from "./fixtures/property-matrix-collections";
+import { planCollections, PLAN_REFUSAL_ALLOWED_MESSAGES } from "./helpers/plan-tables";
 
 /** Every problem loading these collections as tables reports: lifted, compiled and lowered as the loader does. */
 function loadProblems(collections: CollectionConfig[]): readonly SchemaDefinitionProblem[] {
@@ -48,7 +49,7 @@ describe("a configuration the schema planner refuses", () => {
         // Refused before the planner now, in the table model's words where the message moved.
         const because = PLAN_REFUSAL_ALLOWED_MESSAGES.find(moved => moved.id === `property-matrix.${collection.slug}`)?.pattern ?? legacyBecause;
         it(`${collection.slug} — is refused at config load too`, () => {
-            expect(() => planSchema([collection])).toThrow(because);
+            expect(() => planCollections([collection])).toThrow(because);
 
             const problems = loadProblems([collection]);
             expect(problems.length).toBeGreaterThan(0);
@@ -62,7 +63,7 @@ describe("a configuration the schema planner refuses", () => {
     it("and nothing else is refused for one of these reasons", () => {
         // The other direction: a load rule stricter than the planner would
         // refuse a project that generates a perfectly good schema.
-        expect(() => planSchema(everything)).not.toThrow();
+        expect(() => planCollections(everything)).not.toThrow();
 
         // The two legacy shapes the lift refuses on purpose, stripped as
         // `plan-equivalence.test.ts` strips them (neither moves a planned

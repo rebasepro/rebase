@@ -27,6 +27,7 @@ import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.
 import { ensureCollectionTables } from "../../src/schema/ensure-collection-tables.js";
 import { generatePostgresDdl } from "../../src/schema/generate-postgres-ddl-logic.js";
 import { buildDeferredIndexes, poolIndexBuildSession } from "../../src/schema/deferred-index-build.js";
+import { compileSet } from "../helpers/plan-tables";
 
 const articles: CollectionConfig = {
     slug: "articles", table: "articles", name: "Articles",
@@ -57,7 +58,7 @@ async function liveDatabase(rows: number): Promise<{ url: string; names: { title
     const url = new URL(container.connectionString);
     url.pathname = `/${name}`;
 
-    const ddl = generatePostgresDdl([articles], { includePolicies: false });
+    const ddl = generatePostgresDdl(compileSet([articles]), { includePolicies: false });
     const title = /CREATE INDEX "(articles_title_ix_[0-9a-f]{7})"/.exec(ddl)![1];
     const code = /CREATE UNIQUE INDEX "(articles_code_ux_[0-9a-f]{7})"/.exec(ddl)![1];
     const client = new pg.Client({ connectionString: url.toString() });
@@ -96,7 +97,7 @@ const queryable = (pool: pg.Pool) => ({
 
 /** The boot: ensure with the builds deferred, then the background build it schedules. */
 async function boot(pool: pg.Pool) {
-    const outcome = await ensureCollectionTables(queryable(pool), [articles], undefined, {
+    const outcome = await ensureCollectionTables(queryable(pool), compileSet([articles]), undefined, {
         deferIndexBuilds: true,
         lockTimeoutMs: 1_000,
         batchNewTables: true,

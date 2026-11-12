@@ -32,6 +32,7 @@ import { ensureCollectionTables, readExistingSchema } from "../../src/schema/ens
 import { generatePostgresDdl } from "../../src/schema/generate-postgres-ddl-logic.js";
 import { buildDeferredIndexes, poolIndexBuildSession } from "../../src/schema/deferred-index-build.js";
 import { planCollectionSchemaEnsure } from "../../src/schema/ensure-collection-tables.js";
+import { compileSet } from "../helpers/plan-tables";
 
 const authors: CollectionConfig = {
     slug: "authors", table: "authors", name: "Authors",
@@ -68,7 +69,7 @@ async function preUpgradeDatabase(rows: number): Promise<{ url: string; names: s
     const url = new URL(container.connectionString);
     url.pathname = `/${name}`;
 
-    const ddl = generatePostgresDdl(collections);
+    const ddl = generatePostgresDdl(compileSet(collections));
     const names = [...ddl.matchAll(/CREATE INDEX "([^"]+_id_ix_[0-9a-f]{7})"/g)].map(m => m[1]);
     const client = new pg.Client({ connectionString: url.toString() });
     await client.connect();
@@ -124,7 +125,7 @@ describe("deferred foreign-key index builds", () => {
         const { url, names } = await preUpgradeDatabase(1_000);
         const pool = new pg.Pool({ connectionString: url, max: 2 });
         try {
-            const outcome = await ensureCollectionTables(queryable(pool), collections, undefined, {
+            const outcome = await ensureCollectionTables(queryable(pool), compileSet(collections), undefined, {
                 deferIndexBuilds: true, lockTimeoutMs: 1_000, batchNewTables: true
             });
             expect(outcome.deferredIndexes.map(d => d.indexName).sort()).toEqual([...names].sort());
@@ -139,7 +140,7 @@ describe("deferred foreign-key index builds", () => {
         const pools = Array.from({ length: 5 }, () => new pg.Pool({ connectionString: url, max: 2 }));
         try {
             const deferred = planCollectionSchemaEnsure(
-                collections, await readExistingSchema(queryable(pools[0]), ["public"])
+                compileSet(collections), await readExistingSchema(queryable(pools[0]), ["public"])
             ).deferredIndexes;
             expect(deferred).toHaveLength(2);
 
@@ -153,7 +154,7 @@ describe("deferred foreign-key index builds", () => {
 
             // Nothing left that needs repair: the next boot finds the indexes
             // valid and plans nothing.
-            const after = planCollectionSchemaEnsure(collections, await readExistingSchema(queryable(pools[0]), ["public"]));
+            const after = planCollectionSchemaEnsure(compileSet(collections), await readExistingSchema(queryable(pools[0]), ["public"]));
             expect(after.deferredIndexes).toEqual([]);
         } finally {
             await Promise.all(pools.map(pool => pool.end()));
@@ -166,7 +167,7 @@ describe("deferred foreign-key index builds", () => {
         const killer = new pg.Client({ connectionString: url });
         await killer.connect();
         try {
-            const deferred = planCollectionSchemaEnsure(collections, await readExistingSchema(queryable(pool), ["public"]))
+            const deferred = planCollectionSchemaEnsure(compileSet(collections), await readExistingSchema(queryable(pool), ["public"]))
                 .deferredIndexes.find(d => d.table === "posts")!;
             // Cancel a real build part-way, the way a deploy replacing the pod
             // or a statement timeout does.
@@ -178,7 +179,7 @@ describe("deferred foreign-key index builds", () => {
             expect(await indexes(url)).toEqual({ [deferred.indexName]: false });
 
             // IF NOT EXISTS alone would call this done.
-            const plan = planCollectionSchemaEnsure(collections, await readExistingSchema(queryable(pool), ["public"]));
+            const plan = planCollectionSchemaEnsure(compileSet(collections), await readExistingSchema(queryable(pool), ["public"]));
             const husk = plan.deferredIndexes.find(d => d.indexName === deferred.indexName)!;
             expect(husk.invalid).toBe(true);
 
@@ -196,7 +197,7 @@ describe("deferred foreign-key index builds", () => {
         // A timeout no build of this table fits in.
         const pool = new pg.Pool({ connectionString: url, max: 1, statement_timeout: 50 });
         try {
-            const deferred = planCollectionSchemaEnsure(collections, await readExistingSchema(queryable(pool), ["public"]))
+            const deferred = planCollectionSchemaEnsure(compileSet(collections), await readExistingSchema(queryable(pool), ["public"]))
                 .deferredIndexes;
             const outcome = await buildDeferredIndexes(poolIndexBuildSession(pool), deferred, { lockTimeoutMs: 1_000 });
             expect(outcome.failed).toEqual([]);
@@ -215,7 +216,7 @@ describe("deferred foreign-key index builds", () => {
         const holder = new pg.Client({ connectionString: url });
         await holder.connect();
         try {
-            const deferred = planCollectionSchemaEnsure(collections, await readExistingSchema(queryable(pool), ["public"]))
+            const deferred = planCollectionSchemaEnsure(compileSet(collections), await readExistingSchema(queryable(pool), ["public"]))
                 .deferredIndexes.filter(d => d.table === "posts");
             await holder.query("BEGIN");
             await holder.query("LOCK TABLE posts IN SHARE UPDATE EXCLUSIVE MODE");
@@ -238,7 +239,7 @@ describe("deferred foreign-key index builds", () => {
         const { url } = await preUpgradeDatabase(1_000_000);
         const pool = new pg.Pool({ connectionString: url, max: 4 });
         try {
-            const deferred = planCollectionSchemaEnsure(collections, await readExistingSchema(queryable(pool), ["public"]))
+            const deferred = planCollectionSchemaEnsure(compileSet(collections), await readExistingSchema(queryable(pool), ["public"]))
                 .deferredIndexes.filter(d => d.table === "posts");
             const build = buildDeferredIndexes(poolIndexBuildSession(pool), deferred, { lockTimeoutMs: 1_000 });
             // Give the build time to take the table.

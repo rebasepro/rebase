@@ -40,8 +40,10 @@
 import {
     DEFAULT_COMMIT_PATHS,
     type CollectionConfig,
+    type CompiledTable,
     type SchemaCommitPaths
 } from "@rebasepro/types";
+import { compileEditedCollections } from "./collection-input";
 import { generateSchema } from "./generate-drizzle-schema-logic";
 import {
     planCollectionSchemaEnsure,
@@ -155,8 +157,8 @@ export function additiveStatements(
     existing: ExistingSchema = nothing(),
     options: EnsureOptions = {}
 ): string[] {
-    const previous = new Set(planCollectionSchemaEnsure(before, existing, options).statements);
-    return planCollectionSchemaEnsure(after, existing, options).statements
+    const previous = new Set(planCollectionSchemaEnsure(compileEditedCollections(before), existing, options).statements);
+    return planCollectionSchemaEnsure(compileEditedCollections(after), existing, options).statements
         .filter(statement => !previous.has(statement));
 }
 
@@ -215,6 +217,9 @@ export async function generateSchemaCommit(input: SchemaCommitInput): Promise<Sc
     // not get the same latitude.
     const options: EnsureOptions = { constraints: "converge" };
     const classified = classifyCollectionChanges(input.before, input.after, input.existing);
+    // The editor hands collections; the planner reads compiled tables. Lifted
+    // only once the classification accepted them (it reports a refusal itself).
+    const after = (): CompiledTable[] => compileEditedCollections(input.after);
 
     if (input.sourceOnly) {
         // A change with no account of what it leaves behind is one that may
@@ -230,7 +235,7 @@ export async function generateSchemaCommit(input: SchemaCommitInput): Promise<Sc
         // Nothing runs: the source is committed, the database is left as it
         // is, and the message says what it keeps.
         return {
-            files: [...(input.sourceFiles ?? []), { path: paths.schemaFile, contents: generateSchema(input.after) }],
+            files: [...(input.sourceFiles ?? []), { path: paths.schemaFile, contents: generateSchema(after()) }],
             statements: [],
             classified,
             message: sourceOnlyCommitMessage(classified),
@@ -255,7 +260,7 @@ export async function generateSchemaCommit(input: SchemaCommitInput): Promise<Sc
     // commit would be read by nothing — and was worse than dead weight, since
     // it landed at the project root while the CLI writes beside the backend.
     const generated: SchemaCommitFile[] = [
-        { path: paths.schemaFile, contents: generateSchema(input.after) }
+        { path: paths.schemaFile, contents: generateSchema(after()) }
     ];
 
     // Both sides planned once, here, rather than through `additiveStatements` —
@@ -263,8 +268,8 @@ export async function generateSchemaCommit(input: SchemaCommitInput): Promise<Sc
     // planner is pure, so a second call is only wasted work rather than a
     // correctness problem, but this runs on every `/plan` — every change the
     // panel reviews — and again on `/apply`.
-    const previous = planCollectionSchemaEnsure(input.before, existing, options);
-    const next = planCollectionSchemaEnsure(input.after, existing, options);
+    const previous = planCollectionSchemaEnsure(compileEditedCollections(input.before), existing, options);
+    const next = planCollectionSchemaEnsure(after(), existing, options);
     const already = new Set(previous.statements);
     const statements = next.statements.filter(statement => !already.has(statement));
     // A changed or dropped DEFAULT, which the additive ensure never makes and

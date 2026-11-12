@@ -7,13 +7,13 @@
  * ESM and a schema that throws on import cannot take the preflight down with
  * it.
  *
- *   argv: <tables|collections> <entry index.ts> <generate-postgres-ddl-logic.ts> <load-schema.ts>
+ *   argv: <tables|collections> <entry index.ts> <generate-postgres-ddl-logic.ts> <load-schema.ts> <common index.ts>
  *   stdout: MARKER, then `{ "<schema.table>": ["DROP POLICY …", "CREATE POLICY …"] }`
  *
  * `tables`: the entry is `backend/schema/index.ts`; its directory is loaded
  * with `loadBackendSchema` and lowered with `compileLoadedSchema`, exactly as
  * boot does. `collections`: the entry is a pre-0.31 `config/collections/index.ts`
- * and its `collections` export is planned as it was.
+ * and its `collections` export is lifted into tables and planned.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -22,19 +22,21 @@ import { pathToFileURL } from "node:url";
 /** Anything a module prints on import comes before this, and is ignored. */
 const MARKER = "@@rebase-cloud-policies@@"; // the same string in cloud-policies.mjs
 
-const [kind, index, compiler, loader] = process.argv.slice(2);
+const [kind, index, compiler, loader, lifter] = process.argv.slice(2);
 
 const policies = {};
 if (fs.existsSync(index)) {
     const { planCollectionPolicies } = await import(pathToFileURL(compiler).href);
-    let collections;
+    let tables;
     if (kind === "tables") {
         const { loadBackendSchema, compileLoadedSchema } = await import(pathToFileURL(loader).href);
-        collections = compileLoadedSchema(await loadBackendSchema(path.dirname(index))).collections;
+        tables = compileLoadedSchema(await loadBackendSchema(path.dirname(index))).tables;
     } else {
-        collections = (await import(pathToFileURL(index).href)).collections ?? [];
+        const { collectionsToTableDefs, compileSchema } = await import(pathToFileURL(lifter).href);
+        const lifted = collectionsToTableDefs((await import(pathToFileURL(index).href)).collections ?? []);
+        tables = compileSchema(lifted.tables, lifted.defaultRls ? { defaultRls: lifted.defaultRls } : {});
     }
-    for (const plan of planCollectionPolicies(collections)) {
+    for (const plan of planCollectionPolicies(tables)) {
         policies[plan.qualified] = plan.policyStatements;
     }
 }

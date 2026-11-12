@@ -15,6 +15,7 @@
 import { CollectionConfig } from "@rebasepro/types";
 import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
 import { generatePolicyStatements } from "../src/schema/generate-postgres-ddl-logic";
+import { compileSet } from "./helpers/plan-tables";
 
 /** The clause a `` sql`…` `` call in the generated file actually receives. */
 const evaluateTemplate = (source: string): string => {
@@ -44,7 +45,7 @@ describe("drizzle policy clauses survive the TypeScript file", () => {
 
     it("keeps the backslashes in a regex clause", async () => {
         const using = "email ~ '^admin\\.user@corp\\.com$'";
-        const schema = await generateSchema([collectionWith(using)]);
+        const schema = await generateSchema(compileSet([collectionWith(using)]));
 
         const clauses = emittedClauses(schema);
         expect(clauses).toContain(using);
@@ -56,7 +57,7 @@ describe("drizzle policy clauses survive the TypeScript file", () => {
         const using = "email ~ '^[a-z]+\\.[a-z]+@corp\\.com$'";
         const collection = collectionWith(using);
 
-        const schema = await generateSchema([collection]);
+        const schema = await generateSchema(compileSet([collection]));
         const ddl = generatePolicyStatements(collection, collection.securityRules![0], () => undefined)
             .find(s => /^CREATE POLICY/i.test(s))!;
 
@@ -66,7 +67,7 @@ describe("drizzle policy clauses survive the TypeScript file", () => {
 
     it("does not let a backtick close the template early", async () => {
         const using = "tag = 'a`b'";
-        const schema = await generateSchema([collectionWith(using)]);
+        const schema = await generateSchema(compileSet([collectionWith(using)]));
 
         expect(schema).toContain("\\`");
         expect(emittedClauses(schema)).toContain(using);
@@ -74,7 +75,7 @@ describe("drizzle policy clauses survive the TypeScript file", () => {
 
     it("does not let ${ open an interpolation", async () => {
         const using = "note = '${table}'";
-        const schema = await generateSchema([collectionWith(using)]);
+        const schema = await generateSchema(compileSet([collectionWith(using)]));
 
         // Unescaped, this is a reference to whatever `table` is in scope — the
         // generated file compiles and means something else entirely.
@@ -85,7 +86,7 @@ describe("drizzle policy clauses survive the TypeScript file", () => {
     it("leaves an ordinary clause untouched", async () => {
         // Recognised by the parser, so it comes back with the uid cast the
         // compiler adds — but with no escaping applied to any of it.
-        const schema = await generateSchema([collectionWith("owner_id = rebase.uid()")]);
+        const schema = await generateSchema(compileSet([collectionWith("owner_id = rebase.uid()")]));
 
         expect(schema).toContain("sql`(owner_id)::text = (SELECT rebase.uid())`");
         expect(schema).not.toContain("\\");

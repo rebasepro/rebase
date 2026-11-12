@@ -45,6 +45,7 @@ import {
     NEW_POLICY_SHAPE_ROWS,
     type NewPolicyShapeCaller
 } from "./fixtures/policy-shapes-new";
+import { compileSet } from "./helpers/plan-tables";
 
 const RECORDED: Record<string, string[]> = JSON.parse(
     readFileSync(path.join(__dirname, "fixtures", "policy-shapes-new.recorded.json"), "utf8")
@@ -177,7 +178,7 @@ async function importedFromDatabase(db: PGlite): Promise<string[]> {
     return statements;
 }
 
-const currentPlans = () => planCollectionPolicies(NEW_POLICY_SHAPE_COLLECTIONS);
+const currentPlans = () => planCollectionPolicies(compileSet(NEW_POLICY_SHAPE_COLLECTIONS));
 const currentStatements = () => currentPlans().flatMap(p => p.policyStatements);
 const createStatements = (statements: string[]) => statements.filter(s => /^CREATE POLICY/.test(s));
 

@@ -37,6 +37,7 @@ import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.
 import { createPostgresBootstrapper } from "../../src/PostgresBootstrapper.js";
 import { createPostgresDatabaseConnection } from "../../src/connection.js";
 import { ensureCollectionTables, type Queryable } from "../../src/schema/ensure-collection-tables.js";
+import { compileSet } from "../helpers/plan-tables";
 
 // ── The project's collections ────────────────────────────────────────────────
 //
@@ -128,11 +129,11 @@ describe("Two data sources, one routed collection (E2E)", () => {
         // collections routed to it.
         await ensureCollectionTables(
             queryableFor(defaultConn.pool),
-            [postsCollection, tagsCollection]
+            compileSet([postsCollection, tagsCollection])
         );
         await ensureCollectionTables(
             queryableFor(analyticsConn.pool),
-            [eventsCollection]
+            compileSet([eventsCollection])
         );
 
         // ── Boot both drivers, capturing everything they say ────────────────
@@ -219,7 +220,7 @@ describe("Two data sources, one routed collection (E2E)", () => {
         const probe = new pg.Client({ connectionString: orderingUrl });
         await probe.connect();
         try {
-            await ensureCollectionTables(queryableFor(conn.pool), [eventsCollection]);
+            await ensureCollectionTables(queryableFor(conn.pool), compileSet([eventsCollection]));
 
             const before = await probe.query(
                 "SELECT to_regprocedure('rebase.roles()') IS NOT NULL AS present"

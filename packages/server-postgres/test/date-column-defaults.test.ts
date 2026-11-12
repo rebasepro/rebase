@@ -14,6 +14,7 @@ import type { CollectionConfig } from "@rebasepro/types";
 
 import { planSchema } from "../src/schema/plan/plan-schema";
 import { renderPostgresDdl } from "../src/schema/plan/render-ddl";
+import { planCollections } from "./helpers/plan-tables";
 
 const events: CollectionConfig = {
     name: "Events",
@@ -35,7 +36,7 @@ afterEach(async () => {
 });
 
 async function applied(collection: CollectionConfig): Promise<PGlite> {
-    const ddl = renderPostgresDdl(planSchema([collection]), { includePolicies: false });
+    const ddl = renderPostgresDdl(planCollections([collection]), { includePolicies: false });
     db = new PGlite();
     await db.waitReady;
     await db.exec(ddl);
@@ -72,7 +73,7 @@ describe("a date property's DEFAULT", () => {
     });
 
     it("gives no DEFAULT for a string that is no date at all, rather than a schema that will not apply", () => {
-        const plan = planSchema([{
+        const plan = planCollections([{
             ...events,
             properties: {
                 id: { name: "ID", type: "number", isId: "increment" },

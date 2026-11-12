@@ -21,6 +21,7 @@ import { generatePostgresPoliciesDdl, planCollectionPolicies } from "../src/sche
 import { formatPolicyPushPlan, planPolicyPush, policyPlanChanges, type PolicyPushPlan } from "../src/schema/push-policy-plan";
 import { checkPolicyDrift, dropOrphanedPolicies, type Queryable } from "../src/security/policy-drift";
 import { RLS_BOOTSTRAP_STATEMENTS } from "../src/schema/rls-bootstrap-sql";
+import { compileSet } from "./helpers/plan-tables";
 
 const OWNER = "owner_id = current_setting('app.uid', true)";
 
@@ -98,13 +99,13 @@ async function catalogue(db: PGlite): Promise<Catalogue> {
 
 /** What `rebase db push` does after Atlas, to row-level security, in its order. */
 async function push(client: Queryable, collections: CollectionConfig[]): Promise<void> {
-    await lockCollectionTables(client, collections);
-    const policiesSql = generatePostgresPoliciesDdl(collections);
-    const statements = stampableTables(planCollectionPolicies(collections), policiesSql)
+    await lockCollectionTables(client, compileSet(collections));
+    const policiesSql = generatePostgresPoliciesDdl(compileSet(collections));
+    const statements = stampableTables(planCollectionPolicies(compileSet(collections)), policiesSql)
         .map(plan => policyStampSql(plan))
         .filter((statement): statement is string => statement !== undefined);
     await applyPoliciesFile(client, policiesSql, { statements });
-    await dropOrphanedPolicies(client, await checkPolicyDrift(client, collections), collections);
+    await dropOrphanedPolicies(client, await checkPolicyDrift(client, compileSet(collections)), compileSet(collections));
 }
 
 const keys = (refs: { schema: string; table: string; name: string }[]): string[] =>
@@ -160,7 +161,7 @@ describe("the push's row-level security plan", () => {
         await push(client, [collection("items", { securityRules: [{ name: "items_read", operation: "select", using: "true" }] })]);
         const declared = collections(OWNER);
 
-        const plan = await planPolicyPush(client, declared);
+        const plan = await planPolicyPush(client, compileSet(declared));
         const before = await catalogue(db);
         await push(client, declared);
         const after = await catalogue(db);
@@ -199,7 +200,7 @@ describe("the push's row-level security plan", () => {
         const declared = collections(OWNER);
         await push(client, declared);
 
-        const again = await planPolicyPush(client, declared);
+        const again = await planPolicyPush(client, compileSet(declared));
         expect(policyPlanChanges(again)).toBe(false);
         // Every policy it wrote is stamped now, so none is left to guess about.
         expect(again.unstamped).toEqual([]);
@@ -228,7 +229,7 @@ describe("the push's row-level security plan", () => {
         });
         const legacy = [collection("legacy", { securityRules: [...introspected, { name: "legacy_read", operation: "select", using: "true" }] })];
 
-        const plan = await planPolicyPush(client, legacy);
+        const plan = await planPolicyPush(client, compileSet(legacy));
         expect(plan.replace).toEqual([]);
         expect(plan.unstamped).toEqual([]);
         expect(policyPlanChanges(plan)).toBe(false);
@@ -238,10 +239,10 @@ describe("the push's row-level security plan", () => {
     // stamp: every later dry run listed all of them as unstamped.
     it("plans nothing for unstamped policies its rules would store as they are", async () => {
         const declared = [collection("items", { securityRules: [{ name: "items_read", operation: "select", using: OWNER }] })];
-        await lockCollectionTables(client, declared);
-        await client.query(generatePostgresPoliciesDdl(declared));
+        await lockCollectionTables(client, compileSet(declared));
+        await client.query(generatePostgresPoliciesDdl(compileSet(declared)));
 
-        const plan = await planPolicyPush(client, declared);
+        const plan = await planPolicyPush(client, compileSet(declared));
         expect(plan.unstamped).toEqual([]);
         expect(plan.replace).toEqual([]);
         expect(policyPlanChanges(plan)).toBe(false);
@@ -253,7 +254,7 @@ describe("the push's row-level security plan", () => {
     it("plans no baseline for a table that opts out of it, as introspection now writes", async () => {
         const declared = [collection("orders", { securityRules: [ordersRule], disableDefaultPolicies: true })];
 
-        const plan = await planPolicyPush(client, declared);
+        const plan = await planPolicyPush(client, compileSet(declared));
         const before = await catalogue(db);
         await push(client, declared);
         const after = await catalogue(db);

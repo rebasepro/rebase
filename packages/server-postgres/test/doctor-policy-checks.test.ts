@@ -8,6 +8,7 @@
  */
 import { exitCodeForPolicyGate, runPolicyChecks } from "../src/schema/doctor-policy-checks";
 import { loadTables } from "../src/schema/load-tables";
+import { compileSet } from "./helpers/plan-tables";
 import { checkPolicyDrift, hasDrift } from "../src/security/policy-drift";
 import { validatePolicyPgRoles } from "../src/security/rls-enforcement";
 import { CollectionConfig } from "@rebasepro/types";
@@ -50,7 +51,7 @@ describe("rebase doctor --policies", () => {
         jest.clearAllMocks();
         jest.spyOn(console, "log").mockImplementation(() => undefined);
         jest.spyOn(console, "error").mockImplementation(() => undefined);
-        (loadTables as jest.Mock).mockResolvedValue(collections);
+        (loadTables as jest.Mock).mockResolvedValue(compileSet(collections));
         (validatePolicyPgRoles as jest.Mock).mockResolvedValue(undefined);
         (checkPolicyDrift as jest.Mock).mockResolvedValue(emptyDrift);
         (hasDrift as jest.Mock).mockReturnValue(false);

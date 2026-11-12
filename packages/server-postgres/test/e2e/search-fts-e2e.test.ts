@@ -17,6 +17,7 @@ import { PostgresCollectionConfig, CollectionConfig } from "@rebasepro/types";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup";
 import { generatePostgresDdl } from "../../src/schema/generate-postgres-ddl-logic";
 import { buildSearchColumnSpec } from "../../src/schema/search-column";
+import { compileSet } from "../helpers/plan-tables";
 
 const talents: PostgresCollectionConfig = {
     slug: "talents",
@@ -58,7 +59,7 @@ describe("opt-in full-text search, end to end", () => {
         await client.connect();
 
         // Exactly what `rebase db push` would write — no hand-edits.
-        const ddl = await generatePostgresDdl([talents as CollectionConfig], { includePolicies: false });
+        const ddl = await generatePostgresDdl(compileSet([talents as CollectionConfig]), { includePolicies: false });
         await client.query(ddl);
 
         await client.query(`
@@ -224,7 +225,7 @@ describe("a collection that did not opt in", () => {
             name: "Posts",
             properties: { id: { type: "string", isId: "uuid" }, title: { type: "string" } }
         };
-        const ddl = await generatePostgresDdl([plain], { includePolicies: false });
+        const ddl = await generatePostgresDdl(compileSet([plain]), { includePolicies: false });
         expect(ddl).not.toContain("tsvector");
         expect(ddl).not.toContain("rebase_search");
     });

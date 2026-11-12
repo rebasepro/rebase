@@ -22,6 +22,7 @@ import type { CollectionConfig } from "@rebasepro/types";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { createPostgresBootstrapper, createPostgresDatabaseConnection, openRebase, type OpenedRebase } from "../../src/index.js";
 import { generatePostgresDdl } from "../../src/schema/generate-postgres-ddl-logic.js";
+import { compileSet } from "../helpers/plan-tables";
 
 const scores: CollectionConfig = {
     name: "Scores",
@@ -63,7 +64,7 @@ describe("a date in a composite key (E2E)", () => {
     }, 60_000);
 
     it("keys the table on a date column, in the DDL and in the database", async () => {
-        expect(generatePostgresDdl([scores], { includePolicies: false })).toMatch(/"day" DATE NOT NULL/i);
+        expect(generatePostgresDdl(compileSet([scores]), { includePolicies: false })).toMatch(/"day" DATE NOT NULL/i);
         const rows = await rebase.sql(`SELECT a.attname, format_type(a.atttypid, a.atttypmod) AS type
             FROM pg_index i JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
             WHERE i.indrelid = 'public.scores'::regclass AND i.indisprimary ORDER BY a.attname`);

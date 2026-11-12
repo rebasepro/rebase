@@ -24,6 +24,7 @@ import { ensureCollectionTables } from "../../src/schema/ensure-collection-table
 import { generatePostgresDdl } from "../../src/schema/generate-postgres-ddl-logic.js";
 import { buildDeferredIndexes, poolIndexBuildSession } from "../../src/schema/deferred-index-build.js";
 import { pushIndexAdoptions } from "../../src/schema/push-index-adoption.js";
+import { compileSet } from "../helpers/plan-tables";
 
 const events: CollectionConfig = {
     slug: "events", table: "events", name: "Events",
@@ -47,7 +48,7 @@ const queryable = (pool: pg.Pool) => ({
 });
 
 async function boot(pool: pg.Pool) {
-    const outcome = await ensureCollectionTables(queryable(pool), [events], undefined, {
+    const outcome = await ensureCollectionTables(queryable(pool), compileSet([events]), undefined, {
         deferIndexBuilds: true,
         lockTimeoutMs: 1_000,
         batchNewTables: true,
@@ -83,7 +84,7 @@ describe("adopting an identical existing index", () => {
         const url = new URL(container.connectionString);
         url.pathname = "/adoption";
 
-        const ddl = generatePostgresDdl([events], { includePolicies: false });
+        const ddl = generatePostgresDdl(compileSet([events]), { includePolicies: false });
         const declared = [...ddl.matchAll(/CREATE INDEX "(events_[a-z_]+_ix_[0-9a-f]{7})"/g)].map(match => match[1]);
         expect(declared).toHaveLength(3);
 
@@ -98,7 +99,7 @@ describe("adopting an identical existing index", () => {
             await pool.query("CREATE INDEX events_at_asc ON public.events (at)");
             await pool.query("INSERT INTO public.events (kind, at, tags) SELECT 'k' || (g % 5), now() - g * interval '1 minute', ARRAY['t' || (g % 3)] FROM generate_series(1, 2000) g");
 
-            const planned = await pushIndexAdoptions(queryable(pool), [events]);
+            const planned = await pushIndexAdoptions(queryable(pool), compileSet([events]));
             expect(planned.map(adoption => adoption.from).sort()).toEqual(["events_kind_at", "events_tags"]);
 
             const { outcome, background } = await boot(pool);
@@ -122,7 +123,7 @@ describe("adopting an identical existing index", () => {
 
             const next = await boot(pool);
             expect(next.outcome.deferredIndexes).toEqual([]);
-            expect(await pushIndexAdoptions(queryable(pool), [events])).toEqual([]);
+            expect(await pushIndexAdoptions(queryable(pool), compileSet([events]))).toEqual([]);
         } finally {
             await pool.end();
         }

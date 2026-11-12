@@ -27,6 +27,7 @@ import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
 import { readCatalogueSchema } from "../src/schema/catalogue-schema";
 import { describeSchemaDifference, diffGeneratedSchemaAgainstCatalogue } from "../src/schema/generated-schema-diff";
 import { checkCollectionsVsDatabase, generatedSchemaDriftIssues, runDoctor, type DoctorIssue } from "../src/schema/doctor";
+import { compileSet } from "./helpers/plan-tables";
 
 let mockDb: PGlite | undefined;
 jest.mock("pg", () => {
@@ -89,7 +90,7 @@ function writeGeneratedSchema(source: string): { dir: string; file: string } {
 }
 
 async function generatedTables(collections: CollectionConfig[]): Promise<Record<string, unknown>> {
-    const { dir, file } = writeGeneratedSchema(await generateSchema(collections));
+    const { dir, file } = writeGeneratedSchema(await generateSchema(compileSet(collections)));
     try {
         const module: unknown = await import(file);
         if (!isRecord(module) || !isRecord(module.tables)) throw new Error("the generated module exports no tables");
@@ -118,9 +119,9 @@ describe("doctor and boot agree about schema drift", () => {
         // The table as it was, with a row in it, then boot's additive ensure
         // for the renamed property — which adds `contact_email` and leaves
         // `email` alone, as the boot of `rebase dev` does.
-        expect((await ensureCollectionTables(mockDb, [authorsBefore])).failures).toEqual([]);
+        expect((await ensureCollectionTables(mockDb, compileSet([authorsBefore]))).failures).toEqual([]);
         await mockDb.exec(`INSERT INTO "public"."authors" (id, name, email) VALUES (gen_random_uuid(), 'Ada', 'ada@example.com')`);
-        expect((await ensureCollectionTables(mockDb, [authorsAfter])).failures).toEqual([]);
+        expect((await ensureCollectionTables(mockDb, compileSet([authorsAfter]))).failures).toEqual([]);
     });
 
     afterEach(async () => {
@@ -135,7 +136,7 @@ describe("doctor and boot agree about schema drift", () => {
         const boot = await bootDifferences([authorsAfter], generated);
         expect(boot.map(d => `${d.kind} ${d.column}`).sort()).toEqual(["extra-column email", "nullability contact_email"]);
 
-        const phase = await checkCollectionsVsDatabase([authorsAfter], URL, { generated });
+        const phase = await checkCollectionsVsDatabase(compileSet([authorsAfter]), URL, { generated });
         expect(phase.passed).toBe(false);
         const nullability = phase.issues.find(i => i.category === "nullability_mismatch");
         const extra = phase.issues.find(i => i.category === "extra_column");
@@ -161,7 +162,7 @@ describe("doctor and boot agree about schema drift", () => {
         `);
         const generated = await generatedTables([authorsAfter]);
         expect(await bootDifferences([authorsAfter], generated)).toEqual([]);
-        const phase = await checkCollectionsVsDatabase([authorsAfter], URL, { generated });
+        const phase = await checkCollectionsVsDatabase(compileSet([authorsAfter]), URL, { generated });
         expect(phase.issues.filter(i => i.severity !== "info")).toEqual([]);
         expect(phase.passed).toBe(true);
     });
@@ -184,10 +185,10 @@ describe("doctor and boot agree about schema drift", () => {
     });
 
     it("runDoctor reads schema.generated.ts from --schema and reports the same drift", async () => {
-        jest.mocked(loadTableSchema).mockResolvedValue({ collections: [authorsAfter], descriptors: [] });
+        jest.mocked(loadTableSchema).mockResolvedValue({ collections: [authorsAfter], descriptors: [], tables: compileSet([authorsAfter]) });
         const logSpy = jest.spyOn(console, "log").mockImplementation(() => undefined);
         const errSpy = jest.spyOn(console, "error").mockImplementation(() => undefined);
-        const { dir, file } = writeGeneratedSchema(await generateSchema([authorsAfter]));
+        const { dir, file } = writeGeneratedSchema(await generateSchema(compileSet([authorsAfter])));
         try {
             const report = await runDoctor({
                 schemaDir: dir,

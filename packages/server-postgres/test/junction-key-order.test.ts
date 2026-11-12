@@ -16,6 +16,7 @@
  */
 import type { CollectionConfig, PostgresCollectionConfig } from "@rebasepro/types";
 import { planSchema } from "../src/schema/plan/plan-schema";
+import { planCollections } from "./helpers/plan-tables";
 
 const people: PostgresCollectionConfig = {
     slug: "people",
@@ -38,7 +39,7 @@ const categories: CollectionConfig = {
 };
 
 const junctionOf = (collections: CollectionConfig[]) => {
-    const junction = planSchema(collections).tables.find(t => t.kind === "junction");
+    const junction = planCollections(collections).tables.find(t => t.kind === "junction");
     if (!junction) throw new Error("no junction planned");
     return { primaryKey: junction.primaryKey, columns: junction.columns.map(c => `${c.column} ${c.type.kind}`) };
 };

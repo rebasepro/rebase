@@ -1,6 +1,9 @@
 import { CollectionConfig, StringProperty } from "@rebasepro/types";
 import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
 import ts from "typescript";
+import { col, defineTable, rel } from "@rebasepro/types";
+import { compileSchema } from "@rebasepro/common";
+import { compileSet } from "./helpers/plan-tables";
 
 describe("generateDrizzleSchema", () => {
 
@@ -29,7 +32,7 @@ validation: { required: true } },
             }
         ];
 
-        const result = await generateSchema(collections);
+        const result = await generateSchema(compileSet(collections));
         const cleanResult = cleanSchema(result);
 
         expect(cleanResult).toContain("export const products = pgTable(\"products\", {");
@@ -67,7 +70,7 @@ validation: { required: true } },
             ]
         };
 
-        const result = await generateSchema([usersCollection, postsCollection]);
+        const result = await generateSchema(compileSet([usersCollection, postsCollection]));
         const cleanResult = cleanSchema(result);
 
         expect(cleanResult).toContain("authorId: text(\"author_id\").references((): AnyPgColumn => users.id, { onDelete: \"set null\" })");
@@ -86,24 +89,20 @@ validation: { required: true } },
         // Three of the four relation-emission sites normalised via
         // `resolvePropertyKeyForColumn`; the belongsTo branch did not, and it
         // only shows up for a collection that actually declares the FK property.
-        const users: CollectionConfig = {
-            slug: "users", table: "users", name: "Users",
-            properties: { name: { type: "string" } }
-        };
-        const teamMembers: CollectionConfig = {
-            slug: "team_members", table: "team_members", name: "Team Members",
-            properties: {
-                userId: { type: "relation" }
-            },
-            relations: [
-                { kind: "belongsTo",
-relationName: "user",
-target: () => users,
-localKey: "user_id" }
-            ]
-        };
+        // Written as tables: the legacy literal declared an inline relation
+        // property `userId` beside a `relations` entry named `user`, which the
+        // table model refuses (a column and a relation are kept apart).
+        const users = defineTable("users", {
+            columns: { id: col.text().primaryKey(), name: col.text() },
+            rls: "admin-only"
+        });
+        const teamMembers = defineTable("team_members", {
+            columns: { id: col.text().primaryKey(), userId: col.text() },
+            relations: { user: rel.belongsTo(() => users, { localKey: "user_id" }) },
+            rls: "admin-only"
+        });
 
-        const result = cleanSchema(await generateSchema([users, teamMembers]));
+        const result = cleanSchema(await generateSchema(compileSchema([users, teamMembers])));
 
         expect(result).toContain("fields: [teamMembers.userId]");
         expect(result).not.toContain("fields: [teamMembers.user_id]");
@@ -140,7 +139,7 @@ localKey: "user_id" }
             }
         };
 
-        const result = await generateSchema([postsCollection, tagsCollection]);
+        const result = await generateSchema(compileSet([postsCollection, tagsCollection]));
         const cleanResult = cleanSchema(result);
 
         expect(cleanResult).toContain("export const postsToTags = pgTable(\"posts_to_tags\",");
@@ -198,7 +197,7 @@ localKey: "user_id" }
             ]
         };
 
-        const cleanResult = cleanSchema(await generateSchema([postsCollection, usersCollection]));
+        const cleanResult = cleanSchema(await generateSchema(compileSet([postsCollection, usersCollection])));
 
         expect(cleanResult).toContain("export const postEditors = pgTable(\"post_editors\",");
         expect(cleanResult).not.toContain("rebaseSchema.table(\"post_editors\"");
@@ -219,7 +218,7 @@ table: "texts",
 name: "Texts",
 properties: { t_default: { type: "string" } }
                 }];
-                const result = await generateSchema(collections);
+                const result = await generateSchema(compileSet(collections));
                 expect(cleanSchema(result)).toContain("t_default: text(\"t_default\")");
             });
 
@@ -237,7 +236,7 @@ columnType: "char" },
 columnType: "varchar" }
                     }
                 }];
-                const result = await generateSchema(collections);
+                const result = await generateSchema(compileSet(collections));
                 const cleanResult = cleanSchema(result);
 
                 expect(cleanResult).toContain("t_text: text(\"t_text\"),");
@@ -263,7 +262,7 @@ columnType: "varchar",
 validation: { max: 40 } }
                     }
                 }];
-                const result = await generateSchema(collections);
+                const result = await generateSchema(compileSet(collections));
                 expect(cleanSchema(result)).toContain("t_varchar: varchar(\"t_varchar\", { length: 40 })");
             });
 
@@ -285,9 +284,9 @@ validation: { max: 40 } }
                     }
                 }]);
 
-                const plain = cleanSchema(await generateSchema(build({})));
-                const markdown = cleanSchema(await generateSchema(build({ admin: { markdown: true } })));
-                const multiline = cleanSchema(await generateSchema(build({ admin: { multiline: true } })));
+                const plain = cleanSchema(await generateSchema(compileSet(build({}))));
+                const markdown = cleanSchema(await generateSchema(compileSet(build({ admin: { markdown: true } }))));
+                const multiline = cleanSchema(await generateSchema(compileSet(build({ admin: { multiline: true } }))));
 
                 expect(plain).toContain("body: text(\"body\")");
                 expect(markdown).toBe(plain);
@@ -309,7 +308,7 @@ validation: { max: 40 } }
                     }
                 }];
 
-                const result = cleanSchema(await generateSchema(collections));
+                const result = cleanSchema(await generateSchema(compileSet(collections)));
                 expect(result).toContain("id: text(\"id\").primaryKey()");
                 expect(result).toContain("name: text(\"name\")");
                 expect(result).not.toMatch(/varchar\("/);
@@ -323,7 +322,7 @@ name: "Texts",
 properties: { t_uuid: { type: "string",
 isId: "uuid" } }
                 }];
-                const result = await generateSchema(collections);
+                const result = await generateSchema(compileSet(collections));
                 expect(cleanSchema(result)).toContain("t_uuid: uuid(\"t_uuid\").primaryKey().defaultRandom()");
             });
 
@@ -336,7 +335,7 @@ properties: { t_id: { type: "string",
 isId: true,
 columnType: "text" } }
                 }];
-                const result = await generateSchema(collections);
+                const result = await generateSchema(compileSet(collections));
                 expect(cleanSchema(result)).toContain("t_id: text(\"t_id\").primaryKey()");
             });
 
@@ -349,7 +348,7 @@ properties: { t_unique: { type: "string",
 columnType: "char",
 validation: { unique: true } } }
                 }];
-                const result = await generateSchema(collections);
+                const result = await generateSchema(compileSet(collections));
                 expect(cleanSchema(result)).toContain("t_unique: char(\"t_unique\", { length: 255 }).unique()");
             });
         });
@@ -362,7 +361,7 @@ table: "nums",
 name: "Nums",
 properties: { n_def: { type: "number" } }
                 }];
-                const result = await generateSchema(collections);
+                const result = await generateSchema(compileSet(collections));
                 expect(cleanSchema(result)).toContain("n_def: numeric(\"n_def\")");
             });
 
@@ -374,7 +373,7 @@ name: "Nums",
 properties: { n_int: { type: "number",
 validation: { integer: true } } }
                 }];
-                const result = await generateSchema(collections);
+                const result = await generateSchema(compileSet(collections));
                 expect(cleanSchema(result)).toContain("n_int: integer(\"n_int\")");
             });
 
@@ -386,7 +385,7 @@ name: "Nums",
 properties: { n_id: { type: "number",
 isId: true } }
                 }];
-                const result = await generateSchema(collections);
+                const result = await generateSchema(compileSet(collections));
                 expect(cleanSchema(result)).toContain("n_id: integer(\"n_id\").primaryKey()");
             });
 
@@ -412,7 +411,7 @@ columnType: "serial" },
 columnType: "bigserial" }
                     }
                 }];
-                const result = await generateSchema(collections);
+                const result = await generateSchema(compileSet(collections));
                 const cleanResult = cleanSchema(result);
 
                 expect(cleanResult).toContain("n_int: integer(\"n_int\"),");
@@ -446,7 +445,7 @@ columnType: "bigserial" }
                     name: "Counters",
                     properties: { hits: { type: "number", columnType: "bigint" } }
                 }];
-                const result = cleanSchema(await generateSchema(collections));
+                const result = cleanSchema(await generateSchema(compileSet(collections)));
 
                 expect(result).toMatch(/bigint\("hits", \{ mode: "number" \}\)/);
                 expect(result).not.toMatch(/bigint\("hits"\)/);
@@ -461,7 +460,7 @@ properties: { n_inc: { type: "number",
 isId: "increment",
 columnType: "bigint" } }
                 }];
-                const result = await generateSchema(collections);
+                const result = await generateSchema(compileSet(collections));
                 // `isId: "increment"` is an identity column and its width is
                 // INTEGER, and every column pointing at it takes the same type
                 // (`primaryKeyPgType`). The DDL generator has always
@@ -484,7 +483,7 @@ properties: { n_uniq: { type: "number",
 columnType: "real",
 validation: { unique: true } } }
                 }];
-                const result = await generateSchema(collections);
+                const result = await generateSchema(compileSet(collections));
                 expect(cleanSchema(result)).toContain("n_uniq: real(\"n_uniq\").unique()");
             });
         });
@@ -497,7 +496,7 @@ table: "dates",
 name: "Dates",
 properties: { d_def: { type: "date" } }
                 }];
-                const result = await generateSchema(collections);
+                const result = await generateSchema(compileSet(collections));
                 expect(cleanSchema(result)).toContain("d_def: timestamp(\"d_def\", { withTimezone: true, mode: 'string' })");
             });
 
@@ -515,7 +514,7 @@ columnType: "time" },
 columnType: "timestamp" }
                     }
                 }];
-                const result = await generateSchema(collections);
+                const result = await generateSchema(compileSet(collections));
                 const cleanResult = cleanSchema(result);
 
                 expect(cleanResult).toContain("d_date: date(\"d_date\", { mode: 'string' }),");
@@ -535,7 +534,7 @@ properties: {
                         map_def: { type: "map" }
                     }
                 }];
-                const result = await generateSchema(collections);
+                const result = await generateSchema(compileSet(collections));
                 expect(cleanSchema(result)).toContain("arr_def: jsonb(\"arr_def\"),");
                 expect(cleanSchema(result)).toContain("map_def: jsonb(\"map_def\")");
             });
@@ -556,7 +555,7 @@ columnType: "json" },
 columnType: "jsonb" }
                     }
                 }];
-                const result = await generateSchema(collections);
+                const result = await generateSchema(compileSet(collections));
                 const cleanResult = cleanSchema(result);
 
                 expect(cleanResult).toContain("a_json: json(\"a_json\"),");
@@ -591,7 +590,7 @@ ownerField: "user_id" }
                 ]
             }];
 
-            const result = await generateSchema(collections);
+            const result = await generateSchema(compileSet(collections));
             const allPolicy = result.split("pgPolicy(").find(p => p.includes('for: "all"'));
             expect(allPolicy).toBeDefined();
             expect(allPolicy).toContain('as: "permissive"');
@@ -616,7 +615,7 @@ ownerField: "user_id" }
                 ]
             }];
 
-            const result = await generateSchema(collections);
+            const result = await generateSchema(compileSet(collections));
             expect(result).toContain('for: "select"');
             // Every SELECT policy (author + injected default read) has using and
             // no withCheck; the injected default WRITE policies do have withCheck.
@@ -643,7 +642,7 @@ ownerField: "user_id" }
                 ]
             }];
 
-            const result = await generateSchema(collections);
+            const result = await generateSchema(compileSet(collections));
             expect(result).toContain('for: "insert"');
             expect(result).toContain("withCheck:");
             // The INSERT policy itself has no `using:` (the injected default
@@ -665,7 +664,7 @@ access: "public" }
                 ]
             }];
 
-            const result = await generateSchema(collections);
+            const result = await generateSchema(compileSet(collections));
             expect(result).toContain("sql`true`");
             expect(result).toContain('for: "select"');
         });
@@ -682,7 +681,7 @@ roles: ["admin"] }
                 ]
             }];
 
-            const result = await generateSchema(collections);
+            const result = await generateSchema(compileSet(collections));
             expect(result).toContain("string_to_array(rebase.roles(), ',') && ARRAY['admin']");
         });
 
@@ -698,7 +697,7 @@ roles: ["view"] } // Should not match 'viewer'
                 ]
             }];
 
-            const result = await generateSchema(collections);
+            const result = await generateSchema(compileSet(collections));
             // Before array change: rebase.roles() ~ 'view' would match 'viewer'
             // Now: array intersection prevents this
             expect(result).toContain("string_to_array(rebase.roles(), ',') && ARRAY['view']");
@@ -716,7 +715,7 @@ roles: ["admin", "editor", "super-admin"] }
                 ]
             }];
 
-            const result = await generateSchema(collections);
+            const result = await generateSchema(compileSet(collections));
             expect(result).toContain("string_to_array(rebase.roles(), ',') && ARRAY['admin','editor','super-admin']");
         });
 
@@ -733,7 +732,7 @@ access: "public" }
                 ]
             }];
 
-            const result = await generateSchema(collections);
+            const result = await generateSchema(compileSet(collections));
             // Should be (true) AND (role check)
             expect(result).toContain("(true) AND (string_to_array(rebase.roles(), ',') && ARRAY['admin','manager'])");
         });
@@ -754,7 +753,7 @@ ownerField: "user_id" }
                 ]
             }];
 
-            const result = await generateSchema(collections);
+            const result = await generateSchema(compileSet(collections));
             // Should combine owner check AND role check
             expect(result).toContain("rebase.uid()");
             expect(result).toContain("string_to_array(rebase.roles(), ',') && ARRAY['editor']");
@@ -777,7 +776,7 @@ using: "{is_locked} = false" }
                 ]
             }];
 
-            const result = await generateSchema(collections);
+            const result = await generateSchema(compileSet(collections));
             expect(result).toContain('as: "restrictive"');
             expect(result).toContain("is_locked = false");
         });
@@ -797,7 +796,7 @@ using: "{published_at} > now() - interval '30 days'" }
                 ]
             }];
 
-            const result = await generateSchema(collections);
+            const result = await generateSchema(compileSet(collections));
             expect(result).toContain("published_at > now() - interval '30 days'");
         });
 
@@ -820,7 +819,7 @@ using: "{published_at} > now() - interval '30 days'" }
                 ]
             }];
 
-            const result = await generateSchema(collections);
+            const result = await generateSchema(compileSet(collections));
             expect(result).toContain("using:");
             expect(result).toContain("withCheck:");
             expect(result).toContain("user_id = rebase.uid()");
@@ -840,7 +839,7 @@ access: "public" }
                 ]
             }];
 
-            const result = await generateSchema(collections);
+            const result = await generateSchema(compileSet(collections));
             expect(result).toContain('pgPolicy("my_custom_policy"');
         });
 
@@ -872,7 +871,7 @@ using: "{is_locked} = false" }
                 ]
             }];
 
-            const result = await generateSchema(collections);
+            const result = await generateSchema(compileSet(collections));
             expect(result).toContain('pgPolicy("admin_read"');
             expect(result).toContain('pgPolicy("owner_read"');
             expect(result).toContain('pgPolicy("owner_write"');
@@ -889,7 +888,7 @@ using: "{is_locked} = false" }
                 // No securityRules defined — table should still have .enableRLS()
             }];
 
-            const result = await generateSchema(collections);
+            const result = await generateSchema(compileSet(collections));
             expect(result).toContain(".enableRLS()");
             // Locked by default: server-or-admin read + write baselines are
             // injected (user requests run under the restricted rebase_user role,
@@ -912,7 +911,7 @@ access: "public" }
                 ]
             }];
 
-            const result = await generateSchema(collections);
+            const result = await generateSchema(compileSet(collections));
             expect(result).toContain(".enableRLS()");
             expect(result).toContain("pgPolicy(");
         });
@@ -929,7 +928,7 @@ access: "public" }
                 ]
             }];
 
-            const result = await generateSchema(collections);
+            const result = await generateSchema(compileSet(collections));
             expect(result).toContain("sql`false`");
         });
 
@@ -948,7 +947,7 @@ describe("generateDrizzleSchema V2 improvements", () => {
 roles: ["admin"] }
             ]
         }];
-        const result = await generateSchema(collections);
+        const result = await generateSchema(compileSet(collections));
         expect(result).toContain("string_to_array(rebase.roles(), ',') && ARRAY['admin']");
     });
     it("should generate multiple policies from operations array", async () => {
@@ -966,7 +965,7 @@ operations: ["select", "update"],
 ownerField: "user_id" }
             ]
         }];
-        const result = await generateSchema(collections);
+        const result = await generateSchema(compileSet(collections));
         // Should generate two separate policies
         expect(result).toContain('pgPolicy("owner_rw_select"');
         expect(result).toContain('pgPolicy("owner_rw_update"');
@@ -984,7 +983,7 @@ ownerField: "user_id" }
 access: "public" }
             ]
         }];
-        const result = await generateSchema(collections);
+        const result = await generateSchema(compileSet(collections));
         expect(result).toContain('for: "select"');
         expect(result).toContain('for: "delete"');
     });
@@ -1000,7 +999,7 @@ operations: ["select"],
 access: "public" }
             ]
         }];
-        const result = await generateSchema(collections);
+        const result = await generateSchema(compileSet(collections));
         expect(result).toContain('pgPolicy("my_policy"');
         // Should NOT have _select suffix since only one operation
         expect(result).not.toContain('pgPolicy("my_policy_select"');
@@ -1020,7 +1019,7 @@ operations: ["select", "insert"],
 ownerField: "user_id" }
             ]
         }];
-        const result = await generateSchema(collections);
+        const result = await generateSchema(compileSet(collections));
         // SELECT should have USING only
         const selectPolicy = result.split("\n").find(l => l.includes("owner_select"));
         expect(selectPolicy).toContain("using:");
@@ -1043,7 +1042,7 @@ operations: ["select", "insert"],
 access: "public" }
             ]
         }];
-        const result = await generateSchema(collections);
+        const result = await generateSchema(compileSet(collections));
         // operations[] should win for the author rule — select+insert, no delete.
         // (A default_admin_write delete policy exists separately.)
         expect(result).toContain('pgPolicy("test_select"');
@@ -1062,7 +1061,7 @@ roles: ["admin"],
 using: "true" }
             ]
         }];
-        const result = await generateSchema(collections);
+        const result = await generateSchema(compileSet(collections));
         // Should be (true) AND (role check) — same effect as access: "public" + roles
         expect(result).toContain("(true) AND (string_to_array(rebase.roles(), ',') && ARRAY['admin'])");
     });
@@ -1078,7 +1077,7 @@ access: "public",
 pgRoles: ["app_role", "service_role"] }
             ]
         }];
-        const result = await generateSchema(collections);
+        const result = await generateSchema(compileSet(collections));
         expect(result).toContain('to: ["app_role", "service_role"]');
         // Only the injected default read policy targets public.
         const authorPolicy = result.split("pgPolicy(").find(p => p.includes("tenant_data_select"));
@@ -1096,7 +1095,7 @@ pgRoles: ["app_role", "service_role"] }
 access: "public" }
             ]
         }];
-        const result = await generateSchema(collections);
+        const result = await generateSchema(compileSet(collections));
         expect(result).toContain('to: ["public"]');
     });
 });
@@ -1125,8 +1124,8 @@ roles: ["admin", "user"] }
             ]
         }];
 
-        const result1 = await generateSchema(collections1);
-        const result2 = await generateSchema(collections2);
+        const result1 = await generateSchema(compileSet(collections1));
+        const result2 = await generateSchema(compileSet(collections2));
 
         // Extract the generated policy name, which should look like pgPolicy("test_hash_select_<hash>"
         const match1 = result1.match(/pgPolicy\("test_hash_select_([a-f0-9]{7})"/);
@@ -1166,8 +1165,8 @@ roles: ["admin", "user"] }
             ]
         }];
 
-        const resultUnsorted = await generateSchema(collectionsUnsorted);
-        const resultSorted = await generateSchema(collectionsSorted);
+        const resultUnsorted = await generateSchema(compileSet(collectionsUnsorted));
+        const resultSorted = await generateSchema(compileSet(collectionsSorted));
 
         // The policy names should match because the configuration arrays should be sorted before hashing
         const matchUnsorted = resultUnsorted.match(/pgPolicy\("test_order_select_([a-f0-9]{7})"/);
@@ -1206,7 +1205,7 @@ roles: ["admin", "user"] }
             properties: { name: { type: "string" } }
         };
 
-        expect(await generateSchema([authors, articles])).toEqual(await generateSchema([articles, authors]));
+        expect(await generateSchema(compileSet([authors, articles]))).toEqual(await generateSchema(compileSet([articles, authors])));
     });
 });
 
@@ -1230,7 +1229,7 @@ describe("generateDrizzleSchema ID Generation", () => {
 isId: "uuid" }
             }
         }];
-        const result = await generateSchema(collections);
+        const result = await generateSchema(compileSet(collections));
         const cleanResult = cleanSchema(result);
 
         expect(cleanResult).toContain("custom_id: uuid(\"custom_id\").primaryKey().defaultRandom()");
@@ -1250,7 +1249,7 @@ isId: "uuid" }
 isId: "increment" }
             }
         }];
-        const result = await generateSchema(collections);
+        const result = await generateSchema(compileSet(collections));
         const cleanResult = cleanSchema(result);
 
         expect(cleanResult).toContain("ticket_id: integer(\"ticket_id\").generatedByDefaultAsIdentity().primaryKey()");
@@ -1266,7 +1265,7 @@ isId: "increment" }
 isId: "sql`gen_random_uuid()`" }
             }
         }];
-        const result = await generateSchema(collections);
+        const result = await generateSchema(compileSet(collections));
         const cleanResult = cleanSchema(result);
 
         expect(cleanResult).toContain("event_id: text(\"event_id\").primaryKey().default(sql`gen_random_uuid()`)");
@@ -1282,7 +1281,7 @@ isId: "sql`gen_random_uuid()`" }
 isId: true }
             }
         }];
-        const result = await generateSchema(collections);
+        const result = await generateSchema(compileSet(collections));
         const cleanResult = cleanSchema(result);
 
         expect(cleanResult).toContain("user_name: text(\"user_name\").primaryKey()");
@@ -1319,7 +1318,7 @@ describe("generateDrizzleSchema columnName support", () => {
             }
         }];
 
-        const result = await generateSchema(collections);
+        const result = await generateSchema(compileSet(collections));
         const cleanResult = cleanSchema(result);
 
         // Must use the exact columnName, NOT toSnakeCase(propKey) which would produce "employee_number_140_a"
@@ -1345,7 +1344,7 @@ describe("generateDrizzleSchema columnName support", () => {
             }
         }];
 
-        const result = await generateSchema(collections);
+        const result = await generateSchema(compileSet(collections));
         const cleanResult = cleanSchema(result);
 
         // JS key stays camelCase, SQL column name gets snake_cased
@@ -1372,7 +1371,7 @@ describe("generateDrizzleSchema columnName support", () => {
             }
         }];
 
-        const result = await generateSchema(collections);
+        const result = await generateSchema(compileSet(collections));
         const cleanResult = cleanSchema(result);
 
         // Introspected prop uses exact columnName
@@ -1410,7 +1409,7 @@ describe("generateDrizzleSchema columnName support", () => {
             }
         }];
 
-        const result = await generateSchema(collections);
+        const result = await generateSchema(compileSet(collections));
         const cleanResult = cleanSchema(result);
 
         expect(cleanResult).toContain('count_v2: numeric("count_v2")');
@@ -1466,7 +1465,7 @@ name: "Company ID" }
             }
         }];
 
-        const result = await generateSchema(collections);
+        const result = await generateSchema(compileSet(collections));
 
         // Every _140a column must stay _140a, not become _140_a
         const brokenPattern = /_140_a/;
@@ -1497,7 +1496,7 @@ name: "Company ID" }
                 }
             ];
 
-            const result = await generateSchema(collections);
+            const result = await generateSchema(compileSet(collections));
 
             // on_create should produce .default(sql`now()`)
             expect(result).toContain(".default(sql`now()`)");
@@ -1523,7 +1522,7 @@ name: "Company ID" }
                 }
             ];
 
-            const result = await generateSchema(collections);
+            const result = await generateSchema(compileSet(collections));
 
             // on_update should produce .default(sql`now()`) for initial INSERT value
             expect(result).toContain(".default(sql`now()`)");
@@ -1545,7 +1544,7 @@ name: "Company ID" }
                 }
             ];
 
-            const result = await generateSchema(collections);
+            const result = await generateSchema(compileSet(collections));
 
             // A plain date should NOT have any autoValue-related modifiers
             expect(result).not.toContain(".default(sql`now()`)");
@@ -1572,7 +1571,7 @@ name: "Company ID" }
                 }
             ];
 
-            const result = await generateSchema(collections);
+            const result = await generateSchema(compileSet(collections));
 
             // Both should get .default(sql`now()`) for INSERT defaults
             expect(result).toMatch(/created_at:.*\.default\(sql`now\(\)`\)/);
@@ -1599,7 +1598,7 @@ name: "Company ID" }
                 }
             ];
 
-            const result = await generateSchema(collections);
+            const result = await generateSchema(compileSet(collections));
 
             // Should use date() column with the default
             expect(result).toContain("date(\"log_date\"");
@@ -1643,7 +1642,7 @@ describe("the generated schema parses for names Postgres allows", () => {
             }
         }];
 
-        const schema = await generateSchema(collections);
+        const schema = await generateSchema(compileSet(collections));
         expect(syntaxErrors(schema)).toEqual([]);
         expect(schema).toContain('"O\'Brien"');
     });
@@ -1661,7 +1660,7 @@ describe("the generated schema parses for names Postgres allows", () => {
             }
         }];
 
-        const schema = await generateSchema(collections);
+        const schema = await generateSchema(compileSet(collections));
         expect(syntaxErrors(schema)).toEqual([]);
         // The column keeps its real name — it is what the database is asked for.
         expect(schema).toContain('"full name"');
@@ -1688,7 +1687,7 @@ describe("the generated schema parses for names Postgres allows", () => {
             }
         };
 
-        const schema = await generateSchema([posts, authors]);
+        const schema = await generateSchema(compileSet([posts, authors]));
         expect(syntaxErrors(schema)).toEqual([]);
     });
 });
@@ -1717,11 +1716,11 @@ describe("names that are legal in Postgres and not in JavaScript", () => {
     const id: StringProperty = { name: "ID", type: "string", isId: "uuid" };
 
     it("a search column containing a hyphen still generates a file that parses", async () => {
-        const out = await generateSchema([{
+        const out = await generateSchema(compileSet([{
             name: "Notes", singularName: "Note", slug: "notes", table: "notes",
             properties: { id, title: { name: "Title", type: "string" } },
             search: { column: "search-vector", fields: ["title"] }
-        }]);
+        }]));
 
         expect(parse(out)).toHaveLength(0);
         // Quoted as a key AND as the column literal, not just one of the two.
@@ -1732,10 +1731,10 @@ describe("names that are legal in Postgres and not in JavaScript", () => {
         // What makes applying the helpers safe: for every name that is already
         // an identifier, `propKey` and `member` are the identity and `quote` is
         // the same double-quoted string that was written by hand.
-        const out = await generateSchema([{
+        const out = await generateSchema(compileSet([{
             name: "Items", singularName: "Item", slug: "items", table: "items",
             properties: { id, title: { name: "Title", type: "string" } }
-        }]);
+        }]));
 
         expect(parse(out)).toHaveLength(0);
         expect(out).toContain('export const items = pgTable("items"');

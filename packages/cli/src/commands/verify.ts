@@ -400,7 +400,7 @@ async function checkMigrations(
     let changes: ReturnType<typeof findUnmigratedSchema>;
     try {
         changes = findUnmigratedSchema(
-            verified.schema.compiled.collections,
+            verified.schema.compiled.tables,
             files.map(f => fs.readFileSync(path.join(migrationsDir, f), "utf-8"))
         );
     } catch (error) {

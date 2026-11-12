@@ -24,12 +24,12 @@
  *   database has none of them, and Atlas refuses such a column whether or not
  *   it is in `schema.sql`; adding it would only change the error.
  */
-import { declaredDatabaseExtensions, type CollectionConfig, type Property } from "@rebasepro/types";
+import { declaredDatabaseExtensions, type CompiledTable } from "@rebasepro/types";
+import { databaseOwnsDefault } from "@rebasepro/common";
 import { planSchema } from "./plan/plan-schema";
-import { resolveColumnName } from "./column-plan-helpers";
 import type { Queryable } from "./ensure-collection-tables";
 
-/** A column whose DEFAULT the collections leave to the database. */
+/** A column whose DEFAULT the tables leave to the database. */
 export interface DatabaseOwnedDefaultColumn {
     schema: string;
     table: string;
@@ -42,23 +42,22 @@ export interface KeptDefault extends DatabaseOwnedDefaultColumn {
 }
 
 /**
- * Every column declared `databaseDefault: true` that the planner writes no
- * DEFAULT for. An id strategy or `autoValue` writes one of its own, and that
- * one is the planner's to keep.
+ * Every column declared `.dbDefault()` that the planner writes no DEFAULT
+ * for. A key strategy or a stamp writes one of its own, and that one is the
+ * planner's to keep.
  */
-export function databaseOwnedDefaultColumns(collections: CollectionConfig[]): DatabaseOwnedDefaultColumn[] {
-    const declared = collections.filter(collection =>
-        Object.values(collection.properties ?? {}).some(prop => isDatabaseOwned(prop)));
-    if (declared.length === 0) return [];
+export function databaseOwnedDefaultColumns(tables: readonly CompiledTable[]): DatabaseOwnedDefaultColumn[] {
+    const declared = new Map(tables
+        .map(table => [table.descriptor.slug, table.descriptor.columns.filter(databaseOwnsDefault)] as const)
+        .filter(([, columns]) => columns.length > 0));
+    if (declared.size === 0) return [];
 
-    const plan = planSchema(collections, { databaseExtensions: declaredDatabaseExtensions() });
+    const plan = planSchema(tables, { databaseExtensions: declaredDatabaseExtensions() });
     const found: DatabaseOwnedDefaultColumn[] = [];
     for (const table of plan.tables) {
-        const collection = declared.find(each => each.slug === table.slug);
-        if (!collection) continue;
-        for (const [key, prop] of Object.entries(collection.properties ?? {})) {
-            if (!isDatabaseOwned(prop)) continue;
-            const name = resolveColumnName(key, prop);
+        const owned = table.slug ? declared.get(table.slug) : undefined;
+        if (!owned) continue;
+        for (const { column: name } of owned) {
             const column = table.columns.find(each => each.column === name);
             if (!column || column.default || column.generated) continue;
             found.push({ schema: table.schema, table: table.table, column: name });
@@ -66,10 +65,6 @@ export function databaseOwnedDefaultColumns(collections: CollectionConfig[]): Da
     }
     return found;
 }
-
-const isDatabaseOwned = (prop: unknown): prop is Property =>
-    typeof prop === "object" && prop !== null &&
-    (prop as { databaseDefault?: unknown }).databaseDefault === true;
 
 /**
  * Every column DEFAULT outside the system schemas, and whether Atlas can carry

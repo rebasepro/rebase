@@ -13,10 +13,11 @@
  * that migrates the cloud app compares one of each:
  *
  * - `backend/schema/index.ts` (0.31 on): loaded with `loadBackendSchema` and
- *   lowered with `compileLoadedSchema` — the one path boot, the runtime and the
- *   CLI take — and the result planned with `planCollectionPolicies`.
- * - `config/collections/index.ts` (before): its `collections` export, planned
- *   the same way.
+ *   compiled with `compileLoadedSchema` — the one path boot, the runtime and
+ *   the CLI take — and the result planned with `planCollectionPolicies`.
+ * - `config/collections/index.ts` (before): its `collections` export, lifted
+ *   into tables (`collectionsToTableDefs`, the codemod's core), compiled, and
+ *   planned the same way.
  *
  * Each revision is copied to a temporary directory and compiled there, the base
  * from git and the working tree from disk, so the two are resolved the same way
@@ -33,6 +34,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, "..", "..", "..", "..");
 const COMPILER = path.join(REPO, "packages", "server-postgres", "src", "schema", "generate-postgres-ddl-logic.ts");
 const LOADER = path.join(REPO, "packages", "server", "src", "schema", "load-schema.ts");
+const LIFTER = path.join(REPO, "packages", "common", "src", "index.ts");
 const PRINTER = path.join(HERE, "print-cloud-policies.mjs");
 const MARKER = "@@rebase-cloud-policies@@";
 
@@ -106,7 +108,7 @@ function compileAt(saasRoot, revision) {
         materialize(saasRoot, revision, dir, layout);
         const out = execFileSync(
             process.execPath,
-            ["--import", "tsx", PRINTER, layout.kind, path.join(dir, layout.entry), COMPILER, LOADER],
+            ["--import", "tsx", PRINTER, layout.kind, path.join(dir, layout.entry), COMPILER, LOADER, LIFTER],
             // From the repo root, so `--import tsx` resolves the repo's own tsx.
             { cwd: REPO, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: 120_000 },
         );

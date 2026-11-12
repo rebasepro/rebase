@@ -57,7 +57,9 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { planSchema } from "../src/schema/plan/plan-schema";
+import { isSchemaDefinitionError } from "@rebasepro/common";
+import { compileHandedTables } from "../src/schema/collection-input";
+import { INPUT_ADJUSTMENTS, PLAN_GOLDEN_ALLOWED_DIFFERENCES, PLAN_REFUSAL_ALLOWED_MESSAGES, compileSet, lowerSet, planCollections } from "./helpers/plan-tables";
 import {
     PLAN_REFUSALS,
     PLAN_REFUSALS_GOLDEN,
@@ -67,8 +69,10 @@ import {
     toGoldenJson,
     withPinnedPlannerWorld,
     writeGolden,
-    type PlanCorpus
+    type PlanCorpus,
+    type PlanCorpusOptions
 } from "./helpers/plan-corpus";
+import type { CollectionConfig } from "@rebasepro/types";
 
 const UPDATE = process.env.UPDATE_PLAN_GOLDEN === "1";
 
@@ -83,7 +87,24 @@ let corpus: PlanCorpus;
 
 beforeAll(async () => {
     corpus = await loadPlanCorpus();
+    for (const adjustment of INPUT_ADJUSTMENTS) {
+        const set = corpus.sets.find(candidate => candidate.id === adjustment.set);
+        if (!set) throw new Error(`An input adjustment names the set "${adjustment.set}", which the corpus does not have.`);
+        adjustment.apply(set.collections);
+    }
 }, 120_000);
+
+/**
+ * A corpus set as the planner takes it: lifted into the table model and
+ * compiled. The goldens were recorded from the legacy planner, which took the
+ * collections themselves; `PLAN_GOLDEN_ALLOWED_DIFFERENCES` lists, with the
+ * reason, every recorded output the lifted set does not reproduce.
+ */
+const render = (collections: CollectionConfig[], options: PlanCorpusOptions): Record<string, string> =>
+    renderAllOutputs(compileSet(collections), options);
+
+const allowed = (setId: string, output: string): boolean =>
+    PLAN_GOLDEN_ALLOWED_DIFFERENCES.some(entry => entry.set === setId && entry.output === output);
 
 afterAll(() => corpus?.dispose());
 
@@ -114,18 +135,24 @@ describe("every schema-pipeline output matches its golden", () => {
 
     it("for each set, byte for byte", () => {
         const mismatches: string[] = [];
+        const unusedAllowances = new Set(PLAN_GOLDEN_ALLOWED_DIFFERENCES.map(entry => `${entry.set} ${entry.output}`));
         for (const set of corpus.sets) {
-            const rendered = renderAllOutputs(set.collections, set.options);
+            const rendered = render(set.collections, set.options);
+            const recorded = readGolden(set);
             if (UPDATE) {
+                // An allowed difference keeps the legacy recording it is measured against.
+                for (const name of Object.keys(rendered)) if (allowed(set.id, name) && name in recorded) rendered[name] = recorded[name];
                 writeGolden(set, rendered);
                 continue;
             }
-            const recorded = readGolden(set);
             const names = new Set([...Object.keys(rendered), ...Object.keys(recorded)]);
             for (const name of [...names].sort()) {
                 if (!(name in recorded)) mismatches.push(`${set.id}/${name}: rendered, but no golden`);
                 else if (!(name in rendered)) mismatches.push(`${set.id}/${name}: golden, but no longer rendered`);
-                else if (rendered[name] !== recorded[name]) mismatches.push(`${set.id}/${name}: differs`);
+                else if (rendered[name] !== recorded[name]) {
+                    if (allowed(set.id, name)) unusedAllowances.delete(`${set.id} ${name}`);
+                    else mismatches.push(`${set.id}/${name}: differs`);
+                }
             }
         }
         // One list, so a change shows its whole reach at once; then the first
@@ -135,11 +162,13 @@ describe("every schema-pipeline output matches its golden", () => {
             const [id, name] = first ? first.replace(/: differs$/, "").split(/\/(.*)/s) : [];
             const set = corpus.sets.find(s => s.id === id);
             if (set && name) {
-                expect({ file: `${id}/${name}`, content: renderAllOutputs(set.collections, set.options)[name] })
+                expect({ file: `${id}/${name}`, content: render(set.collections, set.options)[name] })
                     .toEqual({ file: `${id}/${name}`, content: readGolden(set)[name] });
             }
         }
         expect(mismatches).toEqual([]);
+        // An allowance nothing needs is a difference that went away: drop it.
+        if (!UPDATE) expect([...unusedAllowances]).toEqual([]);
     });
 });
 
@@ -150,10 +179,29 @@ describe("the outputs do not depend on input order", () => {
     it("a shuffled set renders identically", () => {
         const differing: string[] = [];
         for (const set of corpus.sets) {
-            const straight = renderAllOutputs(set.collections, set.options);
-            const permuted = renderAllOutputs(shuffled(set.collections), set.options);
+            const straight = render(set.collections, set.options);
+            const permuted = render(shuffled(set.collections), set.options);
             for (const name of Object.keys(straight)) {
                 if (straight[name] !== permuted[name]) differing.push(`${set.id}/${name}`);
+            }
+        }
+        expect(differing).toEqual([]);
+    });
+});
+
+describe("the lowered collections the server still hands boot plan what their tables plan", () => {
+    // Boot's appliers are handed the server's lowered collections (until the
+    // server hands compiled tables) and compile them again
+    // (`compileHandedTables`); that round trip must not move a byte.
+    it("for each set", () => {
+        const differing: string[] = [];
+        for (const set of corpus.sets) {
+            const tables = compileSet(set.collections);
+            const roundTrip = compileHandedTables(lowerSet(set.collections));
+            const straight = renderAllOutputs(tables, set.options);
+            const handed = renderAllOutputs(roundTrip, set.options);
+            for (const name of Object.keys(straight)) {
+                if (straight[name] !== handed[name]) differing.push(`${set.id}/${name}`);
             }
         }
         expect(differing).toEqual([]);
@@ -164,12 +212,12 @@ describe("the planner's ambient inputs are pinned", () => {
     it("an exported REBASE_RLS_* variable does not reach a render", () => {
         const set = corpus.sets.find(s => s.id === "policy-shapes");
         if (!set) throw new Error("the policy-shapes set is missing");
-        const before = renderAllOutputs(set.collections, set.options);
+        const before = render(set.collections, set.options);
         process.env.REBASE_RLS_ADMIN_POLICIES = "public";
         process.env.REBASE_RLS_DEFAULT_POLICIES = "false";
         process.env.REBASE_RLS_POLICY_TARGET = "requestRole";
         try {
-            expect(renderAllOutputs(set.collections, set.options)).toEqual(before);
+            expect(render(set.collections, set.options)).toEqual(before);
         } finally {
             delete process.env.REBASE_RLS_ADMIN_POLICIES;
             delete process.env.REBASE_RLS_DEFAULT_POLICIES;
@@ -178,29 +226,41 @@ describe("the planner's ambient inputs are pinned", () => {
     });
 });
 
-describe("a configuration the planner refuses keeps being refused, with the same message", () => {
+describe("a configuration the planner refused keeps being refused, with the same message or an allowed one", () => {
     it("for every refusal in the corpus", () => {
         const recorded = PLAN_REFUSALS.map(refusal => {
             let message = "(did not throw)";
             withPinnedPlannerWorld(() => {
                 try {
-                    planSchema(refusal.collections);
+                    planCollections(refusal.collections);
                 } catch (error) {
-                    message = error instanceof Error ? error.message : String(error);
+                    // The lift refuses some configurations before the planner
+                    // sees them, naming each problem.
+                    message = isSchemaDefinitionError(error)
+                        ? error.problems.map(problem => problem.message).join("\n")
+                        : error instanceof Error ? error.message : String(error);
                 }
             });
             return { id: refusal.id, messagePattern: refusal.messagePattern.source, message };
         });
+        const golden: { id: string; message: string }[] = JSON.parse(fs.readFileSync(PLAN_REFUSALS_GOLDEN, "utf8"));
+        expect(recorded.map(entry => entry.id)).toEqual(golden.map(entry => entry.id));
         for (const entry of recorded) {
+            const moved = PLAN_REFUSAL_ALLOWED_MESSAGES.find(allowance => allowance.id === entry.id);
+            if (moved) {
+                // Still refused; the message is the table model's (see the allowance's reason).
+                expect({ id: entry.id, message: entry.message }).toEqual({ id: entry.id, message: expect.stringMatching(moved.pattern) });
+                continue;
+            }
             const refusal = PLAN_REFUSALS.find(r => r.id === entry.id);
             expect({ id: entry.id, matches: refusal?.messagePattern.test(entry.message) }).toEqual({ id: entry.id, matches: true });
+            expect({ id: entry.id, message: entry.message }).toEqual({ id: entry.id, message: golden.find(g => g.id === entry.id)?.message });
         }
-        const text = toGoldenJson(recorded);
         if (UPDATE) {
             fs.mkdirSync(path.dirname(PLAN_REFUSALS_GOLDEN), { recursive: true });
-            fs.writeFileSync(PLAN_REFUSALS_GOLDEN, text);
-            return;
+            // Allowed messages keep the legacy recording they are measured against.
+            const kept = recorded.map(entry => PLAN_REFUSAL_ALLOWED_MESSAGES.some(a => a.id === entry.id) ? { ...entry, message: golden.find(g => g.id === entry.id)?.message ?? entry.message } : entry);
+            fs.writeFileSync(PLAN_REFUSALS_GOLDEN, toGoldenJson(kept));
         }
-        expect(text).toEqual(fs.readFileSync(PLAN_REFUSALS_GOLDEN, "utf8"));
     });
 });

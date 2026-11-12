@@ -19,6 +19,7 @@ import { FixtureTableRegistry } from "../helpers/tables";
 import { FetchService } from "../../src/services/FetchService.js";
 import { generatePostgresDdl } from "../../src/schema/generate-postgres-ddl-logic.js";
 import { buildSearchColumnSpec } from "../../src/schema/search-column.js";
+import { compileSet } from "../helpers/plan-tables";
 
 const searched: PostgresCollectionConfig = {
     slug: "talents",
@@ -95,7 +96,7 @@ describe("search through the driver", () => {
         await admin.connect();
 
         const ddl = await generatePostgresDdl(
-            [searched as CollectionConfig, plain as CollectionConfig, fuzzied as CollectionConfig],
+            compileSet([searched as CollectionConfig, plain as CollectionConfig, fuzzied as CollectionConfig]),
             { includePolicies: false }
         );
         await admin.query(ddl);

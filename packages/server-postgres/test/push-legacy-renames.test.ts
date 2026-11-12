@@ -10,6 +10,7 @@ import type { CollectionConfig } from "@rebasepro/types";
 import { generateForeignKeyName, legacyForeignKeyName } from "@rebasepro/utils";
 import { ensureCollectionTables, type Queryable } from "../src/schema/ensure-collection-tables";
 import { legacyForeignKeyRenames } from "../src/schema/push-legacy-renames";
+import { compileSet } from "./helpers/plan-tables";
 
 const categories: CollectionConfig = {
     slug: "categories",
@@ -37,13 +38,13 @@ describe("db push on a database whose relation columns carry the pre-0.13 names"
         const db = new PGlite();
         const client: Queryable = { query: async <T,>(text: string) => ({ rows: (await db.query<T>(text)).rows }) };
         await db.exec('CREATE SCHEMA IF NOT EXISTS "rebase";');
-        await ensureCollectionTables(db, [products, categories]);
+        await ensureCollectionTables(db, compileSet([products, categories]));
         const junction = (await db.query<{ table_name: string }>(
             `SELECT table_name FROM information_schema.columns WHERE column_name = '${CURRENT}' AND table_schema = 'public'`
         )).rows[0].table_name;
         await db.exec(`ALTER TABLE "public"."${junction}" RENAME COLUMN "${CURRENT}" TO "${LEGACY}";`);
 
-        const renames = await legacyForeignKeyRenames(client, [products, categories]);
+        const renames = await legacyForeignKeyRenames(client, compileSet([products, categories]));
         expect(renames).toEqual([expect.objectContaining({
             table: `public.${junction}`,
             legacy: LEGACY,
@@ -52,7 +53,7 @@ describe("db push on a database whose relation columns carry the pre-0.13 names"
         })]);
 
         for (const rename of renames) await db.exec(rename.sql);
-        expect(await legacyForeignKeyRenames(client, [products, categories])).toEqual([]);
+        expect(await legacyForeignKeyRenames(client, compileSet([products, categories]))).toEqual([]);
         await db.close();
     });
 });
