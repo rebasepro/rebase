@@ -16,13 +16,20 @@
  * So the sample is not written any more, it is **generated**. Three fenced
  * blocks are marked in the page:
  *
- *     <!-- schema-sample: collection -->   the input, which the gate evaluates
+ *     <!-- schema-sample: table -->        the input: a `backend/schema` module, which the gate runs
  *     <!-- schema-sample: drizzle -->      generateSchema's output
  *     <!-- schema-sample: sql -->          generatePostgresDdl's, as `drizzle/schema.sql`
  *
  * and this compares the last two against a live run of the real generators on
  * the first. `--write` puts the current output back into the page, which is how
  * a change to a generator reaches the docs: run it, read the diff, commit.
+ *
+ * The `table` block is run for real, not stubbed: it is a module as a project
+ * writes it in `backend/schema` (importing `defineTable`, `col`, … from
+ * `@rebasepro/server/schema`), its imports are pointed at the builders' source,
+ * and every `defineTable` / `defineAuthTable` / `defineView` it exports — with
+ * its `defaultRls`, if it exports one — is compiled (which refuses what boot
+ * refuses) and lowered the way `rebase db generate` lowers `backend/schema`.
  *
  * The SQL block is generated with policies, search and vector **off**, because
  * that is exactly how `generate-postgres-ddl.ts` writes `drizzle/schema.sql` —
@@ -38,7 +45,12 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { collectionSnippets } from "./docs-verify/collection-snippets.mjs";
+import os from "node:os";
+import { createRequire } from "node:module";
+import { pathToFileURL } from "node:url";
+
+import { isTableDef, isViewDef } from "../../packages/types/src/index.ts";
+import { compileTables, lowerTables } from "../../packages/common/src/index.ts";
 import { generateSchema } from "../../packages/server-postgres/src/schema/generate-drizzle-schema-logic.ts";
 import { generatePostgresDdl } from "../../packages/server-postgres/src/schema/generate-postgres-ddl-logic.ts";
 
@@ -84,7 +96,50 @@ function markedBlocks(text) {
     return blocks;
 }
 
-/** What the generators emit for one page's sample collection. */
+/** The builders' source, which the sample's imports are pointed at. */
+const BUILDERS = path.join(ROOT, "packages", "types", "src", "index.ts");
+
+/** The packages a schema module imports its builders from, as a project writes them. */
+const BUILDER_SPECIFIERS = /(["'])@rebasepro\/(?:server\/schema|server|types)\1/g;
+
+/** The workspace's own TypeScript, the one every other gate here compiles with. */
+const ts = createRequire(import.meta.url)("typescript");
+
+/**
+ * Run a page's `table` block as the module a project writes in
+ * `backend/schema`, and lower what it exports the way `rebase db generate`
+ * does: compiled (so a definition boot refuses is refused here), lowered, in
+ * slug order.
+ *
+ * Written to a scratch file outside the repository and imported, so the
+ * builders are the real ones: a sample the builders reject cannot render.
+ *
+ * @returns {Promise<object[]>} the lowered tables.
+ */
+async function tablesFromSample(code, doc) {
+    if (/\bdefineCollection\b/.test(code)) {
+        throw new Error("the `table` block uses `defineCollection`. The sample is a backend/schema module now: `defineTable(...)`.");
+    }
+    const source = ts.transpileModule(code.replace(BUILDER_SPECIFIERS, JSON.stringify(BUILDERS)), {
+        compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
+        fileName: "sample.ts"
+    }).outputText;
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-schema-sample-"));
+    try {
+        const file = path.join(dir, `${path.basename(doc, ".md")}.mjs`);
+        fs.writeFileSync(file, source);
+        const mod = await import(pathToFileURL(file).href);
+        const defs = Object.values(mod).filter((value) => isTableDef(value) || isViewDef(value));
+        if (defs.length === 0) throw new Error("the `table` block exports no `defineTable`, `defineAuthTable` or `defineView`.");
+        const options = mod.defaultRls !== undefined ? { defaultRls: mod.defaultRls } : {};
+        compileTables(defs, options);
+        return lowerTables(defs, options).sort((a, b) => a.slug.localeCompare(b.slug));
+    } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+    }
+}
+
+/** What the generators emit for one page's sample tables. */
 async function expectedFor(collections) {
     return {
         // The header line the CLI writes into the file is kept, and a
@@ -112,35 +167,34 @@ for (const doc of DOCS) {
 
     const text = fs.readFileSync(docPath, "utf8");
     const blocks = markedBlocks(text);
-    const missing = ["collection", "drizzle", "sql"].filter((k) => !blocks.has(k));
+    const missing = ["table", "drizzle", "sql"].filter((k) => !blocks.has(k));
     if (missing.length > 0) {
         problems.push({
             doc,
             message:
                 `no \`<!-- schema-sample: ${missing.join(" -->\`, no \`<!-- schema-sample: ")} -->\` marker. ` +
-                "All three are needed — the collection to generate from, and the two blocks generated from it. " +
+                "All three are needed — the table module to generate from, and the two blocks generated from it. " +
                 "Without them this gate compares nothing, which is how the page drifted in the first place. " +
                 "A re-translation that dropped the comments is the likely cause; put them back above the same fences."
         });
         continue;
     }
 
-    // The sample collection is read through the same evaluator the doc-examples
-    // gate uses, so a page cannot show one collection and generate from another.
-    const { results } = await collectionSnippets(ROOT, { globs: [doc] });
-    const collectionBody = blocks.get("collection").body.trim();
-    const sample = results.find((r) => r.snippet.code.trim() === collectionBody);
-
-    if (!sample || sample.error || sample.collections.length === 0) {
+    // The page's own table block, run with the real builders: a page cannot
+    // show one table and generate from another.
+    let tables;
+    try {
+        tables = await tablesFromSample(blocks.get("table").body, doc);
+    } catch (error) {
         problems.push({
             doc,
-            message: `the \`schema-sample: collection\` block produced no collection${sample?.error ? ` — ${sample.error.message}` : ""}.`
+            message: `the \`schema-sample: table\` block produced no table — ${error instanceof Error ? error.message : String(error)}`
         });
         continue;
     }
 
     checked++;
-    const expected = await expectedFor(sample.collections);
+    const expected = await expectedFor(tables);
     const stale = ["drizzle", "sql"].filter((key) => blocks.get(key).body !== expected[key]);
     if (stale.length === 0) continue;
 

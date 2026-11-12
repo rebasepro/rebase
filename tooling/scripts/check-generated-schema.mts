@@ -4,7 +4,7 @@
  * `backend/src/schema.generated.ts` is checked in, and it can stop describing
  * the schema the runtime expects **without anybody editing anything**. That is
  * the whole trap: 0.13 derives `category_id` where 0.12 derived `categorie_id`,
- * from the same unedited collection, so the collections watcher never fires.
+ * from the same unedited table, so the schema watcher never fires.
  * Boot-ensure renames the column in the database, relation validation then reads
  * the stale module and refuses to start — on that boot and every boot after it,
  * because the rename is already applied and will not be attempted again.
@@ -22,14 +22,18 @@
  *   1. does the generated schema name a foreign key the way a previous release's
  *      rule did? (the upgrade trap above);
  *   2. does it declare every table and derived foreign-key column the
- *      collections name? (the ordinary one — a collection or relation was added
- *      and the generator was not re-run).
+ *      tables name? (the ordinary one — a table or relation was added and the
+ *      generator was not re-run).
  *
  * The second is what gives this gate content. On this repository today the first
  * has nothing to catch: no relation here has a name the 0.12 and 0.13 rules
  * disagree about, so on its own it would be a green light for an unchecked file.
  *
  *     pnpm check:schema-fresh
+ *
+ * The tables are read from `backend/schema` by the driver's own loader
+ * (`loadTables`: the server's `loadBackendSchema`, lowered, in slug order), so
+ * this gate sees exactly what `rebase schema generate` generates from.
  *
  * Fixing a failure is `rebase schema stale --fix` in `app/backend`, then commit
  * the regenerated file.
@@ -38,7 +42,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { loadCollectionsFromDirectory } from "../../packages/server/src/collections/loader.ts";
+import { loadTables } from "../../packages/server-postgres/src/schema/load-tables.ts";
 import {
     findLegacyForeignKeyNames,
     describeLegacyForeignKeyNames,
@@ -48,11 +52,11 @@ import {
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
-/** Every checked-in generated schema, with the collections it was generated from. */
+/** Every checked-in generated schema, with the schema directory it was generated from. */
 const TARGETS = [
     {
         schema: path.join(ROOT, "app", "backend", "src", "schema.generated.ts"),
-        collections: path.join(ROOT, "app", "config", "collections")
+        tables: path.join(ROOT, "app", "backend", "schema")
     }
 ];
 
@@ -69,12 +73,23 @@ for (const target of TARGETS) {
         continue;
     }
 
-    const collections = await loadCollectionsFromDirectory(target.collections);
+    // A schema the loader refuses (a module that does not import, a table
+    // with no `rls`…) throws here, and the gate fails with it: there is no
+    // way to say whether a file is fresh against tables that cannot be read.
+    let collections: Awaited<ReturnType<typeof loadTables>>;
+    try {
+        collections = await loadTables(target.tables);
+    } catch (error) {
+        console.error(`✗ ${rel(target.tables)} could not be read — nothing was checked:\n`);
+        console.error(error instanceof Error ? error.message : String(error));
+        failed = true;
+        continue;
+    }
     if (collections.length === 0) {
-        // Loud rather than silent: zero collections makes every check below
+        // Loud rather than silent: zero tables makes every check below
         // vacuous, and a gate that passes because it found nothing to check is
         // worse than no gate.
-        console.error(`✗ No collections loaded from ${rel(target.collections)} — nothing was checked.`);
+        console.error(`✗ No tables loaded from ${rel(target.tables)} — nothing was checked.`);
         failed = true;
         continue;
     }
@@ -84,7 +99,7 @@ for (const target of TARGETS) {
     const missing = findMissingGeneratedNames(source, collections);
 
     if (stale.length === 0 && missing.length === 0) {
-        console.log(`  ok   ${rel(target.schema)} — ${collections.length} collection(s)`);
+        console.log(`  ok   ${rel(target.schema)} — ${collections.length} table(s)`);
         continue;
     }
 
