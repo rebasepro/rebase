@@ -9,7 +9,7 @@
  * reads a stale `dist`. A user's project runs the CLI command instead.
  *
  * Run: TSX_TSCONFIG_PATH=tsconfig.typecheck.json node --import tsx \
- *        tooling/scripts/migrate-collections-to-tables.mts <project dir> [--dry-run] [--check] [--json] [--force]
+ *        tooling/scripts/migrate-collections-to-tables.mts <project dir> [--dry-run] [--check] [--json] [--force] [--skip-sdk-calls]
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -36,16 +36,17 @@ if (args.includes("--help") || args.includes("-h")) {
     printCollectionsToTablesHelp();
     process.exit(0);
 }
-const known = new Set(["--check", "--dry-run", "--json", "--force"]);
+const known = new Set(["--check", "--dry-run", "--json", "--force", "--skip-sdk-calls"]);
 const unknown = args.filter(arg => arg.startsWith("-") && !known.has(arg));
 const positionals = args.filter(arg => !arg.startsWith("-"));
 if (unknown.length > 0 || positionals.length > 1) {
-    console.error(`Usage: migrate-collections-to-tables.mts [dir] [--dry-run] [--check] [--json] [--force]${unknown.length > 0 ? ` (unknown: ${unknown.join(", ")})` : ""}`);
+    console.error(`Usage: migrate-collections-to-tables.mts [dir] [--dry-run] [--check] [--json] [--force] [--skip-sdk-calls]${unknown.length > 0 ? ` (unknown: ${unknown.join(", ")})` : ""}`);
     process.exit(2);
 }
 await runCollectionsToTables({
     check: args.includes("--check"),
     dryRun: args.includes("--dry-run"),
     json: args.includes("--json"),
-    force: args.includes("--force")
+    force: args.includes("--force"),
+    skipSdkCalls: args.includes("--skip-sdk-calls")
 }, positionals[0], workspaceAliases());
