@@ -82,6 +82,7 @@ describe("lowerTables — columns", () => {
         ["uuid defaultRandom outside the key", col.uuid().defaultRandom(), { type: "string", columnType: "uuid", databaseDefault: "sql`gen_random_uuid()`" }],
         ["enum", col.enum(["a", "b"]).default("a"), { type: "string", enum: [{ id: "a", label: "a" }, { id: "b", label: "b" }], defaultValue: "a" }],
         ["enum named <table>_<column>", col.enum(["a"], { name: "t_c" }), { type: "string", enum: [{ id: "a", label: "a" }] }],
+        ["enum naming a shared type", col.enum(["a"], { name: "shared_kind" }), { type: "string", enum: [{ id: "a", label: "a" }] }],
         ["string rules", col.text().validate({ min: 1, max: 9, length: 4, matches: /^a/i, matchesMessage: "m", trim: true, lowercase: true, uppercase: false, requiredMessage: "r" }),
             { type: "string", validation: { min: 1, max: 9, length: 4, matches: /^a/i, matchesMessage: "m", trim: true, lowercase: true, uppercase: false, requiredMessage: "r" } }],
         ["string pattern without flags stays a string", col.text().validate({ matches: "^a" }), { type: "string", validation: { matches: "^a" } }],
@@ -622,7 +623,6 @@ describe("lowerTables — refusals", () => {
     /** One definition per pending feature, each refused with that feature's id. */
     const PENDING: Record<PendingTableFeatureId, () => (AnyTableDef | AnyViewDef)[]> = {
         "array-element-modifiers": () => [defineTable("t", { columns: { id, a: col.array(col.text().notNull()) }, rls: "admin-only" })],
-        "enum-type-name": () => [defineTable("t", { columns: { id, s: col.enum(["a"], { name: "shared_status" }) }, rls: "admin-only" })],
         "text-one-of": () => [defineTable("t", { columns: { id, s: col.text().oneOf(["a", "b"]) }, rls: "admin-only" })],
         "has-many-order-by": () => [defineTable("t", { columns: { id }, relations: { posts: rel.hasMany(() => users, { orderBy: ["id", "asc"] }) }, rls: "admin-only" }), users],
         "belongs-to-unconstrained-derived": () => [defineTable("t", { columns: { id }, relations: { user: rel.belongsTo(() => users, { constraint: false, index: false }) }, rls: "admin-only" }), users],

@@ -29,7 +29,7 @@ import { readCatalogueSchema } from "../src/schema/catalogue-schema";
 import { parsePropertyFromServer, serializePropertyToServer } from "../src/data-transformer";
 import { drizzle } from "drizzle-orm/pglite";
 import {
-    TABLE_FEATURES, codes, counters, days, grades, initials, keyed, lists, pairs, people, prices, slugs, switches, tallies, tickets
+    TABLE_FEATURES, bugs, codes, counters, days, grades, initials, keyed, lists, pairs, people, prices, slugs, switches, tallies, tasks, tickets
 } from "./fixtures/table-features";
 
 const PACKAGE_ROOT = path.resolve(__dirname, "..");
@@ -368,5 +368,52 @@ describe("table features: `col.array(inner)` of every scalar element type", () =
         } finally {
             await db.close();
         }
+    });
+});
+
+describe("table features: a shared enum type, `col.enum(values, { name })`", () => {
+    it("plans one type for every column naming it, beside the unnamed ones' own types", () => {
+        const plan = planOf([tasks, bugs]);
+        expect(plan.enums.map(e => [e.name, e.varName, e.labels])).toEqual([
+            ["priority", "priorityEnum", ["low", "normal", "high"]],
+            ["bugs_state", "bugsState", ["open", "closed"]]
+        ]);
+        const shared = { kind: "enum", schema: "public", name: "priority", varName: "priorityEnum", labels: ["low", "normal", "high"] };
+        expect(columnOf(plan, "tasks", "priority").type).toEqual(shared);
+        expect(columnOf(plan, "tasks", "escalated_to").type).toEqual(shared);
+        expect(columnOf(plan, "bugs", "priority").type).toEqual(shared);
+        expect(columnOf(plan, "bugs", "history").type).toEqual({ kind: "array", of: shared });
+    });
+
+    it("renders one CREATE TYPE and one pgEnum, referenced by every column", () => {
+        const ddl = ddlOf([tasks, bugs]);
+        expect(ddl.match(/CREATE TYPE "public"\."priority"/g)).toHaveLength(1);
+        expect(ddlLine(ddl, "priority")).toBe("\"priority\" \"public\".\"priority\" DEFAULT 'normal' NOT NULL,");
+        expect(ddlLine(ddl, "history")).toBe("\"history\" \"public\".\"priority\"[],");
+        const drizzle = drizzleOf([tasks, bugs]);
+        expect(drizzle.match(/export const priorityEnum = pgEnum\("priority", \["low", "normal", "high"\]\);/g)).toHaveLength(1);
+        expect(drizzleLine(drizzle, "escalatedTo")).toBe("escalatedTo: priorityEnum(\"escalated_to\")");
+        expect(drizzleLine(drizzle, "history")).toBe("history: priorityEnum(\"history\").array(),");
+    });
+
+    it("is one type in Postgres, shared by both tables", async () => {
+        const db = new PGlite();
+        try {
+            await db.waitReady;
+            await db.exec(ddlOf([tasks, bugs]));
+            await db.query("INSERT INTO tasks (escalated_to) VALUES ('high')");
+            await db.query("INSERT INTO bugs (priority, history) VALUES ('low', ARRAY['low', 'high']::priority[])");
+            await expect(db.query("INSERT INTO bugs (priority) VALUES ('urgent')")).rejects.toThrow(/invalid input value for enum priority/);
+        } finally {
+            await db.close();
+        }
+    });
+
+    it("refuses two value lists under one name, as compileTables does", () => {
+        const other = defineTable("others", {
+            columns: { id: col.uuid().primaryKey(), priority: col.enum(["low", "high"], { name: "priority" }) },
+            rls: "admin-only"
+        });
+        expect(() => planOf([tasks, other])).toThrow(/Columns sharing a named enum type must list the same values/);
     });
 });

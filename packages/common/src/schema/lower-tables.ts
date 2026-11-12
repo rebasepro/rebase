@@ -128,10 +128,6 @@ export const PENDING_TABLE_FEATURES = [
         description: "An array element declaring more than `.validate()`, `.oneOf()`, storage or `.transform()` (a default, `.notNull()`, `.unique()`, access…). Those apply to a column, not to the items of one."
     },
     {
-        id: "enum-type-name",
-        description: "`col.enum(values, { name })` naming a type other than `<table>_<column>`. Shared enum types are not planned yet."
-    },
-    {
         id: "text-one-of",
         description: "`.oneOf([...])` on a text column outside an array. A closed set of strings is planned as a Postgres enum type today; use `col.enum()` until a plain checked text column is supported."
     },
@@ -430,7 +426,6 @@ function fillCollection(collection: LoweredCollection, def: AnyDef, ctx: LowerCo
             key: column.key,
             property: fromColumn(lowerColumn(column.key, column.def, {
                 at,
-                tableName,
                 primaryKey: column.def.primaryKey,
                 describe: ctx.options.describe,
                 slug: slugOf(def)
@@ -710,7 +705,6 @@ function lowerRelation(entry: PlannedRelation, owner: AnyDef, ctx: LowerContext)
                     if (builder.def.primaryKey) refuse(pivotAt, "is a pivot column marked `.primaryKey()`. The junction's key is its two link columns.");
                     pivot[key] = fromColumn(lowerColumn(key, builder.def, {
                         at: pivotAt,
-                        tableName: relation.through ?? "",
                         primaryKey: false,
                         describe: ctx.options.describe,
                         slug: slugOf(owner)
@@ -741,8 +735,6 @@ function lowerRelation(entry: PlannedRelation, owner: AnyDef, ctx: LowerContext)
 
 interface ColumnContext {
     at: Where;
-    /** The SQL table the column lands on: an enum type is named after it. */
-    tableName: string;
     primaryKey: boolean;
     slug: string;
     describe: LowerTablesOptions["describe"];
@@ -1025,12 +1017,11 @@ function lowerStringColumn(
             if (rules?.max !== undefined && rules.max !== type.length) pending(at, "varchar-validate-max");
             if (rules?.max === undefined && type.length !== 255) rules = { ...rules, max: type.length };
             break;
-        case "enum": {
-            const column = def.column ?? toSnakeCase(key);
-            if (type.name !== undefined && type.name !== `${ctx.tableName}_${column}`) pending(at, "enum-type-name");
+        case "enum":
+            // A shared type (`name`) is planned from the definition; the
+            // runtime reads the values.
             property.enum = enumValues(type.values);
             break;
-        }
         case "text":
             break;
     }

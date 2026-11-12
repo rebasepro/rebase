@@ -100,5 +100,29 @@ export const lists = defineTable("lists", {
     rls: "admin-only"
 });
 
+const PRIORITIES = ["low", "normal", "high"] as const;
+
+/** `col.enum(values, { name })`: one shared type, used by several columns of several tables. */
+export const tasks = defineTable("tasks", {
+    columns: {
+        id: col.uuid().primaryKey().defaultRandom(),
+        priority: col.enum(PRIORITIES, { name: "priority" }).notNull().default("normal"),
+        escalatedTo: col.enum(PRIORITIES, { name: "priority" })
+    },
+    rls: "admin-only"
+});
+
+export const bugs = defineTable("bugs", {
+    columns: {
+        id: col.uuid().primaryKey().defaultRandom(),
+        priority: col.enum(PRIORITIES, { name: "priority" }),
+        history: col.array(col.enum(PRIORITIES, { name: "priority" })),
+        state: col.enum(["open", "closed"])
+    },
+    rls: "admin-only"
+});
+
 /** Every table, in an order that declares a target before what points at it. */
-export const TABLE_FEATURES = [people, counters, tallies, codes, initials, grades, days, switches, prices, tickets, slugs, pairs, keyed, lists];
+export const TABLE_FEATURES = [
+    people, counters, tallies, codes, initials, grades, days, switches, prices, tickets, slugs, pairs, keyed, lists, tasks, bugs
+];
