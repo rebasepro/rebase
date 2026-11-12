@@ -226,6 +226,11 @@ export async function readExistingSchema(
     // — `int4`, `jsonb`, `_numeric`, `vector` — which is what the drift check
     // needs.
     const columnTypes = new Map<string, string>();
+    // `format_type(atttypid, atttypmod)`: the type as Postgres spells it in
+    // full (`timestamp(3) without time zone`, `geometry(Point,4326)`,
+    // `inet[]`). A `col.custom()` type is compared against this, since such a
+    // type is identified by its name and modifiers, not by a family.
+    const columnFormats = new Map<string, string>();
     // A NOT NULL column that has a DEFAULT is not a problem for a write that
     // omits it, so orphan detection needs the default as well as the nullability
     // — otherwise every `created_at DEFAULT now()` on a table whose collection
@@ -240,6 +245,7 @@ export async function readExistingSchema(
         column_default: string | null;
         numeric_precision: number | null;
         numeric_scale: number | null;
+        formatted_type?: string | null;
     }>(
         // `numeric_precision`/`numeric_scale` because `udt_name` is `numeric`
         // for both `NUMERIC` and `NUMERIC(10, 2)`, and a property that declares
@@ -248,7 +254,12 @@ export async function readExistingSchema(
         // `numeric`, where the modifier changes what a value *is*; a `varchar`
         // width is a limit on the same family and `typesAgree` ignores it.
         `SELECT table_schema, table_name, column_name, is_nullable, udt_name, column_default,
-                numeric_precision, numeric_scale
+                numeric_precision, numeric_scale,
+                (SELECT format_type(a.atttypid, a.atttypmod)
+                 FROM pg_catalog.pg_attribute a
+                 JOIN pg_catalog.pg_class c ON c.oid = a.attrelid
+                 JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+                 WHERE n.nspname = table_schema AND c.relname = table_name AND a.attname = column_name) AS formatted_type
          FROM information_schema.columns
          WHERE table_schema IN (${inList})`
     );
@@ -263,6 +274,7 @@ export async function readExistingSchema(
                 : "";
             columnTypes.set(`${key}.${row.column_name}`, `${row.udt_name}${modifier}`);
         }
+        if (row.formatted_type) columnFormats.set(`${key}.${row.column_name}`, row.formatted_type);
         if (row.column_default !== null) columnDefaults.add(`${key}.${row.column_name}`);
     }
 
@@ -484,7 +496,7 @@ export async function readExistingSchema(
     for (const row of extensionRows) extensions.add(row.name);
 
     return {
-        tables, enums, constraints, columnComments, enumValues, notNullColumns, populatedTables, columnTypes,
+        tables, enums, constraints, columnComments, enumValues, notNullColumns, populatedTables, columnTypes, columnFormats,
         columnDefaults, triggers, indexes, invalidIndexes, indexShapes, extensions, functions
     };
 }

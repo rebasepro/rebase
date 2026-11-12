@@ -1,7 +1,6 @@
 import { defineTable, col } from "@rebasepro/server/schema";
 
 // ⚠ Not reproduced exactly by `rebase db push` — read before pushing:
-//   - "address" is inet, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
 //   - "k" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
 //   - "v" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
 //   - "domain" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.

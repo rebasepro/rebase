@@ -3,8 +3,6 @@ import { changesets } from "./changesets";
 import { currentNodeTags } from "./current_node_tags";
 import { currentWayNodes } from "./current_way_nodes";
 
-// ⚠ Not reproduced exactly by `rebase db push` — read before pushing:
-//   - "timestamp" is timestamp without time zone, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
 export const currentNodes = defineTable("current_nodes", {
     columns: {
         id: col.bigserial().primaryKey(),

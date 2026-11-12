@@ -32,12 +32,11 @@ import {
     generateRealSchema,
     planDefinitions,
     planDifferences,
-    plannedSchemaOf,
-    withoutCustomColumns,
-    type CustomColumn
+    plannedSchemaOf
 } from "./helpers/introspect-generation";
 import { buildSchema, column, serialPk, type RealSchemaName } from "./helpers/schema-metadata";
 import { generateSchemaModules, type SchemaGeneration } from "../src/schema/introspect-db-logic";
+import { toSnakeCase } from "@rebasepro/utils";
 
 const REPO_ROOT = path.resolve(__dirname, "..", "..", "..");
 const GOLDEN_DIR = path.join(__dirname, "fixtures", "introspect-golden");
@@ -142,9 +141,10 @@ describe("tables generated from a real schema", () => {
         expect(moduleOf("pagila", "film")).toContain("rentalDuration: col.smallint().notNull().default(3)");
     });
 
-    it("declares a type no other builder names with col.custom, and says what that means for a push", () => {
+    it("declares a type no other builder names with col.custom", () => {
         expect(moduleOf("chinook", "employee")).toContain("birthDate: col.custom(\"timestamp without time zone\")");
-        expect(moduleOf("chinook", "employee")).toMatch(/^\/\/ {3}- "birth_date" is timestamp without time zone, declared with `col\.custom\(\)`/m);
+        // Planned as that type now, so the generator has nothing to warn about.
+        expect(moduleOf("chinook", "employee")).not.toContain("custom-sql-type");
     });
 
     it("carries a generated column, CHECK bounds and comments across", () => {
@@ -294,6 +294,8 @@ const INTENDED: { pattern: RegExp; reason: string }[] = [
     { pattern: /: default undefined → \{"kind":"literal",/, reason: "a foreign-key column's DEFAULT is kept (a legacy relation property could not state one, so the push dropped it)" },
     { pattern: /^public\.(film_actor|film_category)\.last_update: column only in the new generation$/, reason: "a junction's own columns are its pivot (legacy declared none, so the push dropped them)" },
     { pattern: /^public\.(nodes|ways|relations): table only in the new generation$/, reason: "a composite key pointed at by another table is declared (legacy left it out); the links into it stay plain columns" },
+    { pattern: /: type \{[^}]*\} → \{"kind":"custom","sqlType":"[^"]+"\}$/, reason: "a type no other builder names is planned as the type the database holds, `col.custom()` (legacy mapped `timestamp without time zone` to timestamptz, `inet`/`tsvector` to text, and asked for a conversion)" },
+    { pattern: /^public\.film\.fulltext: nullable true → false$/, reason: "the tsvector column is NOT NULL, as the database holds it (legacy declared its stand-in text column nullable)" },
     { pattern: /^public\.gps_points: table only in the legacy generation$/, reason: "a table with no primary key is not generated (legacy gave it an implicit `id`, which the push would have added)" }
 ];
 
@@ -301,19 +303,34 @@ describe("the generated project plans what the database holds", () => {
     jest.setTimeout(180_000);
 
     it.each(REAL_SCHEMAS)("%s: every difference from the legacy generation is intended", name => {
-        const evaluated = evaluateSchemaModules(of(name).tables.map(t => t.schemaModule));
-        const { defs, removed } = withoutCustomColumns(evaluated);
+        const defs = evaluateSchemaModules(of(name).tables.map(t => t.schemaModule));
         const legacy = plannedSchemaOf(readGolden({ id: `real-schema.${name}`, collections: [], options: {} })["plan.json"]);
         const differences = planDifferences(legacy, planDefinitions(defs));
-        const custom = new Set(removed.map((c: CustomColumn) => `public.${c.table}.${c.column}: column only in the legacy generation`));
-        const unexplained = differences.filter(line => !custom.has(line) && !INTENDED.some(intended => intended.pattern.test(line)));
+        // A `timestamp without time zone` column is a `col.custom()` one, which
+        // no stamp applies to: where the database holds no DEFAULT, the plan
+        // states none (legacy invented `now()` from the column's name).
+        const custom = new Set(defs.flatMap(def => Object.entries(def.config.columns)
+            .filter(([, builder]) => builder.def.type.kind === "other")
+            .map(([key, builder]) => `public.${def.config.table ?? def.name}.${builder.def.column ?? toSnakeCase(key)}`)));
+        const unstamped = (line: string): boolean => {
+            const match = /^(public\.[^:]+): default \{"kind":"sql","expression":"now\(\)"\} → undefined$/.exec(line);
+            return match !== null && custom.has(match[1]);
+        };
+        const unexplained = differences.filter(line => !unstamped(line) && !INTENDED.some(intended => intended.pattern.test(line)));
         expect(unexplained).toEqual([]);
     });
 
-    it("leaves out of the plan only the col.custom() columns, which wait on `custom-sql-type`", () => {
-        const removed = REAL_SCHEMAS.flatMap(name => withoutCustomColumns(evaluateSchemaModules(of(name).tables.map(t => t.schemaModule))).removed);
-        const types = [...new Set(removed.map(c => c.sqlType))].sort();
-        expect(types).toEqual(expect.arrayContaining(["timestamp without time zone"]));
-        for (const type of types) expect(type).not.toMatch(/^(text|integer|uuid|jsonb?)$/);
+    it("plans every col.custom() column as the type the database holds, verbatim", () => {
+        const planned = REAL_SCHEMAS.flatMap(name => {
+            const defs = evaluateSchemaModules(of(name).tables.map(t => t.schemaModule));
+            const custom = defs.flatMap(def => Object.values(def.config.columns)
+                .map(builder => builder.def.type)
+                .flatMap(type => (type.kind === "other" ? [type.sqlType] : [])));
+            const plan = planDefinitions(defs);
+            const types = [...plan.tables.values()].flatMap(table => [...table.columns.values()].map(column => column.type));
+            return custom.map(sqlType => ({ sqlType, planned: types.some(type => JSON.stringify(type) === JSON.stringify({ kind: "custom", sqlType })) }));
+        });
+        expect(planned.map(entry => entry.sqlType)).toEqual(expect.arrayContaining(["timestamp without time zone"]));
+        expect(planned.filter(entry => !entry.planned)).toEqual([]);
     });
 });

@@ -3,9 +3,6 @@ import { users } from "./users";
 import { notes } from "./notes";
 
 // Introspected as an owned-child: belongs to notes (its only NOT NULL foreign key) and nothing else references it.
-// ⚠ Not reproduced exactly by `rebase db push` — read before pushing:
-//   - "created_at" is timestamp without time zone, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
-//   - "author_ip" is inet, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
 export const noteComments = defineTable("note_comments", {
     columns: {
         id: col.bigserial().primaryKey(),

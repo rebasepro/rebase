@@ -134,7 +134,12 @@ export const COLUMNS_QUERY = `
          JOIN pg_class pc ON a.attrelid = pc.oid
          WHERE pc.relname = c.table_name
            AND a.attname = c.column_name
-           AND pc.relnamespace = (SELECT oid FROM pg_namespace WHERE nspname = c.table_schema)) as atttypmod
+           AND pc.relnamespace = (SELECT oid FROM pg_namespace WHERE nspname = c.table_schema)) as atttypmod,
+        (SELECT format_type(a.atttypid, a.atttypmod) FROM pg_attribute a
+         JOIN pg_class pc ON a.attrelid = pc.oid
+         WHERE pc.relname = c.table_name
+           AND a.attname = c.column_name
+           AND pc.relnamespace = (SELECT oid FROM pg_namespace WHERE nspname = c.table_schema)) as formatted_type
     FROM information_schema.columns c
     WHERE c.table_schema = $1
     ORDER BY c.table_name, c.ordinal_position

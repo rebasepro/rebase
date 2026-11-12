@@ -2,8 +2,6 @@ import { defineTable, col } from "@rebasepro/server/schema";
 
 // ⚠ Not reproduced exactly by `rebase db push` — read before pushing:
 //   - "phrase" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
-//   - "created_at" is timestamp without time zone, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
-//   - "updated_at" is timestamp without time zone, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
 export const spammyPhrases = defineTable("spammy_phrases", {
     columns: {
         id: col.bigserial().primaryKey(),

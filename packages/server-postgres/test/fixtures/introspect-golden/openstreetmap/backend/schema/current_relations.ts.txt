@@ -3,8 +3,6 @@ import { changesets } from "./changesets";
 import { currentRelationMembers } from "./current_relation_members";
 import { currentRelationTags } from "./current_relation_tags";
 
-// ⚠ Not reproduced exactly by `rebase db push` — read before pushing:
-//   - "timestamp" is timestamp without time zone, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
 export const currentRelations = defineTable("current_relations", {
     columns: {
         id: col.bigserial().primaryKey(),

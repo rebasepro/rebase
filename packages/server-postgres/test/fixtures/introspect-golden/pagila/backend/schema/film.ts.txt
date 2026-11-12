@@ -5,7 +5,6 @@ import { actor } from "./actor";
 import { category } from "./category";
 
 // ⚠ Not reproduced exactly by `rebase db push` — read before pushing:
-//   - "fulltext" is tsvector, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
 //   - "length_hours" is a generated column whose expression was not read; it is declared read-only, and a push would plan it as a plain column.
 export const film = defineTable("film", {
     columns: {

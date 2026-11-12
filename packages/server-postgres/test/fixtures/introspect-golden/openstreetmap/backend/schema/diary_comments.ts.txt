@@ -2,9 +2,6 @@ import { defineTable, col, rel } from "@rebasepro/server/schema";
 import { diaryEntries } from "./diary_entries";
 import { users } from "./users";
 
-// ⚠ Not reproduced exactly by `rebase db push` — read before pushing:
-//   - "created_at" is timestamp without time zone, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
-//   - "updated_at" is timestamp without time zone, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
 export const diaryComments = defineTable("diary_comments", {
     columns: {
         id: col.bigserial().primaryKey(),

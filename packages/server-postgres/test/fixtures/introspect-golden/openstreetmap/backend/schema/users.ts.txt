@@ -24,17 +24,13 @@ import { userRoles } from "./user_roles";
 // ⚠ Not reproduced exactly by `rebase db push` — read before pushing:
 //   - "email" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
 //   - "pass_crypt" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
-//   - "creation_time" is timestamp without time zone, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
 //   - "display_name" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
 //   - "pass_salt" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
 //   - "new_email" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
 //   - "languages" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
-//   - "terms_agreed" is timestamp without time zone, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
 //   - "auth_uid" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
 //   - "preferred_editor" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
 //   - "auth_provider" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
-//   - "tou_agreed" is timestamp without time zone, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
-//   - "creation_address" is inet, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
 //   - "home_location_name" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
 //   - "company" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
 export const users = defineTable("users", {

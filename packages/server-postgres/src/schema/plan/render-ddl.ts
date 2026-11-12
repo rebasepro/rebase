@@ -98,6 +98,9 @@ export const renderPgType = (type: PgType): string => {
         case "bytea": return "BYTEA";
         case "tsvector": return "tsvector";
         case "array": return `${renderPgType(type.of)}[]`;
+        // Verbatim: `assertCustomSqlType` admitted it as a type name that
+        // cannot leave the statement.
+        case "custom": return type.sqlType;
     }
 };
 

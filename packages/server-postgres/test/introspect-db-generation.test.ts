@@ -140,11 +140,16 @@ describe("a generated table", () => {
         compiles(g);
     });
 
-    it("declares a type no other builder names with col.custom, and notes that a push refuses it", () => {
-        const g = generate({ tables: [{ name: "hits", columns: [serialPk("hits"), column("hits", "ip", { data_type: "inet", udt_name: "inet" })] }] });
+    it("declares a type no other builder names with col.custom, as `format_type` prints it — which a push plans", () => {
+        const g = generate({ tables: [{ name: "hits", columns: [
+            serialPk("hits"),
+            column("hits", "ip", { data_type: "inet", udt_name: "inet" }),
+            column("hits", "at", { data_type: "timestamp without time zone", udt_name: "timestamp", formatted_type: "timestamp(3) without time zone" })
+        ] }] });
         expect(moduleOf(g, "hits")).toContain("ip: col.custom(\"inet\")");
-        expect(g.tables[0].notes).toEqual([expect.stringContaining("\"ip\" is inet, declared with `col.custom()`")]);
-        expect(moduleOf(g, "hits")).toContain("// ⚠ Not reproduced exactly by `rebase db push` — read before pushing:");
+        expect(moduleOf(g, "hits")).toContain("at: col.custom(\"timestamp(3) without time zone\")");
+        expect(g.tables[0].notes).toEqual([]);
+        expect(moduleOf(g, "hits")).not.toContain("Not reproduced exactly");
     });
 
     it("leaves out a table with no primary key, saying why", () => {

@@ -7,7 +7,6 @@ import { activeStorageVariantRecords } from "./active_storage_variant_records";
 //   - "filename" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
 //   - "content_type" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
 //   - "checksum" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
-//   - "created_at" is timestamp without time zone, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
 //   - "service_name" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
 export const activeStorageBlobs = defineTable("active_storage_blobs", {
     columns: {

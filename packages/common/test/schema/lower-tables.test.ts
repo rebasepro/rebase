@@ -666,9 +666,40 @@ describe("lowerTables — an introspected database (`introspected: true`)", () =
         expect(refusal(() => lowerTables([keyless]))).toEqual([expect.stringMatching(/^log: declares no primary key/)]);
     });
 
-    it("still refuses `col.custom()` for a definition that is planned", () => {
-        expect(refusal(() => lowerTables([defineTable("t", { columns: { id, ip: col.custom("inet") }, rls: "admin-only" })])))
-            .toEqual([expect.stringContaining("t.ip: uses a feature that cannot be lowered to the collection model yet [custom-sql-type]")]);
+});
+
+describe("lowerTables — `col.custom()` in a planned project", () => {
+    it("lowers it as introspection does — the planner plans the type from the definition", () => {
+        const [t] = lowerWithDefinitions([defineTable("t", {
+            columns: { code: col.custom("citext").primaryKey(), ip: col.custom("inet").notNull(), nets: col.custom("cidr[]") },
+            rls: "admin-only"
+        })]);
+        expect(t.properties.code).toMatchObject({ type: "string", isId: true, tableColumn: { type: { kind: "other", sqlType: "citext" } } });
+        expect(t.properties.ip).toMatchObject({ type: "string", validation: { required: true } });
+        expect(t.properties.nets).toMatchObject({ type: "array" });
+    });
+
+    it.each([
+        "inet", "interval", "timestamp(3) without time zone", "double precision", "character varying(20)", "int4range",
+        "public.citext", "\"geo\".\"point 3\"", "geometry(Point, 4326)", "geometry(Point,4326)", "inet[]", "int4range[][]", "text[3]",
+        "interval day to second(3)"
+    ])("accepts the type name %s", sqlType => {
+        expect(() => lowerTables([defineTable("t", { columns: { id, c: col.custom(sqlType) }, rls: "admin-only" })])).not.toThrow();
+    });
+
+    it.each<[string, RegExp]>([
+        ["inet DEFAULT '1.1.1.1'", /cannot be read as a type name/],
+        ["inet NOT NULL", /holds `not`, which starts a column clause/],
+        ["inet) DROP TABLE x", /cannot be read as a type name/],
+        ["text[] x", /has a word after its array brackets/],
+        ["public.", /ends without a type name/],
+        ["(4326)", /cannot be read as a type name|modifier list that follows no type name/],
+        ["geometry(Point, 'x')", /cannot be read as a type name/],
+        ["\"open", /cannot be read as a type name/]
+    ])("refuses the type name %s, naming the column", (sqlType, reason) => {
+        const problems = refusal(() => lowerTables([defineTable("t", { columns: { id, c: col.custom(sqlType) }, rls: "admin-only" })]));
+        expect(problems).toEqual([expect.stringMatching(/^t\.c: is `col\.custom\(/)]);
+        expect(problems[0]).toMatch(reason);
     });
 });
 
@@ -683,8 +714,7 @@ describe("lowerTables — refusals", () => {
         "json-document-shape": () => [defineTable("t", { columns: { id, j: col.jsonb(json.string()) }, rls: "admin-only" })],
         "json-one-of-placement": () => [defineTable("t", { columns: { id, j: col.jsonb(json.object({ b: json.oneOf({ x: json.string() }) })) }, rls: "admin-only" })],
         "json-unknown-field": () => [defineTable("t", { columns: { id, j: col.jsonb(json.object({ u: json.unknown() })) }, rls: "admin-only" })],
-        "array-unique-items": () => [defineTable("t", { columns: { id, a: col.array(col.text()).validate({ uniqueItems: true }) }, rls: "admin-only" })],
-        "custom-sql-type": () => [defineTable("t", { columns: { id, ip: col.custom("inet") }, rls: "admin-only" })]
+        "array-unique-items": () => [defineTable("t", { columns: { id, a: col.array(col.text()).validate({ uniqueItems: true }) }, rls: "admin-only" })]
     };
 
     it("lists each pending feature once", () => {

@@ -9,9 +9,6 @@ import { nodes } from "./nodes";
 import { relations } from "./relations";
 import { ways } from "./ways";
 
-// ⚠ Not reproduced exactly by `rebase db push` — read before pushing:
-//   - "created_at" is timestamp without time zone, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
-//   - "closed_at" is timestamp without time zone, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
 export const changesets = defineTable("changesets", {
     columns: {
         id: col.bigserial().primaryKey(),

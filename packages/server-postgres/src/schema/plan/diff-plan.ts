@@ -42,7 +42,7 @@ import {
 import { collectionIndexStatement, sortIndexSpecs } from "../collection-index";
 import { indexAdoptionStatement, planIndexAdoptions, type ExistingIndexShape } from "../index-adoption";
 import { vectorIndexStatement, type SkippedVectorIndex } from "../vector-index";
-import { typesAgree, type ColumnTypeDrift } from "../column-type-drift";
+import { customTypesAgree, typesAgree, type ColumnTypeDrift } from "../column-type-drift";
 
 /** Postgres identifiers this module is willing to interpolate. */
 const SAFE_IDENTIFIER = /^[A-Za-z_][A-Za-z0-9_$]*$/;
@@ -102,6 +102,12 @@ export interface ExistingSchema {
      * `numeric(10,2)`).
      */
     columnTypes?: Map<string, string>;
+    /**
+     * `schema.table.column` → `format_type(atttypid, atttypmod)`, the type as
+     * Postgres spells it in full. What a `col.custom()` column is compared
+     * against.
+     */
+    columnFormats?: Map<string, string>;
     /**
      * `schema.table.trigger` of every trigger that already exists, and the
      * same with its arguments — {@link triggerArgumentsKey}.
@@ -680,6 +686,15 @@ export function diffPlanAgainstCatalogue(
         const key = `${table.qualified}.${column.column}`;
         if (existing.tables.get(table.qualified)?.has(column.column) !== true || column.sqlDefinition) return;
         const declaredType = renderPgType(column.type);
+        // A custom type is a name: compared, normalised, with the catalogue's
+        // own spelling of it.
+        const formatted = column.type.kind === "custom" ? existing.columnFormats?.get(key) : undefined;
+        if (formatted !== undefined) {
+            if (!customTypesAgree(declaredType, formatted)) {
+                columnTypeDrift.push({ table: table.qualified, column: column.column, declared: declaredType, actual: formatted });
+            }
+            return;
+        }
         const actualType = existing.columnTypes?.get(key);
         if (actualType && !typesAgree(declaredType, actualType)) {
             columnTypeDrift.push({ table: table.qualified, column: column.column, declared: declaredType, actual: actualType });

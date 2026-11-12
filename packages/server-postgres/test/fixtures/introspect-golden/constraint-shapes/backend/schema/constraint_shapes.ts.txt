@@ -7,7 +7,6 @@ import { constraintShapesChild } from "./constraint_shapes_child";
 //   - "visibility" accepts only 'public', 'private' (a CHECK the database enforces); a closed set on a text column is not declared yet (`.oneOf()` there waits on `text-one-of`), so the API leaves it to the database.
 //   - "pinned_kind" accepts only 'only-one' (a CHECK the database enforces); a closed set on a text column is not declared yet (`.oneOf()` there waits on `text-one-of`), so the API leaves it to the database.
 //   - "apostrophe_set" accepts only 'it's', 'won't' (a CHECK the database enforces); a closed set on a text column is not declared yet (`.oneOf()` there waits on `text-one-of`), so the API leaves it to the database.
-//   - "search" is tsvector, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
 //   - "computed_total" is a generated column whose expression was not read; it is declared read-only, and a push would plan it as a plain column.
 export const constraintShapes = defineTable("constraint_shapes", {
     description: "Every CHECK shape the parser is expected to handle.",

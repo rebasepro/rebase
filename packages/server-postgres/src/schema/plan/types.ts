@@ -73,7 +73,16 @@ export type PgType =
     | { kind: "bytea" }
     /** The generated full-text column. Only the search planner produces it. */
     | { kind: "tsvector" }
-    | { kind: "array"; of: PgType };
+    | { kind: "array"; of: PgType }
+    /**
+     * A type no other member names (`col.custom(sqlType)`): `inet`,
+     * `interval`, `timestamp`, a range, a PostGIS `geometry(Point, 4326)`, or
+     * an array of one (`inet[]`). Written into DDL verbatim — the planner
+     * accepts only a type name that cannot leave the statement
+     * (`assertCustomSqlType`) — and never created, altered or dropped: an
+     * extension or a `CREATE TYPE` the database holds provides it.
+     */
+    | { kind: "custom"; sqlType: string };
 
 /**
  * What a column defaults to, as the thing itself rather than a rendered string.

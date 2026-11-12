@@ -58,6 +58,12 @@ export interface TableColumn {
     character_maximum_length?: number | null;
     numeric_precision?: number | null;
     numeric_scale?: number | null;
+    /**
+     * `format_type(atttypid, atttypmod)`: the type as Postgres spells it in
+     * full, modifiers included (`timestamp(3) without time zone`,
+     * `geometry(Point,4326)`) — what a `col.custom()` column is declared as.
+     */
+    formatted_type?: string | null;
 }
 
 export interface EnumValue {

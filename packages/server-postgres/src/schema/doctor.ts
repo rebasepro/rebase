@@ -123,7 +123,7 @@ export interface DoctorReport {
  * unpersistable was the one the doctor never checked). It reads the schema plan
  * now.
  */
-const INFORMATION_SCHEMA_NAMES: Record<PgType["kind"], string> = {
+const INFORMATION_SCHEMA_NAMES: Record<Exclude<PgType["kind"], "custom">, string> = {
     text: "text",
     varchar: "character varying",
     char: "character",
@@ -155,6 +155,15 @@ const INFORMATION_SCHEMA_NAMES: Record<PgType["kind"], string> = {
 };
 
 /**
+ * {@link INFORMATION_SCHEMA_NAMES} for any planned type, or `null` for a
+ * `col.custom()` type: its `data_type` is whatever the catalogue calls that
+ * type (`inet`, `int4range`, `USER-DEFINED` for PostGIS), so the boot diff
+ * compares it against `format_type` instead, and the doctor has nothing to add.
+ */
+const informationSchemaName = (type: PgType): string | null =>
+    type.kind === "custom" ? null : INFORMATION_SCHEMA_NAMES[type.kind];
+
+/**
  * The `data_type` the database should report for a property's column, or `null`
  * when there is nothing to compare.
  *
@@ -182,7 +191,7 @@ export function getExpectedColumnType(prop: Property): string | null {
 
     try {
         const type = columnPgType("__column__", prop, collection, () => undefined);
-        return INFORMATION_SCHEMA_NAMES[type.kind];
+        return informationSchemaName(type);
     } catch {
         return null;
     }
@@ -526,8 +535,8 @@ export function junctionKeyIssues(
             });
             continue;
         }
-        const expected = INFORMATION_SCHEMA_NAMES[column.type.kind];
-        if (dbCol.data_type !== expected) {
+        const expected = informationSchemaName(column.type);
+        if (expected !== null && dbCol.data_type !== expected) {
             issues.push({
                 severity: "warning",
                 category: "type_mismatch",

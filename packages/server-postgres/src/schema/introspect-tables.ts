@@ -462,10 +462,6 @@ function describeColumn(col: TableColumn, key: string, meta: TableMeta, context:
     if (facts.derived) out.derived = true;
     if (context.generate) {
         applyGeneratedFacts(out, col, meta, context);
-        if (type.kind === "other") {
-            context.note(meta.name, `"${col.column_name}" is ${type.sqlType}, declared with \`col.custom()\`: Rebase serves it as the driver returns it, ` +
-                "and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).");
-        }
     }
     return out;
 }
@@ -591,15 +587,18 @@ function columnTypeOf(col: TableColumn, context: TableContext, table: string): C
             if (col.udt_name === "vector" && typeof col.atttypmod === "number" && col.atttypmod > 0) {
                 return { kind: "vector", dimensions: col.atttypmod };
             }
-            return { kind: "other", sqlType: col.udt_name };
+            return { kind: "other", sqlType: col.formatted_type ?? col.udt_name };
         }
         case "array": {
             const element = col.udt_name.replace(/^_/, "");
             const of = elementTypeOf(element, col.atttypmod, context.enumMap);
-            return of ? { kind: "array", of } : { kind: "other", sqlType: `${element}[]` };
+            return of ? { kind: "array", of } : { kind: "other", sqlType: col.formatted_type ?? `${element}[]` };
         }
+        // A `col.custom()` type, as `format_type` prints it where the read has
+        // it — modifiers kept (`timestamp(3)`, a PostGIS SRID) — which is the
+        // type a push then writes back.
         default:
-            return { kind: "other", sqlType: col.data_type };
+            return { kind: "other", sqlType: col.formatted_type ?? col.data_type };
     }
 }
 

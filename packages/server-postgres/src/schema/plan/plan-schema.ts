@@ -60,7 +60,8 @@ import {
     resolveCollectionRelations,
     resolveJunctionSpecs,
     assertBeforeQueryIsPostgresOnly,
-    resolveStringColumnLength
+    resolveStringColumnLength,
+    customSqlTypeProblem
 } from "@rebasepro/common";
 import {
     generateForeignKeyName,
@@ -623,11 +624,19 @@ const pgTypeOf = (type: ColumnType, site: DefinedColumnSite): PgType => {
                 );
             }
             return { kind: "array", of: pgTypeOf(type.of, site) };
-        case "other":
-            throw new Error(
-                `Column "${site.column}" of "${describe(site.collection)}" is typed \`${type.sqlType}\`, which only ` +
-                "introspection reports and Rebase does not create. Declare it with a `col.*` builder."
-            );
+        case "other": {
+            // `col.custom(sqlType)`, written into DDL verbatim — so refused
+            // again here, whoever built the definition, unless it is a type
+            // name that cannot leave the statement.
+            const problem = customSqlTypeProblem(type.sqlType);
+            if (problem !== undefined) {
+                throw new Error(
+                    `Column "${site.column}" of "${describe(site.collection)}" is \`col.custom(${JSON.stringify(type.sqlType)})\`, ` +
+                    `and that type name ${problem}. Write the Postgres type as \`format_type\` prints it.`
+                );
+            }
+            return { kind: "custom", sqlType: type.sqlType.trim() };
+        }
     }
 };
 
@@ -741,6 +750,12 @@ const definedLiteralDefault = (value: unknown, type: PgType): ColumnDefault | un
             const literal = dateDefaultLiteral(value, type);
             return literal === undefined ? undefined : { kind: "literal", value: literal, sql: quoteSqlLiteral(literal) };
         }
+        // A custom scalar takes a string literal, which Postgres reads as the
+        // column's type (`'10.0.0.1'` for `inet`, `'1 day'` for `interval`).
+        case "custom":
+            return typeof value === "string" && !/\]\s*$/.test(type.sqlType)
+                ? { kind: "literal", value, sql: quoteSqlLiteral(value) }
+                : undefined;
         case "json":
         case "jsonb": {
             let json: string | undefined;

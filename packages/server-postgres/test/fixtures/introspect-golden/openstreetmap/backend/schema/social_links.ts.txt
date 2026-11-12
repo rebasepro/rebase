@@ -4,8 +4,6 @@ import { users } from "./users";
 // Introspected as an owned-child: belongs to users (its only NOT NULL foreign key) and nothing else references it.
 // ⚠ Not reproduced exactly by `rebase db push` — read before pushing:
 //   - "url" is a varchar with no length, declared as text: a push would convert it to text, which keeps every value.
-//   - "created_at" is timestamp without time zone, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
-//   - "updated_at" is timestamp without time zone, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
 export const socialLinks = defineTable("social_links", {
     columns: {
         id: col.bigserial().primaryKey(),

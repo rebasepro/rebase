@@ -51,36 +51,6 @@ export function evaluateSchemaModules(modules: readonly string[]): (AnyTableDef 
     return result.filter((def): def is AnyTableDef | AnyViewDef => isTableDef(def) || isViewDef(def));
 }
 
-/** One `col.custom()` column, which the planner cannot plan yet (`custom-sql-type`). */
-export interface CustomColumn {
-    table: string;
-    column: string;
-    sqlType: string;
-}
-
-/**
- * The definitions without their `col.custom()` columns — which `lowerTables`
- * refuses until the planner has a type to plan them as — and the list of what
- * was taken out, so a comparison states it rather than hides it.
- */
-export function withoutCustomColumns(defs: readonly (AnyTableDef | AnyViewDef)[]): { defs: (AnyTableDef | AnyViewDef)[]; removed: CustomColumn[] } {
-    const removed: CustomColumn[] = [];
-    const out = defs.map(def => {
-        const columns: Record<string, unknown> = {};
-        for (const [key, builder] of Object.entries(def.config.columns)) {
-            if (isColumnBuilder(builder) && builder.def.type.kind === "other") {
-                removed.push({ table: def.name, column: builder.def.column ?? toSnakeCase(key), sqlType: builder.def.type.sqlType });
-                continue;
-            }
-            columns[key] = builder;
-        }
-        // Mutated in place: the relation thunks of the other definitions return these very objects.
-        Reflect.set(def.config, "columns", columns);
-        return def;
-    });
-    return { defs: out, removed };
-}
-
 /** What a column plan says about the database, without the planner's bookkeeping. */
 export interface PlannedColumn {
     type: unknown;

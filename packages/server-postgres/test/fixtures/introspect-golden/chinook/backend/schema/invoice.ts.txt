@@ -2,8 +2,6 @@ import { defineTable, col, rel } from "@rebasepro/server/schema";
 import { customer } from "./customer";
 import { invoiceLine } from "./invoice_line";
 
-// ⚠ Not reproduced exactly by `rebase db push` — read before pushing:
-//   - "invoice_date" is timestamp without time zone, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
 export const invoice = defineTable("invoice", {
     columns: {
         invoiceId: col.integer().primaryKey(),

@@ -167,6 +167,57 @@ export function typesAgree(declared: string, actual: string): boolean {
     return declaredModifier === numericModifier(actual);
 }
 
+/**
+ * The names `format_type` prints for the aliases a type is commonly written
+ * under. Applied to the leading words of a declared type.
+ */
+const FORMAT_TYPE_ALIASES: [RegExp, string][] = [
+    [/^timestamptz(\(\d+\))?(?![\w(])/, "timestamp$1 with time zone"],
+    [/^timestamp(\(\d+\))?(?![\w(]| with| without)/, "timestamp$1 without time zone"],
+    [/^timetz(\(\d+\))?(?![\w(])/, "time$1 with time zone"],
+    [/^time(\(\d+\))?(?![\w(]| with| without)/, "time$1 without time zone"],
+    [/^(?:int|int4)\b/, "integer"],
+    [/^int8\b/, "bigint"],
+    [/^int2\b/, "smallint"],
+    [/^float8\b/, "double precision"],
+    [/^float4\b/, "real"],
+    [/^decimal\b/, "numeric"],
+    [/^bool\b/, "boolean"],
+    [/^varchar\b/, "character varying"],
+    [/^(?:char|bpchar)\b/, "character"]
+];
+
+/**
+ * A type as `format_type` would print it, for comparing a `col.custom()`
+ * declaration with the catalogue: lower-case outside quotes, no space after a
+ * comma or inside a modifier list, `timestamp` as `timestamp without time
+ * zone` and the other common aliases spelled out, a `public.` qualifier
+ * dropped (`format_type` prints a type on the search path bare).
+ */
+export function normalizeFormatType(raw: string): string {
+    let type = raw.trim().replace(/"[^"]*"|[^"]+/g, part => (part.startsWith("\"") ? part : part.toLowerCase()));
+    type = type.replace(/\s+/g, " ").replace(/\s*([(),[\]])\s*/g, "$1").replace(/\)(?=[a-z])/g, ") ");
+    type = type.replace(/^(?:public|"public")\./, "");
+    for (const [alias, name] of FORMAT_TYPE_ALIASES) {
+        if (alias.test(type)) {
+            type = type.replace(alias, name);
+            break;
+        }
+    }
+    return type;
+}
+
+/**
+ * Whether a `col.custom()` type and the type the catalogue holds
+ * (`format_type(atttypid, atttypmod)`) are the same type, as
+ * {@link normalizeFormatType} spells both. A custom type is identified by its
+ * name, so unlike {@link typesAgree} there is no family to fall back on: two
+ * names that differ are two types.
+ */
+export function customTypesAgree(declared: string, formatted: string): boolean {
+    return normalizeFormatType(declared) === normalizeFormatType(formatted);
+}
+
 /** `NUMERIC`, `numeric(10,2)`, `DECIMAL(10, 2)` — the arbitrary-precision type itself. */
 function isNumeric(raw: string): boolean {
     return /^\s*(?:numeric|decimal)\s*(?:\(|$)/i.test(raw);

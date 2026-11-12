@@ -1,9 +1,6 @@
 import { defineTable, col, rel } from "@rebasepro/server/schema";
 import { customer } from "./customer";
 
-// ⚠ Not reproduced exactly by `rebase db push` — read before pushing:
-//   - "birth_date" is timestamp without time zone, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
-//   - "hire_date" is timestamp without time zone, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
 export const employee = defineTable("employee", {
     columns: {
         employeeId: col.integer().primaryKey(),

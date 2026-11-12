@@ -2,8 +2,6 @@ import { defineTable, col, rel } from "@rebasepro/server/schema";
 import { changesets } from "./changesets";
 import { redactions } from "./redactions";
 
-// ⚠ Not reproduced exactly by `rebase db push` — read before pushing:
-//   - "timestamp" is timestamp without time zone, declared with `col.custom()`: Rebase serves it as the driver returns it, and `rebase db generate` / `db push` refuse it until the planner can plan a custom type (`custom-sql-type`).
 export const relations = defineTable("relations", {
     columns: {
         relationId: col.bigint().primaryKey(),

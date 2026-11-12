@@ -130,6 +130,9 @@ const builderFor = (type: PgType, column: string, uses: BuilderUses): string => 
         case "tsvector": return `${needs(uses, "customType")}({ dataType() { return 'tsvector'; } })(${name})`;
         // pg-core has no array *type*; `.array()` is a modifier on the element.
         case "array": return `${builderFor(type.of, column, uses)}.array()`;
+        // The type as the DDL names it, an array type (`inet[]`) included:
+        // drizzle-kit reads `dataType()` back as the column's type.
+        case "custom": return `${needs(uses, "customType")}({ dataType() { return ${quote(type.sqlType)}; } })(${name})`;
     }
 };
 
