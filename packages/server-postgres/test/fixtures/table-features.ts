@@ -122,7 +122,17 @@ export const bugs = defineTable("bugs", {
     rls: "admin-only"
 });
 
+/** A `varchar(n)` / `char(n)` length is `n`, whatever `.validate({ max })` says to the API. */
+export const handles = defineTable("handles", {
+    columns: {
+        id: col.uuid().primaryKey().defaultRandom(),
+        handle: col.varchar(40).notNull().validate({ max: 20 }),
+        country: col.char(2).validate({ min: 2, max: 3 })
+    },
+    rls: "admin-only"
+});
+
 /** Every table, in an order that declares a target before what points at it. */
 export const TABLE_FEATURES = [
-    people, counters, tallies, codes, initials, grades, days, switches, prices, tickets, slugs, pairs, keyed, lists, tasks, bugs
+    people, counters, tallies, codes, initials, grades, days, switches, prices, tickets, slugs, pairs, keyed, lists, tasks, bugs, handles
 ];

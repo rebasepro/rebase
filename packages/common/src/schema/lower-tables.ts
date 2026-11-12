@@ -144,10 +144,6 @@ export const PENDING_TABLE_FEATURES = [
         description: "`rel.belongsTo(target, { constraint: false })` without `index: false`. A foreign-key index is planned only with its constraint; declare the index in `indexes` instead."
     },
     {
-        id: "varchar-validate-max",
-        description: "`.validate({ max })` on a `varchar`/`char` column that differs from its length. One number states both today."
-    },
-    {
         id: "index-without-reason",
         description: "An entry of `indexes` without a `reason`. The planner refuses an index nobody can justify."
     },
@@ -1011,10 +1007,10 @@ function lowerStringColumn(
             break;
         case "varchar":
         case "char":
-            // One number is both the column's length and the API's `max`; 255
-            // is what the planner gives a `varchar` that states none.
+            // The column's length is the builder's `n`, which the planner
+            // reads off the definition. `.validate({ max })` is the API's own
+            // rule and is kept as written; without one, the API checks `n`.
             property.columnType = type.kind;
-            if (rules?.max !== undefined && rules.max !== type.length) pending(at, "varchar-validate-max");
             if (rules?.max === undefined && type.length !== 255) rules = { ...rules, max: type.length };
             break;
         case "enum":

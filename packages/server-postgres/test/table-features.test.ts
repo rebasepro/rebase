@@ -29,7 +29,7 @@ import { readCatalogueSchema } from "../src/schema/catalogue-schema";
 import { parsePropertyFromServer, serializePropertyToServer } from "../src/data-transformer";
 import { drizzle } from "drizzle-orm/pglite";
 import {
-    TABLE_FEATURES, bugs, codes, counters, days, grades, initials, keyed, lists, pairs, people, prices, slugs, switches, tallies, tasks, tickets
+    TABLE_FEATURES, bugs, codes, counters, days, grades, handles, initials, keyed, lists, pairs, people, prices, slugs, switches, tallies, tasks, tickets
 } from "./fixtures/table-features";
 
 const PACKAGE_ROOT = path.resolve(__dirname, "..");
@@ -415,5 +415,19 @@ describe("table features: a shared enum type, `col.enum(values, { name })`", () 
             rls: "admin-only"
         });
         expect(() => planOf([tasks, other])).toThrow(/Columns sharing a named enum type must list the same values/);
+    });
+});
+
+describe("table features: a varchar/char length is the builder's `n`, not `.validate({ max })`", () => {
+    it("plans and renders the declared length, and lowers `max` as the API's rule", () => {
+        const plan = planOf([handles]);
+        expect(columnOf(plan, "handles", "handle").type).toEqual({ kind: "varchar", length: 40 });
+        expect(columnOf(plan, "handles", "country").type).toEqual({ kind: "char", length: 2 });
+        expect(ddlLine(ddlOf([handles]), "handle")).toBe("\"handle\" VARCHAR(40) NOT NULL,");
+        expect(ddlLine(ddlOf([handles]), "country")).toBe("\"country\" CHAR(2)");
+        expect(drizzleLine(drizzleOf([handles]), "handle")).toBe("handle: varchar(\"handle\", { length: 40 }).notNull(),");
+        const [collection] = lowered([handles]);
+        expect(collection.properties.handle).toMatchObject({ validation: { max: 20 } });
+        expect(collection.properties.country).toMatchObject({ validation: { min: 2, max: 3 } });
     });
 });
