@@ -14,7 +14,7 @@ const getRelationId = (val: unknown): string | number | undefined => {
 };
 
 async function updateCustomerMetrics(customerId: string | number, context: HookContext) {
-    const { data: customerOrders } = await context.data.collection("orders").find({
+    const { data: customerOrders } = await context.data.table("orders").find({
         where: {
             customer: ["==", customerId],
             status: ["!=", "cancelled"] // Ignore cancelled orders
@@ -30,7 +30,7 @@ async function updateCustomerMetrics(customerId: string | number, context: HookC
         return sum;
     }, 0);
 
-    await context.data.collection("customers").update(customerId, {
+    await context.data.table("customers").update(customerId, {
         total_orders: totalOrders,
         lifetime_value: lifetimeValue,
         is_vip: lifetimeValue >= 1000 // VIP threshold

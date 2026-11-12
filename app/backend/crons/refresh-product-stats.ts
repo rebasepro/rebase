@@ -6,7 +6,7 @@ export default defineCron({
     description: "Counts active products and logs the total — demo/dogfood job.",
 
     async handler({ rebase, log }) {
-        const { meta } = await rebase.dataAsAdmin.collection("products").find({ limit: 1 });
+        const { meta } = await rebase.dataAsAdmin.table("products").find({ limit: 1 });
         log(`products total: ${meta.total}`);
         return { total: meta.total };
     },

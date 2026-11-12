@@ -20,20 +20,20 @@ const getRelationId = (val: unknown): string | number | undefined => {
 };
 
 async function updateOrderTotals(orderId: string | number, context: HookContext) {
-    const { data: items } = await context.data.collection("order_items").find({
+    const { data: items } = await context.data.table("order_items").find({
         where: { order: ["==", orderId] }
     });
 
     const subtotal = items.reduce((sum: number, item) => sum + Number(item.line_total ?? 0), 0);
 
-    const order = await context.data.collection("orders").findById(orderId);
+    const order = await context.data.table("orders").findById(orderId);
     if (order) {
         const tax = Number(order.tax_amount ?? 0);
         const shipping = Number(order.shipping_cost ?? 0);
         const discount = Number(order.discount_amount ?? 0);
         const total = subtotal + tax + shipping - discount;
 
-        await context.data.collection("orders").update(orderId, {
+        await context.data.table("orders").update(orderId, {
             subtotal,
             total
         });
@@ -66,7 +66,7 @@ export const orderItems = defineTable("order_items", {
             const productId = getRelationId(row.productId);
             // 1. Resolve and entity product info if missing
             if (productId && (!row.product_name || !row.sku || row.unit_price === undefined || row.unit_price === null)) {
-                const product = await context.data.collection<ProductValues>("products").findById(productId);
+                const product = await context.data.table<ProductValues>("products").findById(productId);
                 if (product) {
                     if (!row.product_name) values.product_name = product.name;
                     if (!row.sku) values.sku = product.sku;
