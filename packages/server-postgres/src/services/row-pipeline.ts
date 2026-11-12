@@ -1,6 +1,6 @@
-import { CollectionConfig, INCLUDE_COUNT_KEY, JUNCTION_PIVOT_KEY, Property, ResolvedRelation, isManyToMany, type ColumnDescriptor, type ResolvedVia } from "@rebasepro/types";
-import { canReadField, effectiveAccess, resolveCollectionRelations, findRelation, createRelationRefWithData, fieldKeyForColumn, restCodecOf } from "@rebasepro/common";
-import type { RelationDescriptor } from "@rebasepro/types";
+import { CollectionConfig, INCLUDE_COUNT_KEY, JUNCTION_PIVOT_KEY, ResolvedRelation, isManyToMany, type ColumnDescriptor, type ResolvedVia } from "@rebasepro/types";
+import { canReadColumn, hasColumnAccessRules, restrictedKeys, resolveCollectionRelations, findRelation, createRelationRefWithData, restCodecOf } from "@rebasepro/common";
+import type { RelationDescriptor, TableDescriptor } from "@rebasepro/types";
 import { currentFieldViewer } from "./field-viewer";
 import { normalizeDbValues } from "../data-transformer";
 import { deriveRowAddress } from "./collection-helpers";
@@ -127,15 +127,12 @@ type RestKeyStep = { relation: ResolvedRelation } | ((value: unknown) => unknown
 
 /**
  * What every row of a collection shares, worked out once rather than per row
- * and per column: what each key renders as, and which properties carry a read
- * rule for {@link stripUnreadable} to judge. Keyed by the collection object,
+ * and per column: what each key renders as. Keyed by the collection object,
  * as `resolveCollectionRelations` caches its relations.
  */
 interface RestRowPlan {
     /** Filled as keys are first seen: a row has the keys its read selected. */
     steps: Map<string, RestKeyStep>;
-    /** The properties a caller may be refused, with their keys. Usually none. */
-    restricted: [string, Property][];
 }
 
 const restRowPlans = new WeakMap<CollectionConfig, RestRowPlan>();
@@ -143,11 +140,7 @@ const restRowPlans = new WeakMap<CollectionConfig, RestRowPlan>();
 function restRowPlan(collection: CollectionConfig): RestRowPlan {
     let plan = restRowPlans.get(collection);
     if (!plan) {
-        const properties = (collection.properties ?? {}) as Record<string, Property>;
-        plan = {
-            steps: new Map(),
-            restricted: Object.entries(properties).filter(([, property]) => effectiveAccess(property) !== undefined)
-        };
+        plan = { steps: new Map() };
         restRowPlans.set(collection, plan);
     }
     return plan;
@@ -201,20 +194,42 @@ function toRestValues(
     return out;
 }
 
-/** Render one target row in the requested style. */
 /**
- * Drop every column this caller may not read.
+ * Whether the table restricts any column or relation, worked out once per
+ * descriptor: every read of every row runs through the strip, and the table
+ * with no rules — almost all of them — has to cost one map lookup.
+ */
+const tablesWithRules = new WeakMap<TableDescriptor, boolean>();
+
+function restrictsAnything(table: TableDescriptor): boolean {
+    let restricts = tablesWithRules.get(table);
+    if (restricts === undefined) {
+        restricts = hasColumnAccessRules(table);
+        tablesWithRules.set(table, restricts);
+    }
+    return restricts;
+}
+
+/** The name a `_matches` entry reports: the entry itself, or its `field`. */
+function matchedField(match: unknown): string {
+    if (typeof match === "string") return match;
+    if (typeof match === "object" && match !== null && "field" in match) return String(match.field);
+    return String(match);
+}
+
+/**
+ * Drop every column this caller may not read, as the table's descriptor says.
  *
  * Password hashes and verification tokens have to be readable server-side but
  * must never reach a client — and "never" has to mean every exit from this
  * pipeline, including relation targets, or a secret leaks through whichever
- * path was overlooked. Keyed by both the property name and its column name,
- * since a row can arrive keyed either way depending on the caller.
+ * path was overlooked. Keyed by both the column key and its SQL name, since a
+ * row can arrive keyed either way depending on the caller.
  *
- * `excludeFromApi` is the case with no roles in it: `effectiveAccess` expands
- * the flag to `read: []`, which no caller satisfies, so the flag needs no branch
- * of its own here and no longer has one. `access.read: ["hr"]` is the same walk
- * asking a different question of {@link currentFieldViewer}.
+ * `.private()` is the rule no caller satisfies (`read: []`), so it needs no
+ * branch of its own; `.access({ read: ["hr"] })` is the same question asked of
+ * {@link currentFieldViewer}. The names are common's `restrictedKeys`, the one
+ * answer every enforcement point reads.
  *
  * The field is **deleted**, never nulled. A withheld value that arrives as
  * `null` is indistinguishable from a stored `null`, which turns a permission
@@ -222,10 +237,9 @@ function toRestValues(
  * an `update` that echoes the row back overwrite the real value with the null it
  * was handed.
  *
- * A withheld to-one relation takes its foreign key with it. `bandId: 7` names
- * the salary band exactly as `band: { id: 7 }` does, and the row carries the
- * column beside the relation — so withholding only the relation withheld
- * nothing.
+ * A withheld relation (`rel.*(…, { access })`, `{ private: true }`) is withheld
+ * whole, and a withheld `belongsTo` takes its foreign key with it: `bandId: 7`
+ * names the salary band exactly as `band: { id: 7 }` does.
  *
  * `_matches` is filtered rather than deleted: it is the list of fields a text
  * search hit, and a field the caller cannot read must not appear in it even
@@ -233,87 +247,40 @@ function toRestValues(
  */
 export function stripUnreadable(
     row: Record<string, unknown>,
-    collection: CollectionConfig
+    table: TableDescriptor
 ): Record<string, unknown> {
-    if (!collection.properties) return row;
-    // Only a property with a read rule can be withheld; most collections have none.
-    const { restricted } = restRowPlan(collection);
-    if (restricted.length === 0) return row;
+    if (!restrictsAnything(table)) return row;
 
-    const viewer = currentFieldViewer();
-    const hidden = new Set<string>();
-    const hide = (name: string) => {
-        hidden.add(name);
-        delete row[name];
-    };
-    // Resolved only when a withheld property is a relation, which is rare: this
-    // runs on every row of every read.
-    let relations: ReturnType<typeof resolveCollectionRelations> | undefined;
-
-    for (const [key, property] of restricted) {
-        if (canReadField(property, viewer)) continue;
-        hide(key);
-        if (property.columnName) hide(property.columnName);
-        if (property.type === "relation") {
-            relations ??= resolveCollectionRelations(collection);
-            const relation = findRelation(relations, key);
-            if (relation?.kind === "belongsTo") {
-                hide(fieldKeyForColumn(collection, relation.localKey));
-                hide(relation.localKey);
-            }
-        }
-    }
+    const { refused: hidden } = restrictedKeys(table, currentFieldViewer(), "read");
+    if (hidden.size === 0) return row;
+    for (const name of hidden) delete row[name];
 
     // A relation withheld from this viewer is withheld whole: its total under
     // `_count` says as much about it as its rows would.
     const counts = row[INCLUDE_COUNT_KEY];
-    if (hidden.size > 0 && counts && typeof counts === "object") {
-        for (const name of hidden) delete (counts as Record<string, unknown>)[name];
-        if (Object.keys(counts).length === 0) delete row[INCLUDE_COUNT_KEY];
+    if (counts && typeof counts === "object") {
+        const remaining = Object.fromEntries(Object.entries(counts).filter(([name]) => !hidden.has(name)));
+        if (Object.keys(remaining).length === 0) delete row[INCLUDE_COUNT_KEY];
+        else row[INCLUDE_COUNT_KEY] = remaining;
     }
-    if (hidden.size > 0 && Array.isArray(row._matches)) {
-        row._matches = (row._matches as unknown[]).filter(
-            match => !hidden.has(typeof match === "string" ? match : String((match as { field?: unknown })?.field))
-        );
+    if (Array.isArray(row._matches)) {
+        row._matches = row._matches.filter((match: unknown) => !hidden.has(matchedField(match)));
     }
     return row;
 }
 
 /**
- * May the current caller be handed the rows of this relation of `collection`?
+ * May the current caller be handed the rows of this relation?
  *
- * A relation property's value *is* its related rows, so a property the caller
- * may not read withholds the relation whole: an `include` neither loads it nor
- * counts it. {@link stripUnreadable} cannot be the only guard here, because the
- * REST rows are stripped before the include loader runs (`toRestRow`, then
- * `loadIncludes`) — the loader wrote the rows back onto the key the strip had
- * just deleted, and `_count` beside them.
- *
- * Judged by every `type: "relation"` property that names this relation: by its
- * own key (the include key of an inline relation), or by the `relationName` it
- * addresses in the collection's `relations` array. A relation declared only in
- * `relations` has no property, so no field rule, and stays readable.
+ * A relation's value *is* its related rows, so a relation the caller may not
+ * read (`rel.*(…, { access: { read } })`, `{ private: true }`) is withheld
+ * whole: an `include` neither loads it nor counts it. {@link stripUnreadable}
+ * cannot be the only guard here, because the REST rows are stripped before the
+ * include loader runs (`toRestRow`, then `loadIncludes`) — the loader wrote the
+ * rows back onto the key the strip had just deleted, and `_count` beside them.
  */
-export function canReadRelation(
-    collection: CollectionConfig,
-    key: string,
-    relation: RelationDescriptor
-): boolean {
-    const properties = collection.properties as Record<string, Property> | undefined;
-    if (!properties) return true;
-
-    const viewer = currentFieldViewer();
-    if (!canReadField(properties[key], viewer)) return false;
-
-    let relations: ReturnType<typeof resolveCollectionRelations> | undefined;
-    for (const [name, property] of Object.entries(properties)) {
-        if (property?.type !== "relation" || canReadField(property, viewer)) continue;
-        relations ??= resolveCollectionRelations(collection);
-        if (findRelation(relations, name)?.relationName === relation.name) return false;
-        const addressed = property.relation?.relationName;
-        if (addressed && findRelation(relations, addressed)?.relationName === relation.name) return false;
-    }
-    return true;
+export function canReadRelation(relation: RelationDescriptor): boolean {
+    return canReadColumn(relation, currentFieldViewer());
 }
 
 function renderTarget(
@@ -325,7 +292,8 @@ function renderTarget(
     if (style === "inline") {
         // The target's columns, and only those: its address is the consumer's
         // to derive, and merging one in overwrites a real `id` column.
-        return stripUnreadable(toRestValues({ ...targetRow }, registry.requireTable(targetCollection.slug)), targetCollection);
+        const target = registry.requireTable(targetCollection.slug);
+        return stripUnreadable(toRestValues({ ...targetRow }, target), target.descriptor);
     }
 
     const address = relationTargetAddress(targetRow, targetCollection, registry);
@@ -341,7 +309,7 @@ function renderTarget(
         // and every WebSocket fetch of anything with a relation to users.
         values: stripUnreadable(
             normalizeDbValues(targetRow, registry.requireTable(targetCollection.slug)) as Record<string, unknown>,
-            targetCollection
+            registry.requireTable(targetCollection.slug).descriptor
         )
     });
 }
@@ -402,7 +370,7 @@ export function toFlatRow(
         }
     }
 
-    return stripUnreadable(normalized, collection);
+    return stripUnreadable(normalized, registry.requireTable(collection.slug).descriptor);
 }
 
 /**
@@ -457,5 +425,5 @@ export function toRestRow(
         }
     }
 
-    return stripUnreadable(flat, collection);
+    return stripUnreadable(flat, table.descriptor);
 }

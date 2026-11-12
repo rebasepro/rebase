@@ -117,9 +117,9 @@ export function numericAggregateAliases(
  * withheld field from a row; a request that *names* one as what to read or
  * sort by is refused, naming it — field names are public, values are not.
  *
- * Except an `excludeFromApi` relation's name, which is not public. Its callers
- * answer it as a relation the collection does not declare before they get
- * here, so reaching this with one is a missed door — refused all the same.
+ * Except a private relation's name (`{ private: true }`), which is not public.
+ * Its callers answer it as a relation the table does not declare before they
+ * get here, so reaching this with one is a missed door — refused all the same.
  */
 function assertRelationReadable(
     collection: CollectionConfig,
@@ -127,9 +127,9 @@ function assertRelationReadable(
     relation: RelationDescriptor,
     use: string
 ): void {
-    if (canReadRelation(collection, key, relation)) return;
+    if (canReadRelation(relation)) return;
     throw ApiError.badRequest(
-        `'${key}' is not readable on '${collection.slug}' with your roles, so it cannot be used in ${use}.`,
+        `'${key}' is not readable on table '${collection.slug}' with your roles, so it cannot be used in ${use}.`,
         "FIELD_NOT_READABLE",
         {
             collection: collection.slug,
@@ -905,7 +905,7 @@ target });
         // door reaches (REST, `POST …/query`, the in-process SDK, socket fetches
         // and subscriptions), and at every level of a nested include. The REST
         // rows were stripped before this runs, so the strip cannot catch it.
-        const levels = requested.filter(({ key, relation }) => canReadRelation(collection, key, relation));
+        const levels = requested.filter(({ relation }) => canReadRelation(relation));
 
         for (const { key, node, relation } of levels) {
             // The target's lowered collection, looked up by the relation's
@@ -1579,7 +1579,7 @@ target });
 
                 // Again, now the relations are on the row: a relation property
                 // the caller may not read is withheld like any other field.
-                return stripUnreadable(flatRow, collection);
+                return stripUnreadable(flatRow, this.registry.requireTable(collection.slug).descriptor);
             }
         }
 
@@ -1606,7 +1606,7 @@ target });
         // The primary path strips inside `toFlatRow`; this one parses the row
         // itself, so it strips itself. Without it a fetch that fell back served
         // every declared column, `excludeFromApi` ones included.
-        stripUnreadable(values, collection);
+        stripUnreadable(values, this.registry.requireTable(collection.slug).descriptor);
 
         return {
             ...values,
@@ -1735,7 +1735,7 @@ target });
         // the pipeline and it is what the socket's `FETCH_COLLECTION`, a text
         // search and the MCP tools are served from. Without it every one of
         // them handed a plain user each row's password hash.
-        for (const row of values) stripUnreadable(row, collection);
+        for (const row of values) stripUnreadable(row, this.registry.requireTable(collection.slug).descriptor);
 
         // Columns only — the address is the consumer's to derive.
         return values;

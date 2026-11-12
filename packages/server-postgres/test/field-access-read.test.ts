@@ -59,6 +59,8 @@ function makeRegistry(): PostgresTableRegistry {
 }
 
 const registry = makeRegistry();
+/** The table descriptor the strip reads, for a registered fixture. */
+const described = (collection: CollectionConfig) => registry.requireTable(collection.slug).descriptor;
 const row = () => ({ id: 1, name: "Ada", salary: 90_000, rating: 5, passwordHash: "salt:hash" });
 
 describe("the REST row", () => {
@@ -140,7 +142,7 @@ describe("a relation target", () => {
 describe("the column-name spelling", () => {
     it("is deleted as well as the property key", () => {
         const raw = { id: 1, password_hash: "salt:hash", name: "Ada" };
-        const served = withFieldViewer({ roles: ["admin"] }, () => stripUnreadable(raw, staff));
+        const served = withFieldViewer({ roles: ["admin"] }, () => stripUnreadable(raw, described(staff)));
         expect(served).not.toHaveProperty("password_hash");
     });
 });
@@ -162,19 +164,19 @@ describe("`_matches`, the list of fields a search hit", () => {
 
     it("loses the entries a caller cannot read, and keeps the rest", () => {
         const raw = { id: 1, name: "Ada", salary: 1, _matches: matches() };
-        const served = withFieldViewer({ roles: ["staff"] }, () => stripUnreadable(raw, staff));
+        const served = withFieldViewer({ roles: ["staff"] }, () => stripUnreadable(raw, described(staff)));
         expect(served._matches).toEqual([{ field: "name", snippet: "<b>Ada</b>" }]);
     });
 
     it("is untouched for a caller who can read them all", () => {
         const raw = { id: 1, name: "Ada", salary: 1, _matches: matches() };
-        const served = withFieldViewer({ roles: ["hr"] }, () => stripUnreadable(raw, staff));
+        const served = withFieldViewer({ roles: ["hr"] }, () => stripUnreadable(raw, described(staff)));
         expect(served._matches).toEqual(matches());
     });
 
     it("handles the bare-name shape too", () => {
         const raw = { id: 1, name: "Ada", salary: 1, _matches: ["name", "salary"] };
-        const served = withFieldViewer({ roles: ["staff"] }, () => stripUnreadable(raw, staff));
+        const served = withFieldViewer({ roles: ["staff"] }, () => stripUnreadable(raw, described(staff)));
         expect(served._matches).toEqual(["name"]);
     });
 });
@@ -185,32 +187,41 @@ describe("`_count`, the totals of counted relations", () => {
      * the rows. A relation property the caller may not read is withheld whole,
      * and its total says as much about it as its rows: it goes with them.
      */
+    const reviews: CollectionConfig = {
+        name: "Reviews",
+        slug: "reviews",
+        properties: { id: { name: "Id", type: "number", isId: "increment" } }
+    };
     const team: CollectionConfig = {
         name: "Teams",
         slug: "teams",
         properties: {
             id: { name: "Id", type: "number", isId: "increment" },
-            members: { name: "Members", type: "relation" },
-            reviews: { name: "Reviews", type: "relation", access: { read: ["hr"] } }
+            members: { name: "Members", type: "relation", relation: { kind: "hasMany", target: () => staff, foreignKeyOnTarget: "team_id" } },
+            reviews: {
+                name: "Reviews", type: "relation", access: { read: ["hr"] },
+                relation: { kind: "hasMany", target: () => reviews, foreignKeyOnTarget: "team_id" }
+            }
         }
     };
+    registry.registerMultiple([reviews, team]);
 
     it("loses the total of a relation the caller cannot read, and keeps the rest", () => {
         const raw = { id: 1, members: [], reviews: [], _count: { members: 12, reviews: 3 } };
-        const served = withFieldViewer({ roles: ["staff"] }, () => stripUnreadable(raw, team));
+        const served = withFieldViewer({ roles: ["staff"] }, () => stripUnreadable(raw, described(team)));
         expect(served).not.toHaveProperty("reviews");
         expect(served._count).toEqual({ members: 12 });
     });
 
     it("goes altogether when every counted relation is withheld", () => {
         const raw = { id: 1, reviews: [], _count: { reviews: 3 } };
-        const served = withFieldViewer({ roles: ["staff"] }, () => stripUnreadable(raw, team));
+        const served = withFieldViewer({ roles: ["staff"] }, () => stripUnreadable(raw, described(team)));
         expect(served).not.toHaveProperty("_count");
     });
 
     it("is untouched for a caller who can read them all", () => {
         const raw = { id: 1, members: [], reviews: [], _count: { members: 12, reviews: 3 } };
-        const served = withFieldViewer({ roles: ["hr"] }, () => stripUnreadable(raw, team));
+        const served = withFieldViewer({ roles: ["hr"] }, () => stripUnreadable(raw, described(team)));
         expect(served._count).toEqual({ members: 12, reviews: 3 });
     });
 });
@@ -286,7 +297,7 @@ describe("a withheld to-one relation", () => {
     it("takes its foreign key with it, under the wire name and the column name", () => {
         const rest = withFieldViewer({ roles: ["staff"] }, () => toRestRow(person(), people, registry));
         expect(rest).toEqual({ id: 1, name: "Ann" });
-        const raw = withFieldViewer({ roles: ["staff"] }, () => stripUnreadable({ id: 1, band_id: 7 }, people));
+        const raw = withFieldViewer({ roles: ["staff"] }, () => stripUnreadable({ id: 1, band_id: 7 }, described(people)));
         expect(raw).toEqual({ id: 1 });
     });
 
@@ -299,69 +310,35 @@ describe("a withheld to-one relation", () => {
 describe("a relation an include may load (`canReadRelation`)", () => {
     /**
      * The include loader asks this before it loads a relation, because the
-     * REST rows are stripped before it runs: a withheld relation property it
-     * loaded anyway was written back onto the stripped row, `_count` beside it
-     * (pinned end to end in `test/e2e/include-field-access-e2e.test.ts`). Here,
-     * the three ways a property can name the relation it withholds.
+     * REST rows are stripped before it runs: a withheld relation it loaded
+     * anyway was written back onto the stripped row, `_count` beside it
+     * (pinned end to end in `test/e2e/include-field-access-e2e.test.ts`).
+     *
+     * The rule is the relation's own (`rel.*(…, { access })`, `{ private:
+     * true }`). The legacy model had three ways for a *property* to name the
+     * relation it withheld; a table declares the rule on the relation.
      */
-    const tags: CollectionConfig = {
-        name: "Tags", slug: "tags",
-        properties: { id: { name: "Id", type: "number", isId: "increment" } }
-    };
+    const withheld = { ...manyToMany("labels", "tags", { table: "projects_tags", sourceKey: "project_id", targetKey: "tag_id" }), access: { read: ["hr"] } };
+    const manager = { ...belongsTo("manager", "staff", "manager_id", "managerId"), access: { read: ["hr"] } };
+    const sponsor = belongsTo("sponsor", "staff", "sponsor_id", "sponsorId");
+    const hidden = { ...belongsTo("auditor", "staff", "auditor_id", "auditorId"), private: true as const };
 
-    const projects: CollectionConfig = {
-        name: "Projects",
-        slug: "projects",
-        properties: {
-            id: { name: "Id", type: "number", isId: "increment" },
-            // Inline: the include key is the property key.
-            labels: {
-                name: "Labels", type: "relation", access: { read: ["hr"] },
-                relation: { kind: "manyToMany", target: () => tags }
-            },
-            // Addresses an entry of `relations` under a name of its own.
-            owner: {
-                name: "Owner", type: "relation", access: { read: ["hr"] },
-                relation: { kind: "belongsTo", relationName: "manager", target: () => staff, localKey: "manager_id" }
-            },
-            // Named exactly as the `relations` entry it stands for.
-            reviewer: { name: "Reviewer", type: "relation", access: { read: ["hr"] } }
-        },
-        relations: [
-            { kind: "belongsTo", relationName: "manager", target: () => staff, localKey: "manager_id" },
-            { kind: "belongsTo", relationName: "reviewer", target: () => staff, localKey: "reviewer_id" },
-            // No property at all: a record tab, with no field rule to apply.
-            { kind: "belongsTo", relationName: "sponsor", target: () => staff, localKey: "sponsor_id" }
-        ]
-    };
+    const readable = (relation: Parameters<typeof canReadRelation>[0], roles: string[]) =>
+        withFieldViewer({ roles }, () => canReadRelation(relation));
 
-    // The relations as compiled descriptors, written out: the lift refuses
-    // `owner` (a property naming another relation), which is what this case
-    // pins on the legacy side.
-    const relations = new Map([
-        ["labels", manyToMany("labels", "tags", { table: "projects_tags", sourceKey: "project_id", targetKey: "tag_id" })],
-        ["manager", belongsTo("manager", "staff", "manager_id", "managerId")],
-        ["reviewer", belongsTo("reviewer", "staff", "reviewer_id", "reviewerId")],
-        ["sponsor", belongsTo("sponsor", "staff", "sponsor_id", "sponsorId")]
-    ]);
-    const relationAt = (key: string) => {
-        const relation = relations.get(key);
-        if (!relation) throw new Error(`projects declares no relation '${key}'`);
-        return relation;
-    };
-    const readable = (key: string, roles: string[]) =>
-        withFieldViewer({ roles }, () => canReadRelation(projects, key, relationAt(key)));
-
-    it.each(["labels", "manager", "reviewer"])("withholds '%s' from a caller without the role", (key) => {
-        expect(relations.get(key)).toBeDefined();
-        expect(readable(key, ["staff"])).toBe(false);
+    it.each([withheld, manager])("withholds '$name' from a caller without the role", (relation) => {
+        expect(readable(relation, ["staff"])).toBe(false);
     });
 
-    it.each(["labels", "manager", "reviewer", "sponsor"])("serves '%s' to a caller holding it", (key) => {
-        expect(readable(key, ["hr"])).toBe(true);
+    it.each([withheld, manager, sponsor])("serves '$name' to a caller holding it", (relation) => {
+        expect(readable(relation, ["hr"])).toBe(true);
     });
 
-    it("serves a relation no property declares", () => {
-        expect(readable("sponsor", ["staff"])).toBe(true);
+    it("serves a relation with no rule", () => {
+        expect(readable(sponsor, ["staff"])).toBe(true);
+    });
+
+    it("never serves a private relation, the admin included", () => {
+        expect(readable(hidden, ["admin"])).toBe(false);
     });
 });

@@ -435,7 +435,7 @@ export class RelationService {
             // The target's OWN exclusions, applied to the target's own columns.
             // WebSocket fetches and every realtime frame come through here, so
             // a leak here is invisible from the REST surface people test.
-            stripUnreadable(values, targetCollection);
+            stripUnreadable(values, this.registry.requireTable(targetCollection.slug).descriptor);
         }
 
         return {
