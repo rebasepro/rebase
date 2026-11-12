@@ -255,9 +255,10 @@ function freezeRecord(value: unknown): void {
  * });
  * ```
  *
- * A table whose `slug` differs from its name states it as the second type
- * argument: `customizeTable<typeof posts, "blog_posts">("blog_posts", …)`.
- * Without type arguments the options are accepted loosely typed.
+ * The slug is read from the table's type: for
+ * `defineTable("blog_posts", { slug: "posts", … })` the first argument is
+ * `"posts"`, still with the one type argument. Without a type argument the
+ * slug is any string and the options are accepted loosely typed.
  *
  * The result is frozen; pass it to `<RebaseCMS tableCustomizations>`. Unknown
  * options, legacy `admin` names and components that are not values throw here,
@@ -265,10 +266,10 @@ function freezeRecord(value: unknown): void {
  *
  * @group Tables
  */
-export function customizeTable<
-    T extends CustomizableTable | undefined = undefined,
-    const S extends string = TableSlug<T>
->(slug: S, options: NoInfer<TableCustomizationOptions<T>>): TableCustomization<T> {
+export function customizeTable<T extends CustomizableTable | undefined = undefined>(
+    slug: TableSlug<T>,
+    options: NoInfer<TableCustomizationOptions<T>>
+): TableCustomization<T> {
     if (typeof slug !== "string" || slug.length === 0) {
         throw new Error("`customizeTable(slug, options)` needs the slug of the table it customizes as its first argument.");
     }

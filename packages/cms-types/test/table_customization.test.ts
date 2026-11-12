@@ -174,7 +174,10 @@ const badSection: TableCustomizationOptions<Posts> = { form: { sections: [{ key:
 // @ts-expect-error a sort key is checked too
 const badSort: TableCustomizationOptions<Posts> = { sort: ["published_at", "desc"] };
 
-// @ts-expect-error a relation's preview fields are the target's fields
+// A relation's target is a `TableThunk` (`() => void`) — what lets two tables
+// point at each other without an annotation — so its type is not known here:
+// a relation's preview fields are any strings. (Before relation thunks became
+// `TableThunk`, this line was a compile error.)
 const badRelationPreview: TableCustomizationOptions<Posts> = { fields: { author: { previewFields: ["title"] } } };
 
 // ── Enum labels are keyed by the column's values ─────────────────────────────

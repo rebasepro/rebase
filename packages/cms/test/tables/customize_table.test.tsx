@@ -114,9 +114,13 @@ describe("customizeTable", () => {
     it("is typed against the table's slug when given the table", () => {
         // @ts-expect-error the first argument is the table's slug, "posts"
         expect(() => customizeTable<typeof posts>("post", {})).not.toThrow();
-        // A table defined with its own `slug` names it as the second type argument.
-        expect(customizeTable<typeof blogPosts, "blog_posts">("blog_posts", { fields: { title: { multiline: true } } }).table)
-            .toBe("blog_posts");
+        // A table defined with its own `slug` is matched by that slug, read from its type.
+        const blogCms = customizeTable<typeof blogPosts>("blog_posts", { fields: { title: { multiline: true } } });
+        expect(blogCms.table).toBe("blog_posts");
+        const slugIsLiteral: "blog_posts" = blogCms.table;
+        void slugIsLiteral;
+        // @ts-expect-error the slug is "blog_posts", not the name the table was defined under
+        expect(() => customizeTable<typeof blogPosts>("blog_posts_table", {})).not.toThrow();
         // Without type arguments, any slug and any field: the zero-ceremony form.
         const loose = customizeTable("anything", { fields: { whatever: { hidden: true } } });
         expect(loose.table).toBe("anything");

@@ -1,5 +1,5 @@
 import { col, defineAuthTable, defineTable, defineView, json, rel } from "../../src/schema";
-import type { ColumnKeyOf, InferInsert, InferRow, InferUpdate, JsonGeoPoint, RelationKeyOf } from "../../src/schema";
+import type { ColumnKeyOf, InferInsert, InferRow, InferUpdate, JsonGeoPoint, RelationKeyOf, AnyTableDef, TableSlugOf, TableDef } from "../../src/schema";
 
 /**
  * The type-level contract of the schema builders.
@@ -266,6 +266,36 @@ function keyTypes(): void {
     assertType<Equal<InferInsert<typeof posts>["status"], "draft" | "needs_review" | "published" | "archived" | undefined>>();
 }
 
+// ── The slug is part of the type ─────────────────────────────────────────────
+
+const blogPosts = defineTable("blog_posts", {
+    slug: "posts",
+    columns: { id: col.uuid().primaryKey() },
+    rls: "admin-only"
+});
+const people = defineAuthTable("app_users", { slug: "people", columns: { id: col.uuid().primaryKey() }, rls: "admin-only" });
+const totals = defineView("order_totals", { slug: "totals", query: "select 1 as id", columns: { id: col.integer().primaryKey() } });
+const plainView = defineView("plain_view", { query: "select 1 as id", columns: { id: col.integer().primaryKey() } });
+
+function slugTypes(): void {
+    // A slug that differs from the name is read from the type…
+    assertType<Equal<TableSlugOf<typeof blogPosts>, "posts">>();
+    assertType<Equal<typeof blogPosts["name"], "blog_posts">>();
+    assertType<Equal<TableSlugOf<typeof people>, "people">>();
+    assertType<Equal<TableSlugOf<typeof totals>, "totals">>();
+    // …and without one, the slug is the name.
+    assertType<Equal<TableSlugOf<typeof tags>, "tags">>();
+    assertType<Equal<TableSlugOf<typeof users>, "users">>();
+    assertType<Equal<TableSlugOf<typeof plainView>, "plain_view">>();
+    assertType<Equal<TableSlugOf<typeof posts>, "posts">>();
+    // Structurally: a `{ name, config }` without a slug, and a table typed loosely.
+    assertType<Equal<TableSlugOf<{ name: "x"; config: { columns: Record<never, never> } }>, "x">>();
+    assertType<Equal<TableSlugOf<TableDef>, string>>();
+    // A table with a literal slug is still any table.
+    const loose: AnyTableDef = blogPosts;
+    void loose;
+}
+
 // ── Views ────────────────────────────────────────────────────────────────────
 
 const published = defineView("published_posts", {
@@ -423,7 +453,7 @@ function hookTypes(): void {
     });
 }
 
-void [rowTypes, insertTypes, updateTypes, keyTypes, viewTypes, refusedTables, keyTypedOptions, kindRestrictedModifiers, relationOptions, hookTypes];
+void [slugTypes, rowTypes, insertTypes, updateTypes, keyTypes, viewTypes, refusedTables, keyTypedOptions, kindRestrictedModifiers, relationOptions, hookTypes];
 
 test("the typed examples build", () => {
     expect(posts.name).toBe("posts");

@@ -25,9 +25,17 @@ export const VIEW_BRAND = "rebase.view";
  *
  * @group Schema
  */
-export interface TableConfig<C extends ColumnsShape, R extends RelationsShape = Record<never, never>, USER extends User = User> {
-    /** The name in the API, the SDK and in scopes. The table's name when omitted. */
-    slug?: string;
+export interface TableConfig<
+    C extends ColumnsShape,
+    R extends RelationsShape = Record<never, never>,
+    USER extends User = User,
+    S extends string = string
+> {
+    /**
+     * The name in the API, the SDK and in scopes. The table's name when
+     * omitted. Captured as a literal type, so `TableSlugOf<typeof table>` reads it.
+     */
+    slug?: S;
     /** The SQL table name, when it is not the name the table is defined under. */
     table?: string;
     /** The Postgres schema. `public` when omitted. */
@@ -78,18 +86,23 @@ export interface TableConfig<C extends ColumnsShape, R extends RelationsShape = 
 /**
  * A table as authored: the result of `defineTable`.
  *
+ * `N` is the name it was defined under and `S` its slug — the `slug` it was
+ * given, or the name when it was given none — both as literal types, so a
+ * frontend holding only `typeof posts` knows the slug (`TableSlugOf`).
+ *
  * @group Schema
  */
 export interface TableDef<
     N extends string = string,
     C extends ColumnsShape = ColumnsShape,
-    R extends RelationsShape = RelationsShape
+    R extends RelationsShape = RelationsShape,
+    S extends string = N
 > {
     readonly brand: typeof TABLE_BRAND;
     /** The name it was defined under. */
     readonly name: N;
     /** What it was defined with, as written. */
-    readonly config: TableConfig<C, R>;
+    readonly config: TableConfig<C, R, User, S>;
     /** Present when defined with `defineAuthTable`. */
     readonly auth?: AuthTableOptions;
 }
@@ -177,8 +190,9 @@ function assertRlsDeclared(builder: string, name: string, config: object): void 
 export function defineTable<
     const N extends string,
     C extends ColumnsShape,
-    R extends RelationsShape = Record<never, never>
->(name: N, config: TableConfig<C, R>): TableDef<N, C, R> {
+    R extends RelationsShape = Record<never, never>,
+    const S extends string = N
+>(name: N, config: TableConfig<C, R, User, S>): TableDef<N, C, R, S> {
     assertTableShape("defineTable", name, config);
     assertRlsDeclared("defineTable", name, config);
     return { brand: TABLE_BRAND, name, config };
@@ -207,8 +221,12 @@ export interface AuthTableOptions {
  *
  * @group Schema
  */
-export interface AuthTableConfig<C extends ColumnsShape, R extends RelationsShape = Record<never, never>, USER extends User = User>
-    extends TableConfig<C, R, USER> {
+export interface AuthTableConfig<
+    C extends ColumnsShape,
+    R extends RelationsShape = Record<never, never>,
+    USER extends User = User,
+    S extends string = string
+> extends TableConfig<C, R, USER, S> {
     /** Roles, scopes, personal keys and the user-lifecycle hooks. */
     auth?: AuthTableOptions;
 }
@@ -226,8 +244,9 @@ export interface AuthTableConfig<C extends ColumnsShape, R extends RelationsShap
 export function defineAuthTable<
     const N extends string,
     C extends ColumnsShape,
-    R extends RelationsShape = Record<never, never>
->(name: N, config: AuthTableConfig<C, R>): TableDef<N, C, R> {
+    R extends RelationsShape = Record<never, never>,
+    const S extends string = N
+>(name: N, config: AuthTableConfig<C, R, User, S>): TableDef<N, C, R, S> {
     assertTableShape("defineAuthTable", name, config);
     assertRlsDeclared("defineAuthTable", name, config);
     const { auth, ...table } = config;
@@ -239,7 +258,12 @@ export function defineAuthTable<
  *
  * @group Schema
  */
-export interface ViewConfig<C extends ColumnsShape, R extends RelationsShape = Record<never, never>, USER extends User = User> {
+export interface ViewConfig<
+    C extends ColumnsShape,
+    R extends RelationsShape = Record<never, never>,
+    USER extends User = User,
+    S extends string = string
+> {
     /** The defining `SELECT`. */
     query: string;
     /**
@@ -251,8 +275,8 @@ export interface ViewConfig<C extends ColumnsShape, R extends RelationsShape = R
     roles?: readonly string[];
     /** The columns the query returns. `.primaryKey()` marks the ones that identify a row. */
     columns: C;
-    /** The name in the API. The view's name when omitted. */
-    slug?: string;
+    /** The name in the API. The view's name when omitted. Captured as a literal type, like a table's. */
+    slug?: S;
     /** The Postgres schema. `public` when omitted. */
     schema?: string;
     /** A non-default Postgres database. */
@@ -277,11 +301,14 @@ export interface ViewConfig<C extends ColumnsShape, R extends RelationsShape = R
 export interface ViewDef<
     N extends string = string,
     C extends ColumnsShape = ColumnsShape,
-    R extends RelationsShape = RelationsShape
+    R extends RelationsShape = RelationsShape,
+    S extends string = N
 > {
     readonly brand: typeof VIEW_BRAND;
+    /** The name it was defined under. */
     readonly name: N;
-    readonly config: ViewConfig<C, R>;
+    /** What it was defined with, as written. */
+    readonly config: ViewConfig<C, R, User, S>;
 }
 
 /**
@@ -296,8 +323,9 @@ export interface ViewDef<
 export function defineView<
     const N extends string,
     C extends ColumnsShape,
-    R extends RelationsShape = Record<never, never>
->(name: N, config: ViewConfig<C, R>): ViewDef<N, C, R> {
+    R extends RelationsShape = Record<never, never>,
+    const S extends string = N
+>(name: N, config: ViewConfig<C, R, User, S>): ViewDef<N, C, R, S> {
     assertTableShape("defineView", name, config);
     if (typeof config.query !== "string" || config.query.trim().length === 0) {
         throw new Error(`View "${name}" needs a \`query\`: the SELECT that defines it.`);
@@ -310,6 +338,28 @@ export function defineView<
     }
     return { brand: VIEW_BRAND, name, config };
 }
+
+/**
+ * The slug of a table or view, from its type: `TableSlugOf<typeof posts>`.
+ *
+ * The `slug` it was defined with, or the name it was defined under when it was
+ * given none — the table's API path, SDK accessor and what scopes name. Reads
+ * any `{ name, config: { slug? } }` structurally, so `import type { posts }`
+ * is enough; `string` for a table whose type is not literal.
+ *
+ * ```ts
+ * const posts = defineTable("blog_posts", { slug: "posts", … });
+ * type S = TableSlugOf<typeof posts>; // "posts"
+ * ```
+ *
+ * @group Schema
+ */
+export type TableSlugOf<T extends { readonly name: string }> =
+    T extends { readonly config: { readonly slug?: infer S } }
+        ? [Exclude<S, undefined>] extends [never]
+            ? T["name"]
+            : Exclude<S, undefined> extends string ? Exclude<S, undefined> : T["name"]
+        : T["name"];
 
 /**
  * A type compared member by member rather than through its type parameters.

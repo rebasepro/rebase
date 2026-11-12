@@ -49,6 +49,7 @@ import type {
     FilterPreset,
     FilterValues,
     InferRow,
+    TableSlugOf,
     InferUpdate,
     NumericColumnKind,
     OrderBySpec,
@@ -102,13 +103,13 @@ type ColumnsOf<T> = T extends CustomizableTable ? T["config"]["columns"] : Colum
 type RelationsOf<T> = T extends CustomizableTable ? NonNullable<T["config"]["relations"]> : RelationsShape;
 
 /**
- * The slug a customization of `T` is matched by: the name the table was
- * defined under, which is also its slug unless `defineTable` was given a
- * `slug`. Any string for the untyped form.
+ * The slug a customization of `T` is matched by: the `slug` the table was
+ * defined with, or the name it was defined under when it was given none — read
+ * from `typeof table` (`TableSlugOf`). Any string for the untyped form.
  *
  * @group Table customization
  */
-export type TableSlug<T> = T extends CustomizableTable ? T["name"] : string;
+export type TableSlug<T> = T extends CustomizableTable ? TableSlugOf<T> : string;
 
 /**
  * The column keys of `T`: the keys of its `columns`, which are the keys of
@@ -198,7 +199,13 @@ type TextColumnKeyOf<T> = T extends CustomizableTable
     ? { [K in TableColumnKey<T>]: KindOf<ColumnsOf<T>[K]> extends TextColumnKind ? K : never }[TableColumnKey<T>]
     : string;
 
-/** The target of a relation, when it is a table a customization can be typed against. */
+/**
+ * The target of a relation, when it is a table a customization can be typed
+ * against. A `rel.*` thunk is a `TableThunk` (`() => void`, so mutual relations
+ * need no annotation), which carries no target type: this is `undefined` for
+ * every relation `defineTable` builds, and a relation's options are typed
+ * loosely.
+ */
 type RelationTargetOf<Rel> = Rel extends { readonly target: () => infer Target }
     ? Target extends CustomizableTable ? Target : undefined
     : undefined;
@@ -975,7 +982,7 @@ export type TableCustomization<T extends CustomizableTable | undefined = undefin
     Readonly<TableCustomizationOptions<T, USER>> & {
         readonly brand: typeof TABLE_CUSTOMIZATION_BRAND;
         /** The slug of the table it applies to. */
-        readonly table: string;
+        readonly table: TableSlug<T>;
     };
 
 /**
