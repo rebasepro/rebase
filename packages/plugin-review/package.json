@@ -129,7 +129,8 @@
       "^react/jsx-runtime$": "<rootDir>/node_modules/react/jsx-runtime"
     },
     "testTimeout": 30000,
-    "transformIgnorePatterns": []
+    "transformIgnorePatterns": [],
+    "maxWorkers": 4
   },
   "files": [
     "dist"

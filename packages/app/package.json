@@ -161,6 +161,7 @@
     },
     "transformIgnorePatterns": [
       "node_modules/(?!.*(?:react-router|cookie-es|fractional-indexing))"
-    ]
+    ],
+    "maxWorkers": 4
   }
 }

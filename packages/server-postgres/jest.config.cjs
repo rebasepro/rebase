@@ -25,6 +25,13 @@
  * @type {import("jest").Config}
  */
 module.exports = {
+    // Two workers, each restarted once it holds 1.5 GB: the budget CI gives
+    // this suite (`test:unit:postgres`, verify.yml's unit-postgres job), as
+    // the default here too. Every worker keeps the PGlite and Postgres
+    // instances its files start; at jest's default of one worker per core a
+    // bare `pnpm test` exhausted a 32 GB machine. Explicit flags still win.
+    maxWorkers: 2,
+    workerIdleMemoryLimit: "1536MB",
     transform: {
         "^.+\\.tsx?$": "ts-jest"
     },

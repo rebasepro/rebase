@@ -10,6 +10,11 @@ const PACKAGES = path.resolve(import.meta.dirname, "..");
  * and the admin panel's router as `@rebasepro/cms` has it.
  */
 export default defineConfig({
+    test: {
+        // At most four workers (vitest's default is one per core); see
+        // packages/server/jest.config.cjs. An explicit --maxWorkers still wins.
+        maxWorkers: 4,
+    },
     resolve: {
         alias: [
             // The admin's MCP view runtime whole, from source: the published

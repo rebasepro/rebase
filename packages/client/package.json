@@ -95,6 +95,7 @@
       "^@rebasepro/types$": "<rootDir>/../types/src/index.ts",
       "^@rebasepro/utils$": "<rootDir>/../utils/src/index.ts"
     },
-    "testTimeout": 30000
+    "testTimeout": 30000,
+    "maxWorkers": 4
   }
 }

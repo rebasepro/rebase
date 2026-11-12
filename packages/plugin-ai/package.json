@@ -110,7 +110,8 @@
     },
     "transformIgnorePatterns": [
       "node_modules/(?!.*(?:react-router|cookie-es))"
-    ]
+    ],
+    "maxWorkers": 4
   },
   "files": [
     "dist"

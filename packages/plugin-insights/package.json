@@ -99,7 +99,8 @@
     ],
     "moduleNameMapper": {
       "^@rebasepro/([a-z0-9-]+)$": "<rootDir>/../$1/src/index.ts"
-    }
+    },
+    "maxWorkers": 4
   },
   "files": [
     "dist"

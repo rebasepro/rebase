@@ -88,6 +88,9 @@ export function workspaceSourceAliases(): { find: RegExp; replacement: string }[
 
 export default defineConfig({
     test: {
+        // At most four workers (vitest's default is one per core); see
+        // packages/server/jest.config.cjs. An explicit --maxWorkers still wins.
+        maxWorkers: 4,
         globals: true,
         environment: "node",
         env: TEST_ENV,

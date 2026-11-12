@@ -10,6 +10,11 @@ import { fileURLToPath } from "node:url";
  * check:test-resolution` holds every package's test runners to this.
  */
 export default defineConfig({
+    test: {
+        // At most four workers (vitest's default is one per core); see
+        // packages/server/jest.config.cjs. An explicit --maxWorkers still wins.
+        maxWorkers: 4,
+    },
     resolve: {
         alias: [
             {
