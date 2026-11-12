@@ -30,7 +30,7 @@ const ITEMS: [string, string][] = [
     ["Database branching", "a branch of the data for every branch of the code"],
     ["Hooks", "before and after every write"],
     ["Indexes", "declared with the collection, owned by name"],
-    ["Multiple databases", "and MongoDB, beside Postgres"],
+    ["Multiple databases", "several Postgres databases, one backend"],
     ["Auth adapters & API keys", "email, OAuth, keys with permissions on them"],
     ["REST API & OpenAPI", "generated, documented, with Swagger"],
     ["Soft delete", "one condition, applied on every read path"],

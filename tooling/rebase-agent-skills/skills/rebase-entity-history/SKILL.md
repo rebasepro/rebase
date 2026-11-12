@@ -75,7 +75,7 @@ const productsCollection = defineCollection({
 
 ## How History Recording Works
 
-On Postgres, history is recorded **inside the write's transaction** and awaited: the row and its history entry commit together or neither does. A failed history insert therefore fails the write — deliberately, because a trail with silent gaps cannot tell "nothing changed" from "the entry was lost". Only the pruning pass afterwards is non-blocking. (The MongoDB driver still records history fire-and-forget: errors are logged and the write stands.)
+On Postgres, history is recorded **inside the write's transaction** and awaited: the row and its history entry commit together or neither does. A failed history insert therefore fails the write — deliberately, because a trail with silent gaps cannot tell "nothing changed" from "the entry was lost". Only the pruning pass afterwards is non-blocking.
 
 ### When History Entries Are Created
 

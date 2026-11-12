@@ -41,7 +41,6 @@ const PAGE = "website/src/content/docs/docs/getting-started/configuration.md";
 const GLOBS = [
     "packages/server/src/**/*.ts",
     "packages/server-postgres/src/**/*.ts",
-    "packages/server-mongo/src/**/*.ts",
     "packages/cli/src/**/*.ts",
     "packages/common/src/**/*.ts",
     "packages/types/src/**/*.ts"

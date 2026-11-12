@@ -51,7 +51,6 @@ const COLLECTION_DIRS = [
 const SERVER_PACKAGES = [
     "packages/server/src/index.ts",
     "packages/server-postgres/src/index.ts",
-    "packages/server-mongo/src/index.ts",
     "packages/client/src/index.ts",
     // Not a server package — the type surface a collection file imports
     // `defineCollection` from. It is checked here rather than banned by name,

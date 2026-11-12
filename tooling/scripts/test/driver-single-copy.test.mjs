@@ -70,7 +70,7 @@ const REGISTRY_MARKERS = [
     '"@rebasepro/types.resourceKinds'
 ];
 
-const DRIVERS = ["server-postgres", "server-mongo"];
+const DRIVERS = ["server-postgres"];
 
 for (const driver of DRIVERS) {
     const files = distFiles(driver);

@@ -393,7 +393,7 @@ Rules an agent needs before writing one:
 
 - **Both are driver capabilities**, `supportsRelationFieldFilters` and
   `relationAggregateSorts`, and both default to **false** for an unclaimed
-  driver. Firestore and MongoDB declare neither. Postgres has both.
+  driver. Firestore declares neither. Postgres has both.
 - **The offline overlay refuses both** rather than answering them wrongly — a
   dotted key resolves to `undefined` on a cached row, which would exclude every
   row and read as "nothing matched".

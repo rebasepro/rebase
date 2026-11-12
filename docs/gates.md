@@ -205,7 +205,6 @@ has one line saying where it runs, or that nothing does and why;
 - `@rebasepro/cms-types` `test:lint` — `check:lint` (static job) lints the same files.
 - `@rebasepro/common` `test:lint` — `check:lint` (static job) lints the same files.
 - `@rebasepro/server` `test:lint` — `check:lint` (static job) lints the same files.
-- `@rebasepro/server-mongo` `test:lint` — `check:lint` (static job) lints the same files.
 - `@rebasepro/server-postgres` `test:lint` — `check:lint` (static job) lints the same files.
 - `@rebasepro/types` `test:lint` — `check:lint` (static job) lints the same files.
 - `@rebasepro/ui` `test:lint` — `check:lint` (static job) lints the same files.

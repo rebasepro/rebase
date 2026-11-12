@@ -435,7 +435,7 @@ Regardless of database persistence, the scheduler keeps an **in-memory ring buff
 |--------|-------------|----------|
 | PostgreSQL | ✅ DB + memory | Logs written to `rebase.cron_logs` and in-memory buffer |
 | PostgreSQL (`cronPersistence: false`) | ❌ Memory only | Logs kept in-memory ring buffer only |
-| Non-SQL (e.g. MongoDB) | ❌ Memory only | Warning logged; no DB persistence |
+| A custom driver with no SQL | ❌ Memory only | Warning logged; no DB persistence |
 
 ### Startup Seeding
 
@@ -771,7 +771,7 @@ await client.cron.toggleJob("cleanup-sessions", true);
 | **Handler throws an exception** | Marked as failed; `error` field populated; `totalFailures` incremented; `executing` flag cleared. |
 | **Handler exceeds timeout** | `ctx.signal` is aborted and the race rejects with the timeout error; marked as failed. Timeout timer is always cleaned up. |
 | **Scheduler stopped while handler runs** | No further scheduling occurs. `backend.shutdown()` waits for the run within its budget; a run still going then has `ctx.signal` aborted and is recorded as failed. |
-| **Non-SQL driver (e.g. MongoDB)** | Warning logged; cron jobs run normally but logs are not persisted to DB (in-memory only). |
+| **Custom driver with no SQL** | Warning logged; cron jobs run normally but logs are not persisted to DB (in-memory only). |
 | **DB persistence insert fails** | Error logged; scheduler continues normally (non-blocking). |
 | **`cronPersistence: false`** | No `rebase.cron_logs` table created; logs kept in-memory ring buffer (50 per job). |
 | **Job registered after scheduler started** | Automatically scheduled — late-registered jobs don't sit idle. |

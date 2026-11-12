@@ -288,9 +288,7 @@ function isStubbable(specifier, root, where) {
                 path.join(root, "packages/app"),
                 path.join(root, "packages/ui"),
                 path.join(root, "packages/server"),
-                path.join(root, "packages/cms"),
-                // `mongodb`, which the server-mongo README imports.
-                path.join(root, "packages/server-mongo")
+                path.join(root, "packages/cms")
             ]
         });
         // Key on the package name, never the full specifier: mapping

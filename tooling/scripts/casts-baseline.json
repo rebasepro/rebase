@@ -44,10 +44,6 @@
     "as never": 5,
     "as unknown as": 1
   },
-  "packages/server-mongo (tests)": {
-    "as never": 1,
-    "as unknown as": 1
-  },
   "packages/server-postgres": {
     "as unknown as": 3
   },

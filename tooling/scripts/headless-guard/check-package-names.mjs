@@ -20,7 +20,7 @@ const repoRoot = execSync("git rev-parse --show-toplevel").toString().trim();
 const RENAMED = {
     "server-core": "server",
     "server-postgresql": "server-postgres",
-    "server-mongodb": "server-mongo",
+    "server-mongodb": "server-postgres (MongoDB support was removed)",
     "client-postgresql": "client-postgres",
     "client-firebase": "firebase",
     "plugin-data-enhancement": "plugin-ai",

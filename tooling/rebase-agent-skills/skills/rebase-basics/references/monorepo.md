@@ -17,7 +17,6 @@ rebase/
 │   ├── client/               # the SDK
 │   ├── server/               # BaaS — Hono coordinator. Never imports a UI package
 │   ├── server-postgres/      # database driver
-│   ├── server-mongo/         # database driver
 │   ├── cli/
 │   ├── codegen/
 │   ├── inference/
@@ -44,7 +43,6 @@ A BaaS install is `server` + a driver + `client`, with no React in the tree.
 |---------|---------|-------------|
 | `@rebasepro/server` | Hono server coordinator, API generation, auth middleware, storage, email, cron, custom functions | Backend entry point — every Rebase backend imports this |
 | `@rebasepro/server-postgres` | PostgreSQL bootstrapper and Drizzle ORM data driver | Backend setup when using PostgreSQL |
-| `@rebasepro/server-mongo` | MongoDB bootstrapper and data driver | Backend setup when using MongoDB |
 | `@rebasepro/app` | The frontend runtime: hooks, providers, context, the auth controller (`useRebaseAuthController`) and `LoginView` | Frontend — React integration, hooks, providers, auth flows |
 | `@rebasepro/types` | Shared TypeScript type definitions (`PostgresCollectionConfig`, `CollectionConfig`, `RebaseClient`, etc.) | Type imports across all packages |
 | `@rebasepro/ui` | Standalone component library (Tailwind CSS v4 + Radix) | Building custom views in Studio or standalone UI |

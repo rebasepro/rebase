@@ -58,7 +58,6 @@ const CORE_PACKAGES = [
     "codegen",
     "server",
     "server-postgres",
-    "server-mongo",
     "cli",
     "inference",
     "mcp"

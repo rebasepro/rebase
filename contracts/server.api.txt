@@ -525,7 +525,7 @@ const BUILT_IN_SCOPE_DESCRIPTIONS
 const BUNDLE_FORMAT_VERSION
 const CANONICAL_TO_REST
 const DATA_PLANE_SCOPES
-const DEFAULT_CAPABILITIES { filterOperators, filterableRelationKinds, key, label, relationAggregateSorts, supportsColumnTypes, supportsDocumentAdmin, supportsRLS, supportsRealtime, supportsReferences, supportsRelationFieldFilters, supportsRelations, supportsSQLAdmin, supportsSchemaAdmin, supportsSubcollections, supportsVectors }
+const DEFAULT_CAPABILITIES { filterOperators, filterableRelationKinds, key, label, relationAggregateSorts, supportsColumnTypes, supportsRLS, supportsRealtime, supportsReferences, supportsRelationFieldFilters, supportsRelations, supportsSQLAdmin, supportsSchemaAdmin, supportsSubcollections, supportsVectors }
 const DEFAULT_COMMIT_PATHS { schemaFile }
 const DEFAULT_DATA_SOURCE_KEY
 const DEFAULT_FILTERABLE_RELATION_KINDS
@@ -542,7 +542,7 @@ const DEFAULT_VECTOR_LIST_LIMIT
 const EMPTY_ACCESS_MODEL { roles, scopes }
 const FIELDLESS_AGGREGATES
 const FIELD_OPERATORS
-const FIREBASE_CAPABILITIES { filterOperators, filterableRelationKinds, key, label, relationAggregateSorts, supportsColumnTypes, supportsDocumentAdmin, supportsRLS, supportsRealtime, supportsReferences, supportsRelationFieldFilters, supportsRelations, supportsSQLAdmin, supportsSchemaAdmin, supportsSubcollections, supportsVectors }
+const FIREBASE_CAPABILITIES { filterOperators, filterableRelationKinds, key, label, relationAggregateSorts, supportsColumnTypes, supportsRLS, supportsRealtime, supportsReferences, supportsRelationFieldFilters, supportsRelations, supportsSQLAdmin, supportsSchemaAdmin, supportsSubcollections, supportsVectors }
 const IMPERSONATE_HEADER
 const INCLUDE_COUNT_KEY
 const JUNCTION_PIVOT_KEY
@@ -555,9 +555,8 @@ const LIST_OPS
 const MAX_INCLUDE_DEPTH
 const MAX_LIST_LIMIT
 const MCP_APP_MODULES { @rebasepro/app, @rebasepro/cms, @rebasepro/ui, react, react/jsx-runtime }
-const MONGODB_CAPABILITIES { filterOperators, filterableRelationKinds, key, label, relationAggregateSorts, supportsColumnTypes, supportsDocumentAdmin, supportsRLS, supportsRealtime, supportsReferences, supportsRelationFieldFilters, supportsRelations, supportsSQLAdmin, supportsSchemaAdmin, supportsSubcollections, supportsVectors }
 const NULL_OPS
-const POSTGRES_CAPABILITIES { filterOperators, filterableRelationKinds, key, label, relationAggregateSorts, supportsColumnTypes, supportsDocumentAdmin, supportsRLS, supportsRealtime, supportsReferences, supportsRelationFieldFilters, supportsRelations, supportsSQLAdmin, supportsSchemaAdmin, supportsSubcollections, supportsVectors }
+const POSTGRES_CAPABILITIES { filterOperators, filterableRelationKinds, key, label, relationAggregateSorts, supportsColumnTypes, supportsRLS, supportsRealtime, supportsReferences, supportsRelationFieldFilters, supportsRelations, supportsSQLAdmin, supportsSchemaAdmin, supportsSubcollections, supportsVectors }
 const PUBLIC_STORAGE_PREFIX
 const REBASE_ADMIN_REQUEST_ROLE
 const REBASE_ADMIN_ROLE
@@ -628,12 +627,10 @@ function isChannelBusInstance
 function isCollectionPatch
 function isContentHashedFileName
 function isDataPlaneScope
-function isDocumentAdmin
 function isFieldOperation
 function isFirebaseCollectionConfig
 function isLazyComponentRef
 function isManyToMany
-function isMongoDBCollectionConfig
 function isPercentileFraction
 function isPostgresCollectionConfig
 function isPublicStorageKey
@@ -829,7 +826,7 @@ interface CustomAuthAdapterOptions { capabilities, serviceKey, transformAuthResp
 interface DataDriver { admin, batchWrite, checkUniqueField, checksRowPreconditions, cmsToDelegateModel, count, currentTime, delegateToCMSModel, delete, deleteAll, deleteMany, deleteWhere, fetchCollection, fetchOne, initTextSearch, initialised, isFilterCombinationValid, key, listenCollection, listenOne, needsInitTextSearch, readTogether, refreshView, restFetchService, save, saveMany, scanStoredRows, sql, subscribeToExternalChanges, updateMany, updateRelationPivot, updateWhere }
 interface DataRateLimitCaller { apiKey, header, socketAddress, uid }
 interface DataRepository { checkUniqueField, count, delete, fetchCollection, fetchOne, save, searchRows }
-interface DataSourceCapabilities { filterOperators, filterableRelationKinds, key, label, relationAggregateSorts, supportsColumnTypes, supportsDocumentAdmin, supportsRLS, supportsRealtime, supportsReferences, supportsRelationFieldFilters, supportsRelations, supportsSQLAdmin, supportsSchemaAdmin, supportsSubcollections, supportsVectors }
+interface DataSourceCapabilities { filterOperators, filterableRelationKinds, key, label, relationAggregateSorts, supportsColumnTypes, supportsRLS, supportsRealtime, supportsReferences, supportsRelationFieldFilters, supportsRelations, supportsSQLAdmin, supportsSchemaAdmin, supportsSubcollections, supportsVectors }
 interface DataSourceDefinition { databaseId, engine, key, label, transport }
 interface DataTransformer { deserializeFromDatabase, serializeToDatabase }
 interface DatabaseAdapter { destroy, ensureCollectionPolicies, ensureCollectionSchema, ensureRlsRuntime, finalizeSecurityPosture, getAdmin, initializeAuth, initializeDriver, initializeHistory, initializeRealtime, initializeWebsockets, mountRoutes, readCollectionsSchemaVersion, stampCollectionsSchemaVersion, type, verifyConnection }
@@ -847,7 +844,6 @@ interface DeleteManyProps { collection, hard, ids, path }
 interface DeleteProps { collection, hard, precondition, row }
 interface DeleteWhereProps { collection, filter, hard, logical, path }
 interface DeviceSession { createdAt, id, ipAddress, isCurrentSession, userAgent }
-interface DocumentAdmin { executeAggregate, fetchCollectionStats }
 interface DownloadConfig { fileNotFound, metadata, url }
 interface DownloadMetadata { bucket, contentType, customMetadata, fullPath, name, public, size, token, tokenExpiresIn }
 interface DriverAggregate { alias, field, filter, fn, p }
@@ -900,7 +896,6 @@ interface LogicalConditionFor { conditions, type }
 interface ManagedCompatibility { eligible, reasons }
 interface ManyToManyRelation { kind, onDelete, onUpdate, overrides, relationName, target, through }
 interface MapProperty { access, callbacks, columnName, columnType, conditions, databaseDefault, defaultValue, description, dynamicProps, excludeFromApi, keyValue, metadata, name, properties, propertiesOrder, propertyConfig, type, validation }
-interface MongoDBCollectionConfig { auth, callbacks, childCollections, dataSource, databaseId, description, engine, history, metadata, name, ownerId, path, properties, securityRules, singularName, slug, strictWrites }
 interface MountableRouter { fetch, routes }
 interface NativeDependency { name, reason }
 interface NotPolicyExpression { kind, operand }
@@ -1157,8 +1152,6 @@ type ListenOneProps
 type ListenOneTarget
 type McpAppModule
 type McpAppModuleExport
-type MongoProperties
-type MongoProperty
 type NoSuchKey { didYouMean, noSuchKey }
 type NonColumnFieldPath
 type NullsPlacement

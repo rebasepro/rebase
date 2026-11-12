@@ -50,7 +50,6 @@ const COLLECTION_TYPE_NAMES = new Set([
     "CollectionConfig",
     "PostgresCollectionConfig",
     "FirebaseCollectionConfig",
-    "MongoDBCollectionConfig",
     "AnyCollectionConfig"
 ]);
 

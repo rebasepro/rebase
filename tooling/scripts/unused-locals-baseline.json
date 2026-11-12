@@ -74,7 +74,6 @@
   "packages/firebase/src/components/RebaseFirebaseApp.tsx::error": 1,
   "packages/firebase/src/hooks/useFirebaseAuthController.ts::authError": 1,
   "packages/firebase/src/hooks/useFirestoreDriver.ts::resolvedPath": 1,
-  "packages/server-mongo/src/websocket.ts::options": 1,
   "packages/server-postgres/src/schema/introspect-db-inference.ts::COLOR_HEX_REGEX": 1,
   "packages/server-postgres/src/services/PersistService.ts::primaryKeyFields": 1,
   "packages/server-postgres/src/services/RelationService.ts::options": 1,

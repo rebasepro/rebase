@@ -44,10 +44,10 @@ Properties define the fields of your collection. Rebase supports these built-in 
 | Junction tables | Yes (many-to-many) | No |
 | Multi-hop joins | Yes (`joinPath`) | No |
 | Inverse lookups | Yes (`kind: "hasMany"` / `"hasOne"`) | No |
-| Where to use | **PostgresCollectionConfig** | FirebaseCollectionConfig / MongoDBCollectionConfig — `PostgresCollectionConfig`'s properties type excludes it |
-| Stored value | FK column(s) managed by framework | An `EntityReference` (id + path): a Firestore `DocumentReference`, a tagged sub-document in MongoDB |
+| Where to use | **PostgresCollectionConfig** | FirebaseCollectionConfig — `PostgresCollectionConfig`'s properties type excludes it |
+| Stored value | FK column(s) managed by framework | An `EntityReference` (id + path): a Firestore `DocumentReference` |
 
-**Use `relation` for all new Postgres collections.** `reference` is the native primitive of document databases (Firestore, MongoDB).
+**Use `relation` for all new Postgres collections.** `reference` is the native primitive of document databases (Firestore).
 
 ### Schema-as-Code
 
@@ -159,7 +159,7 @@ export default productsCollection;
 | `admin.icon` | `string \| ReactNode` | — | Lucide icon name or React element |
 | `admin.group` | `string` | `"Views"` | Sidebar group heading |
 | `dataSource` | `string \| DatabaseHandle` | `"(default)"` | Routes the collection to a database declared with `database("<key>")` in `config/resources.ts`. Pass the handle (`import { analytics } from "../resources"`, `dataSource: analytics`) — `defineCollection` records its key — or the key as a string. See **Data sources & multiple backends** below. |
-| `engine` | `string` | resolved from `dataSource` | The engine behind the collection (`"postgres"`/`"firestore"`/`"mongodb"`). Stamped during normalization; set it only to override. There is no collection-level `driver` field |
+| `engine` | `string` | resolved from `dataSource` | The engine behind the collection (`"postgres"`/`"firestore"`). Stamped during normalization; set it only to override. There is no collection-level `driver` field |
 | `databaseId` | `string` | — | Physical DB/schema/Firestore-database within the engine |
 | `history` | `boolean` | `false` | Enable entity audit trail (needs the backend `history` option or `REBASE_HISTORY`) |
 | `admin.defaultViewMode` | `ViewMode` | `"list"` | Default view: `"list"`, `"table"`, `"cards"`, `"kanban"`, or a custom view's `key` |
@@ -422,7 +422,7 @@ client.data.talents.search("auditor iso 14001").orderBy("_score", "desc").find()
   index (and, with `fuzzy`, a second column and a trigram index). Boot-ensure
   adds them; adding a stored generated column rewrites the table, so on a large
   live table treat it as a planned migration.
-- **Do not add it to a Mongo or Firestore collection.** It is refused at boot.
+- **Do not add it to a Firestore collection.** It is refused at boot.
 
 ### Explaining a match
 
@@ -582,11 +582,10 @@ export default defineCollection({
 
 A collection lives in a **data source** identified by `collection.dataSource`
 (default `"(default)"`). A data source has an **engine** (`postgres`,
-`mongodb`, `firestore`, custom → drives editor capabilities) and a **transport**:
+`firestore`, custom → drives editor capabilities) and a **transport**:
 
-- **`server`** — through the Rebase backend/client. Covers Postgres, MongoDB,
-  and any server-mediated engine. This is the default; such collections need no
-  registration.
+- **`server`** — through the Rebase backend/client. Postgres is the only server
+  engine. This is the default; such collections need no registration.
 - **`direct`** — straight from the client to an external backend via its SDK
   (e.g. Firestore). The Rebase backend is not in the data path.
 - **`custom`** — a developer-supplied `DataDriver`.
@@ -608,32 +607,27 @@ client and only need a backend bootstrapper.
 ```
 
 ```ts no-verify
-// Backend — multiple engines in one instance (Postgres + MongoDB)
-// config/resources.ts — declare direct/custom sources so the backend skips
-// server routes for them:
-//   export const analytics = database("analytics", {
-//       engine: "firestore", transport: "direct"
+// Backend — several Postgres databases in one instance.
+// config/resources.ts:
+//   export const warehouse = database("warehouse");          // DATABASE_URL__WAREHOUSE
+//   export const analytics = database("analytics", {         // client-side only:
+//       engine: "firestore", transport: "direct"             // the backend skips it
 //   });
-initializeRebaseBackend({
-  bootstrappers: [pgBootstrapper /* isDefault */, mongoBootstrapper],
-  collections: [
-    { slug: "products" },                      // → Postgres (default)
-    { slug: "orders", dataSource: "mongodb" }  // → the bootstrapper with id "mongodb"
-  ],
-});
+// config/collections/orders.ts:
+//   defineCollection({ slug: "orders", dataSource: warehouse, … })
 ```
 
 Routing is automatic and resolved by collection path: list/entity views,
-references, board, import/export, and `context.data` all hit the right backend
-with no per-collection wiring. The data-source key matches the backend
-bootstrapper id/type (e.g. `"mongodb"`). RLS is applied per-engine where
-supported.
+references, board, import/export, realtime and `context.data` all hit the right
+database with no per-collection wiring. Every server source is Postgres, with
+its own RLS policies. MongoDB support was removed: a `database()` declared with
+`engine: "mongodb"` (or any engine but Postgres) is refused at boot.
 
 > **There is no collection-level `driver` field**, and no `drivers` prop on
 > `<Rebase>`. A collection names its source with `dataSource`; `engine`
-> (`"postgres"`, `"firestore"`, `"mongodb"`, …) is stamped from that source
-> during normalization. The Firestore and MongoDB collection types declare it
-> as their literal discriminant (`engine: "firestore"`).
+> (`"postgres"`, `"firestore"`, …) is stamped from that source during
+> normalization. The Firestore collection type declares it as its literal
+> discriminant (`engine: "firestore"`).
 
 ## Common Property Options (BaseProperty)
 

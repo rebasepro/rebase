@@ -302,8 +302,7 @@ not at all. None of them is fire-and-forget.
 > **IMPORTANT FOR AGENTS**: because `afterSave`/`afterDelete` hold the write's
 > transaction open, never make a network call (webhook, email, third-party API)
 > from one — it holds a lock for the round trip, and a failure rolls the user's
-> write back. On MongoDB there is no transaction: the write is already stored
-> when `afterSave` runs, and a throw does not undo it.
+> write back.
 
 ### Execution Order
 
@@ -401,9 +400,9 @@ rows*; it does not redact a column. Hiding a phone number from non-admins on
 rows they may otherwise see is exactly what `afterRead` is for, and the pattern
 below is the right one.
 
-**A non-Postgres engine.** `@rebasepro/server-mongo` and `@rebasepro/firebase`
-have no row-level security, and are rated Experimental for that reason. There
-the callbacks below are the only enforcement there is.
+**A client-direct engine.** `@rebasepro/firebase` talks to Firestore from the
+browser; Rebase policies never see those reads, and Firestore's own security
+rules are what enforce them. The callbacks below do not run there either.
 
 What this section is **not** is an alternative to writing policies on Postgres.
 A table without RLS is not served, so "enforce it in the application instead"

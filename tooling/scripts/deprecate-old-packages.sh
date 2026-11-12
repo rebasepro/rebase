@@ -2,7 +2,7 @@
 #
 # Deprecate every @rebasepro package on npm that this repo no longer publishes.
 #
-# The scope holds 43 packages; the repo publishes 21. The other 22 are still
+# The scope holds 43 packages; the repo publishes 20. The other 23 are still
 # installable and still serve code, and `@rebasepro/server-core@0.9.0` is a  # version-pin: ignore — a package that no longer exists, named as it shipped
 # perfectly working install of a package that is no longer built. Deprecating
 # puts a pointer to the replacement in front of anyone who installs one.
@@ -46,11 +46,15 @@ done
 # The trailing entries are not renames. They are early prototypes from Mar-Apr
 # 2026 that only ever had canary builds and were abandoned, not superseded, so
 # they point at nothing.
-# All 22 names in the @rebasepro scope that this repo no longer publishes.
+#
+# server-mongo is neither: it was published, and retired with MongoDB support,
+# so it has no successor — `retired_message` says why instead (as it does for
+# the two older names that once pointed at it).
+# All 23 names in the @rebasepro scope that this repo no longer publishes.
 # data_export, data_import and editor are already deprecated; they stay listed so
 # this is a complete audit of the scope rather than of the work outstanding.
 RENAMED_KEYS=(
-  server-core server-postgresql server-mongodb client-postgresql client-firebase
+  server-core server-postgresql server-mongodb server-mongo client-postgresql client-firebase
   plugin-data-enhancement schema-inference sdk-generator mcp-server formex core auth
   schema_inference data_enhancement mongodb
   backend cms datatalk data_import_export
@@ -60,7 +64,6 @@ renamed_to() {
   case "$1" in
     server-core)              echo "server" ;;
     server-postgresql)        echo "server-postgres" ;;
-    server-mongodb)           echo "server-mongo" ;;
     client-postgresql)        echo "client-postgres" ;;
     client-firebase)          echo "firebase" ;;
     plugin-data-enhancement)  echo "plugin-ai" ;;
@@ -73,15 +76,28 @@ renamed_to() {
     # Underscore-era duplicates of the same moves.
     schema_inference)         echo "inference" ;;
     data_enhancement)         echo "plugin-ai" ;;
-    mongodb)                  echo "server-mongo" ;;
     # Abandoned, never released: no successor to name.
     backend|cms|datatalk|data_import_export|data_export|data_import|editor) echo "" ;;
     *) echo "" ;;
   esac
 }
 
+# Published packages that were retired with the feature they served, not renamed.
+retired_message() {
+  case "$1" in
+    server-mongo|server-mongodb|mongodb)
+      echo "MongoDB support was removed from Rebase: Postgres is the only server engine. Use @rebasepro/server-postgres. This package is no longer built or published." ;;
+    *) echo "" ;;
+  esac
+}
+
 message_for() {
-  local old="$1" new
+  local old="$1" new retired
+  retired=$(retired_message "$old")
+  if [ -n "$retired" ]; then
+    echo "$retired"
+    return
+  fi
   new=$(renamed_to "$old")
   if [ -n "$new" ]; then
     echo "Renamed to @rebasepro/$new — install that instead. This package is no longer built or published."

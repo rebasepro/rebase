@@ -29,7 +29,6 @@ const PACKAGE_ORDER = [
     "@rebasepro/client",
     "@rebasepro/server",
     "@rebasepro/server-postgres",
-    "@rebasepro/server-mongo",
     "@rebasepro/types",
     "@rebasepro/common",
     "@rebasepro/utils",
