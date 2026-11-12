@@ -19,13 +19,16 @@
  */
 
 import fc from "fast-check";
-import { PolicyExpression, policy } from "@rebasepro/types";
+import { PolicyExpression, PolicyShorthand, SecurityRule, isPolicyShorthand, policy } from "@rebasepro/types";
+import { getPolicyNameHash, newShapeHashInput } from "@rebasepro/utils";
 import { toSnakeCase } from "@rebasepro/utils";
 import { sqlToPolicy } from "../../src/util/policy/sqlToPolicy";
 import { findAnonymousGrants } from "../../src/util/policy/sqlToPolicy";
 import { policyToPostgres } from "../../src/util/policy/policyToPostgres";
 import { evaluatePolicy, TriState } from "../../src/util/policy/evaluatePolicy";
-import { policyExpression, innerPolicyExpression, evalContext, snakeIdentifier } from "./arbitraries";
+import { policyConditionToExpression } from "../../src/util/policy/policyCondition";
+import { securityRuleToConditions } from "../../src/util/policy/securityRuleToConditions";
+import { policyExpression, innerPolicyExpression, evalContext, snakeIdentifier, literalValue } from "./arbitraries";
 
 /**
  * Run count. High enough to explore the grammar, low enough to stay in CI.
@@ -263,6 +266,91 @@ describe("policy SQL — existsIn scoping", () => {
             const introductions = [...policyToPostgres(expr).matchAll(/FROM\s+"[^"]+"\."[^"]+"\s+"(_ex\d+)"/g)]
                 .map(m => m[1]);
             expect(new Set(introductions).size).toBe(introductions.length);
+        }), { numRuns: RUNS });
+    });
+});
+
+describe("policy SQL — the shorthand and access + condition shapes", () => {
+
+    /** A shorthand: one to four columns (never `kind`) mapped to literals. */
+    const shorthand: fc.Arbitrary<PolicyShorthand> = fc.dictionary(
+        snakeIdentifier.filter(key => key !== "kind"),
+        literalValue,
+        { minKeys: 1, maxKeys: 4 }
+    );
+    const access = fc.constantFrom<"public" | "authenticated">("public", "authenticated");
+    const accessRule: fc.Arbitrary<SecurityRule> = fc.tuple(access, shorthand, fc.option(shorthand, { nil: undefined }))
+        .map(([a, condition, check]): SecurityRule => check
+            ? { operation: "update", access: a, condition, check }
+            : { operation: "update", access: a, condition });
+
+    /** The same object with its keys in a different order. */
+    const reordered = (value: PolicyShorthand, seed: number): PolicyShorthand => {
+        const keys = Object.keys(value);
+        const rotated = keys.slice(seed % keys.length).concat(keys.slice(0, seed % keys.length)).reverse();
+        return Object.fromEntries(rotated.map(key => [key, value[key]]));
+    };
+
+    it("recognises every shorthand, and never an expression", () => {
+        fc.assert(fc.property(shorthand, s => expect(isPolicyShorthand(s)).toBe(true)), { numRuns: RUNS });
+        fc.assert(fc.property(policyExpression, e => expect(isPolicyShorthand(e)).toBe(false)), { numRuns: RUNS });
+    });
+
+    it("names and compiles a shorthand independently of its key order", () => {
+        fc.assert(fc.property(shorthand, fc.nat(), access, (s, seed, a) => {
+            const one: SecurityRule = { operation: "select", access: a, condition: s };
+            const two: SecurityRule = { operation: "select", access: a, condition: reordered(s, seed) };
+            expect(newShapeHashInput(two)).toBe(newShapeHashInput(one));
+            expect(getPolicyNameHash(two)).toBe(getPolicyNameHash(one));
+            expect(policyToPostgres(securityRuleToConditions(two).usingExpr!))
+                .toBe(policyToPostgres(securityRuleToConditions(one).usingExpr!));
+        }), { numRuns: RUNS });
+    });
+
+    it("hashes from an input no legacy rule can produce", () => {
+        fc.assert(fc.property(accessRule, rule => {
+            expect(newShapeHashInput(rule).startsWith("rls2:")).toBe(true);
+        }), { numRuns: RUNS });
+    });
+
+    it("compiles every access + shorthand rule to SQL that reaches a fixed point through the parser", () => {
+        fc.assert(fc.property(accessRule, rule => {
+            const { usingExpr, withCheckExpr } = securityRuleToConditions(rule);
+            for (const expr of [usingExpr!, withCheckExpr!]) {
+                const once = policyToPostgres(expr);
+                expect(parenBalance(once)).toBe(0);
+                const twice = reparse(once);
+                expect(reparse(twice)).toBe(twice);
+            }
+        }), { numRuns: RUNS });
+    });
+
+    /**
+     * The evaluator's answer for a shorthand is SQL's: true when every column
+     * equals its value, false when one differs, unknown when a value is
+     * missing or NULL (a comparison with NULL is NULL, and `IS NULL` is
+     * Postgres's to decide).
+     */
+    it("evaluates a shorthand against a row as Postgres would", () => {
+        fc.assert(fc.property(shorthand, evalContext, (s, ctx) => {
+            const got = evaluatePolicy(policyConditionToExpression(s), ctx);
+            const values = ctx.entity?.values;
+            const cells = Object.entries(s).map(([key, want]): TriState => {
+                if (want === null || !values) return "unknown";
+                const have = values[key];
+                if (have === null || have === undefined) return "unknown";
+                return have === want;
+            });
+            const expected: TriState = cells.includes(false) ? false : cells.includes("unknown") ? "unknown" : true;
+            expect(got).toBe(expected);
+        }), { numRuns: RUNS });
+    });
+
+    it("never turns a denial of an access + shorthand rule into a grant when re-read from SQL", () => {
+        fc.assert(fc.property(accessRule, evalContext, (rule, ctx) => {
+            const { usingExpr } = securityRuleToConditions(rule);
+            if (evaluatePolicy(usingExpr!, ctx) !== false) return;
+            expect(evaluatePolicy(sqlToPolicy(policyToPostgres(usingExpr!)), ctx)).not.toBe(true);
         }), { numRuns: RUNS });
     });
 });
