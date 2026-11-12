@@ -30,7 +30,7 @@ import { lowerTables } from "../../src/schema/lower-tables";
 import { ALL, DOCUMENT_RULES, documents, everything, notes } from "./fixtures/legacy-capabilities";
 
 /** Presentation fields of a collection, stripped before comparing (modulo 1). */
-const UI_COLLECTION_FIELDS = ["singularName", "icon", "admin", "childCollections", "ownerId"];
+const UI_COLLECTION_FIELDS = ["name", "singularName", "icon", "admin", "childCollections", "ownerId"];
 /** Presentation fields of a property, stripped before comparing (modulo 1). */
 const UI_PROPERTY_FIELDS = ["name", "propertyConfig", "dynamicProps", "conditions", "mode", "timezone", "propertiesOrder", "admin", "metadata"];
 
@@ -89,8 +89,17 @@ describe("bridge round trip: lowerTables(collectionsToTableDefs(c)) is c", () =>
         const { lowered } = roundTrip(ALL);
         expect(lowered.map(collection => collection.slug)).toEqual(ALL.map(collection => collection.slug));
         lowered.forEach((collection, index) => {
-            expect(canonical(collection)).toEqual(canonical(withoutPresentation(ALL[index])));
+            expect(canonical(withoutPresentation(collection))).toEqual(canonical(withoutPresentation(ALL[index])));
         });
+    });
+
+    it("derives the labels a collection declaring none was given, from the slug", () => {
+        const { lowered } = roundTrip(ALL);
+        expect(lowered.map(collection => [collection.slug, collection.name, collection.singularName])).toEqual(expect.arrayContaining([
+            ["posts", "Posts", "Post"],
+            ["post_titles", "Post Titles", "Post Title"],
+            ["everything", "Everything", "Everything"]
+        ]));
     });
 
     it("passes the security rules through as the very objects written", () => {
@@ -124,7 +133,7 @@ describe("bridge round trip: lowerTables(collectionsToTableDefs(c)) is c", () =>
         Reflect.set(decorated, "icon", "article");
         const others = ALL.filter(collection => collection !== notes);
         const { lowered, notes: notCarried } = roundTrip([decorated, ...others]);
-        expect(canonical(lowered[0])).toEqual(canonical(withoutPresentation(decorated)));
+        expect(canonical(withoutPresentation(lowered[0]))).toEqual(canonical(withoutPresentation(decorated)));
         expect(notCarried.filter(note => note.collection === "notes").map(note => [note.key ?? "", note.field, note.kind])).toEqual([
             ["", "name", "ui"],
             ["", "singularName", "ui"],

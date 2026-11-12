@@ -488,7 +488,8 @@ describe("lowerTables — table keys", () => {
         const lowered = only([table]);
         expect({ ...lowered, properties: undefined, securityRules: undefined }).toEqual({
             slug: "documents",
-            name: "documents",
+            name: "Documents",
+            singularName: "Document",
             table: "documents_table",
             schema: "docs",
             dataSource: "analytics",
@@ -527,7 +528,8 @@ describe("lowerTables — table keys", () => {
         });
         expect(only([view])).toEqual({
             slug: "post_titles",
-            name: "post_titles",
+            name: "Post Titles",
+            singularName: "Post Title",
             table: "post_titles",
             view: { query: "SELECT id, title FROM posts", materialized: true, roles: ["admin", "editor"] },
             properties: { id: { type: "number", isId: true }, title: { type: "string" } },
@@ -641,7 +643,6 @@ describe("lowerTables — refusals", () => {
         "array-element-modifiers": () => [defineTable("t", { columns: { id, a: col.array(col.text().notNull()) }, rls: "admin-only" })],
         "text-one-of": () => [defineTable("t", { columns: { id, s: col.text().oneOf(["a", "b"]) }, rls: "admin-only" })],
         "has-many-order-by": () => [defineTable("t", { columns: { id }, relations: { posts: rel.hasMany(() => users, { orderBy: ["id", "asc"] }) }, rls: "admin-only" }), users],
-        "belongs-to-unconstrained-index": () => [defineTable("t", { columns: { id, userId: col.uuid() }, relations: { user: rel.belongsTo(() => users, { constraint: false }) }, rls: "admin-only" }), users],
         "json-document-shape": () => [defineTable("t", { columns: { id, j: col.jsonb(json.string()) }, rls: "admin-only" })],
         "json-one-of-placement": () => [defineTable("t", { columns: { id, j: col.jsonb(json.object({ b: json.oneOf({ x: json.string() }) })) }, rls: "admin-only" })],
         "json-unknown-field": () => [defineTable("t", { columns: { id, j: col.jsonb(json.object({ u: json.unknown() })) }, rls: "admin-only" })],

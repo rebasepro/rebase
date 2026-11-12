@@ -93,7 +93,7 @@ import {
     type ArrayPropertyValidationSchema,
     type EnumValueConfig
 } from "@rebasepro/types";
-import { generateForeignKeyName, toSnakeCase, toWireKey } from "@rebasepro/utils";
+import { generateForeignKeyName, labelFromIdentifier, singularLabel, toSnakeCase, toWireKey } from "@rebasepro/utils";
 
 import { SchemaDefinitionError, type SchemaDefinitionProblem } from "./errors";
 
@@ -293,7 +293,11 @@ export function lowerTables(
         if (cached) return cached;
         // Registered before its properties are built, so a relation that points
         // back at this table (or at itself) finds the same object.
-        const collection: LoweredCollection = { slug: slugOf(def), name: slugOf(def), properties: {} };
+        // A table has no labels; the legacy readers that print one (OpenAPI
+        // component names, tags, summaries) get the defaults a collection
+        // declaring none was given: "order_items" → "Order Items" / "Order Item".
+        const name = labelFromIdentifier(slugOf(def));
+        const collection: LoweredCollection = { slug: slugOf(def), name, singularName: singularLabel(name), properties: {} };
         lowered.set(def, collection);
         fillCollection(collection, def, { lowerDef, options });
         return collection;
