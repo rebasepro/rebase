@@ -20,7 +20,8 @@ import { describe, it, expect, beforeAll, jest } from "@jest/globals";
 import { col, defineTable, rel, type TableDescriptor, type UiPreferences } from "@rebasepro/types";
 import { configureJwt, generateMcpAccessToken } from "../src/auth/jwt";
 import { MCP_APP_MIME_TYPE, mcpAppBaseUri, versionedMcpAppUri, withProjectView, type McpAppResource } from "../src/mcp/mcp-apps";
-import { MCP_APP_URI, SHOW_APP_CODE_GUIDE, SHOW_APP_GUIDE_TOOL } from "../src/mcp/mcp-tools";
+import { MCP_APP_URI, SHOW_APP_CODE_GUIDE, SHOW_APP_GUIDE_TOOL, type McpCaller } from "../src/mcp/mcp-tools";
+import type { McpViewPreferences } from "../src/mcp/mcp-view";
 import { buildApp, rpc, schemaOf, stubDriver, PUBLIC_URL } from "./helpers/mcp-harness";
 import { DEFAULT_LIST_LIMIT } from "@rebasepro/types";
 
@@ -326,7 +327,7 @@ describe("the project's presentation, from its UI preferences", () => {
 
     /** The layers as `/api/admin/ui-config` reads them: the shipped file, the workspace's rows, each person's own. */
     const asked: string[] = [];
-    const getUiPreferences = async (caller: { uid: string }) => {
+    const getUiPreferences = async (caller: McpCaller): Promise<McpViewPreferences> => {
         asked.push(caller.uid);
         return {
             file: { tables: { candidates: { name: "Pipeline", fields: { stage: { enumLabels: { applied: { label: "New", color: "blue" } } } } } } },

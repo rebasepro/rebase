@@ -181,26 +181,53 @@ export interface ArrayValidation extends BaseValidation {
  * @group Schema
  */
 export interface ColumnValidation {
+    /** The API error when a `.notNull()` column is missing from a create. */
     requiredMessage?: string;
+    /**
+     * Lower bound: minimum length of text, inclusive minimum of a number, earliest
+     * accepted value of a temporal column (an ISO string).
+     */
     min?: number | string;
+    /**
+     * Upper bound: maximum length of text, inclusive maximum of a number, latest
+     * accepted value of a temporal column (an ISO string).
+     */
     max?: number | string;
+    /** Exact length of a text value. */
     length?: number;
+    /** A pattern a text value must match: a `RegExp`'s source, its flags in `matchesFlags`. */
     matches?: string;
+    /** Flags of `matches` (`"i"`, `"u"`, …). No flags when omitted. */
     matchesFlags?: string;
+    /** The API error when `matches` fails. */
     matchesMessage?: string;
+    /** A text value must be an e-mail address. */
     email?: boolean;
+    /** A text value must be a URL. */
     url?: boolean;
+    /** Lower-case a text value before it is stored. */
     lowercase?: boolean;
+    /** Upper-case a text value before it is stored. */
     uppercase?: boolean;
+    /** Trim surrounding whitespace from a text value before it is stored. */
     trim?: boolean;
+    /** Exclusive upper bound of a number. */
     lessThan?: number;
+    /** Exclusive lower bound of a number. */
     moreThan?: number;
+    /** A number must be greater than zero. */
     positive?: boolean;
+    /** A number must be less than zero. */
     negative?: boolean;
+    /** A number must be a whole number. */
     integer?: boolean;
+    /** Fewest items an array accepts. */
     minItems?: number;
+    /** Most items an array accepts. */
     maxItems?: number;
+    /** Refuse an array holding the same value twice. */
     uniqueItems?: boolean;
+    /** Fields of a JSON array's object items, each unique across the items. See {@link ArrayValidation.uniqueBy}. */
     uniqueBy?: string[];
 }
 
@@ -241,10 +268,28 @@ export function normalizeValidation(rules: ValidationInput): ColumnValidation {
  * @group Schema
  */
 export interface StorageImageResize {
+    /**
+     * Largest width in pixels; a wider image is scaled down proportionally. No
+     * width limit when omitted.
+     */
     maxWidth?: number;
+    /**
+     * Largest height in pixels; a taller image is scaled down proportionally. No
+     * height limit when omitted.
+     */
     maxHeight?: number;
+    /**
+     * How the image fits `maxWidth` × `maxHeight`: `contain` (the default) scales
+     * it to fit inside, keeping its aspect ratio; `cover` scales it to fill the box,
+     * keeping its aspect ratio, and may crop.
+     */
     mode?: "contain" | "cover";
+    /** The stored image's format. `original` (the default) keeps the uploaded one. */
     format?: "original" | "jpeg" | "png" | "webp";
+    /**
+     * Quality of a lossy output (JPEG, WebP), 0–100: higher is sharper and larger.
+     * 80 when omitted.
+     */
     quality?: number;
 }
 
