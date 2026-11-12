@@ -88,25 +88,27 @@ const anyValue = (name) => `declare const ${name}: any;`;
 const anyType = (name) => `type ${name}<A = any, B = any, C = any> = any;`;
 
 /**
- * A fence that is the body of a collection's `callbacks` object —
+ * A fence that is the body of a table's `hooks` object —
  * `afterSave: async ({ … }) => { … }` — is an object member, not a statement.
  * Compiled bare, its parameters are untyped, so nothing it destructures can be
- * wrong: `collections/callbacks.md` destructured an `entityId` that no callback
- * receives (the prop is `id`), and a reader who copied it passed `undefined` to
+ * wrong: a hooks page once destructured an `entityId` that no hook receives
+ * (the prop is `id`), and a reader who copied it passed `undefined` to
  * `update()` inside `afterSave`, which rolled back their own save.
  *
- * Such a fence compiles inside `const … : CollectionCallbacks = { … }`, on the
- * prelude's line and after the body, so every hook it names is typed by the real
- * props and the line arithmetic still holds.
+ * Such a fence compiles inside `const … : TableHooks = { … }` — the type of
+ * `defineTable(name, { hooks })` — on the prelude's line and after the body, so
+ * every hook it names is typed by the real props (`TableAfterSaveProps`, …) and
+ * the line arithmetic still holds.
  */
-const CALLBACK_FRAGMENT =
+export const CALLBACK_FRAGMENT =
     /^(?:\s*\/\/[^\n]*\n)*\s*(?:afterRead|beforeQuery|beforeSave|afterSave|afterSaveError|beforeDelete|afterDelete)\s*:/;
 // Rows and users as loose as a docs example writes them: a page reads
 // `values.price` and `context.user.tenant` off its own schema, which a fence
 // does not declare. What stays typed is the part that can drift — the props.
-const CALLBACKS_OPEN =
-    " const __docsCallbacks: import(\"@rebasepro/types\").CollectionCallbacks<" +
-    "Record<string, any>, import(\"@rebasepro/types\").User & Record<string, any>> = {";
+// `TableHooks<Row, Insert, USER>`: the same loose row for reads and writes.
+export const CALLBACKS_OPEN =
+    " const __docsHooks: import(\"@rebasepro/types\").TableHooks<" +
+    "Record<string, any>, Record<string, any>, import(\"@rebasepro/types\").User & Record<string, any>> = {";
 const CALLBACKS_CLOSE = "\n};";
 
 /**
