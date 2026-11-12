@@ -5,7 +5,9 @@ import type { EntityCustomView } from "../types/entity_views";
 import type { CollectionCustomView } from "../types/collection_views";
 import type { EntityAction } from "../types/entity_actions";
 import type { AppView, NavigationGroupMapping } from "./navigation";
-import type { AdminCollection } from "@rebasepro/cms-types";
+import type { AdminCollection, AdminPostgresCollection } from "../admin_collection";
+import type { TableCustomization } from "../table_customization";
+import type { Properties } from "@rebasepro/types";
 
 /**
  * Options to enable the built-in collection editor.
@@ -23,8 +25,75 @@ export interface CollectionEditorOptions {
     pathSuggestions?: string[];
 }
 
+/**
+ * A Postgres table's collection as the panel registers it: what a
+ * `TableDescriptor` projects to, after `customizeTable`.
+ *
+ * The flat Postgres collection, with one difference: its properties may
+ * include a `reference` — what `fields.x.referenceTo` makes of a column that
+ * holds another collection's ids — which the backend's `PostgresProperties`
+ * does not admit, while the registry, the row codec and every view handle
+ * one.
+ *
+ * @group Tables
+ */
+export type AdminTableCollection<M extends Record<string, unknown> = Record<string, unknown>> =
+    Omit<AdminPostgresCollection<M>, "properties"> & { properties: Properties };
+
+/**
+ * Anything `<RebaseCMS>` and `CollectionsProvider` register: a collection of
+ * the panel's view model, or a table's.
+ *
+ * @group Tables
+ */
+export type PanelCollection = AdminCollection | AdminTableCollection;
+
 export interface RebaseCMSConfig<EC extends AdminCollection = AdminCollection> {
-    collections?: EC[] | CollectionConfigsBuilder<EC>;
+    /**
+     * Collections declared in code, the way projects did before their tables
+     * were served (`config/collections`, `virtual:rebase-collections`).
+     *
+     * Still honoured beside the served tables: when one of these and a served
+     * table have the same slug, this one is shown and the table's projection is
+     * ignored (with a warning in development), so a project keeps exactly what
+     * it had until it moves to `tableCustomizations`.
+     */
+    collections?: (EC | AdminTableCollection)[] | CollectionConfigsBuilder<EC>;
+
+    /**
+     * Presentation for the tables the server serves, one `customizeTable(...)`
+     * result per table: labels, icons, view modes, field components, actions.
+     *
+     * Every table the signed-in user may see is shown with no configuration at
+     * all (`GET /api/schema/tables`); a customization only states what differs
+     * from those defaults. One for a table the user is not served is ignored,
+     * with a warning in development. Two for the same table throw.
+     *
+     * @example
+     * ```tsx
+     * const postsCms = customizeTable<typeof posts>("posts", { icon: "FileText", group: "Content" });
+     * <RebaseCMS tableCustomizations={[postsCms]}/>
+     * ```
+     */
+    tableCustomizations?: readonly TableCustomization[];
+
+    /**
+     * Collections whose rows live outside the Rebase backend — Firestore's,
+     * from `defineFirestoreCollection` — shown beside the tables in the same
+     * navigation, search and reference picker. Each is read through the data
+     * source it names (`dataSource`, registered on `<Rebase dataSources>`), and
+     * references between them and the tables resolve in both directions.
+     *
+     * A slug may name one collection only: an external collection with the slug
+     * of a served table, or of another collection, throws, naming both.
+     *
+     * @example
+     * ```tsx
+     * const events = defineFirestoreCollection({ slug: "fs_events", path: "events", dataSource: "firestore", fields: { … } });
+     * <RebaseCMS externalCollections={[events]}/>
+     * ```
+     */
+    externalCollections?: readonly AdminCollection[];
 
     /**
      * Custom top-level views added to the main navigation.

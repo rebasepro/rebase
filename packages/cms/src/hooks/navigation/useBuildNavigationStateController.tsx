@@ -21,6 +21,12 @@ export type BuildNavigationStateProps<EC extends AdminCollection, USER extends U
     plugins?: RebasePlugin[];
     navigationGroupMappings?: NavigationGroupMapping[];
     disabled?: boolean;
+    /**
+     * What the collections are built from is still being fetched: the
+     * navigation reports `loading` until the collections built from what
+     * arrives are registered. See `useResolvedCollections`.
+     */
+    collectionsPending?: boolean;
     viewsOrder?: string[];
     collectionRegistryController: CollectionRegistryController<EC> & { collectionRegistryRef: React.MutableRefObject<CollectionRegistry> };
     urlController: UrlController;
@@ -52,6 +58,7 @@ export function useBuildNavigationStateController<EC extends AdminCollection, US
         plugins,
         data,
         disabled,
+        collectionsPending,
         navigationGroupMappings,
         collectionRegistryController,
         urlController,
@@ -70,6 +77,7 @@ export function useBuildNavigationStateController<EC extends AdminCollection, US
         data,
         plugins,
         disabled,
+        pending: collectionsPending,
         collectionRegistryController
     });
 

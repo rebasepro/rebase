@@ -140,6 +140,8 @@ export const de: RebaseTranslations = {
     home: "Startseite",
     this_form_has_errors: "Dieses Formular enthält Fehler",
     error_loading_navigation: "Fehler beim Laden der Navigation",
+    tables_load_failed: "Die Tabellen des Servers konnten nicht geladen werden: {{message}}",
+    tables_load_signed_out: "Der Server hat die Liste seiner Tabellen verweigert, weil Ihre Sitzung nicht mehr gültig ist. Melden Sie sich erneut an.",
     error_loading_auth: "Fehler beim Laden der Authentifizierung",
     this_form_has_been_modified: "Dieses Formular wurde geändert",
     current_form_in_sync: "Das aktuelle Formular ist mit der Datenbank synchron",

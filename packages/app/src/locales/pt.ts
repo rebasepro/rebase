@@ -145,6 +145,8 @@ export const pt: RebaseTranslations = {
     home: "Início",
     this_form_has_errors: "Este formulário tem erros",
     error_loading_navigation: "Erro ao carregar navegação",
+    tables_load_failed: "Não foi possível carregar as tabelas do servidor: {{message}}",
+    tables_load_signed_out: "O servidor não listou as suas tabelas porque a sua sessão já não é válida. Inicie sessão novamente.",
     error_loading_auth: "Erro ao carregar autenticação",
     this_form_has_been_modified: "Este formulário foi modificado",
     current_form_in_sync: "O formulário atual está sincronizado com a base de dados",

@@ -21,6 +21,7 @@ export function useAsyncResolver<T>({
     isEqual,
     deps,
     disabled,
+    pending = false,
 }: {
     /** Async function that resolves the data */
     resolver: () => Promise<T>;
@@ -32,6 +33,13 @@ export function useAsyncResolver<T>({
     deps: React.DependencyList;
     /** When true, skip resolution */
     disabled?: boolean;
+    /**
+     * The input is not ready yet (it is being fetched): do not resolve, and
+     * report `loading` — not only now but until the first resolution after it
+     * clears has finished, so no render sees the input ready and the result
+     * still the old one.
+     */
+    pending?: boolean;
 }): UseAsyncResolverResult<T> {
 
     const [data, setData] = useState<T>(initialValue);
@@ -56,6 +64,10 @@ export function useAsyncResolver<T>({
     isEqualRef.current = isEqual;
 
     useEffect(() => {
+        if (pending) {
+            setLoading(true);
+            return;
+        }
         if (disabled) return;
 
         let cancelled = false;
@@ -89,12 +101,12 @@ export function useAsyncResolver<T>({
             cancelled = true;
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [...deps, refreshTrigger, disabled]);
+    }, [...deps, refreshTrigger, disabled, pending]);
 
     return useMemo(() => ({
         data,
-        loading,
+        loading: loading || pending,
         error,
         refresh
-    }), [data, loading, error, refresh]);
+    }), [data, loading, pending, error, refresh]);
 }

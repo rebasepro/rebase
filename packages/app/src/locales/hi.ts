@@ -140,6 +140,8 @@ export const hi: RebaseTranslations = {
     home: "होम",
     this_form_has_errors: "इस फॉर्म में त्रुटियाँ हैं",
     error_loading_navigation: "नेविगेशन लोड करने में त्रुटि",
+    tables_load_failed: "सर्वर की टेबल लोड नहीं हो सकीं: {{message}}",
+    tables_load_signed_out: "आपका सत्र अब मान्य नहीं है, इसलिए सर्वर ने अपनी टेबल की सूची नहीं दी। फिर से साइन इन करें।",
     error_loading_auth: "प्रमाणीकरण लोड करने में त्रुटि",
     this_form_has_been_modified: "इस फॉर्म को संशोधित किया गया है",
     current_form_in_sync: "वर्तमान फॉर्म डेटाबेस के साथ सिंक में है",

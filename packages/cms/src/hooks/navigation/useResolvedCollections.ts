@@ -17,6 +17,12 @@ export type UseResolvedCollectionsProps<EC extends AdminCollection, USER extends
     data: RebaseSdkData;
     plugins?: RebasePlugin[];
     disabled?: boolean;
+    /**
+     * What the collections are built from is still being fetched (the tables
+     * the server serves): nothing is resolved meanwhile, and `loading` stays
+     * true until the collections built from what arrived are registered.
+     */
+    pending?: boolean;
     collectionRegistryController: CollectionRegistryController<EC> & { collectionRegistryRef: React.MutableRefObject<CollectionRegistry> };
 
 };
@@ -49,6 +55,7 @@ export function useResolvedCollections<EC extends AdminCollection, USER extends 
         data,
         plugins,
         disabled,
+        pending,
         collectionRegistryController
     } = props;
 
@@ -91,6 +98,7 @@ export function useResolvedCollections<EC extends AdminCollection, USER extends 
         isEqual: areCollectionListsEqual,
         deps: [collectionsProp, userIdentity, disabled],
         disabled: disabled || authController.initialLoading,
+        pending
     });
 
     return useMemo(() => ({

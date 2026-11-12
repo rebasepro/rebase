@@ -15,6 +15,12 @@ export { customizeTable } from "./tables/customize_table";
 export { applyTableCustomization, applyTableCustomizations } from "./tables/apply_customization";
 export type { TableCollection } from "./tables/apply_customization";
 export { updateRecord } from "./tables/update_record";
+export { collectionFromTable, collectionsFromTables } from "./tables/project_table";
+export type { ProjectedCollection, TableProjectionContext } from "./tables/project_table";
+export { useTableDescriptors } from "./hooks/useTableDescriptors";
+export type { TableDescriptorsState, TableDescriptorsStatus, UseTableDescriptorsOptions } from "./hooks/useTableDescriptors";
+export { composeCollections } from "./hooks/navigation/compose_collections";
+export type { CollectionSources } from "./hooks/navigation/compose_collections";
 export type {
     AnyFieldCustomization,
     CustomizableTable,

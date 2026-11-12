@@ -1,48 +1,70 @@
-import React, { useLayoutEffect, useMemo } from "react";
+import React, { useLayoutEffect } from "react";
 import { useRebaseEmbedHost, useRebaseRegistryDispatch } from "@rebasepro/app";
-import type { AdminCollection, CollectionConfigsBuilder, RebaseCMSConfig } from "@rebasepro/cms-types";
+import type { RebaseCMSConfig } from "@rebasepro/cms-types";
 
 /**
- * Declarative component to configure the admin in Rebase.
- * Renders nothing — purely registers config into the RebaseRegistry.
+ * The admin panel's content: every table the backend serves the signed-in
+ * user, with no configuration at all, plus what you add.
+ *
+ * Renders nothing — it registers its configuration with `<Rebase>`, and
+ * `<RebaseShell>` draws the panel from it.
+ *
+ * - `tableCustomizations` — `customizeTable(...)` results: labels, icons, view
+ *   modes, field components and actions for the served tables.
+ * - `externalCollections` — collections whose rows live elsewhere
+ *   (`defineFirestoreCollection`), side by side with the tables.
+ * - `collections` — collections declared in code, as before the tables were
+ *   served; one with the slug of a served table wins over it.
  *
  * When `collectionEditor` is provided, the built-in visual schema editor
  * is auto-wired as a native feature (slots, provider, Studio view) without
  * needing any external plugin.
+ *
+ * @example
+ * ```tsx
+ * <Rebase client={rebaseClient} dataSources={[firestoreSource]} authController={authController}>
+ *     <RebaseAuth/>
+ *     <RebaseCMS tableCustomizations={[postsCms]} externalCollections={[firestoreEvents]}/>
+ *     <RebaseShell title="Acme Ops"/>
+ * </Rebase>
+ * ```
  */
-export function RebaseCMS({ collections: collectionsProp, views, homePage, entityViews, collectionViews, entityActions, collectionEditor: collectionEditorProp, navigationGroupMappings, basePath }: RebaseCMSConfig) {
+export function RebaseCMS({
+    collections,
+    tableCustomizations,
+    externalCollections,
+    views,
+    homePage,
+    entityViews,
+    collectionViews,
+    entityActions,
+    collectionEditor: collectionEditorProp,
+    navigationGroupMappings,
+    basePath
+}: RebaseCMSConfig) {
     const dispatch = useRebaseRegistryDispatch();
 
-    // In an embedding (an MCP App view, `embed_host.ts`), the collections are
-    // the app's own — custom fields, previews, views and actions included —
-    // narrowed to what the person may see and do there; and the schema
-    // editor, which writes the project's files, is not offered.
-    const embed = useRebaseEmbedHost();
-    const narrow = embed?.narrowCollections;
-    const collections = useMemo(() => narrow && collectionsProp ? narrowed(collectionsProp, narrow) : collectionsProp,
-        [collectionsProp, narrow]);
-    const collectionEditor = embed ? undefined : collectionEditorProp;
+    // In an embedding (an MCP App view, `embed_host.ts`) the schema editor,
+    // which writes the project's files, is not offered. The collections are
+    // narrowed there by the navigation, which composes them.
+    const collectionEditor = useRebaseEmbedHost() ? undefined : collectionEditorProp;
 
     useLayoutEffect(() => {
-        dispatch.registerAdmin({ collections,
-views,
-homePage,
-entityViews,
-collectionViews,
-entityActions,
-collectionEditor,
-navigationGroupMappings,
-basePath });
+        dispatch.registerAdmin({
+            collections,
+            tableCustomizations,
+            externalCollections,
+            views,
+            homePage,
+            entityViews,
+            collectionViews,
+            entityActions,
+            collectionEditor,
+            navigationGroupMappings,
+            basePath
+        });
         return () => dispatch.unregisterAdmin();
-    }, [dispatch, collections, views, homePage, entityViews, collectionViews, entityActions, collectionEditor, navigationGroupMappings, basePath]);
+    }, [dispatch, collections, tableCustomizations, externalCollections, views, homePage, entityViews, collectionViews, entityActions, collectionEditor, navigationGroupMappings, basePath]);
 
     return null;
-}
-
-function narrowed(
-    collections: AdminCollection[] | CollectionConfigsBuilder,
-    narrow: (collections: AdminCollection[]) => AdminCollection[]
-): AdminCollection[] | CollectionConfigsBuilder {
-    if (Array.isArray(collections)) return narrow(collections);
-    return async params => narrow(await collections(params));
 }

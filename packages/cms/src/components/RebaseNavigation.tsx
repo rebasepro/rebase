@@ -14,21 +14,28 @@ import {
     useBridgeRegistration,
     CustomizationControllerContext,
     RebaseDataContext,
-    useRebaseEmbedHost
+    useRebaseEmbedHost,
+    useTranslation
 } from "@rebasepro/app";
 import { buildRoutedRebaseData, resolveDataSource } from "@rebasepro/common";
 import { CircularProgressCenter, lazyChunk } from "@rebasepro/ui";
 
-import type { AppView, CollectionCustomView, CollectionEditorOptions, EntityCustomView, EntityAction, RebasePlugin, AdminCollection } from "@rebasepro/cms-types";
+import type { AppView, CollectionCustomView, CollectionEditorOptions, EntityCustomView, EntityAction, RebasePlugin, AdminCollection, TableCustomization } from "@rebasepro/cms-types";
+import { RebaseApiError } from "@rebasepro/types";
 import type { CollectionRegistryController } from "@rebasepro/types";
 import type { UrlController, NavigationStateController } from "@rebasepro/cms-types";
 
 const EMPTY_PLUGINS: RebasePlugin[] = [];
 const EMPTY_COLLECTIONS: AdminCollection[] = [];
+const NO_CUSTOMIZATIONS: readonly TableCustomization[] = [];
+const NO_EXTERNAL_COLLECTIONS: readonly AdminCollection[] = [];
 
 import { useBuildNavigationStateController } from "../hooks/navigation/useBuildNavigationStateController";
 import { useBuildUrlController } from "../hooks/navigation/useBuildUrlController";
 import { useBuildCollectionRegistryController } from "../hooks/navigation/useBuildCollectionRegistryController";
+import { composeCollectionsInput } from "../hooks/navigation/compose_collections_input";
+import { registeredCollection } from "../hooks/navigation/registered_collection";
+import { useTableDescriptors } from "../hooks/useTableDescriptors";
 
 import { CollectionRegistryContext } from "../hooks/navigation/contexts/CollectionRegistryContext";
 import { UrlContext } from "../hooks/navigation/contexts/UrlContext";
@@ -97,11 +104,32 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
         return collectionEditorConfig;
     }, [collectionEditorConfig]);
 
-    // ── Combine admin and Studio Configs ────────────────────────────────
+    // ── The collections: served tables, external, declared in code ─────
+    // Every table the server serves the signed-in user, projected and
+    // customized, beside the collections whose rows live elsewhere
+    // (Firestore) and those the app still declares in code. Only with a
+    // <RebaseCMS> registered: a Studio alone shows no collections.
     const cmsCollections = registry.cmsConfig?.collections ?? EMPTY_COLLECTIONS;
+    const tableCustomizations = registry.cmsConfig?.tableCustomizations ?? NO_CUSTOMIZATIONS;
+    const externalCollections = registry.cmsConfig?.externalCollections ?? NO_EXTERNAL_COLLECTIONS;
+    const descriptors = useTableDescriptors({ enabled: registry.cmsConfig !== null });
+    const servedTables = descriptors.tables;
+
+    // In an embedding (an MCP App view, `embed_host.ts`), the collections are
+    // the app's own — custom fields, previews, views and actions included —
+    // narrowed to what the person may see and do there.
+    const narrow = useRebaseEmbedHost()?.narrowCollections;
 
     // ── Build the navigation controllers ──────────────────────────────
-    const collectionsBuilder = useMemo(() => Array.isArray(cmsCollections) ? () => [...cmsCollections] : cmsCollections, [cmsCollections]);
+    const collectionsBuilder = useMemo(() => {
+        const composed = composeCollectionsInput(cmsCollections, {
+            tables: servedTables,
+            tableCustomizations,
+            externalCollections
+        });
+        if (!narrow) return composed;
+        return async (params: Parameters<typeof composed>[0]) => narrow(await composed(params));
+    }, [cmsCollections, servedTables, tableCustomizations, externalCollections, narrow]);
 
     const dataSources = useDataSources();
     const collectionRegistryController = useBuildCollectionRegistryController({ userConfigPersistence, dataSources: dataSources.registry });
@@ -166,7 +194,7 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
     const rebaseClient = useRebaseClient();
     const authController = useAuthController();
     const resolvedCollections = useMemo(
-        () => Array.isArray(cmsCollections) ? cmsCollections : [],
+        () => Array.isArray(cmsCollections) ? cmsCollections.map(registeredCollection) : EMPTY_COLLECTIONS,
         [cmsCollections]
     );
 
@@ -268,9 +296,13 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
 
     const parentCustomizationController = useCustomizationController();
 
-    const navigationStateController = useBuildNavigationStateController({
+    const builtNavigationStateController = useBuildNavigationStateController({
         plugins: parentCustomizationController.plugins ?? EMPTY_PLUGINS,
         collections: collectionsBuilder,
+        // Until the tables arrive, no route that needs a collection renders:
+        // they show the loading state, not "collection not found", and a deep
+        // link resolves once the collections built from them are registered.
+        collectionsPending: descriptors.status === "loading",
         views: mergedViews,
         navigationGroupMappings: registry.cmsConfig?.navigationGroupMappings,
         authController: context.authController!,
@@ -280,6 +312,37 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
         urlController,
         adminMode: adminModeController?.mode
     });
+
+    // A failure to load the tables is the navigation's loading error: the home
+    // page and a route to a collection that could not be built say what failed
+    // and offer to retry. A session the server no longer accepts is the
+    // client's to renew, and it signs out when it cannot — so the error says to
+    // sign in again.
+    //
+    // Refreshing the navigation asks for the tables again too: it is what the
+    // collection editor calls after it changed the schema, and with an `ETag`
+    // an unchanged schema costs a 304.
+    const { t } = useTranslation();
+    const tablesError = descriptors.status === "error" ? descriptors.error : undefined;
+    const reloadTables = descriptors.reload;
+    const tablesInUse = registry.cmsConfig !== null && !descriptors.unavailable;
+    const navigationStateController = useMemo<NavigationStateController>(() => {
+        if (!tablesInUse) return builtNavigationStateController;
+        const signedOut = tablesError instanceof RebaseApiError && tablesError.status === 401;
+        const error = tablesError
+            ? new Error(signedOut
+                ? t("tables_load_signed_out")
+                : t("tables_load_failed", { message: tablesError.message }), { cause: tablesError })
+            : undefined;
+        return {
+            ...builtNavigationStateController,
+            navigationLoadingError: builtNavigationStateController.navigationLoadingError ?? error,
+            refreshNavigation: () => {
+                reloadTables();
+                builtNavigationStateController.refreshNavigation();
+            }
+        };
+    }, [builtNavigationStateController, tablesInUse, tablesError, reloadTables, t]);
 
     // ── Merge admin-registered entityViews/entityActions into the customization controller ──
     // The <Rebase> component builds the customizationController from its own props,

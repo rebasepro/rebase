@@ -12,11 +12,12 @@ import {
 } from "@rebasepro/app";
 import { buildRoutedRebaseData, CollectionRegistry, resolveDataSource } from "@rebasepro/common";
 import { resolveAdminCollection } from "@rebasepro/cms-types";
-import type { AdminCollection, AppView, RebasePlugin, UrlController } from "@rebasepro/cms-types";
+import type { AppView, PanelCollection, RebasePlugin, UrlController } from "@rebasepro/cms-types";
 
 import { useBuildCollectionRegistryController } from "../hooks/navigation/useBuildCollectionRegistryController";
 import { useBuildUrlController } from "../hooks/navigation/useBuildUrlController";
 import { useBuildNavigationStateController } from "../hooks/navigation/useBuildNavigationStateController";
+import { registeredCollection } from "../hooks/navigation/registered_collection";
 import { CollectionRegistryContext } from "../hooks/navigation/contexts/CollectionRegistryContext";
 import { UrlContext } from "../hooks/navigation/contexts/UrlContext";
 import { NavigationStateContext } from "../hooks/navigation/contexts/NavigationStateContext";
@@ -44,11 +45,13 @@ const NO_VIEWS: AppView[] = [];
  */
 export interface CollectionsProviderProps {
     /**
-     * The collections this scope can show and edit — `defineCollection`
-     * configs or resolved collections. Keep the array stable (a module
-     * constant, or `useMemo`): a new array is a new set of collections.
+     * The collections this scope can show and edit — a table's collection
+     * (`collectionFromTable`, customized with `applyTableCustomization`), a
+     * `defineFirestoreCollection`, or a collection declared in code. Keep the
+     * array stable (a module constant, or `useMemo`): a new array is a new set
+     * of collections.
      */
-    collections: AdminCollection[];
+    collections: PanelCollection[];
     children: React.ReactNode;
 }
 
@@ -132,7 +135,7 @@ export function CollectionsProvider({ collections, children }: CollectionsProvid
         routesMounted: false
     }), [builtUrlController]);
 
-    const resolvedCollections = useMemo(() => collections.map(collection => resolveAdminCollection(collection)), [collections]);
+    const resolvedCollections = useMemo(() => collections.map(collection => resolveAdminCollection(registeredCollection(collection))), [collections]);
     const navigationStateController = useBuildNavigationStateController({
         plugins: customizationController.plugins ?? EMPTY_PLUGINS,
         collections: resolvedCollections,

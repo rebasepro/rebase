@@ -1,7 +1,7 @@
 import type { HomePageSection, NavigationEntry, NavigationGroupMapping, PluginGenericProps } from "@rebasepro/cms-types";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Fuse from "fuse.js";
-import { Container, SearchBar } from "@rebasepro/ui";
+import { CircularProgressCenter, Container, SearchBar } from "@rebasepro/ui";
 import { AnalyticsEvent, studioSchemaToolEnabled } from "@rebasepro/cms-types";
 import { FavouritesView } from "./FavouritesView";
 import { ErrorBoundary } from "@rebasepro/ui";
@@ -26,6 +26,15 @@ import { SchemaDriftBanner } from "@rebasepro/app";
 import { useBreadcrumbsController } from "../../hooks/useBreadcrumbsController";
 import { useAdminContext } from "../../hooks/useAdminContext";
 import { NavigationLoadingErrorView } from "../NavigationLoadingErrorView";
+
+/**
+ * What the page reads while the navigation is not built yet. Constants: a
+ * fresh `[]` per render fed the memos below a new input every time, and their
+ * effect's `setState` rendered again — a loop for as long as there were no
+ * collections, which is the whole time the served tables are loading.
+ */
+const NO_ENTRIES: NavigationEntry[] = [];
+const NO_GROUPS: string[] = [];
 
 export const DEFAULT_GROUP_NAME = "Views";
 export const ADMIN_GROUP_NAME = "Admin";
@@ -61,8 +70,8 @@ export function ContentHomePage({
 
     const {
         allowDragAndDrop = false,
-        navigationEntries: unFilteredNavigationEntries = [],
-        groups: unFilteredGroupOrder = [],
+        navigationEntries: unFilteredNavigationEntries = NO_ENTRIES,
+        groups: unFilteredGroupOrder = NO_GROUPS,
         onNavigationEntriesUpdate = () => {}
     } = navigationStateController.topLevelNavigation || {};
 
@@ -356,6 +365,10 @@ export function ContentHomePage({
                         <NavigationLoadingErrorView error={navigationStateController.navigationLoadingError}
                             onRetry={navigationStateController.refreshNavigation}/>
                     </div>}
+
+                {/* The collections are still being built (the served tables are on their way). */}
+                {navigationStateController.loading && rawNavigationEntries.length === 0 &&
+                    <CircularProgressCenter/>}
 
                 <FavouritesView hidden={performingSearch}/>
 

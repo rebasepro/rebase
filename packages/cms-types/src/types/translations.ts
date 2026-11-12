@@ -306,6 +306,10 @@ export interface RebaseTranslations {
     home: string;
     this_form_has_errors: string;
     error_loading_navigation: string;
+    /** The panel could not load the tables the server serves; `{{message}}` is why. */
+    tables_load_failed: string;
+    /** The server refused to list its tables because the session is no longer valid. */
+    tables_load_signed_out: string;
     error_loading_auth: string;
     this_form_has_been_modified: string;
     current_form_in_sync: string;

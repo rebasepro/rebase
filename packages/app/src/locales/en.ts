@@ -148,6 +148,8 @@ export const en: RebaseTranslations = {
     home: "Home",
     this_form_has_errors: "This form has errors",
     error_loading_navigation: "Error loading navigation",
+    tables_load_failed: "The server's tables could not be loaded: {{message}}",
+    tables_load_signed_out: "The server would not list its tables because your session is no longer valid. Sign in again.",
     error_loading_auth: "Error loading auth",
     this_form_has_been_modified: "This form has been modified",
     current_form_in_sync: "The current form is in sync with the database",
