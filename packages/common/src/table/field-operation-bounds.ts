@@ -56,7 +56,8 @@ export type FieldOperationBounds = NumberOperationBounds | ArrayOperationBounds;
  * - a numeric column: `validate({ min, max, moreThan, lessThan, positive,
  *   negative })`, for `$inc`;
  * - a list (`fieldOperationKind` is `"array"`): `validate({ minItems,
- *   maxItems })`, for `$push` and `$pull`.
+ *   maxItems })` — on the column, or on the `json.array()` shape of a JSON
+ *   list — for `$push` and `$pull`.
  *
  * `uniqueItems` / `uniqueBy` are not bounds of the result's size; the request
  * checks the pushed items against them. Replaces the `property.type` and
@@ -65,7 +66,9 @@ export type FieldOperationBounds = NumberOperationBounds | ArrayOperationBounds;
  * @group Table
  */
 export function fieldOperationBounds(column: ColumnDescriptor): FieldOperationBounds | undefined {
-    const rules = column.validate;
+    // A JSON list states its size rules on its shape (`json.array(…).validate()`);
+    // a lifted legacy array states them on the column.
+    const rules = column.validate ?? (column.json?.kind === "array" ? column.json.validate : undefined);
     if (!rules) return undefined;
     const kind = fieldOperationKind(column);
     if (kind === "number") {

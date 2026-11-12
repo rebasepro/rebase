@@ -140,8 +140,8 @@ describe("compileFieldOpBounds", () => {
             id: col.integer().primaryKey(),
             views: col.integer().validate({ min: 0, max: 10, moreThan: -1, lessThan: 11, positive: true, negative: true }),
             tags: col.array(col.text()).validate({ minItems: 1, maxItems: 3 }),
-            jsonTags: col.jsonb(jsonShape.array(jsonShape.string())).validate({ minItems: 1, maxItems: 3 }),
-            legacyTags: col.json(jsonShape.array(jsonShape.string())).validate({ maxItems: 3 }),
+            jsonTags: col.jsonb(jsonShape.array(jsonShape.string()).validate({ minItems: 1, maxItems: 3 })),
+            legacyTags: col.json(jsonShape.array(jsonShape.string()).validate({ maxItems: 3 })),
             meta: col.jsonb(jsonShape.object({}))
         },
         rls: "admin-only"

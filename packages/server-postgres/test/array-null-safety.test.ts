@@ -6,7 +6,7 @@ import {
     serializeDataToServer
 } from "../src/data-transformer";
 import { liftedColumnOf, runtimeTableOf } from "./helpers/codec-columns";
-import type { Property, Properties, CollectionConfig, PostgresCollectionConfig, PostgresProperty } from "@rebasepro/types";
+import type { Property, PostgresProperties, CollectionConfig, PostgresCollectionConfig, PostgresProperty } from "@rebasepro/types";
 
 // ─────────────────────────────────────────────────────────────
 // Fixture helpers
@@ -271,7 +271,7 @@ describe("serializeDataToServer — entity with null array fields", () => {
         }
     };
 
-    const properties: Properties = {
+    const properties: PostgresProperties = {
         tags: tagsProperty
     };
 
@@ -306,7 +306,7 @@ describe("serializeDataToServer — entity with null array fields", () => {
 
     // ── Multiple array fields, mixed null / populated ──
     it("handles entity with multiple array fields, some null, some populated", () => {
-        const multiProperties: Properties = {
+        const multiProperties: PostgresProperties = {
             tags: tagsProperty,
             categories: categoriesProperty
         };
@@ -321,7 +321,7 @@ describe("serializeDataToServer — entity with null array fields", () => {
 
     // ── Nested map containing null array ──
     it("handles entity with nested map containing array field that is null", () => {
-        const nestedProperties: Properties = {
+        const nestedProperties: PostgresProperties = {
             metadata: metadataProperty
         };
 
@@ -335,7 +335,7 @@ describe("serializeDataToServer — entity with null array fields", () => {
 
     // ── All array fields null ──
     it("handles entity with only array fields, all null — scalarData should have all null values", () => {
-        const allArrayProperties: Properties = {
+        const allArrayProperties: PostgresProperties = {
             tags: tagsProperty,
             categories: categoriesProperty
         };

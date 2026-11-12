@@ -1,4 +1,4 @@
-import { col, defineTable, type AnyColumn, type AnyTableDef, type AnyViewDef, type CollectionConfig, type ColumnDescriptor, type Property } from "@rebasepro/types";
+import { col, defineTable, type AnyColumn, type AnyTableDef, type AnyViewDef, type CollectionConfig, type ColumnDescriptor, type PostgresProperty } from "@rebasepro/types";
 import { compileSchema } from "@rebasepro/common";
 import { buildRuntimeTable, type RuntimeTable } from "../../src/model/runtime-table";
 import { FixtureTableRegistry } from "./tables";
@@ -42,7 +42,7 @@ export function runtimeTableOf(collection: CollectionConfig, ...others: Collecti
 }
 
 /** The column a legacy property compiles to, as the `value` column of a one-property collection. */
-export function liftedColumnOf(property: Property): ColumnDescriptor {
+export function liftedColumnOf(property: PostgresProperty): ColumnDescriptor {
     const column = runtimeTableOf({
         slug: "codec_probe",
         name: "Codec probe",

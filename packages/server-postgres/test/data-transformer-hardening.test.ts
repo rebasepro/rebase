@@ -7,7 +7,7 @@ import {
 } from "../src/data-transformer";
 import { liftedColumnOf, runtimeTableOf } from "./helpers/codec-columns";
 import { pgTable, varchar, type AnyPgColumn } from "drizzle-orm/pg-core";
-import type { PostgresCollectionConfig, Properties } from "@rebasepro/types";
+import type { PostgresCollectionConfig, PostgresProperties } from "@rebasepro/types";
 
 // ─────────────────────────────────────────────────────────────
 // Fixture helpers
@@ -29,7 +29,7 @@ function makeCollection(
 // serializeDataToServer — typed return (Issue #7 regression)
 // ─────────────────────────────────────────────────────────────
 describe("serializeDataToServer typed return", () => {
-    const properties: Properties = {
+    const properties: PostgresProperties = {
         title: { type: "string",
 name: "Title" },
         count: { type: "number",
@@ -149,14 +149,14 @@ name: "Name" }
     const table = runtimeTableOf(collection, targetCollection);
 
     it("produces a relation ref with __type 'relation' from a string key on the relation", async () => {
-        const result = (await parseDataFromServer({ author: "author-123" }, table, collection)).author as Record<string, unknown>;
+        const result = (await parseDataFromServer<Record<string, unknown>>({ author: "author-123" }, table, collection)).author as Record<string, unknown>;
         expect(result.__type).toBe("relation");
         expect(result.id).toBe("author-123");
         expect(result.path).toBe("authors");
     });
 
     it("produces a relation ref with __type 'relation' from a numeric key on the relation", async () => {
-        const result = (await parseDataFromServer({ author: 42 }, table, collection)).author as Record<string, unknown>;
+        const result = (await parseDataFromServer<Record<string, unknown>>({ author: 42 }, table, collection)).author as Record<string, unknown>;
         expect(result.__type).toBe("relation");
         expect(result.id).toBe("42");
         expect(result.path).toBe("authors");
@@ -425,7 +425,7 @@ authorId: null }, runtimeTableOf(collection)
 // ─────────────────────────────────────────────────────────────
 describe("structural dunder guard", () => {
     it("scalarData never contains any __ prefixed keys", () => {
-        const properties: Properties = {
+        const properties: PostgresProperties = {
             title: { type: "string",
 name: "Title" },
             count: { type: "number",
@@ -451,7 +451,7 @@ active: true },
 name: "Label" }
         });
 
-        const properties: Properties = {
+        const properties: PostgresProperties = {
             title: { type: "string",
 name: "Title" },
             tag: {
