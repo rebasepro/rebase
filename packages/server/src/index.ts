@@ -66,6 +66,20 @@ export { rebase, _setRebaseMock, _resetRebaseMock } from "./singleton";
 // test or a script without booting a driver.
 export { composeCallbacks, createCallContext } from "@rebasepro/common";
 
+// The single definition of "the tables": boot, the stock runtime, `rebase db
+// generate`, the doctor and SDK generation all read backend/schema through
+// this, so what is served and what is protected can never drift apart.
+export {
+    loadBackendSchema,
+    compileLoadedSchema,
+    compileSchemaDefs,
+    SchemaLoadError,
+    isSchemaLoadError,
+    type LoadedSchema,
+    type LoadBackendSchemaOptions,
+    type CompiledSchema
+} from "./schema/load-schema";
+
 // The single definition of "the collections" — the runtime, the schema and
 // policy generators, and the doctor all load them through this, so what gets
 // served and what gets pushed can never drift apart.
