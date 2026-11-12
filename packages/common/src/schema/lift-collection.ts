@@ -1661,4 +1661,3 @@ function nonEmpty<T>(items: readonly T[]): readonly [T, ...T[]] | undefined {
     const [first, ...rest] = items;
     return first === undefined ? undefined : [first, ...rest];
 }
-
