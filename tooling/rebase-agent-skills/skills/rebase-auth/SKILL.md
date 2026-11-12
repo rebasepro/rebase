@@ -120,8 +120,8 @@ export const members = defineAuthTable("members", {
         id: col.uuid().primaryKey().defaultRandom(),
         email: col.text().notNull().unique(),
         displayName: col.text(),
-        roles: col.array(col.text().oneOf(["admin", "support", "editor"])),
-        createdAt: col.timestamptz().onCreateNow()
+        roles: col.text({ enum: ["admin", "support", "editor"] }).array(),
+        createdAt: col.timestamp({ withTimezone: true }).onCreateNow()
     },
     // Editors may list members; everyone reads their own row through the injected policy.
     rls: [{ operation: "select", roles: ["editor"] }],
@@ -148,7 +148,7 @@ export const members = defineAuthTable("members", {
 ```
 
 The password hash and the verification token are private whatever the
-declaration says. Declaring `roles` as `col.array(col.text().oneOf([...]))`
+declaration says. Declaring `roles` as `col.text({ enum: [...] }).array()`
 closes it to the roles you name. The scaffold's `backend/schema/users.ts` and
 `app/backend/schema/users.ts` are worked examples.
 

@@ -956,7 +956,7 @@ export const exercisesCms = customizeTable<typeof exercises>("exercises", {
 ```
 
 The table in `backend/schema/exercises.ts` declares the column
-(`body_parts: col.array(col.text().oneOf([...]))`); the frontend imports it as
+(`body_parts: col.text({ enum: [...] }).array()`); the frontend imports it as
 a type only, so no server code reaches the browser.
 
 The component itself is ordinary React, in `frontend/`:

@@ -47,8 +47,8 @@ export const tasks = defineTable("tasks", {
         status: col.enum(["todo", "doing", "done"]).notNull().default("todo"),
         dueDate: col.date(),
         ownerId: col.uuid().notNull().onCreateUser(),
-        createdAt: col.timestamptz().onCreateNow(),
-        updatedAt: col.timestamptz().onUpdateNow(),
+        createdAt: col.timestamp({ withTimezone: true }).onCreateNow(),
+        updatedAt: col.timestamp({ withTimezone: true }).onUpdateNow(),
         __order: col.text().describe("Fractional index maintained by the Kanban board")
     },
     relations: {
@@ -197,12 +197,13 @@ below.
 | SQL table | the name | `table: "blog_posts"` |
 | API slug, SDK accessor, scope target | the name | `slug: "articles"` |
 | Postgres schema | `public` | `schema: "content"` |
-| SQL column of a column | the snake_case of its key | `.column("legacy_name")` |
+| SQL column of a column | the snake_case of its key | the builder's leading argument, `col.text("legacy_name")` |
 
 A column's key is its name on the JSON row, in the SDK, in filters and sorts;
 its SQL name is the snake_case of the key (`publishDate` → `publish_date`).
-`.column()` maps a key to any other SQL name, which is how a table adopts an
-existing database's names without changing what clients see.
+A builder's optional first argument, as in Drizzle, maps a key to any other SQL
+name (`col.text("legacy_name")`), which is how a table adopts an existing
+database's names without changing what clients see.
 
 The slug matters beyond the URL: foreign-key and junction column names are
 derived from it, so changing the slug of a deployed table can rename columns.
@@ -215,21 +216,35 @@ A column is a `col.*` builder refined by modifiers. The builder decides the
 Postgres type; the modifiers say the rest. Builders are immutable, so a column
 can be declared once and shared between tables.
 
+After the dot a column reads like Drizzle's `pg-core`: the same builder names,
+an optional SQL column name first, then Drizzle's config object, then the chain
+(`col.varchar({ length: 32 })`, `col.timestamp({ withTimezone: true })`,
+`col.text().array()`, `.default(sql\`now()\`)`). A Drizzle spelling Rebase does
+not accept fails to compile with a message that says what to write instead.
+Two differences matter:
+
+- **A foreign key is a relation.** Declare it under `relations` with
+  `rel.belongsTo(() => users, { localKey: "author_id" })`; the relation's key is
+  what `include` names. `.references()` does not exist, and says so.
+- **`.defaultNow()` is a database default only** (`DEFAULT now()`, a client may
+  still send a value). `.onCreateNow()` is a server stamp: the server writes the
+  time on create whatever the client sent.
+
 ```ts
 import { defineTable, col } from "@rebasepro/server/schema";
 
 export const products = defineTable("products", {
     columns: {
         id:        col.uuid().primaryKey().defaultRandom(),
-        sku:       col.varchar(32).notNull().unique(),
+        sku:       col.varchar({ length: 32 }).notNull().unique(),
         name:      col.text().notNull().validate({ min: 2, max: 120, trim: true }),
-        price:     col.numeric(10, 2).notNull().validate({ min: 0 }),
+        price:     col.numeric({ precision: 10, scale: 2 }).notNull().validate({ min: 0 }),
         status:    col.enum(["draft", "active", "retired"]).notNull().default("draft"),
-        tags:      col.array(col.text()).validate({ maxItems: 10 }),
+        tags:      col.text().array().validate({ maxItems: 10 }),
         photo:     col.storage({ path: "products/", accept: ["image/*"], maxBytes: "5MB" }),
         createdBy: col.uuid().onCreateUser().readOnly(),
-        createdAt: col.timestamptz().notNull().onCreateNow(),
-        updatedAt: col.timestamptz().notNull().onUpdateNow()
+        createdAt: col.timestamp({ withTimezone: true }).notNull().onCreateNow(),
+        updatedAt: col.timestamp({ withTimezone: true }).notNull().onUpdateNow()
     },
     rls: "admin-only"
 });
@@ -240,21 +255,22 @@ export const products = defineTable("products", {
 | Builder | Postgres type | Wire type |
 |---|---|---|
 | `col.uuid()` | `UUID` | `string` |
-| `col.text()`, `col.varchar(n?)`, `col.char(n?)` | `TEXT`, `VARCHAR(n)`, `CHAR(n)` (n defaults to 255) | `string` |
-| `col.enum(values, { name? })` | a Postgres enum type, `<table>_<column>` unless named | the union of `values` |
-| `col.smallint()`, `col.integer()`, `col.bigint()` | `SMALLINT`, `INTEGER`, `BIGINT` | `number` |
-| `col.serial()`, `col.smallserial()`, `col.bigserial()` | the serial types (for existing schemas; prefer `.identity()`) | `number` |
-| `col.real()`, `col.doublePrecision()`, `col.numeric(p?, s?)` | `REAL`, `DOUBLE PRECISION`, `NUMERIC` | `number` |
+| `col.text()`, `col.varchar({ length })`, `col.char({ length })` | `TEXT`, `VARCHAR(n)`, `CHAR(n)` (the length is required) | `string`; `{ enum: [...] }` on any of them accepts only those values, typed as their union |
+| `col.enum(values)` | a Postgres enum type of its own, `<table>_<column>` | the union of `values` |
+| `const status = pgEnum("post_status", values)`, then `status()` | a named Postgres enum type, shared by every column of it | the union of `values` |
+| `col.smallint()`, `col.integer()`, `col.bigint({ mode: "number" })` | `SMALLINT`, `INTEGER`, `BIGINT` | `number` |
+| `col.serial()`, `col.smallserial()`, `col.bigserial({ mode: "number" })` | the serial types (for existing schemas; prefer `.generatedByDefaultAsIdentity()`) | `number` |
+| `col.real()`, `col.doublePrecision()`, `col.numeric({ precision?, scale? })` | `REAL`, `DOUBLE PRECISION`, `NUMERIC` | `number` |
 | `col.boolean()` | `BOOLEAN` | `boolean` |
-| `col.timestamptz()`, `col.date()`, `col.time()` | `TIMESTAMPTZ`, `DATE`, `TIME` | ISO `string` (a write also takes a `Date`) |
-| `col.jsonb<T>()` / `col.jsonb(shape)` | `JSONB` | `T`, or the shape's type — see [JSON columns](#json-columns) |
-| `col.json<T>()` / `col.json(shape)` | `JSON` | as `jsonb`; prefer `jsonb` |
-| `col.array(inner)` | `<inner>[]` | an array of the inner wire type (no arrays of arrays) |
-| `col.vector(dims, { index? })` | `vector(dims)` (pgvector), HNSW cosine index unless told otherwise | `number[]` |
+| `col.timestamp({ withTimezone: true })`, `col.date()`, `col.time()` | `TIMESTAMPTZ`, `DATE`, `TIME` | ISO `string` (a write also takes a `Date`) |
+| `col.jsonb().$type<T>()` / `col.jsonb(shape)` | `JSONB` | `T`, or the shape's type — see [JSON columns](#json-columns) |
+| `col.json().$type<T>()` / `col.json(shape)` | `JSON` | as `jsonb`; prefer `jsonb` |
+| `<builder>.array()`, e.g. `col.text().array()` | `<inner>[]` | an array of the inner wire type (no arrays of arrays) |
+| `col.vector({ dimensions, index? })` | `vector(dimensions)` (pgvector), HNSW cosine index unless told otherwise | `number[]` |
 | `col.bytea()` | `BYTEA` | base64 `string` |
 | `col.geopoint()` | `JSONB` | `{ latitude: number; longitude: number }` |
 | `col.storage(options)` | `TEXT` (`.multiple()`: `TEXT[]`) | the file's path |
-| `col.custom<T>("sqlType")` | any other Postgres type, as written | `T` (default `string`) |
+| `col.custom({ dataType: "inet" })` (`.$type<T>()` to type it) | any other Postgres type, as written | `string`, or `T` |
 
 ### Modifiers
 
@@ -263,18 +279,20 @@ export const products = defineTable("products", {
 | `.notNull()` | every column | `NOT NULL`; required on create unless it has a default. Columns are **nullable** otherwise, as in SQL. |
 | `.primaryKey()` | every column | part of the primary key (several make a composite key, in declaration order) |
 | `.unique()` | every column | single-column `UNIQUE`; a duplicate is a `409` |
-| `.default(value)` / `.defaultSql(expr)` / `.dbDefault()` | every column | a default; the column may be left out of a create |
-| `.generatedAs(expr)` | every column | `GENERATED ALWAYS AS (expr) STORED`; never writable |
-| `.column(name)` | every column | the SQL column name |
+| `.default(value)` / `.default(sql\`expr\`)` / `.dbDefault()` | every column | a default; the column may be left out of a create (`sql` is imported beside `col`) |
+| `.generatedAlwaysAs(sql\`expr\`)` | every column | `GENERATED ALWAYS AS (expr) STORED`; never writable |
+| `.$type<T>()` | every column | types the value for TypeScript only, as in Drizzle |
 | `.readOnly()` | every column | client writes refused; server code and the database still fill it |
 | `.private()` | every column | never on the wire, in the SDK or OpenAPI; server code and hooks see it |
 | `.access({ read?, write? })` | every column | per-role read and write (lists of role names) |
 | `.describe(text)` | every column | the description in OpenAPI and MCP |
 | `.validate(rules)` | every column | checked before every write; a `400` naming the column |
 | `.transform({ beforeSave?, afterRead? })` | every column | field-level hooks, see [Column transforms](#column-transforms) |
-| `.oneOf(values)` | text and numeric columns | only these values, typed as their union (on a text column, use it as an array item: `col.array(col.text().oneOf([...]))`; a single closed set of strings is `col.enum`) |
+| `.oneOf(values)` | numeric columns | only these values, typed as their union (on a text column write `col.text({ enum: [...] })`; a Postgres-enforced set of strings is `col.enum` / `pgEnum`) |
 | `.defaultRandom()` | `col.uuid()` | `DEFAULT gen_random_uuid()` |
-| `.identity()` | integer columns | `GENERATED BY DEFAULT AS IDENTITY` — the form for an integer key |
+| `.generatedByDefaultAsIdentity()` | integer columns | `GENERATED BY DEFAULT AS IDENTITY` — the form for an integer key |
+| `.array()` | every builder | the Postgres array of it: rules before it describe each item (`col.text({ enum: [...] }).array()`), `.notNull()`, defaults and the rest go after it (`.array().notNull().default([])`) |
+| `.defaultNow()` | temporal columns | `DEFAULT now()`: a database default a client may override |
 | `.onCreateNow()` / `.onUpdateNow()` | temporal columns | the server stamps the time on create / on every write |
 | `.onCreateUser()` / `.onUpdateUser()` | text columns, `col.uuid()` | the server writes the caller's id on create / on every write |
 | `.userId()` | text columns, `col.uuid()`, `text[]` items | the column holds a Rebase user id: the CMS renders the user picker, and whoever may write the table may look users up |
@@ -308,7 +326,7 @@ declared in `backend/resources.ts`. The upload route enforces `accept` and
 
 ## JSON columns
 
-`col.jsonb<T>()` types a document for TypeScript only. `col.jsonb(shape)` with
+`col.jsonb().$type<T>()` types a document for TypeScript only. `col.jsonb(shape)` with
 a `json.*` shape also tells the server: it validates each field, applies
 defaults, stamps dates, runs field transforms, tracks `json.storage()` files,
 lets `search` name a path inside it, and lets the CMS build a form for it.
@@ -319,7 +337,7 @@ import { defineTable, col, json } from "@rebasepro/server/schema";
 export const pages = defineTable("pages", {
     columns: {
         id: col.uuid().primaryKey().defaultRandom(),
-        settings: col.jsonb<{ theme?: "light" | "dark"; pinned?: boolean }>(),
+        settings: col.jsonb().$type<{ theme?: "light" | "dark"; pinned?: boolean }>(),
         seo: col.jsonb(json.object({
             title: json.string().validate({ max: 60 }).required(),
             canonicalUrl: json.string().validate({ url: true }),
@@ -643,7 +661,7 @@ export const talents = defineTable("talents", {
         id: col.uuid().primaryKey().defaultRandom(),
         fullName: col.text().notNull(),
         location: col.text(),
-        interests: col.array(col.text()),
+        interests: col.text().array(),
         questionnaire: col.jsonb(json.object({ certifications: json.string() }))
     },
     rls: "admin-only",
@@ -690,7 +708,7 @@ export const posts = defineTable("posts", {
     columns: {
         id: col.uuid().primaryKey().defaultRandom(),
         status: col.enum(["draft", "published"]).notNull().default("draft"),
-        publishDate: col.timestamptz(),
+        publishDate: col.timestamp({ withTimezone: true }),
         workspaceId: col.uuid().notNull(),
         slug: col.text().notNull()
     },
@@ -727,7 +745,7 @@ export const posts = defineTable("posts", {
 - **Order is identity.** Postgres uses a leading subset only; never reorder
   keys to tidy a declaration, and never declare a `desc` twin of an `asc` index.
 - **Never a plain index for text search or embeddings**: that is `search` and
-  `col.vector(dims, { index })`.
+  `col.vector({ dimensions, index })`.
 - **Do not index the primary key.**
 - **Changing a declaration is a DROP and a CREATE.** Fine on a dev database;
   on a large live table, say so before suggesting the edit.

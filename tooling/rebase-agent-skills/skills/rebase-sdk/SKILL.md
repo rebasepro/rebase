@@ -68,15 +68,15 @@ is the one the backend answers to.
 
 | Column | TypeScript Type |
 |--------|-----------------|
-| `col.text()`, `col.varchar()`, `col.uuid()` | `string` |
-| `col.enum([...])`, `.oneOf([...])` | the union of the values |
-| `col.integer()`, `col.bigint()`, `col.numeric()`, … | `number` |
+| `col.text()`, `col.varchar({ length })`, `col.uuid()` | `string` |
+| `col.enum([...])`, a `pgEnum`, `col.text({ enum: [...] })`, `.oneOf([...])` | the union of the values |
+| `col.integer()`, `col.bigint({ mode: "number" })`, `col.numeric()`, … | `number` |
 | `col.boolean()` | `boolean` |
-| `col.timestamptz()`, `col.date()`, `col.time()` | `string` (ISO 8601) |
+| `col.timestamp({ withTimezone: true })`, `col.date()`, `col.time()` | `string` (ISO 8601) |
 | `col.geopoint()` | `{ latitude: number; longitude: number }` |
-| `col.jsonb(shape)` / `col.jsonb<T>()` | the shape's type / `T` |
-| `col.array(inner)` | `Array<inner>` |
-| `col.vector(n)` | `number[]` |
+| `col.jsonb(shape)` / `col.jsonb().$type<T>()` | the shape's type / `T` |
+| `<builder>.array()`, e.g. `col.text().array()` | `Array<inner>` |
+| `col.vector({ dimensions })` | `number[]` |
 | `col.bytea()` | `string` (base64) |
 | `col.storage()` | `string` (`string[]` with `.multiple()`) |
 

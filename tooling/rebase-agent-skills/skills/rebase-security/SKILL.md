@@ -339,7 +339,7 @@ import { defineTable, col } from "@rebasepro/server/schema";
 export const orders = defineTable("orders", {
     columns: {
         id: col.uuid().primaryKey().defaultRandom(),
-        total: col.numeric(10, 2).notNull(),
+        total: col.numeric({ precision: 10, scale: 2 }).notNull(),
         status: col.enum(["open", "paid", "fulfilled"]).notNull().default("open")
     },
     rls: [{ operation: "all", access: "authenticated" }],
@@ -718,7 +718,7 @@ export const auditLogs = defineTable("audit_logs", {
     columns: {
         id: col.uuid().primaryKey().defaultRandom(),
         action: col.text().notNull(),
-        createdAt: col.timestamptz().onCreateNow()
+        createdAt: col.timestamp({ withTimezone: true }).onCreateNow()
     },
     rls: [
         { operation: "select", roles: ["auditor"] },
