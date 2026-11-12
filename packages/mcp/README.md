@@ -216,10 +216,10 @@ The server exposes MCP resources for AI context:
 
 | URI | Description |
 |---|---|
-| `rebase://collections/{name}` | TypeScript source of a collection definition |
+| `rebase://tables/{name}` | TypeScript source of a table definition (`defineTable`) |
 | `rebase://schema` | Generated Drizzle schema (`schema.generated.ts`) |
 
-Collection files are discovered from `app/config/collections/`, `config/collections/`, or `collections/` under the active project directory.
+Table files are the modules of the schema directory, its `index.ts` aside: the `tables` key of the backend app in `rebase.json`, `backend/schema` by default, under the active project directory or its `app/`.
 
 ## Quick Start
 

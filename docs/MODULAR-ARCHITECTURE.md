@@ -6,8 +6,8 @@ differently.
 
 | Mode | You get | Comparable to |
 | --- | --- | --- |
-| **BaaS** | REST + auth + storage + realtime + backups over your database. No config files, no UI. | Supabase |
-| **CMS** | BaaS + a schema-driven admin UI built from your collection definitions. | Payload, Directus |
+| **BaaS** | REST + auth + storage + realtime + backups over your database — tables declared in `backend/schema`, or read from the database itself. No UI. | Supabase |
+| **CMS** | BaaS + a schema-driven admin UI that renders every table the backend serves, customized in `frontend/src/cms`. | Payload, Directus |
 | **Full** | CMS + Studio (SQL editor, schema visualizer, RLS editor, logs, API explorer). | Supabase + Payload |
 
 The architecture enforces this at two levels. **No server package imports a UI
@@ -27,49 +27,55 @@ package.
 
 ---
 
-## 1. BaaS mode — no collections at all
+## 1. BaaS mode — tables, declared or introspected
 
-This is the important property: **BaaS mode requires zero collection definitions.**
-You point Rebase at a database and it serves an API.
+The backend serves tables. Where they come from is the one choice a BaaS
+project makes, and neither choice involves the admin panel.
+
+**Declared** (since 0.31): `backend/schema/index.ts` exports `defineTable`,
+`defineAuthTable` and `defineView` results, and optionally `defaultRls`. Every
+table states a row-level security posture — a list of rules, `"admin-only"`, or
+`"inherit"` — and a table without one is a type error and a boot error. The
+builders come from `@rebasepro/server/schema`, an entry that loads nothing of the
+server.
 
 ```ts
 initializeRebaseBackend({
     app,
     server,
+    schemaDir: path.resolve(__dirname, "../schema"),   // or tables: [...], defaultRls
     database: createPostgresAdapter({ connection: db, connectionString })
 });
 ```
 
-**There is no mode flag.** `mode: "cms" | "baas"` used to be authored here and was
-deleted — on the manifest, on `RebaseBackendConfig`, on the wire contract, and as
-`REBASE_DEV_MODE`. It was never independent of the collections: it could only agree
-with them or contradict them, and when it contradicted, the server warned and threw
-the declared collections away.
+At boot the definitions are compiled into `TableDescriptor`s — fail closed: one
+`SchemaDefinitionError` names every problem. The descriptors are what REST,
+realtime, MCP, OpenAPI and `GET /api/schema/tables` serve, what the schema version
+hashes, and what `rebase generate-sdk` reads.
 
-What decides it now is one question, asked **after** the collections directory is
-loaded: did any collections resolve? None did, so the adapter is asked to describe
-the schema (`introspectCollections`). A `collectionsDir` pointing at nothing falls
-through to introspection instead of serving an empty API and never looking. The flip
-side: declaring collections alongside what used to be `mode: "baas"` now *serves*
-them.
+**Introspected**: no `backend/schema/index.ts`, and no `tables`. The adapter is
+asked to describe the database (`introspectTables`), and every table it may serve
+becomes a REST resource, with types, primary keys and relations derived from the
+catalogue. The drizzle tables the query layer needs are built in memory from the
+same metadata, so no generated `schema.generated.ts` is required either. Join
+tables are skipped — they are an edge between two tables, not a resource.
 
-Collections are **introspected from the database at boot** rather than imported from
-config files. Every table becomes a REST resource, with types, primary keys, and
-relations derived from `information_schema`. The drizzle tables the query layer needs
-are built in memory from the same metadata, so no generated `schema.generated.ts` is
-required either. Join tables are skipped — they are an edge between two collections,
-not a collection. Nothing about the admin UI is loaded, imported, or installed.
+**There is no mode flag.** `mode: "cms" | "baas"` used to be authored and was
+deleted — it could only agree with what the backend loaded or contradict it. What
+decides it now is whether any tables were declared. A `schemaDir` pointing at
+nothing falls through to introspection instead of serving an empty API.
 
-Change the schema with a migration and the API follows; there is nothing to keep in
-sync. Set `introspectionSchema` on the adapter to read a schema other than `public`.
+Change the schema with a migration and an introspected API follows; there is
+nothing to keep in sync. Set `introspectionSchema` on the adapter to read a
+schema other than `public`.
 
-### Which tables get served
+### Which introspected tables get served
 
 **Only the ones the database protects.** Every authenticated request runs as the
 `rebase_user` role, which is granted `SELECT/INSERT/UPDATE/DELETE` on the schema so
 that RLS — not the grant — decides who sees what. A table with RLS *disabled* has no
 authorization model at all, so serving it would hand every row to every logged-in
-user. BaaS never runs `db push`, so nothing here enables RLS on your behalf.
+user. Introspection never runs `db push`, so nothing here enables RLS on your behalf.
 
 So a table is served only when it has `ENABLE ROW LEVEL SECURITY`. Anything else is
 skipped, and named at boot with the SQL to protect it:
@@ -87,10 +93,10 @@ Two escape hatches, both explicit:
   legal Postgres and indistinguishable from an empty table, so it is called out at
   boot rather than left to look like missing data.
 
-A join table is not served either way, because it never becomes a collection. One
-with RLS off is named at boot and left out of the schema relations are built from.
-`rebase_user` keeps its grants on it: a policy that reads a join table runs as the
-caller, so taking them back would break every read that policy guards.
+A join table is not served either way. One with RLS off is named at boot and left
+out of the schema relations are built from. `rebase_user` keeps its grants on it: a
+policy that reads a join table runs as the caller, so taking them back would break
+every read that policy guards.
 
 The tables are read once, at boot. If RLS is disabled on a served table later, it
 stays served until the next boot excludes it. The scheduled RLS audit reports it
@@ -100,167 +106,118 @@ Internal tables are never introspected: the `rebase` and `auth` schemas sit outs
 `introspectionSchema` (default `public`), and `rebase_*` / `drizzle_*` names are
 filtered out.
 
-What BaaS mode keeps, deliberately, because it is the control plane and not the CMS:
+What BaaS mode keeps, either way:
 
-- REST data API (`/api/data/*`) over introspected tables
+- REST data API (`/api/data/*`), realtime/CDC, `GET /api/schema/tables`
 - Auth, including admin user routes and API keys
-- Storage, realtime/CDC, backups, cron, functions
+- Storage, backups, cron, functions
 - OpenAPI/Swagger
 
-What it drops:
-
-- Collection config files and the `collectionsDir` scan
-- The schema-editor routes (which exist to write config files back to disk)
-- The admin SPA (`serveSPA` is never called)
-- Every React package
+What it never loads: the admin SPA (`serveSPA` is never called) and every React
+package. The schema-editor routes exist only where there is a `backend/schema` to
+write to.
 
 Install: `@rebasepro/server` + a driver (`@rebasepro/server-postgres`) +
 `@rebasepro/client` for the SDK. No `react` in the dependency tree.
 
-The SDK needs no collections either — there is nothing to generate or declare:
+The SDK needs nothing generated or declared:
 
 ```ts
 const rebase = createRebaseClient({ baseUrl, token });
-await rebase.data.collection("posts").find({ limit: 5 });   // just a table name
-await rebase.data.collection("authors").create({ name: "Ada" });
+await rebase.data.table("posts").find({ limit: 5 });   // just a table name
+await rebase.data.table("authors").create({ name: "Ada" });
 ```
 
-Typed accessors (`rebase.data.posts`) work the same way; the optional `collections`
+Typed accessors (`rebase.data.posts`) work the same way; the optional `tables`
 map only exists to pin non-obvious slugs. `rebase generate-sdk` adds types if you
-want them, but nothing requires it.
-
-## 2. CMS mode — collections drive the UI
-
-Add collection definitions and the admin packages. The collection file is a single
-unified object that describes both the backend schema (validation, callbacks,
-security rules) and the presentation (icons, views, field components) — one file,
-like Payload.
-
-The same files are consumed twice:
-
-- **backend**, at runtime, via `loadCollectionsFromDirectory` (`collectionsDir`)
-- **frontend**, at build time, via `virtual:rebase-collections`
-  (`rebaseCollectionsPlugin` from `@rebasepro/app/vitePlugin`)
-
-Install: the BaaS set plus `@rebasepro/app`, `@rebasepro/cms`, `@rebasepro/ui`,
-`@rebasepro/forms`.
-
-### One definition of "the collections"
-
-The runtime, the drizzle-schema generator, the policy generator and the doctor all
-load collections through the **same** loader (`loadCollectionsFromDirectory`, exported
-from `@rebasepro/server`). Four copies of that scan used to exist, agreeing only by
-discipline — and a drift between them would serve one set of collections while pushing
-policies for another, which reads as an empty table rather than an error. A file that
-fails to import is now a hard error for the same reason: skipping it silently produces
-a missing route and a missing policy with a successful exit code.
+want them, and a project that declares its tables can type data with no codegen at
+all by registering `Register.tables`.
 
 ### Where security rules live, and what enforces them
 
-**Collections do not enforce anything at runtime.** Nothing on the data path reads
-`securityRules`. Authorization is entirely Postgres RLS:
+**Tables do not enforce anything in Node.** Nothing on the data path evaluates
+`rls` rules in memory. Authorization is entirely Postgres RLS:
 
 ```
-collection files → generatePostgresPoliciesDdl → drizzle/policies.sql → db push → pg_policies
-                                                                                       ↓
-                                           every request: SET LOCAL ROLE rebase_user → RLS decides
+backend/schema (rls) → compiled policies → policies.sql → db push / boot → pg_policies
+                                                                              ↓
+                                  every request: SET LOCAL ROLE rebase_user → RLS decides
 ```
 
-`securityRules` are a **source for code generation**, not a runtime check. That is why
-`policies.sql` is committed, why fixing a config cannot fix a database that already has
-the old policy, and why `rebase doctor --policies` exists.
+`rls` is a **source for policy generation**, not a runtime check. That is why
+fixing a definition cannot fix a database that already has the old policy until
+boot or `db push` re-applies it, and why `rebase doctor --policies` exists.
 
-Directory-level defaults live with the collections, in `config/collections/index.ts`:
+The project default lives with the tables, in `backend/schema/index.ts`:
 
 ```ts
-export const defaultSecurityRules: SecurityRule[] = [
+export const defaultRls: DefaultRls = [
     { operation: "select", access: "public" },
     { operations: ["insert", "update", "delete"], roles: ["admin"] }
 ];
 ```
 
-Any collection in that directory declaring no `securityRules` inherits them; one
-declaring its own keeps them; one with neither is **locked by default** (admin-only).
-They belong here, not on `RebaseBackendConfig`, because `db push` generates the
-policies from these files and never sees the running server — a default on the server
-could never reach the database, while reading exactly like an authorization setting.
+Only a table that says `rls: "inherit"` takes it; `"inherit"` with no `defaultRls`
+refuses the boot. It belongs beside the tables, not on `RebaseBackendConfig`,
+because `db push` generates the policies from these files and never sees the
+running server.
 
-### The collection-file import rule
+### The schema-file import rule
 
-Because the Node backend imports these files, **collection files must never import a
-UI package.** They may import:
+`backend/schema` is loaded by Node — boot, `db push`, `generate-sdk`, the doctor —
+so **a table file never imports a UI package.** It imports
+`@rebasepro/server/schema` (or `@rebasepro/types`), other table files and local
+non-UI helpers. Hooks are server code and stay there; their code never reaches the
+wire, where a descriptor only says which hooks exist.
 
-- `@rebasepro/types` — the contract
-- `@rebasepro/common` — `defineCollection`, in a project with no panel
-- `@rebasepro/cms-types` — the same `defineCollection` with the `admin` block
-  type-checked, in a project with the panel. It is the type surface, not the panel:
-  nothing in it reaches React at runtime, and `check:headless` loads it to prove so
-- local, non-UI helpers
+The other direction is a rule too: **the frontend imports `backend/**` as types
+only** (`import type { posts } from "../../../backend/schema/posts"`, which the
+compiler erases). A value import would put the table, its hooks and every server
+module they reach into the browser bundle. That replaced the Vite plugin that used
+to strip server code from shared collection files — no file is shared any more.
 
-Custom components are referenced with a **lazy import thunk**, which TypeScript checks
-and the backend never evaluates:
+## 2. CMS mode — the panel renders the served tables
 
-```ts
-admin: { Field: () => import("../../frontend/src/BodyPartsField") }
+Add the admin packages and mount `<RebaseCMS />`. It renders every table the
+backend serves at `GET /api/schema/tables` — labels, widgets, filters and
+relation tabs derived from the descriptors — with no file per table. The panel's
+own files say how a table differs from that default:
+
+```tsx
+// frontend/src/cms/posts.tsx
+import { customizeTable } from "@rebasepro/cms";
+import type { posts } from "../../../backend/schema/posts";
+import { MarkdownField } from "../fields/MarkdownField";
+
+export const postsCms = customizeTable<typeof posts>("posts", {
+    icon: "FileText",
+    fields: { body: { Field: MarkdownField } }
+});
+
+// App.tsx
+<RebaseCMS tableCustomizations={[postsCms]} externalCollections={[firestoreEvents]} />
 ```
 
-A wrong path is a compile error, go-to-definition works, and editors follow the
-specifier on a file move. The bare-string form (`Field: "../../frontend/src/X"`) still
-works: the Vite plugin rewrites a relative string on `Field`, `Preview`, `Builder` or
-`Filter` into the same lazy import for the browser, and on the backend the string is
-inert. Prefer the thunk when authoring by hand.
+Components are imported by value: these files run only in Vite/React.
+Firestore collections, which the browser reads directly, are declared here too
+(`defineFirestoreCollection` from `@rebasepro/firebase`). What the panel calls a
+**collection** is a table as it shows it, or one of these.
 
-`@rebasepro/types` declares **no `admin` field** — not on a collection, not on a
-property. In a BaaS project, writing one is a type error. `@rebasepro/cms-types` adds
-it back by declaration merging, so installing that package is what makes the admin
-surface exist:
+How a person resized or reordered a table is a UI preference, never a schema edit:
+saved per user and per workspace, through `/api/admin/ui-config`, over the code's
+customizations.
 
-```ts
-// config/cms.d.ts — one line, once per project
-/// <reference types="@rebasepro/cms-types" />
-```
-
-```ts
-// config/collections/posts.ts — plain core types, `admin` now typed
-import type { PostgresCollectionConfig } from "@rebasepro/types";
-
-const posts: PostgresCollectionConfig = {
-    slug: "posts",
-    table: "posts",
-    properties: {
-        title: { name: "Title", type: "string", admin: { multiline: true } }
-    },
-    admin: { icon: "FileText", listProperties: ["title"] }
-};
-```
-
-An augmentation applies to the whole *program*, and `config/` and `frontend/` are
-separate tsconfig programs — which is why the reference lives in the config package
-rather than being inherited from the frontend. There is deliberately no
-`AdminCollectionConfig` wrapper: with the field merged in, `CollectionConfig` *is* the
-authoring type.
-
-This works only because `BaseProperty`, the ten concrete property types and
-`BaseCollectionConfig` are `interface`s. Interfaces merge; `type` aliases do not.
-
-Whichever form a component reference takes, a collection file never imports a React
-component by value: the backend never calls the thunk, and a string stays inert until
-the Vite plugin rewrites it for the browser. Anything the admin UI needs to inject into a collection (for example the
-reset-password entity action on auth collections) is injected **frontend-side** by
-`@rebasepro/cms`, not imported into config.
-
-This rule is enforced in CI by `pnpm run check:headless`, which imports every
-collection file and every server package under a Node loader hook that throws if the
-module graph reaches `react`, `react-dom`, `react-router` (or `react-router-dom`), or
-any `@rebasepro/{cms,cms-common,ui,app,studio,forms}`.
+Install: the BaaS set plus `@rebasepro/app`, `@rebasepro/cms`, `@rebasepro/ui`,
+`@rebasepro/forms`.
 
 ## 3. Full mode — Studio
 
 Studio is the **BaaS console**: SQL editor, schema visualizer, RLS editor, storage
 browser, logs, API explorer, API keys, backups, cron. Its views target the BaaS
 control plane, not the CMS — it talks to the backend over HTTP through
-`@rebasepro/client`, and `@rebasepro/cms` is an *optional* peer dependency it never
-imports.
+`@rebasepro/client`, reads the schema from `GET /api/schema/tables`
+(`useTableDescriptors`), and `@rebasepro/cms` is an *optional* peer dependency it
+never imports.
 
 Where Studio wants CMS capabilities (jumping from a SQL result to an entity, say) it
 asks for them through the **Studio bridge** (`useStudioBridge` in `@rebasepro/app`),
@@ -280,7 +237,6 @@ Shared kernel   types → utils → common → client        (isomorphic, no UI,
 
 BaaS            server → client, common, types, utils
                 server-postgres → codegen, common, server, types, utils
-                server-mongo → common, types, utils   (server: optional peer)
                 cli → agent-skills, client, codegen, server, server-postgres, types
                 codegen → common                      (types: peer)
                 mcp → client
@@ -325,8 +281,8 @@ from the framework. BaaS deployments simply never call it.
 ## Scaffolding
 
 ```bash
-rebase init my-app --headless      # backend alone, collections introspected
-rebase init my-app                 # backend + admin: config/ + backend/ + frontend/ (default)
+rebase init my-app --headless      # backend alone, no backend/schema: tables introspected
+rebase init my-app                 # backend/ (tables in backend/schema) + frontend/ (default)
 ```
 
 Without `--headless`, `rebase init` asks. `dev`, `build`, and `start` detect a missing
@@ -342,18 +298,20 @@ Without `--headless`, `rebase init` asks. `dev`, `build`, and `start` detect a m
   `import type React`, which a `/^import React/` scan misses, and a stray
   `@types/react` devDependency, which is what let the leak sit unnoticed.
 - `pnpm run check:baas-types` (`tests/e2e/baas-typecheck/`) — typechecks a real BaaS project
-  (backend, a collection file with schema/validation/relations/RLS/callbacks, SDK reads
-  and writes) with `react` mapped onto a stub that stands in for its absence. Catches a
+  (backend, SDK reads and writes, server-side data typed from a registered `Database`) with `react` mapped onto a stub that stands in for its absence. Catches a
   React type reached through an alias, which a text scan cannot see. The two are
   complementary: the scan cannot see through an alias, the fixture cannot see an unused
   import.
-- `pnpm run check:templates` — compiles the scaffolded collection files once per
-  preset (`blog`, `ecommerce`, `blank`), laid out the way `applyPreset` lays them out.
-  Nothing else checked them fast: the only thing that compiled a template was the CMS
+- `pnpm run check:templates` — compiles every scaffold `rebase init` writes, once per
+  preset (`blog`, `ecommerce`, `blank`) and for `--headless`, laid out as `rebase init`
+  lays it out — tables, resources, storage, functions and every `customizeTable`
+  against its table — and checks every table states its `rls` and the frontend imports
+  the backend as types only. Nothing else checked them fast: the only thing that compiled a template was the CMS
   init e2e, inside a Docker build about fifteen minutes in. These are the first files
   every new project runs, so they should fail in seconds.
-- `pnpm run check:headless` — imports every collection file and every server package
-  under a Node loader hook that throws on `react`, `react-dom`, `react-router` (or
+- `pnpm run check:headless` — imports every `backend/schema` module (the demo's, the
+  template's and each preset's), the `resources` / `storage` / `hooks` modules beside
+  them, and every server package under a Node loader hook that throws on `react`, `react-dom`, `react-router` (or
   `react-router-dom`), or any `@rebasepro/{cms,cms-common,ui,app,studio,forms}`
   (the list is `FORBIDDEN_PACKAGES` in `tooling/scripts/headless-guard/forbid-ui-hook.mjs`).
   Runs in CI before the build, reads
@@ -361,6 +319,9 @@ Without `--headless`, `rebase init` asks. `dev`, `build`, and `start` detect a m
   `SERVER_PACKAGES` in `tooling/scripts/headless-guard/check.mjs`.
   Imports that TypeScript elides because they are unused do not trip it, which
   matches runtime: backends run this same TS through tsx.
+- `pnpm run check:frontend-backend-imports` — code under a `frontend/` imports its
+  sibling `backend/` as types only, in the demo, every example and the template and
+  preset sources. The rule that replaced the Vite collections plugin's stripping.
 - `tests/e2e/tests/cli-init-baas-e2e.ts` — scaffolds `--headless`, installs it from real
   tarballs, creates tables the project was never told about, and checks the API serves
   them. This is the only place a scaffolded project is installed and booted
@@ -368,14 +329,14 @@ Without `--headless`, `rebase init` asks. `dev`, `build`, and `start` detect a m
   than the library behind it. It also asserts no `react` in the install tree — the
   guard above can't see templates.
 - `packages/server/test/init-mode.test.ts` — the derivation contract: which
-  collections register given what resolved, and that the schema editor follows that
+  tables are served given what resolved, and that the schema editor follows that
   and `NODE_ENV`.
 - A driver that cannot introspect fails at boot rather than serving
-  nothing: reporting no collections means it never looked, so `init` throws and names
+  nothing: reporting no tables means it never looked, so `init` throws and names
   it. An empty database is different — that warns and boots.
-- `rebase doctor --policies` diffs `pg_policies` against the policies your collections generate,
+- `rebase doctor --policies` diffs `pg_policies` against the policies your tables' `rls` generates,
   and exits non-zero on drift. **RLS fails silently by design**: a policy that never
   matches filters every row, and an empty table is indistinguishable from a table with
-  no data. Policies live in Postgres and the config is only their source, so a stale
-  policy from an old push outlives any config fix — which is exactly how the demo
-  served empty collections for months. Run it in CI against a deployed database.
+  no data. Policies live in Postgres and the definition is only their source, so a stale
+  policy from an old push outlives any fix to it — which is exactly how the demo
+  served empty tables for months. Run it in CI against a deployed database.

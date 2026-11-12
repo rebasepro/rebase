@@ -21,8 +21,8 @@ This is the central orchestrator for any Rebase backend. It provides the framewo
 | Export | Description |
 |--------|-------------|
 | `initializeRebaseBackend(config)` | The one-call boot: `createRebaseBackend`, then `mount`, `attachRealtime` and `start`. Returns the backend, already serving. |
-| `createRebaseBackend(options)` | Builds the backend (drivers, auth, storage, route groups, the in-process client) and mounts, starts and listens to nothing. `provision` (`true`, `false` or `{ collections, realtime }`) decides what it may change in the database. New in 0.25. |
-| `RebaseBackend` | What both return: `routes.auth/data/storage/functions/admin/cron/meta()` (each a mountable Hono sub-app), `mount(app, { basePath })`, `attachRealtime(server, { path })`, `start()`, `shutdown()`, `fetch(request)`, `rebase`, and the services (`driver`, `cronScheduler`, `jobQueue`, …). |
+| `createRebaseBackend(options)` | Builds the backend (drivers, auth, storage, route groups, the in-process client) and mounts, starts and listens to nothing. `provision` (`true`, `false` or `{ collections, realtime }`) decides what it may change in the database. The tables come from `tables` + `defaultRls`, or `schemaDir`; `hooks` are the global table hooks. New in 0.25. |
+| `RebaseBackend` | What both return: `routes.auth/data/storage/functions/admin/cron/meta/schema()` (each a mountable Hono sub-app), `mount(app, { basePath })`, `attachRealtime(server, { path })`, `start()`, `shutdown()`, `fetch(request)`, `rebase`, `setTableHooks(slug, hooks)`, `getTableDescriptors()`, and the services (`driver`, `cronScheduler`, `jobQueue`, …). |
 | `rebase` | Server-side singleton — a `RebaseServerClient` (from `@rebasepro/types`): the client without `data`, plus `dataAsAdmin`. Available after init. Admin-scoped access to data (RLS is evaluated as the service identity, not skipped), auth, email, and storage. |
 | `loadEnv()` | Validates `process.env` against the Rebase env schema (Zod). Auto-generates dev secrets. Supports `extend` for custom vars. |
 | `serveSPA(app, config)` | Mounts SPA static-file serving + index.html fallback on a Hono app. |
@@ -30,14 +30,15 @@ This is the central orchestrator for any Rebase backend. It provides the framewo
 | `RebaseAuthConfig` | Auth config type (JWT, OAuth providers, hooks, service key). |
 | `RebaseBackendInstance` | `initializeRebaseBackend`'s return type, the same as `RebaseBackend`. |
 | `loadFunctions(dir)` / `loadCrons(dir)` | Read a directory of function or cron files into the `functions` / `crons` option values (`{ [name]: app }`, `{ [id]: definition }`). `declareCrons(crons)` records crons in the resource graph. New in 0.25; `loadFunctionsFromDirectory`, `loadFunctionsWithDiagnostics`, `loadCronJobsFromDirectory` and `loadCronJobsWithDiagnostics` are deprecated. |
-| `composeCallbacks(...sets)` / `createCallContext(partial)` | Combine sets of collection callbacks the way the backend's tiers combine; build the `context` a callback receives, to call one from a test. New in 0.25. |
+| `loadBackendSchema(dir)` | Reads a `backend/schema` directory the way boot does: the tables and views its `index.ts` exports, and its `defaultRls`. New in 0.31. |
+| `createCallContext(partial)` | Builds the `context` a table hook receives, to call one from a test. New in 0.25. |
 | `RebaseEnv` | Zod-inferred type of validated environment variables. |
 | `z` | The runtime's own Zod instance. Build `loadEnv({ extend })` schemas with this one — a schema from a second copy of zod is silently ignored. |
 | `_setRebaseMock` / `_resetRebaseMock` | Test helpers to mock the `rebase` singleton (NODE_ENV=test only). |
 
 Also exports `HonoEnv`, the auth, email, storage, history and cron modules, custom functions, logging utilities, and the driver registry. The abstract driver interfaces (`DatabaseAdapter`, `AuthAdapter`, `DataDriver`, …) are not re-exported: import them from `@rebasepro/types`.
 
-`@rebasepro/server/functions` is the portable surface a function file imports — `defineFunction`, the `requireAuth`/`requireAdmin`/`requireScope` guards, `getUser`, `getScopes`, `hasScope`, `rebase` and the rest. The package also ships the `rebase-server` binary, which runs a built project bundle (`rebase-server ./dist-bundle`); it is what the `rebasepro/server` image executes.
+`@rebasepro/server/schema` holds the table builders — `defineTable`, `defineAuthTable`, `defineView`, `col`, `rel`, `json`, `policy` — and their types, and loads nothing of the server, so a frontend can `import type` a table from `backend/schema`. `@rebasepro/server/functions` is the portable surface a function file imports — `defineFunction`, the `requireAuth`/`requireAdmin`/`requireScope` guards, `getUser`, `getScopes`, `hasScope`, `rebase` and the rest. The package also ships the `rebase-server` binary, which runs a built project bundle (`rebase-server ./dist-bundle`); it is what the `rebasepro/server` image executes.
 
 ## Quick Start
 
@@ -45,6 +46,7 @@ Also exports `HonoEnv`, the auth, email, storage, history and cron modules, cust
 import { createServer } from "node:http";
 import { getRequestListener } from "@hono/node-server";
 import { Hono } from "hono";
+import path from "node:path";
 import { initializeRebaseBackend, loadEnv, serveSPA, type HonoEnv } from "@rebasepro/server";
 import { createPostgresAdapter } from "@rebasepro/server-postgres";
 
@@ -60,9 +62,9 @@ const backend = await initializeRebaseBackend({
   app,
   server,
   database: createPostgresAdapter({ connection: db, schema: { tables, enums, relations } }),
-  collections: myCollections,
+  // The tables backend/schema/index.ts exports; users live in its defineAuthTable.
+  schemaDir: path.resolve("./schema"),
   auth: {
-    collection: defaultUsersCollection,
     jwtSecret: env.JWT_SECRET,
     allowRegistration: env.ALLOW_REGISTRATION,
     serviceKey: env.REBASE_SERVICE_KEY,
@@ -102,7 +104,7 @@ import { createPostgresAdapter } from "@rebasepro/server-postgres";
 
 const backend = await createRebaseBackend({
   database: createPostgresAdapter({ connection: db, schema: { tables, enums, relations } }),
-  collections: myCollections,
+  tables: [posts, users],   // defineTable / defineAuthTable results
   auth: { jwtSecret: env.JWT_SECRET },
   provision: true
 });
@@ -118,6 +120,6 @@ See [Custom Server Integration](https://rebase.pro/docs/backend/custom-server).
 | Package | Role |
 |---------|------|
 | `@rebasepro/server-postgres` | PostgreSQL database driver (Drizzle ORM) |
-| `@rebasepro/types` | Shared type definitions (`DataDriver`, `CollectionConfig`, etc.) |
+| `@rebasepro/types` | Shared type definitions and the table builders (`DataDriver`, `TableDescriptor`, `defineTable`, …) |
 | `@rebasepro/client` | Client SDK used internally by the `rebase` singleton |
-| `@rebasepro/common` | Shared utilities and default collections |
+| `@rebasepro/common` | Shared utilities and the schema compiler (`compileTables`) |

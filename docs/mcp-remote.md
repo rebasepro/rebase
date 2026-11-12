@@ -23,7 +23,7 @@ the application itself.
 
 Two consequences that look like bugs and are not:
 
-- a tool can return an empty list for a collection that plainly has rows — that
+- a tool can return an empty list for a table that plainly has rows — that
   is RLS working;
 - a write can fail with a permission error the tool cannot explain in detail,
   because the policy that refused it is not visible from the tool.
@@ -117,14 +117,14 @@ and no others — `MCP_SCOPES` in `mcp/oauth-metadata.ts`:
 
 | Scope | What it grants |
 |---|---|
-| `data:read` | `list_collections`, `describe_collection`, `query_collection`, `show_collection`, `show_record` and `show_app` (where the MCP App view is served — `mcp/mcp-apps.ts`), `count_documents`, `aggregate_documents`, `get_document` |
-| `data:write` | `create_document`, `update_document` |
-| `data:delete` | `delete_document` |
+| `data:read` | `list_tables`, `describe_table`, `query_table`, `show_table`, `show_record` and `show_app` (where the MCP App view is served — `mcp/mcp-apps.ts`), `count_rows`, `aggregate_rows`, `get_row` |
+| `data:write` | `create_row`, `update_row` |
+| `data:delete` | `delete_row` |
 
 A client that asks for nothing gets `data:read`. Each scope can be narrowed to a
-collection — `data:read:posts` — and then the tools it offers reach that
-collection only (`list_collections` lists only what `data:read` covers, and
-`describe_collection` describes exactly those: both gate on `SCHEMA_SCOPE`
+table — `data:read:posts` — and then the tools it offers reach that
+table only (`list_tables` lists only what `data:read` covers, and
+`describe_table` describes exactly those: both gate on `SCHEMA_SCOPE`
 through the one `reaches` check). An unknown scope in a request is dropped, not
 refused.
 
@@ -133,7 +133,7 @@ Grants made before the shared vocabulary are read as what they granted:
 (`upgradeStoredMcpScope`, applied to stored refresh grants and to access tokens
 still in flight).
 
-A scope decides whether a tool is *offered* and which collections it reaches.
+A scope decides whether a tool is *offered* and which tables it reaches.
 It is not the access-control mechanism — a `data:write` token still cannot write
 a row the user could not write themselves.
 
@@ -151,20 +151,20 @@ the REST list route's own parser (`parseQueryOptions`) as the query string the
 SDK would send. The reads then go through REST's own read path
 (`RestApiGenerator.readPage` / `readRow` / `countRawEntities` / `aggregate`), so:
 
-- a row is the row `GET /api/data/<collection>` serves: dates as ISO strings, a
+- a row is the row `GET /api/data/<table>` serves: dates as ISO strings, a
   `belongsTo` as its foreign key (`authorId`), never the admin view model's
   `{ "__type": "date" }` envelope or an embedded related row — which is what
-  lets a model send a row it read back in `update_document`;
-- `query_collection` answers REST's list body, `{ data, meta }`,
-  `count_documents` answers `/count`'s `{ count }`, and `aggregate_documents`
+  lets a model send a row it read back in `update_row`;
+- `query_table` answers REST's list body, `{ data, meta }`,
+  `count_rows` answers `/count`'s `{ count }`, and `aggregate_rows`
   answers `/aggregate`'s `{ data, meta? }` — its `select` and `groupBy` lists
   joined into REST's `?select=` / `?groupBy=` and read by the same parser, with
   the same field checks and the same `afterRead` refusal (only `count()` on a
-  collection a callback rewrites);
-- `list_collections` gives each collection's `name`, `title` and
-  `description`, and nothing else: with every schema in it, 200 collections of
+  table a callback rewrites);
+- `list_tables` gives each table's `name`, `description` and `kind` (a view),
+  and nothing else: with every schema in it, 200 tables of
   20 fields were ~150k tokens of a model's context, and as a summary they are
-  ~5k. `describe_collection { collection }` gives one collection's `row` and
+  ~5k. `describe_table { table }` gives one table's `row` and
   `create` JSON Schemas, built by the OpenAPI generator's own
   `buildCollectionSchema` / `buildCollectionInputSchema`, and its
   `softDeleteField` (~0.7k tokens). The write tools' descriptions and the
@@ -186,7 +186,7 @@ A result's `content[0].text` is fenced in `untrustedEnvelope`
 (`@rebasepro/common`), the marking the local MCP server puts on every data
 result: a row was written by somebody, and it reaches the model on the channel
 the model takes its instructions from. `structuredContent` stays the plain
-result, except on `list_collections` and `describe_collection`: what they say
+result, except on `list_tables` and `describe_table`: what they say
 is for the model alone and is sent once, in the text (`structuredContent: false`
 on the tool). The text is
 compact JSON — indentation was half of it. The `initialize` instructions and
@@ -205,8 +205,8 @@ this way ([hosted-mcp-connector.md](hosted-mcp-connector.md)).
 Every tool is listed with a `title` and MCP's `annotations` (`readOnlyHint`,
 `destructiveHint`, `idempotentHint`, `openWorldHint`). Hosts read them to
 decide whether to ask the person before a call. The data tools carry them too:
-the reads are read-only, `create_document` adds, `update_document` and
-`delete_document` overwrite.
+the reads are read-only, `create_row` adds, `update_row` and
+`delete_row` overwrite.
 
 **Plan, then confirm** (`mcp/confirmation.ts`). A tool that declares
 `confirm(args, ctx)` takes two calls. The first changes nothing and answers

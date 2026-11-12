@@ -8,7 +8,7 @@ release, a control-plane deploy and a fleet rollout.
 
 A developer adds one connector in claude.ai (Settings → Connectors), signs in
 with their Rebase account, and gets their projects, the cloud operations on
-them, and each project's data, including the `show_collection` table view. It
+them, and each project's data, including the `show_table` table view. It
 works from claude.ai on the web, the desktop app and mobile, where the local
 `rebase-mcp` stdio server cannot run.
 
@@ -62,7 +62,7 @@ claude.ai ──OAuth 2.1──▶ control plane  app.rebase.pro
    │                POST /api/admin/mcp   Bearer rpt_…
    │                runs the app's own MCP tools (mcp-tools.ts) under RLS
    ▼
-the reply (and, for show_collection, the ui:// view the control plane serves)
+the reply (and, for show_table, the ui:// view the control plane serves)
 ```
 
 ### Where it runs: inside the control plane
@@ -141,12 +141,12 @@ cannot sign itself more than that list.
 #### Why proxy to the tenant rather than run the tools in the control plane
 
 - One implementation of the data tools. The tenant's tools already speak REST
-  (`docs/mcp-remote.md`), apply the app's collection callbacks, its auth
-  collection rules and its RLS. Re-implementing them in the control plane
+  (`docs/mcp-remote.md`), apply the app's table hooks, its auth
+  table rules and its RLS. Re-implementing them in the control plane
   against the tenant's REST API would be a second, drifting copy.
-- The control plane does not need the app's collection schemas. The tenant has
+- The control plane does not need the app's table schemas. The tenant has
   them, at the version that is deployed.
-- `show_collection` is already a tool there.
+- `show_table` is already a tool there.
 
 The cost is a rollout dependency: a tenant must run a runtime that serves
 `/api/admin/mcp` before its data is reachable. Until then the data tools say
@@ -194,12 +194,12 @@ name; ambiguity is an error that lists the matches) except `projects`.
 | 1 | `projects` | `organization?` | read-only | signed in | the control plane's projects, filtered by membership |
 | 2 | `project_status` | `project`, `include?: ("deployments" \| "env" \| "cron" \| "metrics")[]` | read-only | `project:read` (+ `project:env` for env names, `project:studio` for cron) | status, health, current and recent deployments; env var **names** only |
 | 3 | `logs` | `project`, `source: "runtime" \| "build" \| "cron"`, `deployment?`, `job?`, `tail?` (200), `since?` | read-only | `project:logs` (+ `project:studio` for cron) | runtime-logs, a deployment's build log, cron run history |
-| 4 | `schema` | `project`, `collection?` | read-only | `project:studio` | tenant `list_collections`, or `describe_collection` when `collection` is given |
-| 5 | `query` | `project`, `collection`, `id?`, `where?`, `orderBy?`, `limit?`, `offset?`, `searchString?`, `count?` | read-only | `project:studio` | tenant `get_document` / `query_collection` / `count_documents` |
-| 6 | `show_collection` | as `query`, without `id` and `count`, plus `view?` | read-only, opens a view | `project:studio` | tenant `show_collection`; the view is served by the connector |
-| 6b | `show_record` | `project`, `collection`, `id?`, `values?` | read-only, opens a view | `project:studio` | tenant `show_record` |
-| 6c | `show_app` | `project`, `title?`, `collections`, `code` (a React component) | read-only, opens a view | `project:studio` | tenant `show_app`, which compiles the code |
-| 7 | `write` | `project`, `collection`, `action: "create" \| "update" \| "delete"`, `id?`, `data?`, `confirm?` | destructive, not idempotent | `project:studio` | tenant `create_document` / `update_document` / `delete_document`. Users are rows of the auth collection, so this covers creating, editing and deleting users, under the auth rules the app's REST routes apply |
+| 4 | `schema` | `project`, `table?` | read-only | `project:studio` | tenant `list_tables`, or `describe_table` when `table` is given |
+| 5 | `query` | `project`, `table`, `id?`, `where?`, `orderBy?`, `limit?`, `offset?`, `searchString?`, `count?` | read-only | `project:studio` | tenant `get_row` / `query_table` / `count_rows` |
+| 6 | `show_table` | as `query`, without `id` and `count`, plus `view?` | read-only, opens a view | `project:studio` | tenant `show_table`; the view is served by the connector |
+| 6b | `show_record` | `project`, `table`, `id?`, `values?` | read-only, opens a view | `project:studio` | tenant `show_record` |
+| 6c | `show_app` | `project`, `title?`, `tables`, `code` (a React component) | read-only, opens a view | `project:studio` | tenant `show_app`, which compiles the code |
+| 7 | `write` | `project`, `table`, `action: "create" \| "update" \| "delete"`, `id?`, `data?`, `confirm?` | destructive, not idempotent | `project:studio` | tenant `create_row` / `update_row` / `delete_row`. Users are rows of the auth table, so this covers creating, editing and deleting users, under the auth rules the app's REST routes apply |
 | 8 | `deploy` | `project`, `action: "deploy" \| "rollback" \| "cancel"`, `branch?`, `deployment?`, `confirm?` | destructive, not idempotent | `project:deploy` | the control plane's deploy routes |
 | 9 | `env` | `project`, `action: "set" \| "unset"`, `vars?: { KEY: value }`, `keys?: string[]`, `confirm?` | destructive, idempotent | `project:env` | the control plane's env-vars routes |
 | 10 | `cron` | `project`, `job`, `action: "run" \| "enable" \| "disable"`, `confirm?` | destructive, not idempotent | `project:studio` | the tenant's `/api/admin/cron` |
@@ -211,7 +211,7 @@ Why reads and writes are separate tools: annotations are per tool. An `env`
 tool that also listed variables would have to be marked destructive, and the
 host would ask before every read. So env **names** are read through
 `project_status`, and the `env` tool only writes. The same split keeps `query`
-and `show_collection` free of prompts.
+and `show_table` free of prompts.
 
 Not offered, on purpose:
 
@@ -228,8 +228,8 @@ Not offered, on purpose:
   was in the brief.
 
 Tool descriptions are written for the model: one sentence on what it is for,
-one on when to use it rather than its neighbour (`query` vs `show_collection`:
-"use show_collection when the person wants to look at rows; use query when you
+one on when to use it rather than its neighbour (`query` vs `show_table`:
+"use show_table when the person wants to look at rows; use query when you
 need the rows yourself"), and, on the four mutating tools, the confirmation
 contract.
 
@@ -287,36 +287,35 @@ confirmation dialog itself) would close that gap, but it needs a
 server-initiated message, which this stateless POST-only endpoint does not
 send. That is listed under decisions.
 
-**The table view's edits.** A cell edit in `show_collection` is the person's
+**The table view's edits.** A cell edit in `show_table` is the person's
 own action, but it goes through the same protocol: the view calls `write`
 (plan), shows the change inline with a Confirm button, and sends the second
 call when the person presses it.
 
 The protocol lives in the framework (`packages/server/src/mcp/confirmation.ts`)
 as an opt-in on a tool definition, so the per-app `/mcp` can adopt it for
-`delete_document` later. Its single-use store is an interface with a Postgres
+`delete_row` later. Its single-use store is an interface with a Postgres
 implementation beside the OAuth store.
 
-## MCP Apps: `show_collection`, `show_record`, `show_app`
+## MCP Apps: `show_table`, `show_record`, `show_app`
 
 - **The view** (`ui://rebase/app.html`) is served by the connector, from the
   same `@rebasepro/mcp-apps` build the server already inlines: the admin
   panel's own components (`<Rebase>`, `CollectionPanel`, `RecordForm`)
   over a data driver that calls tools. `resources/list` and `resources/read`
-  answer from the control plane, which also serves the same document under
-  the old `ui://rebase/collection-table.html`. The tenant is never asked for
+  answer from the control plane. The tenant is never asked for
   HTML. The address the tools advertise and `resources/list` names carries
   the document's version — `await versionedMcpAppUri(MCP_APP_URI, html)`,
   `ui://rebase/app.html?v=<12 hex>` — because Claude caches a view per URI
   and would otherwise never fetch a new build; `resources/read` matches on
-  `mcpAppBaseUri(uri)`, so the bare address, the old alias and a stale
+  `mcpAppBaseUri(uri)`, so the bare address and a stale
   version still read the current document. Both come from `@rebasepro/server`.
-- **The screen** is built by the tenant's own `show_collection`,
+- **The screen** is built by the tenant's own `show_table`,
   `show_record` or `show_app`, under the platform token: the tenant holds the
-  collections, checks the arguments as its read and write tools would (and
+  tables, checks the arguments as its read and write tools would (and
   compiles show_app's code), and returns what the model reads plus `view` —
-  the block to draw, and the
-  collections' configs narrowed to the caller (no field they never receive,
+  the block to draw (payload version 2), and the tables' descriptors redacted
+  for the caller, with per-table `grants` (no column they never receive,
   read-only where they may not write, a restrictive rule closing what the
   token does not grant). The connector forwards the arguments without
   `project` and adds `actions`. A tenant on a runtime from before a tool
@@ -326,7 +325,7 @@ implementation beside the OAuth store.
   connector, because the host relays them to the server that served the view.
   `actions` names its tools for each (`query` to read a page, a row or a
   count, and — with `select` — an aggregate, which `query` relays to the
-  tenant's `aggregate_documents`; `write` with `action` to create, update or
+  tenant's `aggregate_rows`; `write` with `action` to create, update or
   delete), each with the project. A save is therefore `write`'s two calls:
   the view shows the plan in a dialog and sends the second only when the
   person presses Save. The per-app `/mcp` names no `actions`, and the view
@@ -335,8 +334,8 @@ implementation beside the OAuth store.
   `write`'s plan; where a tool does not plan (the per-app `/mcp`), the view
   asks the person itself before sending any write from an app's screen —
   from the app's code or from a form or table in it.
-- **The first page** a `show_collection` result carries (`data`, `meta`, the
-  rows the tenant read for the model) is the collection block's first read
+- **The first page** a `show_table` result carries (`data`, `meta`, the
+  rows the tenant read for the model) is the table block's first read
   when that read asks for exactly those arguments; any other read, or one
   after a write, goes to `query`.
 - **Apps the model writes** (`show_app`'s `code`) run in the same frame, with
@@ -485,5 +484,5 @@ Francesco approved every recommendation on 2026-11-05.
    backups (list, create), storage objects, invoking functions, creating a
    project.
 6. **The per-app `/mcp`.** Taken: unchanged, except that its tools get
-   annotations. Adopting the confirmation protocol for its `delete_document`
+   annotations. Adopting the confirmation protocol for its `delete_row`
    would change behaviour for apps' end users, and is a separate decision.

@@ -318,7 +318,7 @@ in that category: they are stamped into built bundles and into live databases,
 and Rebase Cloud reads them to decide what may run where.
 
 If your change touches the bundle format, the bundle↔runtime contract, the auth
-schema version, or the collection schema hash, read
+schema version, or the schema version hash, read
 **[docs/compatibility.md](docs/compatibility.md)** first. It says what each one
 promises, which direction it is compatible in, what a bump costs, and which gate
 will catch you. One of them invalidates every bundle ever built, so it is worth

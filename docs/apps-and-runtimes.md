@@ -5,7 +5,20 @@ Scope: `packages/types`, `packages/cms`, `packages/cms-types`, `packages/app`,
 `packages/cli`, `packages/server`, `saas`, templates
 
 §5's execution plan is history; read §1–§4 for the decisions and §6 for the
-traps, which is what the code cannot carry on its own. Checked, not assumed:
+traps, which is what the code cannot carry on its own.
+
+**Since 0.31 the schema half of this document is superseded** by the
+Postgres-first model (`docs/plans/POSTGRES-FIRST.md`): the backend serves the
+tables `backend/schema/index.ts` exports (`defineTable`), there is no config
+package (`backend/resources.ts`, `backend/storage.ts`, `backend/hooks.ts`
+replace it), `rebase.json`'s `config` and `usersCollection` are replaced by
+`tables`, bundles are format 3 with `entry.tables` / `resources` / `storage` /
+`hooks` (format 2 is refused), and the admin panel renders the tables the
+server serves at `GET /api/schema/tables` — which is what finally gives a
+platform-built admin the data model §2.2 said it could not have, as table
+descriptors rather than serialized collections. §4.2 and §4.3 below show the
+current shapes; §2 and §4.9b are the record of why the old ones went, written
+in the vocabulary of their day ("collections"). Checked, not assumed:
 
 | Decision | Where it landed |
 | --- | --- |
@@ -149,7 +162,7 @@ Two axes. Conflating them is the source of the confusion.
 ### Axis 1 — who owns the backend's code (authored, in `rebase.json`)
 
 - **`managed`** — the platform's runtime image runs your bundle. You supply
-  collections, functions, crons and schema; Rebase supplies the server.
+  tables, functions, crons and schema; Rebase supplies the server.
 - **`custom`** — you supply the server: a Dockerfile and an entrypoint. The
   escape hatch, with no managed-runtime guarantees.
 
@@ -247,17 +260,19 @@ export interface RebaseBackendAppConfig {
      */
     runtime: "managed" | "custom";
 
-    /** Directory of the config package. Default `config`. */
-    config?: string;
+    /**
+     * Directory whose `index.ts` exports the tables (`defineTable`, …) and,
+     * optionally, `defaultRls`. Default `backend/schema`. Without an index the
+     * runtime introspects the database. Replaced `config` and
+     * `usersCollection` in 0.31; both are refused with the codemod named.
+     */
+    tables?: string;
     /** Directory of server functions. Default `backend/functions`. */
     functions?: string;
     /** Directory of cron definitions. Default `backend/crons`. */
     crons?: string;
     /** Generated Drizzle schema module. Default `backend/src/schema.generated.ts`. */
     schema?: string;
-    /** Module (relative to `config`) default-exporting the auth users collection. */
-    usersCollection?: string;
-
     /** `runtime: "custom"` only. Dockerfile path. Default `Dockerfile`. */
     dockerfile?: string;
     /** `runtime: "custom"` only. Build context. Default `.`. */
@@ -381,12 +396,13 @@ In `packages/types/src/types/project_manifest.ts`:
 
 ```ts
 export interface RebaseBundleEntrypoints {
-    config?: string;
-    collections?: string;
+    tables?: string;      // the compiled backend/schema directory (format 3)
+    resources?: string;   // backend/resources
+    storage?: string;     // backend/storage (storageAuthorize)
+    hooks?: string;       // backend/hooks (global table hooks)
     functions?: string;
     crons?: string;
     schema?: string;
-    usersCollection?: string;
     /** Built static apps to serve from this process, in mount order. */
     static?: RebaseBundleStatic[];
     // `admin` is REMOVED.
@@ -656,7 +672,7 @@ pair has nothing left to name:
 
 ```
 rebase init my-app              # backend + admin
-rebase init my-api --headless   # backend only, collections introspected
+rebase init my-api --headless   # backend only, no backend/schema: tables introspected
 ```
 
 `TemplateFlavor` (`packages/cli/src/commands/init.ts:60`) is deleted; the overlay
@@ -725,7 +741,7 @@ docker compose up -d db
 docker compose up         # boot creates the tables it is missing
 ```
 
-Boot provisions the collection tables itself (`REBASE_MIGRATE_ON_BOOT=ensure`,
+Boot provisions the declared tables itself (`REBASE_MIGRATE_ON_BOOT=ensure`,
 additive only, row-level security included); `rebase db push` remains the step
 for what it deliberately leaves alone — any change that is not purely additive.
 The scaffold has no `backend/src/index.ts`: `backend/` holds the functions and the

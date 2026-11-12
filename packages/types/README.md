@@ -18,16 +18,18 @@ Provides the canonical type definitions used across all Rebase packages — both
 
 ## Key Exports
 
-### Collection & Entity Types
+### Tables
 
 | Export | Description |
 |--------|-------------|
-| `CollectionConfig` | Full collection definition (name, slug, properties, callbacks, security rules, views) |
-| `Property` | Union type for all property configurations (text, number, date, reference, array, map, etc.) |
-| `Entity` | Generic entity record type |
-| `CollectionCallbacks` | Lifecycle hooks (`afterRead`, `beforeSave`, `afterSave`, `afterSaveError`, `beforeDelete`, `afterDelete`) |
-| `EntityValues` | Record of property values for an entity |
-| `SecurityRule` | RLS-style access control rule for a collection |
+| `defineTable`, `defineAuthTable`, `defineView` | Declare a table, the users table, or a SQL view. `rls` is required on every table. Re-exported by `@rebasepro/server/schema`, the entry a `backend/schema` file imports. New in 0.31. |
+| `col`, `rel`, `json`, `policy` | The column, relation, JSON-shape and policy-expression builders. New in 0.31. |
+| `TableDescriptor`, `ColumnDescriptor`, `RelationDescriptor`, `RlsDescriptor` | The compiled form of a table: what the backend serves at `GET /api/schema/tables` and the SDK generator reads. New in 0.31. |
+| `TableHooks` | A table's lifecycle hooks (`beforeQuery`, `afterRead`, `beforeSave`, `afterSave`, `afterSaveError`, `beforeDelete`, `afterDelete`). New in 0.31. |
+| `InferRow`, `InferInsert`, `InferUpdate`, `DatabaseOf` | Row types inferred from a table, and a typed `Database` from a schema module. New in 0.31. |
+| `TablePatch` | The schema editor's edits, as a typed list of operations. New in 0.31. |
+| `SecurityRule` | One rule of a table's `rls` |
+| `Register` | Augmented by a project to type server-side data: `database` (generated) or `tables` (the schema module) |
 
 ### Backend & Driver Interfaces
 
@@ -36,7 +38,7 @@ Provides the canonical type definitions used across all Rebase packages — both
 | `DataDriver` | Abstract interface for database drivers (`fetchCollection`, `fetchOne`, `save`, `delete`, etc.) |
 | `DatabaseAdapter` | Pluggable database adapter interface (used by `server`) |
 | `BackendBootstrapper` | Lifecycle interface for initializing database drivers, auth, history, and realtime |
-| `DatabaseAdmin` | Admin operations interface (SQL execution, collection stats, table metadata) |
+| `DatabaseAdmin` | Admin operations interface (SQL execution, table stats, table metadata) |
 | `RealtimeProvider` | Interface for realtime subscription providers |
 | `BackendConfig` / `BackendInstance` | Abstract backend configuration and instance types |
 | `HealthCheckResult` | Return type for health check operations |
@@ -57,14 +59,12 @@ Provides the canonical type definitions used across all Rebase packages — both
 | `RebaseClient` | Top-level client interface (data, auth, storage, email) |
 | `RebaseServerClient` | The server-side `rebase` singleton: `RebaseClient` without `data`, plus `dataAsAdmin` |
 | `StorageSource` | File storage interface |
-| `CollectionRegistryInterface` | Collection lookup and registration |
 
 ### Other
 
 | Export | Description |
 |--------|-------------|
 | `CronJobDefinition` | Cron job configuration type |
-| `CollectionCallbacks` | Lifecycle callbacks for entity CRUD operations |
 | `WebSocketMessage` | WebSocket protocol message types |
 
 The admin panel's own types — `AuthController`, the plugin type `RebasePlugin`, `Locale` — live in `@rebasepro/cms-types`.
@@ -73,11 +73,10 @@ The admin panel's own types — `AuthController`, the plugin type `RebasePlugin`
 
 ```typescript
 import type {
-  CollectionConfig,
+  TableDescriptor,
   DataDriver,
   DatabaseAdapter,
   User,
-  Property,
 } from "@rebasepro/types";
 ```
 
@@ -87,7 +86,7 @@ Every `@rebasepro/*` package depends on this one. Key consumers:
 
 | Package | Uses |
 |---------|------|
-| `@rebasepro/server` | `DataDriver`, `DatabaseAdapter`, `BackendBootstrapper`, `AuthAdapter` |
+| `@rebasepro/server` | the table builders, `DataDriver`, `DatabaseAdapter`, `BackendBootstrapper`, `AuthAdapter` |
 | `@rebasepro/server-postgres` | `BackendBootstrapper`, `InitializedDriver`, `RealtimeProvider` |
 | `@rebasepro/client` | `RebaseClient`, `StorageSource` |
-| `@rebasepro/cms` | `CollectionConfig`, `Property`, controller interfaces |
+| `@rebasepro/cms` | `TableDescriptor`, controller interfaces |

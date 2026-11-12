@@ -151,4 +151,4 @@ token.
 - `@rebasepro/cms` — The admin panel this plugin extends
 - `@rebasepro/app` — Core framework providing the plugin system
 - `@rebasepro/cms-types` — `RebasePlugin` and the rest of the admin types
-- `@rebasepro/types` — Shared types (`CollectionConfig`, etc.)
+- `@rebasepro/types` — Shared types

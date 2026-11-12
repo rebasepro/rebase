@@ -52,16 +52,16 @@ Implements the Rebase `DatabaseAdapter` / `BackendBootstrapper` interfaces for P
 | `createPostgresBootstrapper(config)` | Lower-level `BackendBootstrapper` factory. Used internally by the adapter. |
 | `openPostgresDriver(pgConfig, init)` | Opens the data driver from explicit settings, reading no environment variable; `provision: false` opens it with no DDL. What the adapter runs at boot. New in 0.25. |
 | `postgresDriverConfigFromEnv(config, env?)` | Reads `DATABASE_READ_URL`, `DATABASE_DIRECT_URL` and the `REALTIME_*` variables into a driver config, as the server's boot does. New in 0.25. |
-| `openRebase({ databaseUrl, collections })` | A project's data from a script, a test or a REPL: `dataAsAdmin`, `sql`, `withAuth(user)` and `close()`. No server, no DDL, no environment reads. `rebase console` is built on it. New in 0.25. |
+| `openRebase({ databaseUrl, collections })` | A project's data from a script, a test or a REPL: `dataAsAdmin`, `sql`, `withAuth(user)` and `close()`. No server, no DDL, no environment reads. `rebase console` is built on it. `collections` is the project's tables lowered with `lowerTables` from `@rebasepro/common` — the form it reads until it takes `defineTable` results directly. New in 0.25. |
 | `createPostgresDatabaseConnection(url, schema?, poolConfig?)` | Creates a production-grade pooled Drizzle connection. Returns `{ db, pool, connectionString }`. |
 | `createDirectDatabaseConnection(url, schema?, poolConfig?)` | Non-pooled connection for LISTEN/NOTIFY and advisory locks (bypasses PgBouncer). |
 | `createReadReplicaConnection(url, schema?, poolConfig?)` | Read-only connection for routing reads to replicas. |
 | `PostgresBackendDriver` | The `DataDriver` implementation — CRUD, filtering, RLS, subcollections, admin SQL. |
 | `RealtimeService` | Postgres LISTEN/NOTIFY-based `RealtimeProvider`. |
 | `DatabasePoolManager` | Per-branch/per-tenant dynamic pool management (used with `ADMIN_CONNECTION_STRING`). |
-| `PostgresCollectionRegistry` | Collection → Drizzle table registry with enum and relation tracking. |
+| `PostgresTableRegistry` | Served table → Drizzle table registry with enum and relation tracking. |
 | `BranchService` | Database branching (one database per branch, copied from a template). |
-| `generateSchema(collections, options?)` | Generates Drizzle schema code from collection definitions. |
+| `generateSchema(collections, options?)` | Generates the Drizzle schema code (`schema.generated.ts`) from the lowered tables; `rebase schema generate` runs it over `backend/schema`. |
 | `createAuthSchema(schemaName?)` | Drizzle tables for the auth system, in schema `rebase` by default: `users` (with `roles` as a `text[]` column), `refresh_tokens`, `password_reset_tokens`, `user_identities`, `mfa_factors`, `mfa_challenges`, `recovery_codes`, `magic_link_tokens`, `app_config`. |
 
 ## Quick Start
@@ -90,7 +90,7 @@ const backend = await initializeRebaseBackend({
   app,
   server,
   database,
-  collections,
+  schemaDir: "./schema",   // backend/schema: the tables its index.ts exports
   auth: { /* ... */ },
 });
 
@@ -106,6 +106,7 @@ process.on("SIGTERM", async () => {
 ```typescript
 import { openRebase } from "@rebasepro/server-postgres";
 
+// `collections`: lowerTables([...the tables backend/schema/index.ts exports], { defaultRls })
 const rebase = await openRebase({ databaseUrl: process.env.DATABASE_URL!, collections });
 const { data } = await rebase.dataAsAdmin.posts.find({ limit: 10 });
 const ada = await rebase.withAuth({ uid: "ada", roles: ["user"] });   // what Ada's RLS lets her see
@@ -152,5 +153,5 @@ Pointing `vitest` at a unit test is the easy mistake here — it produces a bare
 |---------|------|
 | `@rebasepro/server` | Backend orchestrator that consumes this adapter |
 | `@rebasepro/types` | Shared interfaces (`DatabaseAdapter`, `BackendBootstrapper`, `DataDriver`) |
-| `@rebasepro/codegen` | Generates typed SDKs from collections |
-| `@rebasepro/common` | Default collections and shared utilities |
+| `@rebasepro/codegen` | Generates typed SDKs from table descriptors |
+| `@rebasepro/common` | The schema compiler (`compileTables`) and shared utilities |

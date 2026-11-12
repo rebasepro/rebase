@@ -16,15 +16,15 @@ of it resolves too: Node has supported `require(esm)` since 22.12.
 
 `@rebasepro/client` is the primary SDK for interacting with a Rebase backend from any JavaScript/TypeScript environment (browser, Node.js, edge). It creates a single client instance that provides:
 
-- **Collection CRUD** with a fluent query builder (`.where()`, `.orderBy()`, `.limit()`, etc.)
+- **Table CRUD** with a fluent query builder (`.where()`, `.orderBy()`, `.limit()`, etc.)
 - **Authentication** — email/password, Google, 10+ OAuth providers, session management, password reset
 - **Admin** — user CRUD for admins
 - **Storage** — file upload, download, delete, list
-- **Realtime** — WebSocket subscriptions for collection and row changes
+- **Realtime** — WebSocket subscriptions for table and row changes
 - **Offline / local-first sync** (opt-in) — a local row database, writes that apply instantly offline and replay when the connection returns, and live queries
 - **Cron** — list, trigger, and manage cron jobs
 - **Custom functions** — invoke server-side Hono route functions
-- **Type-safe data proxy** — `client.data.products` auto-maps to the `products` collection
+- **Type-safe data proxy** — `client.data.products` auto-maps to the `products` table
 
 ## Key Exports
 
@@ -34,7 +34,7 @@ of it resolves too: Node has supported `require(esm)` since 22.12.
 |---|---|
 | `createRebaseClient<DB>(options)` | Create a client instance. Generic `DB` parameter enables type-safe `client.data.*` access. |
 | `CreateRebaseClientResult<DB>` | The client type it returns (`RebaseClient<DB>` from `@rebasepro/types`, narrowed) — includes `auth`, `admin`, `cron`, `functions`, `storage`, `ws`, `data`, `call`, and token management methods. |
-| `CreateRebaseClientOptions` | Extends `RebaseClientConfig` with the `auth`, `admin`, `cron`, `apiKeys` and `personalKeys` sub-configs, plus `storageSources`, `collections`, `offline` and `debug`. |
+| `CreateRebaseClientOptions` | Extends `RebaseClientConfig` with the `auth`, `admin`, `cron`, `apiKeys` and `personalKeys` sub-configs, plus `storageSources`, `tables`, `offline` and `debug`. |
 
 ### Config
 
@@ -47,7 +47,7 @@ of it resolves too: Node has supported `require(esm)` since 22.12.
 | `onUnauthorized` | `() => Promise<boolean>` | auto-refresh | Handler for a refused token, over HTTP (401) and on the realtime socket |
 | `websocketUrl` | `string` | derived from `baseUrl` | WebSocket URL for realtime |
 | `realtime` | `boolean` | `true` | Open the WebSocket — `false` lets a one-shot script exit |
-| `collections` | `Record<string, string>` | — | Maps accessor names to collection slugs |
+| `tables` | `Record<string, string>` | — | Maps accessor names to table slugs: the generated `tablesDictionary`. With it, an unknown accessor throws `UNKNOWN_TABLE` |
 | `offline` | `boolean \| OfflineConfig` | `false` | Local-first sync — see [the docs](https://rebase.pro/docs/sdk/offline) |
 | `debug` | `boolean` | `false` | Log the realtime connection's progress with `console.debug`. One browser can turn it on with `localStorage.setItem("rebase_debug", "1")` — see [Connection logging](https://rebase.pro/docs/sdk#connection-logging) |
 
@@ -66,9 +66,9 @@ Installing a getter or calling `setToken()` rebuilds an open socket so it authen
 client.setAuthTokenGetter(() => clerk.session?.getToken() ?? Promise.resolve(null));
 ```
 
-### Collection Client
+### Table Client
 
-`client.data.table("slug")` or `client.data.myCollection` returns a `TableClient<M>`:
+`client.data.table("slug")` or `client.data.myTable` returns a `TableClient<M>`:
 
 | Method | Description |
 |---|---|
@@ -81,7 +81,7 @@ client.setAuthTokenGetter(() => clerk.session?.getToken() ?? Promise.resolve(nul
 | `where(col, op, val)` | Start a fluent query — returns a query builder |
 | `orderBy(col, dir?)` | Order results — returns a query builder |
 | `limit(n)` / `offset(n)` | Pagination — returns a query builder |
-| `search(str)` | Text search: a case-insensitive substring match by default, ranked full-text where the collection opts in — returns a query builder |
+| `search(str)` | Text search: a case-insensitive substring match by default, ranked full-text where the table opts in — returns a query builder |
 | `include(...rels)` | Include related rows — returns a query builder |
 | `listen(params, onUpdate, onError?)` | Realtime subscription (requires WebSocket) |
 | `listenById(id, onUpdate, onError?)` | Realtime single-row subscription |

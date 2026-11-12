@@ -29,18 +29,25 @@ This package has no React dependency — it's pure TypeScript and can be used in
 
 | Export | Description |
 |---|---|
-| `buildRebaseData(driver)` | Wraps a `DataDriver` in a `Proxy`-based `RebaseData` object. Property access like `data.products` returns a `TableAccessor` for that collection slug (camelCase → snake_case). |
+| `buildRebaseData(driver)` | Wraps a `DataDriver` in a `Proxy`-based `RebaseData` object. Property access like `data.products` returns a `TableAccessor` for that table's slug (camelCase → snake_case); `data.table(slug)` names one explicitly. |
 | `QueryBuilder<M>` | Fluent query builder with `.where()`, `.orderBy()`, `.limit()`, `.offset()`, `.search()`, `.include()`, `.find()`, and `.listen()` |
 | `or(...conditions)` | Create an OR logical condition |
 | `and(...conditions)` | Create an AND logical condition |
 | `cond(column, op, value)` | Create a single filter condition |
 
-### Callbacks
+### The schema compiler
 
 | Export | Description |
 |---|---|
-| `composeCallbacks(...sets)` | Combines several sets of collection callbacks into one, run in order, the way the backend combines its global, collection and property tiers. Also exported from `@rebasepro/cms-types` and `@rebasepro/server`. New in 0.25. |
-| `createCallContext(partial)` | Builds the `context` a collection callback receives, so a test can call a hook directly; a missing `client`, `data` or `storageSource` throws on first use, naming itself. New in 0.25. |
+| `compileTables(defs, options?)` | Compiles `defineTable` / `defineAuthTable` / `defineView` results into `TableDescriptor[]` — the form the backend serves, the SDK generator reads and the schema version hashes. Throws one `SchemaDefinitionError` naming every problem. New in 0.31. |
+| `SchemaDefinitionError` | What the compiler throws: every table and key that is wrong, with what to write instead. New in 0.31. |
+
+### Hooks
+
+| Export | Description |
+|---|---|
+| `composeTableHooks(...sets)` | Combines several sets of table hooks into one, run in order, the way the backend combines its global and table tiers. New in 0.31. |
+| `createCallContext(partial)` | Builds the `context` a table hook receives, so a test can call a hook directly; a missing `client`, `data` or `storageSource` throws on first use, naming itself. New in 0.25. |
 
 ### Deprecation
 
@@ -69,7 +76,7 @@ This package has no React dependency — it's pure TypeScript and can be used in
 | `relations` | Relation property helpers |
 | `builders` | Collection/property builder utilities |
 | `storage` | Storage path utilities |
-| `callbacks` | Callback composition utilities |
+| `callbacks` | Hook composition utilities |
 | `conditions` | Conditional logic helpers |
 
 ## Quick Start

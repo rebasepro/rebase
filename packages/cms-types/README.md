@@ -1,21 +1,17 @@
 # @rebasepro/cms-types
 
-Type definitions for the Rebase CMS: collection and property shapes, the entity
-and navigation models, and the translation keys the admin panel renders.
+Type definitions for the Rebase CMS: what `customizeTable` accepts (the
+table- and field-level presentation options), the entity actions, views and
+navigation models, the UI-preference shapes, and the translation keys the
+admin panel renders.
 
-This package is **mostly types** — the vocabulary that the runtime, the generated
-SDK and the admin panel all agree on, kept in one package so a change to a
-collection's shape cannot mean one thing to the server and another to the panel.
-The little that executes is there for the same reason: `defineCollection`, which
-type-checks a collection's `admin` block, the key lists (`ADMIN_PROPERTY_KEYS`,
-`ADMIN_COLLECTION_KEYS`) that tell an `admin` key from a core one, and
-`composeCallbacks` (0.25+), re-exported from `@rebasepro/common`, which combines
-several sets of collection callbacks into one.
-
-The runtime that consumes these types is
-[`@rebasepro/cms`](https://www.npmjs.com/package/@rebasepro/cms). A project that
-`rebase init` scaffolds depends on this package directly: its collection files
-import `defineCollection` from here.
+This package is **types**. The tables themselves are declared in the backend,
+with `defineTable` from `@rebasepro/server/schema`; the admin panel renders
+every table the server serves with no configuration, and a project's
+`frontend/src/cms/*.tsx` files state how one table differs from that default,
+with `customizeTable` from [`@rebasepro/cms`](https://www.npmjs.com/package/@rebasepro/cms),
+typed by the interfaces here (`TableCustomizationOptions`, `FieldOptions`,
+`TableEntityAction`, `TableEntityView`, …).
 
 ## Installation
 
@@ -29,23 +25,30 @@ of it resolves too: Node has supported `require(esm)` since 22.12.
 
 ## Usage
 
-```ts
-import { defineCollection } from "@rebasepro/cms-types";
+```tsx
+// frontend/src/cms/posts.tsx
+import { customizeTable } from "@rebasepro/cms";
+import type { TableEntityAction } from "@rebasepro/cms-types";
+import type { posts } from "../../../backend/schema/posts";
 
-export const posts = defineCollection({
-    name: "Posts",
-    slug: "posts",
-    table: "posts",
-    properties: {
-        title: { name: "Title", type: "string", validation: { required: true } },
-        body: { name: "Body", type: "string", admin: { multiline: true } }
+const archive: TableEntityAction = {
+    key: "archive",
+    name: "Archive",
+    onClick: async ({ id, context }) => {
+        if (id !== undefined) await context?.data.table("posts").update(id, { status: "archived" });
     }
+};
+
+export const postsCms = customizeTable<typeof posts>("posts", {
+    icon: "Article",
+    fields: { body: { multiline: true } },
+    entityActions: [archive]
 });
 ```
 
 ## Documentation
 
-- [Collections](https://rebase.pro/docs/collections)
+- [Customizing a table](https://rebase.pro/docs/frontend/customize-table/)
 - [Full documentation](https://rebase.pro/docs)
 
 ## License

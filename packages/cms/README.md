@@ -16,7 +16,7 @@ of it resolves too: Node has supported `require(esm)` since 22.12.
 
 ## What This Package Does
 
-`@rebasepro/cms` is the complete CMS layer of Rebase. It provides the admin panel UI — collection table/card views, entity editing forms, side-panel navigation, the visual collection (schema) editor, data import/export (CSV, JSON, Excel), and the app shell with auth gating, routing, and drawer layout. It sits on top of `@rebasepro/app` (runtime hooks/providers) and `@rebasepro/ui` (design system components).
+`@rebasepro/cms` is the complete CMS layer of Rebase. It renders every table the backend serves at `GET /api/schema/tables` with no configuration, changed per table by `customizeTable` (in a project's `frontend/src/cms/`), and Firestore collections passed as `externalCollections`. It provides the admin panel UI — table/card views, entity editing forms, side-panel navigation, the visual collection (schema) editor, data import/export (CSV, JSON, Excel), and the app shell with auth gating, routing, and drawer layout. It sits on top of `@rebasepro/app` (runtime hooks/providers) and `@rebasepro/ui` (design system components).
 
 ## Key Exports
 
@@ -36,7 +36,7 @@ of it resolves too: Node has supported `require(esm)` since 22.12.
 | `DrawerFooterActions` | Footer action buttons inside the drawer |
 | `SideDialogs` | Stacked side-panel dialog system |
 | `AdminModeSyncer` | Syncs the admin mode (`"cms"` \| `"studio"`) with the current route |
-| `CollectionPanel` | Standalone collection browser panel — by slug, or with the collection as a value (`collection={postsCollection}`), anywhere under `<Rebase>` and a router |
+| `CollectionPanel` | Standalone collection browser panel — a served table by its slug (`collection="posts"`), or an external collection as a value, anywhere under `<Rebase>` and a router |
 | `RecordForm` | One record's form, loaded by `id` (or new without one) and saved through `<Rebase>`'s data layer, with `onSaved` and `onClose` |
 | `CollectionsProvider` | The minimal scope for those two in a page of your own app: a registry of the served tables (with your `tableCustomizations`) and your `externalCollections`, and the side panels records open in. No `RebaseCMS`, `RebaseNavigation` or `RebaseShell` needed; any React Router router |
 
@@ -86,7 +86,7 @@ All exports from `./data_import` and `./data_export` — utilities for importing
 
 ### Collection Editor (Visual Schema Editor)
 
-All exports from `./collection_editor` — the visual schema editor UI for creating and editing collection definitions (properties, relations, validation rules) from within the CMS.
+All exports from `./collection_editor` — the visual editor for a table and how the panel shows it. A save is split into `TablePatch` edits, which the server's schema editor writes into `backend/schema`, and UI preferences (labels, view modes, column order), which go to `/api/admin/ui-config`.
 
 Also available as a separate entry point:
 
@@ -141,7 +141,7 @@ function App() {
 
 - [`@rebasepro/app`](../app) — Runtime hooks, providers, auth components, and context
 - [`@rebasepro/ui`](../ui) — Design system components (buttons, dialogs, inputs, etc.)
-- [`@rebasepro/common`](../common) — Shared utilities, collection registry, query builder
+- [`@rebasepro/common`](../common) — Shared utilities, the schema compiler, query builder
 - [`@rebasepro/types`](../types) — TypeScript type definitions
 - [`@rebasepro/forms`](../forms) — Form state management
-- [`@rebasepro/inference`](../inference) — Schema introspection from databases
+- [`@rebasepro/inference`](../inference) — Infer fields from sample data (the "create from a file" import)

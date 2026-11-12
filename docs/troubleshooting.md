@@ -4,7 +4,7 @@ The failures that stop a Rebase backend from starting or serving, what each one
 actually looks like on screen, and what to do about it.
 
 Boot fails loudly and completely. If the database is unreachable, the
-credentials are wrong, or the collection schema cannot be applied,
+credentials are wrong, or the schema cannot be compiled or applied,
 `initializeRebaseBackend` throws, nothing is served, and the process exits `1`.
 There is no degraded mode: a server that comes up answering sign-in while every
 `/api/data/*` route fails is harder to diagnose than one that never comes up.
@@ -81,10 +81,28 @@ Check the credentials in `DATABASE_URL`. A password containing `@`, `/`, `?` or
 `#` must be percent-encoded — an unencoded one silently reshapes the URL and the
 host you end up connecting to is not the one you wrote.
 
+## `SchemaDefinitionError` — the schema does not compile
+
+Boot, `rebase db generate`, `db push`, `generate-sdk` and `doctor` compile the
+tables `backend/schema/index.ts` exports before anything else, and stop when any
+table does not compile — no `rls`, `"inherit"` with no `defaultRls`, a relation
+to a table the index does not export, a `defineTable` in a sibling file the index
+leaves out — naming every table, key and problem at once. Fix each one;
+`rebase verify` reports the same list without starting anything.
+
+## `config/collections` is refused
+
+A project from before 0.31 keeps its data model in `config/collections`, which
+nothing reads any more: the runtime, every CLI command and a format-2 bundle
+are refused with `rebase migrate collections-to-tables` in the message. Run it
+on a clean git tree; it rewrites the project as `backend/schema` and
+`frontend/src/cms`, proves the generated SQL unchanged, and prints the steps
+left to you. See [Upgrading 0.30 to 0.31](https://rebase.pro/docs/upgrading/0-30-to-0-31/).
+
 ## `type "vector" does not exist`
 
 pgvector is a server extension, so Rebase installs it only where a project says
-it may. Declare it in `config/resources.ts`:
+it may. Declare it in `backend/resources.ts`:
 
 ```ts
 database({ extensions: ["vector"] })
@@ -108,7 +126,7 @@ distinguishes them:
 
 - **A row-level security policy denied the row** — the message above. The
   access-control system is working; the caller asked for something their
-  policies do not permit. Check the collection's `securityRules`, and run
+  policies do not permit. Check the table's `rls` in `backend/schema`, and run
   `npx @rebasepro/rls-check` for a read-only audit of what the database will
   actually enforce.
 - **The role lacks a `GRANT`.** The message names the object instead:
@@ -122,11 +140,11 @@ distinguishes them:
   Nothing about the request will help — the role requests run as cannot touch
   that object at all. The server grants its request role on the schemas it
   provisions, at boot; an object created outside it (by another role, or in a
-  schema no collection declares) needs a `GRANT` of its own. This is a
+  schema no table declares) needs a `GRANT` of its own. This is a
   deployment problem.
 
 A read that RLS excludes is not an error: the rows are filtered and you get an
-empty page. If a collection reads as empty for a signed-in user who should see
+empty page. If a table reads as empty for a signed-in user who should see
 rows, the policy is the place to look, not the query.
 
 ## `SCHEMA_DRIFT` — a table or column does not exist
@@ -138,14 +156,14 @@ SCHEMA_DRIFT — Schema drift: table "posts" does not exist.
 The code and the database disagree. In development:
 
 ```bash
-rebase db push        # apply the collections to the database
+rebase db push        # apply the tables to the database
 rebase doctor         # the full three-way drift report
 ```
 
 On a managed Cloud tenant, `db push` cannot reach the database — the runtime
 applies the schema at boot instead, so redeploy rather than pushing.
 
-If a table exists but a column does not, the usual cause is a collection file
+If a table exists but a column does not, the usual cause is a table file
 that was edited without regenerating: run `rebase schema generate` and push
 again.
 
@@ -192,7 +210,7 @@ waits for a file change. When the backend has not announced itself within
 ```
 
 The error above it is the real one. The most common causes are a syntax error in
-a collection file, an import that does not resolve, and a `DATABASE_URL` that
+a file in `backend/schema`, an import that does not resolve, and a `DATABASE_URL` that
 points at nothing.
 
 ## A custom function is not being served

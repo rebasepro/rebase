@@ -24,9 +24,9 @@ The CLI is also bundled with every Rebase project as a local dependency.
 | `rebase normalize-imports` | Complete compiled output's relative imports for Node ESM |
 | `rebase start` | Run the built bundle, as a deployment does, in the `NODE_ENV` you set |
 | `rebase apps list` | Show the apps this repository declares |
-| `rebase schema generate` | Generate Drizzle schema from collection definitions |
-| `rebase schema introspect` | Introspect an existing database → Rebase collections |
-| `rebase schema stale` | Report generated schema files the collections have moved past |
+| `rebase schema generate` | Generate the Drizzle schema from the tables in `backend/schema` |
+| `rebase schema introspect` | Write `defineTable` files in `backend/schema` from an existing database |
+| `rebase schema stale` | Report generated schema files the tables have moved past |
 | `rebase db push` | Apply schema directly to database (dev). Previews the plan and refuses destructive changes (e.g. dropped columns) unless confirmed interactively or run with `--allow-destructive`. |
 | `rebase db generate` | Generate SQL migration files |
 | `rebase db migrate` | Run pending migrations |
@@ -34,11 +34,12 @@ The CLI is also bundled with every Rebase project as a local dependency.
 | `rebase db branch` | Create, list, switch and delete database branches |
 | `rebase db stop` | Stop the managed development database (data is kept) |
 | `rebase db reset` | Delete the managed development database and start over |
-| `rebase generate-sdk` | Generate a typed TypeScript SDK from collections |
+| `rebase generate-sdk` | Generate a typed TypeScript SDK from the tables |
+| `rebase migrate` | `collections-to-tables`: move a project from `config/collections` to `backend/schema`, SQL-checked; `sdk-calls`: rewrite its SDK calls |
 | `rebase auth reset-password` | Reset a user's password |
 | `rebase api-keys list \| get \| create \| revoke \| scopes` | Manage service API keys and the scopes they hold |
-| `rebase doctor` | Detect schema drift between collections, Drizzle schema, and database |
-| `rebase verify` | Check collections, RLS coverage and migration freshness in one fast pass (`--json` for agents, `--live` for the database) |
+| `rebase doctor` | Detect schema drift between the tables, the Drizzle schema, and the database |
+| `rebase verify` | Check the tables, RLS coverage and migration freshness in one fast pass (`--json` for agents, `--live` for the database) |
 | `rebase status` | Show every resource this project declares and whether its variables are set |
 | `rebase resources` | List the databases, buckets and topics this project declares |
 | `rebase eject` | Own the server process and the image (one-way) |
@@ -103,7 +104,7 @@ pnpm run dev
 
 That is the whole first run. With no `DATABASE_URL` set, `rebase dev` starts a
 managed PostgreSQL (PGlite) in the project directory, generates the Drizzle
-schema from your collections, and creates the tables at boot — no database to
+schema from your tables, and creates them at boot — no database to
 install and no schema step.
 
 Two commands worth knowing straight after:

@@ -156,7 +156,8 @@ function App() {
     return (
         <Rebase client={client} authController={authController}>
             <RebaseAuth />
-            <RebaseCMS collections={collections} />
+            {/* Every table the backend serves; ./cms changes how some look. */}
+            <RebaseCMS tableCustomizations={tableCustomizations} />
             <RebaseShell title="Rebase" />
         </Rebase>
     );

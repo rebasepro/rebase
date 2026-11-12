@@ -47,7 +47,7 @@
 
 Rebase is a **developer-first**, open-source backend-as-a-service built on **PostgreSQL** — authentication, S3-compatible storage, realtime, backups and auto-generated REST APIs over a database you own. It is **self-hosted** and agent-native, with a built-in MCP server for AI-assisted development.
 
-The admin panel is the **second layer of the same definition**: add collection definitions and you get a schema-driven back-office built from them, extensible with your own **React** components, serverless functions, and scripts.
+You declare your tables in TypeScript (`defineTable` in `backend/schema/`), each with a required row-level security posture, and the backend serves them. The admin panel is the **second layer of the same definition**: it renders every table the backend serves as a schema-driven back-office, with no file per table, and your `frontend/src/cms/` files customize it with your own **React** components.
 
 ### Adopt only what you want
 
@@ -55,8 +55,8 @@ Three modes, same packages, wired differently — see [MODULAR-ARCHITECTURE.md](
 
 | Mode | You get | Comparable to |
 | --- | --- | --- |
-| **BaaS** | REST + auth + storage + realtime + backups over your database. No config files, no UI, no React in the dependency tree. | Supabase |
-| **CMS** | BaaS + a schema-driven admin UI built from your collection definitions. | Payload, Directus |
+| **BaaS** | REST + auth + storage + realtime + backups over your database — declared in `backend/schema`, or read from the database itself. No UI, no React in the dependency tree. | Supabase |
+| **CMS** | BaaS + a schema-driven admin UI built from your tables, customized in `frontend/src/cms`. | Payload, Directus |
 | **Full** | CMS + Studio (SQL editor, schema visualizer, RLS editor, logs, API explorer). | Supabase + Payload |
 
 ### ✨ Key Highlights
@@ -85,7 +85,7 @@ pnpm run dev
 
 That is the whole first run — no database to install, no schema step. With no
 `DATABASE_URL` set, `rebase dev` starts a managed PostgreSQL (PGlite) that lives
-in the project directory, generates the schema from your collections, and creates
+in the project directory, generates the schema from your tables, and creates
 the tables at boot.
 
 **Read the URLs from its output.** `rebase dev` picks a free port per project
@@ -111,12 +111,12 @@ pnpm dlx @rebasepro/cli init my-api --headless
 ```
 
 That scaffolds a headless backend: REST, auth, storage, realtime and backups over
-your database, with **no collection files and no UI**. Tables are served
+your database, with **no `backend/schema` and no UI**. Tables are served
 automatically, derived from your schema at boot — change the schema with a
 migration, restart, and the API follows. No React anywhere in the dependency tree.
 
 A fresh headless project has no tables yet, so `/api/data/*` answers
-`404 NO_COLLECTIONS` until you create some. Point it at a database that already
+`404 NO_TABLES` until you create some. Point it at a database that already
 has tables, or add them with a migration, and they appear.
 
 The three adoption modes — BaaS (like Supabase), CMS (like Payload/Directus), and
@@ -134,11 +134,11 @@ An incredibly fast, windowed spreadsheet view to manage your database with inlin
 - **Card grid** — Visual overview with image previews
 - **List view** — Compact, scannable layout
 - **Kanban board** — Cards grouped into columns by a property, dragged between them
-- **Custom views** — Build any React component as a collection view
+- **Custom views** — Build any React component as a view of a table
 
 ### 🔒 Typed Schema & Database Migrations
 
-Define your data models using pure TypeScript collections. Rebase automatically generates your Drizzle ORM schema, handles PostgreSQL migrations, and keeps your live database perfectly in sync using built-in tooling like `rebase doctor`.
+Declare your tables in TypeScript with `defineTable` — columns, relations and a required `rls`. Rebase automatically generates your Drizzle ORM schema, handles PostgreSQL migrations, and keeps your live database perfectly in sync using built-in tooling like `rebase doctor`.
 
 ### 💾 Backups & Restore
 
@@ -162,7 +162,7 @@ Built-in authentication with multiple providers:
 - **Anonymous** — For guest access, opt-in
 - **Captcha and API keys** — Bot protection on sign-up and the routes that send mail; scoped keys for scripts and agents
 
-Granular **role-based access control (RBAC)** with customizable permissions per collection, field, and action.
+Granular **role-based access control (RBAC)** with customizable permissions per table, column, and action.
 
 ### 📦 S3-Compatible Storage
 
@@ -181,7 +181,7 @@ A full developer environment built into the admin panel — SQL and JS editors, 
 
 A full WebSocket engine built into every Rebase backend:
 
-- **Live data subscriptions** — Subscribe to collection queries or individual entities. Changes propagate instantly with RLS-aware security.
+- **Live data subscriptions** — Subscribe to table queries or individual rows. Changes propagate instantly with RLS-aware security.
 - **Broadcast channels** — Send typed messages between connected clients. Build chat, notifications, or collaborative features.
 - **Presence tracking** — Track who's online, sync user state across clients (typing indicators, cursor positions, online status).
 - **Auto-reconnect** — Exponential backoff, automatic resubscription, and token refresh on reconnect.
@@ -200,7 +200,7 @@ Drop custom Hono routes or scheduled tasks into `backend/functions/` and `backen
 
 ### 🧬 SDK Generator
 
-Auto-generate fully typed **TypeScript SDKs** from your collection definitions. Use them in any frontend, script, or service to interact with your Rebase backend with complete type safety.
+Auto-generate fully typed **TypeScript SDKs** from your tables. Use them in any frontend, script, or service to interact with your Rebase backend with complete type safety.
 
 ```bash
 pnpm dlx @rebasepro/cli generate-sdk
@@ -217,7 +217,7 @@ A built-in **Model Context Protocol** server that enables AI assistants to:
 
 ### 🔍 Schema Inference & Introspection
 
-Point Rebase at an existing PostgreSQL database and automatically generate collection definitions from your tables — including types, relations, validation constraints, and more.
+Point Rebase at an existing PostgreSQL database and automatically write a `defineTable` file for each of its tables — including types, relations, policies, validation constraints, and more.
 
 ### 📥📤 Import & Export
 
@@ -301,7 +301,7 @@ every such change is in the [changelog](CHANGELOG.md).
 
 Separately, a small set of contracts is versioned and enforced — the bundle
 format, the bundle↔runtime contract, the auth schema version, and the hash
-identifying which collection schema a generated SDK was built against. These are
+identifying which schema a generated SDK was built against. These are
 stamped into built artifacts and live databases, checked at boot, and fail with
 a specific message rather than degrading. They are also the only things Rebase
 Cloud depends on, which is what lets a project move between self-hosting and the
@@ -334,7 +334,7 @@ Rebase is designed from the ground up to be **AI-agent ready**. When developing 
 ### 1. Built-in Agent Guidelines (`ai-instructions.md`)
 Every project scaffolded with `rebase init` carries its agent rules in `ai-instructions.md`, plus a short pointer file for each assistant that reads its own — `AGENTS.md`, `CLAUDE.md`, `.cursorrules`, `.windsurfrules` and `.github/copilot-instructions.md`. Each pointer names `ai-instructions.md` and the `rebase skills install --agent <name>` command for that assistant. The rules cover:
 - Using the **Rebase SDK** instead of raw SQL / direct Drizzle queries against application tables (which skip validation, hooks and row-level security).
-- Applying a collection change: while `pnpm dev` runs, saving the collection file is the whole step; `db:push` is for what boot leaves alone, and production uses `db:generate` then `db:migrate`.
+- Applying a schema change: while `pnpm dev` runs, saving a file in `backend/schema/` is the whole step; `db:push` is for what boot leaves alone, and production uses `db:generate` then `db:migrate`.
 - Guarding custom functions, and what an agent must never do — deploy, edit `.env`, or hand-edit generated files.
 
 ### 2. Built-in MCP Server

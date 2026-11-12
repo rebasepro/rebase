@@ -1,221 +1,147 @@
 # Data Sources (multi-backend routing)
 
-Rebase routes each collection to a **data source** — a named place its data
-lives. The same model is shared by the frontend and the backend.
+Two layers route data, and they route different things:
 
-## The three axes
+- **The backend** routes each **table** to a Postgres database. A table is
+  declared with `defineTable` in `backend/schema/`; its `database` names a
+  database declared in `backend/resources.ts`, and the default database serves
+  the rest. Postgres is the only server engine (the MongoDB driver was
+  retired in 0.31).
+- **The admin panel** routes each **collection** — a served table as the panel
+  shows it, or a Firestore collection the browser reads itself — to a data
+  source. The served tables all ride the `RebaseClient`; a Firestore collection
+  rides a direct driver.
 
-A collection's storage has three orthogonal properties:
+## The three axes of a panel collection
 
 | Axis | Meaning | Field |
 |------|---------|-------|
-| **Engine** | `postgres` / `mongodb` / `firestore` / custom — drives editor capabilities (relations vs subcollections, RLS, column types) | `DataSourceDefinition.engine`, or `collection.engine` where no definition is registered |
-| **Instance** | which physical DB / schema / Firestore database within the engine | `collection.databaseId` (defaults from the data source) |
+| **Engine** | `postgres` / `firestore` / custom — drives editor capabilities (relations vs subcollections, RLS, column types) | `DataSourceDefinition.engine`, or the collection's `engine` where no definition is registered |
+| **Instance** | which physical database / Firestore database within the engine | `databaseId` (defaults from the data source) |
 | **Transport** | how the *frontend* reaches it | `DataSourceDefinition.transport` |
 
 Transport values:
 
-- **`server`** — through the Rebase backend (the `RebaseClient`). The backend
-  holds the database adapter. This is the default and covers Postgres, MongoDB,
-  and any server-mediated engine. **Server sources need no frontend driver.**
+- **`server`** — through the Rebase backend (the `RebaseClient`). This is every
+  table the backend serves. **Server sources need no frontend driver.**
 - **`direct`** — straight from the client to the external backend via its own
-  SDK (e.g. Firestore). The Rebase backend is not in the data path.
+  SDK (Firestore). The Rebase backend is not in the data path.
 - **`custom`** — a developer-supplied `DataDriver`.
 
-## Collections opt in by key
+## Backend: tables opt in by key
 
 ```ts
-// Default data source (server-mediated Postgres)
-{ slug: "products", properties: { /* … */ } }
+// backend/resources.ts
+import { database } from "@rebasepro/types";
 
-// A registered data source by key
-{ slug: "events", dataSource: "analytics", properties: { /* … */ } }
+export const analytics = database("analytics");   // DATABASE_URL__ANALYTICS
 ```
 
-`collection.dataSource` is the routing key (default `"(default)"`);
-`defineCollection` also accepts the handle `database("analytics")` returned and
-records its key. `collection.engine` is the engine hint: a registered definition's
-`engine` wins over it, and build-time tooling, which has no registry, reads it
-directly (see below).
+```ts
+// backend/schema/page_views.ts
+import { defineTable, col } from "@rebasepro/server/schema";
+import { analytics } from "../resources";
+
+export const pageViews = defineTable("page_views", {
+    database: analytics,          // or the key, "analytics"
+    columns: { id: col.uuid().primaryKey().defaultRandom(), path: col.text().notNull() },
+    rls: "admin-only"
+});
+```
+
+`database` defaults to the default database. The compiled descriptor records the
+key; boot opens one connection per declared database, provisions each table and
+its policies in its own database, and routes every request — REST, realtime,
+`rebase.dataAsAdmin` — to the database its table names.
+
+- A declared database with no connection string **fails the boot**, naming the
+  variable. The alternative — falling back to the default database — is data
+  landing in the wrong place behind a server that reports itself healthy.
+- A `database("x", { engine: "mongodb" })` (the `database` kind's frozen engine
+  list still admits the name) refuses the boot: Postgres is the only server
+  engine. `REBASE_DRIVER__<KEY>` overrides the driver *package*, never the engine.
+- A `direct` or `custom` declaration is client-only: the backend holds no
+  connection and demands no configuration for it.
 
 ## Frontend
 
 ```tsx
 <Rebase
-  client={rebaseClient}                       // server transport = the default
+  client={rebaseClient}                       // every served table
   dataSources={[
-    { key: "analytics", engine: "firestore", transport: "direct", driver: firestoreDriver }
+    { key: "firestore", engine: "firestore", transport: "direct", driver: firestoreDriver }
   ]}
 >
+  <RebaseCMS tableCustomizations={tableCustomizations} externalCollections={[events]} />
+</Rebase>
 ```
 
-- Only register **direct** and **custom** sources. Postgres/Mongo ride the
-  `client`.
-- Routing is automatic and resolved by collection path against the registry —
-  it works for list/entity views, references, the board view, import/export,
-  and programmatic `context.data`, with no per-collection wiring. Routing
-  follows the *target* path, so a reference from a Firestore form to a Postgres
-  collection is still served by Postgres.
+- Only register **direct** and **custom** sources. The backend's tables, in any
+  of its databases, ride the `client`.
+- A Firestore collection is declared in the frontend with
+  `defineFirestoreCollection` from `@rebasepro/firebase` and passed as an
+  `externalCollection`. It never appears in `backend/schema`.
+- Routing is automatic and resolved by path against the registry — list and
+  record views, references, the board view, import/export and programmatic
+  `context.data`, with no per-collection wiring. Routing follows the *target*,
+  so a reference from a Firestore form to a Postgres table is served by
+  Postgres.
+- A reference between data sources is stored as the target's id (a string,
+  queryable with `==`) and read back as a reference carrying the target's data
+  source; references within one source are untouched. A Firestore reference
+  property's `path` is read as the slug of its target on any data source.
 - `transport` may be left out on the frontend: an entry with a `driver` is
   `direct`, one without is `server`.
 
-## Backend
+> **Note:** entity **history** is served by the backend's history service, for
+> the tables it serves. A Firestore collection has none.
 
-The backend takes no list of data sources. They are declared once, with
-`database()` in `config/resources.ts`, and every consumer reads the declarations:
+## Auth and data sources
 
-```ts
-// config/resources.ts
-import { database } from "@rebasepro/types";
-
-export const main      = database();                                // (default) — DATABASE_URL
-export const events    = database("events", { engine: "mongodb" }); // DATABASE_URL__EVENTS
-export const analytics = database("analytics", { engine: "firestore", transport: "direct" }); // client-only
-```
-
-Run `rebase resources --write` after changing them, so `rebase.resources.json` —
-the copy a host reads without running code — follows. The managed runtime reads
-the declarations at boot; an ejected backend reads them with
-`declaredDataSources()`, resolves connections with `resolveDataSources()`, opens
-them with `initializeDataSources()` and hands the resulting bootstrappers to
-`initializeRebaseBackend`, which is what the ejected template does. A
-`dataSources` key on the backend config is refused at boot rather than ignored.
-
-- Every server-transport source needs its own connection, `DATABASE_URL__<KEY>`.
-  A declared source without one is a boot error, not a silent fall-back to the
-  default database. The driver package follows from the engine;
-  `REBASE_DRIVER__<KEY>` overrides it.
-- The backend resolves each collection's engine and transport from the same
-  definitions.
-- Collections on a `direct`/`custom` transport are **client-only**: the backend
-  still owns their schema/registry but does **not** generate server data routes
-  for them (so a Firestore collection never gets a mis-engined Postgres
-  endpoint).
-- Multiple instances of the *same* engine (e.g. several Postgres schemas) are
-  handled by the engine adapter via `databaseId`.
-
-### Multiple engines in one instance (Postgres + MongoDB)
-
-Declare the second database with its engine, as `events` above, and point the
-collections that live there at its key:
-
-```ts
-{ slug: "products", /* … */ }                     // → Postgres (default)
-{ slug: "events", dataSource: "events", /* … */ } // → MongoDB
-```
-
-One bootstrapper is initialized per declared server-transport source, each
-registered under the source's key, and the `(default)` one is the default.
-Each request is routed to the right delegate by the collection's resolved
-data-source key, which is that bootstrapper's id. The auth middleware scopes the
-chosen delegate into the request context — applying Postgres RLS where
-supported, and no-op scoping for engines without `withAuth()`. Single-engine
-backends are unaffected (no per-request lookup).
-
-**Realtime** is routed too: the single WebSocket server is driven by a composite
-that sends each `subscribe_collection`/`subscribe_entity` to the realtime
-provider owning that collection's engine (Postgres LISTEN/NOTIFY, MongoDB change
-streams, …), while channels/presence/broadcast use the default provider.
-Firestore (`direct`) realtime is handled entirely client-side by its SDK and
-never reaches the backend.
-
-If a server-transport collection names a data-source key with no registered
-driver, the backend logs a warning at boot (the collection would otherwise
-silently fall back to the default driver — i.e. the wrong database). Declare the
-source with `database("<key>")`, or mark it `direct`/`custom`.
-
-> **Note:** entity **history** is served by the default engine's history
-> service; the revert action routes through the per-request delegate. Per-engine
-> history services for non-default engines are a separate feature.
-
-## Auth & multiple data sources
-
-Authentication has important interactions with multi-data-source setups:
-
-- **Auth lives in the default data source.** The built-in auth subsystem
-  (users, sessions, repository, API keys) is bootstrapped on the *default*
-  driver. The auth collection must therefore be on the default data source —
-  the backend warns at boot if it isn't (a non-default auth collection would
-  produce a split-brain user store).
-- **Database-enforced row security is Postgres-only; the rules are not.**
-  `securityRules` are a declaration about the data, and the engine decides *who*
-  enforces them, not *whether* they hold. Postgres compiles them to RLS DDL;
-  MongoDB has no RLS, so its driver applies the same rules in-process — on the
-  listing, the count, `fetchOne`, `save`, `delete` and realtime subscriptions
-  alike. An engine with no `withAuth()` at all still gets no row-level
-  authorization (`scopeDataDriver` no-ops for it); enforce access there with
-  app-level checks or engine-native rules. The backend warns at boot for
-  non-RLS server engines.
-- **In-process enforcement refuses what it cannot express.** The MongoDB driver
-  translates each rule through the same compiler the Postgres DDL generator
-  uses. A rule it cannot turn into a query — raw SQL beyond simple comparisons,
-  a membership subquery (`existsIn`), a negated column predicate — makes the
-  request fail with `SECURITY_RULE_UNSUPPORTED` rather than be served without
-  authorization. Prefer `access`, `ownerField`, `roles` and structured
-  `condition`/`check` on a non-Postgres collection; raw `using`/`withCheck`
-  stays Postgres-only.
-- **`withCheck` runs before the write on MongoDB.** There is no transaction to
-  roll back, so the driver evaluates `USING` against the stored row and
-  `WITH CHECK` against the row that would replace it, and refuses before
-  touching the document.
-- **Direct data sources bypass Rebase auth entirely.** A Firestore (`direct`)
-  collection is reached straight from the client, so the Rebase JWT, RLS, and
-  API keys never apply — security is governed by the external backend's own
-  rules and token (e.g. external auth provider + native security rules).
+- **Auth lives in the default database.** The users table is the one declared
+  with `defineAuthTable`, and it must be on the default database: the built-in
+  auth subsystem (users, sessions, API keys) is bootstrapped on the default
+  driver.
+- **Row security is Postgres RLS, in every database.** Each table's `rls` is
+  compiled to policies in the database that holds it, and every request runs
+  under them as `rebase_user`.
+- **Direct data sources bypass Rebase auth entirely.** A Firestore collection is
+  reached straight from the client, so the Rebase JWT, RLS and API keys never
+  apply — security is governed by Firestore's own rules and token.
 - **Overriding auth completely.** Pass an `AuthAdapter` as `auth` to
-  `initializeRebaseBackend` to fully replace the built-in system (Clerk, Auth0,
-  external providers, …). It controls `verifyRequest` and optionally
-  `userManagement`. This is the recommended way to unify identity across a
-  server backend and a direct source — the same adapter can mint the external
-  token. Per-request data-source routing works identically under an adapter.
+  `initializeRebaseBackend` to replace the built-in system (Clerk, Auth0, …). It
+  controls `verifyRequest` and optionally `userManagement`, and is the way to
+  unify identity across the backend and a direct source. Per-request database
+  routing works identically under an adapter.
 
 ## The shared resolver
 
 `resolveDataSource(collection, registry)` in `@rebasepro/common` is the single
-source of truth used by the frontend router, the backend, and the editor:
+source of truth the panel's router and editor use:
 
 ```ts
 const { key, engine, transport, databaseId, capabilities } =
     resolveDataSource(collection, createDataSourceRegistry(definitions));
 ```
 
-## The schema toolchain only owns SQL collections
+## The schema toolchain owns only the tables
 
-`config/collections` holds *every* collection the project declares, whatever
-engine serves it. The SQL toolchain reads only the ones a SQL engine stores —
-`isRelationalCollection` / `relationalCollections` in `@rebasepro/common` are
-the single rule, and it is the resolved engine's `supportsRelations`
-capability, not a name check.
-
-Skipped for a Firestore or MongoDB collection:
-
-- the generated Drizzle schema and the Postgres DDL (`rebase schema generate`)
-- boot-time table creation and RLS policies (`REBASE_MIGRATE_ON_BOOT`)
-- the `db push` include list — and this one matters beyond tidiness: a name on
-  that list is a name Atlas is allowed to drop, so a Firestore collection called
-  `exercises` used to remove a real, unrelated `public.exercises` table's
-  protection from the next auto-approved push
-- `rebase doctor`'s drift report, and the schema-drift warning `rebase dev`
-  prints when a collection file changes
-
-**Declare `engine` on a collection that is not SQL-backed.** Build-time tooling
-has no data-source registry to resolve a `dataSource` key against — the CLI
-cannot evaluate your backend's `initializeRebaseBackend` call — so it falls back
-to reading the key as the engine name, and an engine it does not recognise is
-treated as SQL. That fallback is deliberate: generating a table nobody writes to
-is recoverable, and silently *not* generating one the app serves from is not.
-
-At runtime the same question has an exact answer, because boot knows the
-initialized sources: it hands each bootstrapper only the collections its engine
-stores, and logs the ones it routed elsewhere.
+`backend/schema` holds only Postgres tables, so every SQL tool — the generated
+Drizzle schema and DDL, boot-time table creation and RLS, the `db push` include
+list, `rebase doctor` — reads exactly the tables declared there. A Firestore
+collection cannot reach any of them: it is declared in the frontend. Before
+0.31 one directory held every engine's collections and each tool had to filter
+the SQL ones out — a Firestore collection called `exercises` once put a real,
+unrelated `public.exercises` table on the list of names Atlas was allowed to
+drop.
 
 ## What is gone
 
 - A plain app needs no `dataSources`: `<Rebase client>` alone serves every
-  collection through the backend. The frontend's only two data props are
-  `client` and `dataSources`; the old top-level `driver`, `data` and
-  `drivers={{…}}` props no longer exist.
-- On a collection, `dataSource`, `engine` and `databaseId` are the fields.
-  There is no `collection.driver`.
+  table through the backend. The frontend's only two data props are `client`
+  and `dataSources`.
+- On a table, `database` is the routing key. There is no `dataSource`,
+  `engine` or `databaseId` on `defineTable`.
 - On the backend, a `dataSources` option is refused at boot, with the
   `database()` declaration named as its replacement.
+- The MongoDB engine, with its in-process rule evaluation.
