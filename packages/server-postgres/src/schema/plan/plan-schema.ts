@@ -1886,9 +1886,14 @@ function planRelationColumn(
     // with "column specified more than once".
     const fkFieldKey = fieldKeyForColumn(collection, relation.localKey);
     const columnOwnedByProperty = Boolean(collection.properties?.[fkFieldKey]) && propName !== fkFieldKey;
-    const { required, unique, constrained } = linkColumnFacts(prop, columnOwnedByProperty
-        ? collection.properties?.[fkFieldKey]
-        : undefined);
+    const owner = columnOwnedByProperty ? collection.properties?.[fkFieldKey] : undefined;
+    const { required, unique, constrained } = linkColumnFacts(prop, owner);
+    // A declared column that owns the link's column says what that column is:
+    // the constraint-only entry beside it states the same type and
+    // nullability, so one column never reads two ways in the plan (a key
+    // column of a composite key is NOT NULL; an `integer` column pointing at a
+    // `bigint` key stays `integer`, which Postgres's integer comparison holds).
+    const ownerDefinition = owner?.type === "relation" ? undefined : tableColumnOf(owner);
 
     // Only a *derived* column name can be affected by the change to
     // `generateForeignKeyName`; one the author wrote is theirs.
@@ -1900,8 +1905,10 @@ function planRelationColumn(
     return {
         key: fkFieldKey,
         column: relation.localKey,
-        type: primaryKeyPgType(target, via),
-        nullable: !required,
+        type: ownerDefinition
+            ? definedPgType(ownerDefinition, { collection, propName: fkFieldKey, column: relation.localKey })
+            : primaryKeyPgType(target, via),
+        nullable: ownerDefinition ? !(ownerDefinition.notNull || ownerDefinition.primaryKey) : !required,
         primaryKey: false,
         // `validation.unique` on a link is a one-to-one, and all three emitters
         // dropped it: the property said unique, the column was not, and a

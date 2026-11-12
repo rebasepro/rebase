@@ -1,4 +1,5 @@
 import type {
+    ColumnType,
     AnyTableDef,
     AnyViewDef,
     AuthTableDescriptor,
@@ -107,6 +108,13 @@ const TENANT_KINDS = new Set([
     "smallint", "integer", "bigint", "smallserial", "serial", "bigserial", "numeric"
 ]);
 const TEMPORAL_KINDS = new Set(["timestamptz", "date", "time"]);
+/**
+ * Integer widths. A foreign key holds between any two of them — Postgres
+ * compares `integer` with `bigint` in one operator family — so a bound column
+ * keeps its declared width when it points at a key of another one (the shape
+ * a database grown over years holds: an `integer` column into a `bigint` key).
+ */
+const INTEGER_KINDS: ReadonlySet<ColumnType["kind"]> = new Set(["smallint", "integer", "bigint", "smallserial", "serial", "bigserial"]);
 
 /**
  * Compile table and view definitions into the descriptors the backend runs on
@@ -427,7 +435,9 @@ function compileOne(
                         refuse(`the relations "${previous}" and "${relationName}" both use the column "${localKey}" as their foreign key. One column holds one link; give one of them its own \`localKey\`.`, relationName);
                     }
                     boundBy.set(bound.key, relationName);
-                    if (targetKey && referencing && !sameColumnType(bound.def.type, entry.table, bound.column, referencing, target.table, targetKey.column)) {
+                    if (targetKey && referencing
+                        && !sameColumnType(bound.def.type, entry.table, bound.column, referencing, target.table, targetKey.column)
+                        && !(INTEGER_KINDS.has(bound.def.type.kind) && INTEGER_KINDS.has(referencing.kind))) {
                         refuse(
                             `the relation binds the column "${bound.key}" (\`${columnTypeLabel(bound.def.type)}\`) as its foreign key, ` +
                             `and \`${target.name}\`'s key "${targetKey.key}" is \`${columnTypeLabel(referencing)}\`. A foreign key ` +

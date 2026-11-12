@@ -77,8 +77,9 @@ const RENAMED = "a relation served under its own FK column's key is renamed `<ke
  * A relation property `required` over a property-owned column that is
  * nullable (introspection marks the relation, not the column). The table
  * model has one answer, the column's; only the OpenAPI document and the SDK
- * read the relation's. The plan's constraint-only entry is nullable now, and
- * `relational-columns.json` reports it so.
+ * read the relation's. The plan's constraint-only entry takes the column's
+ * nullability (and `relational-columns.json`, which reports the created
+ * column, reads as the goldens do).
  */
 const REQUIRED = "a relation `required` over a nullable property-owned column takes the column's nullability (the plan's constraint-only entry); DDL identical";
 
@@ -107,15 +108,12 @@ ALLOWED_DIFFERENCES.push(
     { set: "real-schema.chinook", output: "schema.generated.ts", reason: RENAMED },
     { set: "real-schema.chinook", output: "schema.generated.no-policies.ts", reason: RENAMED },
     { set: "real-schema.musicbrainz", output: "plan.json", reason: `${RENAMED}; ${REQUIRED}` },
-    { set: "real-schema.musicbrainz", output: "relational-columns.json", reason: REQUIRED },
     { set: "real-schema.musicbrainz", output: "schema.generated.ts", reason: RENAMED },
     { set: "real-schema.musicbrainz", output: "schema.generated.no-policies.ts", reason: RENAMED },
     { set: "real-schema.northwind", output: "plan.json", reason: `${RENAMED}; ${REQUIRED}` },
-    { set: "real-schema.northwind", output: "relational-columns.json", reason: REQUIRED },
     { set: "real-schema.northwind", output: "schema.generated.ts", reason: RENAMED },
     { set: "real-schema.northwind", output: "schema.generated.no-policies.ts", reason: RENAMED },
     { set: "real-schema.openstreetmap", output: "plan.json", reason: `${RENAMED}; ${REQUIRED}` },
-    { set: "real-schema.openstreetmap", output: "relational-columns.json", reason: REQUIRED },
     { set: "real-schema.openstreetmap", output: "schema.generated.ts", reason: RENAMED },
     { set: "real-schema.openstreetmap", output: "schema.generated.no-policies.ts", reason: RENAMED }
 );

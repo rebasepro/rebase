@@ -15,7 +15,7 @@ import { afterEach, beforeEach, describe, expect, it } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
 import { pgTable, text, uuid } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
-import { findRelation, lowerTables, resolveCollectionRelations, type LoweredCollection } from "@rebasepro/common";
+import { compileTables, findRelation, isSchemaDefinitionError, lowerTables, resolveCollectionRelations, type LoweredCollection } from "@rebasepro/common";
 import { col, defineTable, rel, type AnyTableDef } from "@rebasepro/types";
 
 import { planSchema } from "../src/schema/plan/plan-schema";
@@ -30,7 +30,7 @@ import { collectionIndexStatement } from "../src/schema/collection-index";
 import { parsePropertyFromServer, serializePropertyToServer } from "../src/data-transformer";
 import { drizzle } from "drizzle-orm/pglite";
 import {
-    TABLE_FEATURES, audits, bugs, codes, counters, days, grades, handles, initials, keyed, lists, pairs, people, prices, slugs, switches, tallies, tasks, tickets
+    TABLE_FEATURES, audits, bugs, memberTags, members, codes, counters, days, grades, handles, initials, keyed, lists, pairs, people, prices, slugs, switches, tallies, tasks, tickets
 } from "./fixtures/table-features";
 
 const PACKAGE_ROOT = path.resolve(__dirname, "..");
@@ -491,6 +491,52 @@ describe("table features: `rel.belongsTo(…, { constraint: false })`", () => {
             await db.query("INSERT INTO audits (subject_id) VALUES (gen_random_uuid())");
             const { rows } = await db.query<{ n: number }>("SELECT count(*)::int AS n FROM audits");
             expect(rows).toEqual([{ n: 1 }]);
+        } finally {
+            await db.close();
+        }
+    });
+});
+
+describe("table features: a declared foreign-key column, keyed, at another integer width", () => {
+    it("compiles: a foreign key holds between integer widths", () => {
+        expect(() => compileTables([members, memberTags])).not.toThrow();
+    });
+
+    it("still refuses a bound column of a type no foreign key holds across", () => {
+        const wrong = defineTable("wrong", {
+            columns: { id: col.uuid().primaryKey(), memberId: col.text() },
+            relations: { member: rel.belongsTo(() => members, { localKey: "member_id" }) },
+            rls: "admin-only"
+        });
+        let problems: string[] = [];
+        try {
+            compileTables([members, wrong]);
+        } catch (error) {
+            if (isSchemaDefinitionError(error)) problems = error.problems.map(problem => problem.message);
+        }
+        expect(problems).toEqual([expect.stringContaining("binds the column \"memberId\" (`text`) as its foreign key")]);
+    });
+
+    it("plans the column one way: its constraint-only entry states the column's type and NOT NULL", () => {
+        const plan = planOf([members, memberTags]);
+        const entries = tableOf(plan, "member_tags").columns.filter(column => column.column === "member_id");
+        expect(entries.map(entry => ({ type: entry.type, nullable: entry.nullable, owned: entry.columnOwnedByProperty === true })))
+            .toEqual([
+                { type: { kind: "integer" }, nullable: false, owned: false },
+                { type: { kind: "integer" }, nullable: false, owned: true }
+            ]);
+        expect(tableOf(plan, "member_tags").primaryKey).toEqual(["member_id", "tag"]);
+        expect(entries[1].foreignKey).toMatchObject({ targetTable: "members", targetColumn: "id", onDelete: "RESTRICT" });
+    });
+
+    it("is created by Postgres, its foreign key across the two widths holding", async () => {
+        const db = new PGlite();
+        try {
+            await db.waitReady;
+            await db.exec(ddlOf([members, memberTags]));
+            await db.query("INSERT INTO members DEFAULT VALUES");
+            await db.query("INSERT INTO member_tags (member_id, tag) VALUES (1, 'a')");
+            await expect(db.query("INSERT INTO member_tags (member_id, tag) VALUES (2, 'a')")).rejects.toThrow(/foreign key/);
         } finally {
             await db.close();
         }

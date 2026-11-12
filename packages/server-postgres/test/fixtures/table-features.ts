@@ -151,7 +151,22 @@ export const audits = defineTable("audits", {
     rls: "admin-only"
 });
 
+/**
+ * A declared column that is both part of a composite key and a foreign key,
+ * at another integer width than the key it points at — the shape a database
+ * grown over years holds (`integer` into `bigint`).
+ */
+export const members = defineTable("members", { columns: { id: col.bigint().primaryKey().identity() }, rls: "admin-only" });
+export const memberTags = defineTable("member_tags", {
+    columns: {
+        memberId: col.integer().primaryKey(),
+        tag: col.text().primaryKey()
+    },
+    relations: { member: rel.belongsTo(() => members, { localKey: "member_id" }) },
+    rls: "admin-only"
+});
+
 /** Every table, in an order that declares a target before what points at it. */
 export const TABLE_FEATURES = [
-    people, counters, tallies, codes, initials, grades, days, switches, prices, tickets, slugs, pairs, keyed, lists, tasks, bugs, handles, audits
+    people, counters, tallies, codes, initials, grades, days, switches, prices, tickets, slugs, pairs, keyed, lists, tasks, bugs, handles, audits, members, memberTags
 ];
