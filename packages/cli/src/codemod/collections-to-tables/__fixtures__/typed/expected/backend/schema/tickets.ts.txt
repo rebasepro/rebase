@@ -1,5 +1,7 @@
 import { defineTable, col } from "@rebasepro/server/schema";
 import { audit } from "../lib/audit.js";
+import { notifyOwner } from "../lib/notify.js";
+import { LOCALES } from "../lib/locales";
 
 export const tickets = defineTable("tickets", {
     slug: "support-tickets",
@@ -8,6 +10,7 @@ export const tickets = defineTable("tickets", {
         subject: col.text().notNull(),
         priority: col.enum(["low", "normal", "high"]).default("normal"),
         owner_id: col.uuid(),
+        locale: col.enum(LOCALES),
         created_at: col.timestamptz().onCreateNow(),
         updated_at: col.timestamptz().onUpdateNow()
     },
@@ -18,6 +21,7 @@ export const tickets = defineTable("tickets", {
     hooks: {
         afterSave: async (props) => {
             await audit(props.table.slug, props.id);
+            await notifyOwner(props.context, props.id);
         },
         beforeDelete: ({ table: collection }) => {
             // TODO(rebase-migrate): `collection` is now the table's descriptor, not the collection: check every use but `.slug` (line 2 of the hook).

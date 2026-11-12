@@ -1,0 +1,6 @@
+import type { EnumValueConfig } from "@rebasepro/types";
+
+export const LOCALE_ENUM: EnumValueConfig[] = [
+    { id: "en", label: "English" },
+    { id: "de", label: "German" }
+];

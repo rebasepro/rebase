@@ -1,0 +1,7 @@
+import type { EntityCallbackContext } from "@rebasepro/common";
+
+/** Tell the ticket's owner. */
+export async function notifyOwner(context: EntityCallbackContext, id: string | number): Promise<void> {
+    void context;
+    void id;
+}

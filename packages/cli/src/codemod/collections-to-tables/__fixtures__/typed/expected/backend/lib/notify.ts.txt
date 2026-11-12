@@ -1,0 +1,9 @@
+import type { TableHookProps } from "@rebasepro/server/schema";
+
+type EntityCallbackContext = TableHookProps["context"];
+
+/** Tell the ticket's owner. */
+export async function notifyOwner(context: EntityCallbackContext, id: string | number): Promise<void> {
+    void context;
+    void id;
+}

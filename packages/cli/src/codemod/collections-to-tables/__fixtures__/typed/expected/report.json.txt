@@ -24,6 +24,8 @@
   ],
   "files": [
     "create backend/lib/audit.ts",
+    "create backend/lib/locales.ts",
+    "create backend/lib/notify.ts",
     "update backend/package.json",
     "create backend/schema/events.ts",
     "create backend/schema/index.ts",
@@ -33,6 +35,7 @@
     "update frontend/package.json",
     "update frontend/src/App.tsx",
     "create frontend/src/cms/index.ts",
+    "create frontend/src/cms/lib/locales.ts",
     "create frontend/src/cms/open_tickets.tsx",
     "create frontend/src/cms/tickets.tsx",
     "update frontend/src/virtual.d.ts",
@@ -45,7 +48,7 @@
   "notes": [
     {
       "file": "config/collections/tickets.ts",
-      "line": 39,
+      "line": 43,
       "collection": "support-tickets",
       "message": "`ticketsCollection.securityRules` is assigned after the declaration; the evaluated value is what was carried."
     },

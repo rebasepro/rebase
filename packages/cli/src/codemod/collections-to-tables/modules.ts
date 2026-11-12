@@ -13,6 +13,8 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import type { SourceFile } from "ts-morph";
+
 import type { AstContext, ImportUse } from "./ast";
 import { toPosix } from "./ast";
 
@@ -92,6 +94,11 @@ export class Relocator {
         private readonly libDirs: Readonly<Record<Side, string>>
     ) {}
 
+    /** The config directory, absolute. */
+    get configDirectory(): string {
+        return this.configDir;
+    }
+
     /** Whether `file` is inside the config directory (and so goes away). */
     isInConfig(file: string): boolean {
         const relative = path.relative(this.configDir, file);
@@ -143,6 +150,47 @@ export class Relocator {
         return moved;
     }
 
+    /** Collection-model types left in moved backend code (used with type arguments), for the report. */
+    readonly legacyTypesLeft: { file: string; name: string }[] = [];
+
+    /** Edits replacing the collection-model types a moved backend module imports (see {@link replaceLegacyTypes}). */
+    private legacyTypeEdits(sf: SourceFile, text: string, edits: { start: number; end: number; text: string }[]): void {
+        const aliases: string[] = [];
+        const types = new Set<string>();
+        for (const declaration of sf.getImportDeclarations()) {
+            const specifier = declaration.getModuleSpecifierValue();
+            if (!LEGACY_TYPE_PACKAGES.has(specifier)) continue;
+            const named = declaration.getNamedImports();
+            const replaced = named.filter(entry => {
+                const replacement = LEGACY_TYPE_REPLACEMENTS[entry.getName()];
+                const local = entry.getAliasNode()?.getText() ?? entry.getName();
+                if (!replacement) return false;
+                if (new RegExp(`\\b${local}\\s*<`).test(text)) {
+                    this.legacyTypesLeft.push({ file: sf.getBaseName(), name: local });
+                    return false;
+                }
+                types.add(replacement.type);
+                aliases.push(`type ${local} = ${replacement.expression};`);
+                return true;
+            });
+            if (replaced.length === 0) continue;
+            const remaining = named.filter(entry => !replaced.includes(entry));
+            if (remaining.length === 0 && !declaration.getDefaultImport() && !declaration.getNamespaceImport()) {
+                const end = text[declaration.getEnd()] === "\n" ? declaration.getEnd() + 1 : declaration.getEnd();
+                edits.push({ start: declaration.getStart(), end, text: "" });
+            } else {
+                const bindings = remaining.map(entry => entry.getText()).join(", ");
+                const typeOnly = declaration.isTypeOnly() ? "type " : "";
+                const head = declaration.getDefaultImport() ? `${declaration.getDefaultImport()?.getText()}, ` : "";
+                edits.push({ start: declaration.getStart(), end: declaration.getEnd(), text: `import ${typeOnly}${head}{ ${bindings} } from ${JSON.stringify(specifier)};` });
+            }
+        }
+        if (aliases.length === 0) return;
+        const imports = sf.getImportDeclarations();
+        const at = imports.length > 0 ? imports[imports.length - 1].getEnd() : 0;
+        edits.push({ start: at, end: at, text: `${imports.length > 0 ? "\n" : ""}import type { ${[...types].sort().join(", ")} } from "@rebasepro/server/schema";\n\n${aliases.join("\n")}${imports.length > 0 ? "" : "\n"}` });
+    }
+
     /**
      * Every module specifier in `text` (static imports, re-exports, dynamic
      * `import()`), moved from `fromFile` to `destFile`.
@@ -166,13 +214,78 @@ export class Relocator {
                 const moved = this.relocate(value, fromFile, destFile, side);
                 if (moved !== value) edits.push({ start: literal.getStart() + 1, end: literal.getEnd() - 1, text: moved });
             }
+            if (side === "backend") this.legacyTypeEdits(sf, text, edits);
             let out = text;
-            for (const edit of edits.sort((a, b) => b.start - a.start)) out = out.slice(0, edit.start) + edit.text + out.slice(edit.end);
+            for (const edit of edits.sort((a, b) => b.start - a.start || b.end - a.end)) out = out.slice(0, edit.start) + edit.text + out.slice(edit.end);
             return out;
         } finally {
             this.ctx.project.removeSourceFile(sf);
         }
     }
+}
+
+/** Packages a backend helper imported collection-model types from. */
+const LEGACY_TYPE_PACKAGES = new Set(["@rebasepro/common", "@rebasepro/types", "@rebasepro/server", "@rebasepro/cms-types"]);
+
+/**
+ * Collection-model types a backend helper used, and what each is in the table
+ * model (from `@rebasepro/server/schema`, which a backend depends on). A
+ * helper keeps its own name for the type — `type EntityCallbackContext =
+ * TableHookProps["context"];` — so its body is untouched.
+ */
+export const LEGACY_TYPE_REPLACEMENTS: Readonly<Record<string, { type: string; expression: string }>> = {
+    EntityCallbackContext: { type: "TableHookProps", expression: `TableHookProps["context"]` },
+    RebaseCallContext: { type: "TableHookProps", expression: `TableHookProps["context"]` },
+    CollectionCallbacks: { type: "TableHooks", expression: "TableHooks" },
+    BeforeQueryProps: { type: "TableBeforeQueryProps", expression: "TableBeforeQueryProps" },
+    AfterReadProps: { type: "TableAfterReadProps", expression: "TableAfterReadProps" },
+    BeforeSaveProps: { type: "TableBeforeSaveProps", expression: "TableBeforeSaveProps" },
+    AfterSaveProps: { type: "TableAfterSaveProps", expression: "TableAfterSaveProps" },
+    AfterSaveErrorProps: { type: "TableAfterSaveErrorProps", expression: "TableAfterSaveErrorProps" },
+    BeforeDeleteProps: { type: "TableDeleteProps", expression: "TableDeleteProps" },
+    AfterDeleteProps: { type: "TableDeleteProps", expression: "TableDeleteProps" },
+    PropertyCallbacks: { type: "ColumnTransform", expression: "ColumnTransform" }
+};
+
+/** What {@link replaceLegacyTypes} decided. */
+export interface LegacyTypeReplacement {
+    /** The uses still imported as they were. */
+    kept: ImportUse[];
+    /** `import type { … } from "@rebasepro/server/schema";`, when any type was replaced. */
+    imports: string[];
+    /** `type <local> = <replacement>;`, one per replaced binding. */
+    aliases: string[];
+    /** A binding used with type arguments, which an alias cannot stand for. */
+    unreplaceable: string[];
+}
+
+/**
+ * Replace collection-model types a backend module imports with their
+ * table-model equivalents, as local aliases.
+ *
+ * @param text the code that uses them, to tell a generic use (`AfterSaveProps<M>`) apart
+ */
+export function replaceLegacyTypes(uses: readonly ImportUse[], text: string): LegacyTypeReplacement {
+    const kept: ImportUse[] = [];
+    const types = new Set<string>();
+    const aliases: string[] = [];
+    const unreplaceable: string[] = [];
+    for (const use of uses) {
+        const replacement = LEGACY_TYPE_PACKAGES.has(use.specifier) ? LEGACY_TYPE_REPLACEMENTS[use.imported] : undefined;
+        if (!replacement) {
+            kept.push(use);
+            continue;
+        }
+        if (new RegExp(`\\b${use.local}\\s*<`).test(text)) {
+            unreplaceable.push(use.local);
+            kept.push(use);
+            continue;
+        }
+        types.add(replacement.type);
+        aliases.push(`type ${use.local} = ${replacement.expression};`);
+    }
+    const imports = types.size > 0 ? [`import type { ${[...types].sort().join(", ")} } from "@rebasepro/server/schema";`] : [];
+    return { kept, imports, aliases, unreplaceable };
 }
 
 /** One import line's worth of bindings. */

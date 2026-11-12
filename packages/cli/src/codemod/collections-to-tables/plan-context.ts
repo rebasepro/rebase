@@ -9,6 +9,7 @@ import type { CollectionConfig } from "@rebasepro/types";
 import type { AstContext, CollectionSite } from "./ast";
 import { toPosix } from "./ast";
 import type { Relocator } from "./modules";
+import type { SplitConstant } from "./split-constants";
 import type { ManualStep, Note, Refusal } from "./types";
 
 /** One legacy collection with everything the planners read about it. */
@@ -37,6 +38,8 @@ export interface PlanContext {
     refusals: Refusal[];
     notes: Note[];
     manualSteps: ManualStep[];
+    /** Enum constants of `config/` split into backend values and CMS labels (see `split-constants.ts`). */
+    splitConstants?: SplitConstant[];
 }
 
 /** A path relative to the project root, `/`-separated. */

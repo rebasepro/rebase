@@ -24,7 +24,7 @@ import { isViewDef, type AnyTableDef, type AnyViewDef, type DefaultRls, type Pro
 import type { Member, PathSegment } from "./ast";
 import { collectReferences, leadingComments, memberOf, nodeAtPath, nodeText, postDeclarationAssignments, resolveObject, toPosix } from "./ast";
 import { carryHook, carryTransform, type CarriedFunction } from "./hooks";
-import { importLines, RelocationError } from "./modules";
+import { importLines, RelocationError, replaceLegacyTypes } from "./modules";
 import type { CollectionEntry, PlanContext } from "./plan-context";
 import { note, planFile, refuse, relativeToRoot } from "./plan-context";
 import { dedent, reindent } from "./print-js";
@@ -367,9 +367,22 @@ function planTableModule(plan: PlanContext, entry: CollectionEntry, def: AnyTabl
     }
 
     // Imports: the builders and related tables, then what carried code uses.
+    // Collection-model types the carried code names become table-model aliases.
+    const usesText = [...statements.map(statement => statement.getText()), ...carried.map(site_ => site_.member.node.getText())].join("\n");
+    const legacyTypes = replaceLegacyTypes(references.imports, usesText);
+    for (const local of legacyTypes.unreplaceable) {
+        plan.manualSteps.push({
+            title: `Replace the collection-model type ${local} in ${name.table}`,
+            detail: `Carried code uses \`${local}\` with type arguments, which a table-model alias cannot stand for. Use the table-model type (\`TableHooks\`, \`TableBeforeSaveProps\`, … from \`@rebasepro/server/schema\`) instead.`,
+            file: relativeToRoot(plan, name.file)
+        });
+    }
     let carriedImports: string[];
     try {
-        carriedImports = importLines(references.imports, use => plan.relocator.relocate(use.specifier, use.fromFile, name.file, "backend"));
+        carriedImports = [
+            ...importLines(legacyTypes.kept, use => plan.relocator.relocate(use.specifier, use.fromFile, name.file, "backend")),
+            ...legacyTypes.imports
+        ];
     } catch (error) {
         refuse(plan, entry, error instanceof Error ? error.message : String(error));
         return;
@@ -413,6 +426,7 @@ function planTableModule(plan: PlanContext, entry: CollectionEntry, def: AnyTabl
     const parts = [
         ...(header.length > 0 ? [header.join("\n")] : []),
         [...printImportLines(printed.imports), ...carriedImports].join("\n"),
+        ...(legacyTypes.aliases.length > 0 ? [legacyTypes.aliases.join("\n")] : []),
         ...statementTexts,
         [...own, code].join("\n")
     ];

@@ -1,5 +1,6 @@
 import { customizeTable } from "@rebasepro/cms";
 import type { tickets } from "../../../backend/schema/tickets";
+import { LOCALE_LABELS } from "./lib/locales";
 
 export const ticketsCms = customizeTable<typeof tickets>("support-tickets", {
     name: "Support tickets",
@@ -13,6 +14,10 @@ export const ticketsCms = customizeTable<typeof tickets>("support-tickets", {
         },
         owner_id: {
             name: "Owner"
+        },
+        locale: {
+            name: "Language",
+            enumLabels: LOCALE_LABELS
         },
         created_at: {
             name: "Created at"

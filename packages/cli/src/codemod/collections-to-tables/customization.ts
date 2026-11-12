@@ -24,6 +24,7 @@ import { enumValueLabel, labelFromIdentifier, singularLabel } from "@rebasepro/u
 import type { Member, PathSegment } from "./ast";
 import { collectReferences, nodeAtPath, nodeText, postDeclarationAssignments, resolveObject, toPosix, unwrap } from "./ast";
 import { memberFunctionText } from "./hooks";
+import { constantForEnum } from "./split-constants";
 import {
     COLLECTION_ADMIN_DESTINATIONS,
     KANBAN_DESTINATIONS,
@@ -51,6 +52,8 @@ interface Builder {
     codeNodes: Node[];
     /** Component imports: local → `import X from "spec"` / `import { X } from "spec"`. */
     componentImports: Map<string, { specifier: string; imported: string }>;
+    /** Named imports of split constants' label modules: specifier → names. */
+    libImports: Map<string, Set<string>>;
     failed: boolean;
 }
 
@@ -405,6 +408,14 @@ function applyFieldNote(plan: PlanContext, builder: Builder, item: LiftNote, fie
             if (isPlainObject(item.value)) fieldAdmin(plan, builder, item.value, literal, target, label);
             return;
         case "enum": {
+            const constant = constantForEnum(plan.splitConstants ?? [], builder.entry.file, item.value);
+            if (constant?.frontendFile) {
+                let specifier = toPosix(path.relative(path.dirname(builder.file), constant.frontendFile.replace(/\.tsx?$/, "")));
+                if (!specifier.startsWith(".")) specifier = `./${specifier}`;
+                builder.libImports.set(specifier, new Set([...(builder.libImports.get(specifier) ?? []), constant.labelsName]));
+                target.enumLabels = new RawSource(constant.labelsName);
+                return;
+            }
             const labels = enumLabelsOf(item.value as EnumValues);
             if (labels) target.enumLabels = labels;
             return;
@@ -527,7 +538,7 @@ export function planCustomizations(
         const name = names.get(entry.collection.slug);
         if (!name) continue;
         const file = path.join(cmsDir, `${path.basename(name.file, ".ts")}.tsx`);
-        const builder: Builder = { entry, name, file, options: {}, codeNodes: [], componentImports: new Map(), failed: false };
+        const builder: Builder = { entry, name, file, options: {}, codeNodes: [], componentImports: new Map(), libImports: new Map(), failed: false };
         const fields: Record<string, unknown> = {};
         for (const item of notes) {
             if (item.collection !== entry.collection.slug) continue;
@@ -580,6 +591,7 @@ function printModule(plan: PlanContext, builder: Builder, options: Record<string
         `import { customizeTable } from "@rebasepro/cms";`,
         `import type { ${name.identifier} } from ${JSON.stringify(tableImportPath(file, name))};`,
         ...componentLines,
+        ...[...builder.libImports].map(([specifier, imported]) => `import { ${[...imported].join(", ")} } from ${JSON.stringify(specifier)};`),
         ...carriedImports
     ];
     let body: string;

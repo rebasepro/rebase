@@ -25,6 +25,7 @@ import { addSourceFile, createAstContext, findCollectionSite, postDeclarationAss
 import { nameTables, planBackend } from "./backend";
 import { planCustomizations, printCmsIndex } from "./customization";
 import { planFirestoreCollection } from "./firestore";
+import { findSplitConstants, planSplitConstants } from "./split-constants";
 import { Journal } from "./journal";
 import { createSchemaModuleImporter } from "../../utils/import-schema-module";
 import { LegacyLoadError, loadLegacyProject } from "./load-legacy";
@@ -142,6 +143,10 @@ export async function migrateCollectionsToTables(options: MigrateOptions): Promi
     }
     if (cmsDir) for (const entry of firestore) relocator.moved.set(entry.file, path.join(cmsDir, path.basename(entry.file)));
 
+    // Enum constants of config/ the collections use: values for the schema, labels for the CMS.
+    const split = await findSplitConstants(plan, postgres, importModule, cmsDir);
+    plan.splitConstants = split.constants;
+
     // The tables.
     let lift: LiftResult | undefined;
     try {
@@ -169,6 +174,7 @@ export async function migrateCollectionsToTables(options: MigrateOptions): Promi
         const names = nameTables(postgres, lift.tables, schemaDir);
         const order = (legacy.navigationOrder ?? []).map(collection => collection.slug).filter(slug => names.has(slug));
         planBackend(plan, { entries: postgres, lift, schemaDir, order }, names);
+        planSplitConstants(plan, split.constants, new Map(postgres.map(entry => [entry.file, names.get(entry.collection.slug)?.file ?? ""])));
         for (const [slug, name] of names) {
             const outcome = outcomes.get(slug);
             if (outcome) {
@@ -253,6 +259,16 @@ export async function migrateCollectionsToTables(options: MigrateOptions): Promi
         });
     }
 
+    for (const constant of split.constants) handled.add(constant.module);
+    for (const { module, reason } of split.unsplit) {
+        handled.add(module);
+        plan.manualSteps.push({
+            title: `Split ${relativeToRoot(plan, module)} by hand`,
+            detail: `The collections use enum values from ${relativeToRoot(plan, module)}; the tables inline the values and the customizations the labels, and the module was not moved because it ${reason}. If it is still the one source of those values, split it: the values into backend/lib (\`export const X = [...] as const\`), the labels into frontend/src/cms/lib (\`Record<(typeof X)[number], string>\`, importing the values' type), and name them in the tables and customizations.`,
+            file: relativeToRoot(plan, module)
+        });
+    }
+
     // Helper modules the moved code imports.
     for (const copy of relocator.helpers.values()) {
         handled.add(copy.from);
@@ -266,6 +282,13 @@ export async function migrateCollectionsToTables(options: MigrateOptions): Promi
                 file: relativeToRoot(plan, copy.to)
             });
         }
+    }
+
+    for (const { file, name } of relocator.legacyTypesLeft) {
+        plan.manualSteps.push({
+            title: `Replace the collection-model type ${name} in ${file}`,
+            detail: `A helper copied to backend/lib uses \`${name}\` with type arguments; a table-model alias cannot stand for it. Use the table-model type from \`@rebasepro/server/schema\` (\`TableHooks\`, \`TableBeforeSaveProps\`, \`TableHookProps["context"]\`, …).`
+        });
     }
 
     planManifest(plan, manifest);

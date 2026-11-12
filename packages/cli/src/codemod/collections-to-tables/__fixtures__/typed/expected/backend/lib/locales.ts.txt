@@ -1,0 +1,5 @@
+/** The values of `LOCALE_ENUM` (config/locales.ts). What the panel calls each one is the CMS's: frontend/src/cms/lib/locales.ts. */
+export const LOCALES = ["en", "de"] as const;
+
+/** One of {@link LOCALES}. */
+export type Locale = (typeof LOCALES)[number];
