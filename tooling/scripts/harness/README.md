@@ -36,10 +36,9 @@ the trace — a broken check must not be able to wedge a session.
 
 | Check | What it catches |
 |---|---|
-| `lockfile-worktree` | `pnpm-lock.yaml` modified in a worktree, where the gitignored `saas/` member is absent so an install prunes it silently, exit 0 |
+| `lockfile-worktree` | A worktree install that pruned workspace importers from `pnpm-lock.yaml` — typically the gitignored `saas/` members, absent from a fresh worktree, so the install drops them silently, exit 0. Compares importers with the merge-base: one may leave only together with its member |
 | `migration-order` | A drizzle migration sorting at or before main's latest. The migrator tracks a high-water mark, so such a migration is never applied and never reported |
-| `rls-drift` | A change to the policies `saas/config/collections` compiles to, with no migration SQL. The boot applies the rules but cannot create what a new one calls, so the table is left denying. Compares compiled policies at the merge-base and the working tree, so comments and respellings pass |
-| `config-build` | `saas/config` not compiling. The backend's tsc does not cover it, dev loads TS source, production loads `config/dist` |
+| `rls-drift` | A change to the policies `saas/backend/schema` compiles to, with no migration SQL. The boot applies the rules but cannot create what a new one calls, so the table is left denying. Compares compiled policies at the merge-base and the working tree, so comments and respellings pass |
 | `control-plane` | A deploy aimed at Cloud Run or Terraform, which do not serve `app.rebase.pro` (GKE does), and destructive `kubectl` verbs |
 | `release-ci` | A release command (`gh workflow run publish.yml`, `npm`/`pnpm publish`, pushing a `v*` tag) while CI on the commit it would ship is red (blocks) or not yet green (asks). Reads the remote branch tip from GitHub, so it judges what the dispatch builds |
 

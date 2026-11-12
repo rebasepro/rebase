@@ -194,6 +194,72 @@ test("lockfile check only fires inside a worktree", () => {
     assert.ok(!blocking(lockfileWorktree.run(cleanWorktree)));
 });
 
+/** A lockfile carrying exactly these importers. */
+const lockfileWith = (importers) =>
+    `lockfileVersion: '9.0'\n\nimporters:\n\n${importers.map((i) => `  ${i}:\n    dependencies: {}\n`).join("\n")}\npackages:\n\n  a@1.0.0:\n    resolution: {}\n`;
+
+/** A worktree on disk holding a `package.json` for each listed member. */
+function worktreeWithMembers(members) {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "lockfile-wt-"));
+    for (const member of members) {
+        fs.mkdirSync(path.join(root, member), { recursive: true });
+        fs.writeFileSync(path.join(root, member, "package.json"), "{}");
+    }
+    return root;
+}
+
+const ALL_IMPORTERS = [".", "packages/server", "saas", "saas/backend", "saas/frontend"];
+
+test("lockfileImporters reads the importer keys and nothing else", () => {
+    assert.deepEqual(lockfileWorktree.lockfileImporters(lockfileWith(ALL_IMPORTERS)), ALL_IMPORTERS);
+    assert.deepEqual(lockfileWorktree.lockfileImporters("importers:\n\n  tooling/skills: {}\n  'quoted/x':\n"), ["tooling/skills", "quoted/x"]);
+});
+
+test("lockfile check passes a worktree that has saas/ checked out and kept every importer", () => {
+    // The branch changed the lockfile on purpose (a dependency bump); the worktree
+    // has saas/, so nothing was pruned. This used to fail with "saas/ is absent here".
+    const root = worktreeWithMembers(ALL_IMPORTERS);
+    const ctx = {
+        isWorktree: true, changed: ["pnpm-lock.yaml"], root, primaryRoot: "/primary",
+        readLockfile: () => lockfileWith(ALL_IMPORTERS),
+    };
+    assert.ok(!blocking(lockfileWorktree.run(ctx)));
+});
+
+test("lockfile check passes an importer retired together with its member", () => {
+    // saas/config stopped being a workspace member: its directory is gone, so its
+    // importer leaving the lockfile is the change, not damage.
+    const root = worktreeWithMembers(ALL_IMPORTERS);
+    const ctx = {
+        isWorktree: true, changed: ["pnpm-lock.yaml"], root, primaryRoot: "/primary",
+        readLockfile: (side) => lockfileWith(side === "base" ? [...ALL_IMPORTERS, "saas/config"] : ALL_IMPORTERS),
+    };
+    assert.ok(!blocking(lockfileWorktree.run(ctx)));
+});
+
+test("lockfile check fails the saas importers pruned by an install in a worktree without saas/", () => {
+    const root = worktreeWithMembers([".", "packages/server"]);
+    const ctx = {
+        isWorktree: true, changed: ["pnpm-lock.yaml"], root, primaryRoot: "/primary",
+        readLockfile: (side) => lockfileWith(side === "base" ? ALL_IMPORTERS : [".", "packages/server"]),
+    };
+    const findings = lockfileWorktree.run(ctx);
+    assert.ok(blocking(findings));
+    assert.match(findings[0].message, /saas, saas\/backend, saas\/frontend/);
+    assert.match(findings[0].message, /absent from this worktree/);
+});
+
+test("lockfile check fails an importer dropped while its member is still in the tree", () => {
+    const root = worktreeWithMembers(ALL_IMPORTERS);
+    const ctx = {
+        isWorktree: true, changed: ["pnpm-lock.yaml"], root, primaryRoot: "/primary",
+        readLockfile: (side) => lockfileWith(side === "base" ? ALL_IMPORTERS : [".", "saas", "saas/backend", "saas/frontend"]),
+    };
+    const findings = lockfileWorktree.run(ctx);
+    assert.ok(blocking(findings));
+    assert.match(findings[0].message, /packages\/server/);
+});
+
 test("blocking() distinguishes fail from warn", () => {
     assert.equal(blocking([finding("x", WARN, "w")]), false);
     assert.equal(blocking([finding("x", WARN, "w"), finding("y", FAIL, "f")]), true);
@@ -340,8 +406,7 @@ test("migration-order warns rather than passing when main's journal is unreachab
 //
 // rls-drift read the monorepo's `git diff`, in which `saas/` — gitignored, its
 // own repository — does not exist: every run said "No cloud collection config
-// changed", whatever had. config-build asked the same question and got the same
-// answer, and the preflight stamp ignored saas/ edits too. These pin that the
+// changed", whatever had, and the preflight stamp ignored saas/ edits too. These pin that the
 // harness now sees into the nested repository, and that rls-drift decides on the
 // policies the collections compile to rather than on which lines moved.
 

@@ -2,9 +2,9 @@
  * The gate every deploy has to pass.
  *
  * Each check here corresponds to a way a deploy has actually gone wrong: a migration
- * that was skipped instead of applied, an RLS tightening that never left the config
- * file, a config package that only production compiles, a lockfile pruned by a
- * worktree install, a deploy aimed at the control plane that serves nothing.
+ * that was skipped instead of applied, an RLS tightening that never left the schema
+ * file, a lockfile pruned by a worktree install, a deploy aimed at the control plane
+ * that serves nothing.
  *
  * On success it writes a stamp keyed to the exact tree state. The PreToolUse hook
  * reads that stamp, which is what makes this gate rather than advice — and why the
@@ -17,12 +17,11 @@ import { print, blocking } from "../lib/report.mjs";
 
 import * as migrationOrder from "../checks/migration-order.mjs";
 import * as rlsDrift from "../checks/rls-drift.mjs";
-import * as configBuild from "../checks/config-build.mjs";
 import * as lockfileWorktree from "../checks/lockfile-worktree.mjs";
 import * as controlPlane from "../checks/control-plane.mjs";
 import * as releaseCi from "../checks/release-ci.mjs";
 
-export const CHECKS = [lockfileWorktree, migrationOrder, rlsDrift, configBuild, controlPlane, releaseCi];
+export const CHECKS = [lockfileWorktree, migrationOrder, rlsDrift, controlPlane, releaseCi];
 
 /**
  * Checks that judge the proposed command rather than the tree. The hook runs them on

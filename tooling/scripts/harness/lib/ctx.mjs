@@ -66,7 +66,7 @@ function resolveRoots() {
  * `saas/` is its own repository and `/saas` is in the monorepo's .gitignore, so
  * the monorepo's `git diff` and `git status` cannot see a single file in it. Every
  * check that asked "did this change touch saas/…" was answered "no", forever:
- * rls-drift and config-build passed on every run without ever looking, and the
+ * rls-drift passed on every run without ever looking, and the
  * preflight stamp outlived any edit made there.
  */
 const NESTED_REPOS = ["saas"];
@@ -106,7 +106,7 @@ export function baseRevision(repoRoot) {
 /**
  * Files changed against the merge-base with main, plus anything uncommitted — in
  * the checkout and in each repository nested in it, the latter under its prefix
- * (`saas/config/…`), as if it were one tree.
+ * (`saas/backend/…`), as if it were one tree.
  */
 export function changedFiles(root) {
     const files = new Set(changedInRepository(root));
