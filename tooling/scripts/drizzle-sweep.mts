@@ -917,7 +917,7 @@ async function verifyChains(rewrites: ChainRewrite[]): Promise<ChainVerdict> {
 /** Whether a module exports a table and may be imported (not a test file). */
 function exportsTables(text: string): boolean {
     return /export\s+const\s+\w+\s*=\s*(defineTable|defineAuthTable|defineView)\s*\(/.test(text) &&
-        !/(?<![.\w])(describe|it|test)\s*\(\s*["'`]/.test(text);
+        !/^\s*(describe|it|test)(\.\w+)?\s*\(\s*["'`]/m.test(text);
 }
 
 /** Rewrite relative module specifiers to absolute paths, so a copy elsewhere imports the same siblings. */
