@@ -85,6 +85,16 @@ His instructions, in his words (all still in force):
 
 Lessons learned the hard way:
 
+- **Memory is the hard limit.** The Mac (32 GB) restarted twice (20:18 and ~22:45 on 2026-11-12)
+  from memory exhaustion: too many agents ran full test suites, the repo type check and Docker
+  suites at the same time (jest defaults to one worker per core). Rules now in `AGENT-RULES.md`
+  ("Memory is the hard limit"): at most six agents live, at most three in
+  `packages/server-postgres`; every heavy command (full package suite, repo type check, build,
+  Docker e2e) goes through `locked.sh heavy …`, which is a single lock; agents run only the
+  test files they touched with `--maxWorkers=2`; the coordinator publishes shared baselines in
+  `~/.rebase-audits/pgfirst/baselines/` instead of each agent taking its own. Never write
+  "baseline the failing set" in a brief again.
+
 - Give a new big slice to a **fresh** agent. An agent that already did two slices runs out of
   context mid-way (the planner agent did; it handed back cleanly).
 - Never call `ListAgents` (it lists ~180 unrelated sessions). Use the ledger, `git log`, and
@@ -145,9 +155,17 @@ All committed on the branch (≈150 commits OSS, 12 in `saas`). Details per slic
   upgrade guide `upgrading/0-30-to-0-31`), READMEs, all 24 agent skills, `AGENTS.md`,
   `.agent/workflows`.
 
-## 6. What is running right now (2026-11-12 21:00 CET)
+## 6. What is running right now (2026-11-12 23:25 CET)
 
-The Mac restarted at 20:18; every agent was resumed with its uncommitted work intact.
+**The table below is from 21:00 and is out of date — the current list of agents (ids, slices,
+which are resumed and which are still stopped after the second restart) is in the SNAPSHOT
+section of `~/.rebase-audits/pgfirst/PLAN.md`.** In short, at 23:25: resumed — two security-fix
+agents, parity fixes, Firestore editor, tooling gates, planner steps 2–6; stopped and waiting
+for a slot — driver codecs (B-R2), write path (B-R3), relations (B-R6), field access (B-R4);
+done since 21:00 — both server request-path slices (B-S4a, B-S4b), the driver foundation's
+model (B-R1), two independent reviews (`~/.rebase-audits/pgfirst/reviews/{security,parity}.md`).
+
+The Mac restarted at 20:18 and again at ~22:45; each time every agent's uncommitted work was intact.
 
 | Agent id | Slice | What it is doing |
 |---|---|---|
