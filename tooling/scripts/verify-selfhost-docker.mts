@@ -177,7 +177,7 @@ const built = await buildBundle({
     log: () => {}
 });
 check("bundle built", fs.existsSync(path.join(outDir, "manifest.json")));
-check("collections compiled in", (built.collectionCount ?? 0) > 0, `${built.collectionCount} collection(s)`);
+check("tables compiled in", (built.tableCount ?? 0) > 0, `${built.tableCount} table(s)`);
 if (failures > 0) process.exit(1);
 
 // ── A static app, folded in ──────────────────────────────────────────────────
@@ -486,7 +486,7 @@ const SCAFFOLD_SERVICE_KEY = readEnv("REBASE_SERVICE_KEY");
 fs.copyFileSync(path.join(scaffoldDir, "docker-compose.yml"), scaffoldComposeFile);
 // The one difference between this repository's reference app and a scaffolded
 // project, patched over rather than papered over: the scaffold ships
-// `config/storage.ts` exporting a `storageAuthorize` hook, and `app/` does not.
+// `backend/storage.ts` exporting a `storageAuthorize` hook, and `app/` does not.
 // The scaffold's compose sets FORCE_LOCAL_STORAGE, so a storage controller
 // survives into production — and the boot guard then refuses a deployment with
 // no access-control model at all, correctly. An override file states the
@@ -500,25 +500,29 @@ fs.writeFileSync(scaffoldOverrideFile, [
     ""
 ].join("\n"));
 
-// The buckets a scaffolded project declares in `config/resources.ts`, compiled
+// The buckets a scaffolded project declares in `backend/resources.ts`, compiled
 // into the bundle the way `rebase build` compiles them: the default and a named
 // local one. `app/` declares none, and the named one is the case under test —
 // its directory sits beside the default's, so a volume holding only the
-// default's directory loses it with the container.
-const bundleConfigDir = path.join(
-    outDir,
-    JSON.parse(fs.readFileSync(path.join(outDir, "manifest.json"), "utf8")).entry.config
-);
-const resourcesFile = path.join(bundleConfigDir, "resources.js");
+// default's directory loses it with the container. `rebase build` names the
+// compiled module in `entry.resources` only when the project has one, so the
+// manifest is pointed at it too.
+const manifestFile = path.join(outDir, "manifest.json");
+const builtManifest: { entry: { resources?: string } } = JSON.parse(fs.readFileSync(manifestFile, "utf8"));
 // Replacing the project's own declarations would test something else.
-check("app/ declares no resources this would replace", !fs.existsSync(resourcesFile));
+check("app/ declares no resources this would replace", builtManifest.entry.resources === undefined, String(builtManifest.entry.resources));
+const resourcesEntry = "backend/resources.js";
+const resourcesFile = path.join(outDir, resourcesEntry);
 writtenIntoBundle.push(resourcesFile);
+fs.mkdirSync(path.dirname(resourcesFile), { recursive: true });
 fs.writeFileSync(resourcesFile, [
     "import { bucket } from \"@rebasepro/types\";",
     "export const uploads = bucket();",
     "export const media = bucket(\"media\", { engine: \"local\" });",
     ""
 ].join("\n"));
+builtManifest.entry.resources = resourcesEntry;
+fs.writeFileSync(manifestFile, JSON.stringify(builtManifest, null, 2));
 
 // Every `${VAR:?…}` in the generated file must be answerable from the generated
 // `.env`. Asserted on its own because the failure is total — Compose
