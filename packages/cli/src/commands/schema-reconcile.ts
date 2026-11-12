@@ -2,14 +2,14 @@
  * CLI command: rebase schema reconcile
  *
  * The reviewed step for what boot will not do. Boot only ever adds, so a
- * property made optional leaves its column NOT NULL, and a property removed
- * leaves its column behind, with its data, and blocking inserts if it was
+ * column made nullable keeps its NOT NULL, and a column removed from a table
+ * leaves it behind, with its data, and blocking inserts if it was
  * required. This asks the running backend for the plan that fixes both, prints
  * it, and applies it only once confirmed.
  *
  * Through the backend rather than a database URL, because on Rebase Cloud the
  * backend is the one thing that can reach the database — and because it plans
- * against the collections it actually runs, not the ones in this checkout.
+ * against the tables it actually runs, not the ones in this checkout.
  * Columns are dropped only when named with `--drop`; the confirmation sends
  * the plan's digest, so the server runs exactly the statements printed here.
  */
@@ -23,7 +23,7 @@ import { UsageError } from "../utils/args";
 import { cliUserAgent } from "../utils/version";
 import { describeFailure, requireBackendUrl } from "./api-keys";
 
-export const RECONCILE_USAGE = "rebase schema reconcile [--drop <collection>.<column>]... [--yes]";
+export const RECONCILE_USAGE = "rebase schema reconcile [--drop <table>.<column>]... [--yes]";
 
 export function parseReconcileArgs(rawArgs: string[]): { drop: string[]; yes: boolean } {
     const flags = arg({ "--drop": [String], "--yes": Boolean, "-y": "--yes" }, { argv: rawArgs.slice(2) });
@@ -36,8 +36,8 @@ export function describeReconcilePlan(plan: SchemaReconcilePlan): string[] {
     const lines: string[] = [];
     for (const r of plan.relaxed) {
         const why = r.undeclared
-            ? `no property in "${r.collection}" declares it, and every insert fails on it; its data stays`
-            : `optional in "${r.collection}", NOT NULL in the database`;
+            ? `"${r.collection}" does not declare it, and every insert fails on it; its data stays`
+            : `nullable in "${r.collection}", NOT NULL in the database`;
         lines.push(`  ${chalk.cyan("relax")}  ${r.table}.${r.column}  ${chalk.gray(why)}`);
     }
     for (const d of plan.dropped) {
@@ -50,7 +50,7 @@ export function describeReconcilePlan(plan: SchemaReconcilePlan): string[] {
     for (const u of kept) {
         const note = u.blocksInserts
             ? chalk.yellow("NOT NULL with no default: every insert fails until it is dropped or relaxed")
-            : chalk.gray("no property declares it; kept");
+            : chalk.gray("no table declares it; kept");
         lines.push(`  ${chalk.gray("keep")}   ${u.table}.${u.column}  ${note}`);
     }
     return lines;
@@ -135,10 +135,10 @@ export async function schemaReconcileCommand(rawArgs: string[]): Promise<void> {
         process.exit(1);
     }
     if (plan.statements.length === 0) {
-        console.log(chalk.green("✓ Nothing to do: the database already matches what the collections declare."));
+        console.log(chalk.green("✓ Nothing to do: the database already matches what the tables declare."));
     }
     if (plan.undeclared.length > plan.dropped.length) {
-        console.log(chalk.gray("  To drop a column no property declares, name it: --drop <collection>.<column>"));
+        console.log(chalk.gray("  To drop a column no table declares, name it: --drop <table>.<column>"));
     }
     if (plan.statements.length === 0) return;
 
@@ -167,7 +167,7 @@ export async function schemaReconcileCommand(rawArgs: string[]): Promise<void> {
         console.log(chalk.green(`✓ Applied ${result.applied.length} statement(s).`));
     } catch (error) {
         if (error instanceof RebaseApiError && error.code === "SCHEMA_RECONCILE_STALE") {
-            console.error(chalk.red("✗ Not applied: the database or the collections changed since this plan was made. Run it again to review the new plan."));
+            console.error(chalk.red("✗ Not applied: the database or the tables changed since this plan was made. Run it again to review the new plan."));
             process.exit(1);
         }
         fail("Failed to apply the reconcile", error, backend.baseUrl);

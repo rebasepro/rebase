@@ -53,12 +53,12 @@ describe("normalizeEsmSpecifiers", () => {
     });
 
     it("resolves a directory import to its index", () => {
-        write("collections/index.js", "export const collections = [];");
-        const file = write("index.js", 'export { collections } from "./collections";\n');
+        write("schema/index.js", "export const posts = {};");
+        const file = write("index.js", 'export { posts } from "./schema";\n');
 
         normalizeEsmSpecifiers(scratch);
 
-        expect(fs.readFileSync(file, "utf8")).toContain('"./collections/index.js"');
+        expect(fs.readFileSync(file, "utf8")).toContain('"./schema/index.js"');
     });
 
     it("handles every import form the compiler emits", () => {
@@ -253,12 +253,12 @@ describe("collectDeclaredDependencies", () => {
     it("never declares a package of this project's own workspace, however it resolved", () => {
         // Resolved to the registry's package of the same name, which is what
         // pnpm did for a scaffold: the bundle would have installed it.
-        write("config/package.json", JSON.stringify({ name: "my-app-config", version: "1.0.0" }));
+        write("frontend/package.json", JSON.stringify({ name: "my-app-frontend", version: "1.0.0" }));
         write("backend/package.json", JSON.stringify({
             name: "my-app-backend",
-            dependencies: { "my-app-config": "*", pg: "^8.0.0" }
+            dependencies: { "my-app-frontend": "*", pg: "^8.0.0" }
         }));
-        write("backend/node_modules/my-app-config/package.json", JSON.stringify({ version: "1.1.2" }));
+        write("backend/node_modules/my-app-frontend/package.json", JSON.stringify({ version: "1.1.2" }));
 
         expect(collectDeclaredDependencies(scratch)).toEqual({ pg: "^8.0.0" });
     });
@@ -268,10 +268,10 @@ describe("collectDeclaredDependencies", () => {
         // copy makes `loadEnv({ extend })` reject every defaulted field. See
         // RUNTIME_PROVIDED, and the test below.
         write("backend/package.json", JSON.stringify({ dependencies: { pg: "^8.0.0" } }));
-        write("config/package.json", JSON.stringify({ dependencies: { dayjs: "^1.11.0" } }));
+        write("package.json", JSON.stringify({ dependencies: { dayjs: "^1.11.0" } }));
 
-        expect(collectDeclaredDependencies(scratch)).toEqual({ pg: "^8.0.0",
-dayjs: "^1.11.0" });
+        expect(collectDeclaredDependencies(scratch)).toEqual({ dayjs: "^1.11.0",
+pg: "^8.0.0" });
     });
 
     it("omits packages the runtime image already provides", () => {
@@ -296,19 +296,19 @@ pg: "^8.0.0" }
     });
 
     it("omits a plain-range dep that resolves to an in-repo workspace package", () => {
-        // The standard case: the backend depends on the `config` package by name
-        // with a plain `"*"` (not `workspace:`), symlinked to `../config`. It
-        // travels *inside* the bundle, so declaring it would make the runtime
-        // try — and fail — to `npm install` it from the registry.
-        write("config/package.json", JSON.stringify({ name: "dadaki-config" }));
+        // A shared package of the project's own, depended on by name with a
+        // plain `"*"` (not `workspace:`) and symlinked to `../shared`. The
+        // registry has never heard of it, so declaring it would make the
+        // runtime try — and fail — to `npm install` it.
+        write("shared/package.json", JSON.stringify({ name: "acme-shared" }));
         write("backend/package.json", JSON.stringify({
-            dependencies: { "dadaki-config": "*",
+            dependencies: { "acme-shared": "*",
 pg: "^8.0.0" }
         }));
         fs.mkdirSync(path.join(scratch, "backend/node_modules"), { recursive: true });
         fs.symlinkSync(
-            path.join("..", "..", "config"),
-            path.join(scratch, "backend/node_modules/dadaki-config")
+            path.join("..", "..", "shared"),
+            path.join(scratch, "backend/node_modules/acme-shared")
         );
 
         expect(collectDeclaredDependencies(scratch)).toEqual({ pg: "^8.0.0" });
@@ -325,7 +325,7 @@ pg: "^8.0.0" }
 
     it("ignores an unparseable package.json rather than failing the build", () => {
         write("backend/package.json", "{ broken");
-        write("config/package.json", JSON.stringify({ dependencies: { dayjs: "^1.11.0" } }));
+        write("package.json", JSON.stringify({ dependencies: { dayjs: "^1.11.0" } }));
 
         expect(collectDeclaredDependencies(scratch)).toEqual({ dayjs: "^1.11.0" });
     });
@@ -469,10 +469,11 @@ describe("detecting a server entrypoint the bundle ignores", () => {
 });
 
 describe("storage access-control detection", () => {
+    /** A compiled `backend/storage.js`; returns the module the manifest records. */
     const write = (contents: string): string => {
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-storage-detect-"));
-        fs.writeFileSync(path.join(dir, "index.js"), contents);
-        return dir;
+        fs.writeFileSync(path.join(dir, "storage.js"), contents);
+        return path.join(dir, "storage");
     };
 
     it("finds a directly exported hook", () => {
@@ -484,19 +485,19 @@ describe("storage access-control detection", () => {
     it("finds it in an export clause, renamed or re-exported", () => {
         expect(detectStorageAuthorize(write("export { storageAuthorize };"))).toBe(true);
         expect(detectStorageAuthorize(write('export { authz as storageAuthorize } from "./storage.js";'))).toBe(true);
-        expect(detectStorageAuthorize(write("export { collections, storageAuthorize, callbacks };"))).toBe(true);
+        expect(detectStorageAuthorize(write("export { buckets, storageAuthorize, hooks };"))).toBe(true);
     });
 
     it("does not claim a hook that is only mentioned", () => {
         // The failure that matters: reporting `true` for a bundle without a hook
         // hands back the crash loop this field exists to prevent.
-        expect(detectStorageAuthorize(write("// TODO: add storageAuthorize\nexport const collections = [];"))).toBe(false);
+        expect(detectStorageAuthorize(write("// TODO: add storageAuthorize\nexport const buckets = [];"))).toBe(false);
         expect(detectStorageAuthorize(write("const storageAuthorize = () => true;"))).toBe(false);
         expect(detectStorageAuthorize(write('export { storageAuthorizeHelper } from "./x.js";'))).toBe(false);
     });
 
-    it("reports false when there is no config index at all", () => {
-        expect(detectStorageAuthorize(fs.mkdtempSync(path.join(os.tmpdir(), "rebase-empty-")))).toBe(false);
+    it("reports false when there is no storage module at all", () => {
+        expect(detectStorageAuthorize(path.join(fs.mkdtempSync(path.join(os.tmpdir(), "rebase-empty-")), "storage"))).toBe(false);
     });
 });
 
@@ -534,7 +535,7 @@ describe("folding a frontend into the backend bundle", () => {
         // directory name — so copying without recording serves nothing.
         const bundleDir = bundleWith({ bundleFormat: 1,
 app: "backend",
-entry: { config: "config" } });
+entry: { tables: "backend/schema" } });
         const assetsDir = assets({ "index.html": "<html>",
 "assets/app.js": "//",
 "assets/logo.svg": "<svg>" });
@@ -553,7 +554,7 @@ dir: "static/web",
 spa: true,
 name: "web" }]);
         // And it does not lose what was already there.
-        expect(manifest.entry.config).toBe("config");
+        expect(manifest.entry.tables).toBe("backend/schema");
     });
 
     it("appends a second app instead of replacing the first", () => {
@@ -715,7 +716,7 @@ describe("detectFrameworkDepDrift", () => {
         write("backend/package.json", JSON.stringify({
             dependencies: { "@rebasepro/server-postgres": "^0.10.0" }
         }));
-        write("config/package.json", JSON.stringify({
+        write("frontend/package.json", JSON.stringify({
             dependencies: { "@rebasepro/types": "^0.12.0" }
         }));
 
@@ -846,7 +847,7 @@ file: "package.json" });
     it("is refused by the builder itself, before anything is built", async () => {
         write("package.json", JSON.stringify({ dependencies: { dotenv: "^16.0.0" } }));
         write("backend/package.json", JSON.stringify({ dependencies: { dotenv: "^17.4.2" } }));
-        write("config/collections/posts.ts", "export default {};");
+        write("backend/schema/index.ts", "export {};");
 
         await expect(buildBundle({ projectRoot: scratch, appName: "backend", app: { type: "backend" }, runtimeRange: "^1" }))
             .rejects.toThrow(/dotenv\n.*\^16\.0\.0 {2}\(package\.json\)\n.*\^17\.4\.2 {2}\(backend\/package\.json\)/);

@@ -16,6 +16,8 @@
 import fs from "fs";
 import path from "path";
 import chalk from "chalk";
+import { LEGACY_LAYOUT_REMEDY } from "@rebasepro/types";
+import { UsageError } from "./args";
 import { SCHEMA_DIR_FLAG } from "./schema-dir";
 
 /** The rule, as every help page and error states it. */
@@ -104,6 +106,58 @@ export function missingSchemaDir(
     }
     lines.push("", ...MISSING_SCHEMA_DIR_CONSEQUENCE[use].map(line => chalk.gray(`  ${line}`)));
     return lines;
+}
+
+/**
+ * The commands that took the removed `--collections` flag, keyed as the
+ * command is named in messages (`rebase <command>`). Their `-c` was the
+ * flag's short form; elsewhere `-c` never existed, so only these name it as
+ * removed.
+ */
+const COMMANDS_THAT_TOOK_COLLECTIONS = new Set([
+    "verify",
+    "doctor",
+    "console",
+    "generate-sdk",
+    "db push",
+    "db generate",
+    "schema generate",
+    "schema stale"
+]);
+
+/**
+ * The sentence a typed `--collections` (or, on a command that had it, `-c`)
+ * is refused with, or `null` when the line has neither.
+ *
+ * The flag named a `config/collections` directory of `defineCollection` files,
+ * which nothing reads any more. Refused rather than ignored: reading the
+ * default directory instead of the one typed would check, generate or push a
+ * different schema than the one asked about. There is no short form of the
+ * replacement — `--schema-dir` is spelled out.
+ *
+ * Only the words before a `--` separator count: after it, the line belongs to
+ * whatever the command relays it to.
+ */
+export function removedCollectionsFlag(args: readonly string[], command: string): string | null {
+    const end = args.indexOf("--");
+    const words = end === -1 ? args : args.slice(0, end);
+    const shortForm = COMMANDS_THAT_TOOK_COLLECTIONS.has(command);
+    const used = words.find(word =>
+        word === "--collections" || word.startsWith("--collections=") || (shortForm && word === "-c"));
+    if (used === undefined) return null;
+    const flag = used === "-c" ? "-c" : "--collections";
+    return `\`rebase ${command}\`: ${flag} was removed. Tables are read from backend/schema (or the backend's ` +
+        `"tables" in rebase.json) by default, and \`${SCHEMA_DIR_FLAG} <dir>\` names another directory. ` +
+        `Nothing was run. A project still on config/collections: ${LEGACY_LAYOUT_REMEDY}.`;
+}
+
+/**
+ * Throw {@link removedCollectionsFlag}'s sentence as a {@link UsageError}, or
+ * return. Called before anything starts — no database, no driver.
+ */
+export function refuseRemovedCollectionsFlag(args: readonly string[], command: string): void {
+    const sentence = removedCollectionsFlag(args, command);
+    if (sentence !== null) throw new UsageError(sentence);
 }
 
 /** Print {@link missingSchemaDir}'s refusal and exit 1, or return. */

@@ -8,14 +8,14 @@
  *
  * Resolved like `rebase db push`: the same project and `.env`, the same
  * database (the managed one started if that is what the project uses), the
- * same `--collections` loader — the driver's, spawned in `backend/`. Opening
+ * same `backend/schema` loader — the driver's, spawned in `backend/`. Opening
  * the database changes nothing in it.
  */
 import chalk from "chalk";
 import path from "path";
 import { parseCommandArgs, wantsHelp } from "../utils/args";
 import { argsFromCommand } from "../utils/command-words";
-import { SCHEMA_DIR_FLAG_HELP, refuseMissingSchemaDir } from "../utils/path-flags";
+import { SCHEMA_DIR_FLAG_HELP, refuseMissingSchemaDir, refuseRemovedCollectionsFlag } from "../utils/path-flags";
 import { schemaDirArgs } from "../utils/schema-dir";
 import { reportSpawnFailure } from "../utils/spawn-error";
 import { DEV_DATABASE_KIND_ENV, managedNotices, prepareDatabaseEnv } from "../dev-db/prepare";
@@ -24,8 +24,7 @@ import { absolutizeLocalPathArgs, ensureDockerDatabase, resolveDriverCli, spawnD
 export const CONSOLE_FLAGS = {
     "--eval": String,
     "-e": "--eval",
-    "--collections": String,
-    "-c": "--collections",
+    "--schema-dir": String,
     "--database-url": String,
     "--docker": Boolean
 } as const;
@@ -33,7 +32,7 @@ export const CONSOLE_FLAGS = {
 /** What each long flag above does, for the Options block. */
 const CONSOLE_FLAG_HELP: Record<string, string> = {
     "--eval": "Run this code instead of the REPL, print its awaited result as JSON, and exit 1 if it throws",
-    "--collections": SCHEMA_DIR_FLAG_HELP,
+    "--schema-dir": SCHEMA_DIR_FLAG_HELP,
     "--database-url": "Open this database instead of the project's",
     "--docker": "Use the database from docker compose, starting it if needed"
 };
@@ -64,7 +63,7 @@ ${Object.keys(CONSOLE_FLAG_HELP)
 
 In scope:
   rebase        dataAsAdmin, sql(query, { params }), withAuth(user) → { data }, close()
-  collections   the project's collections
+  collections   the project's tables (the driver's scope name for them)
 
 Top-level await works. Opening the database changes nothing in it: no table,
 role or trigger is created. withAuth runs as the user under row-level security.
@@ -85,6 +84,7 @@ export async function consoleCommand(rawArgs: string[]): Promise<void> {
 
     // Strictly, before the line is relayed: the driver would otherwise be the
     // first to see a mistyped flag, after a database had been started for it.
+    refuseRemovedCollectionsFlag(rawArgs.slice(2), "console");
     const { flags } = parseCommandArgs({
         spec: CONSOLE_FLAGS,
         rawArgs,

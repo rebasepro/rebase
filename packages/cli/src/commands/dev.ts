@@ -43,9 +43,16 @@ import { fileURLToPath } from "url";
 import {
     cmsMountOf,
     findBackendApp,
+    DEFAULT_CRONS_DIR,
+    DEFAULT_FUNCTIONS_DIR,
+    DEFAULT_SCHEMA_FILE,
+    DEFAULT_TABLES_DIR,
     formatAppAddress,
-    LEGACY_CONFIG_DIR,
+    HOOKS_FILE,
+    findTablesIndex,
     loadManifest,
+    RESOURCES_FILE,
+    STORAGE_FILE,
     resolveBackendPaths,
     staticAppAddress
 } from "../manifest";
@@ -249,16 +256,21 @@ function resolveDevRuntimeEntry(): string {
 /**
  * Tell the dev runtime where this project keeps its parts.
  *
- * Read from `rebase.json` when there is one, so a project that moved its config
- * directory is honoured; otherwise the conventional layout.
+ * Read from `rebase.json` when there is one, so a project that moved its schema
+ * directory is honoured; otherwise the conventional layout. The three backend
+ * modules (`resources`, `storage`, `hooks`) are at fixed places; the runtime
+ * resolves each one's extension and drops a module that is not there.
  */
 function devRuntimeEnv(projectRoot: string): Record<string, string> {
     const result: Record<string, string> = {
         REBASE_DEV_PROJECT_ROOT: projectRoot,
-        REBASE_DEV_CONFIG: LEGACY_CONFIG_DIR,
-        REBASE_DEV_FUNCTIONS: "backend/functions",
-        REBASE_DEV_CRONS: "backend/crons",
-        REBASE_DEV_SCHEMA: "backend/src/schema.generated.ts"
+        REBASE_DEV_TABLES: DEFAULT_TABLES_DIR,
+        REBASE_DEV_RESOURCES: RESOURCES_FILE,
+        REBASE_DEV_STORAGE: STORAGE_FILE,
+        REBASE_DEV_HOOKS: HOOKS_FILE,
+        REBASE_DEV_FUNCTIONS: DEFAULT_FUNCTIONS_DIR,
+        REBASE_DEV_CRONS: DEFAULT_CRONS_DIR,
+        REBASE_DEV_SCHEMA: DEFAULT_SCHEMA_FILE
     };
 
     try {
@@ -266,6 +278,7 @@ function devRuntimeEnv(projectRoot: string): Record<string, string> {
         const backend = findBackendApp(loaded.manifest);
         if (backend) {
             const paths = resolveBackendPaths(backend.app, projectRoot);
+            result.REBASE_DEV_TABLES = paths.tables;
             result.REBASE_DEV_FUNCTIONS = paths.functions;
             result.REBASE_DEV_CRONS = paths.crons;
             result.REBASE_DEV_SCHEMA = paths.schema;
@@ -276,8 +289,8 @@ function devRuntimeEnv(projectRoot: string): Record<string, string> {
         // the conventional layout rather than refusing to start.
     }
 
-    // Nothing here says whether collections are declared or introspected, and
-    // nothing should: `createSourceBundle` drops a config directory that does
+    // Nothing here says whether tables are declared or introspected, and
+    // nothing should: `createSourceBundle` drops a schema directory that does
     // not exist, and the server derives the answer from that. A REBASE_DEV_MODE
     // env var said it a second time, and a second place to say it is a second
     // place for it to disagree.
@@ -291,8 +304,9 @@ function devRuntimeEnv(projectRoot: string): Record<string, string> {
  * crons are not imported: the runtime scans their directories at boot. So
  * adding `backend/functions/new.ts` while `rebase dev` ran did nothing —
  * `GET /api/functions/new` stayed 404, and a new cron never registered — until
- * somebody restarted by hand. The same is true of `config/`, which is read as
- * data.
+ * somebody restarted by hand. The schema directory is imported, but it is
+ * excluded from tsx's own tracking (see {@link devWatchArgs}) and restarted
+ * through the trigger instead.
  *
  * `--include` is tsx's own answer to this, it takes a directory rather than a
  * glob, and it tolerates a directory that does not exist yet: a `crons/`
@@ -308,12 +322,11 @@ export function devWatchIncludes(
     const dirs = [paths.REBASE_DEV_FUNCTIONS, paths.REBASE_DEV_CRONS]
         .filter((entry): entry is string => Boolean(entry))
         .map(entry => path.resolve(projectRoot, entry));
-    dirs.push(path.join(projectRoot, LEGACY_CONFIG_DIR));
     return dirs;
 }
 
-/** Where dev watches the collections it regenerates the schema and SDK from. */
-function devCollectionsDir(projectRoot: string): string {
+/** Where dev watches the tables it regenerates the schema and SDK from. */
+function devSchemaDir(projectRoot: string): string {
     return resolveSchemaDir(projectRoot);
 }
 
@@ -323,7 +336,7 @@ function devCollectionsDir(projectRoot: string): string {
  * Watches the nearest directory above `target` that exists (no higher than
  * `root`), and follows the path down as each part of it appears — `fs.watch`
  * cannot watch a directory that is not there yet. A headless project has no
- * `config/collections` until `rebase schema introspect` writes one, and dev
+ * `backend/schema` until one is written, and dev
  * watched it only when it was there at start: the backend kept serving the
  * API it derived from the database, and edits to the new files did nothing,
  * until dev was restarted by hand.
@@ -352,7 +365,7 @@ export function whenDirectoryAppears(target: string, root: string, onAppear: () 
         try {
             watcher = fs.watch(dir, () => arm());
         } catch {
-            // Unwatchable: the collections are picked up at the next start, as before.
+            // Unwatchable: the tables are picked up at the next start, as before.
             watcher = null;
         }
     };
@@ -368,7 +381,7 @@ export function whenDirectoryAppears(target: string, root: string, onAppear: () 
  * path with a dot-named segment (its built-in `**\/.*\/**`), so a trigger under
  * `.rebase/` — or under a TMPDIR inside a dot directory — would never fire; in
  * that case there is no trigger and {@link devWatchArgs} leaves the
- * collections to tsx, as before.
+ * schema directory to tsx, as before.
  */
 export function devRestartTrigger(projectRoot: string): string | null {
     let tmp = os.tmpdir();
@@ -379,7 +392,7 @@ export function devRestartTrigger(projectRoot: string): string | null {
     }
     const key = createHash("sha256").update(projectRoot).digest("hex").slice(0, 16);
     // Named for what it means: tsx prints the name on every restart it causes.
-    const trigger = path.join(tmp, "rebase-dev", key, "collections-changed");
+    const trigger = path.join(tmp, "rebase-dev", key, "schema-changed");
     return trigger.split(path.sep).some(segment => segment.startsWith(".")) ? null : trigger;
 }
 
@@ -393,26 +406,26 @@ const TSX_DEFAULT_IGNORES = ["**/.*/**", "**/.*", "**/{node_modules,bower_compon
 /**
  * The `tsx watch` argument list for the backend (unquoted).
  *
- * One save of a collection file must restart the backend once. The runtime
- * `import()`s the collections, so tsx tracks them as dependencies and used to
+ * One save of a schema file must restart the backend once. The runtime
+ * `import()`s the schema, so tsx tracks it as a dependency and used to
  * restart the moment a file was saved — before dev had regenerated
  * `schema.generated.ts`. That boot warned "schema.generated.ts no longer
  * describes the database … Run `rebase schema generate`", telling the reader to
  * run what dev was running at that moment, and the regeneration then rewrote
  * the file and restarted the backend a second time. So tsx is told to leave the
- * collections directory alone (`--exclude` wins over its dependency tracking),
+ * schema directory alone (`--exclude` wins over its dependency tracking),
  * and dev restarts the backend itself, once, after the regeneration — through
  * `restartTrigger`, which tsx watches.
  *
  * Every included directory also gets tsx's own default ignores, made absolute.
  * tsx resolves those defaults (`**\/node_modules/**`, `**\/.*`, …) against its
- * cwd, which is `backend/`, so they never reached `config/`, a sibling: chokidar
- * walked `config/node_modules` — following symlinks — before tsx spawned the
+ * cwd, which is `backend/`, so they never reached a sibling directory: chokidar
+ * walked the old `config/node_modules` — following symlinks — before tsx spawned the
  * backend at all, and kept every file in it watched. In the monorepo's example
  * app that was 17 s before the first backend line and 1,400 open files, and any
  * install (or another checkout's Vite build writing `.vite-temp` deep inside
  * that tree) restarted the backend. A `.DS_Store` or an editor swap file in
- * `config/` restarted it too.
+ * an included directory restarted it too.
  */
 export function devWatchArgs(
     projectRoot: string,
@@ -433,7 +446,7 @@ export function devWatchArgs(
     }
     if (restartTrigger) {
         args.push("--include", restartTrigger);
-        args.push("--exclude", `${glob(devCollectionsDir(projectRoot))}/**`);
+        args.push("--exclude", `${glob(devSchemaDir(projectRoot))}/**`);
     }
     // The server reads `.env` at boot, and the entry never imports it, so an
     // edit there changed nothing until some watched file did. tsx watches a
@@ -458,7 +471,7 @@ export function envFileHiddenFromTsx(envFile: string, backendDir: string): boole
 /**
  * The databases the project declares beyond the default, by key.
  *
- * Read from the graph, so `database("analytics")` in `config/resources.ts`
+ * Read from the graph, so `database("analytics")` in `backend/resources.ts`
  * is enough for `rebase dev` to serve a second database — the declaration is
  * the request. A config that does not evaluate is the backend's problem to
  * report, in the terms it already uses; here it means "no additional
@@ -470,7 +483,15 @@ async function declaredAdditionalDatabases(projectRoot: string): Promise<string[
         const backend = findBackendApp(loaded.manifest);
         if (!backend) return [];
         const { deriveResourceGraph, deriveOptionsFor } = await import("../resources/derive");
-        const { graph } = await deriveResourceGraph({ ...deriveOptionsFor(projectRoot, backend.app), cronsDir: undefined, functionsDir: undefined });
+        // The declarations alone: databases are declared in `backend/resources.ts`,
+        // and importing the tables (and the server's loader with them) would put
+        // seconds in front of the database start for nothing this asks.
+        const { graph } = await deriveResourceGraph({
+            ...deriveOptionsFor(projectRoot, backend.app),
+            schemaDir: undefined,
+            cronsDir: undefined,
+            functionsDir: undefined
+        });
         return graph.resources
             .filter(r => r.kind === "database" && r.transport === "server" && r.key !== DEFAULT_RESOURCE_KEY)
             .map(r => r.key);
@@ -923,23 +944,22 @@ function readEnvVar(projectRoot: string, name: string): string | undefined {
 }
 
 /**
- * Whether this project declares collections at all.
+ * Whether this project declares tables at all: its schema directory has an
+ * `index`, the module the loader reads.
  *
  * A project with none has no schema to generate or push — the headless BaaS
  * mode serves whatever the database already has.
  */
-function projectHasCollections(projectRoot: string): boolean {
-    const collectionsDir = devCollectionsDir(projectRoot);
-    return fs.existsSync(collectionsDir)
-        && fs.readdirSync(collectionsDir).some(name => /\.(ts|js|mts|mjs)$/.test(name) && !name.startsWith("index."));
+function projectHasTables(projectRoot: string): boolean {
+    return findTablesIndex(devSchemaDir(projectRoot)) !== undefined;
 }
 
 /**
- * Make the generated Drizzle schema match the collections before anything reads it.
+ * Make the generated Drizzle schema match the tables before anything reads it.
  *
  * `rebase init` writes `backend/src/schema.generated.ts` from the preset's own
- * collections (`templates/generated-schemas/<preset>.ts`), so a new project
- * starts with the real schema. It is stale the moment a collection changes, and
+ * tables (`templates/generated-schemas/<preset>.ts`), so a new project
+ * starts with the real schema. It is stale the moment a table changes, and
  * on the managed PGlite path — the one a new project takes, because `rebase
  * init` leaves `DATABASE_URL` commented out — no `rebase db push` runs to
  * regenerate it. So `dev` does.
@@ -951,10 +971,10 @@ function projectHasCollections(projectRoot: string): boolean {
  *
  * ## Why it runs unconditionally
  *
- * Generation reads collection files and writes one file. It needs no database,
+ * Generation reads the schema directory and writes one file. It needs no database,
  * it is idempotent, and it takes about two seconds. Making it a precondition of
  * starting the dev server — rather than a side effect of one database path —
- * is what makes "the generated schema matches the collections" true by
+ * is what makes "the generated schema matches the tables" true by
  * construction instead of true by remembering. The same staleness bites a
  * project whose database was already running, where the push never ran either.
  *
@@ -963,7 +983,7 @@ function projectHasCollections(projectRoot: string): boolean {
  * worse than one that boots and says so.
  */
 async function ensureGeneratedSchema(projectRoot: string): Promise<SchemaGeneration> {
-    if (!projectHasCollections(projectRoot)) return "skipped";
+    if (!projectHasTables(projectRoot)) return "skipped";
     // Where the driver writes it: `src/schema.generated.ts` under the backend.
     const schemaFile = path.join(findBackendDir(projectRoot) ?? path.join(projectRoot, "backend"), "src", "schema.generated.ts");
     const read = (): string | null => {
@@ -977,17 +997,17 @@ async function ensureGeneratedSchema(projectRoot: string): Promise<SchemaGenerat
     try {
         await runDriverSchemaCommand(["node", "rebase", "schema", "generate"], { quiet: true });
         // Said when it changed, because the file is committed: a stale one means
-        // the collections moved without it, and the diff is now the reader's.
+        // the tables moved without it, and the diff is now the reader's.
         const after = read();
         if (before !== null && after !== null && before !== after) {
             const shown = path.relative(projectRoot, schemaFile).split(path.sep).join("/");
-            console.log(`  ${chalk.gray(`↻ ${shown} was out of date with the collections, so it was regenerated.`)}`);
+            console.log(`  ${chalk.gray(`↻ ${shown} was out of date with the tables, so it was regenerated.`)}`);
         }
         return "generated";
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         console.log(`  ${chalk.yellow("⚠")} ${chalk.gray(`Could not regenerate the database schema: ${message}`)}`);
-        console.log(`  ${chalk.gray(`Run ${chalk.cyan("rebase schema generate")} to see why. Collection reads will fail until it succeeds.`)}`);
+        console.log(`  ${chalk.gray(`Run ${chalk.cyan("rebase schema generate")} to see why. Reads of the changed tables will fail until it succeeds.`)}`);
         return "failed";
     }
 }
@@ -1000,7 +1020,7 @@ export type SchemaGeneration = "generated" | "skipped" | "failed";
  * backend boots.
  *
  * Not after a regeneration that succeeded: that wrote `schema.generated.ts`
- * from these collections with this driver, moments earlier, and `stale`
+ * from these tables with this driver, moments earlier, and `stale`
  * compares the file against the same generator — it can only answer "nothing
  * stale", and it cost a driver process (~0.6 s) on every start. The repair it
  * exists for, a library upgrade that changed what the generator derives, is
@@ -1012,17 +1032,17 @@ export function needsStaleSchemaPreflight(generation: SchemaGeneration): boolean
 }
 
 /**
- * Make `generated/sdk` match the collections, the same way the schema is kept.
+ * Make `generated/sdk` match the tables, the same way the schema is kept.
  *
  * This used to happen only under `--generate`, and `generated/` is gitignored,
  * so a fresh clone had no SDK types at all until someone ran
- * `rebase generate-sdk`, and every collection edit left the typed client one
+ * `rebase generate-sdk`, and every schema edit left the typed client one
  * step behind. A frontend compiling against a `Database` type that no longer
  * describes the backend is the drift this whole command exists to prevent.
  *
- * A child process rather than a call into `generateSdkCommand`: that loads the
- * collections through jiti, whose module cache would hand the second
- * regeneration the collections the first one loaded. And this CLI re-run
+ * A child process rather than a call into `generateSdkCommand`: that imports the
+ * schema in process, and Node's module cache would hand the second
+ * regeneration the tables the first one loaded. And this CLI re-run
  * directly, not `pnpm exec rebase`: the package manager's pre-run dependency
  * check can start an install on every save, and its `rebase` is whichever one
  * it resolves, not necessarily the one running `dev`.
@@ -1037,7 +1057,7 @@ export function needsStaleSchemaPreflight(generation: SchemaGeneration): boolean
  * rather than left to read `.rebase/state.json`.
  */
 async function regenerateSdk(projectRoot: string, backendPort: number | null): Promise<SchemaGeneration> {
-    if (!projectHasCollections(projectRoot)) return "skipped";
+    if (!projectHasTables(projectRoot)) return "skipped";
     const entry = resolveCliEntry();
     const { execPath, prefixArgs } = resolveSpawn(entry);
     try {
@@ -1061,15 +1081,15 @@ async function regenerateSdk(projectRoot: string, backendPort: number | null): P
 }
 
 /**
- * What dev prints once a collection edit's regeneration is done.
+ * What dev prints once a schema edit's regeneration is done.
  *
  * The green "regenerated" box only when neither half failed. It used to be
  * printed unconditionally, right under "⚠ Could not regenerate the database
  * schema … nothing was applied" — and then the backend refused to boot over
- * the same collection error, so the success line was the one wrong thing on
+ * the same schema error, so the success line was the one wrong thing on
  * the screen.
  */
-export function collectionChangeSummary(schema: SchemaGeneration, sdk: SchemaGeneration): string[] {
+export function schemaChangeSummary(schema: SchemaGeneration, sdk: SchemaGeneration): string[] {
     const failed = [schema === "failed" && "the database schema", sdk === "failed" && "the SDK types"]
         .filter((part): part is string => Boolean(part));
     if (failed.length > 0) {
@@ -1081,7 +1101,7 @@ export function collectionChangeSummary(schema: SchemaGeneration, sdk: SchemaGen
     }
     return [
         chalk.green("  ✓ Schema and SDK types regenerated. The backend restarts and boot"),
-        chalk.green("    creates what is missing — a new collection, a new property."),
+        chalk.green("    creates what is missing — a new table, a new column."),
         // `db push` is the remedy for what boot leaves alone, on the
         // managed database as on your own PostgreSQL.
         chalk.gray("    For what boot leaves alone — a renamed column, a narrowed type,"),
@@ -1138,12 +1158,12 @@ export function schemaPushArgv(databaseUrl: string | undefined): string[] {
  * Start-up's independent halves, overlapped rather than run one after another.
  *
  * `rebase dev` used to regenerate the schema and the SDK, then derive the
- * resource graph (every collection evaluated again, in this process), then
+ * resource graph (every table evaluated again, in this process), then
  * start the managed database and wait for it — about a second when it was not
  * already running — and only then spawn the backend. None of the three reads
- * what another writes: the generators read `config/` and write
+ * what another writes: the generators read `backend/schema` and write
  * `backend/src/schema.generated.ts` and `generated/sdk/`; the derivation reads
- * `config/resources.ts` and the collections; the database needs neither, and
+ * `backend/resources.ts` and the tables; the database needs neither, and
  * `schema generate` never connects to one. So `database` starts first and is
  * collected last.
  *
@@ -1195,7 +1215,7 @@ async function runDatabasePreflight(options: {
 }): Promise<void> {
     const { projectRoot, disabled } = options;
 
-    const hasCollections = projectHasCollections(projectRoot);
+    const hasTables = projectHasTables(projectRoot);
 
     // The one DSN this preflight is about. `ensureDevDatabase` decides from it,
     // and the push has to run against the same one — re-resolving inside the
@@ -1207,7 +1227,7 @@ async function runDatabasePreflight(options: {
         projectRoot,
         databaseUrl,
         disabled,
-        hasTables: hasCollections,
+        hasTables,
         pushSchema: async () => {
             // The same driver entry point `rebase db push` uses, called with the
             // argv layout every command in this CLI receives — the full process
@@ -1344,7 +1364,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
     if (switchOn(rawArgs, "--generate") || rawArgs.includes("-g")) {
         throw new UsageError(
             "`rebase dev --generate` is gone: dev now regenerates the schema and the SDK types " +
-            "on every start and every collection save. Drop the flag."
+            "on every start and every schema save. Drop the flag."
         );
     }
 
@@ -1470,7 +1490,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
             : null;
         const dockerUrl = resolved?.kind === "docker" ? resolved.url ?? undefined : undefined;
         ({ schemaGeneration, database: prepared } = await overlapDevStartup({
-            // Side by side: they read the same collections and write different
+            // Side by side: they read the same tables and write different
             // files, so the SDK costs nothing on top of the schema.
             generate: async () => (await Promise.all([ensureGeneratedSchema(projectRoot), regenerateSdkFor(sdkBackendPort)]))[0],
             // Not under --database-url: the preflight decides from `.env`, and
@@ -1879,9 +1899,9 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
         // the backend sees it.
         //
         // Distinct from the regeneration further down, which watches
-        // `config/collections` and so only fires when the developer edits
+        // `backend/schema` and so only fires when the developer edits
         // something. This case has no edit: 0.13 derives `category_id` where 0.12
-        // derived `categorie_id`, from an unchanged collection. Boot-ensure renames
+        // derived `categorie_id`, from an unchanged table. Boot-ensure renames
         // the database column, relation validation reads the stale generated module
         // and refuses to start — on this boot and every boot after, since the
         // rename does not run twice. Regenerating is the whole fix, and the release
@@ -1903,7 +1923,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
             }
         } catch {
             // Never block `dev` on this. A project with no generated schema, a
-            // driver too old to know the subcommand, or a collections directory
+            // driver too old to know the subcommand, or a schema directory
             // that will not load all land here, and the boot itself reports each
             // of them better than a preflight can.
         }
@@ -1932,13 +1952,13 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
                 fs.writeFileSync(restartTrigger, String(Date.now()));
             } catch {
                 // Unwritable tmpdir: the trigger cannot fire, so let tsx keep the
-                // collections — two restarts per save beats none.
+                // schema directory — two restarts per save beats none.
             }
         }
         const usableTrigger = restartTrigger && fs.existsSync(restartTrigger) ? restartTrigger : null;
         const envFileForDev = envFile && envFileHiddenFromTsx(envFile, backendDir) ? envFile : null;
         const backendCommand = backendWatchCommand(tsxBin, devWatchArgs(projectRoot, runtimePaths, entryTarget, usableTrigger, envFileForDev ? null : envFile));
-        /** Restart the backend once, after dev has finished reacting to a collection save. */
+        /** Restart the backend once, after dev has finished reacting to a schema save. */
         const restartBackend = (): void => {
             if (!usableTrigger) return; // tsx restarted on the save itself
             try {
@@ -1973,7 +1993,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
             }
         };
 
-        // Watch the collections folder and regenerate what is derived from it.
+        // Watch the schema directory and regenerate what is derived from it.
         //
         // This used to print a box telling the reader to run `rebase schema
         // generate` themselves, which made the documented first edit fail in a
@@ -1987,22 +2007,20 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
         // The driver reads the database now, so that particular 400 is gone at
         // the root. This stays because the file is still what `eject` and the
         // developer's own imports read, and the SDK types are what a frontend
-        // compiles against: either one silently falling behind the collections
+        // compiles against: either one silently falling behind the tables
         // during a dev session is a surprise waiting at the next deploy. The
         // reader's single instruction is still "save the file".
-        const collectionsDir = devCollectionsDir(projectRoot);
+        const schemaDir = devSchemaDir(projectRoot);
         {
             let debounce: NodeJS.Timeout | null = null;
-            // The SQL schema and the SDK do not answer to the same edits. The
-            // SDK is generated from the collections `index` module, which can
-            // re-export anything the project puts under this directory, so every
-            // change is a reason to rebuild it. The Drizzle schema covers only the
-            // SQL-backed collections the loader reads — a Firestore collection
-            // has nothing to generate, push or check for drift. Tracked across the
+            // Every module under the schema directory is a schema edit
+            // (`isSchemaSourceFile`): it holds tables and the helpers they
+            // import, nothing else. Anything else that lands there — a README,
+            // a JSON fixture — rebuilds the SDK only. Tracked across the
             // debounce window because one burst can touch both kinds of file.
             let sqlSchemaAffected = false;
             let changed = "";
-            const collectionsChanged = (filename: string, affectsSchema: boolean): void => {
+            const schemaChanged = (filename: string, affectsSchema: boolean): void => {
                 sqlSchemaAffected = sqlSchemaAffected || affectsSchema;
                 changed = filename;
                 if (debounce) clearTimeout(debounce);
@@ -2021,7 +2039,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
                         console.log([
                             "",
                             chalk.yellow("  ┌──────────────────────────────────────────────────────────────┐"),
-                            chalk.yellow("  │  🔄 Collection file changed: ") + chalk.white(shown) + chalk.yellow("│"),
+                            chalk.yellow("  │  🔄 Schema file changed:     ") + chalk.white(shown) + chalk.yellow("│"),
                             chalk.yellow("  │     Regenerating the schema and the SDK types…               │"),
                             chalk.yellow("  └──────────────────────────────────────────────────────────────┘")
                         ].join("\n"));
@@ -2037,25 +2055,25 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
                         // import it — dev restarts the backend itself.
                         if (!(usesStockRuntime && schemaBefore !== null && generatedSchemaStamp() !== schemaBefore)) restartBackend();
 
-                        console.log(collectionChangeSummary(schemaResult, sdkResult).join("\n"));
+                        console.log(schemaChangeSummary(schemaResult, sdkResult).join("\n"));
                     })();
                 }, 500);
             };
-            const watchCollections = (): void => {
-                fs.watch(collectionsDir, { recursive: true }, (_eventType, filename) => {
+            const watchSchema = (): void => {
+                fs.watch(schemaDir, { recursive: true }, (_eventType, filename) => {
                     if (!filename || filename.startsWith(".") || filename.endsWith(".tmp")) return;
-                    collectionsChanged(filename, isSchemaSourceFile(filename));
+                    schemaChanged(filename, isSchemaSourceFile(filename));
                 });
             };
-            if (fs.existsSync(collectionsDir)) {
-                watchCollections();
+            if (fs.existsSync(schemaDir)) {
+                watchSchema();
             } else {
-                // A headless project has none until `rebase schema introspect`
-                // writes them. They are new to the backend as a whole, so they
-                // count as a schema change.
-                whenDirectoryAppears(collectionsDir, projectRoot, () => {
-                    watchCollections();
-                    collectionsChanged(`${path.basename(collectionsDir)}/`, true);
+                // A headless project has none until it writes `backend/schema`.
+                // Its tables are new to the backend as a whole, so they count
+                // as a schema change.
+                whenDirectoryAppears(schemaDir, projectRoot, () => {
+                    watchSchema();
+                    schemaChanged(`${path.basename(schemaDir)}/`, true);
                 });
             }
         }
@@ -2138,7 +2156,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
          * half that was missing. The old timer fired once, thirty seconds after
          * start-up, and its body began `if (backendAnnounced) return` — so a
          * backend that came up and then died on the next save was covered by
-         * nothing at all. Breaking `config/resources.ts` under a running
+         * nothing at all. Breaking `backend/resources.ts` under a running
          * `rebase dev` printed a stack trace, took `/health` to nothing, and
          * left the CLI saying "Press Ctrl+C to stop all servers."
          */
@@ -2391,7 +2409,7 @@ ${chalk.green.bold("Which database")}
     6. the managed development database ${chalk.gray("(PGlite, data in .rebase/)")}
 
   A scaffolded project sets none of 1–5, so it lands on (6): no Docker,
-  nothing to install, and the collections' tables are created at boot.
+  nothing to install, and the tables are created at boot.
 
   ${chalk.blue("--docker")} reaches the ${chalk.gray("db")} service in this project's docker-compose.yml,
   starting the container if nothing is listening on its port, and pushing
@@ -2438,9 +2456,9 @@ ${chalk.green.bold("Description")}
   VITE_API_URL is injected with the port the backend actually bound —
   the frontend is restarted if the backend had to move.
 
-  On startup and on every save under config/collections, the Drizzle
+  On startup and on every save under backend/schema, the Drizzle
   schema (backend/src/schema.generated.ts) and the SDK types
-  (generated/sdk) are regenerated from the collections.
+  (generated/sdk) are regenerated from the tables.
 
   An edit to .env restarts the backend, which reads the file again. What
   this command sets for it is kept until ${chalk.cyan("rebase dev")} restarts: ${chalk.gray("PORT")}, and

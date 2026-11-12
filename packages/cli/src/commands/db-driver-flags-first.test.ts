@@ -70,7 +70,7 @@ function project(remembered: "docker" | "managed"): void {
         name: "backend",
         dependencies: { "@rebasepro/server": "0.25.0", "@rebasepro/server-postgres": "0.25.0" }
     }));
-    fs.mkdirSync(path.join(state.root, "config", "collections"), { recursive: true });
+    fs.mkdirSync(path.join(state.root, "backend", "schema"), { recursive: true });
     if (remembered === "docker") {
         fs.writeFileSync(path.join(state.root, "docker-compose.yml"), [
             "services:",
@@ -141,8 +141,8 @@ describe.each(["docker", "managed"] as const)("with the %s database not running"
         expect(state.ensured + state.prepared).toBe(0);
     });
 
-    it("refuses a --collections path that is not there before starting anything", async () => {
-        await expect(dbCommand("push", argv("push", "--collections", "./nope"))).rejects.toThrow(Exit);
+    it("refuses a --schema-dir path that is not there before starting anything", async () => {
+        await expect(dbCommand("push", argv("push", "--schema-dir", "./nope"))).rejects.toThrow(Exit);
 
         expect(printed.join("\n")).toContain("nope");
         expect(state.ensured + state.prepared).toBe(0);

@@ -333,7 +333,7 @@ beforeEach(() => {
         deps: { declared: {} },
         build: { cli: "0.23.0", node: "22", createdAt: "2026-09-30T00:00:00Z" }
     }));
-    write(bundleDir, "config/index.js", "export default {};\n");
+    write(bundleDir, "backend/schema/index.js", "export default {};\n");
 
     cwd = process.cwd();
     process.chdir(project_);

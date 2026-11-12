@@ -24,7 +24,7 @@ const __dirname = path.dirname(__filename);
  *
  * A fixed relative path can't work in both modes: in dev this file runs from
  * source at `backend/src/env.ts`, but the compiled output lives at
- * `backend/dist/backend/src/env.js` — two directories deeper — so
+ * `backend/dist/src/env.js` — one directory deeper — so
  * `../../.env` points at a file that doesn't exist in production. Walking up
  * finds the root `.env` from either location.
  */

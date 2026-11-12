@@ -1,54 +1,52 @@
 /**
  * CLI command: rebase verify
  *
- * One command that says whether the collections are safe to ship, fast enough
- * to run after every edit. An agent writing `config/collections/*.ts` gets three
- * things wrong more than anything else — an option that does not exist, a UI
- * widget outside `admin: { … }`, and no `securityRules` — and every one of them
- * used to surface late: at boot, in review, or never. The project's Claude Code
- * hook (`.claude/hooks/post-edit-collection.sh`, written by `rebase init` and
- * `rebase skills --hooks`) runs this after each edit to a collection file, and
- * CI runs it on every push.
+ * One command that says whether the tables are safe to ship, fast enough to
+ * run after every edit. An agent editing `backend/schema/*.ts` gets a table
+ * definition wrong — a relation to a table the index does not export, an
+ * `rls: "inherit"` with no `defaultRls`, a table with no primary key — or
+ * writes rules that hand every row of a per-user table to everyone; each of
+ * those used to surface late: at boot, in review, or never. The project's
+ * Claude Code hook (written by `rebase init` and `rebase skills --hooks`) runs
+ * this after each edit to a schema file, and CI runs it on every push.
  *
  * Four steps, each reported on its own:
  *
- * 1. **Collection config** — every file under `config/collections/` loads and
- *    passes `findCollectionConfigProblems` with unknown keys as errors: the same
- *    validator the backend runs at boot, at its strictest.
- * 2. **RLS coverage** — a collection that declares no `securityRules` and
- *    inherits none, or one with a `user_id` / `owner_id` / `organization_id` /
- *    `tenant_id` column that leans on directory defaults instead of its own
- *    rules; and a rule that lets a role read every row of such a table.
+ * 1. **Table definitions** — `backend/schema` loads and compiles through
+ *    `loadBackendSchema`, the loader the backend boots from, so every problem
+ *    it would refuse to boot on is a finding here, one per problem.
+ * 2. **RLS coverage** — a table with a `user_id` / `owner_id` /
+ *    `organization_id` / `tenant_id` column whose rules (its own, or the
+ *    `defaultRls` it inherits) let a role read every row regardless of it.
+ *    `rls` itself is mandatory, so "no rules at all" is a step-1 error now.
  * 3. **Migration freshness** — whether `drizzle/migrations` still builds the
- *    tables and columns the collections declare (offline), and with `--live`
+ *    tables and columns the schema declares (offline), and with `--live`
  *    whether the database has applied every migration.
  * 4. **Live RLS audit** — with `--live`, the `@rebasepro/rls-check` catalogue
  *    against the project's database, resolved as `db *` resolves it (the
  *    managed one unless something names another).
  *
  * `--json` prints one object an agent can act on: every finding carries the
- * file, the dotted path into the config and the fix.
+ * file, the dotted path into the table and the fix.
  */
 import chalk from "chalk";
 import fs from "fs";
 import path from "path";
 import {
     parseEnvBoolean,
-    isFirebaseCollectionConfig,
-    isRelationalCollectionConfig,
-    type CollectionConfig,
-    type Property,
-    type SecurityRule
+    type SecurityRule,
+    type TableDescriptor
 } from "@rebasepro/types";
+import { isSchemaDefinitionError } from "@rebasepro/common";
 import { parseCommandArgs, wantsHelp } from "../utils/args";
 import { failAsJson, findBackendDir, getActiveBackendPlugin, readEnvFile, requireProjectRoot } from "../utils/project";
-import { SCHEMA_DIR_FLAG_HELP, missingSchemaDir } from "../utils/path-flags";
+import { SCHEMA_DIR_FLAG_HELP, missingSchemaDir, refuseRemovedCollectionsFlag } from "../utils/path-flags";
 import { resolveSchemaDir } from "../utils/schema-dir";
+import { loadProjectSchema, type ModuleAliases, type ProjectSchema } from "../utils/project-schema";
 
 /** The flags `rebase verify` takes. */
 export const VERIFY_FLAGS = {
-    "--collections": String,
-    "-c": "--collections",
+    "--schema-dir": String,
     "--json": Boolean,
     "--quiet": Boolean,
     "-q": "--quiet",
@@ -58,7 +56,7 @@ export const VERIFY_FLAGS = {
 } as const;
 
 const VERIFY_FLAG_HELP: Record<string, string> = {
-    "--collections, -c": SCHEMA_DIR_FLAG_HELP,
+    "--schema-dir": SCHEMA_DIR_FLAG_HELP,
     "--json": "Print one JSON object: every step, and every finding with its file, path and fix",
     "--quiet, -q": "Print nothing when everything passes; only the problems when something fails",
     "--live": "Also connect to the project's database: check migrations are applied and run the rls-check audit",
@@ -66,7 +64,7 @@ const VERIFY_FLAG_HELP: Record<string, string> = {
     "--docker": "With --live: use the database from docker compose, starting it if needed"
 };
 
-export type VerifyStepId = "config" | "rls" | "migrations" | "live";
+export type VerifyStepId = "schema" | "rls" | "migrations" | "live";
 
 export interface VerifyFinding {
     step: VerifyStepId;
@@ -76,11 +74,11 @@ export interface VerifyFinding {
     message: string;
     /** What to change, when there is one thing to change. */
     fix?: string;
-    /** The collection's slug. */
-    collection?: string;
+    /** The table's slug. */
+    table?: string;
     /** The file to open, relative to the project root. */
     file?: string;
-    /** Dotted path into the collection config — `posts.properties.title.widget`. */
+    /** Dotted path into the table definition — `posts.rls[0]`, `posts.author`. */
     path?: string;
 }
 
@@ -94,8 +92,8 @@ export interface VerifyStep {
 
 export interface VerifyReport {
     ok: boolean;
-    /** Relative to the project root. */
-    collectionsDir: string;
+    /** The schema directory, relative to the project root. */
+    schemaDir: string;
     steps: VerifyStep[];
     findings: VerifyFinding[];
     summary: { errors: number; warnings: number };
@@ -103,7 +101,8 @@ export interface VerifyReport {
 
 export interface VerifyOptions {
     projectRoot: string;
-    collectionsDir: string;
+    /** The schema directory, absolute. */
+    schemaDir: string;
     /** The backend package, where `drizzle/migrations` lives. Null for a project without one. */
     backendDir: string | null;
     live: boolean;
@@ -116,10 +115,12 @@ export interface VerifyOptions {
      * Defaults to true, the runtime's default.
      */
     authRequired?: boolean;
+    /** Module specifiers mapped to files when importing the schema (in-repo runs and tests). */
+    moduleAliases?: ModuleAliases;
 }
 
 const STEP_TITLES: Record<VerifyStepId, string> = {
-    config: "Collection config",
+    schema: "Table definitions",
     rls: "RLS coverage",
     migrations: "Migration freshness",
     live: "Live RLS audit"
@@ -131,167 +132,93 @@ const STEP_TITLES: Record<VerifyStepId, string> = {
  */
 const OWNER_COLUMNS: readonly string[] = ["user_id", "owner_id", "organization_id", "tenant_id"];
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-    typeof value === "object" && value !== null && !Array.isArray(value);
+const MODULE_EXTENSIONS = [".ts", ".mts", ".js", ".mjs"] as const;
 
-/** What a collection file must default-export to be loaded as one. */
-function isCollection(value: unknown): value is CollectionConfig {
-    return isRecord(value) && typeof value.slug === "string" && isRecord(value.properties);
-}
+// ─── Step 1: table definitions ────────────────────────────────────────────────
 
-/** `organizationId` → `organization_id`, as the generator derives a column from a key. */
-function snake(key: string): string {
-    return key.replace(/([a-z0-9])([A-Z])/g, "$1_$2").replace(/[\s-]+/g, "_").toLowerCase();
-}
-
-// ─── Loading ──────────────────────────────────────────────────────────────────
-
-interface LoadedCollections {
-    collections: CollectionConfig[];
-    /** Parallel to `collections`: the file each one came from, relative to the project root. */
-    sources: string[];
-    /** Each collection's `securityRules` as its file declares them, before directory defaults. */
-    ownRules: (readonly SecurityRule[] | undefined)[];
-    /** `defaultSecurityRules` from the directory's `index.ts`. */
-    defaults: readonly SecurityRule[] | undefined;
-    defaultsFile?: string;
-    failures: VerifyFinding[];
+/** The schema as far as the later steps need it: the compiled tables, and where each one is written. */
+interface VerifiedSchema {
+    schema: ProjectSchema;
+    descriptors: TableDescriptor[];
+    /** The file each table is written in, by slug, relative to the project root. */
+    files: Map<string, string>;
 }
 
 /**
- * Load the collections the way the backend finds them: every top-level file
- * the loader reads (`isLegacyCollectionFile`), each default-exporting one
- * collection, plus `defaultSecurityRules` from the directory's `index.ts`.
- *
- * Through jiti, with its caches off: the CLI is plain Node and the files are
- * TypeScript, and a verifier that answered from the previous edit's module
- * would be worse than none. A file that does not load is a finding, not a
- * crash — after an agent's edit it is the most likely problem of all.
+ * Where a table is written, as far as the files say without running them:
+ * the conventional `<schema>/<name>.ts` (or its slug, or its SQL name), else
+ * the index that exports it.
  */
-async function loadCollectionFiles(projectRoot: string, collectionsDir: string): Promise<LoadedCollections> {
-    const { createJiti } = await import("jiti");
-    const jiti = createJiti(path.join(collectionsDir, "index.ts"), {
-        interopDefault: true,
-        moduleCache: false,
-        fsCache: false
-    });
-    const relative = (file: string) => path.relative(projectRoot, file);
-
-    const loaded: LoadedCollections = { collections: [], sources: [], ownRules: [], defaults: undefined, failures: [] };
-
-    for (const name of fs.readdirSync(collectionsDir).filter(isLegacyCollectionFile).sort()) {
-        const file = path.join(collectionsDir, name);
-        try {
-            const exported = await jiti.import<unknown>(file, { default: true });
-            if (!isCollection(exported)) {
-                loaded.failures.push({
-                    step: "config",
-                    check: "config-no-collection",
-                    severity: "error",
-                    file: relative(file),
-                    message: `${name} does not default-export a collection (an object with a \`slug\` and \`properties\`).`,
-                    fix: "End the file with `export default defineCollection({ slug, name, properties, … })` — the backend refuses to boot on a collection file that exports anything else."
-                });
-                continue;
-            }
-            loaded.collections.push(exported);
-            loaded.sources.push(relative(file));
-            loaded.ownRules.push(exported.securityRules);
-        } catch (error) {
-            loaded.failures.push({
-                step: "config",
-                check: "config-load",
-                severity: "error",
-                file: relative(file),
-                message: `${name} does not load: ${error instanceof Error ? error.message : String(error)}`,
-                fix: "Fix the syntax or import error. The backend refuses to boot on the same file."
-            });
+function tableFile(projectRoot: string, schemaDir: string, indexFile: string, names: readonly string[]): string | undefined {
+    for (const name of names) {
+        for (const extension of MODULE_EXTENSIONS) {
+            const candidate = path.join(schemaDir, `${name}${extension}`);
+            if (fs.existsSync(candidate)) return path.relative(projectRoot, candidate);
         }
     }
-
-    for (const index of ["index.ts", "index.js"]) {
-        const file = path.join(collectionsDir, index);
-        if (!fs.existsSync(file)) continue;
-        try {
-            const mod = await jiti.import<unknown>(file);
-            const rules = isRecord(mod) ? mod.defaultSecurityRules : undefined;
-            if (Array.isArray(rules)) {
-                loaded.defaults = rules;
-                loaded.defaultsFile = relative(file);
-            }
-        } catch (error) {
-            loaded.failures.push({
-                step: "config",
-                check: "config-load",
-                severity: "error",
-                file: relative(file),
-                message: `${index} does not load: ${error instanceof Error ? error.message : String(error)}`,
-                fix: "Fix the file, or delete it if the project declares no `defaultSecurityRules`. The backend refuses to boot without reading it."
-            });
-        }
-        break;
-    }
-
-    return loaded;
+    return indexFile ? path.relative(projectRoot, indexFile) : undefined;
 }
 
-// ─── Step 1: collection config ────────────────────────────────────────────────
-
-async function checkConfig(loaded: LoadedCollections): Promise<VerifyFinding[]> {
-    const { findCollectionConfigProblems } = await import("@rebasepro/server");
-    const fileBySlug = new Map(loaded.collections.map((c, i) => [c.slug, loaded.sources[i]]));
-    const problems = findCollectionConfigProblems(loaded.collections, {
-        unknownKeys: "error",
-        sources: loaded.sources
-    });
-    return problems.map((problem): VerifyFinding => {
-        const slug = problem.path.split(".")[0];
-        const file = fileBySlug.get(slug);
+/**
+ * Load the schema the way the backend boots from it. A schema that does not
+ * load or does not compile is a set of findings, not a crash — after an
+ * agent's edit it is the most likely problem of all.
+ */
+async function loadSchema(
+    options: VerifyOptions
+): Promise<{ verified: VerifiedSchema; failures: [] } | { verified: null; failures: VerifyFinding[] }> {
+    const relative = (file: string) => path.relative(options.projectRoot, file);
+    const indexOf = (): string => MODULE_EXTENSIONS
+        .map(extension => path.join(options.schemaDir, `index${extension}`))
+        .find(candidate => fs.existsSync(candidate)) ?? "";
+    try {
+        const schema = await loadProjectSchema(options.projectRoot, options.schemaDir, options.moduleAliases);
+        const descriptors = schema.compiled.descriptors;
+        const files = new Map<string, string>();
+        for (const descriptor of descriptors) {
+            const file = tableFile(options.projectRoot, options.schemaDir, schema.loaded.indexFile,
+                [descriptor.name, descriptor.slug, descriptor.table]);
+            if (file) files.set(descriptor.slug, file);
+        }
+        return { verified: { schema, descriptors, files }, failures: [] };
+    } catch (error) {
+        if (isSchemaDefinitionError(error)) {
+            const index = indexOf();
+            return {
+                verified: null,
+                failures: error.problems.map((problem): VerifyFinding => {
+                    const file = tableFile(options.projectRoot, options.schemaDir, index, [problem.table]);
+                    return {
+                        step: "schema",
+                        check: "schema-definition",
+                        severity: "error",
+                        table: problem.table,
+                        ...(file && { file }),
+                        path: problem.key ? `${problem.table}.${problem.key}` : problem.table,
+                        message: problem.message,
+                        fix: "Change the definition as the message says. The backend refuses to boot on the same schema."
+                    };
+                })
+            };
+        }
+        const file = typeof error === "object" && error !== null && "file" in error && typeof error.file === "string"
+            ? relative(error.file)
+            : undefined;
         return {
-            step: "config",
-            check: problem.kind === "key" ? "config-key" : "config-incoherent",
-            severity: problem.severity,
-            message: problem.message,
-            path: problem.path,
-            ...(fileBySlug.has(slug) && { collection: slug }),
-            ...(file && { file })
+            verified: null,
+            failures: [{
+                step: "schema",
+                check: "schema-load",
+                severity: "error",
+                ...(file && { file }),
+                message: error instanceof Error ? error.message : String(error),
+                fix: "Fix the module as the message says. The backend refuses to boot on the same files."
+            }]
         };
-    });
+    }
 }
 
 // ─── Step 2: RLS coverage ─────────────────────────────────────────────────────
-
-/** An owner-ish column a collection's table carries, and the property that declares it. */
-interface OwnerColumn {
-    column: string;
-    key: string;
-}
-
-/** The owner-ish columns a collection's table carries: plain columns and `belongsTo` keys. */
-function ownerColumnsOf(collection: CollectionConfig): OwnerColumn[] {
-    const found: OwnerColumn[] = [];
-    const consider = (column: string, key: string) => {
-        if (OWNER_COLUMNS.includes(column)) found.push({ column, key });
-    };
-    for (const [key, property] of Object.entries<Property>(collection.properties ?? {})) {
-        if (!isRecord(property)) continue;
-        if (property.type === "relation") {
-            const relation = property.relation;
-            if (isRecord(relation) && relation.kind === "belongsTo") {
-                // As the generator names it (`generateForeignKeyName` in
-                // `@rebasepro/utils`, which the CLI does not depend on): from
-                // the relation's name, which is the property key only when
-                // `relationName` is not set.
-                const name = typeof relation.relationName === "string" && relation.relationName ? relation.relationName : key;
-                const singular = /[^s]s$/.test(name) ? name.slice(0, -1) : name;
-                consider(typeof relation.localKey === "string" ? relation.localKey : `${snake(singular)}_id`, key);
-            }
-            continue;
-        }
-        consider(typeof property.columnName === "string" ? property.columnName : snake(key), key);
-    }
-    return found;
-}
 
 /** Whether a rule applies to reads. */
 function coversSelect(rule: SecurityRule): boolean {
@@ -324,95 +251,68 @@ function describeRuleTarget(rule: Pick<SecurityRule, "roles">): string {
     return rule.roles?.length ? `role${rule.roles.length > 1 ? "s" : ""} ${rule.roles.map(r => `"${r}"`).join(", ")}` : "every signed-in user";
 }
 
-function checkRls(loaded: LoadedCollections): VerifyFinding[] {
+function checkRls(verified: VerifiedSchema): VerifyFinding[] {
     const findings: VerifyFinding[] = [];
-    loaded.collections.forEach((collection, i) => {
-        // Firestore does not implement `securityRules` at all — its own rules
-        // language governs it, and nothing here can say anything about that.
-        if (isFirebaseCollectionConfig(collection)) return;
+    const defaultsFile = verified.schema.loaded.indexFile
+        ? path.basename(verified.schema.loaded.indexFile)
+        : "the schema index";
+    for (const table of verified.descriptors) {
+        // A view takes the policies of the tables it reads; the auth table gets
+        // a self-read policy and an admin-only write gate from the framework.
+        if (table.kind !== "table" || table.auth) continue;
+        // `"admin-only"`, declared or inherited, is a posture said on purpose.
+        if (table.rls.posture !== "rules") continue;
+        // A tenant-scoped table is filtered by the tenant policy before any rule.
+        if (table.tenant) continue;
 
-        const slug = collection.slug;
-        const file = loaded.sources[i];
-        const own = loaded.ownRules[i] ?? [];
-        const owners = ownerColumnsOf(collection);
-        const tenantScoped = isRelationalCollectionConfig(collection) && isRecord(collection.tenant);
-        const ownerField = owners[0]?.column ?? "user_id";
+        const owner = table.columns.find(column => OWNER_COLUMNS.includes(column.column));
+        if (!owner) continue;
 
-        if (own.length === 0) {
-            // An auth collection gets a self-read policy and an admin-only write
-            // gate from the framework; it is never served unfiltered.
-            if (collection.auth) return;
+        const slug = table.slug;
+        const file = verified.files.get(slug);
+        const ownerField = owner.column;
+        const perUser = ownerField === "user_id" || ownerField === "owner_id";
+        const fix = perUser
+            ? `Give it rules of its own: \`rls: [{ operation: "all", ownerField: "${ownerField}" }]\` so each user reaches only their own rows. ` +
+                "A table meant to be readable by everyone says so on the table: `{ operation: \"select\", access: \"public\" }`."
+            : `Scope it with \`tenant: { field: "${owner.key}", from: { claim: "${ownerField}" } }\` (the claim that carries the caller's tenant), ` +
+                "plus the `rls` rules that grant access inside a tenant — e.g. `[{ operation: \"select\", access: \"public\" }]`.";
 
-            if (owners.length > 0 && !tenantScoped) {
-                const perUser = ownerField === "user_id" || ownerField === "owner_id";
-                const fix = perUser
-                    ? `Add \`securityRules: [{ operation: "all", ownerField: "${ownerField}" }]\` so each user reaches only their own rows. ` +
-                        "A table meant to be readable by everyone says so: `{ operation: \"select\", access: \"public\" }`."
-                    : `Scope it with \`tenant: { field: "${owners[0].key}", from: { claim: "${ownerField}" } }\` (the claim that carries the caller's tenant), ` +
-                        "plus the `securityRules` that grant access inside a tenant — e.g. `[{ operation: \"select\", access: \"public\" }]`.";
-                const inherited = loaded.defaults ?? [];
-                if (inherited.length === 0) {
-                    findings.push({
-                        step: "rls",
-                        check: "rls-missing",
-                        severity: "error",
-                        collection: slug,
-                        file,
-                        path: `${slug}.securityRules`,
-                        message: `"${slug}" has a \`${ownerField}\` column but declares no \`securityRules\`, and inherits none: nothing says which rows belong to whom (by default only admins can read or write it).`,
-                        fix
-                    });
-                } else if (inherited.some(opensEveryRow)) {
-                    // Directory defaults are written for every table. On a
-                    // tenant column, inheriting an all-rows read is the
-                    // cross-tenant leak; on a per-user column it is often a
-                    // public profile or author list, so it is said, not failed.
-                    findings.push({
-                        step: "rls",
-                        check: perUser ? "rls-inherited-read" : "rls-missing",
-                        severity: perUser ? "warning" : "error",
-                        collection: slug,
-                        file,
-                        path: `${slug}.securityRules`,
-                        message: `"${slug}" has a \`${ownerField}\` column but declares no \`securityRules\` of its own, so it inherits \`defaultSecurityRules\` from ${loaded.defaultsFile}, which let ${describeRuleTarget(inherited.find(opensEveryRow) ?? {})} read every row regardless of \`${ownerField}\`.`,
-                        fix
-                    });
-                }
-                return;
-            }
-
-            if (!loaded.defaults?.length) {
-                findings.push({
-                    step: "rls",
-                    check: "rls-missing",
-                    severity: "error",
-                    collection: slug,
-                    file,
-                    path: `${slug}.securityRules`,
-                    message: `"${slug}" declares no \`securityRules\` and inherits none, so nothing says who may read or write it (by default only admins can).`,
-                    fix: "Declare its access: `securityRules: [{ operation: \"select\", access: \"public\" }, { operations: [\"insert\", \"update\", \"delete\"], roles: [\"admin\"] }]` " +
-                        "for a public table, `{ operation: \"all\", ownerField: \"user_id\" }` for per-user rows, " +
-                        "or `{ operation: \"all\", roles: [\"admin\"] }` to keep it admin-only on purpose."
-                });
-            }
-            return;
+        if (table.rls.inherited) {
+            const opening = table.rls.rules.find(opensEveryRow);
+            if (!opening) continue;
+            // `defaultRls` is written for every table. On a tenant column,
+            // inheriting an all-rows read is the cross-tenant leak; on a per-user
+            // column it is often a public profile or author list, so it is said,
+            // not failed.
+            findings.push({
+                step: "rls",
+                check: perUser ? "rls-inherited-read" : "rls-inherited-tenant-read",
+                severity: perUser ? "warning" : "error",
+                table: slug,
+                ...(file && { file }),
+                path: `${slug}.rls`,
+                message: `"${slug}" has a \`${ownerField}\` column and \`rls: "inherit"\`, so it takes \`defaultRls\` from ${defaultsFile}, ` +
+                    `which lets ${describeRuleTarget(opening)} read every row regardless of \`${ownerField}\`.`,
+                fix
+            });
+            continue;
         }
 
-        if (owners.length === 0 || tenantScoped) return;
-        own.forEach((rule, index) => {
+        table.rls.rules.forEach((rule, index) => {
             if (!isUnfilteredRead(rule)) return;
             findings.push({
                 step: "rls",
                 check: "rls-unfiltered-read",
                 severity: "warning",
-                collection: slug,
-                file,
-                path: `${slug}.securityRules[${index}]`,
-                message: `"${slug}" has a \`${ownerField}\` column, and securityRules[${index}] lets ${describeRuleTarget(rule)} read every row of it with no row filter.`,
+                table: slug,
+                ...(file && { file }),
+                path: `${slug}.rls[${index}]`,
+                message: `"${slug}" has a \`${ownerField}\` column, and rls[${index}] lets ${describeRuleTarget(rule)} read every row of it with no row filter.`,
                 fix: `Filter the rule — \`ownerField: "${ownerField}"\` or a \`condition\` — or, if every row really is meant for ${describeRuleTarget(rule)}, keep it and ignore this warning.`
             });
         });
-    });
+    }
     return findings;
 }
 
@@ -462,7 +362,7 @@ export function pendingMigrations(
 
 async function checkMigrations(
     options: VerifyOptions,
-    loaded: LoadedCollections,
+    verified: VerifiedSchema,
     step: VerifyStep
 ): Promise<VerifyFinding[]> {
     const skip = (detail: string): VerifyFinding[] => {
@@ -487,12 +387,11 @@ async function checkMigrations(
     const { findUnmigratedSchema } = await import("@rebasepro/server-postgres");
     const findings: VerifyFinding[] = [];
     const fix = "Run `rebase db generate` to write the migration, then `rebase db migrate` to apply it.";
-    const fileBySlug = new Map(loaded.collections.map((c, i) => [c.slug, loaded.sources[i]]));
 
     let changes: ReturnType<typeof findUnmigratedSchema>;
     try {
         changes = findUnmigratedSchema(
-            loaded.collections,
+            verified.schema.compiled.collections,
             files.map(f => fs.readFileSync(path.join(migrationsDir, f), "utf-8"))
         );
     } catch (error) {
@@ -500,7 +399,7 @@ async function checkMigrations(
             step: "migrations",
             check: "migration-plan",
             severity: "error",
-            message: `Could not derive the schema from the collections: ${error instanceof Error ? error.message : String(error)}`,
+            message: `Could not derive the SQL schema from the tables: ${error instanceof Error ? error.message : String(error)}`,
             fix: "`rebase schema generate` reports the same problem with more context."
         }];
     }
@@ -508,18 +407,18 @@ async function checkMigrations(
     for (const change of changes) {
         const where = change.column ? `${change.table}.${change.column}` : change.table;
         const message = change.kind === "missing-table"
-            ? `Table ${where} is declared by the collections but no migration in ${relativeDir} creates it.`
+            ? `Table ${where} is declared in the schema but no migration in ${relativeDir} creates it.`
             : change.kind === "missing-column"
-                ? `Column ${where} is declared by the collections but no migration in ${relativeDir} adds it.`
-                : `Column ${where} is no longer declared by the collections, but the migrations in ${relativeDir} still create it.`;
-        const file = change.slug ? fileBySlug.get(change.slug) : undefined;
+                ? `Column ${where} is declared in the schema but no migration in ${relativeDir} adds it.`
+                : `Column ${where} is no longer declared in the schema, but the migrations in ${relativeDir} still create it.`;
+        const file = change.slug ? verified.files.get(change.slug) : undefined;
         findings.push({
             step: "migrations",
             check: change.kind === "removed-column" ? "migration-stale-column" : "migration-missing",
             severity: "error",
             message,
             fix,
-            ...(change.slug && { collection: change.slug }),
+            ...(change.slug && { table: change.slug }),
             ...(file && { file })
         });
     }
@@ -686,47 +585,48 @@ function settle(step: VerifyStep, findings: VerifyFinding[]): VerifyStep {
     step.status = mine.some(f => f.severity === "error") ? "failed" : mine.length > 0 ? "warnings" : "passed";
     return step;
 }
-
 /**
  * Run every step and return the report. Prints nothing and never exits, so a
  * caller — the command, a test — decides what to do with it.
  */
 export async function runVerify(options: VerifyOptions): Promise<VerifyReport> {
     const findings: VerifyFinding[] = [];
-    const steps: VerifyStep[] = (["config", "rls", "migrations", "live"] as const).map(id => ({
+    const steps: VerifyStep[] = (["schema", "rls", "migrations", "live"] as const).map(id => ({
         id,
         title: STEP_TITLES[id],
         status: "passed"
     }));
-    const [configStep, rlsStep, migrationsStep, liveStep] = steps;
-    const collectionsDir = path.relative(options.projectRoot, options.collectionsDir) || ".";
-
-    if (!fs.existsSync(options.collectionsDir) || !fs.statSync(options.collectionsDir).isDirectory()) {
+    const [schemaStep, rlsStep, migrationsStep, liveStep] = steps;
+    const schemaDir = path.relative(options.projectRoot, options.schemaDir) || ".";
+    const skipAll = (detail: string): VerifyReport => {
         for (const step of steps) {
             step.status = "skipped";
-            step.detail = `no collections directory at ${collectionsDir}`;
+            step.detail = detail;
         }
-        return { ok: true, collectionsDir, steps, findings, summary: { errors: 0, warnings: 0 } };
+        return { ok: true, schemaDir, steps, findings, summary: { errors: 0, warnings: 0 } };
+    };
+
+    // No schema is a project that declares no tables — its API is introspected
+    // from the database (a headless one). A skip, not a failure.
+    if (!fs.existsSync(options.schemaDir) || !fs.statSync(options.schemaDir).isDirectory()) {
+        return skipAll(`no schema directory at ${schemaDir}`);
     }
 
-    const loaded = await loadCollectionFiles(options.projectRoot, options.collectionsDir);
-    findings.push(...loaded.failures);
-
-    if (loaded.collections.length > 0) {
-        findings.push(...await checkConfig(loaded));
-    }
-    const counted = `${loaded.collections.length} collection${loaded.collections.length === 1 ? "" : "s"}`;
-    configStep.detail = `${counted}, unknown keys are errors`;
-    rlsStep.detail = counted;
-
-    // Directory defaults reach a collection the way the loader applies them, so
-    // the migration step plans the same policies the backend would.
-    if (loaded.defaults?.length) {
-        const { applyCollectionDefaults } = await import("@rebasepro/server");
-        applyCollectionDefaults(loaded.collections, { defaultSecurityRules: [...loaded.defaults] });
+    const { verified, failures } = await loadSchema(options);
+    findings.push(...failures);
+    if (verified && !verified.schema.loaded.indexFile) {
+        return skipAll(`${schemaDir} has no index.ts, so it declares no tables`);
     }
 
-    findings.push(...checkRls(loaded));
+    if (verified) {
+        const tables = verified.descriptors.length;
+        schemaStep.detail = `${tables} table${tables === 1 ? "" : "s"}, compiled as the backend boots them`;
+        rlsStep.detail = `${tables} table${tables === 1 ? "" : "s"}`;
+        findings.push(...checkRls(verified));
+    } else {
+        rlsStep.status = "skipped";
+        rlsStep.detail = "fix the table definitions first";
+    }
 
     // The database the live steps read, once it is known to answer. Under
     // `--live` a database that is missing or does not answer is an error: the
@@ -761,11 +661,11 @@ export async function runVerify(options: VerifyOptions): Promise<VerifyReport> {
         }
     }
 
-    if (findings.some(f => f.step === "config" && f.severity === "error")) {
+    if (!verified) {
         migrationsStep.status = "skipped";
-        migrationsStep.detail = "fix the collection config errors first";
+        migrationsStep.detail = "fix the table definitions first";
     } else {
-        findings.push(...await checkMigrations({ ...options, databaseUrl: liveUrl }, loaded, migrationsStep));
+        findings.push(...await checkMigrations({ ...options, databaseUrl: liveUrl }, verified, migrationsStep));
     }
 
     if (!options.live) {
@@ -779,7 +679,7 @@ export async function runVerify(options: VerifyOptions): Promise<VerifyReport> {
     const errors = findings.filter(f => f.severity === "error").length;
     return {
         ok: errors === 0,
-        collectionsDir,
+        schemaDir,
         steps,
         findings,
         summary: { errors, warnings: findings.length - errors }
@@ -809,7 +709,7 @@ export function printReport(report: VerifyReport, quiet: boolean): void {
     }
 
     console.log("");
-    console.log(`  ${chalk.bold("rebase verify")} ${chalk.gray(report.collectionsDir)}`);
+    console.log(`  ${chalk.bold("rebase verify")} ${chalk.gray(report.schemaDir)}`);
     console.log("");
     for (const step of report.steps) {
         const mark = step.status === "passed" ? chalk.green("✓")
@@ -830,7 +730,7 @@ export function printReport(report: VerifyReport, quiet: boolean): void {
 
 function printVerifyHelp(): void {
     console.log(`
-${chalk.bold("rebase verify")} — Check the collections are safe to ship
+${chalk.bold("rebase verify")} — Check the tables are safe to ship
 
 ${chalk.green.bold("Usage")}
   rebase verify [options]
@@ -839,8 +739,8 @@ ${chalk.green.bold("Options")}
 ${Object.entries(VERIFY_FLAG_HELP).map(([flag, help]) => `  ${chalk.blue(flag.padEnd(20))} ${help}`).join("\n")}
 
 ${chalk.green.bold("Steps")}
-  1. Collection config     every file loads and passes the boot validator, unknown keys as errors
-  2. RLS coverage          securityRules are declared, and owner/tenant columns are filtered on
+  1. Table definitions     backend/schema loads and compiles as the backend boots it
+  2. RLS coverage          owner and tenant columns are filtered on by the rules that read them
   3. Migration freshness   drizzle/migrations builds every declared table and column
   4. Live RLS audit        with --live: the rls-check catalogue against the project's database
 
@@ -901,6 +801,7 @@ export async function verifyCommand(rawArgs: string[]): Promise<void> {
         printVerifyHelp();
         return;
     }
+    refuseRemovedCollectionsFlag(rawArgs.slice(2), "verify");
     const { flags } = parseCommandArgs({
         spec: VERIFY_FLAGS,
         rawArgs,
@@ -911,18 +812,19 @@ export async function verifyCommand(rawArgs: string[]): Promise<void> {
 
     const projectRoot = requireProjectRoot();
     const backendDir = findBackendDir(projectRoot);
-    if (flags["--collections"]) {
-        // A mistyped `-c` used to skip every step and print "0 errors" with
+    const typedDir = flags["--schema-dir"];
+    if (typedDir) {
+        // A mistyped path used to skip every step and print "0 errors" with
         // exit 0 — a green CI run over nothing. Refused as `doctor` and
-        // `schema` refuse it. Without the flag, a project with no collections
+        // `schema` refuse it. Without the flag, a project with no schema
         // directory (a headless one) is still a skip, not a failure.
         const refusal = missingSchemaDir(rawArgs, process.cwd(), backendDir ?? projectRoot, "verify");
         if (refusal) {
             if (flags["--json"]) {
                 failAsJson(
-                    `Collections path not found: "${flags["--collections"]}" (resolved to ${path.resolve(process.cwd(), flags["--collections"])}).`,
-                    "collections_not_found",
-                    "Leave --collections out (config/collections is the default), or pass a directory that exists; relative paths are resolved from where you run the command."
+                    `Schema directory not found: "${typedDir}" (resolved to ${path.resolve(process.cwd(), typedDir)}).`,
+                    "schema_dir_not_found",
+                    "Leave --schema-dir out (backend/schema is the default), or pass a directory that exists; relative paths are resolved from where you run the command."
                 );
             }
             console.error("");
@@ -931,9 +833,7 @@ export async function verifyCommand(rawArgs: string[]): Promise<void> {
             process.exit(1);
         }
     }
-    const collectionsDir = flags["--collections"]
-        ? path.resolve(process.cwd(), flags["--collections"])
-        : resolveSchemaDir(projectRoot);
+    const schemaDir = typedDir ? path.resolve(process.cwd(), typedDir) : resolveSchemaDir(projectRoot);
     const live = flags["--live"] === true;
     const database = live
         ? await resolveLiveDatabase(projectRoot, rawArgs, {
@@ -945,7 +845,7 @@ export async function verifyCommand(rawArgs: string[]): Promise<void> {
 
     const report = await runVerify({
         projectRoot,
-        collectionsDir,
+        schemaDir,
         backendDir,
         live,
         ...database,
@@ -960,12 +860,3 @@ export async function verifyCommand(rawArgs: string[]): Promise<void> {
     if (!report.ok) process.exitCode = 1;
 }
 
-/**
- * The legacy collections loader's file filter: top-level `.ts`/`.js` modules
- * other than `index`, tests and declarations. Goes when this command reads
- * `backend/schema/index.ts` instead of scanning a collections directory.
- */
-function isLegacyCollectionFile(file: string): boolean {
-    return /\.(ts|js)$/.test(file) && !file.startsWith(".") && !file.includes(".test.")
-        && !file.endsWith(".d.ts") && file !== "index.ts" && file !== "index.js";
-}

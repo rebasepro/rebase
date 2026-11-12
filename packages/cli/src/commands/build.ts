@@ -3,7 +3,7 @@
  *
  * Builds the apps a repository declares in `rebase.json`.
  *
- * For a `backend` app this produces a **bundle** — compiled collections,
+ * For a `backend` app this produces a **bundle** — compiled tables,
  * functions and schema plus a manifest — which is the artifact the runtime
  * loads. For `static` and bundled `admin` apps it runs the declared build
  * command and reports where the output landed.
@@ -54,7 +54,7 @@ ${chalk.bold("Options")}
   --output, --out <dir>        Bundle output directory (default: ${DEFAULT_BUNDLE_DIR});
                                one app at a time
   --skip-type-check            Compile without type checking (faster; use for iteration only)
-  --skip-schema                Do not regenerate the database schema from collections
+  --skip-schema                Do not regenerate the database schema from the tables
   --no-static                  Do not fold the frontend into the backend bundle (each
                                static app still gets its own bundle)
   --skip-static-build          Fold the frontend as already built, without running its
@@ -297,7 +297,7 @@ export async function buildCommand(rawArgs: string[] = []): Promise<void> {
             // that failed to render rather than one that does not exist.
             const schemaVersion = result.manifest.schemaVersion;
             console.log(chalk.dim(
-                `    ${result.collectionCount} collection(s)${schemaVersion ? `, schema ${schemaVersion}` : ""}`
+                `    ${result.tableCount} table(s)${schemaVersion ? `, schema ${schemaVersion}` : ""}`
             ));
             /* Say what the bundle's cold start will be, at the one moment
                anyone is listening.

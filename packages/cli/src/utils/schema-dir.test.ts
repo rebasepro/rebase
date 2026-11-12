@@ -4,8 +4,8 @@
  * `rebase.json` may move the tables directory (`apps.<backend>.tables`). Under
  * the old layout the runtime, `rebase build` and `rebase generate view`
  * honoured the moved config package while `verify`, `doctor`, `generate-sdk`,
- * `console` and dev's regeneration read `config/collections` regardless — so
- * `rebase verify` passed over no collections at all. Every one of them asks
+ * `console` and dev's regeneration read the conventional directory regardless
+ * — so `rebase verify` passed over no tables at all. Every one of them asks
  * `resolveSchemaDir` now.
  */
 import fs from "fs";
@@ -16,6 +16,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resolveSchemaDir, resolveTablesDir, SCHEMA_DIR_FLAG, schemaDirArgs, schemaDirFlag } from "./schema-dir";
 import { doctorDriverArgs } from "../commands/doctor";
 import { runVerify, verifyCommand } from "../commands/verify";
+import { col, defineTable } from "@rebasepro/types";
+import { TYPES_SOURCE, writeTableModules } from "../../test/helpers/project";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = path.resolve(HERE, "..", "..");
@@ -65,7 +67,7 @@ describe("schemaDirArgs: the driver is told where they are", () => {
     it("names the declared directory, absolute, to every driver command that reads the schema", () => {
         manifest({ tables: "db/tables" });
         const dir = path.join(root, "db", "tables");
-        for (const line of [["db", "push"], ["db", "generate"], ["schema", "generate"], ["schema", "stale", "--fix"], ["doctor"], ["console", "-e", "1"]]) {
+        for (const line of [["db", "push"], ["db", "generate"], ["db", "migrate"], ["schema", "generate"], ["schema", "stale", "--fix"], ["doctor"], ["console", "-e", "1"]]) {
             expect(schemaDirArgs(root, line), line.join(" ")).toEqual(["--schema-dir", dir]);
         }
     });
@@ -73,7 +75,6 @@ describe("schemaDirArgs: the driver is told where they are", () => {
     it("adds nothing to a command that does not read it, or a line that names its own", () => {
         manifest({ tables: "db/tables" });
         expect(schemaDirArgs(root, ["db", "url"])).toEqual([]);
-        expect(schemaDirArgs(root, ["db", "migrate"])).toEqual([]);
         expect(schemaDirArgs(root, ["schema", "introspect"])).toEqual([]);
         expect(schemaDirArgs(root, ["db", "push", "--schema-dir", "/x"])).toEqual([]);
         expect(schemaDirArgs(root, ["schema", "generate", "--schema-dir=/x"])).toEqual([]);
@@ -95,15 +96,11 @@ describe("schemaDirArgs: the driver is told where they are", () => {
 
 describe("rebase verify in a project that moved its tables", () => {
     it("reads the declared directory by default instead of passing over none", async () => {
-        // verify still checks legacy collection files until it reads
-        // `backend/schema/index.ts`; what is asserted here is where it looks.
         manifest({ tables: "db/tables" });
-        fs.mkdirSync(path.join(root, "db", "tables"), { recursive: true });
-        fs.writeFileSync(path.join(root, "db", "tables", "notes.ts"), `export default {
-    slug: "notes", table: "notes", name: "Notes",
-    properties: { title: { type: "string", name: "Title", widget: "markdown" } }
-};
-`);
+        writeTableModules(path.join(root, "db", "tables"), [defineTable("notes", {
+            columns: { id: col.uuid().primaryKey(), title: col.text() },
+            rls: "admin-only"
+        })], undefined, TYPES_SOURCE);
         const stdout: string[] = [];
         vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => { stdout.push(args.map(String).join(" ")); });
         const cwd = process.cwd();
@@ -115,6 +112,8 @@ describe("rebase verify in a project that moved its tables", () => {
             process.exitCode = undefined;
         }
         const report = JSON.parse(stdout.join("\n")) as Awaited<ReturnType<typeof runVerify>>;
-        expect(report.collectionsDir).toBe(path.join("db", "tables"));
+        expect(report.schemaDir).toBe(path.join("db", "tables"));
+        expect(report.steps[0]).toMatchObject({ id: "schema", status: "passed" });
+        expect(report.steps[0].detail).toContain("1 table");
     });
 });

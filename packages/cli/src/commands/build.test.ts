@@ -23,7 +23,7 @@ vi.mock("../bundle", async (importOriginal) => {
         ...actual,
         buildBundle: vi.fn(async () => ({
             outDir: "/tmp/dist-bundle",
-            collectionCount: 0,
+            tableCount: 0,
             manifest: { schemaVersion: "v1",
 hooks: { native: false },
 deps: { declared: {} } },
@@ -176,7 +176,7 @@ describe("the build summary line", () => {
         manifest("managed");
         vi.mocked(buildBundle).mockResolvedValueOnce({
             outDir: path.join(projectRoot, "dist-bundle"),
-            collectionCount: 0,
+            tableCount: 0,
             manifest: {
                 bundleFormat: 2,
                 runtime: { range: "^1", builtAgainst: "1.4.2", contract: 1 },
@@ -193,19 +193,19 @@ describe("the build summary line", () => {
         });
         await buildCommand(["node", "rebase", "build"]);
         const printed = vi.mocked(console.log).mock.calls.map(c => String(c[0]));
-        return printed.find(line => line.includes("collection(s)")) ?? "";
+        return printed.find(line => line.includes("table(s)")) ?? "";
     }
 
     it("omits the schema clause for a headless build, rather than dangling", async () => {
         // A headless project's manifest carries `schemaVersion: ""` — its API is
         // introspected at boot — and the line interpolated it anyway, ending in
-        // `0 collection(s), schema ` with nothing after it. That reads as a
+        // `0 table(s), schema ` with nothing after it. That reads as a
         // value that failed to render.
-        expect(await summary("")).toMatchInlineSnapshot(`"    0 collection(s)"`);
+        expect(await summary("")).toMatchInlineSnapshot(`"    0 table(s)"`);
     });
 
     it("still names the schema when there is one", async () => {
-        expect(await summary("v1")).toMatchInlineSnapshot(`"    0 collection(s), schema v1"`);
+        expect(await summary("v1")).toMatchInlineSnapshot(`"    0 table(s), schema v1"`);
     });
 });
 

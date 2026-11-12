@@ -2,7 +2,7 @@
  * `rebase generate view <slug>` — scaffold a custom admin screen and register it.
  *
  * Most back-office screens are a table, a form or a board, and the admin draws
- * those from the collection. The rest — a dispatch board, a reconciliation
+ * those from the table. The rest — a dispatch board, a reconciliation
  * screen, a record's audit trail — are a hundred lines of React. Written inside
  * the admin they inherit the sign-in, the security rules, the sidebar, the UI
  * kit and the data layer; written as a separate app they have to rebuild every
@@ -15,11 +15,13 @@
  *   `<frontend>/src/views/index.ts` as an `AppView`, which `App.tsx` hands to
  *   `<RebaseCMS views>`. The first run wires `App.tsx`; later runs only append
  *   to the list.
- * - **A record tab** (`--collection <slug>`): the same file location, with a
- *   component that takes `EntityCustomViewParams`, added to that collection's
- *   `admin.entityViews` *by path*. The collection file is shared with the
- *   backend, and a path is the one form of component reference the backend
- *   never evaluates — the admin's Vite plugin turns it into a lazy import.
+ * - **A record tab** (`--collection <slug>`, the slug of a table in
+ *   `backend/schema`): the same file location, with a component that takes
+ *   `EntityCustomViewParams`, added to the `entityViews` of that table's
+ *   `customizeTable(…)` in `<frontend>/src/cms/` — imported directly, because
+ *   that directory is the admin's own code and the backend never reads it. A
+ *   table with no customization yet gets one, `<frontend>/src/cms/<slug>.tsx`,
+ *   listed in `cms/index.ts`'s `tableCustomizations` when there is one.
  *
  * The frontend is where `rebase.json` says the CMS is (the static app with a
  * `cms` mount), which is `frontend/` in everything `rebase init` writes. A
@@ -27,7 +29,7 @@
  * nowhere for a view to render.
  *
  * Edits to existing files are textual and conservative. When `App.tsx` already
- * passes its own `views`, or a collection's shape is not one this can read, the
+ * passes its own `views`, or a customization's shape is not one this can read, the
  * view file is still written and the command prints the one line to add by
  * hand instead of guessing.
  */
@@ -36,8 +38,10 @@ import path from "path";
 import { fileURLToPath } from "url";
 import chalk from "chalk";
 
+import { tableIdentifier } from "@rebasepro/common";
 import { cmsMountOf, loadManifest } from "../manifest";
 import { resolveSchemaDir } from "../utils/schema-dir";
+import { declaredTables } from "../utils/schema-text";
 import { requireProjectRoot } from "../utils/project";
 import { parseCommandArgs, UsageError, wantsHelp } from "../utils/args";
 
@@ -68,7 +72,7 @@ const RESERVED_SCREEN_SLUGS: readonly string[] = ["c", "s", "settings"];
 export interface GenerateViewOptions {
     projectRoot: string;
     slug: string;
-    /** Register as a tab on this collection's records instead of as a screen. */
+    /** Register as a tab on this table's records (its slug) instead of as a screen. */
     collection?: string;
     /** The label in the sidebar or on the tab. Defaults to the slug in sentence case. */
     name?: string;
@@ -304,14 +308,15 @@ export function resolveFrontendDir(projectRoot: string): string | undefined {
 /** The tables directory, as the backend app declares it — one resolver for every command. */
 export { resolveSchemaDir };
 
-function collectionFiles(dir: string): string[] {
+/** Every source file under the admin's `src/cms`, sorted: where table customizations live. */
+function customizationFiles(dir: string): string[] {
     if (!fs.existsSync(dir)) return [];
     const out: string[] = [];
     const entries = fs.readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name));
     for (const entry of entries) {
         const full = path.join(dir, entry.name);
         if (entry.isDirectory()) {
-            if (entry.name !== "node_modules" && entry.name !== "presets") out.push(...collectionFiles(full));
+            if (entry.name !== "node_modules") out.push(...customizationFiles(full));
         } else if (/\.tsx?$/.test(entry.name) && !/\.(test|spec|d)\.tsx?$/.test(entry.name)) {
             out.push(full);
         }
@@ -319,18 +324,21 @@ function collectionFiles(dir: string): string[] {
     return out;
 }
 
-const SLUG_PROPERTY = /(^|[\s,{])slug\s*:\s*(["'])([^"'\n]+)\2/g;
-
-/** Every `slug: "…"` a collection file declares, with where. */
-function declaredSlugs(dir: string): { slug: string; file: string; at: number }[] {
-    const found: { slug: string; file: string; at: number }[] = [];
-    for (const file of collectionFiles(dir)) {
+/**
+ * Every `customizeTable("<slug>", {` of a table, in code (not in a comment or
+ * a string): the file, and where the options object opens. Empty when no file
+ * under `cmsDir` customizes the table.
+ */
+function findCustomization(cmsDir: string, slug: string): { file: string; optionsOpen: number }[] {
+    const found: { file: string; optionsOpen: number }[] = [];
+    const call = /\bcustomizeTable\s*(?:<[^>]*>)?\(\s*(["'`])([^"'`\n]+)\1\s*,\s*\{/g;
+    for (const file of customizationFiles(cmsDir)) {
         const source = fs.readFileSync(file, "utf8");
         const masked = maskCode(source);
-        for (const match of source.matchAll(SLUG_PROPERTY)) {
-            const at = (match.index ?? 0) + match[1].length;
-            if (masked[at] !== "s") continue; // inside a comment or a string
-            found.push({ slug: match[3], file, at });
+        for (const match of source.matchAll(call)) {
+            const at = match.index ?? 0;
+            if (match[2] !== slug || masked[at] !== "c") continue;
+            found.push({ file, optionsOpen: at + match[0].length - 1 });
         }
     }
     return found;
@@ -363,6 +371,17 @@ function findCliRoot(from: string): string | null {
 }
 
 type ViewTemplateOptions = { slug: string; componentName: string; label: string; collection: string };
+
+/** The `{ key, name, Builder }` an entity view is registered as, with `unit` indentation inside. */
+function entityViewEntry(view: { key: string; name: string; componentName: string }, unit: string): string {
+    return [
+        "{",
+        `${unit}key: ${JSON.stringify(view.key)},`,
+        `${unit}name: ${JSON.stringify(view.name)},`,
+        `${unit}Builder: ${view.componentName}`,
+        "}"
+    ].join("\n");
+}
 
 /**
  * A label as JSX text: written as is when it is plain, as a string expression
@@ -457,7 +476,7 @@ function planCmsTypesDependency(frontendDir: string, files: PlannedFile[], manua
 }
 
 function defaultCollectionFor(projectRoot: string): string {
-    const slugs = declaredSlugs(resolveSchemaDir(projectRoot)).map(entry => entry.slug);
+    const slugs = declaredTables(resolveSchemaDir(projectRoot)).map(entry => entry.slug);
     return slugs.find(slug => slug !== "users") ?? slugs[0] ?? "users";
 }
 
@@ -505,42 +524,94 @@ export function planGenerateView(options: GenerateViewOptions): GenerateViewPlan
 
     if (options.collection) {
         const kind = "entity" as const;
-        const collectionsDir = resolveSchemaDir(projectRoot);
-        const declared = declaredSlugs(collectionsDir);
-        const matches = declared.filter(entry => entry.slug === options.collection);
-        if (matches.length === 0) {
+        const table = options.collection;
+        const schemaDir = resolveSchemaDir(projectRoot);
+        const declared = declaredTables(schemaDir);
+        if (!declared.some(entry => entry.slug === table)) {
             const known = [...new Set(declared.map(entry => entry.slug))].sort();
             throw new UsageError(
-                `No collection with slug "${options.collection}" under ${path.relative(projectRoot, collectionsDir) || "."}.` +
+                `No table with slug "${table}" under ${path.relative(projectRoot, schemaDir) || "."}.` +
                 (known.length ? ` Declared: ${known.join(", ")}.` : "")
             );
         }
-        if (matches.length > 1) {
+        const cmsDir = path.join(frontendDir, "src", "cms");
+        const customizations = findCustomization(cmsDir, table);
+        if (customizations.length > 1) {
             throw new UsageError(
-                `More than one collection declares slug "${options.collection}": ` +
-                `${matches.map(entry => path.relative(projectRoot, entry.file)).join(", ")}.`
+                `More than one customizeTable("${table}", …) under ${path.relative(projectRoot, cmsDir)}: ` +
+                `${[...new Set(customizations.map(entry => path.relative(projectRoot, entry.file)))].join(", ")}.`
             );
         }
-        const [{ file: collectionFile, at: slugAt }] = matches;
 
         files.push({
             path: viewFile,
-            contents: entityViewSource({ slug, componentName, label, collection: options.collection }),
+            contents: entityViewSource({ slug, componentName, label, collection: table }),
             action: viewAction
         });
 
-        const builder = relativeImport(path.dirname(collectionFile), viewFile);
-        const source = fs.readFileSync(collectionFile, "utf8");
-        const updated = registerEntityView(source, slugAt, { key: slug, name: label, builder });
-        const where = `${path.relative(projectRoot, collectionFile)}`;
-        if (updated === "already") {
-            // Registered on an earlier run: --force replaced the file only.
-        } else if (updated === undefined) {
-            manualSteps.push(
-                `Add this to admin.entityViews in ${where}: { key: ${JSON.stringify(slug)}, name: ${JSON.stringify(label)}, Builder: ${JSON.stringify(builder)} }`
-            );
+        const view = { key: slug, name: label, componentName };
+        if (customizations.length === 1) {
+            const [{ file, optionsOpen }] = customizations;
+            const importLine = `import { ${componentName} } from "${relativeImport(path.dirname(file), viewFile)}";`;
+            const source = fs.readFileSync(file, "utf8");
+            const updated = registerEntityView(source, optionsOpen, view);
+            const where = path.relative(projectRoot, file);
+            if (updated === "already") {
+                // Registered on an earlier run: --force replaced the file only.
+            } else if (updated === undefined) {
+                manualSteps.push(
+                    `Add this to the entityViews of customizeTable("${table}", …) in ${where}: ` +
+                    `{ key: ${JSON.stringify(slug)}, name: ${JSON.stringify(label)}, Builder: ${componentName} }, and ${importLine}`
+                );
+            } else {
+                files.push({ path: file, contents: addImport(updated, importLine), action: "update" });
+            }
         } else {
-            files.push({ path: collectionFile, contents: updated, action: "update" });
+            const identifier = `${tableIdentifier(table)}Cms`;
+            const file = path.join(cmsDir, `${table}.tsx`);
+            if (fs.existsSync(file)) {
+                throw new UsageError(
+                    `${path.relative(projectRoot, file)} exists but holds no customizeTable("${table}", …): ` +
+                    "add the record tab to the table's customization by hand, or move that file aside."
+                );
+            }
+            const unit = "    ";
+            files.push({
+                path: file,
+                contents: [
+                    "import { customizeTable } from \"@rebasepro/cms\";",
+                    `import { ${componentName} } from "${relativeImport(cmsDir, viewFile)}";`,
+                    "",
+                    `export const ${identifier} = customizeTable("${table}", {`,
+                    `${unit}entityViews: [`,
+                    reindent(entityViewEntry(view, unit), unit + unit),
+                    `${unit}]`,
+                    "});",
+                    ""
+                ].join("\n"),
+                action: "create"
+            });
+            // Handed to the admin where the project lists its customizations:
+            // a `tableCustomizations` list exported by `cms/index.ts`, else
+            // the one `App.tsx` passes to `<RebaseCMS>`.
+            const indexFile = path.join(cmsDir, "index.ts");
+            const appFile = path.join(frontendDir, "src", "App.tsx");
+            const index = readIfExists(indexFile);
+            const app = readIfExists(appFile);
+            const listedInIndex = index === undefined ? undefined : listCustomization(index, identifier, `./${table}`);
+            const listedInApp = listedInIndex === undefined && app !== undefined
+                ? listCustomization(app, identifier, `./cms/${table}`)
+                : undefined;
+            if (listedInIndex !== undefined) {
+                if (listedInIndex !== "already") files.push({ path: indexFile, contents: listedInIndex, action: "update" });
+            } else if (listedInApp !== undefined) {
+                if (listedInApp !== "already") files.push({ path: appFile, contents: listedInApp, action: "update" });
+            } else {
+                manualSteps.push(
+                    `Hand the customization to the admin: import { ${identifier} } from "./cms/${table}" and add it to ` +
+                    `<RebaseCMS tableCustomizations={[…]}> in ${path.relative(projectRoot, appFile)}.`
+                );
+            }
         }
         planCmsTypesDependency(frontendDir, files, manualSteps);
         return { kind, componentName, viewFile, files, manualSteps };
@@ -647,65 +718,75 @@ export function wireViewsIntoApp(source: string): string | "already" | undefined
 }
 
 /**
- * The collection file with a `{ key, name, Builder }` entry in the
- * `admin.entityViews` of the collection whose `slug:` is at `slugAt`;
- * `"already"` when that key is there; `undefined` when the shape cannot be read.
+ * The customization file with a `{ key, name, Builder }` entry in the
+ * `entityViews` of the `customizeTable(…)` options object whose `{` is at
+ * `optionsOpen`; `"already"` when that key is there; `undefined` when the
+ * shape cannot be read. The component's import is the caller's to add.
  *
  * Exported for its tests.
  */
 export function registerEntityView(
     source: string,
-    slugAt: number,
-    view: { key: string; name: string; builder: string }
+    optionsOpen: number,
+    view: { key: string; name: string; componentName: string }
 ): string | "already" | undefined {
     const masked = maskCode(source);
-    const collectionOpen = enclosingBrace(masked, slugAt);
-    if (collectionOpen === -1) return undefined;
+    const close = matchClose(masked, optionsOpen);
+    if (close === -1) return undefined;
     const unit = indentUnit(source);
-    const entry = [
-        "{",
-        `${unit}key: ${JSON.stringify(view.key)},`,
-        `${unit}name: ${JSON.stringify(view.name)},`,
-        `${unit}Builder: ${JSON.stringify(view.builder)}`,
-        "}"
-    ].join("\n");
+    const entry = entityViewEntry(view, unit);
 
-    const admin = directProperty(masked, collectionOpen, "admin", "{");
-    if (admin) {
-        const entityViews = directProperty(masked, admin.valueOpen, "entityViews", "[");
-        if (entityViews) {
-            const close = matchClose(masked, entityViews.valueOpen);
-            if (close === -1) return undefined;
-            const listed = source.slice(entityViews.valueOpen, close);
-            if (new RegExp(`key\\s*:\\s*["']${view.key}["']|["']${view.key}["']`).test(listed)) return "already";
-            const indent = indentAt(source, entityViews.keyAt) + unit;
-            return appendToArray(source, masked, entityViews.valueOpen, reindent(entry, indent));
-        }
-        // `entityViews` as the first property of `admin`.
-        const indent = indentAt(source, admin.keyAt) + unit;
-        const block = `${indent}entityViews: [\n${reindent(entry, indent + unit)}\n${indent}],`;
-        const adminClose = matchClose(masked, admin.valueOpen);
-        const empty = masked.slice(admin.valueOpen + 1, adminClose).trim() === "";
-        const insertAt = admin.valueOpen + 1;
-        return empty
-            ? `${source.slice(0, insertAt)}\n${block.replace(/,$/, "")}\n${indentAt(source, admin.keyAt)}${source.slice(adminClose)}`
-            : `${source.slice(0, insertAt)}\n${block}${source.slice(insertAt)}`;
+    const entityViews = directProperty(masked, optionsOpen, "entityViews", "[");
+    if (entityViews) {
+        const listClose = matchClose(masked, entityViews.valueOpen);
+        if (listClose === -1) return undefined;
+        const listed = source.slice(entityViews.valueOpen, listClose);
+        if (new RegExp(`key\\s*:\\s*["']${view.key}["']|["']${view.key}["']`).test(listed)) return "already";
+        const indent = indentAt(source, entityViews.keyAt) + unit;
+        return appendToArray(source, masked, entityViews.valueOpen, reindent(entry, indent));
     }
 
-    // No `admin` block: one, right after the `slug` property.
-    const slugLineEnd = source.indexOf("\n", slugAt);
-    if (slugLineEnd === -1) return undefined;
-    const slugLine = masked.slice(slugAt, slugLineEnd);
-    if (!/,\s*$/.test(slugLine)) return undefined;
-    const indent = indentAt(source, slugAt);
-    const block = [
-        `${indent}admin: {`,
-        `${indent}${unit}entityViews: [`,
-        reindent(entry, indent + unit + unit),
-        `${indent}${unit}]`,
-        `${indent}},`
-    ].join("\n");
-    return `${source.slice(0, slugLineEnd + 1)}${block}\n${source.slice(slugLineEnd + 1)}`;
+    // `entityViews` as the first property of the options.
+    const indent = indentAt(source, optionsOpen) + unit;
+    const block = `${indent}entityViews: [\n${reindent(entry, indent + unit)}\n${indent}]`;
+    const empty = masked.slice(optionsOpen + 1, close).trim() === "";
+    const insertAt = optionsOpen + 1;
+    return empty
+        ? `${source.slice(0, insertAt)}\n${block}\n${indentAt(source, optionsOpen)}${source.slice(close)}`
+        : `${source.slice(0, insertAt)}\n${block},${source.slice(insertAt)}`;
+}
+
+/**
+ * A source with `identifier` imported from `importPath` and appended to its
+ * list of table customizations — `export const tableCustomizations = [ … ]`
+ * (`cms/index.ts`) or `tableCustomizations={[ … ]}` on `<RebaseCMS>`
+ * (`App.tsx`); `"already"` when it is listed; `undefined` when the source has
+ * no such list.
+ *
+ * Exported for its tests.
+ */
+export function listCustomization(source: string, identifier: string, importPath: string): string | "already" | undefined {
+    const masked = maskCode(source);
+    const declaration = /export\s+const\s+tableCustomizations\b[^=]*=\s*\[/.exec(masked)
+        ?? /\btableCustomizations\s*=\s*\{\s*\[/.exec(masked);
+    if (!declaration) return undefined;
+    const open = declaration.index + declaration[0].length - 1;
+    const close = matchClose(masked, open);
+    if (close === -1) return undefined;
+    if (new RegExp(`\\b${identifier}\\b`).test(masked.slice(open, close))) return "already";
+    const inner = masked.slice(open + 1, close);
+    let appended: string;
+    if (inner.trim() !== "" && !inner.includes("\n")) {
+        // A list written on one line stays on one line.
+        let last = close - 1;
+        while (last > open && /\s/.test(masked[last])) last--;
+        const comma = masked[last] === "," ? " " : ", ";
+        appended = `${source.slice(0, last + 1)}${comma}${identifier}${source.slice(last + 1)}`;
+    } else {
+        const unit = indentUnit(source);
+        appended = appendToArray(source, masked, open, `${indentAt(source, open)}${unit}${identifier}`);
+    }
+    return addImport(appended, `import { ${identifier} } from "${importPath}";`);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -718,17 +799,17 @@ ${chalk.bold("rebase generate")} — scaffold code into this project
 
 ${chalk.bold("Usage")}
   rebase generate view <slug>                     A screen of the admin, in the sidebar
-  rebase generate view <slug> --collection <slug> A tab on every record of a collection
+  rebase generate view <slug> --collection <slug> A tab on every record of a table
 
 ${chalk.bold("What it writes")}
   <frontend>/src/views/<Name>View.tsx  The component, drawn with @rebasepro/ui
   <frontend>/src/views/index.ts        The screens list (AppView[]), wired into
                                        <RebaseCMS views> in App.tsx on first run
-  With --collection, the collection file instead gains an admin.entityViews
-  entry that points at the component by path.
+  With --collection, the table's customizeTable(…) in <frontend>/src/cms gains
+  an entityViews entry with the component (a new <slug>.tsx when it has none).
 
 ${chalk.bold("Options")}
-  --collection <slug>          Register as a record tab of this collection
+  --collection <slug>          Register as a record tab of the table with this slug
   --name <label>               Sidebar or tab label ${chalk.gray("(default: the slug in sentence case)")}
   --icon <Lucide name>         Sidebar icon for a screen ${chalk.gray("(default: LayoutDashboard)")}
   --dry-run                    List what would change, and change nothing

@@ -57,7 +57,7 @@ let stderr: string[];
 beforeEach(() => {
     scratch = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-console-"));
     fs.mkdirSync(path.join(scratch, "backend"), { recursive: true });
-    fs.mkdirSync(path.join(scratch, "config", "collections"), { recursive: true });
+    fs.mkdirSync(path.join(scratch, "backend", "schema"), { recursive: true });
     execaSpy.mockClear();
     prepareSpy.mockClear();
     stdout = [];
@@ -144,27 +144,34 @@ describe("rebase console", () => {
         expect(stdout.join("\n")).toContain("Using the managed development database.");
     });
 
-    it("resolves --collections from where the command was run, not from backend/", async () => {
+    it("resolves --schema-dir from where the command was run, not from backend/", async () => {
         const cwd = process.cwd();
         process.chdir(scratch);
         try {
-            await consoleCommand(["node", "rebase", "console", "--collections", "config/collections"]);
+            await consoleCommand(["node", "rebase", "console", "--schema-dir", "backend/schema"]);
         } finally {
             process.chdir(cwd);
         }
-        expect(spawned().args).toContain(fs.realpathSync(path.join(scratch, "config", "collections")));
+        expect(spawned().args).toContain(fs.realpathSync(path.join(scratch, "backend", "schema")));
     });
 
-    it("refuses a --collections path that is not there in its own terms, not db push's", async () => {
+    it("refuses --collections with the flag that replaced it, before anything starts", async () => {
+        await expect(consoleCommand(["node", "rebase", "console", "-c", "config/collections"]))
+            .rejects.toThrow(/-c was removed.*--schema-dir/s);
+        expect(prepareSpy).not.toHaveBeenCalled();
+        expect(execaSpy).not.toHaveBeenCalled();
+    });
+
+    it("refuses a --schema-dir path that is not there in its own terms, not db push's", async () => {
         vi.spyOn(process, "exit").mockImplementation((code?: string | number | null) => {
             throw new Error(`process.exit(${code})`);
         });
 
-        await expect(consoleCommand(["node", "rebase", "console", "--collections", path.join(scratch, "nope")]))
+        await expect(consoleCommand(["node", "rebase", "console", "--schema-dir", path.join(scratch, "nope")]))
             .rejects.toThrow("process.exit(1)");
 
         const said = stderr.join("\n");
-        expect(said).toContain("Collections path not found");
+        expect(said).toContain("Schema directory not found");
         expect(said).toContain("Nothing was started");
         expect(said).not.toContain("drop");
         expect(execaSpy).not.toHaveBeenCalled();
@@ -179,7 +186,7 @@ describe("rebase console", () => {
     it("--help prints every flag and touches nothing", async () => {
         await consoleCommand(["node", "rebase", "console", "--help"]);
         const help = stdout.join("\n");
-        for (const flag of ["--eval", "--collections", "--database-url", "--docker"]) expect(help).toContain(flag);
+        for (const flag of ["--eval", "--schema-dir", "--database-url", "--docker"]) expect(help).toContain(flag);
         expect(prepareSpy).not.toHaveBeenCalled();
         expect(execaSpy).not.toHaveBeenCalled();
     });

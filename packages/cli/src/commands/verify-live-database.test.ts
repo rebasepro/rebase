@@ -17,7 +17,9 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { col, defineTable } from "@rebasepro/types";
 import type { PrepareOptions, PreparedDatabase } from "../dev-db/prepare";
+import { scaffoldProject, TYPES_SOURCE } from "../../test/helpers/project";
 
 const prepareDatabaseEnv = vi.fn<(root: string, options?: PrepareOptions) => Promise<PreparedDatabase>>();
 
@@ -38,14 +40,15 @@ let stdout: string[];
 
 beforeEach(() => {
     root = fs.mkdtempSync(path.join(PACKAGE_ROOT, ".tmp-verify-live-"));
-    fs.writeFileSync(path.join(root, "rebase.json"), JSON.stringify({ apps: {} }));
-    fs.mkdirSync(path.join(root, "config", "collections"), { recursive: true });
-    fs.writeFileSync(path.join(root, "config", "collections", "notes.ts"), `export default {
-    slug: "notes", table: "notes", name: "Notes",
-    securityRules: [{ operation: "select", access: "public" }, { operations: ["insert", "update", "delete"], roles: ["admin"] }],
-    properties: { title: { type: "string", name: "Title" } }
-};
-`);
+    scaffoldProject({
+        root,
+        backendDependencies: false,
+        specifier: TYPES_SOURCE,
+        tables: [defineTable("notes", {
+            columns: { id: col.uuid().primaryKey(), title: col.text() },
+            rls: [{ operation: "select", access: "public" }, { operations: ["insert", "update", "delete"], roles: ["admin"] }]
+        })]
+    });
     cwd = process.cwd();
     process.chdir(root);
     stdout = [];

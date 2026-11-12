@@ -1,10 +1,9 @@
 /**
- * __LABEL__ — a tab on every record of the `__COLLECTION__` collection.
+ * __LABEL__ — a tab on every record of the `__COLLECTION__` table.
  *
  * Scaffolded by `rebase generate view __SLUG__ --collection __COLLECTION__` and
- * listed in that collection's `admin.entityViews` by path, so the backend,
- * which reads the same collection file, never loads this one. The admin
- * imports it lazily and renders the default export.
+ * listed in the `entityViews` of that table's `customizeTable(…)` under
+ * `src/cms`, which the admin bundles and the backend never reads.
  *
  * The admin hands the component `EntityCustomViewParams`: the collection, the
  * saved record as the server sends the row (`row`) and its id (`id`), both

@@ -326,7 +326,7 @@ function ensureBundleDependencies(projectRoot: string, bundleDir: string): void 
 
     // Later sources fill gaps left by earlier ones; the backend's tree wins
     // because it holds the server and driver the runtime itself needs.
-    const sources = ["backend/node_modules", "config/node_modules", "node_modules"]
+    const sources = ["backend/node_modules", "node_modules"]
         .map(relative => path.join(projectRoot, relative))
         .filter(dir => fs.existsSync(dir));
 

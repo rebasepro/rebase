@@ -3,7 +3,8 @@ import fs from "fs";
 import path from "path";
 import os from "os";
 import { generateSdkCommand } from "./generate_sdk";
-import { serializeCollections, type CollectionConfig } from "@rebasepro/types";
+import { col, defineTable, rel, type TableDescriptor } from "@rebasepro/types";
+import { compileTables } from "@rebasepro/common";
 
 /**
  * The `--from` path had no tests at all: the sibling suite mocks
@@ -16,24 +17,19 @@ import { serializeCollections, type CollectionConfig } from "@rebasepro/types";
  * generator, the real files that reach disk, and the schema stamp.
  */
 
-const authors: CollectionConfig = {
-    slug: "authors",
-    name: "Authors",
-    properties: {
-        id: { type: "number", isId: "increment" },
-        name: { type: "string", validation: { required: true } }
-    }
-};
+const authors = defineTable("authors", {
+    columns: { id: col.serial().primaryKey(), name: col.text().notNull() },
+    rls: "admin-only"
+});
 
-const posts: CollectionConfig = {
-    slug: "posts",
-    name: "Posts",
-    properties: {
-        id: { type: "string", isId: "uuid" },
-        title: { type: "string", validation: { required: true } },
-        author: { type: "relation", relation: { kind: "belongsTo", target: () => authors } }
-    }
-};
+const posts = defineTable("posts", {
+    columns: { id: col.uuid().primaryKey().defaultRandom(), title: col.text().notNull() },
+    relations: { author: rel.belongsTo(() => authors) },
+    rls: "admin-only"
+});
+
+/** What `GET /api/meta/contract` serves: the descriptors, as JSON. */
+const TABLES: TableDescriptor[] = JSON.parse(JSON.stringify(compileTables([posts, authors])));
 
 /** A JSON response, as the server answers. */
 function jsonResponse(body: unknown, status = 200): Response {
@@ -41,11 +37,7 @@ function jsonResponse(body: unknown, status = 200): Response {
 }
 
 function contractResponse(schemaVersion = "sha-from-server") {
-    return jsonResponse({
-        schemaVersion,
-        collections: serializeCollections([posts, authors]),
-        collectionSlugs: ["authors", "posts"]
-    });
+    return jsonResponse({ schemaVersion, runtime: { contract: 2 }, tables: TABLES });
 }
 
 describe("generate-sdk --from", () => {
@@ -65,7 +57,7 @@ describe("generate-sdk --from", () => {
     }
 
     const run = (from: string, extra: Record<string, unknown> = {}) => generateSdkCommand({
-        collectionsDir: path.join(tmpDir, "collections"),
+        schemaDir: path.join(tmpDir, "backend", "schema"),
         output: path.join(tmpDir, "out"),
         cwd: tmpDir,
         from,
@@ -254,10 +246,27 @@ describe("generate-sdk --from", () => {
             });
         });
 
-        it("refuses when the response carries no collections", async () => {
+        it("refuses when the response carries no tables", async () => {
             project();
             fetchMock.mockResolvedValue(jsonResponse({ schemaVersion: "x" }));
             await expect(run("https://api.acme.com")).rejects.toThrow("process.exit(1)");
+        });
+
+        it("names an older server, which answers with collections, and says what to do", async () => {
+            project();
+            fetchMock.mockResolvedValue(jsonResponse({ schemaVersion: "x", collections: [{ slug: "posts", properties: {} }] }));
+            await expect(run("https://api.acme.com")).rejects.toThrow("process.exit(1)");
+            const said = vi.mocked(console.log).mock.calls.map(call => call.map(String).join(" ")).join("\n");
+            expect(said).toContain("answers the contract with collections");
+            expect(said).toContain("Upgrade the server");
+        });
+
+        it("refuses an entry of tables that is not a table descriptor, naming it", async () => {
+            project();
+            fetchMock.mockResolvedValue(jsonResponse({ schemaVersion: "x", tables: [TABLES[0], { slug: "half" }] }));
+            await expect(run("https://api.acme.com")).rejects.toThrow("process.exit(1)");
+            const said = vi.mocked(console.log).mock.calls.map(call => call.map(String).join(" ")).join("\n");
+            expect(said).toContain("tables[1]");
         });
 
         it("refuses when the host is unreachable", async () => {
@@ -269,15 +278,13 @@ describe("generate-sdk --from", () => {
 
     it("refuses a schema that cannot produce a valid client, and writes nothing", async () => {
         // Two slugs collapsing onto one accessor. Emitting it would produce a
-        // file that does not compile — and a `collectionsDictionary` keeping
-        // only one of them, sending a collection's reads to the other's table.
+        // file that does not compile — and a dictionary keeping only one of
+        // them, sending a table's reads to the other's.
         project();
+        const note = (name: string) => defineTable(name, { columns: { id: col.uuid().primaryKey() }, rls: "admin-only" });
         fetchMock.mockResolvedValue(jsonResponse({
             schemaVersion: "x",
-            collections: serializeCollections([
-                { slug: "my-notes", name: "A", properties: {} },
-                { slug: "my_notes", name: "B", properties: {} }
-            ])
+            tables: JSON.parse(JSON.stringify(compileTables([note("my-notes"), note("my_notes")])))
         }));
 
         await expect(run("https://api.acme.com")).rejects.toThrow("process.exit(1)");
@@ -290,9 +297,9 @@ describe("generate-sdk --from", () => {
             await run("https://api.acme.com");
 
             const types = fs.readFileSync(path.join(tmpDir, "out", "database.types.ts"), "utf-8");
-            // The relation survives the serialize/deserialize round trip, so the
-            // foreign key is typed from the target's own primary key rather than
-            // degrading to `string | number`.
+            // The descriptor names the derived key column and the target, so
+            // the foreign key is typed from the target's own primary key rather
+            // than degrading to `string | number`.
             //
             // `authorId`, not `author_id`: a generated Row is keyed by what the
             // API answers, and the API is camelCase throughout. The column is
@@ -317,7 +324,7 @@ describe("generate-sdk --from", () => {
         });
 
         it("produces byte-identical output when run twice on the same schema", async () => {
-            // The command sorts collections precisely so a regeneration is not a
+            // The command sorts tables precisely so a regeneration is not a
             // diff. A generation timestamp used to defeat that, and with it any
             // `generate-sdk && git diff --exit-code` staleness gate.
             project();

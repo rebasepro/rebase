@@ -1,34 +1,33 @@
 /**
- * `rebase verify` — the checks an agent's collection edit is held to.
+ * `rebase verify` — the checks an agent's schema edit is held to.
  *
  * Each fixture is a project on disk, laid out as `rebase init` lays one out —
- * `config/collections/*.ts`, `backend/package.json`, `backend/drizzle/migrations`
+ * `backend/schema/*.ts`, `backend/package.json`, `backend/drizzle/migrations`
  * — because loading the files is half of what is under test: a verifier that
  * answered from a stale module cache, or from objects a test constructed in
- * memory, would pass here and miss the edit the hook ran for.
- *
- * The collection files are plain objects rather than `defineCollection(...)`
- * calls: the fixture lives outside any project's `node_modules`, and the
- * builder is an identity function at runtime, so nothing is lost.
+ * memory, would pass here and miss the edit the hook ran for. The schema files
+ * are printed by the shared fixture helper, as the codemod prints them.
  */
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { col, defineAuthTable, defineTable, rel, type AnyTableDef, type DefaultRls } from "@rebasepro/types";
 
 import { createRebaseApp, type TemplatePreset } from "./init";
 import { authRequiredFrom, pendingMigrations, runVerify, verifyCommand, type VerifyReport } from "./verify";
 import { compareMigrationVersions, migrationVersionOf } from "@rebasepro/server-postgres";
+import { scaffoldProject, workspaceModuleAliases, writeTableModules } from "../../test/helpers/project";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = path.resolve(HERE, "..", "..");
+const ALIASES = workspaceModuleAliases();
 
 let root: string;
 
 beforeEach(() => {
     root = fs.mkdtempSync(path.join(PACKAGE_ROOT, ".tmp-verify-"));
-    fs.writeFileSync(path.join(root, "rebase.json"), JSON.stringify({ apps: {} }));
-    fs.mkdirSync(path.join(root, "config", "collections"), { recursive: true });
+    scaffoldProject({ root, backendDependencies: false });
 });
 
 afterEach(() => {
@@ -36,204 +35,211 @@ afterEach(() => {
     fs.rmSync(root, { recursive: true, force: true });
 });
 
-function collectionFile(name: string, source: string): void {
-    fs.writeFileSync(path.join(root, "config", "collections", name), source);
+const SCHEMA = () => path.join(root, "backend", "schema");
+
+/** Write the project's schema: one module per table and the index. */
+function schema(tables: AnyTableDef[], defaultRls?: DefaultRls): void {
+    writeTableModules(SCHEMA(), tables, defaultRls);
 }
 
-/** A collection module, as an agent would write it, from the object literal's body. */
-function collection(body: string): string {
-    return `export default {\n${body}\n};\n`;
-}
+const PUBLIC_READ_ADMIN_WRITE = [
+    { operation: "select", access: "public" },
+    { operations: ["insert", "update", "delete"], roles: ["admin"] }
+] as const;
 
-const NOTES_RULES = `
-    securityRules: [
-        { operation: "select", access: "public" },
-        { operations: ["insert", "update", "delete"], roles: ["admin"] }
-    ],`;
+const notes = (columns: Parameters<typeof defineTable>[1]["columns"] = {
+    id: col.uuid().primaryKey().defaultRandom(),
+    title: col.text()
+}) => defineTable("notes", { columns, rls: PUBLIC_READ_ADMIN_WRITE });
 
 function verify(options: { backend?: boolean; live?: boolean } = {}): Promise<VerifyReport> {
     return runVerify({
         projectRoot: root,
-        collectionsDir: path.join(root, "config", "collections"),
+        schemaDir: SCHEMA(),
         backendDir: options.backend ? path.join(root, "backend") : null,
-        live: options.live ?? false
+        live: options.live ?? false,
+        moduleAliases: ALIASES
     });
 }
 
-describe("rebase verify: collection config", () => {
-    it("passes a well-formed collection", async () => {
-        collectionFile("notes.ts", collection(`
-    slug: "notes",
-    table: "notes",
-    name: "Notes",${NOTES_RULES}
-    properties: {
-        title: { type: "string", name: "Title", admin: { widget: "markdown" } }
-    }`));
+describe("rebase verify: table definitions", () => {
+    it("passes a well-formed table", async () => {
+        schema([notes()]);
         const report = await verify();
         expect(report.findings).toEqual([]);
         expect(report.ok).toBe(true);
+        expect(report.schemaDir).toBe(path.join("backend", "schema"));
         expect(report.steps.map(s => [s.id, s.status])).toEqual([
-            ["config", "passed"],
+            ["schema", "passed"],
             ["rls", "passed"],
             ["migrations", "skipped"],
             ["live", "skipped"]
         ]);
     });
 
-    it("catches a top-level `widget` that belongs in `admin.widget`", async () => {
-        collectionFile("notes.ts", collection(`
-    slug: "notes",
-    table: "notes",
-    name: "Notes",${NOTES_RULES}
-    properties: {
-        title: { type: "string", name: "Title", widget: "markdown" }
-    }`));
-        const report = await verify();
-        expect(report.ok).toBe(false);
-        const finding = report.findings.find(f => f.step === "config");
-        expect(finding).toMatchObject({
-            check: "config-key",
-            severity: "error",
-            collection: "notes",
-            file: path.join("config", "collections", "notes.ts"),
-            path: "notes.properties.title.widget"
+    it("reports every problem the backend would refuse to boot on, one finding each, naming the table and its file", async () => {
+        // `rls: "inherit"` with no `defaultRls`, and a relation to a table the
+        // index does not export: two problems, both the loader's.
+        const authors = defineTable("authors", { columns: { id: col.uuid().primaryKey() }, rls: "admin-only" });
+        const posts = defineTable("posts", {
+            columns: { id: col.uuid().primaryKey() },
+            relations: { author: rel.belongsTo(() => authors) },
+            rls: "inherit"
         });
-        // The message is the fix: an agent reading it knows where the key goes.
-        expect(finding?.message).toContain("admin");
-        expect(report.steps.find(s => s.id === "config")?.status).toBe("failed");
-    });
-
-    it("catches a property option that does not exist, naming the near miss", async () => {
-        collectionFile("notes.ts", collection(`
-    slug: "notes",
-    table: "notes",
-    name: "Notes",${NOTES_RULES}
-    properties: {
-        title: { type: "string", name: "Title", multilne: true }
-    }`));
+        schema([posts]);
+        fs.writeFileSync(path.join(SCHEMA(), "authors.ts"), [
+            "import { defineTable, col } from \"@rebasepro/server/schema\";",
+            "export const authors = defineTable(\"authors\", { columns: { id: col.uuid().primaryKey() }, rls: \"admin-only\" });",
+            ""
+        ].join("\n"));
+        void authors;
         const report = await verify();
         expect(report.ok).toBe(false);
-        const finding = report.findings.find(f => f.path === "notes.properties.title.multilne");
-        expect(finding?.severity).toBe("error");
+        const schemaFindings = report.findings.filter(f => f.step === "schema");
+        expect(schemaFindings.length).toBeGreaterThanOrEqual(1);
+        expect(schemaFindings.every(f => f.check === "schema-definition" && f.severity === "error")).toBe(true);
+        expect(schemaFindings.find(f => f.table === "authors")).toMatchObject({ file: path.join("backend", "schema", "authors.ts") });
+        expect(report.steps.find(s => s.id === "schema")?.status).toBe("failed");
+        // Nothing to check coverage or migrations on until the schema compiles.
+        expect(report.steps.find(s => s.id === "rls")).toMatchObject({ status: "skipped" });
+        expect(report.steps.find(s => s.id === "migrations")).toMatchObject({ status: "skipped" });
     });
 
-    it("reports a file that does not load instead of crashing", async () => {
-        collectionFile("broken.ts", "export default { slug: \"broken\", properties: { ");
+    it("reports a table with no rls as the boot refuses it", async () => {
+        fs.mkdirSync(SCHEMA(), { recursive: true });
+        fs.writeFileSync(path.join(SCHEMA(), "index.ts"), "export { tags } from \"./tags\";\n");
+        fs.writeFileSync(path.join(SCHEMA(), "tags.ts"), [
+            "import { defineTable, col } from \"@rebasepro/server/schema\";",
+            "export const tags = defineTable(\"tags\", { columns: { id: col.uuid().primaryKey() } });",
+            ""
+        ].join("\n"));
         const report = await verify();
         expect(report.ok).toBe(false);
-        expect(report.findings[0]).toMatchObject({ check: "config-load", file: path.join("config", "collections", "broken.ts") });
+        // `defineTable` refuses it as the module is evaluated, so it surfaces
+        // as the index failing to import, with the builder's sentence in it.
+        expect(report.findings).toEqual([expect.objectContaining({ step: "schema", check: "schema-load" })]);
+        expect(report.findings[0].message).toContain("has no usable `rls`");
+    });
+
+    it("reports a module that does not load instead of crashing", async () => {
+        schema([notes()]);
+        fs.writeFileSync(path.join(SCHEMA(), "broken.ts"), "export const broken = { columns: { ");
+        const report = await verify();
+        expect(report.ok).toBe(false);
+        expect(report.findings[0]).toMatchObject({ step: "schema", check: "schema-load", file: path.join("backend", "schema", "broken.ts") });
+    });
+
+    it("refuses a project still on the collections layout, naming the codemod", async () => {
+        schema([notes()]);
+        fs.mkdirSync(path.join(root, "config", "collections"), { recursive: true });
+        const report = await verify();
+        expect(report.ok).toBe(false);
+        expect(report.findings[0]).toMatchObject({ step: "schema", check: "schema-load" });
+        expect(report.findings[0].message).toContain("rebase migrate collections-to-tables");
+    });
+
+    it("skips every step for a project with no schema directory — its API is introspected", async () => {
+        const report = await verify();
+        expect(report.ok).toBe(true);
+        expect(report.steps.every(step => step.status === "skipped")).toBe(true);
+        expect(report.steps[0].detail).toContain("no schema directory");
     });
 });
 
 describe("rebase verify: RLS coverage", () => {
-    it("catches a collection with a tenant_id column and no securityRules", async () => {
-        collectionFile("invoices.ts", collection(`
-    slug: "invoices",
-    table: "invoices",
-    name: "Invoices",
-    properties: {
-        tenant_id: { type: "string", name: "Tenant" },
-        total: { type: "number", name: "Total" }
-    }`));
+    const tenants = defineTable("tenants", { columns: { id: col.uuid().primaryKey(), label: col.text() }, rls: "admin-only" });
+
+    it("fails a tenant_id table that inherits a read of every row from defaultRls", async () => {
+        // The leak this check exists for: a new tenant-scoped table that quietly
+        // inherits "everyone reads every row" from the index.
+        const invoices = defineTable("invoices", {
+            columns: { id: col.uuid().primaryKey(), tenantId: col.text(), total: col.integer() },
+            rls: "inherit"
+        });
+        schema([invoices], [{ operation: "select", access: "public" }]);
         const report = await verify();
         expect(report.ok).toBe(false);
         expect(report.findings).toEqual([expect.objectContaining({
             step: "rls",
-            check: "rls-missing",
+            check: "rls-inherited-tenant-read",
             severity: "error",
-            collection: "invoices",
-            file: path.join("config", "collections", "invoices.ts")
+            table: "invoices",
+            file: path.join("backend", "schema", "invoices.ts"),
+            path: "invoices.rls"
         })]);
         expect(report.findings[0].message).toContain("tenant_id");
+        expect(report.findings[0].message).toContain("defaultRls");
         expect(report.findings[0].fix).toContain("tenant");
     });
 
-    it("still catches it when the directory's defaults would make it public", async () => {
-        // The leak this check exists for: a new tenant-scoped table that quietly
-        // inherits "everyone reads every row" from index.ts.
-        collectionFile("index.ts", `export const defaultSecurityRules = [{ operation: "select", access: "public" }];\n`);
-        collectionFile("invoices.ts", collection(`
-    slug: "invoices",
-    table: "invoices",
-    name: "Invoices",
-    properties: {
-        tenantId: { type: "string", name: "Tenant" }
-    }`));
+    it("reads a belongsTo's derived column the way the compiler names it", async () => {
+        // `rel.belongsTo(() => tenants)` named `tenant` derives `tenant_id`,
+        // which no `columns` entry spells.
+        const invoices = defineTable("invoices", {
+            columns: { id: col.uuid().primaryKey() },
+            relations: { tenant: rel.belongsTo(() => tenants) },
+            rls: "inherit"
+        });
+        schema([tenants, invoices], [{ operation: "select", access: "public" }]);
         const report = await verify();
-        expect(report.findings.map(f => f.check)).toEqual(["rls-missing"]);
-        expect(report.findings[0].message).toContain("defaultSecurityRules");
-    });
-
-    it("reads a belongsTo's column the way the generator names it, from its relationName", async () => {
-        // `relationName: "tenant"` makes the column `tenant_id`, whatever the
-        // property is called. Derived from the key instead (`workspace_id`),
-        // the owner column was missed and the table passed as public.
-        collectionFile("index.ts", `export const defaultSecurityRules = [{ operation: "select", access: "public" }];\n`);
-        collectionFile("tenants.ts", collection(`
-    slug: "tenants",
-    table: "tenants",
-    name: "Tenants",
-    properties: { label: { type: "string", name: "Label" } }`));
-        collectionFile("invoices.ts", collection(`
-    slug: "invoices",
-    table: "invoices",
-    name: "Invoices",
-    properties: {
-        workspace: { type: "relation", name: "Workspace", relation: { kind: "belongsTo", target: () => ({ slug: "tenants" }), relationName: "tenant" } }
-    }`));
-        const report = await verify();
-        expect(report.findings.map(f => f.check)).toEqual(["rls-missing"]);
+        expect(report.findings.map(f => f.check)).toEqual(["rls-inherited-tenant-read"]);
         expect(report.findings[0].message).toContain("tenant_id");
     });
 
-    it("accepts a collection that inherits directory defaults and has no owner column", async () => {
-        collectionFile("index.ts", `export const defaultSecurityRules = [{ operation: "select", access: "public" }];\n`);
-        collectionFile("tags.ts", collection(`
-    slug: "tags",
-    table: "tags",
-    name: "Tags",
-    properties: { label: { type: "string", name: "Label" } }`));
+    it("accepts a tenant-scoped table: the tenant policy filters before any rule", async () => {
+        const invoices = defineTable("invoices", {
+            columns: { id: col.uuid().primaryKey(), tenantId: col.text() },
+            tenant: { field: "tenantId", from: { claim: "tenant_id" } },
+            rls: "inherit"
+        });
+        schema([invoices], [{ operation: "select", access: "public" }]);
+        expect((await verify()).findings).toEqual([]);
+    });
+
+    it("accepts a table that inherits defaultRls and has no owner column", async () => {
+        const tags = defineTable("tags", { columns: { id: col.uuid().primaryKey(), label: col.text() }, rls: "inherit" });
+        schema([tags], [{ operation: "select", access: "public" }]);
         expect((await verify()).ok).toBe(true);
     });
 
-    it("catches a collection with no rules and nothing to inherit", async () => {
-        collectionFile("tags.ts", collection(`
-    slug: "tags",
-    table: "tags",
-    name: "Tags",
-    properties: { label: { type: "string", name: "Label" } }`));
-        const report = await verify();
-        expect(report.findings.map(f => f.check)).toEqual(["rls-missing"]);
+    it("accepts an admin-only table with an owner column: the posture is said on purpose", async () => {
+        const orders = defineTable("orders", { columns: { id: col.uuid().primaryKey(), userId: col.text() }, rls: "admin-only" });
+        schema([orders]);
+        expect((await verify()).findings).toEqual([]);
     });
 
     it("warns, without failing, when a user_id table inherits a read of every row", async () => {
         // An author list or a public profile: often intended, so said, not failed.
-        collectionFile("index.ts", `export const defaultSecurityRules = [{ operation: "select", access: "public" }];\n`);
-        collectionFile("authors.ts", collection(`
-    slug: "authors",
-    table: "authors",
-    name: "Authors",
-    properties: { user_id: { type: "string", name: "User" } }`));
+        const authors = defineTable("authors", { columns: { id: col.uuid().primaryKey(), userId: col.text() }, rls: "inherit" });
+        schema([authors], [{ operation: "select", access: "public" }]);
         const report = await verify();
         expect(report.ok).toBe(true);
         expect(report.findings).toEqual([expect.objectContaining({ check: "rls-inherited-read", severity: "warning" })]);
     });
 
     it("warns when a role reads every row of a table with a user_id", async () => {
-        collectionFile("orders.ts", collection(`
-    slug: "orders",
-    table: "orders",
-    name: "Orders",
-    securityRules: [{ operation: "select", roles: ["support"] }, { operation: "all", ownerField: "user_id" }],
-    properties: { userId: { type: "string", name: "User" } }`));
+        const orders = defineTable("orders", {
+            columns: { id: col.uuid().primaryKey(), userId: col.text() },
+            rls: [{ operation: "select", roles: ["support"] }, { operation: "all", ownerField: "user_id" }]
+        });
+        schema([orders]);
         const report = await verify();
         // A warning: it may be intended, and it must not fail the hook.
         expect(report.ok).toBe(true);
         expect(report.findings).toEqual([expect.objectContaining({
             check: "rls-unfiltered-read",
             severity: "warning",
-            path: "orders.securityRules[0]"
+            path: "orders.rls[0]"
         })]);
+    });
+
+    it("leaves the auth table alone: the framework gives it a self-read and an admin write gate", async () => {
+        const users = defineAuthTable("users", {
+            columns: { id: col.uuid().primaryKey().defaultRandom(), ownerId: col.text() },
+            rls: [{ operation: "select", roles: ["support"] }]
+        });
+        schema([users]);
+        expect((await verify()).findings.filter(f => f.step === "rls")).toEqual([]);
     });
 });
 
@@ -248,18 +254,10 @@ describe("rebase verify: migration freshness", () => {
         for (const [file, sql] of Object.entries(migrations)) fs.writeFileSync(path.join(dir, file), sql);
     }
 
-    const NOTES = collection(`
-    slug: "notes",
-    table: "notes",
-    name: "Notes",${NOTES_RULES}
-    properties: {
-        id: { type: "string", name: "ID", isId: "uuid" },
-        title: { type: "string", name: "Title" },
-        body: { type: "string", name: "Body" }
-    }`);
+    const NOTES = () => notes({ id: col.uuid().primaryKey(), title: col.text(), body: col.text() });
 
-    it("names a column the collections declare and no migration adds", async () => {
-        collectionFile("notes.ts", NOTES);
+    it("names a column the schema declares and no migration adds", async () => {
+        schema([NOTES()]);
         postgresBackend({
             "20260101000000_init.sql": `CREATE TABLE "public"."notes" ("id" uuid NOT NULL, "title" text NULL, PRIMARY KEY ("id"));`
         });
@@ -268,15 +266,15 @@ describe("rebase verify: migration freshness", () => {
         expect(report.findings).toEqual([expect.objectContaining({
             step: "migrations",
             check: "migration-missing",
-            collection: "notes",
-            file: path.join("config", "collections", "notes.ts")
+            table: "notes",
+            file: path.join("backend", "schema", "notes.ts")
         })]);
         expect(report.findings[0].message).toContain("public.notes.body");
         expect(report.findings[0].fix).toContain("rebase db generate");
     });
 
     it("passes when the migrations build every declared column", async () => {
-        collectionFile("notes.ts", NOTES);
+        schema([NOTES()]);
         postgresBackend({
             "20260101000000_init.sql": `CREATE TABLE "public"."notes" ("id" uuid NOT NULL, "title" text NULL, PRIMARY KEY ("id"));`,
             "20260102000000_body.sql": `ALTER TABLE "public"."notes" ADD COLUMN "body" text NULL;`
@@ -287,7 +285,7 @@ describe("rebase verify: migration freshness", () => {
     });
 
     it("is skipped, not failed, for a project that has no migrations yet", async () => {
-        collectionFile("notes.ts", NOTES);
+        schema([NOTES()]);
         postgresBackend({});
         const report = await verify({ backend: true });
         expect(report.ok).toBe(true);
@@ -335,19 +333,14 @@ describe("rebase verify --live: whether the API requires a token", () => {
 });
 
 describe("rebase verify --live", () => {
-    const NOTES = collection(`
-    slug: "notes",
-    table: "notes",
-    name: "Notes",${NOTES_RULES}
-    properties: { title: { type: "string", name: "Title" } }`);
-
     it("fails, rather than skipping the audit, when the database does not answer", async () => {
-        collectionFile("notes.ts", NOTES);
+        schema([notes()]);
         const report = await runVerify({
             projectRoot: root,
-            collectionsDir: path.join(root, "config", "collections"),
+            schemaDir: SCHEMA(),
             backendDir: null,
             live: true,
+            moduleAliases: ALIASES,
             // Port 1 on loopback: nothing listens, the connection is refused at once.
             databaseUrl: "postgresql://nobody:nothing@127.0.0.1:1/none"
         });
@@ -357,60 +350,14 @@ describe("rebase verify --live", () => {
     });
 
     it("fails when it was asked to audit and no database is configured", async () => {
-        collectionFile("notes.ts", NOTES);
+        schema([notes()]);
         const report = await verify({ live: true });
         expect(report.ok).toBe(false);
         expect(report.findings.map(f => f.check)).toEqual(["live-no-database"]);
     });
 });
 
-describe("rebase verify --json", () => {
-    let cwd: string;
-    let stdout: string[];
-
-    beforeEach(() => {
-        cwd = process.cwd();
-        stdout = [];
-        vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
-            stdout.push(args.map(String).join(" "));
-        });
-    });
-
-    afterEach(() => {
-        process.chdir(cwd);
-        process.exitCode = undefined;
-    });
-
-    it("prints one parseable object and sets a failing exit code", async () => {
-        collectionFile("invoices.ts", collection(`
-    slug: "invoices",
-    table: "invoices",
-    name: "Invoices",
-    properties: { tenant_id: { type: "string", name: "Tenant", widget: "select" } }`));
-        process.chdir(root);
-        await verifyCommand(["node", "rebase", "verify", "--json"]);
-
-        const report = JSON.parse(stdout.join("\n")) as VerifyReport;
-        expect(report.ok).toBe(false);
-        expect(report.summary.errors).toBe(2);
-        expect(report.findings.map(f => f.check).sort()).toEqual(["config-key", "rls-missing"]);
-        expect(process.exitCode).toBe(1);
-    });
-
-    it("--quiet prints nothing when everything passes", async () => {
-        collectionFile("notes.ts", collection(`
-    slug: "notes",
-    table: "notes",
-    name: "Notes",${NOTES_RULES}
-    properties: { title: { type: "string", name: "Title" } }`));
-        process.chdir(root);
-        await verifyCommand(["node", "rebase", "verify", "--quiet"]);
-        expect(stdout).toEqual([]);
-        expect(process.exitCode).toBeUndefined();
-    });
-});
-
-describe("rebase verify --collections", () => {
+describe("rebase verify, the command", () => {
     let cwd: string;
     let stdout: string[];
     let stderr: string[];
@@ -431,39 +378,55 @@ describe("rebase verify --collections", () => {
         process.exitCode = undefined;
     });
 
-    it("refuses a mistyped path instead of passing every step over nothing", async () => {
+    // A project with no schema directory: what the command can run without
+    // importing anything (the in-process import of a schema is covered above,
+    // through `runVerify` with workspace aliases).
+    it("--json prints one parseable object", async () => {
         process.chdir(root);
-        await expect(verifyCommand(["node", "rebase", "verify", "-c", "config/colections"])).rejects.toThrow("exit 1");
-        expect(stderr.join("\n")).toContain('Collections path not found: "config/colections"');
+        await verifyCommand(["node", "rebase", "verify", "--json"]);
+        const report = JSON.parse(stdout.join("\n")) as VerifyReport;
+        expect(report.ok).toBe(true);
+        expect(report.schemaDir).toBe(path.join("backend", "schema"));
+        expect(process.exitCode).toBeUndefined();
+    });
+
+    it("--quiet prints nothing when everything passes", async () => {
+        process.chdir(root);
+        await verifyCommand(["node", "rebase", "verify", "--quiet"]);
+        expect(stdout).toEqual([]);
+        expect(process.exitCode).toBeUndefined();
+    });
+
+    it("refuses a mistyped --schema-dir instead of passing every step over nothing", async () => {
+        process.chdir(root);
+        await expect(verifyCommand(["node", "rebase", "verify", "--schema-dir", "backend/shcema"])).rejects.toThrow("exit 1");
+        expect(stderr.join("\n")).toContain('Schema directory not found: "backend/shcema"');
         expect(stdout.join("\n")).not.toContain("0 errors");
     });
 
     it("refuses it with a JSON envelope under --json", async () => {
         process.chdir(root);
-        await expect(verifyCommand(["node", "rebase", "verify", "--json", "--collections", "nope"])).rejects.toThrow("exit 1");
+        await expect(verifyCommand(["node", "rebase", "verify", "--json", "--schema-dir", "nope"])).rejects.toThrow("exit 1");
         const envelope = JSON.parse(stdout.join("\n")) as { error: { code: string; message: string } };
-        expect(envelope.error.code).toBe("collections_not_found");
+        expect(envelope.error.code).toBe("schema_dir_not_found");
         expect(envelope.error.message).toContain("nope");
     });
+
+    it.each([["--collections", "config/collections"], ["-c", "config/collections"], ["--collections=x"]])(
+        "names --schema-dir when %s is typed, and runs nothing",
+        async (...typed) => {
+            process.chdir(root);
+            await expect(verifyCommand(["node", "rebase", "verify", ...typed])).rejects.toThrow(/was removed.*--schema-dir/s);
+            expect(stdout).toEqual([]);
+        }
+    );
 });
 
 describe("a fresh scaffold", () => {
     /**
      * Every preset `rebase init` writes must pass its own verifier — otherwise
      * the hook it ships complains about the scaffold on the agent's first edit.
-     *
-     * The scaffold's collection files import `defineCollection` from
-     * `@rebasepro/cms-types`, which a scaffold only has once installed; a
-     * stand-in package with the same identity builder takes its place, as the
-     * loader resolves imports from the project's own `node_modules`.
      */
-    function stubCmsTypes(projectDir: string): void {
-        const pkg = path.join(projectDir, "node_modules", "@rebasepro", "cms-types");
-        fs.mkdirSync(pkg, { recursive: true });
-        fs.writeFileSync(path.join(pkg, "package.json"), JSON.stringify({ name: "@rebasepro/cms-types", type: "module", main: "index.js" }));
-        fs.writeFileSync(path.join(pkg, "index.js"), "export const defineCollection = (collection) => collection;\n");
-    }
-
     it.each<TemplatePreset>(["blog", "ecommerce", "blank"])("of the %s preset passes rebase verify and ships the hook", async (preset) => {
         vi.stubEnv("REBASE_E2E", "1");
         vi.spyOn(console, "log").mockImplementation(() => undefined);
@@ -474,13 +437,13 @@ describe("a fresh scaffold", () => {
         } finally {
             vi.unstubAllEnvs();
         }
-        stubCmsTypes(project);
 
         const report = await runVerify({
             projectRoot: project,
-            collectionsDir: path.join(project, "config", "collections"),
+            schemaDir: path.join(project, "backend", "schema"),
             backendDir: path.join(project, "backend"),
-            live: false
+            live: false,
+            moduleAliases: ALIASES
         });
         expect(report.findings).toEqual([]);
         expect(report.ok).toBe(true);

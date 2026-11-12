@@ -1,5 +1,5 @@
 {
-    "$generated": "Generated from config by `rebase resources`. Edit the declarations, not this file.",
+    "$generated": "Generated from backend/resources.ts and backend/schema by `rebase resources`. Edit the declarations, not this file.",
     "version": 1,
     "resources": [
         {
@@ -8,10 +8,10 @@
             "engine": "postgres",
             "transport": "server",
             "usedBy": [
-                "collection:categories",
-                "collection:orders",
-                "collection:products",
-                "collection:users"
+                "table:categories",
+                "table:orders",
+                "table:products",
+                "table:users"
             ]
         },
         {

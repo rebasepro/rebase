@@ -10,7 +10,8 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import fs from "fs";
 import os from "os";
 import path from "path";
-import { findLibpqUrlProblems, hasDeclaredCollections } from "./doctor.js";
+import { declaredTableSlugs } from "../utils/schema-text";
+import { findLibpqUrlProblems, hasDeclaredTables } from "./doctor.js";
 
 const BROKEN = "postgresql://rebase_app:pw@127.0.0.1:5435/rebase?options=-c%20search_path=public&sslmode=disable";
 const FIXED = "postgresql://rebase_app:pw@127.0.0.1:5435/rebase?options=-c%20search_path%3Dpublic&sslmode=disable";
@@ -92,7 +93,7 @@ describe("findLibpqUrlProblems", () => {
     });
 });
 
-describe("hasDeclaredCollections", () => {
+describe("hasDeclaredTables", () => {
     const manifest = {
         $schema: "https://rebase.pro/schemas/rebase.json",
         rebase: "^1",
@@ -100,22 +101,37 @@ describe("hasDeclaredCollections", () => {
     };
 
     it("is false for a headless project, which is why doctor stops before the driver", () => {
-        // The driver's doctor opens by loading collections and exits 1 on none,
+        // The driver's doctor opens by loading the tables and exits 1 on none,
         // so `rebase doctor` failed on the documented headless path while every
         // check above it had just passed. All three of its phases compare
-        // *against* declared collections; there is nothing here for them to do.
+        // *against* declared tables; there is nothing here for them to do.
         fs.writeFileSync(path.join(root, "rebase.json"), JSON.stringify(manifest));
-        fs.mkdirSync(path.join(root, "config"), { recursive: true });
-        expect(hasDeclaredCollections(root)).toBe(false);
+        fs.mkdirSync(path.join(root, "backend", "schema"), { recursive: true });
+        expect(hasDeclaredTables(root)).toBe(false);
     });
 
-    it("is true when the collections are there", () => {
+    it("is true when the schema directory has an index", () => {
         fs.writeFileSync(path.join(root, "rebase.json"), JSON.stringify(manifest));
-        fs.mkdirSync(path.join(root, "config", "collections"), { recursive: true });
-        expect(hasDeclaredCollections(root)).toBe(true);
+        fs.mkdirSync(path.join(root, "backend", "schema"), { recursive: true });
+        fs.writeFileSync(path.join(root, "backend", "schema", "index.ts"), "export {};\n");
+        expect(hasDeclaredTables(root)).toBe(true);
     });
 
     it("is true for a project it cannot read, so the drift report is never skipped silently", () => {
-        expect(hasDeclaredCollections(root)).toBe(true);
+        expect(hasDeclaredTables(root)).toBe(true);
+    });
+});
+
+describe("declaredTableSlugs: the slugs a schema file declares, read as text", () => {
+    it("is each definition's name, or the slug: it overrides it with", () => {
+        expect(declaredTableSlugs([
+            'export const posts = defineTable("posts", { columns: {}, rls: "admin-only" });',
+            'export const users = defineAuthTable<Shape>("users", { slug: "people", columns: {} });',
+            "export const recent = defineView('recent_posts', { query: 'select 1' });"
+        ].join("\n"))).toEqual(["posts", "people", "recent_posts"]);
+    });
+
+    it("does not lend one definition's slug to the next", () => {
+        expect(declaredTableSlugs('defineTable("a", { slug: "x" });\ndefineTable("b", {});')).toEqual(["x", "b"]);
     });
 });

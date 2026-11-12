@@ -20,17 +20,19 @@ import { argsFromCommand } from "../utils/command-words";
 import { unknownCommand } from "../utils/unknown-command";
 import { DEV_DATABASE_KIND_ENV, devDatabaseKind, managedNotices, prepareDatabaseEnv } from "../dev-db/prepare";
 import { absolutizeLocalPathArgs } from "./db";
-import { SCHEMA_DIR_FLAG_HELP, refuseMissingSchemaDir } from "../utils/path-flags";
+import { SCHEMA_DIR_FLAG_HELP, refuseMissingSchemaDir, refuseRemovedCollectionsFlag } from "../utils/path-flags";
 import { schemaDirArgs } from "../utils/schema-dir";
 import { RECONCILE_USAGE } from "./schema-reconcile";
 
 /**
  * The line handed to the driver, its paths resolved from where the command was
  * run (the driver runs in `backend/`). `--schema` is left alone: on
- * `introspect` it names a Postgres schema, not a file.
+ * `introspect` it names a Postgres schema, not a file. `--collections` / `-c`
+ * survive only on `introspect`, where the driver still names its output
+ * directory that way until introspection writes tables.
  */
 export function schemaDriverArgs(rawArgs: string[], cwd: string): string[] {
-    return absolutizeLocalPathArgs(argsFromCommand(rawArgs, "schema"), cwd, ["--collections", "-c", "--output", "-o", "--out"]);
+    return absolutizeLocalPathArgs(argsFromCommand(rawArgs, "schema"), cwd, ["--schema-dir", "--collections", "-c", "--output", "-o", "--out"]);
 }
 
 export async function schemaCommand(subcommand: string | undefined, rawArgs: string[]): Promise<void> {
@@ -61,6 +63,10 @@ export async function schemaCommand(subcommand: string | undefined, rawArgs: str
     if (!SCHEMA_ACTION_HELP[subcommand]) {
         unknownCommand(subcommand, Object.keys(SCHEMA_ACTION_HELP), "schema");
     }
+
+    // `introspect` still takes `--collections` (its output directory); the
+    // commands that read the schema do not. Before anything else runs.
+    if (subcommand !== "introspect") refuseRemovedCollectionsFlag(rawArgs.slice(2), `schema ${subcommand}`);
 
     const projectRoot = requireProjectRoot();
 
@@ -99,8 +105,8 @@ export async function schemaCommand(subcommand: string | undefined, rawArgs: str
     }
     // Which database this project is on, so the driver's closing line does not
     // recommend a command that database refuses. A pure decision — nothing is
-    // started, which matters here above all: `schema generate` reads collection
-    // files and writes one file, and booting a database to run it would be a
+    // started, which matters here above all: `schema generate` reads the
+    // schema directory and writes one file, and booting a database to run it would be a
     // side effect nobody asked for.
     env[DEV_DATABASE_KIND_ENV] = devDatabaseKind(projectRoot) ?? "";
 
@@ -151,15 +157,17 @@ export async function schemaCommand(subcommand: string | undefined, rawArgs: str
 /** One page per subcommand, so `rebase schema <action> --help` says something. */
 const SCHEMA_ACTION_HELP: Record<string, { usage: string; summary: string; notes?: string[] }> = {
     generate: {
-        usage: "rebase schema generate [--collections <dir>] [--output <file>] [--watch]",
-        summary: "Generate the Drizzle schema from the collection definitions.",
-        notes: ["--watch regenerates on every change to a collection file."]
+        usage: "rebase schema generate [--schema-dir <dir>] [--output <file>] [--watch]",
+        summary: "Generate the Drizzle schema from the tables in backend/schema.",
+        notes: ["--watch regenerates on every change to a schema file.", `--schema-dir <dir>: ${SCHEMA_DIR_FLAG_HELP}.`]
     },
     introspect: {
         usage: "rebase schema introspect [--collections <dir>] [--output <dir>] [--schema <name>] [--force] [--data-inference | --no-data-inference]",
         summary: "Read an existing database and write Rebase collection definitions from it.",
         notes: [
             "--force overwrites collection files that are already there.",
+            "Introspection still writes collection files (config/collections, or --collections <dir>); it moves to "
+                + "backend/schema tables in a later release — until then, run `rebase migrate collections-to-tables` on its output.",
             "--data-inference samples up to 100 rows per table to detect formats, constraints and UI settings; "
                 + "--no-data-inference reads the structure only. Without either it asks, and without a terminal "
                 + "it reads the structure only.",
@@ -169,7 +177,7 @@ const SCHEMA_ACTION_HELP: Record<string, { usage: string; summary: string; notes
     },
     reconcile: {
         usage: RECONCILE_USAGE,
-        summary: "Relax and drop what boot will not: NOT NULL on properties made optional, and columns no property declares.",
+        summary: "Relax and drop what boot will not: NOT NULL on columns made nullable, and columns no table declares.",
         notes: [
             "Plans on the running backend (the one `.env` and the cloud link point at), prints the plan, and applies it once you type yes.",
             "A column is dropped only when named: --drop voice_cache.wav. Each drop shows how many rows hold a value.",
@@ -177,8 +185,8 @@ const SCHEMA_ACTION_HELP: Record<string, { usage: string; summary: string; notes
         ]
     },
     stale: {
-        usage: "rebase schema stale [--collections <dir>] [--output <file>] [--fix]",
-        summary: "Report generated schema files that no longer match the collections.",
+        usage: "rebase schema stale [--schema-dir <dir>] [--output <file>] [--fix]",
+        summary: "Report generated schema files that no longer match the tables.",
         notes: ["--fix regenerates them instead of only reporting."]
     }
 };
@@ -210,18 +218,19 @@ ${chalk.green.bold("Usage")}
 
 ${chalk.green.bold("Commands")}
   ${chalk.gray("(Commands are provided by your active database driver plugin)")}
-  ${chalk.blue.bold("generate")}    Generate Schema from collection definitions
+  ${chalk.blue.bold("generate")}    Generate the Drizzle schema from the tables in backend/schema
   ${chalk.blue.bold("introspect")}  Introspect an existing database to generate collection definitions
-  ${chalk.blue.bold("stale")}       Report generated schema files that no longer match the collections
-  ${chalk.blue.bold("reconcile")}   Relax NOT NULL and drop columns the collections no longer declare, after review
+  ${chalk.blue.bold("stale")}       Report generated schema files that no longer match the tables
+  ${chalk.blue.bold("reconcile")}   Relax NOT NULL and drop columns the tables no longer declare, after review
 
-${chalk.green.bold("generate Options")}
-  ${chalk.blue("--collections, -c")}  ${SCHEMA_DIR_FLAG_HELP}
+${chalk.green.bold("generate / stale Options")}
+  ${chalk.blue("--schema-dir")}       ${SCHEMA_DIR_FLAG_HELP}
   ${chalk.blue("--output, -o")}       Output path for generated schema
   ${chalk.blue("--watch, -w")}        Watch for changes and regenerate automatically
 
 ${chalk.green.bold("introspect Options")}
   ${chalk.blue("--output, -o")}       Output directory for generated collection files
+  ${chalk.blue("--collections, -c")}  The same, under its older name ${chalk.gray("(introspect only)")}
   ${chalk.blue("--schema")}           Postgres schema to read (default: public)
   ${chalk.blue("--force, -f")}        Overwrite collection files that already exist
   ${chalk.blue("--database-url")}     Read this database instead of the project's own

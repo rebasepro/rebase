@@ -47,7 +47,9 @@ describe("what rebase doctor tells the driver about its database", () => {
     beforeEach(() => {
         state.root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "rebase-doctor-source-")));
         fs.mkdirSync(path.join(state.root, "backend"));
-        fs.mkdirSync(path.join(state.root, "config", "collections"), { recursive: true });
+        // Tables declared in code: doctor hands its drift phases to the driver.
+        fs.mkdirSync(path.join(state.root, "backend", "schema"), { recursive: true });
+        fs.writeFileSync(path.join(state.root, "backend", "schema", "index.ts"), "export {};\n");
         fs.writeFileSync(path.join(state.root, "package.json"), JSON.stringify({ name: "app", private: true }));
         fs.writeFileSync(path.join(state.root, "backend", "package.json"),
             JSON.stringify({ name: "backend", dependencies: { "@rebasepro/server-postgres": "0.22.0" } }));

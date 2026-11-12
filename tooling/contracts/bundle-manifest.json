@@ -17,7 +17,7 @@
     "crons": "backend/crons",
     "schema": "backend/src/schema.generated.js"
   },
-  "collections": [
+  "tables": [
     "events",
     "posts"
   ],
@@ -46,7 +46,7 @@
           "account": "minio"
         },
         "usedBy": [
-          "property:posts.cover"
+          "column:posts.cover"
         ]
       },
       {
@@ -77,7 +77,7 @@
         "transport": "server",
         "options": {},
         "usedBy": [
-          "collection:events"
+          "table:events"
         ]
       },
       {

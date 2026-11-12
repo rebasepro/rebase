@@ -17,7 +17,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { PreparedDatabase } from "../dev-db/prepare";
 
-/** A watcher that never fires: the collections watcher would outlive the test. */
+/** A watcher that never fires: the schema watcher would outlive the test. */
 class StubWatcher extends EventEmitter implements fs.FSWatcher {
     close(): void {
         // Nothing is being watched.
@@ -169,8 +169,10 @@ beforeEach(() => {
     fs.mkdirSync(path.join(scratch, "backend", "src"), { recursive: true });
     // An ejected entry, so the stock runtime is not looked for.
     fs.writeFileSync(path.join(scratch, "backend", "src", "index.ts"), "");
-    fs.mkdirSync(path.join(scratch, "config", "collections"), { recursive: true });
-    fs.writeFileSync(path.join(scratch, "config", "collections", "posts.ts"), "export default {};\n");
+    // Tables declared in code: an index is what makes them declared.
+    fs.mkdirSync(path.join(scratch, "backend", "schema"), { recursive: true });
+    fs.writeFileSync(path.join(scratch, "backend", "schema", "index.ts"), "export { posts } from \"./posts\";\n");
+    fs.writeFileSync(path.join(scratch, "backend", "schema", "posts.ts"), "export const posts = {};\n");
 
     frontendDir = null;
     busyPorts.clear();
@@ -182,7 +184,7 @@ beforeEach(() => {
     vi.spyOn(console, "log").mockImplementation(() => undefined);
     vi.spyOn(console, "warn").mockImplementation(() => undefined);
     vi.spyOn(console, "error").mockImplementation(() => undefined);
-    // The collections watcher would outlive the test.
+    // The schema watcher would outlive the test.
     vi.spyOn(fs, "watch").mockReturnValue(new StubWatcher());
     listeners = { SIGINT: process.listenerCount("SIGINT"), SIGTERM: process.listenerCount("SIGTERM") };
 });
@@ -408,7 +410,7 @@ describe("rebase dev's start-up", () => {
 
     it("says when it regenerated a schema that was out of date, and only then", async () => {
         // A stale schema was regenerated on start without a word, so the reader
-        // never learned their collections and the committed file had drifted.
+        // never learned their tables and the committed file had drifted.
         const schemaFile = path.join(scratch, "backend", "src", "schema.generated.ts");
         const startWith = async (before: string, after: string, port: string): Promise<string> => {
             fs.writeFileSync(schemaFile, before);
@@ -424,7 +426,7 @@ describe("rebase dev's start-up", () => {
         };
 
         expect(await startWith("export const tables = { old };\n", "export const tables = { posts };\n", "45129"))
-            .toContain("backend/src/schema.generated.ts was out of date with the collections");
+            .toContain("backend/src/schema.generated.ts was out of date with the tables");
         expect(await startWith("export const tables = { posts };\n", "export const tables = { posts };\n", "45130"))
             .not.toContain("was out of date");
     });
@@ -619,16 +621,16 @@ describe("the SDK's example address", () => {
 });
 
 /**
- * A headless `rebase dev`, then `rebase schema introspect` in another
- * terminal: dev watched `config/collections` only when it existed at start,
- * so the new collections changed nothing until a manual restart.
+ * A headless `rebase dev`, then a `backend/schema` written in another
+ * terminal: dev watched the schema directory only when it existed at start,
+ * so the new tables changed nothing until a manual restart.
  */
-describe("collections that appear while dev runs", () => {
+describe("a schema that appears while dev runs", () => {
     type Listener = (event: string, filename: string | null) => void;
     let watched: Array<{ dir: string; recursive: boolean; listener: Listener }>;
 
     beforeEach(() => {
-        fs.rmSync(path.join(scratch, "config", "collections"), { recursive: true, force: true });
+        fs.rmSync(path.join(scratch, "backend", "schema"), { recursive: true, force: true });
         watched = [];
         vi.mocked(fs.watch).mockImplementation((dir: fs.PathLike, options: unknown, listener?: Listener) => {
             const recursive = typeof options === "object" && options !== null && "recursive" in options && options.recursive === true;
@@ -643,22 +645,23 @@ describe("collections that appear while dev runs", () => {
         generation.resolve();
         const run = devCommand(["node", "rebase", "dev", "--backend-only", "--port", "45170"]);
         await vi.waitFor(() => expect(spawned.some(s => s.file === BACKEND_FILE)).toBe(true));
-        const collections = path.join(scratch, "config", "collections");
-        const config = watched.find(w => w.dir === path.join(scratch, "config") && !w.recursive);
-        expect(config).toBeDefined();
-        expect(watched.some(w => w.dir === collections)).toBe(false);
+        const schemaDir = path.join(scratch, "backend", "schema");
+        const backend = watched.find(w => w.dir === path.join(scratch, "backend") && !w.recursive);
+        expect(backend).toBeDefined();
+        expect(watched.some(w => w.dir === schemaDir)).toBe(false);
 
         const trigger = devRestartTrigger(scratch);
         const before = trigger && fs.existsSync(trigger) ? fs.readFileSync(trigger, "utf8") : null;
         runDriverSchemaCommand.mockClear();
         const sdkBefore = spawned.filter(s => s.args.includes("generate-sdk")).length;
 
-        // What introspect writes.
-        fs.mkdirSync(collections);
-        fs.writeFileSync(path.join(collections, "orders.ts"), "export default {};\n");
-        config?.listener("rename", "collections");
+        // A schema written while dev runs.
+        fs.mkdirSync(schemaDir);
+        fs.writeFileSync(path.join(schemaDir, "index.ts"), "export { orders } from \"./orders\";\n");
+        fs.writeFileSync(path.join(schemaDir, "orders.ts"), "export const orders = {};\n");
+        backend?.listener("rename", "schema");
 
-        await vi.waitFor(() => expect(watched.some(w => w.dir === collections && w.recursive)).toBe(true));
+        await vi.waitFor(() => expect(watched.some(w => w.dir === schemaDir && w.recursive)).toBe(true));
         await vi.waitFor(() => expect(runDriverSchemaCommand).toHaveBeenCalledWith(["node", "rebase", "schema", "generate"], { quiet: true }), { timeout: 3_000 });
         await vi.waitFor(() => expect(spawned.filter(s => s.args.includes("generate-sdk")).length).toBe(sdkBefore + 1), { timeout: 3_000 });
         if (trigger) {

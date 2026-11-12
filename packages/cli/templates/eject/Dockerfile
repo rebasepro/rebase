@@ -41,7 +41,6 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 # Copy workspace packages. Every workspace the lockfile has an importer for,
 # so `--frozen-lockfile` below sees the same set of packages it was written from.
 COPY backend ./backend
-COPY config ./config
 # {{#frontend}}
 COPY frontend ./frontend
 # {{/frontend}}
@@ -55,8 +54,7 @@ COPY rebase.json ./
 # Install all deps (including devDependencies for build)
 RUN pnpm install --frozen-lockfile
 
-# Build config first, then the rest: both the frontend and the backend import it.
-RUN pnpm --filter "*-config" run build
+# Build the frontend, then the backend.
 # {{#frontend}}
 # The image serves the built site itself (see the `serveSPA` call in
 # backend/src/index.ts), so the frontend is built here rather than deployed
@@ -87,7 +85,6 @@ WORKDIR /app
 COPY --from=builder /app/package.json /app/pnpm-lock.yaml /app/pnpm-workspace.yaml /app/.npmrc /app/rebase.json ./
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/backend ./backend
-COPY --from=builder /app/config ./config
 # {{#frontend}}
 # The built site only — its sources and devDependencies stay in the builder.
 COPY --from=builder /app/frontend/dist ./frontend/dist

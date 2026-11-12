@@ -27,7 +27,11 @@ const optional = (value) => (value && value.length > 0 ? value : undefined);
 
 const bundle = createSourceBundle({
     projectRoot,
-    config: optional(process.env.REBASE_DEV_CONFIG),
+    // The schema directory and the three backend modules beside it.
+    tables: optional(process.env.REBASE_DEV_TABLES),
+    resources: optional(process.env.REBASE_DEV_RESOURCES),
+    storage: optional(process.env.REBASE_DEV_STORAGE),
+    hooks: optional(process.env.REBASE_DEV_HOOKS),
     functions: optional(process.env.REBASE_DEV_FUNCTIONS),
     crons: optional(process.env.REBASE_DEV_CRONS),
     schema: optional(process.env.REBASE_DEV_SCHEMA),

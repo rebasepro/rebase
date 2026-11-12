@@ -3,7 +3,7 @@
  *
  * It held on exactly one: the failure `requireProjectRoot` owns. `rebase status
  * --json` outside a project printed `{"error":{…,"code":"no_project_root"}}` on
- * stdout — and the same command, in a project whose `config/resources.ts`
+ * stdout — and the same command, in a project whose `backend/resources.ts`
  * throws, printed `✗ 2 problem(s) in the declared resources` to **stderr** and
  * left stdout empty. A caller that pipes stdout to a parser therefore got a
  * parseable refusal for the case it was never in and an empty parse for the one
@@ -66,19 +66,18 @@ afterEach(() => {
     fs.rmSync(root, { recursive: true, force: true });
 });
 
-/** A project directory with a manifest and, optionally, a config/ that throws. */
+/** A project directory with a manifest and, optionally, a backend/resources.ts that throws. */
 function project(name: string, options: {
     manifest?: unknown;
     resources?: string;
 } = {}): string {
     const dir = path.join(root, name);
-    fs.mkdirSync(path.join(dir, "config"), { recursive: true });
     fs.mkdirSync(path.join(dir, "backend"), { recursive: true });
     if (options.manifest !== undefined) {
         fs.writeFileSync(path.join(dir, "rebase.json"), JSON.stringify(options.manifest, null, 2));
     }
     if (options.resources !== undefined) {
-        fs.writeFileSync(path.join(dir, "config", "resources.ts"), options.resources);
+        fs.writeFileSync(path.join(dir, "backend", "resources.ts"), options.resources);
     }
     return dir;
 }

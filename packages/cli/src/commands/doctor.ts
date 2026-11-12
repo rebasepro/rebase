@@ -1,8 +1,8 @@
 /**
  * CLI command: rebase doctor
  *
- * Detects three-way schema drift between collection definitions,
- * the generated Drizzle schema, and the live PostgreSQL database.
+ * Detects three-way schema drift between the tables `backend/schema`
+ * declares, the generated Drizzle schema, and the live PostgreSQL database.
  */
 import chalk from "chalk";
 import fs from "fs";
@@ -24,8 +24,9 @@ import { redactConnectionPasswords } from "../utils/redact";
 import { analyseFunctionsDirectory, summarisePortability } from "../function-portability";
 import { reportSpawnFailure } from "../utils/spawn-error";
 import { argsFromCommand } from "../utils/command-words";
-import { SCHEMA_DIR_FLAG_HELP, refuseMissingSchemaDir } from "../utils/path-flags";
+import { SCHEMA_DIR_FLAG_HELP, refuseMissingSchemaDir, refuseRemovedCollectionsFlag } from "../utils/path-flags";
 import { schemaDirArgs, resolveSchemaDir } from "../utils/schema-dir";
+import { declaredTables } from "../utils/schema-text";
 import { absolutizeLocalPathArgs, DATABASE_SOURCE_ENV } from "./db";
 import { parseCommandArgs, wantsHelp } from "../utils/args";
 import { loadManifest, findBackendApp, resolveBackendPaths } from "../manifest";
@@ -192,8 +193,8 @@ export function collectEnvironmentFindings(
         typeof rootPackage?.packageManager === "string" ? rootPackage.packageManager : undefined
     ));
 
-    // Two collections claiming one slug. Read as text rather than imported: a
-    // collection file can import anything, and doctor must not execute a
+    // Two tables claiming one slug. Read as text rather than imported: a
+    // schema file can import anything, and doctor must not execute a
     // project's code to tell it two slugs collide.
     findings.push(...checkDuplicateSlugs(readDeclaredSlugs(projectRoot)));
 
@@ -364,15 +365,15 @@ function readDeclaredRebaseDeps(projectRoot: string): DeclaredDependency[] {
 }
 
 /**
- * Does this project declare its collections in code?
+ * Does this project declare its tables in code?
  *
- * `resolveBackendPaths` answers it against the manifest's own `config` path
+ * `resolveBackendPaths` answers it against the manifest's own `tables` path
  * rather than the convention, because a project may move the directory. A
  * project with no manifest, or one shaped differently, is treated as declaring
  * them: the wrong answer there would silently skip the drift report, which is
  * the reason the command exists.
  */
-export function hasDeclaredCollections(projectRoot: string): boolean {
+export function hasDeclaredTables(projectRoot: string): boolean {
     try {
         const backend = findBackendApp(loadManifest(projectRoot).manifest);
         if (!backend) return true;
@@ -382,35 +383,9 @@ export function hasDeclaredCollections(projectRoot: string): boolean {
     }
 }
 
-/**
- * Every `slug:` a collection file declares, read as text.
- *
- * Deliberately not by importing them: a collection file may import anything the
- * project depends on, and doctor must not run a project's code to tell it two
- * slugs collide. A regex over `slug: "..."` finds the literal in every shape
- * the scaffold and the docs use; a computed slug is simply not seen, which is
- * the right failure for a check that only ever reports.
- */
+/** Every table the schema files declare, by slug — read as text, see `utils/schema-text.ts`. */
 function readDeclaredSlugs(projectRoot: string): Array<{ slug: string }> {
-    const dir = resolveSchemaDir(projectRoot);
-    if (!fs.existsSync(dir)) return [];
-    const slugs: Array<{ slug: string }> = [];
-    let entries: string[];
-    try {
-        entries = fs.readdirSync(dir);
-    } catch {
-        return [];
-    }
-    for (const entry of entries) {
-        if (!/\.(ts|js|mts|mjs)$/.test(entry) || entry.startsWith("index.")) continue;
-        try {
-            const text = fs.readFileSync(path.join(dir, entry), "utf-8");
-            for (const match of text.matchAll(/\bslug:\s*["'`]([^"'`]+)["'`]/g)) {
-                slugs.push({ slug: match[1] });
-            }
-        } catch { /* unreadable is not a finding */ }
-    }
-    return slugs;
+    return declaredTables(resolveSchemaDir(projectRoot)).map(({ slug }) => ({ slug }));
 }
 
 /** Print what the environment checks found, grouped, or nothing at all. */
@@ -445,8 +420,7 @@ function reportEnvironmentFindings(findings: EnvironmentFinding[]): boolean {
 export const DOCTOR_FLAGS = {
     "--policies": Boolean,
     "--database": Boolean,
-    "--collections": String,
-    "-c": "--collections",
+    "--schema-dir": String,
     "--schema": String,
     "-s": "--schema",
     "--sdk": String,
@@ -457,7 +431,7 @@ export const DOCTOR_FLAGS = {
 const DOCTOR_FLAG_HELP: Record<string, string> = {
     "--policies": "Also audit the row-level security policies. The form to use as a CI gate.",
     "--database": "Only check that the database can host the request role(s) under the rls settings: roles, memberships, grants, policies. Read-only; exits 1 on a failure.",
-    "--collections": SCHEMA_DIR_FLAG_HELP,
+    "--schema-dir": SCHEMA_DIR_FLAG_HELP,
     "--schema": "Path to the generated Drizzle schema (default: backend/src/schema.generated.ts)",
     "--sdk": "Path to the generated SDK types (default: generated/sdk/database.types.ts)"
 };
@@ -467,11 +441,11 @@ const DOCTOR_FLAG_HELP: Record<string, string> = {
  * command was run — the driver runs in `backend/`. See `utils/path-flags.ts`.
  */
 export function doctorDriverArgs(rawArgs: string[], cwd: string, projectRoot?: string): string[] {
-    const args = absolutizeLocalPathArgs(argsFromCommand(rawArgs, "doctor"), cwd, ["--collections", "-c", "--schema", "-s", "--sdk", "-k"]);
+    const args = absolutizeLocalPathArgs(argsFromCommand(rawArgs, "doctor"), cwd, ["--schema-dir", "--schema", "-s", "--sdk", "-k"]);
     return projectRoot ? [...args, ...schemaDirArgs(projectRoot, args)] : args;
 }
 
-/** `--collections, -c` — the aliases, resolved from the spec rather than retyped. */
+/** `--schema, -s` — the aliases, resolved from the spec rather than retyped. */
 function doctorFlagLabel(flag: string): string {
     const aliases = Object.entries(DOCTOR_FLAGS)
         .filter(([, target]) => target === flag)
@@ -491,7 +465,7 @@ ${Object.keys(DOCTOR_FLAG_HELP)
         .map(flag => `  ${chalk.blue(doctorFlagLabel(flag).padEnd(22))} ${DOCTOR_FLAG_HELP[flag]}`)
         .join("\n")}
 
-Compares the collections you declare, the generated Drizzle schema, and the
+Compares the tables backend/schema declares, the generated Drizzle schema, and the
 tables that actually exist, then reports what disagrees and how to reconcile it.
 
 With --database it checks the database itself instead: whether the role
@@ -504,7 +478,7 @@ Also checks the connection strings in .env and the compose files for the
 unencoded "=" that makes PostgreSQL's own tools refuse to parse them — which
 breaks backups and psql while leaving the app itself working.
 
-Run from inside a Rebase project — it reads the project's collections and
+Run from inside a Rebase project — it reads the project's tables and
 connects to its database.
 `);
 }
@@ -520,6 +494,7 @@ export async function doctorCommand(rawArgs: string[]): Promise<void> {
     // than an error, so `rebase doctor --polices` ran the ordinary doctor and
     // exited 0 — a CI gate that reported success because the flag asking for it
     // was dropped on the way.
+    refuseRemovedCollectionsFlag(rawArgs.slice(2), "doctor");
     const { flags } = parseCommandArgs({
         spec: DOCTOR_FLAGS,
         rawArgs,
@@ -563,7 +538,7 @@ export async function doctorCommand(rawArgs: string[]): Promise<void> {
     reportFunctionPortability(projectRoot);
 
     // Everything that breaks a first run happens before a table is compared:
-    // the wrong Node, two lockfiles disagreeing, two collections claiming one
+    // the wrong Node, two lockfiles disagreeing, two tables claiming one
     // slug, a JWT_SECRET short enough to be refused in production, three
     // versions of @rebasepro/server in one workspace. Doctor said nothing about
     // any of it. Reported before the plugin runs, and non-blocking — a project
@@ -611,16 +586,16 @@ export async function doctorCommand(rawArgs: string[]): Promise<void> {
         console.error(chalk.gray("    The checks that need one are reported below as not run."));
     }
 
-    // A headless project has no `config/collections` by design — its API is
+    // A headless project has no `backend/schema` by design — its API is
     // introspected from the live database at boot — and the driver's doctor
-    // opens by loading them, finds none, and exits 1. So `rebase doctor` failed
-    // on the documented headless path, in 0.17.3 and on main, while every check
-    // above it had just passed. Its three phases all compare *against* declared
-    // collections, so there is nothing for them to do here; the environment
-    // findings are the whole report.
+    // opens by loading the tables, finds none, and exits 1. So `rebase doctor`
+    // failed on the documented headless path while every check above it had
+    // just passed. Its three phases all compare *against* declared tables, so
+    // there is nothing for them to do here; the environment findings are the
+    // whole report.
     // `--database` is the exception: it checks the database a headless project
     // is introspected from, which is exactly the existing database it is for.
-    if (!hasDeclaredCollections(projectRoot) && flags["--database"] !== true) {
+    if (!hasDeclaredTables(projectRoot) && flags["--database"] !== true) {
         console.log("");
         console.log(chalk.gray(
             "  ○ Schema drift not checked: this project derives its API from the database — "

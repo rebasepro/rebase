@@ -3,6 +3,7 @@ import arg from "arg";
 import { errorClass, isEnabled, recordEvent } from "./telemetry";
 import { failAsJson, requireProjectRoot, wantsJsonOutput } from "./utils/project";
 import { parseCommandArgs, UsageError } from "./utils/args";
+import { refuseRemovedCollectionsFlag } from "./utils/path-flags";
 import { unknownCommand } from "./utils/unknown-command";
 import { cliVersion } from "./utils/version";
 import path from "path";
@@ -97,8 +98,8 @@ async function commandVocabulary(command: string): Promise<CommandVocabulary> {
  * group dispatches.
  *
  * The first word that is not a flag is not always the subcommand: after a flag
- * that takes a value it is that value. `rebase db --collections ./c push` was
- * refused as an unknown db command `./c`, `rebase api-keys --name ci create` as
+ * that takes a value it is that value. `rebase db --schema-dir ./s push` was
+ * refused as an unknown db command `./s`, `rebase api-keys --name ci create` as
  * one called `ci`, and `rebase skills --agent claude install` as `claude` —
  * lines every one of those commands parses happily once it is reached.
  *
@@ -301,12 +302,11 @@ async function dispatch(
             // `generate-sdk` as the first token of the flag line, dropping the
             // flags entirely. `parseCommandArgs` fixes both: it consumes flags
             // wherever they appear and rejects the ones nobody declared.
+            refuseRemovedCollectionsFlag(args.slice(2), "generate-sdk");
             const { flags: sdkArgs, help: sdkHelp } = parseCommandArgs({
                 spec: {
-                    // `--collections`, as every other command spells it; the
-                    // older name stays an alias.
-                    "--collections": String,
-                    "--collections-dir": "--collections",
+                    // `--schema-dir`, as every command that reads the tables spells it.
+                    "--schema-dir": String,
                     "--output": String,
                     // The alias `build`, `cloud env pull` and `db backup` carry.
                     // Two names for one concept across one CLI is a thing you
@@ -315,7 +315,6 @@ async function dispatch(
                     "--from": String,
                     "--token": String,
                     "--register": Boolean,
-                    "-c": "--collections",
                     "-o": "--output"
                 },
                 rawArgs: args,
@@ -323,10 +322,10 @@ async function dispatch(
                 command: "generate-sdk",
                 maxPositionals: 0
             });
-            // Defaults hang off the project root, not the cwd. `./config/
-            // collections` relative to wherever you happen to be standing meant
+            // Defaults hang off the project root, not the cwd. A default schema
+            // directory relative to wherever you happen to be standing meant
             // `rebase generate-sdk` worked from the repository root and threw
-            // "Collections directory not found" one directory down — from
+            // "directory not found" one directory down — from
             // `backend/`, from `frontend/`, from anywhere a developer actually
             // sits — while `rebase db push` and `rebase dev` worked from all of
             // them. An explicitly passed path still resolves against the cwd,
@@ -334,8 +333,8 @@ async function dispatch(
             const sdkRoot = sdkHelp ? process.cwd() : requireProjectRoot();
             const { generateSdkCommand } = await import("./commands/generate_sdk");
             await generateSdkCommand({
-                collectionsDir: sdkArgs["--collections"]
-                    || (sdkHelp ? path.join(sdkRoot, "config/collections") : (await import("./utils/schema-dir")).resolveSchemaDir(sdkRoot)),
+                schemaDir: sdkArgs["--schema-dir"]
+                    || (sdkHelp ? sdkRoot : (await import("./utils/schema-dir")).resolveSchemaDir(sdkRoot)),
                 output: sdkArgs["--output"] || path.join(sdkRoot, "generated/sdk"),
                 from: sdkArgs["--from"],
                 token: sdkArgs["--token"],
@@ -509,9 +508,9 @@ ${chalk.green.bold("Commands")}
   ${chalk.blue.bold("apps list")}               Show the apps this repository declares
 
 ${chalk.green.bold("Schema")}
-  ${chalk.blue.bold("schema generate")}         Generate Drizzle schema from collections
-  ${chalk.blue.bold("schema introspect")}       Introspect database → Rebase collections
-  ${chalk.blue.bold("schema stale")}            Report generated schema files the collections have moved past
+  ${chalk.blue.bold("schema generate")}         Generate the Drizzle schema from backend/schema
+  ${chalk.blue.bold("schema introspect")}       Introspect database → Rebase collections ${chalk.gray("(then migrate collections-to-tables)")}
+  ${chalk.blue.bold("schema stale")}            Report generated schema files the tables have moved past
   ${chalk.blue.bold("schema")} ${chalk.gray("--help")}           Show schema command help
 
 ${chalk.green.bold("Database")}
@@ -529,7 +528,7 @@ ${chalk.green.bold("Explore")}
 
 ${chalk.green.bold("Generate")}
   ${chalk.blue.bold("generate view")} ${chalk.gray("<slug>")}    Scaffold a custom admin screen ${chalk.gray("(--collection: a record tab)")}
-  ${chalk.blue.bold("generate-sdk")}            Generate a typed TypeScript SDK from collections
+  ${chalk.blue.bold("generate-sdk")}            Generate a typed TypeScript SDK from the tables
 
 ${chalk.green.bold("Auth")}
   ${chalk.blue.bold("auth reset-password")}     Reset a user's password
@@ -537,8 +536,8 @@ ${chalk.green.bold("Auth")}
 
 ${chalk.green.bold("Diagnostics")}
   ${chalk.blue.bold("status")}                  Show every resource and whether its variables are set
-  ${chalk.blue.bold("doctor")}                  Detect schema drift between collections, schema, and DB
-  ${chalk.blue.bold("verify")}                  Check collections, RLS coverage and migrations ${chalk.gray("(CI + agent hooks)")}
+  ${chalk.blue.bold("doctor")}                  Detect schema drift between tables, generated schema, and DB
+  ${chalk.blue.bold("verify")}                  Check tables, RLS coverage and migrations ${chalk.gray("(CI + agent hooks)")}
   ${chalk.blue.bold("resources")}               List the databases, buckets and topics this project declares
 
 ${chalk.green.bold("Take ownership")}

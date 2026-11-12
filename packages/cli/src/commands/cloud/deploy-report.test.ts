@@ -79,7 +79,7 @@ contract: 1 },
         kind: "backend",
         hooks: { native: false },
         deps: { declared: {} },
-        entry: { config: "config/index.js",
+        entry: { tables: "backend/schema",
 static: [{ name: "game",
 path: "/",
 dir: "static/game",
@@ -88,7 +88,7 @@ spa: true }] },
 node: "22",
 createdAt: "2026-10-20T00:00:00Z" }
     }));
-    write(bundleDir, "config/index.js", "export default {};\n");
+    write(bundleDir, "backend/schema/index.js", "export default {};\n");
     write(bundleDir, "static/game/index.html", "<html></html>\n");
     cwd = process.cwd();
     process.chdir(project);

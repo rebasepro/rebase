@@ -6,35 +6,39 @@ import { createRequire } from "module";
 import { fileURLToPath } from "url";
 import ts from "typescript";
 import { generateSdkCommand, REGISTER_FILE } from "./generate_sdk";
+import { workspaceModuleAliases } from "../../test/helpers/project";
 
 /**
  * `rebase generate-sdk --register`: the generated `Database`, registered on
- * `@rebasepro/types`' `Register` where both compiles of a collection file see
- * it.
+ * `@rebasepro/types`' `Register` inside the backend's program, where hooks,
+ * functions and crons compile against it.
  *
- * A collection file is compiled twice: by the backend (whose tsconfig includes
- * `../config/**`) and by the `config` package's own `tsc`. A registration in
- * `config/` that imported `../generated/sdk/database.types` broke the second:
- * the file is outside `config/`, so TypeScript refuses it as not under the
- * package's `rootDir`. The registration and a copy of the types therefore go
- * to `config/generated/`, which both programs include.
+ * The registration and a copy of the types go to `backend/generated/`: a
+ * registration that imported `../generated/sdk/database.types` would pull a
+ * file from outside `backend/` into its program, which TypeScript refuses as
+ * not under the backend's `rootDir`.
+ *
+ * The table is written as JavaScript, which the backend's `tsc` does not
+ * compile (no `allowJs`), so the program proves the layout and not this
+ * repository's type declarations; the loader reads it all the same.
  */
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const templateDir = path.resolve(here, "../../templates/template");
 const require = createRequire(import.meta.url);
 
-/** A scaffolded project: the template's two tsconfigs and one collection file. */
+/** A table module, as JavaScript. */
+const tableModule = (identifier: string, name: string, extra: string) =>
+    "import { defineTable, col } from \"@rebasepro/server/schema\";\n" +
+    `export const ${identifier} = defineTable("${name}", { ${extra}columns: { id: col.text().primaryKey(), body: col.text().notNull() }, rls: "admin-only" });\n`;
+
+/** A scaffolded project: the template's backend tsconfig and one table. */
 function scaffold(root: string): string {
-    fs.mkdirSync(path.join(root, "config/collections"), { recursive: true });
+    fs.mkdirSync(path.join(root, "backend/schema"), { recursive: true });
     fs.mkdirSync(path.join(root, "backend/src"), { recursive: true });
-    fs.copyFileSync(path.join(templateDir, "config/tsconfig.json"), path.join(root, "config/tsconfig.json"));
     fs.copyFileSync(path.join(templateDir, "backend/tsconfig.json"), path.join(root, "backend/tsconfig.json"));
-    fs.writeFileSync(
-        path.join(root, "config/collections/my-notes.ts"),
-        "export default { slug: \"my-notes\", table: \"notes\", name: \"Notes\", " +
-        "properties: { id: { type: \"string\", isId: true }, body: { type: \"string\", validation: { required: true } } } };\n"
-    );
+    fs.writeFileSync(path.join(root, "backend/schema/index.js"), "export { notes } from \"./notes.js\";\n");
+    fs.writeFileSync(path.join(root, "backend/schema/notes.js"), tableModule("notes", "notes", "slug: \"my-notes\", "));
     fs.writeFileSync(path.join(root, "backend/src/index.ts"), "export const ready = true;\n");
 
     // The two packages the programs resolve: `@types/node` (both tsconfigs pin
@@ -48,7 +52,7 @@ function scaffold(root: string): string {
     fs.writeFileSync(path.join(typesDir, "index.d.ts"),
         "export interface Register {}\n" +
         "export type RegisteredDatabase = Register extends { database: infer DB } ? DB : unknown;\n");
-    return path.join(root, "config/collections");
+    return path.join(root, "backend/schema");
 }
 
 /** What tsc reports for a tsconfig, as `file(line): TSxxxx message` lines. */
@@ -63,7 +67,7 @@ function diagnostics(tsconfig: string): string[] {
         `${d.file ? path.basename(d.file.fileName) : "-"}: TS${d.code} ${ts.flattenDiagnosticMessageText(d.messageText, "\n")}`);
 }
 
-/** A probe in `config/`: compiles only when `Register` holds the generated `Database`. */
+/** A probe in the backend: compiles only when `Register` holds the generated `Database`. */
 const REGISTERED_PROBE =
     "import type { RegisteredDatabase } from \"@rebasepro/types\";\n" +
     "type Body = RegisteredDatabase extends { myNotes: { Row: { body: infer B } } } ? B : never;\n" +
@@ -95,11 +99,12 @@ describe("generate-sdk --register", () => {
         exitSpy.mockRestore();
     });
 
-    const generate = (collectionsDir: string, register?: boolean) => generateSdkCommand({
-        collectionsDir,
+    const generate = (schemaDir: string, register?: boolean) => generateSdkCommand({
+        schemaDir,
         output: path.join(root, "generated/sdk"),
         cwd: root,
         projectRoot: root,
+        moduleAliases: workspaceModuleAliases(),
         ...(register ? { register } : {})
     });
 
@@ -109,62 +114,59 @@ describe("generate-sdk --register", () => {
     );
     const readManifest = () => JSON.parse(fs.readFileSync(path.join(root, "rebase.json"), "utf-8"));
 
-    it("writes nothing into config/ without the flag", async () => {
-        const collectionsDir = scaffold(root);
-        await generate(collectionsDir);
+    it("writes nothing into backend/generated without the flag", async () => {
+        const schemaDir = scaffold(root);
+        await generate(schemaDir);
 
         expect(fs.existsSync(path.join(root, "generated/sdk/database.types.ts"))).toBe(true);
-        expect(fs.existsSync(path.join(root, "config/generated"))).toBe(false);
+        expect(fs.existsSync(path.join(root, "backend/generated"))).toBe(false);
     });
 
-    it("writes the types and the Register declaration into config/generated", async () => {
-        const collectionsDir = scaffold(root);
-        await generate(collectionsDir, true);
+    it("writes the types and the Register declaration into backend/generated", async () => {
+        const schemaDir = scaffold(root);
+        await generate(schemaDir, true);
 
-        const copied = fs.readFileSync(path.join(root, "config/generated/database.types.ts"), "utf-8");
+        const copied = fs.readFileSync(path.join(root, "backend/generated/database.types.ts"), "utf-8");
         expect(copied).toBe(fs.readFileSync(path.join(root, "generated/sdk/database.types.ts"), "utf-8"));
-        const register = fs.readFileSync(path.join(root, "config/generated", REGISTER_FILE), "utf-8");
+        const register = fs.readFileSync(path.join(root, "backend/generated", REGISTER_FILE), "utf-8");
         expect(register).toContain("declare module \"@rebasepro/types\"");
         expect(register).toContain("database: Database;");
         expect(register).toContain("from \"./database.types\"");
         expect(exitSpy).not.toHaveBeenCalled();
     });
 
-    it("compiles under both the config package's tsc and the backend's, and types both", async () => {
-        const collectionsDir = scaffold(root);
-        await generate(collectionsDir, true);
-        fs.writeFileSync(path.join(root, "config/collections/probe.ts"), REGISTERED_PROBE);
+    it("compiles under the backend's tsc, and types its code", async () => {
+        const schemaDir = scaffold(root);
+        await generate(schemaDir, true);
+        fs.writeFileSync(path.join(root, "backend/src/probe.ts"), REGISTERED_PROBE);
 
-        expect(diagnostics(path.join(root, "config/tsconfig.json"))).toEqual([]);
         expect(diagnostics(path.join(root, "backend/tsconfig.json"))).toEqual([]);
     });
 
     it("the probe is refused without the registration", async () => {
-        const collectionsDir = scaffold(root);
-        await generate(collectionsDir);
-        fs.writeFileSync(path.join(root, "config/collections/probe.ts"), REGISTERED_PROBE);
+        const schemaDir = scaffold(root);
+        await generate(schemaDir);
+        fs.writeFileSync(path.join(root, "backend/src/probe.ts"), REGISTERED_PROBE);
 
-        expect(diagnostics(path.join(root, "config/tsconfig.json")).join("\n")).toMatch(/TS2322/);
+        expect(diagnostics(path.join(root, "backend/tsconfig.json")).join("\n")).toMatch(/TS2322/);
     });
 
     it("keeps the registration current on a later run without the flag", async () => {
-        const collectionsDir = scaffold(root);
-        await generate(collectionsDir, true);
-        fs.writeFileSync(
-            path.join(collectionsDir, "tags.ts"),
-            "export default { slug: \"tags\", name: \"Tags\", properties: { label: { type: \"string\" } } };\n"
-        );
+        const schemaDir = scaffold(root);
+        await generate(schemaDir, true);
+        fs.writeFileSync(path.join(schemaDir, "tags.js"), tableModule("tags", "tags", ""));
+        fs.appendFileSync(path.join(schemaDir, "index.js"), "export { tags } from \"./tags.js\";\n");
 
-        await generate(collectionsDir);
+        await generate(schemaDir);
 
-        expect(fs.readFileSync(path.join(root, "config/generated/database.types.ts"), "utf-8")).toContain("tags");
+        expect(fs.readFileSync(path.join(root, "backend/generated/database.types.ts"), "utf-8")).toContain("tags");
     });
 
     it("remembers --register in rebase.json, keeping the rest of the file", async () => {
-        const collectionsDir = scaffold(root);
+        const schemaDir = scaffold(root);
         writeManifest({ functions: "backend/functions" });
 
-        await generate(collectionsDir, true);
+        await generate(schemaDir, true);
 
         const manifest = readManifest();
         expect(manifest.apps.backend.registerDatabase).toBe(true);
@@ -173,44 +175,44 @@ describe("generate-sdk --register", () => {
     });
 
     it("registers on a fresh clone, where only rebase.json remembers the choice", async () => {
-        // `config/generated/` is gitignored: a clone has the manifest and no register.ts.
-        const collectionsDir = scaffold(root);
+        // `backend/generated/` is gitignored: a clone has the manifest and no register.ts.
+        const schemaDir = scaffold(root);
         writeManifest({ registerDatabase: true });
 
-        await generate(collectionsDir);
+        await generate(schemaDir);
 
-        expect(fs.readFileSync(path.join(root, "config/generated", REGISTER_FILE), "utf-8"))
+        expect(fs.readFileSync(path.join(root, "backend/generated", REGISTER_FILE), "utf-8"))
             .toContain("database: Database;");
         expect(exitSpy).not.toHaveBeenCalled();
     });
 
     it("does not register when rebase.json leaves it off", async () => {
-        const collectionsDir = scaffold(root);
+        const schemaDir = scaffold(root);
         writeManifest({});
 
-        await generate(collectionsDir);
+        await generate(schemaDir);
 
-        expect(fs.existsSync(path.join(root, "config/generated"))).toBe(false);
+        expect(fs.existsSync(path.join(root, "backend/generated"))).toBe(false);
         expect(readManifest().apps.backend).not.toHaveProperty("registerDatabase");
     });
 
     it("writes no rebase.json into a project that has none", async () => {
-        const collectionsDir = scaffold(root);
+        const schemaDir = scaffold(root);
 
-        await generate(collectionsDir, true);
+        await generate(schemaDir, true);
 
-        expect(fs.existsSync(path.join(root, "config/generated", REGISTER_FILE))).toBe(true);
+        expect(fs.existsSync(path.join(root, "backend/generated", REGISTER_FILE))).toBe(true);
         expect(fs.existsSync(path.join(root, "rebase.json"))).toBe(false);
     });
 
     it("leaves a register.ts it did not write alone", async () => {
-        const collectionsDir = scaffold(root);
-        fs.mkdirSync(path.join(root, "config/generated"));
-        fs.writeFileSync(path.join(root, "config/generated", REGISTER_FILE), "// mine\n");
+        const schemaDir = scaffold(root);
+        fs.mkdirSync(path.join(root, "backend/generated"));
+        fs.writeFileSync(path.join(root, "backend/generated", REGISTER_FILE), "// mine\n");
 
-        await expect(generate(collectionsDir, true)).rejects.toBeInstanceOf(ExitCalled);
+        await expect(generate(schemaDir, true)).rejects.toBeInstanceOf(ExitCalled);
 
-        expect(fs.readFileSync(path.join(root, "config/generated", REGISTER_FILE), "utf-8")).toBe("// mine\n");
+        expect(fs.readFileSync(path.join(root, "backend/generated", REGISTER_FILE), "utf-8")).toBe("// mine\n");
         expect(exitSpy).toHaveBeenCalledWith(1);
     });
 });

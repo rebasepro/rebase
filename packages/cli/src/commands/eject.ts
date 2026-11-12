@@ -24,7 +24,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import type { RebaseBackendAppConfig } from "@rebasepro/types";
 import { requireProjectRoot } from "../utils/project";
-import { findBackendApp, LEGACY_CONFIG_DIR, loadManifest, ManifestError, writeManifest } from "../manifest";
+import { findBackendApp, loadManifest, ManifestError, resolveBackendPaths, writeManifest } from "../manifest";
 import { parseCommandArgs, wantsHelp } from "../utils/args";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -41,22 +41,26 @@ function findCliRoot(from: string): string | null {
 }
 
 /**
- * The two ways one project's payload differs from another's.
+ * The ways one project's payload differs from another's.
  *
- * Neither is a flag: both were decided at `rebase init` time. `--headless`
- * deletes `config/collections`, `backend/src/schema.generated.ts` and
- * `frontend/`, so a payload that assumes them emits an entrypoint importing
- * three files that are not there and a Dockerfile whose first `COPY` fails.
+ * None is a flag: each is read from the project. `--headless` has no
+ * `backend/schema`, no `backend/src/schema.generated.ts` and no `frontend/`,
+ * so a payload that assumes them emits an entrypoint importing files that are
+ * not there and a Dockerfile whose first `COPY` fails.
  */
 interface ProjectShape {
     /**
-     * Collections declared in code, under `<config>/collections`. Without them
-     * the server derives its API from the live database instead — the same
-     * signal `rebase build` reads.
+     * Tables declared in code: the schema directory has an index. Without
+     * them the server derives its API from the live database instead — the
+     * same signal `rebase build` reads.
      */
-    collections: boolean;
+    tables: boolean;
     /** A `frontend` workspace for the image to build and the entrypoint to serve. */
     frontend: boolean;
+    /** `backend/storage.ts`, exporting `storageAuthorize`. */
+    storage: boolean;
+    /** `backend/hooks.ts`, exporting the global table `hooks`. */
+    hooks: boolean;
 }
 
 /**
@@ -67,7 +71,7 @@ interface ProjectShape {
  * flag renamed on the interface left this list naming a block that no longer
  * exists, and the template kept switching on it.
  */
-const SHAPE_FLAGS: readonly (keyof ProjectShape)[] = ["collections", "frontend"];
+const SHAPE_FLAGS: readonly (keyof ProjectShape)[] = ["tables", "frontend", "storage", "hooks"];
 
 /** Narrow a marker name to a flag, having checked it is one. */
 function isShapeFlag(name: string): name is keyof ProjectShape {
@@ -84,12 +88,12 @@ function isShapeFlag(name: string): name is keyof ProjectShape {
  * job in an ejected project. So both branches live in the file, marked with
  * lines that are comments in TypeScript, YAML and Dockerfiles alike:
  *
- *     // {{#collections}}
+ *     // {{#tables}}
  *     import { tables } from "./schema.generated.js";
- *     // {{/collections}}
- *     // {{^collections}}
+ *     // {{/tables}}
+ *     // {{^tables}}
  *     // No schema module: this project introspects the database.
- *     // {{/collections}}
+ *     // {{/tables}}
  *
  * `{{#name}}` keeps its block when the flag is on, `{{^name}}` when it is off,
  * and the marker lines themselves never reach the user. The template stays
@@ -150,8 +154,8 @@ overwrite: true },
     // it would silently drop every bucket and database it named. Written when
     // absent because the entrypoint imports it unconditionally: an ejected
     // server that cannot resolve its own resources does not start.
-    { from: "config/resources.ts",
-to: "config/resources.ts",
+    { from: "backend/resources.ts",
+to: "backend/resources.ts",
 overwrite: false },
     // Never overwritten: a Dockerfile someone already wrote is theirs, and so is
     // a compose file they have edited. The scaffolded `docker-compose.yml` is
@@ -283,12 +287,14 @@ export async function ejectCommand(rawArgs: string[] = []): Promise<void> {
     const payloadDir = path.join(cliRoot!, "templates", "eject");
 
     // What the payload has to look like here. Read from the project rather than
-    // asked for: `--headless` left no collections and no frontend, and an
+    // asked for: `--headless` left no tables and no frontend, and an
     // entrypoint importing either would not compile.
+    const paths = resolveBackendPaths(app, projectRoot);
     const shape: ProjectShape = {
-        // Still the `config/` layout, which the eject payload imports, until it is rewritten for `backend/`.
-        collections: fs.existsSync(path.join(projectRoot, LEGACY_CONFIG_DIR, "collections")),
-        frontend: fs.existsSync(path.join(projectRoot, "frontend"))
+        tables: paths.hasTables,
+        frontend: fs.existsSync(path.join(projectRoot, "frontend")),
+        storage: fs.existsSync(path.join(projectRoot, paths.storage)),
+        hooks: fs.existsSync(path.join(projectRoot, paths.hooks))
     };
 
     // Decide everything before writing anything, so --dry-run and the real run
@@ -389,8 +395,8 @@ export async function ejectCommand(rawArgs: string[] = []): Promise<void> {
     console.log("");
     console.log(chalk.yellow("  You now own CORS, auth wiring, storage and shutdown. Platform runtime"));
     console.log(chalk.yellow("  upgrades no longer reach this project."));
-    if (!shape.collections) {
-        console.log(chalk.yellow("  This project declares no collections, so the entrypoint derives them"));
+    if (!shape.tables) {
+        console.log(chalk.yellow("  This project declares no tables, so the entrypoint derives them"));
         console.log(chalk.yellow("  from the live database, as the managed runtime did."));
     }
     console.log("");
@@ -421,8 +427,8 @@ function restoreBackendScripts(projectRoot: string): void {
 
     const scripts = (parsed.scripts ?? {}) as Record<string, string>;
     parsed.main ??= "src/index.ts";
-    scripts.dev ??= 'tsx watch --include="../config/**/*" --include="./functions/**/*" src/index.ts';
-    scripts.start ??= "node dist/backend/src/index.js";
+    scripts.dev ??= 'tsx watch --include="./schema/**/*" --include="./functions/**/*" src/index.ts';
+    scripts.start ??= "node dist/src/index.js";
     parsed.scripts = scripts;
 
     fs.writeFileSync(packagePath, `${JSON.stringify(parsed, null, 4)}\n`, "utf8");

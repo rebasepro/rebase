@@ -4,7 +4,7 @@
  * The model a developer has to hold is small and was nowhere visible:
  *
  *   rebase.json           where the code is, and who runs the server
- *   config/resources.ts   what the project needs
+ *   backend/resources.ts  what the project needs
  *   the environment       how to reach each of them
  *
  * Everything else — `rebase.resources.json`, the bundle manifest — is a
@@ -22,7 +22,7 @@ import fs from "fs";
 import path from "path";
 import { parseCommandArgs, wantsHelp } from "../utils/args";
 import { failAsJson, readEnvFile, requireProjectRoot } from "../utils/project";
-import { findBackendApp, LEGACY_CONFIG_DIR, loadManifest, ManifestError } from "../manifest";
+import { findBackendApp, loadManifest, ManifestError, RESOURCES_FILE } from "../manifest";
 import { deriveOptionsFor, deriveResourceGraph, RESOURCE_GRAPH_FILENAME, readResourceGraphFile, serializeResourceGraph } from "../resources/derive";
 import { computeStatus, type DockerDatabaseStatus, type ManagedDatabaseStatus, type ResourceStatus } from "../resources/status";
 import { findRunningDaemon, managedUrl } from "../dev-db/daemon";
@@ -41,7 +41,7 @@ ${chalk.bold("Usage")}
 
 ${chalk.bold("Reads")}
   rebase.json                  which apps exist, and who owns the server process
-  <config>/resources.ts        the databases, buckets, topics and queues declared
+  backend/resources.ts         the databases, buckets, topics and queues declared
   backend/crons, backend/functions   the crons and functions, by filename
   .env                         whether each one's variables are set
 `);
@@ -263,8 +263,7 @@ export async function statusCommand(rawArgs: string[]): Promise<void> {
     // project with no `resources.ts` is legal — it has one default database and
     // one default bucket — but "declared in <a file you do not have>" reads as
     // a broken install rather than as the default it is.
-    // Still the `config/` layout, as `rebase resources` reads it, until both read `backend/resources.ts`.
-    const resourcesFile = path.join(LEGACY_CONFIG_DIR, "resources.ts");
+    const resourcesFile = RESOURCES_FILE;
     const declaresAnything = fs.existsSync(path.join(projectRoot, resourcesFile));
     console.log(`  ${chalk.gray("declared in")}  ${chalk.gray(resourcesFile)}${
         declaresAnything ? "" : chalk.gray("  (none — the defaults below are implicit)")}`);

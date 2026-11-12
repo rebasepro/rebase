@@ -105,8 +105,8 @@ message: "ship it" });
 describe("packing a bundle for upload", () => {
     function bundleWithModules(): void {
         fs.writeFileSync(path.join(scratch, "manifest.json"), "{}");
-        fs.mkdirSync(path.join(scratch, "config"), { recursive: true });
-        fs.writeFileSync(path.join(scratch, "config", "index.js"), "export const x = 1;");
+        fs.mkdirSync(path.join(scratch, "backend", "schema"), { recursive: true });
+        fs.writeFileSync(path.join(scratch, "backend", "schema", "index.js"), "export const x = 1;");
         fs.mkdirSync(path.join(scratch, "node_modules", "pg", "node_modules", "pg-types"), { recursive: true });
         fs.writeFileSync(path.join(scratch, "node_modules", "pg", "index.js"), "module.exports = {};");
         fs.writeFileSync(path.join(scratch, "node_modules", "pg", "node_modules", "pg-types", "index.js"), "x");
@@ -127,7 +127,7 @@ describe("packing a bundle for upload", () => {
         expect(packed.modulesLeftOut).toBe(false);
         expect(packed.bytes).toBe(fs.statSync(out()).size);
         const listing = entries(out());
-        expect(listing).toContain("./config/index.js");
+        expect(listing).toContain("./backend/schema/index.js");
         expect(listing.some(entry => entry.includes("node_modules"))).toBe(true);
     });
 
@@ -151,13 +151,13 @@ describe("packing a bundle for upload", () => {
 
         expect(packed.modulesLeftOut).toBe(false);
         const listing = entries(out());
-        expect(listing).toContain("./config/index.js");
+        expect(listing).toContain("./backend/schema/index.js");
         expect(listing.some(entry => entry.includes("node_modules"))).toBe(false);
     });
 
     it("refuses a bundle over the upload cap before uploading it", async () => {
         bundleWithModules();
-        fs.writeFileSync(path.join(scratch, "config", "blob.bin"), crypto.randomBytes(64 * 1024));
+        fs.writeFileSync(path.join(scratch, "backend", "schema", "blob.bin"), crypto.randomBytes(64 * 1024));
 
         await expect(packBundleForUpload(scratch, out(), bundleManifest({}), 32 * 1024)).rejects.toThrow(/over the .* upload limit/);
     });

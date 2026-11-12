@@ -2,7 +2,7 @@
  * `rebase generate view` against the layout `rebase init` writes.
  *
  * The scaffold is copied from `templates/template`, not described here, so a
- * change to the template's `App.tsx` or a collection file is a change these
+ * change to the template's `App.tsx`, a table or a customization is a change these
  * tests see. Every file the command edits is parsed afterwards, and the files
  * it writes are compiled against the workspace source of `@rebasepro/*`: a
  * generated view that does not compile is the first thing a user would see.
@@ -20,6 +20,7 @@ import {
     generateCommand,
     maskCode,
     planGenerateView,
+    listCustomization,
     registerEntityView,
     viewComponentName,
     viewLabel,
@@ -32,7 +33,18 @@ const repoRoot = path.resolve(here, "../../../..");
 
 let project: string;
 
-/** A project as `rebase init` lays it out: the manifest, the frontend's entry, the blog collections. */
+/** Whether the template's frontend already depends on `@rebasepro/cms-types`. */
+const TEMPLATE_DECLARES_CMS_TYPES = (() => {
+    const manifest: unknown = JSON.parse(fs.readFileSync(path.join(templateDir, "frontend/package.json"), "utf8"));
+    return typeof manifest === "object" && manifest !== null
+        && "dependencies" in manifest && typeof manifest.dependencies === "object" && manifest.dependencies !== null
+        && "@rebasepro/cms-types" in manifest.dependencies;
+})();
+
+/**
+ * A project as `rebase init` lays it out: the manifest, the frontend's entry,
+ * the blog tables and their customizations.
+ */
 function scaffold(): string {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-generate-view-"));
     const copy = (relative: string) => {
@@ -42,8 +54,10 @@ function scaffold(): string {
     copy("rebase.json");
     copy("frontend/package.json");
     copy("frontend/src/App.tsx");
-    for (const file of fs.readdirSync(path.join(templateDir, "config/collections"))) {
-        if (file.endsWith(".ts")) copy(`config/collections/${file}`);
+    for (const dir of ["backend/schema", "frontend/src/cms"]) {
+        for (const file of fs.readdirSync(path.join(templateDir, dir))) {
+            if (/\.tsx?$/.test(file)) copy(`${dir}/${file}`);
+        }
     }
     return root;
 }
@@ -101,17 +115,19 @@ describe("a screen", () => {
     it("writes the view and the screens list, and wires App.tsx", () => {
         const plan = planGenerateView({ projectRoot: project, slug: "orders-board" });
         const written = plan.files.map(f => [path.relative(project, f.path), f.action]);
-        // The scaffold already declares @rebasepro/cms-types, so its package.json is not touched.
+        // The view imports its prop types from @rebasepro/cms-types: a scaffold
+        // that does not declare it gains it, and is told to install.
         expect(written).toEqual([
             ["frontend/src/views/OrdersBoardView.tsx", "create"],
             ["frontend/src/views/index.ts", "create"],
-            ["frontend/src/App.tsx", "update"]
+            ["frontend/src/App.tsx", "update"],
+            ...(TEMPLATE_DECLARES_CMS_TYPES ? [] : [["frontend/package.json", "update"]])
         ]);
-        expect(plan.manualSteps).toEqual([]);
+        expect(plan.manualSteps.filter(step => !step.includes("@rebasepro/cms-types"))).toEqual([]);
         write(plan);
 
         const app = read("frontend/src/App.tsx");
-        expect(app).toMatch(/<RebaseCMS\s+views=\{views\}\s+collections=\{collections\}/);
+        expect(app).toMatch(/<RebaseCMS\s+views=\{views\}\s+tableCustomizations=/);
         expect(app).toContain("import { views } from \"./views\";");
         expect(syntaxErrors("App.tsx", app)).toEqual([]);
 
@@ -188,76 +204,109 @@ describe("a screen", () => {
 });
 
 describe("a record tab (--collection)", () => {
-    it("adds an entityViews entry by path to the collection's existing admin block", () => {
+    it("adds an entityViews entry to the table's customizeTable, importing the component", () => {
         const plan = planGenerateView({ projectRoot: project, slug: "audit-trail", collection: "posts" });
         write(plan);
 
-        const posts = read("config/collections/posts.ts");
-        expect(posts).toMatch(/admin: \{\n {8}entityViews: \[\n {12}\{\n {16}key: "audit-trail",\n {16}name: "Audit trail",\n {16}Builder: "\.\.\/\.\.\/frontend\/src\/views\/AuditTrailView"\n {12}\}\n {8}\],/);
-        expect(syntaxErrors("posts.ts", posts)).toEqual([]);
+        const posts = read("frontend/src/cms/posts.tsx");
+        expect(posts).toMatch(/customizeTable<typeof posts>\("posts", \{\n {4}entityViews: \[\n {8}\{\n {12}key: "audit-trail",\n {12}name: "Audit trail",\n {12}Builder: AuditTrailView\n {8}\}\n {4}\],\n {4}icon:/);
+        expect(posts).toContain('import { AuditTrailView } from "../views/AuditTrailView";');
+        expect(syntaxErrors("posts.tsx", posts)).toEqual([]);
 
         const view = read("frontend/src/views/AuditTrailView.tsx");
         expect(view).toContain("EntityCustomViewParams");
-        expect(view).toContain("export default AuditTrailView;");
-        // A screen's list is not touched by a record tab.
+        expect(view).toContain("export function AuditTrailView");
+        // A screen's list is not touched by a record tab, and neither is the schema.
         expect(fs.existsSync(path.join(project, "frontend/src/views/index.ts"))).toBe(false);
+        expect(plan.files.map(f => path.relative(project, f.path)).some(file => file.startsWith("backend/"))).toBe(false);
     });
 
     it("appends to an entityViews list that exists, and does not add a key twice", () => {
         write(planGenerateView({ projectRoot: project, slug: "audit-trail", collection: "posts" }));
         write(planGenerateView({ projectRoot: project, slug: "preview", collection: "posts" }));
-        const posts = read("config/collections/posts.ts");
+        const posts = read("frontend/src/cms/posts.tsx");
         expect(posts.match(/key: "audit-trail"/g)).toHaveLength(1);
-        expect(posts).toMatch(/Builder: "\.\.\/\.\.\/frontend\/src\/views\/AuditTrailView"\n {12}\},\n {12}\{\n {16}key: "preview",/);
-        expect(syntaxErrors("posts.ts", posts)).toEqual([]);
+        expect(posts).toMatch(/Builder: AuditTrailView\n {8}\},\n {8}\{\n {12}key: "preview",/);
+        expect(syntaxErrors("posts.tsx", posts)).toEqual([]);
 
         const again = planGenerateView({ projectRoot: project, slug: "preview", collection: "posts", force: true });
-        expect(again.files.map(f => path.relative(project, f.path))).not.toContain("config/collections/posts.ts");
+        expect(again.files.map(f => path.relative(project, f.path))).not.toContain("frontend/src/cms/posts.tsx");
     });
 
-    it("names the collections there are when the slug matches none", () => {
+    it("gives a table with no customization one, and hands it to <RebaseCMS>", () => {
+        fs.writeFileSync(path.join(project, "backend/schema/orders.ts"),
+            "export const orders = defineTable(\"orders\", { columns: {}, rls: \"admin-only\" });\n");
+        const plan = planGenerateView({ projectRoot: project, slug: "audit-trail", collection: "orders" });
+        write(plan);
+
+        const orders = read("frontend/src/cms/orders.tsx");
+        expect(orders).toContain('import { customizeTable } from "@rebasepro/cms";');
+        expect(orders).toContain('import { AuditTrailView } from "../views/AuditTrailView";');
+        expect(orders).toContain('export const ordersCms = customizeTable("orders", {');
+        expect(orders).toContain("Builder: AuditTrailView");
+        expect(syntaxErrors("orders.tsx", orders)).toEqual([]);
+
+        const app = read("frontend/src/App.tsx");
+        expect(app).toMatch(/tableCustomizations=\{\[postsCms, authorsCms, tagsCms, usersCms, ordersCms\]\}/);
+        expect(app).toContain('import { ordersCms } from "./cms/orders";');
+        expect(syntaxErrors("App.tsx", app)).toEqual([]);
+        expect(plan.manualSteps.filter(step => !step.includes("@rebasepro/cms-types"))).toEqual([]);
+    });
+
+    it("names the tables there are when the slug matches none", () => {
         expect(() => planGenerateView({ projectRoot: project, slug: "audit-trail", collection: "orders" }))
-            .toThrow(/No collection with slug "orders".*Declared: authors, posts, tags, users/);
+            .toThrow(/No table with slug "orders" under backend\/schema\. Declared: authors, posts, tags, users/);
     });
 });
 
 describe("registerEntityView", () => {
-    const collection = (body: string) => `import { defineCollection } from "@rebasepro/cms-types";
+    const customization = (body: string) => `import { customizeTable } from "@rebasepro/cms";
 
-export default defineCollection({
-    name: "Orders",
-    slug: "orders",
+export const ordersCms = customizeTable("orders", {
 ${body}
-    properties: {
-        total: { type: "number", validation: { matches: /\\{/ } }
-    }
+    fields: { total: { validate: /\\{/ } }
 });
 `;
-    const view = { key: "audit", name: "Audit", builder: "../../frontend/src/views/AuditView" };
-    const register = (source: string) => registerEntityView(source, source.indexOf("slug:"), view);
+    const view = { key: "audit", name: "Audit", componentName: "AuditView" };
+    const register = (source: string) => registerEntityView(source, source.indexOf("{\n"), view);
 
-    it("creates the admin block when there is none", () => {
-        const updated = register(collection(""));
-        expect(updated).toContain("    slug: \"orders\",\n    admin: {\n        entityViews: [\n            {\n                key: \"audit\",");
-        expect(syntaxErrors("orders.ts", String(updated))).toEqual([]);
+    it("adds the list as the first option when there is none", () => {
+        const updated = register(customization(""));
+        expect(updated).toContain("customizeTable(\"orders\", {\n    entityViews: [\n        {\n            key: \"audit\",");
+        expect(syntaxErrors("orders.tsx", String(updated))).toEqual([]);
     });
 
-    it("fills an empty admin block, and is not fooled by braces in strings or regexes", () => {
-        const updated = register(collection("    admin: {},\n    description: \"{ not code }\","));
-        expect(updated).toMatch(/admin: \{\n {8}entityViews: \[[\s\S]*?\]\n {4}\},/);
-        expect(syntaxErrors("orders.ts", String(updated))).toEqual([]);
+    it("fills an empty options object, and is not fooled by braces in strings or regexes", () => {
+        const source = `export const a = customizeTable("orders", {});\nconst s = "{ not code }";\n`;
+        const updated = registerEntityView(source, source.indexOf("{}"), view);
+        expect(updated).toMatch(/customizeTable\("orders", \{\n {4}entityViews: \[[\s\S]*?\]\n\}\);/);
+        expect(syntaxErrors("orders.tsx", String(updated))).toEqual([]);
     });
 
     it("recognises a view registered by key, in either form", () => {
-        expect(register(collection("    admin: { entityViews: [\"audit\"] },"))).toBe("already");
-        expect(register(collection("    admin: { entityViews: [{ key: \"audit\", name: \"A\" }] },"))).toBe("already");
+        expect(register(customization("    entityViews: [\"audit\"],"))).toBe("already");
+        expect(register(customization("    entityViews: [{ key: \"audit\", name: \"A\" }],"))).toBe("already");
     });
 
-    it("does not reach into a nested admin block", () => {
-        const source = collection("    properties2: { admin: { entityViews: [] } },");
+    it("does not reach into a nested entityViews", () => {
+        const source = customization("    nested: { entityViews: [] },");
         const updated = String(register(source));
-        expect(updated).toContain("    slug: \"orders\",\n    admin: {");
-        expect(updated).toContain("properties2: { admin: { entityViews: [] } }");
+        expect(updated).toContain("customizeTable(\"orders\", {\n    entityViews: [");
+        expect(updated).toContain("nested: { entityViews: [] }");
+    });
+});
+
+describe("listCustomization", () => {
+    it("appends to cms/index.ts's tableCustomizations, once", () => {
+        const source = "import { postsCms } from \"./posts\";\n\nexport const tableCustomizations = [\n    postsCms\n];\n";
+        const updated = String(listCustomization(source, "ordersCms", "./orders"));
+        expect(updated).toContain("    postsCms,\n    ordersCms\n];");
+        expect(updated).toContain("import { ordersCms } from \"./orders\";");
+        expect(listCustomization(updated, "ordersCms", "./orders")).toBe("already");
+    });
+
+    it("answers undefined for a source with no list", () => {
+        expect(listCustomization("export const x = 1;\n", "ordersCms", "./orders")).toBeUndefined();
     });
 });
 

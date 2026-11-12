@@ -1,14 +1,14 @@
 /**
  * Building a project bundle.
  *
- * A bundle is the deployable form of a project: compiled collections, functions,
- * crons and schema, plus a generated manifest describing exactly what it needs
+ * A bundle is the deployable form of a project: its compiled tables, backend
+ * modules, functions, crons and schema, plus a generated manifest describing exactly what it needs
  * to run. It contains no Dockerfile and no repository — the runtime is supplied
  * separately, which is what allows a project to be moved onto a patched runtime
  * without being rebuilt.
  *
  * Compilation runs through a generated tsconfig rooted at the project directory,
- * so the output mirrors the source layout (`config/…`, `backend/functions/…`)
+ * so the output mirrors the source layout (`backend/schema/…`, `backend/functions/…`)
  * and every path in the manifest is predictable. Letting each workspace package
  * emit into its own `dist/` would have meant guessing at three different
  * layouts, since `rootDir` differs between the template flavours.
@@ -23,14 +23,16 @@ import {
     RUNTIME_CONTRACT_VERSION,
     findStorageSuffixCollision,
     parseEnvBoolean,
-    type CollectionConfig,
+    computeSchemaVersion,
     type ResourceGraph,
     type NativeDependency,
     type RebaseBundleManifest,
     type RebaseBundleFunction,
     type RebaseBackendAppConfig
 } from "@rebasepro/types";
-import { compareMountOrder, LEGACY_CONFIG_DIR, resolveBackendPaths } from "./manifest";
+import { compareMountOrder, resolveBackendPaths } from "./manifest";
+import { schemaDirArgs } from "./utils/schema-dir";
+import { loadProjectSchema, type ModuleAliases } from "./utils/project-schema";
 import { cliVersion } from "./utils/version";
 import { toolStdio } from "./utils/tool-stdio";
 import { analyseFunctionsDirectory, summarisePortability } from "./function-portability";
@@ -78,7 +80,7 @@ export interface BuildBundleOptions {
     vendor?: boolean;
     /** Skip type checking. Faster, and strictly worse — for iteration only. */
     skipTypeCheck?: boolean;
-    /** Skip regenerating the Drizzle schema from the collections. */
+    /** Skip regenerating the Drizzle schema from the tables. */
     skipSchema?: boolean;
     /** Emit progress. */
     log?: (message: string) => void;
@@ -87,12 +89,15 @@ export interface BuildBundleOptions {
      * warning the build prints, go to stderr. See `toolStdio`.
      */
     quietStdout?: boolean;
+    /** Module specifiers mapped to files when importing the schema (in-repo runs and tests). */
+    moduleAliases?: ModuleAliases;
 }
 
 export interface BuildBundleResult {
     outDir: string;
     manifest: RebaseBundleManifest;
-    collectionCount: number;
+    /** How many tables (and views) the bundle declares. */
+    tableCount: number;
     /**
      * Whether the dependency tree was installed into the bundle, and why not
      * when it was not. Reported rather than silent: "your pods will take a
@@ -162,13 +167,13 @@ function say(options: BuildBundleOptions, line: string): void {
  * Type roots normally resolve by walking up from the tsconfig's own directory,
  * which breaks here for two reasons: the generated config lives in `.rebase/`,
  * and a pnpm workspace puts `@types/node` inside the *package* that depends on
- * it (`config/node_modules/@types`) rather than at the project root. Listing them
+ * it (`backend/node_modules/@types`) rather than at the project root. Listing them
  * explicitly, as absolute paths, sidesteps both.
  */
 function discoverTypeRoots(projectRoot: string): string[] {
     const candidates: string[] = [];
 
-    for (const relative of [".", "config", "backend", "frontend"]) {
+    for (const relative of [".", "backend", "frontend"]) {
         candidates.push(path.join(projectRoot, relative, "node_modules", "@types"));
     }
 
@@ -275,7 +280,7 @@ dropped };
 /**
  * Compose the tsconfig used to compile the bundle.
  *
- * Extends the config package's own tsconfig when there is one, so the project's
+ * Extends the backend's own tsconfig when there is one, so the project's
  * choices about target, JSX and strictness are respected. It has to be `extends`
  * rather than a copy of `compilerOptions`: TypeScript resolves relative paths
  * against the file they were written in, so copying a value like
@@ -297,16 +302,18 @@ async function writeBundleTsconfig(
         return relative.split(path.sep).join("/");
     };
 
-    const configTsconfigPath = path.join(projectRoot, "config", "tsconfig.json");
-    const extendsFrom = fs.existsSync(configTsconfigPath)
-        ? fromTsconfig(path.join("config", "tsconfig.json"))
+    // Every source the bundle compiles is under `backend/`, so its tsconfig is
+    // the one whose choices apply.
+    const backendTsconfigPath = path.join(projectRoot, "backend", "tsconfig.json");
+    const extendsFrom = fs.existsSync(backendTsconfigPath)
+        ? fromTsconfig(path.join("backend", "tsconfig.json"))
         : undefined;
 
     // Neutralize aliases that escape the project (see `filterProjectPaths`).
     let pathOverrides: Record<string, unknown> = {};
-    const baseOptions = await readCompilerOptions(projectRoot, configTsconfigPath);
+    const baseOptions = await readCompilerOptions(projectRoot, backendTsconfigPath);
     if (baseOptions?.paths && typeof baseOptions.paths === "object") {
-        const baseDir = path.dirname(configTsconfigPath);
+        const baseDir = path.dirname(backendTsconfigPath);
         const baseUrl = path.resolve(
             baseDir,
             typeof baseOptions.baseUrl === "string" ? baseOptions.baseUrl : "."
@@ -378,13 +385,14 @@ paths: kept };
 }
 
 /**
- * Whether the compiled config package exports a `storageAuthorize` hook.
+ * Whether the compiled `backend/storage` module exports a `storageAuthorize`
+ * hook.
  *
  * Recorded in the manifest so a host can refuse a deploy that would enable file
  * storage with no access model, rather than let the runtime's boot guard turn it
  * into a crash loop the developer cannot read.
  *
- * Read from the *compiled* index, deliberately: that is the exact module the
+ * Read from the *compiled* module, deliberately: that is the exact module the
  * runtime imports and reads the export off, so this cannot disagree with what
  * actually happens at boot. It is a textual check rather than an import because
  * a freshly built bundle cannot resolve its own dependencies until it is
@@ -393,21 +401,23 @@ paths: kept };
  * Errs toward `false`: a missed detection costs a deploy rejection whose message
  * says exactly how to proceed, while a false positive would hand back the crash
  * loop this exists to prevent.
+ *
+ * @param compiledStorageModule the module without its extension
+ *   (`<bundle>/backend/storage`), or a file; `.js`, `.mjs` and `.ts` are tried.
  */
-export function detectStorageAuthorize(compiledConfigDir: string, depth = 0): boolean {
-    const indexPath = [".js", ".mjs", ".ts"]
-        .map(ext => path.join(compiledConfigDir, `index${ext}`))
-        .find(candidate => fs.existsSync(candidate));
-    if (!indexPath) return false;
-    return moduleExportsStorageAuthorize(indexPath, depth);
+export function detectStorageAuthorize(compiledStorageModule: string, depth = 0): boolean {
+    const modulePath = [compiledStorageModule, ...[".js", ".mjs", ".ts"].map(ext => `${compiledStorageModule}${ext}`)]
+        .find(candidate => fs.existsSync(candidate) && fs.statSync(candidate).isFile());
+    if (!modulePath) return false;
+    return moduleExportsStorageAuthorize(modulePath, depth);
 }
 
 /**
  * Whether one compiled module re-exports or defines `storageAuthorize`.
  *
  * Split out from {@link detectStorageAuthorize} so a wildcard re-export can be
- * followed. `export * from "./storage.js"` is an ordinary way to write a config
- * barrel, and treating it as "no hook" rejected deploys that were correct — with
+ * followed. `export * from "./access.js"` is an ordinary way to write a module
+ * that re-exports, and treating it as "no hook" rejected deploys that were correct — with
  * a message telling the developer to add a hook they had already written.
  */
 function moduleExportsStorageAuthorize(modulePath: string, depth: number): boolean {
@@ -508,8 +518,7 @@ export function detectNativeDependencies(
 
     const searchRoots = [
         path.join(projectRoot, "node_modules"),
-        path.join(projectRoot, "backend", "node_modules"),
-        path.join(projectRoot, "config", "node_modules")
+        path.join(projectRoot, "backend", "node_modules")
     ].filter(dir => fs.existsSync(dir));
 
     while (queue.length > 0 && visited < limit) {
@@ -592,10 +601,9 @@ function hasNodeBinary(dir: string, depth = 0): boolean {
  *
  * The bundle's declared deps are installed with `npm install` from the public
  * registry beside the bundle at boot. A workspace package is not there, so
- * declaring it guarantees a boot-time install failure. The most common case is
- * the standard `config` package: the backend depends on it by name, but it is
- * *carried in the bundle* (as `entry.config`), so it must never also be an npm
- * dependency. Projects often express this as a `workspace:` range — caught
+ * declaring it guarantees a boot-time install failure — a shared package of the
+ * project's own, for one, which the backend depends on by name. Projects often
+ * express this as a `workspace:` range — caught
  * separately — but a plain `"*"` against a workspace symlink is just as common
  * and looks like a registry range, so the symlink is what actually settles it.
  *
@@ -614,7 +622,7 @@ function resolvesToWorkspacePackage(projectRoot: string, name: string): boolean 
         realRoot = projectRoot;
     }
 
-    for (const base of [projectRoot, path.join(projectRoot, "backend"), path.join(projectRoot, "config")]) {
+    for (const base of [projectRoot, path.join(projectRoot, "backend")]) {
         const link = path.join(base, "node_modules", name);
         try {
             // A workspace link is a *symlink*; a normal (non-pnpm) registry
@@ -646,7 +654,7 @@ function resolvesToWorkspacePackage(projectRoot: string, name: string): boolean 
  * be read last, so a scaffold declaring `dotenv ^16` at the root and `^17.4.2`
  * in the backend shipped a manifest telling the managed runtime to install 16.
  */
-const BUNDLE_DEP_MANIFESTS = ["package.json", "config/package.json", "backend/package.json"];
+const BUNDLE_DEP_MANIFESTS = ["package.json", "backend/package.json"];
 
 /**
  * Where a project's npm configuration may live, in the order they are joined.
@@ -722,10 +730,10 @@ function nonRegistrySpecifier(version: string): string | null {
     return null;
 }
 
-/** The names this project's own `config`, `backend` and `frontend` packages go by. */
+/** The names this project's own `backend` and `frontend` packages go by. */
 function localPackageNames(projectRoot: string): Set<string> {
     const names = new Set<string>();
-    for (const dir of ["config", "backend", "frontend"]) {
+    for (const dir of ["backend", "frontend"]) {
         try {
             const { name } = JSON.parse(fs.readFileSync(path.join(projectRoot, dir, "package.json"), "utf8")) as { name?: string };
             if (name) names.add(name);
@@ -742,8 +750,7 @@ function localPackageNames(projectRoot: string): Set<string> {
  * Packages the runtime image already provides are excluded — reinstalling a
  * second copy of the server next to the one running the process is at best
  * wasted space and at worst a version conflict. Workspace packages are excluded
- * too: they are not on the registry the runtime installs from, and the project's
- * own config package already travels inside the bundle.
+ * too: they are not on the registry the runtime installs from.
  *
  * Throws when a declared range is not something the registry can resolve, or
  * when two manifests declare a name at ranges nothing satisfies. The
@@ -787,7 +794,7 @@ export function collectDeclaredDependencies(projectRoot: string): Record<string,
             // A workspace protocol means nothing outside this repository.
             if (typeof version === "string" && version.startsWith("workspace:")) continue;
             // A plain range that nonetheless resolves to an in-repo workspace
-            // package (e.g. `"config": "*"` symlinked to `../../config`) —
+            // package (e.g. `"shared": "*"` symlinked to `../shared`) —
             // the runtime cannot install it from the registry.
             if (resolvesToWorkspacePackage(projectRoot, name)) continue;
             // Named like one of this project's own packages but resolved
@@ -1004,7 +1011,6 @@ export function detectFrameworkDepDrift(projectRoot: string, cliVersion: string)
     for (const relative of [
         "package.json",
         "backend/package.json",
-        "config/package.json",
         "frontend/package.json"
     ]) {
         const file = path.join(projectRoot, relative);
@@ -1049,7 +1055,7 @@ conflicting: detectDeclaredDepConflicts(projectRoot) };
  *
  * `normalizeEsmSpecifiers` scans emitted output with a regular expression, and a
  * regular expression cannot tell a specifier from a specifier somebody wrote
- * about. The stock template ships one: `config/resources.ts` documents
+ * about. The stock template ships one: `backend/resources.ts` documents
  * `import { media } from "../resources";` inside a docblock, tsc preserves the
  * comment, and every `rebase build` of an untouched scaffold printed
  * `⚠ 1 import(s) could not be resolved`. A warning that is wrong on the default
@@ -1100,7 +1106,7 @@ export function commentSpans(source: string): Array<[number, number]> {
  * Rewrite relative import specifiers in emitted JavaScript so Node can resolve them.
  *
  * TypeScript deliberately does not touch specifiers: `moduleResolution: "bundler"`
- * lets a project write `from "./posts"` or `from "./collections"`, and TypeScript
+ * lets a project write `from "./posts"` or `from "./schema"`, and TypeScript
  * emits them unchanged on the assumption that a bundler will finish the job.
  * Nothing bundles a Rebase bundle — the runtime imports these files directly with
  * Node's ESM loader, which requires a full path with an extension and refuses
@@ -1226,7 +1232,7 @@ force: true });
 }
 
 /**
- * Regenerate the Drizzle schema from the collections.
+ * Regenerate the Drizzle schema from the tables.
  *
  * Delegated to the database driver's own CLI — the same code `rebase schema
  * generate` runs — so there is one implementation of what a schema is. When no
@@ -1236,7 +1242,6 @@ force: true });
  */
 async function regenerateSchema(
     projectRoot: string,
-    configDir: string,
     options: BuildBundleOptions
 ): Promise<void> {
     const backendDir = path.join(projectRoot, "backend");
@@ -1255,18 +1260,20 @@ async function regenerateSchema(
         return;
     }
 
-    const collectionsPath = path.join("..", configDir, "collections");
+    // The driver reads `backend/schema` by default; a project that moved its
+    // tables names them, as every other driver command line does.
+    const driverArgs = ["schema", "generate"];
     // Imported here, not at the top: this module is part of the package's
     // entry, which every `rebase` invocation loads, and execa is ~100 modules.
     const { execa } = await import("execa");
     try {
         await execa(
             runner,
-            [script, "schema", "generate", "--collections", collectionsPath],
+            [script, ...driverArgs, ...schemaDirArgs(projectRoot, driverArgs)],
             { cwd: backendDir,
 stdio: "pipe" }
         );
-        log(options, chalk.dim("  regenerated database schema from collections"));
+        log(options, chalk.dim("  regenerated database schema from the tables"));
     } catch (err) {
         // A schema that cannot be generated means the bundle would carry a stale
         // one, and a stale schema is how a deploy quietly writes to the wrong
@@ -1286,8 +1293,8 @@ stdio: "pipe" }
  * `rebase dev` runs `backend/src/index.ts` whenever a project has one, so for
  * the whole of local development that file *is* the server and every route
  * written in it works. A bundle has no entrypoint of its own: the runtime boots
- * the bundle and mounts what the manifest points at — the config package,
- * functions, crons and the schema. The file is not compiled, not shipped, and
+ * the bundle and mounts what the manifest points at — the tables, the backend
+ * modules, functions, crons and the schema. The file is not compiled, not shipped, and
  * never imported.
  *
  * Nothing said so. A project with custom routes in its entrypoint built clean,
@@ -1322,7 +1329,8 @@ export interface ComposeManifestInput {
     schemaVersion: string;
     appName: string;
     entry: RebaseBundleManifest["entry"];
-    collectionSlugs: string[];
+    /** The slugs of the tables the bundle declares. */
+    tableSlugs: string[];
     functions: RebaseBundleFunction[];
     nativeModules: NativeDependency[];
     declaresStorageAuthorize: boolean;
@@ -1354,7 +1362,7 @@ export function composeBundleManifest(input: ComposeManifestInput): RebaseBundle
         app: input.appName,
         kind: "backend",
         entry: input.entry,
-        tables: [...input.collectionSlugs].sort(),
+        tables: [...input.tableSlugs].sort(),
         ...(input.functions.length > 0 ? { functions: input.functions } : {}),
         hooks: {
             native: input.nativeModules.length > 0,
@@ -1408,29 +1416,42 @@ export async function buildBundle(options: BuildBundleOptions): Promise<BuildBun
     // for the same reason as the refusal above.
     const release = lockBundleBuild(projectRoot);
 
-    const resolved = resolveBackendPaths(app, projectRoot);
-    // Still the `config/` layout: this build moves onto `resolved.tables`
-    // (`entry.tables`, bundle format 3) in its own change. Until then it builds
-    // exactly what it built, from the legacy config package.
-    const paths = {
-        ...resolved,
-        config: LEGACY_CONFIG_DIR,
-        usersCollection: "collections/users",
-        hasConfig: fs.existsSync(path.join(projectRoot, LEGACY_CONFIG_DIR)),
-        hasCollections: fs.existsSync(path.join(projectRoot, LEGACY_CONFIG_DIR, "collections"))
-    };
+    const paths = resolveBackendPaths(app, projectRoot);
     const outDir = path.resolve(projectRoot, options.outDir ?? DEFAULT_BUNDLE_DIR);
+    const schemaDir = path.join(projectRoot, paths.tables);
+
+    // The tables, read by the loader the runtime boots from — before anything
+    // is compiled or written. A definition the runtime would refuse is refused
+    // here, by the same code and in the same words, and so is a project still
+    // on the collections layout: the loader names the codemod. A
+    // format-3 runtime refuses such a bundle at boot, so building one would
+    // only move the failure to the deploy.
+    const schema = await loadProjectSchema(projectRoot, schemaDir, options.moduleAliases);
+    const tables = schema.compiled.descriptors;
+    if (paths.hasTables && tables.length === 0) {
+        throw new Error(
+            `${path.join(paths.tables, path.basename(schema.loaded.indexFile))} exports no tables. ` +
+            "Export at least one defineTable / defineAuthTable / defineView from it, or delete the " +
+            `${paths.tables} directory to have the runtime introspect the live database instead.`
+        );
+    }
+
+    // The backend modules beside the schema, each one when it is there.
+    const backendModules = (["resources", "storage", "hooks"] as const)
+        .filter(part => fs.existsSync(path.join(projectRoot, paths[part])));
 
     const includes: string[] = [];
     const addIfExists = (relative: string, pattern: string): void => {
         if (fs.existsSync(path.join(projectRoot, relative))) includes.push(pattern);
     };
 
-    // The whole config package, not just its collections: a headless project
-    // has no `config/collections` but still ships `storageAuthorize` here.
-    if (paths.hasConfig) {
-        addIfExists(paths.config, `${paths.config}/**/*.ts`);
+    // The whole schema directory, not just what its index reaches: the loader
+    // imports every module under it to hold the index to what they define.
+    // Every module spelling the loader reads, JavaScript too.
+    if (paths.hasTables) {
+        includes.push(`${paths.tables}/**/*`);
     }
+    for (const part of backendModules) includes.push(paths[part]);
     addIfExists(paths.functions, `${paths.functions}/**/*.ts`);
     addIfExists(paths.crons, `${paths.crons}/**/*.ts`);
     if (fs.existsSync(path.join(projectRoot, paths.schema))) {
@@ -1439,41 +1460,43 @@ export async function buildBundle(options: BuildBundleOptions): Promise<BuildBun
 
     if (includes.length === 0) {
         throw new Error(
-            `Nothing to build for app "${appName}". Expected a config directory at ` +
-            `"${paths.config}" or functions at "${paths.functions}".`
+            `Nothing to build for app "${appName}". Expected tables in "${paths.tables}" ` +
+            `(an index.ts exporting them), backend modules (${paths.resources}, ${paths.storage}, ` +
+            `${paths.hooks}) or functions at "${paths.functions}".`
         );
     }
 
-    // Regenerate the Drizzle schema from the collections first.
+    // Regenerate the Drizzle schema from the tables first.
     //
     // The template's backend build did this, so a project moving to the bundle
     // flow would otherwise silently ship whatever `schema.generated.ts` happened
     // to be on disk — stale by exactly the edits just made.
-    if (paths.hasCollections && options.skipSchema !== true) {
-        await regenerateSchema(projectRoot, paths.config, options);
+    if (paths.hasTables && options.skipSchema !== true) {
+        await regenerateSchema(projectRoot, options);
     }
 
     // The server-side `Database` registration, before anything compiles
     // against it. It is gitignored, so on a fresh clone only this writes it:
-    // without it the callbacks compile against untyped `context.data`, and a
+    // without it the hooks compile against untyped `context.data`, and a
     // project that builds locally fails to build in CI.
-    if (paths.hasCollections) {
+    if (paths.hasTables) {
         const { writeRegistrationForBuild } = await import("./commands/generate_sdk");
-        const registered = await writeRegistrationForBuild(
-            path.join(projectRoot, paths.config, "collections"),
-            app.registerDatabase === true
-        );
+        const registered = await writeRegistrationForBuild(projectRoot, tables, app.registerDatabase === true);
         if (registered) {
             log(options, chalk.dim(`  registered the Database for server-side code in ${path.relative(projectRoot, registered)}/`));
         }
     }
+    // The registration is an ambient declaration the hooks compile against,
+    // so it is part of the program whenever it is there.
+    addIfExists(paths.generated, `${paths.generated}/**/*.ts`);
 
     // Say out loud what this build is NOT going to include. See
     // `findUnusedServerEntry` for why silence here was expensive.
     const unusedEntry = findUnusedServerEntry(projectRoot, paths.functions);
     if (unusedEntry) {
         const parts = [
-            ...(paths.hasCollections ? [`${paths.config}/`] : []),
+            ...(paths.hasTables ? [`${paths.tables}/`] : []),
+            ...backendModules.map(part => paths[part]),
             `${paths.functions}/`,
             "the schema"
         ];
@@ -1524,31 +1547,18 @@ stdio: toolStdio(options.quietStdout) });
     }
 
     // ── Inspect what was produced ────────────────────────────────────────────
-    const compiledConfigDir = path.join(outDir, paths.config);
-    const compiledCollectionsDir = path.join(compiledConfigDir, "collections");
-
-    let collections: CollectionConfig[] = [];
-    if (paths.hasCollections) {
-        collections = await loadSourceCollections(path.join(projectRoot, paths.config, "collections"));
-        if (collections.length === 0) {
-            throw new Error(
-                "No collections were found in " +
-                `${path.join(paths.config, "collections")}. ` +
-                "Define at least one collection there, or remove the directory to have the " +
-                "runtime introspect collections from the live database instead."
-            );
-        }
-        if (!fs.existsSync(compiledCollectionsDir)) {
-            throw new Error(
-                "Compilation produced no collections directory at " +
-                `${path.relative(projectRoot, compiledCollectionsDir)}.`
-            );
-        }
+    const compiledTablesDir = path.join(outDir, paths.tables);
+    if (paths.hasTables && !fs.existsSync(compiledTablesDir)) {
+        throw new Error(
+            "Compilation produced no schema directory at " +
+            `${path.relative(projectRoot, compiledTablesDir)}.`
+        );
     }
 
     const declared = collectDeclaredDependencies(projectRoot);
     const nativeModules = detectNativeDependencies(projectRoot, declared);
-    const declaresStorageAuthorize = detectStorageAuthorize(path.join(outDir, paths.config));
+    const compiledModule = (source: string): string => source.replace(/\.[mc]?ts$/, ".js");
+    const declaresStorageAuthorize = detectStorageAuthorize(path.join(outDir, compiledModule(paths.storage)));
 
     // Resolve the declared buckets now, and refuse the build if two of them would
     // read the same environment variables. Catching it here means a rename, not a
@@ -1605,23 +1615,21 @@ stdio: toolStdio(options.quietStdout) });
     const manifest = composeBundleManifest({
         runtimeRange: options.runtimeRange,
         builtAgainst: resolveServerVersion(projectRoot),
-        // The schema version is computed from table descriptors now, and this
-        // build still compiles the legacy config package (see `paths` above):
-        // there are no descriptors to hash yet, so it records none — "ask the
-        // runtime". The format-3 runtime refuses this bundle's `tables` (a
-        // config/collections directory) with the codemod, which is the truth
-        // about a legacy project until this build moves onto backend/schema.
-        schemaVersion: "",
+        // The tables' identity, hashed from their descriptors exactly as the
+        // runtime and every generated SDK hash them, so a client can tell
+        // whether it was generated against this deployment.
+        schemaVersion: paths.hasTables ? computeSchemaVersion(tables) : "",
         appName,
         entry: {
-            tables: paths.hasCollections ? relative(path.join(paths.config, "collections")) : undefined,
+            tables: paths.hasTables ? relative(paths.tables) : undefined,
+            resources: relative(compiledModule(paths.resources)),
+            storage: relative(compiledModule(paths.storage)),
+            hooks: relative(compiledModule(paths.hooks)),
             functions: relative(paths.functions),
             crons: relative(paths.crons),
             schema: relative(schemaOut)
         },
-        collectionSlugs: collections
-            .map(collection => collection.slug)
-            .filter((slug): slug is string => Boolean(slug)),
+        tableSlugs: tables.map(table => table.slug),
         functions: bundledFunctions,
         nativeModules,
         declaresStorageAuthorize,
@@ -1683,7 +1691,7 @@ stdio: toolStdio(options.quietStdout) });
 
     return { outDir,
 manifest,
-collectionCount: collections.length,
+tableCount: tables.length,
 vendor,
 release };
 }
@@ -2096,7 +2104,7 @@ export function buildStaticBundle(options: {
             builtAgainst: resolveServerVersion(projectRoot),
             contract: RUNTIME_CONTRACT_VERSION
         },
-        // A static app has no collections and therefore no schema contract.
+        // A static app has no tables and therefore no schema contract.
         schemaVersion: "",
         app: appName,
         kind: "static",
@@ -2140,84 +2148,6 @@ dependencies: {} }, null, 2)}\n`,
     return { outDir,
 manifest,
 fileCount };
-}
-
-/**
- * Which files in a collections directory are collections.
- *
- * Mirrors the runtime loader's rules exactly, and must keep mirroring them: the
- * set of files counted here decides the schema version, and the runtime decides
- * what it serves the same way. A divergence would show up as a client that is
- * permanently "out of date" against a server that agrees with it.
- *
- * (`._*` guards macOS AppleDouble files, which look like sources and are not.)
- */
-function isCollectionSourceFile(name: string): boolean {
-    if (name.startsWith(".")) return false;
-    if (name.includes(".test.") || name.includes(".spec.")) return false;
-    if (name.endsWith(".d.ts")) return false;
-    if (name === "index.ts" || name === "index.js") return false;
-    return name.endsWith(".ts") || name.endsWith(".js");
-}
-
-/**
- * Load collections from **source**, for hashing and for the manifest's slug list.
- *
- * Deliberately not the compiled output. A compiled bundle imports its
- * dependencies from beside itself — that is the whole point of shipping a
- * `package.json` with it — but at build time nothing has been installed there
- * yet, and under pnpm the project's own `node_modules` lives one directory per
- * package, so the emitted files genuinely cannot resolve their imports until
- * they are deployed.
- *
- * Reading source costs nothing in fidelity: compilation erases types, it does
- * not change the values a collection module exports, so the hash is the same
- * either way.
- */
-async function loadSourceCollections(collectionsDir: string): Promise<CollectionConfig[]> {
-    if (!fs.existsSync(collectionsDir)) return [];
-
-    const { createJiti } = await import("jiti") as {
-        createJiti: (filename: string, options?: Record<string, unknown>) => {
-            import: (id: string) => Promise<unknown>;
-        };
-    };
-    const jiti = createJiti(path.join(collectionsDir, "index.ts"), {
-        interopDefault: true,
-        esmResolve: true
-    });
-
-    const files = fs.readdirSync(collectionsDir)
-        .filter(isCollectionSourceFile)
-        .sort();
-
-    const collections: CollectionConfig[] = [];
-    const failures: string[] = [];
-
-    for (const file of files) {
-        try {
-            const mod = await jiti.import(path.join(collectionsDir, file)) as
-                { default?: CollectionConfig } | CollectionConfig;
-            const collection = (mod as { default?: CollectionConfig }).default
-                ?? (mod as CollectionConfig);
-            if (collection && typeof collection === "object" && "slug" in collection) {
-                collections.push(collection);
-            } else {
-                failures.push(`${file}: no default-exported collection`);
-            }
-        } catch (err) {
-            failures.push(`${file}: ${err instanceof Error ? err.message : String(err)}`);
-        }
-    }
-
-    if (failures.length > 0) {
-        throw new Error(
-            `Could not read ${failures.length} collection file(s):\n` +
-            failures.map(f => `  • ${f}`).join("\n")
-        );
-    }
-
-    return collections;
 }
 
 /** The `@rebasepro/server` version the project resolves — what it was built against. */

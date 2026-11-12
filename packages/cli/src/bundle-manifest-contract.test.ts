@@ -43,17 +43,17 @@ export function exampleManifest() {
             crons: "backend/crons",
             schema: "backend/src/schema.generated.js"
         },
-        collectionSlugs: ["posts", "events"],
+        tableSlugs: ["posts", "events"],
         functions: [{ name: "hello", file: "backend/functions/hello.js", portable: true }],
         nativeModules: [],
         declaresStorageAuthorize: true,
         resources: {
             version: 1,
             resources: [
-                { kind: "bucket", key: "media", engine: "s3", transport: "server", options: { account: "minio" }, usedBy: ["property:posts.cover"] },
+                { kind: "bucket", key: "media", engine: "s3", transport: "server", options: { account: "minio" }, usedBy: ["column:posts.cover"] },
                 { kind: "cron", key: "nightly", engine: "scheduler", transport: "server", options: { schedule: "0 3 * * *", timezone: "Europe/Madrid" } },
                 { kind: "database", key: "(default)", engine: "postgres", transport: "server", options: { extensions: ["vector"] } },
-                { kind: "database", key: "analytics", engine: "postgres", transport: "server", options: {}, usedBy: ["collection:events"] },
+                { kind: "database", key: "analytics", engine: "postgres", transport: "server", options: {}, usedBy: ["table:events"] },
                 { kind: "function", key: "hello", engine: "http", transport: "server", options: { file: "backend/functions/hello.ts", portable: true } },
                 { kind: "queue", key: "thumbnails", engine: "jobs", transport: "server", options: {} },
                 { kind: "topic", key: "signups", engine: "jobs", transport: "server", options: {} }

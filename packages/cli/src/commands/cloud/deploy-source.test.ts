@@ -90,7 +90,7 @@ function bundle(kind: "backend" | "static", deps: Record<string, unknown> = { de
         deps,
         build: { cli: "0.21.0", node: "22", createdAt: "2026-09-15T00:00:00Z" }
     }));
-    write(bundleDir, "config/index.js", "export default {};\n");
+    write(bundleDir, "backend/schema/index.js", "export default {};\n");
 }
 
 /** Route the uploads; `sourceStatus` decides how the source one answers. */
@@ -408,7 +408,7 @@ describe("a vendored bundle", () => {
         await deploy("--no-source");
 
         expect(archiveEntries(bundleArchive)).toEqual(expect.arrayContaining([
-            "config/index.js",
+            "backend/schema/index.js",
             "manifest.json",
             "node_modules/pg/package.json",
             "node_modules/pg/node_modules/pg-types/index.js"
@@ -423,7 +423,7 @@ describe("a vendored bundle", () => {
 
         await deploy("--no-source");
 
-        expect(archiveEntries(bundleArchive)).toEqual(["config/index.js", "manifest.json"]);
+        expect(archiveEntries(bundleArchive)).toEqual(["backend/schema/index.js", "manifest.json"]);
     });
 });
 
@@ -438,7 +438,7 @@ describe("a deploy that builds its own bundle", () => {
         write(project, "rebase.json", JSON.stringify({ rebase: "^1", apps: { backend: { type: "backend", runtime: "managed" } } }));
         write(project, "package.json", JSON.stringify({ dependencies: { dotenv: "^16.0.0" } }));
         write(project, "backend/package.json", JSON.stringify({ dependencies: { dotenv: "^17.4.2" } }));
-        write(project, "config/collections/posts.ts", "export default {};\n");
+        write(project, "backend/schema/index.ts", "export {};\n");
         controlPlane();
 
         await expect(deployCommand(["node", "rebase", "cloud", "deploy", "--no-follow"], "shop"))

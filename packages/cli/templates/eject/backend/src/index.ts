@@ -24,15 +24,17 @@ import {
 import { declaredDataSources, declaredStorageSources } from "@rebasepro/types";
 // Side-effect import: declaring is what registers, so anything that dropped
 // this as "unused" would leave the backend with no buckets — silently.
-import "../../config/resources";
-// {{#collections}}
+import "../resources";
+// {{#tables}}
 import { enums, relations, tables } from "./schema.generated";
-// {{/collections}}
-import { storageAuthorize } from "../../config/storage";
+// {{/tables}}
+// {{#storage}}
+import { storageAuthorize } from "../storage";
+// {{/storage}}
+// {{#hooks}}
+import { hooks } from "../hooks";
+// {{/hooks}}
 import { env } from "./env";
-// {{#collections}}
-import usersCollection from "../../config/collections/users";
-// {{/collections}}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -41,9 +43,9 @@ const __dirname = path.dirname(__filename);
  * The project root: the nearest directory holding `rebase.json`.
  *
  * Walked up to rather than counted, because this file runs from two depths —
- * `backend/src` under `rebase dev`, `backend/dist/backend/src` compiled — and
- * a fixed `../..` from the compiled file is `backend/dist`, where local uploads
- * then landed and the next build wiped them.
+ * `backend/src` under `rebase dev`, `backend/dist/src` compiled — and a fixed
+ * `../..` from the compiled file is `backend/`, where local uploads then
+ * landed beside the code.
  */
 function findProjectRoot(from: string): string {
     for (let dir = from; ; dir = path.dirname(dir)) {
@@ -54,7 +56,7 @@ function findProjectRoot(from: string): string {
 const projectRoot = findProjectRoot(__dirname);
 
 // Which databases and buckets this project has, read from the declarations in
-// `config/resources.ts`. One declaration site, so this process, the platform
+// `backend/resources.ts`. One declaration site, so this process, the platform
 // and the frontend all read the same list. A project that declares none gets
 // one default source of each, from the plain unsuffixed variables.
 const dataSources = declaredDataSources();
@@ -138,7 +140,7 @@ app.use("/*", overridableSecurityHeaders());
 //
 // Doing this by hand — one `createPostgresDatabaseConnection(env.DATABASE_URL)`
 // — is what this file used to do, and it quietly broke the moment anyone
-// declared a second database: collections routed to it fell back to the default
+// declared a second database: tables routed to it fell back to the default
 // driver and their rows landed in the wrong database, behind a server that
 // looked healthy.
 const resolvedDataSources = resolveDataSources(process.env, dataSources);
@@ -157,7 +159,7 @@ async function startServer() {
     // Passed only when the directory exists, because a configured `cronsDir`
     // with nothing in it mounts the cron routes and warns at every boot.
     // Sibling-relative like `functionsDir`: both compile alongside this file, so
-    // the same path is right from source and from `backend/dist/backend/src`.
+    // the same path is right from source and from `backend/dist/src`.
     const cronsDir = path.resolve(__dirname, "../crons");
 
     // Open a connection per declared database. Sequential, and a failure on the
@@ -165,42 +167,46 @@ async function startServer() {
     // server this process is about to abandon.
     const drivers = await initializeDataSources(
         resolvedDataSources,
-        // {{#collections}}
+        // {{#tables}}
         { tables, enums, relations },
-        // {{/collections}}
-        // {{^collections}}
-        // No generated schema: this project declares no collections in code.
+        // {{/tables}}
+        // {{^tables}}
+        // No generated schema: this project declares no tables in code.
         undefined,
-        // {{/collections}}
+        // {{/tables}}
         [__dirname]
     );
 
     const backend = await initializeRebaseBackend({
-        // {{#collections}}
-        collectionsDir: path.resolve(__dirname, "../../config/collections"),
-        // {{/collections}}
-        // {{^collections}}
-        // No `collectionsDir`: this project declares no collections in code, so
-        // the server derives them from the live database schema at boot —
-        // exactly what the managed runtime did for it.
-        // {{/collections}}
+        // {{#tables}}
+        // The tables `backend/schema/index.ts` exports, loaded at boot through
+        // the same loader the managed runtime uses — and the directory the
+        // schema editor writes to. Sibling-relative, so it is `backend/schema`
+        // from source and `backend/dist/schema` compiled.
+        schemaDir: path.resolve(__dirname, "../schema"),
+        // {{/tables}}
+        // {{^tables}}
+        // No `schemaDir`: this project declares no tables in code, so the
+        // server derives them from the live database schema at boot — exactly
+        // what the managed runtime did for it.
+        // {{/tables}}
+        // {{#hooks}}
+        // Global table hooks, from backend/hooks.ts: run for every table.
+        hooks,
+        // {{/hooks}}
         functionsDir: path.resolve(__dirname, "../functions"),
         cronsDir: fs.existsSync(cronsDir) ? cronsDir : undefined,
         server,
         app,
         // One bootstrapper per data source, each registered under its own key —
-        // the key is exactly what `collection.dataSource` routes against. Only
+        // the key is exactly what a table's `database` routes against. Only
         // the default source is handed the generated schema, which describes
         // this project's tables and they live in the default database.
         bootstrappers: drivers.map(driver => driver.bootstrapper),
+        // Users live in the table `backend/schema` defines with
+        // `defineAuthTable`; without one, auth falls back to its own default
+        // users table — the same fallback a headless bundle gets.
         auth: {
-            // {{#collections}}
-            collection: usersCollection,
-            // {{/collections}}
-            // {{^collections}}
-            // No users collection is declared here, so auth falls back to its
-            // own default users table — the same fallback a headless bundle gets.
-            // {{/collections}}
             jwtSecret,
             accessExpiresIn: env.JWT_ACCESS_EXPIRES_IN,
             refreshExpiresIn: env.JWT_REFRESH_EXPIRES_IN,
@@ -256,9 +262,15 @@ pass: env.SMTP_PASS! }
         // Storage is not under row-level security, so this hook IS its access
         // model — the server refuses to boot in production without one, because
         // "signed in" would otherwise be the only thing between a visitor and
-        // every file in the bucket. See config/storage.ts, which also shows the
+        // every file in the bucket. See backend/storage.ts, which also shows the
         // multi-tenant (per-owner) shape and the two escape hatches.
+        // {{#storage}}
         storageAuthorize,
+        // {{/storage}}
+        // {{^storage}}
+        // No backend/storage.ts: add one exporting `storageAuthorize` before
+        // configuring a bucket in production, or the server refuses to boot.
+        // {{/storage}}
         history: true
     });
 
@@ -311,15 +323,16 @@ pass: env.SMTP_PASS! }
     // {{#frontend}}
     // Serve the frontend in production.
     //
-    // Four levels up, not two: in production this file runs compiled, from
-    // `backend/dist/backend/src`. The paths above are the same in both modes
-    // because `config/` is compiled alongside this file; `frontend/dist` is not
-    // in the compiled tree at all, so it stays where the repository put it.
+    // Three levels up, not two: in production this file runs compiled, from
+    // `backend/dist/src`. The paths above are the same in both modes because
+    // `schema/` and `functions/` are compiled alongside this file;
+    // `frontend/dist` is not in the compiled tree at all, so it stays where the
+    // repository put it.
     // `serveSPA` only warns when the path is wrong, which is why the Dockerfile
     // that builds this image also copies `frontend` — verify a mount by
     // fetching `/`, never by reading the log.
     if (isProduction) {
-        serveSPA(app, { frontendPath: path.resolve(__dirname, "../../../../frontend/dist") });
+        serveSPA(app, { frontendPath: path.resolve(__dirname, "../../../frontend/dist") });
     }
     // {{/frontend}}
 

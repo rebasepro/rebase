@@ -70,72 +70,77 @@ describe("rebase.json storage block", () => {
 });
 
 describe("detectStorageAuthorize", () => {
-    const writeConfig = (files: Record<string, string>): string => {
-        const dir = path.join(scratch, "config");
+    /** Compiled backend modules; returns `<dir>/storage`, the module the manifest records. */
+    const writeBackend = (files: Record<string, string>): string => {
+        const dir = path.join(scratch, "backend");
         fs.mkdirSync(dir, { recursive: true });
         for (const [name, content] of Object.entries(files)) {
             fs.writeFileSync(path.join(dir, name), content, "utf8");
         }
-        return dir;
+        return path.join(dir, "storage");
     };
 
     it("finds a directly exported hook", () => {
-        expect(detectStorageAuthorize(writeConfig({
-            "index.js": "export const storageAuthorize = () => true;"
-        }))).toBe(true);
-    });
-
-    it("finds a named re-export", () => {
-        expect(detectStorageAuthorize(writeConfig({
-            "index.js": 'export { storageAuthorize } from "./storage.js";'
-        }))).toBe(true);
-    });
-
-    it("finds a renamed re-export", () => {
-        expect(detectStorageAuthorize(writeConfig({
-            "index.js": 'export { authorize as storageAuthorize } from "./storage.js";'
-        }))).toBe(true);
-    });
-
-    it("follows a wildcard re-export", () => {
-        // The blind spot this test exists for: a barrel is an ordinary way to
-        // write a config index, and reading it as "no hook" rejected correct
-        // deploys, telling the developer to add a hook they had already written.
-        expect(detectStorageAuthorize(writeConfig({
-            "index.js": 'export * from "./storage.js";',
+        expect(detectStorageAuthorize(writeBackend({
             "storage.js": "export const storageAuthorize = () => true;"
         }))).toBe(true);
     });
 
-    it("follows a wildcard chain through several barrels", () => {
-        expect(detectStorageAuthorize(writeConfig({
-            "index.js": 'export * from "./a.js";',
+    it("finds a named re-export", () => {
+        expect(detectStorageAuthorize(writeBackend({
+            "storage.js": 'export { storageAuthorize } from "./access.js";'
+        }))).toBe(true);
+    });
+
+    it("finds a renamed re-export", () => {
+        expect(detectStorageAuthorize(writeBackend({
+            "storage.js": 'export { authorize as storageAuthorize } from "./access.js";'
+        }))).toBe(true);
+    });
+
+    it("follows a wildcard re-export", () => {
+        // The blind spot this test exists for: re-exporting is an ordinary way
+        // to write the module, and reading it as "no hook" rejected correct
+        // deploys, telling the developer to add a hook they had already written.
+        expect(detectStorageAuthorize(writeBackend({
+            "storage.js": 'export * from "./access.js";',
+            "access.js": "export const storageAuthorize = () => true;"
+        }))).toBe(true);
+    });
+
+    it("follows a wildcard chain through several modules", () => {
+        expect(detectStorageAuthorize(writeBackend({
+            "storage.js": 'export * from "./a.js";',
             "a.js": 'export * from "./b.js";',
             "b.js": "export function storageAuthorize() { return true; }"
         }))).toBe(true);
     });
 
     it("resolves a .js specifier that only exists as .ts", () => {
-        expect(detectStorageAuthorize(writeConfig({
-            "index.ts": 'export * from "./storage.js";',
-            "storage.ts": "export const storageAuthorize = () => true;"
+        expect(detectStorageAuthorize(writeBackend({
+            "storage.ts": 'export * from "./access.js";',
+            "access.ts": "export const storageAuthorize = () => true;"
         }))).toBe(true);
     });
 
+    it("takes the module by its file name too", () => {
+        expect(detectStorageAuthorize(`${writeBackend({ "storage.js": "export const storageAuthorize = () => true;" })}.js`)).toBe(true);
+    });
+
     it("still reports false when no hook exists anywhere", () => {
-        expect(detectStorageAuthorize(writeConfig({
-            "index.js": 'export * from "./storage.js";',
-            "storage.js": "export const collections = [];"
+        expect(detectStorageAuthorize(writeBackend({
+            "storage.js": 'export * from "./access.js";',
+            "access.js": "export const tables = [];"
         }))).toBe(false);
     });
 
     it("does not follow bare package specifiers", () => {
-        expect(detectStorageAuthorize(writeConfig({
-            "index.js": 'export * from "@rebasepro/server";'
+        expect(detectStorageAuthorize(writeBackend({
+            "storage.js": 'export * from "@rebasepro/server";'
         }))).toBe(false);
     });
 
-    it("is false with no config index at all", () => {
-        expect(detectStorageAuthorize(path.join(scratch, "missing"))).toBe(false);
+    it("is false with no storage module at all", () => {
+        expect(detectStorageAuthorize(path.join(scratch, "missing", "storage"))).toBe(false);
     });
 });

@@ -38,25 +38,26 @@ const cliRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..",
 function scaffold(): void {
     fs.mkdirSync(path.join(scratch, "backend", "src"), { recursive: true });
     fs.mkdirSync(path.join(scratch, "backend", "functions"), { recursive: true });
-    fs.mkdirSync(path.join(scratch, "config", "collections"), { recursive: true });
+    fs.mkdirSync(path.join(scratch, "backend", "schema"), { recursive: true });
     fs.mkdirSync(path.join(scratch, "frontend"), { recursive: true });
     fs.writeFileSync(path.join(scratch, "package.json"), JSON.stringify({ name: "scratch" }));
     fs.writeFileSync(path.join(scratch, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\n");
     fs.writeFileSync(path.join(scratch, "pnpm-workspace.yaml"), "packages:\n  - backend\n");
     fs.writeFileSync(path.join(scratch, ".npmrc"), "");
-    fs.writeFileSync(path.join(scratch, "config", "storage.ts"), "export const storageAuthorize = () => true;\n");
-    fs.writeFileSync(path.join(scratch, "config", "collections", "users.ts"), "export default {};\n");
+    fs.writeFileSync(path.join(scratch, "backend", "storage.ts"), "export const storageAuthorize = () => true;\n");
+    fs.writeFileSync(path.join(scratch, "backend", "schema", "index.ts"), "export { users } from \"./users\";\n");
+    fs.writeFileSync(path.join(scratch, "backend", "schema", "users.ts"), "export const users = {};\n");
     fs.writeFileSync(path.join(scratch, "backend", "src", "schema.generated.ts"), "export const tables = {};\n");
 }
 
 /**
  * The same project as `rebase init --headless` leaves it.
  *
- * `applyHeadless` deletes exactly these three: there are no collections to
- * declare, so no generated schema and no users collection, and no frontend.
+ * No tables to declare, so no schema directory and no generated schema, and
+ * no frontend.
  */
 function makeHeadless(): void {
-    fs.rmSync(path.join(scratch, "config", "collections"), { recursive: true,
+    fs.rmSync(path.join(scratch, "backend", "schema"), { recursive: true,
 force: true });
     fs.rmSync(path.join(scratch, "backend", "src", "schema.generated.ts"), { force: true });
     fs.rmSync(path.join(scratch, "frontend"), { recursive: true,
@@ -345,8 +346,8 @@ scripts: { build: "tsc" } }, null, 4)
  * — nothing in this repository compiles, builds or boots it.
  */
 describe("the ejected payload", () => {
-    /** Where the compiled entrypoint runs from: `backend/dist/backend/src`. */
-    const COMPILED_DIR = "/app/backend/dist/backend/src";
+    /** Where the compiled entrypoint runs from: `backend/dist/src` (the backend's `rootDir` is itself). */
+    const COMPILED_DIR = "/app/backend/dist/src";
     /** Where it runs from under `tsx`, straight from source. */
     const SOURCE_DIR = "/app/backend/src";
 
@@ -369,7 +370,7 @@ describe("the ejected payload", () => {
     });
 
     it("emits a headless entrypoint that does not import the files --headless deleted", async () => {
-        // `rebase init --headless` removes config/collections, the generated
+        // `rebase init --headless` has no backend/schema, no generated
         // schema and the frontend; the BaaS backend tsconfig then tells the user
         // their entrypoint "lives behind `rebase eject`". Ejecting used to hand
         // them two TS2307s and, past tsc, an ERR_MODULE_NOT_FOUND at boot.
@@ -381,9 +382,9 @@ describe("the ejected payload", () => {
         const entrypoint = path.join(scratch, "backend/src/index.ts");
         expect(unresolvedImports(entrypoint)).toEqual([]);
         const source = fs.readFileSync(entrypoint, "utf8");
-        // Collections come from the live database instead, which is what the
+        // Tables come from the live database instead, which is what the
         // managed runtime does for the same project.
-        expect(source).not.toMatch(/collectionsDir:/);
+        expect(source).not.toMatch(/schemaDir:/);
         expect(source).not.toMatch(/\bserveSPA\b/);
         // And the compose file must not claim the image serves a site it has no
         // sources for.
@@ -452,7 +453,7 @@ describe("the ejected payload", () => {
 
     it("imports only symbols the runtime packages actually export", async () => {
         // Nothing type-checks this template: it carries `{{…}}` markers and
-        // resolves `../../config/*` against a project that does not exist here.
+        // resolves `../resources` against a project that does not exist here.
         // So a symbol renamed or removed in @rebasepro/server reaches a user as
         // a TS2305 in the file they were just handed. This is the check the
         // compiler cannot run.
@@ -491,7 +492,7 @@ describe("the ejected payload", () => {
     it("opens one connection per declared database, not one per project", async () => {
         // It used to be `createPostgresDatabaseConnection(env.DATABASE_URL)` and
         // nothing else, so a project declaring `database("analytics")` ejected
-        // into a backend that ignored it: collections routed there fell back to
+        // into a backend that ignored it: tables routed there fell back to
         // the default driver and their rows landed in the wrong database, behind
         // a server that health-checked green.
         manifestWith("managed");
@@ -503,6 +504,38 @@ describe("the ejected payload", () => {
         expect(source).toMatch(/bootstrappers:\s*drivers\.map/);
         // And every pool closes, not just the first.
         expect(source).toMatch(/drivers\.map\(driver => driver\.connection\.pool\?\.end\(\)\)/);
+    });
+
+    it("boots from backend/schema, and reads backend/storage.ts and backend/hooks.ts when they are there", async () => {
+        fs.writeFileSync(path.join(scratch, "backend", "hooks.ts"), "export const hooks = {};\n");
+        manifestWith("managed");
+
+        await run();
+
+        const source = fs.readFileSync(path.join(scratch, "backend/src/index.ts"), "utf8");
+        const schemaDir = /schemaDir: path\.resolve\(__dirname, "([^"]+)"\)/.exec(source);
+        expect(schemaDir).not.toBeNull();
+        // Correct from both layouts, like `functionsDir`.
+        expect(path.resolve(SOURCE_DIR, schemaDir![1])).toBe("/app/backend/schema");
+        expect(path.resolve(COMPILED_DIR, schemaDir![1])).toBe("/app/backend/dist/schema");
+        expect(source).toContain('import { storageAuthorize } from "../storage";');
+        expect(source).toContain('import { hooks } from "../hooks";');
+        expect(source).toMatch(/^\s+hooks,$/m);
+        expect(fs.existsSync(path.join(scratch, "backend", "resources.ts"))).toBe(true);
+        expect(unresolvedImports(path.join(scratch, "backend/src/index.ts"))).toEqual([]);
+    });
+
+    it("leaves out storageAuthorize and hooks for a project with neither module", async () => {
+        fs.rmSync(path.join(scratch, "backend", "storage.ts"));
+        manifestWith("managed");
+
+        await run();
+
+        const source = fs.readFileSync(path.join(scratch, "backend/src/index.ts"), "utf8");
+        expect(source).not.toContain("../storage");
+        expect(source).not.toContain("../hooks");
+        expect(source).toContain("No backend/storage.ts");
+        expect(unresolvedImports(path.join(scratch, "backend/src/index.ts"))).toEqual([]);
     });
 
     it("passes a cronsDir, and the scaffolded tsconfig compiles what it points at", async () => {
@@ -519,7 +552,7 @@ describe("the ejected payload", () => {
         expect(source).toMatch(/cronsDir:\s*[^,]*\bcronsDir\b/);
         // Correct from both layouts, exactly like the sibling `functionsDir`.
         expect(path.resolve(SOURCE_DIR, declared![1])).toBe("/app/backend/crons");
-        expect(path.resolve(COMPILED_DIR, declared![1])).toBe("/app/backend/dist/backend/crons");
+        expect(path.resolve(COMPILED_DIR, declared![1])).toBe("/app/backend/dist/crons");
 
         // Which only exists if the project's own build compiles that directory:
         // `rebase build` uses a generated tsconfig, but an ejected project
@@ -582,19 +615,18 @@ exists: true });
 });
 
 describe("renderPayload", () => {
-    const shape = { collections: false,
-frontend: true };
+    const shape = { tables: false, frontend: true, storage: true, hooks: false };
 
     it("keeps the branch that applies and removes both markers", () => {
         const rendered = renderPayload(
             [
                 "keep me",
-                "// {{#collections}}",
+                "// {{#tables}}",
                 "declared",
-                "// {{/collections}}",
-                "// {{^collections}}",
+                "// {{/tables}}",
+                "// {{^tables}}",
                 "introspected",
-                "// {{/collections}}",
+                "// {{/tables}}",
                 "# {{#frontend}}",
                 "COPY frontend ./frontend",
                 "# {{/frontend}}"

@@ -29,7 +29,7 @@ describe("rebase schema reconcile", () => {
         const lines = describeReconcilePlan(plan).map(stripVTControlCharacters);
         expect(lines[0]).toMatch(/^ {2}relax {2}public\.voice_cache\.wav/);
         expect(lines[1]).toMatch(/drop {3}public\.voice_cache\.legacy {2}12,408 row\(s\) hold a value/);
-        expect(lines[2]).toMatch(/keep {3}public\.voice_cache\.note {2}no property declares it/);
+        expect(lines[2]).toMatch(/keep {3}public\.voice_cache\.note {2}no table declares it/);
         expect(lines).toHaveLength(3);
     });
 
@@ -44,7 +44,7 @@ describe("rebase schema reconcile", () => {
         };
         const lines = describeReconcilePlan(plan).map(stripVTControlCharacters);
         expect(lines).toEqual([
-            `  relax  public.voice_cache.wav  no property in "voice_cache" declares it, and every insert fails on it; its data stays`
+            `  relax  public.voice_cache.wav  "voice_cache" does not declare it, and every insert fails on it; its data stays`
         ]);
     });
 });

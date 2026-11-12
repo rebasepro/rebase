@@ -236,8 +236,8 @@ describe("CLI routing", () => {
 
 describe("generate-sdk resolves its defaults from the project root", () => {
     /*
-     * `./config/collections` was resolved against the cwd, so this command
-     * worked from a repository root and threw "Collections directory not found"
+     * The default directory was resolved against the cwd, so this command
+     * worked from a repository root and threw "directory not found"
      * one directory down — from `backend/`, from `frontend/` — while every
      * sibling command (`db push`, `dev`, `doctor`) worked from all of them,
      * because they resolve the root first.
@@ -247,17 +247,17 @@ describe("generate-sdk resolves its defaults from the project root", () => {
 
         expect(generateSdkCommand).toHaveBeenCalledWith(
             expect.objectContaining({
-                collectionsDir: path.join("/projects/shop", "backend/schema"),
+                schemaDir: path.join("/projects/shop", "backend/schema"),
                 output: path.join("/projects/shop", "generated/sdk")
             })
         );
     });
 
     it("leaves an explicitly passed path alone — that one means the cwd", async () => {
-        await entry(["node", "rebase", "generate-sdk", "--collections-dir", "./elsewhere", "--output", "./out"]);
+        await entry(["node", "rebase", "generate-sdk", "--schema-dir", "./elsewhere", "--output", "./out"]);
 
         expect(generateSdkCommand).toHaveBeenCalledWith(
-            expect.objectContaining({ collectionsDir: "./elsewhere",
+            expect.objectContaining({ schemaDir: "./elsewhere",
 output: "./out" })
         );
     });

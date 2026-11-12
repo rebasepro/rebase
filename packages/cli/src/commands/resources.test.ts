@@ -37,7 +37,6 @@ let declared = 0;
 
 beforeEach(() => {
     root = fs.mkdtempSync(path.join(PACKAGE_ROOT, ".tmp-resources-cmd-"));
-    fs.mkdirSync(path.join(root, "config"), { recursive: true });
     fs.mkdirSync(path.join(root, "backend"), { recursive: true });
     fs.writeFileSync(path.join(root, "rebase.json"), JSON.stringify({
         rebase: "^1",
@@ -67,15 +66,14 @@ afterEach(() => {
 /**
  * Declare a bucket, and return the graph file that records it.
  *
- * A fresh key each time, and one derive per declaration: `config/resources.ts`
- * is loaded with `import()`, so a second derive in the same process reads the
- * cached module and declares nothing. The CLI derives once per process; the
- * file that matches is therefore written here rather than by a second run.
+ * A fresh key each time, so a graph can never match one written for an
+ * earlier declaration; the file that matches is written here rather than by a
+ * second run.
  */
 function declareBucket(): string {
     declared++;
     const key = `media_${process.pid}_${declared}`;
-    fs.writeFileSync(path.join(root, "config", "resources.ts"), `
+    fs.writeFileSync(path.join(root, "backend", "resources.ts"), `
         import { bucket } from "@rebasepro/types";
         export const media = bucket("${key}");
     `);

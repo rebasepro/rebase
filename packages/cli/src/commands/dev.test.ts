@@ -32,9 +32,10 @@ import { validateManifest } from "../manifest";
  * tsx restarts on changes to what the entrypoint imports, and the runtime does
  * not import these — it scans their directories at boot. So a brand-new
  * `backend/functions/new.ts` was invisible until somebody restarted by hand,
- * which is the opposite of what a watch mode is for. The `config/` case is
- * older and worse: the flag meant to watch it, `--watch=<glob>`, is not a tsx
- * flag at all, so tsx dropped it and the directory was never watched.
+ * which is the opposite of what a watch mode is for. (The flag once meant to
+ * watch such a directory, `--watch=<glob>`, is not a tsx flag at all, so tsx
+ * dropped it and the directory was never watched.) The schema directory and
+ * the backend modules beside it are imported, so tsx tracks those itself.
  */
 describe("devWatchIncludes", () => {
     const paths = {
@@ -42,11 +43,10 @@ describe("devWatchIncludes", () => {
         REBASE_DEV_CRONS: "backend/crons"
     };
 
-    it("watches the functions, crons and config directories, absolute", () => {
+    it("watches the functions and crons directories, absolute", () => {
         expect(devWatchIncludes("/srv/app", paths)).toEqual([
             path.join("/srv/app", "backend", "functions"),
-            path.join("/srv/app", "backend", "crons"),
-            path.join("/srv/app", "config")
+            path.join("/srv/app", "backend", "crons")
         ]);
     });
 
@@ -56,39 +56,38 @@ describe("devWatchIncludes", () => {
             REBASE_DEV_CRONS: "services/api/schedules"
         })).toEqual([
             path.join("/srv/app", "services", "api", "handlers"),
-            path.join("/srv/app", "services", "api", "schedules"),
-            path.join("/srv/app", "config")
+            path.join("/srv/app", "services", "api", "schedules")
         ]);
     });
 
     it("drops an entry the manifest did not resolve", () => {
         expect(devWatchIncludes("/srv/app", { REBASE_DEV_FUNCTIONS: "backend/functions" }))
-            .toEqual([path.join("/srv/app", "backend", "functions"), path.join("/srv/app", "config")]);
+            .toEqual([path.join("/srv/app", "backend", "functions")]);
     });
 });
 
 /**
- * One save of a collection file, one backend restart.
+ * One save of a schema file, one backend restart.
  *
- * The runtime `import()`s the collections, so tsx tracked them as dependencies
- * and restarted the moment a file was saved — before dev had regenerated
+ * The runtime `import()`s the schema, so tsx tracked it as a dependency and
+ * restarted the moment a file was saved — before dev had regenerated
  * `schema.generated.ts`. That boot logged "schema.generated.ts no longer
  * describes the database … Run `rebase schema generate`" (the command dev was
  * running at that moment), and the regeneration then rewrote the file and
- * restarted the backend a second time. The collections directory is dev's to
+ * restarted the backend a second time. The schema directory is dev's to
  * react to: tsx is told to leave it alone, and dev restarts the backend once,
  * after the regeneration, through a trigger file tsx watches.
  */
 describe("devWatchArgs", () => {
     const paths = { REBASE_DEV_FUNCTIONS: "backend/functions", REBASE_DEV_CRONS: "backend/crons" };
 
-    it("hands the collections directory to dev, and watches the trigger instead", () => {
+    it("hands the schema directory to dev, and watches the trigger instead", () => {
         const args = devWatchArgs("/srv/app", paths, "entry.mjs", "/tmp/rebase-dev/x/restart");
         const pairs = (flag: string) => args.flatMap((a, i) => (a === flag ? [args[i + 1]] : []));
-        expect(pairs("--exclude")).toContain("/srv/app/config/collections/**");
+        expect(pairs("--exclude")).toContain("/srv/app/backend/schema/**");
         expect(pairs("--include")).toContain("/tmp/rebase-dev/x/restart");
-        // The rest of config/ (resources, auth, …) still restarts on its own.
-        expect(pairs("--include")).toContain(path.join("/srv/app", "config"));
+        // backend/resources.ts and the rest are imported, so tsx restarts on them itself.
+        expect(pairs("--exclude")).not.toContain("/srv/app/backend/**");
         expect(args.at(-1)).toBe("entry.mjs");
         expect(args[0]).toBe("watch");
         // tsx stops reading its own flags at the first one it does not know and
@@ -97,17 +96,19 @@ describe("devWatchArgs", () => {
         expect(args.indexOf("--exclude")).toBeLessThan(args.indexOf("--conditions"));
     });
 
-    it("leaves the collections to tsx when there is no trigger it could watch", () => {
+    it("leaves the schema to tsx when there is no trigger it could watch", () => {
         const args = devWatchArgs("/srv/app", paths, "entry.mjs", null);
         const excludes = args.flatMap((a, i) => (a === "--exclude" ? [args[i + 1]] : []));
-        expect(excludes).not.toContain("/srv/app/config/collections/**");
+        expect(excludes).not.toContain("/srv/app/backend/schema/**");
     });
 
     /**
      * tsx applies its default ignores relative to its cwd, `backend/`, so they
-     * never reached `config/`: chokidar crawled `config/node_modules` before the
-     * first spawn (17 s in the monorepo's example app) and restarted the backend
-     * on every install there, and on a `.DS_Store` in `config/`.
+     * never reached a sibling directory: chokidar crawled the old config
+     * package's `node_modules` before the first spawn (17 s in the monorepo's
+     * example app) and restarted the backend on every install there, and on a
+     * `.DS_Store`. A functions directory the manifest moves outside `backend/`
+     * is that sibling now.
      */
     it("gives every included directory tsx's default ignores, as absolute globs", () => {
         for (const trigger of ["/tmp/rebase-dev/x/restart", null]) {
@@ -125,15 +126,16 @@ describe("devWatchArgs", () => {
         }
     });
 
-    it("does not restart on dependency churn or a dotfile under config/, under the real tsx", async () => {
+    it("does not restart on dependency churn or a dotfile in a directory outside backend/, under the real tsx", async () => {
         const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "rebase-dev-watch-scope-")));
         const tsxCli = createRequire(import.meta.url).resolve("tsx/cli");
+        const moved = { REBASE_DEV_FUNCTIONS: "services/functions" };
         try {
-            const dependency = path.join(root, "config", "node_modules", "dep", "index.js");
+            const dependency = path.join(root, "services", "functions", "node_modules", "dep", "index.js");
             fs.mkdirSync(path.dirname(dependency), { recursive: true });
             fs.writeFileSync(dependency, "module.exports = 1;\n");
-            const resources = path.join(root, "config", "resources.ts");
-            fs.writeFileSync(resources, "export default {};\n");
+            const handler = path.join(root, "services", "functions", "hello.ts");
+            fs.writeFileSync(handler, "export default {};\n");
             fs.mkdirSync(path.join(root, "backend"));
             const boots = path.join(root, "boots.log");
             fs.writeFileSync(path.join(root, "backend", "entry.mjs"), [
@@ -149,19 +151,19 @@ describe("devWatchArgs", () => {
             };
 
             const { execa } = await import("execa");
-            const child = execa(process.execPath, [tsxCli, ...devWatchArgs(root, {}, "entry.mjs", null)], { cwd: path.join(root, "backend"), reject: false });
+            const child = execa(process.execPath, [tsxCli, ...devWatchArgs(root, moved, "entry.mjs", null)], { cwd: path.join(root, "backend"), reject: false });
             try {
                 expect(await waitFor(1), "tsx never ran the entry").toBe(1);
                 await new Promise(r => setTimeout(r, 500));
                 fs.appendFileSync(dependency, "module.exports = 2;\n");
-                fs.writeFileSync(path.join(root, "config", ".DS_Store"), "x");
-                fs.mkdirSync(path.join(root, "config", "node_modules", ".vite-temp"));
-                fs.writeFileSync(path.join(root, "config", "node_modules", ".vite-temp", "vite.config.mjs.timestamp-1.mjs"), "x");
+                fs.writeFileSync(path.join(root, "services", "functions", ".DS_Store"), "x");
+                fs.mkdirSync(path.join(root, "services", "functions", "node_modules", ".vite-temp"));
+                fs.writeFileSync(path.join(root, "services", "functions", "node_modules", ".vite-temp", "vite.config.mjs.timestamp-1.mjs"), "x");
                 await new Promise(r => setTimeout(r, 1500));
                 expect(count(), "tsx restarted on a write it was never meant to watch").toBe(1);
 
-                // The rest of config/ still restarts the backend.
-                fs.appendFileSync(resources, "export const touched = true;\n");
+                // A real edit there still restarts the backend.
+                fs.appendFileSync(handler, "export const touched = true;\n");
                 expect(await waitFor(2)).toBe(2);
             } finally {
                 child.kill("SIGTERM");
@@ -233,7 +235,7 @@ describe("devWatchArgs", () => {
         expect(devRestartTrigger("/srv/other")).not.toBe(trigger);
     });
 
-    it("restarts once on the trigger and not on a collection save, under the real tsx", async () => {
+    it("restarts once on the trigger and not on a schema save, under the real tsx", async () => {
         // The arguments are only half of it: the claim is about what tsx does
         // with them — that `--exclude` beats its own dependency tracking — so
         // run it.
@@ -244,10 +246,9 @@ describe("devWatchArgs", () => {
         // `reject: false` turned the failure into "no boot".
         const tsxCli = createRequire(import.meta.url).resolve("tsx/cli");
         try {
-            fs.mkdirSync(path.join(root, "config", "collections"), { recursive: true });
-            fs.mkdirSync(path.join(root, "backend"));
-            const collection = path.join(root, "config", "collections", "posts.mjs");
-            fs.writeFileSync(collection, "export default { slug: 'posts' };\n");
+            fs.mkdirSync(path.join(root, "backend", "schema"), { recursive: true });
+            const collection = path.join(root, "backend", "schema", "posts.mjs");
+            fs.writeFileSync(collection, "export const posts = { slug: 'posts' };\n");
             const boots = path.join(root, "boots.log");
             fs.writeFileSync(path.join(root, "backend", "entry.mjs"), [
                 "import fs from 'node:fs';",
@@ -273,7 +274,7 @@ describe("devWatchArgs", () => {
                 await new Promise(r => setTimeout(r, 500));
                 fs.appendFileSync(collection, "export const touched = true;\n");
                 await new Promise(r => setTimeout(r, 1500));
-                expect(count(), "tsx restarted on a collection save").toBe(1);
+                expect(count(), "tsx restarted on a schema save").toBe(1);
 
                 fs.writeFileSync(trigger, String(Date.now()));
                 expect(await waitFor(2)).toBe(2);

@@ -79,11 +79,10 @@ const REMOTE_DESTINATION_RE = /^[a-z][a-z0-9+.-]*:\/\//i;
  * absolutised once, so the one spelling the help page names was the one that
  * landed in `backend/` — and the success line still echoed the path as typed.
  *
- * And `--collections`, which was not absolutised at all: from the project root,
- * `rebase schema generate --collections ./config/collections` was "not found",
- * while the same spelling worked for `generate-sdk`. See `utils/path-flags.ts`.
+ * And `--schema-dir`, the schema directory: a path typed from the project root
+ * must not be read from `backend/`. See `utils/path-flags.ts`.
  */
-export const LOCAL_PATH_FLAGS: readonly string[] = ["--out", "--output", "-o", "--collections", "-c"];
+export const LOCAL_PATH_FLAGS: readonly string[] = ["--out", "--output", "-o", "--schema-dir"];
 
 /**
  * Rewrite local path arguments so they mean what the user typed.
@@ -361,7 +360,7 @@ export async function atlasDevDatabaseFor(
             chalk.gray("  Atlas plans every change against a second, empty database. On the managed"),
             chalk.gray("  database that is a throwaway PGlite, started for the command."),
             "",
-            chalk.gray(`  ${chalk.cyan("rebase dev")} still applies your collections at boot, additively. Otherwise,`),
+            chalk.gray(`  ${chalk.cyan("rebase dev")} still applies your tables at boot, additively. Otherwise,`),
             chalk.gray(`  set ${ATLAS_DEV_URL_ENV} to an empty Postgres database Atlas may fill and clear,`),
             chalk.gray("  or point the project at a real Postgres (uncomment DATABASE_URL in .env)."),
             ""
@@ -476,7 +475,7 @@ export function refuseRestoreOnManagedDatabase(rawArgs: string[], kind: string):
  * Resolve the active driver's CLI and the environment it should run in.
  *
  * Shared by the two runners below. Deliberately does NOT resolve a database:
- * `schema generate` reads collection files and writes one file, and starting a
+ * `schema generate` reads the schema directory and writes one file, and starting a
  * database to run it would be a side effect nobody asked for.
  */
 export async function resolveDriverCli(): Promise<{
@@ -518,7 +517,7 @@ export async function resolveDriverCli(): Promise<{
  * shipped `dist/cli.js` all three quietly switched to plain `node`, and the
  * driver loads the PROJECT's TypeScript in process:
  *
- *   - `schema stale` reads the collections, could not resolve `./authors` onto
+ *   - `schema stale` reads the tables, could not resolve `./authors` onto
  *     `authors.ts`, and answered "⏭ Not checked" while exiting 0;
  *   - `db push` does the same in `ensureAuthTables`, so `rebase.users` was never
  *     created and the push died at "Applying RLS policies" with
@@ -535,7 +534,7 @@ export async function resolveDriverCli(): Promise<{
  * tsx's loader in one Node (`node --import`) rather than the `tsx` binary,
  * which is a shell shim and a relay Node in front of the same loader: one Node
  * start instead of two, ~50–100 ms on each of the driver runs every `rebase
- * dev` start and every collection save makes. The binary stays the fallback for
+ * dev` start and every schema save makes. The binary stays the fallback for
  * a tsx whose loader does not resolve as a package — a global install.
  */
 export async function spawnDriverCli(
@@ -659,8 +658,8 @@ export async function runDriverDbCommand(
     // "db", "push"] and it answered "Unknown domain command: --debug" — for a
     // flag this CLI prints after every failure as the thing to re-run with.
     const typedArgs = absolutizeLocalPathArgs(argsFromCommand(rawArgs, "db"), process.cwd());
-    // The collections `rebase.json` declares (`apps.<backend>.config`), when the
-    // line names none — the driver alone would read `../config/collections`.
+    // The schema directory `rebase.json` declares (`apps.<backend>.tables`), when
+    // the line names none — the driver alone would read `backend/schema`.
     const childArgs = [...typedArgs, ...schemaDirArgs(projectRoot, typedArgs)];
 
     try {
@@ -759,7 +758,7 @@ export async function dbCommand(subcommand: string | undefined, rawArgs: string[
         assertSwitchFlags(rawArgs);
     } else {
         await refuseDriverLineBeforeStarting(projectRoot, rawArgs);
-        // And a `--collections` path that does not exist, for the same
+        // And a `--schema-dir` path that does not exist, for the same
         // reason, in the reader's terms. See utils/path-flags.ts.
         refuseMissingSchemaDir(rawArgs, process.cwd(), requireBackendDir(projectRoot));
     }
@@ -1709,34 +1708,35 @@ const DATABASE_FLAGS_HELP =
 
 const DB_ACTION_HELP: Record<string, { usage: string; summary: string; notes?: string[] }> = {
     push: {
-        usage: "rebase db push [--collections <dir>] [--dry-run] [--allow-destructive] [--yes]",
+        usage: "rebase db push [--schema-dir <dir>] [--dry-run] [--allow-destructive] [--yes]",
         summary: "Apply the schema straight to the database. Development only — it does not write a migration.",
         notes: [
             "--dry-run prints the SQL and applies nothing. Read it before you approve it.",
             "A change that drops data, or re-keys a table (every row gets a new id), needs --allow-destructive.",
             "--yes approves non-destructive pushes. It still approves destructive ones too in this release, with a "
                 + "deprecation warning; from the next release it will not — pass --allow-destructive for those.",
-            `--collections <dir>: ${SCHEMA_DIR_FLAG_HELP}.`,
+            `--schema-dir <dir>: ${SCHEMA_DIR_FLAG_HELP}.`,
             DATABASE_FLAGS_HELP
         ]
     },
     generate: {
-        usage: "rebase db generate [--collections <dir>]",
-        summary: "Generate the Drizzle schema, the Postgres DDL and a SQL migration file from the collections.",
+        usage: "rebase db generate [--schema-dir <dir>]",
+        summary: "Generate the Drizzle schema, the Postgres DDL and a SQL migration file from the tables in backend/schema.",
         notes: [
             "A migration that drops or narrows data is named when it is written. It is still written.",
-            `--collections <dir>: ${SCHEMA_DIR_FLAG_HELP}.`,
+            `--schema-dir <dir>: ${SCHEMA_DIR_FLAG_HELP}.`,
             DATABASE_FLAGS_HELP
         ]
     },
     migrate: {
-        usage: "rebase db migrate [--baseline <version>] [--refuse-destructive] [amount]",
+        usage: "rebase db migrate [--schema-dir <dir>] [--baseline <version>] [--refuse-destructive] [amount]",
         summary: "Run the pending migration files against the database.",
         notes: [
             "--refuse-destructive dry-runs the pending files and applies nothing when one drops or narrows data.",
             "--baseline <version> records that version as already applied and starts from the next one.",
             "It is what a database Rebase has already booted against needs: boot ensures the schema, so the first migration would try to create tables that are already there.",
             "The version is the numeric prefix of a file in drizzle/migrations.",
+            `--schema-dir <dir>: ${SCHEMA_DIR_FLAG_HELP} — read after applying, to stamp the policies the migration created.`,
             DATABASE_FLAGS_HELP
         ]
     },
@@ -1899,7 +1899,7 @@ export function dbExamples(kind: DevDatabase["kind"] | null): string {
     if (kind === "managed") {
         return `  ${chalk.gray("# Quick development workflow (this project is on the managed database)")}
   rebase schema generate
-  rebase dev                        ${chalk.gray("# boot applies your collections to it, additively")}
+  rebase dev                        ${chalk.gray("# boot applies your tables to it, additively")}
   rebase db push                    ${chalk.gray("# also drops, renames and narrows columns")}
 
   ${chalk.gray("# branch needs a Postgres of your own")}
