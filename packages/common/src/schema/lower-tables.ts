@@ -9,8 +9,9 @@
  * into the legacy object such that, for an equivalent schema, the planner's
  * output is byte-identical. It is temporary — Stage B moves those consumers
  * onto `TableDescriptor` and deletes this file — so it adds nothing to the
- * legacy model and invents no shim: what the legacy shape cannot say is listed
- * in {@link PENDING_TABLE_FEATURES} and refused by name.
+ * legacy model and invents no shim: a fact the legacy shape cannot say, and no
+ * legacy reader needs any more (the request-time side reads it from the
+ * descriptor), is lowered without it.
  *
  * The shape it produces, so that every reader of a lowered collection can rely
  * on it:
@@ -96,44 +97,6 @@ import {
 import { generateForeignKeyName, labelFromIdentifier, singularLabel, toSnakeCase, toWireKey } from "@rebasepro/utils";
 
 import { SchemaDefinitionError, type SchemaDefinitionProblem } from "./errors";
-
-// ── What the legacy shape cannot say ─────────────────────────────────────────
-
-/**
- * One thing the table model can say that the legacy collection shape cannot.
- *
- * @group Schema
- */
-export interface PendingTableFeature {
-    /** Stable id, quoted in the refusal. */
-    readonly id: string;
-    /** What the definition said, and why it cannot be lowered yet. */
-    readonly description: string;
-}
-
-/**
- * Everything `lowerTables` refuses because the legacy collection shape — and so
- * today's planner and runtime — has no way to say it.
- *
- * Each one is a capability of `defineTable` that is not yet implemented end to
- * end: a definition using it is refused with a `SchemaDefinitionError` naming
- * the table, the column or relation, and the id below, rather than lowered to
- * something that means less. The planner already plans a lowered column from
- * its own definition; what is left here waits on the request-time side —
- * write validation and the relation service moving onto descriptors — which
- * implements each natively and deletes its entry.
- *
- * @group Schema
- */
-export const PENDING_TABLE_FEATURES = [
-    {
-        id: "has-many-order-by",
-        description: "`rel.hasMany(target, { orderBy })`. Related rows come back in the caller's order only."
-    }
-] as const satisfies readonly PendingTableFeature[];
-
-/** The id of a {@link PendingTableFeature}. */
-export type PendingTableFeatureId = (typeof PENDING_TABLE_FEATURES)[number]["id"];
 
 // ── A custom type, as DDL may name it ────────────────────────────────────────
 
@@ -263,9 +226,6 @@ const fromColumn = <P extends PostgresProperty>(property: P, column: ColumnDef):
 const fromRelation = <P extends PostgresProperty>(property: P, relation: RelationDef): P & LoweredDefinitions =>
     Object.assign(property, { tableRelation: relation });
 
-const pendingDescription = (id: PendingTableFeatureId): string =>
-    PENDING_TABLE_FEATURES.find(feature => feature.id === id)?.description ?? id;
-
 // ── Options ──────────────────────────────────────────────────────────────────
 
 /**
@@ -308,9 +268,6 @@ const refuse = (where: Where, message: string): never => {
     throw new LoweringProblem({ table: where.table, key: where.key, message });
 };
 
-const pending = (where: Where, id: PendingTableFeatureId): never =>
-    refuse(where, `uses a feature that cannot be lowered to the collection model yet [${id}]: ${pendingDescription(id)}`);
-
 // ── Entry point ──────────────────────────────────────────────────────────────
 
 /**
@@ -324,9 +281,8 @@ const pending = (where: Where, id: PendingTableFeatureId): never =>
  * `defs` is lowered on first use.
  *
  * Throws a {@link SchemaDefinitionError} listing every problem found: a
- * definition this module cannot express (see {@link PENDING_TABLE_FEATURES}),
- * `rls: "inherit"` without `options.defaultRls`, `defaultPolicies: false`
- * beside an admin-only posture.
+ * definition this module cannot express, `rls: "inherit"` without
+ * `options.defaultRls`, `defaultPolicies: false` beside an admin-only posture.
  *
  * @group Schema
  */
@@ -420,10 +376,9 @@ function fillCollection(collection: LoweredCollection, def: AnyDef, ctx: LowerCo
     for (const [key, relation] of relationEntries) {
         const entry: PlannedRelation = { key, def: relation };
         planned.push(entry);
-        if (relation.kind !== "belongsTo") {
-            if (relation.kind === "hasMany" && relation.orderBy !== undefined) pending({ table: def.name, key }, "has-many-order-by");
-            continue;
-        }
+        // A `hasMany`'s `orderBy` is not lowered: the relation service reads
+        // it from the descriptor.
+        if (relation.kind !== "belongsTo") continue;
         const localKey = relation.localKey ?? generateForeignKeyName(key);
         const bound = columns.find(c => sqlNameOf(c.key, c.def) === localKey);
         if (!bound) continue;

@@ -21,6 +21,7 @@ import {
     pointsBack,
     relationTarget,
     requireRelation,
+    relatedRowsOrder,
     sourceKeyField,
     type PointsBackRelation
 } from "./relation-tables";
@@ -766,6 +767,17 @@ export class RelationService {
             additionalFilters
         );
 
+        // The order the relation declares (`rel.hasMany(target, { orderBy })`),
+        // then the target's key, so a `limit` keeps the first rows of it.
+        const declared = relatedRowsOrder(relation);
+        if (declared) {
+            query = query.orderBy(...relatedRowOrder(
+                targetTable,
+                targetPks.map(pk => targetTable[pk.fieldName as keyof typeof targetTable] as AnyPgColumn),
+                declared
+            ));
+        }
+
         if (options.limit) {
             query = query.limit(options.limit);
         }
@@ -1283,7 +1295,9 @@ export class RelationService {
         if (matchValues.length === 0) return new Map();
 
         const targetKeys = targetPks.map(pk => targetTable[pk.fieldName as keyof typeof targetTable] as AnyPgColumn);
-        const order = relatedRowOrder(targetTable, targetKeys, window?.orderBy);
+        // The include's own order, else the one the relation declares.
+        const rowsOrder = relatedRowsOrder(relation, window?.orderBy);
+        const order = relatedRowOrder(targetTable, targetKeys, rowsOrder);
         const foreignKeyField = columnKeyOf(target, relation.foreignKey);
         const foreignKeyColumn = targetTable[foreignKeyField as keyof typeof targetTable] as AnyPgColumn | undefined;
 
@@ -1309,7 +1323,7 @@ export class RelationService {
                 query, query, relation, matchValues, targetTable, parentTable,
                 parentIdCol, targetIdField, this.registry, narrowTarget ? [narrowTarget] : []
             );
-            results = window?.orderBy?.length ? await query.orderBy(...order) : await query;
+            results = rowsOrder ? await query.orderBy(...order) : await query;
         }
         const resultMap = new Map<string, RelatedRow<Record<string, unknown>>[]>();
 

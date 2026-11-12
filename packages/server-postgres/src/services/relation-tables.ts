@@ -1,5 +1,5 @@
 import type { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
-import type { RelationDescriptor } from "@rebasepro/types";
+import type { OrderByTuple, RelationDescriptor } from "@rebasepro/types";
 import { relationOf, type PrimaryKeyInfo } from "@rebasepro/common";
 import { toWireKey } from "@rebasepro/utils";
 import { ApiError } from "@rebasepro/server";
@@ -143,4 +143,21 @@ export function requireRelation(table: RuntimeTable, name: string, hidden: Reado
         `Relation '${name}' not found in table '${table.slug}'. Available relations: [${available}]`,
         "UNKNOWN_RELATION"
     );
+}
+
+/**
+ * The order a relation's rows come back in: the caller's, when it names one
+ * (an include's `orderBy`, a nested listing's `orderBy`), else the order the
+ * relation declares (`rel.hasMany(target, { orderBy })`), else none.
+ *
+ * The caller's order **replaces** the declared one rather than extending it:
+ * an include that says `orderBy: [["title", "asc"]]` gets exactly that, as a
+ * top-level read does. Whichever applies, the loaders end it with the
+ * target's key ascending, so rows that tie come back in a stable order, and a
+ * per-parent `limit` (and a nested listing's paging) keeps the first rows of
+ * that same order.
+ */
+export function relatedRowsOrder(relation: RelationDescriptor, callerOrder?: readonly OrderByTuple[]): OrderByTuple[] | undefined {
+    if (callerOrder && callerOrder.length > 0) return [...callerOrder];
+    return relation.kind === "hasMany" && relation.orderBy && relation.orderBy.length > 0 ? relation.orderBy : undefined;
 }

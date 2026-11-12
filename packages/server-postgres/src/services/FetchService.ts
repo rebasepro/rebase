@@ -35,6 +35,7 @@ import { PostgresTableRegistry } from "../model/PostgresTableRegistry";
 import { toFlatRow, toRestRow, stripUnreadable, canReadRelation } from "./row-pipeline";
 import { visibleColumnProjection, hiddenColumnsOption } from "../schema/search-column";
 import { isNestedPath, resolveNestedPath, type NestedPathHop } from "./nested-path";
+import { relatedRowsOrder } from "./relation-tables";
 // One rule, one place. See `soft-delete.ts` for why every read has to ask.
 import { andSoftDelete, withSoftDelete, type WithDeleted } from "./soft-delete";
 import { beforeQueryCondition, beforeQueryConditions, hasBeforeQuery, type ReadCallContextProvider } from "./read-scope";
@@ -1465,6 +1466,20 @@ target });
      * Compile "rows reachable from this parent" into a `WHERE` condition on the
      * target table, so a nested listing can run as an ordinary collection query.
      */
+    /**
+     * The order a nested listing (`authors/1/posts`) reads in: the caller's,
+     * when it names one, else the order the relation declares
+     * (`rel.hasMany(target, { orderBy })`). Passed down as the read's own
+     * `orderBy`, so the cursor of a paged listing is built on the same keys.
+     */
+    private static nestedOrder(
+        hop: NestedPathHop | undefined,
+        orderBy: string | OrderByTuple[] | undefined
+    ): string | OrderByTuple[] | undefined {
+        if (!hop || (orderBy !== undefined && orderBy.length > 0)) return orderBy;
+        return relatedRowsOrder(hop.relation) ?? orderBy;
+    }
+
     private buildRelationScope(hop: NestedPathHop): SQL {
         // The rows of this relation, reached by URL rather than by `include`.
         assertRelationReadable(hop.parentCollection, hop.relationKey, hop.relation, "a nested path");
@@ -1833,7 +1848,7 @@ target });
         const hop = isNestedPath(collectionPath) ? resolveNestedPath(collectionPath, this.registry) : undefined;
         return this.fetchRowsWithConditions<M>(
             hop ? hop.targetCollection.slug : collectionPath,
-            { ...options, relatedTo: hop }
+            { ...options, orderBy: FetchService.nestedOrder(hop, options.orderBy), relatedTo: hop }
         );
     }
 
@@ -2462,6 +2477,7 @@ target });
             if (hop) {
                 return this.fetchCollectionForRest<M>(
                     hop.targetCollection.slug, { ...options,
+orderBy: FetchService.nestedOrder(hop, options.orderBy),
 relatedTo: hop }, include
                 );
             }

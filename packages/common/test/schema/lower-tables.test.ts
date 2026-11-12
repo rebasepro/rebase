@@ -15,10 +15,8 @@ import {
 } from "@rebasepro/types";
 
 import {
-    PENDING_TABLE_FEATURES,
     lowerTables as lowerWithDefinitions,
-    type LoweredCollection,
-    type PendingTableFeatureId
+    type LoweredCollection
 } from "../../src/schema/lower-tables";
 import { SchemaDefinitionError, isSchemaDefinitionError } from "../../src/schema/errors";
 import { createCallContext } from "../../src/data/call-context";
@@ -706,10 +704,20 @@ describe("lowerTables — `col.custom()` in a planned project", () => {
 describe("lowerTables — refusals", () => {
     const users = defineTable("users", { columns: { id }, rls: "admin-only" });
 
-    /** One definition per pending feature, each refused with that feature's id. */
-    const PENDING: Record<PendingTableFeatureId, () => (AnyTableDef | AnyViewDef)[]> = {
-        "has-many-order-by": () => [defineTable("t", { columns: { id }, relations: { posts: rel.hasMany(() => users, { orderBy: ["id", "asc"] }) }, rls: "admin-only" }), users]
-    };
+    /**
+     * A `hasMany`'s `orderBy` was the last pending feature: the relation
+     * service reads it from the descriptor, so the bridge lowers the relation
+     * without it.
+     */
+    it("lowers `rel.hasMany(target, { orderBy })` without the order", () => {
+        const [table] = lowerTables([
+            defineTable("t", { columns: { id }, relations: { posts: rel.hasMany(() => users, { orderBy: ["id", "asc"] }) }, rls: "admin-only" }),
+            users
+        ]);
+        const relation = table.relations?.find(candidate => candidate.relationName === "posts");
+        expect(relation).toMatchObject({ kind: "hasMany", relationName: "posts" });
+        expect(relation).not.toHaveProperty("orderBy");
+    });
 
     /**
      * What was pending until the REST write validation read the descriptor:
@@ -757,18 +765,6 @@ describe("lowerTables — refusals", () => {
         expect(props.doc).not.toHaveProperty("properties.u");
         expect(props.list).toMatchObject({ type: "array", oneOf: { properties: { x: { type: "string" } } } });
         expect(props.list).not.toHaveProperty("oneOf.properties.any");
-    });
-
-    it("lists each pending feature once", () => {
-        const ids = PENDING_TABLE_FEATURES.map(feature => feature.id);
-        expect(new Set(ids).size).toBe(ids.length);
-        expect(Object.keys(PENDING).sort()).toEqual([...ids].sort());
-    });
-
-    it.each(PENDING_TABLE_FEATURES.map(feature => feature.id))("refuses %s by its id", featureId => {
-        const problems = refusal(() => lowerTables(PENDING[featureId]()));
-        expect(problems).toEqual([expect.stringContaining(`[${featureId}]`)]);
-        expect(problems[0]).toMatch(/^t(\.|:)/);
     });
 
     it("refuses a table without a key, and collects every problem before throwing", () => {
