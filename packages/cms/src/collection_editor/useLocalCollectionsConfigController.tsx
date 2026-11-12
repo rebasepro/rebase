@@ -13,13 +13,14 @@ import type { TableDescriptor, TablePatch, UiTablePreferences } from "@rebasepro
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import type { AdminCollection, AdminPostgresCollection } from "@rebasepro/cms-types";
-import type { PostgresProperty, Property } from "@rebasepro/types";
+import type { EnumValues, FirebaseProperty, PostgresProperty, Property } from "@rebasepro/types";
 import { DEFAULT_API_PATH } from "@rebasepro/app";
 import { useLiveSchemaEditing } from "./useLiveSchemaEditing";
 import { LiveSchemaError, type SchemaEditProblem } from "./liveSchemaClient";
 import type { SplitEdit } from "./split_edit";
 import { SplitEditError } from "./split_edit_error";
 import { useDetachRulesConfirmation } from "./useDetachRulesConfirmation";
+import { FIRESTORE_COLLECTION_CALLEE } from "./firestore_edit";
 
 /**
  * What the backend said about its schema editor, and how sure we are.
@@ -94,6 +95,43 @@ function readSummaries(body: unknown): TableSourceSummary[] {
     });
 }
 
+/** How the frontend source editor's `GET /frontend/calls` describes one Firestore collection. */
+interface FrontendCallSummary {
+    slug: string;
+    file: string;
+    version: string;
+    info: TableSourceInfo;
+}
+
+function readCalls(body: unknown): FrontendCallSummary[] {
+    if (!isRecord(body) || !Array.isArray(body.calls)) return [];
+    return body.calls.flatMap((entry): FrontendCallSummary[] => {
+        if (!isRecord(entry) || typeof entry.value !== "string" || typeof entry.file !== "string" || typeof entry.version !== "string") return [];
+        const fields: Record<string, string> = {};
+        if (isRecord(entry.members)) {
+            for (const [member, reason] of Object.entries(entry.members)) {
+                if (typeof reason === "string" && member.startsWith("fields.")) fields[member.slice("fields.".length)] = reason;
+            }
+        }
+        return [{
+            slug: entry.value,
+            file: entry.file,
+            version: entry.version,
+            info: { file: entry.file, fields, ...(typeof entry.editedInCode === "string" ? { editedInCode: entry.editedInCode } : {}) }
+        }];
+    });
+}
+
+/** `values` in the order of `order` (the ones it does not name last), in the shape they were given in. */
+function reorderEnum(values: EnumValues, order: readonly string[]): EnumValues {
+    const rank = (id: string) => {
+        const at = order.indexOf(id);
+        return at === -1 ? order.length : at;
+    };
+    if (Array.isArray(values)) return [...values].sort((a, b) => rank(String(a.id)) - rank(String(b.id)));
+    return Object.fromEntries(Object.entries(values).sort(([a], [b]) => rank(a) - rank(b)));
+}
+
 function sourceInfoOf(summary: TableSourceSummary): TableSourceInfo {
     const columns: Record<string, string> = {};
     for (const column of summary.columns ?? []) if (column.editedInCode) columns[column.key] = column.editedInCode;
@@ -126,8 +164,10 @@ export class SchemaEditRefused extends Error {
  * operations for the server's schema editor, through the plan-and-confirm
  * dialog when live schema editing is on, straight to the source-only editor
  * when it is not — and the presentation delta, written to the UI preferences
- * store. Collections whose rows live elsewhere (Firestore) are defined in the
- * frontend and are read-only here.
+ * store. A Firestore collection is defined in the frontend: on a development
+ * server its save is an edit of its `defineFirestoreCollection` call
+ * (`firestoreCollectionPatches`), written by the server's frontend source
+ * editor; anywhere else it is read-only here.
  */
 export function useLocalCollectionsConfigController(
     clientOrUrl: string | SchemaEditorTransport | null | undefined,
@@ -174,7 +214,7 @@ export function useLocalCollectionsConfigController(
     };
 
     /** A call to the source-only editor; a refusal becomes {@link SchemaEditRefused} with the server's problems. */
-    const request = async (method: "GET" | "POST", endpoint: string, payload?: Record<string, unknown>): Promise<unknown> => {
+    const request = async (method: "GET" | "POST", endpoint: string, payload?: object): Promise<unknown> => {
         const token = await resolveToken();
         const headers: Record<string, string> = { "Content-Type": "application/json" };
         if (token) headers.Authorization = `Bearer ${token}`;
@@ -211,6 +251,17 @@ export function useLocalCollectionsConfigController(
     const authKey = options?.authKey ?? null;
     const [availability, setAvailability] = useState<SchemaEditorAvailability>({ state: "unknown" });
     const [sources, setSources] = useState<Record<string, TableSourceInfo>>({});
+    /** The Firestore collections the frontend source editor found, by slug. */
+    const [frontendCalls, setFrontendCalls] = useState<Record<string, FrontendCallSummary>>({});
+
+    /** Ask the frontend source editor where each Firestore collection is written, and what in it is code. */
+    const refreshFrontendCalls = async (): Promise<void> => {
+        const listed = await request("GET", `/frontend/calls?callee=${FIRESTORE_COLLECTION_CALLEE}&key=slug&list=fields`).catch(() => undefined);
+        if (listed === undefined) return;
+        const next: Record<string, FrontendCallSummary> = {};
+        for (const call of readCalls(listed)) next[call.slug] = call;
+        setFrontendCalls(next);
+    };
 
     useEffect(() => {
         if (forcedReadOnly === true) return;
@@ -244,6 +295,7 @@ export function useLocalCollectionsConfigController(
                             for (const summary of readSummaries(listed)) next[summary.slug] = sourceInfoOf(summary);
                             setSources(next);
                         }
+                        if (!cancelled) await refreshFrontendCalls();
                     }
                 } else {
                     setAvailability({
@@ -261,6 +313,15 @@ export function useLocalCollectionsConfigController(
         return () => { cancelled = true; };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [editorUrl, forcedReadOnly, authKey]);
+
+    // A Firestore collection's file is re-read after every save (the dev
+    // server reloads the module, and the collections change): its version
+    // is what the next save is checked against.
+    const sourceEditorEnabled = availability.state === "known" && availability.enabled;
+    useEffect(() => {
+        if (sourceEditorEnabled && forcedReadOnly !== true) void refreshFrontendCalls();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [parsedCollections]);
 
     // ── Live schema editing ───────────────────────────────────────────
     const liveSchema = useLiveSchemaEditing({
@@ -316,6 +377,29 @@ export function useLocalCollectionsConfigController(
             `"${slug}" is not a table of this backend: it is defined in the frontend (frontend/src/cms), which the schema editor does not write. Edit it there.`);
     };
 
+    /**
+     * Whether Firestore collections can be edited here: the dev server's
+     * source editor is on, which writes their `defineFirestoreCollection`
+     * calls in frontend/src/cms. Off — production, a deployed API, no
+     * `schema:read` — they are read-only, with where to edit them.
+     */
+    const frontendEditable = forcedReadOnly !== true && sourceEditorEnabled;
+
+    /** Save a Firestore collection: the whole edit is an edit of its definition in the frontend. */
+    const saveFirestore = async (slug: string, after: AdminCollection, before?: AdminCollection): Promise<void> => {
+        if (!frontendEditable) {
+            throw new SplitEditError("EXTERNAL_COLLECTION",
+                `"${slug}" is a Firestore collection: it is defined in the frontend (frontend/src/cms), and only a development server's source editor writes the frontend. Edit it there.`);
+        }
+        const loaded = before ?? findCollection(slug);
+        if (!loaded) throw new Error(`No collection "${slug}" is open in the editor.`);
+        const { firestoreCollectionPatches, firestoreSourceEdit } = await import("./firestore_edit");
+        const patches = firestoreCollectionPatches(loaded, after);
+        if (patches.length === 0) return;
+        await request("POST", "/frontend/apply", firestoreSourceEdit(slug, patches, frontendCalls[slug]?.version));
+        await refreshFrontendCalls();
+    };
+
     /** Write one split edit: the schema first, then — once the schema took — the presentation. */
     const commit = async (edit: SplitEdit): Promise<void> => {
         if (edit.detachesInheritedRules) await detach.confirm(edit.table);
@@ -325,6 +409,10 @@ export function useLocalCollectionsConfigController(
 
     const save = async (slug: string, after: AdminCollection, before?: AdminCollection): Promise<void> => {
         const loaded = before ?? findCollection(slug);
+        if ((loaded ?? after).engine === "firestore") {
+            await saveFirestore(slug, after, loaded);
+            return;
+        }
         assertTable(loaded, slug);
         // Loaded with the first save: the boot path of every admin session
         // builds this controller, and most sessions never save a table.
@@ -365,6 +453,23 @@ export function useLocalCollectionsConfigController(
         return found;
     };
 
+    /** A Firestore collection with `properties` replaced, saved. */
+    const saveFirestoreProperties = async (current: AdminCollection, properties: Record<string, Property>, order?: string[]): Promise<void> => {
+        const firestoreProperties: Record<string, FirebaseProperty> = {};
+        for (const [key, property] of Object.entries(properties)) {
+            if (property.type === "relation" || property.type === "vector") {
+                throw new SplitEditError("NOT_A_COLUMN", `"${key}" is a ${property.type}, which Firestore does not store: that belongs to a Postgres table.`, key);
+            }
+            firestoreProperties[key] = property;
+        }
+        await saveFirestore(current.slug, {
+            ...current,
+            engine: "firestore",
+            properties: firestoreProperties,
+            ...(order ? { propertiesOrder: order } : {})
+        }, current);
+    };
+
     const columnProperty = (key: string, property: Property): PostgresProperty => {
         if (property.type === "reference") {
             throw new SplitEditError("NOT_A_COLUMN",
@@ -377,8 +482,9 @@ export function useLocalCollectionsConfigController(
         loading: false,
         readOnly,
         readOnlyReason,
+        frontendCollectionsEditable: frontendEditable,
         collections: parsedCollections,
-        tableSource: (slug: string) => sources[slug],
+        tableSource: (slug: string) => sources[slug] ?? frontendCalls[slug]?.info,
         dialog: (
             <>
                 {liveSchema.dialog}
@@ -393,6 +499,16 @@ export function useLocalCollectionsConfigController(
         // `collectionData` is a partial: the keys it names, set over the
         // collection as it is.
         updateCollection: async ({ id, collectionData }: UpdateCollectionParams) => {
+            const current = currentOf(id);
+            if (current.engine === "firestore") {
+                const edited: AdminCollection = { ...current };
+                for (const [key, value] of Object.entries(collectionData)) {
+                    if (value === undefined) Reflect.deleteProperty(edited, key);
+                    else Reflect.set(edited, key, value);
+                }
+                await saveFirestore(id, edited, current);
+                return;
+            }
             const after: AdminPostgresCollection = { ...tableOf(id) };
             for (const [key, value] of Object.entries(collectionData)) {
                 // Absent rather than `undefined` when cleared.
@@ -404,6 +520,10 @@ export function useLocalCollectionsConfigController(
         // The table's definition and its export from the index go; the SQL
         // table and its rows stay, and the plan says so.
         deleteCollection: async ({ id }: DeleteCollectionParams) => {
+            if (findCollection(id)?.engine === "firestore") {
+                throw new SplitEditError("EXTERNAL_COLLECTION",
+                    `"${id}" is a Firestore collection: delete it in code — its file in frontend/src/cms and its entry in \`externalCollections\`. Its documents stay in Firestore.`);
+            }
             assertTable(findCollection(id), id);
             await writeSchema(id, [{ op: "deleteTable", table: id }]);
         },
@@ -412,6 +532,11 @@ export function useLocalCollectionsConfigController(
         },
 
         saveProperty: async ({ path, propertyKey, property, newPropertiesOrder }: SavePropertyParams) => {
+            const external = currentOf(path);
+            if (external.engine === "firestore") {
+                await saveFirestoreProperties(external, { ...external.properties, [propertyKey]: property }, newPropertiesOrder);
+                return;
+            }
             const current = tableOf(path);
             await save(path, {
                 ...current,
@@ -420,6 +545,13 @@ export function useLocalCollectionsConfigController(
             });
         },
         deleteProperty: async ({ path, propertyKey, newPropertiesOrder }: DeletePropertyParams) => {
+            const external = currentOf(path);
+            if (external.engine === "firestore") {
+                const { [propertyKey]: _gone, ...rest } = external.properties;
+                void _gone;
+                await saveFirestoreProperties(external, rest, newPropertiesOrder);
+                return;
+            }
             const current = tableOf(path);
             const { [propertyKey]: _removed, ...properties } = current.properties ?? {};
             void _removed;
@@ -431,11 +563,29 @@ export function useLocalCollectionsConfigController(
         },
 
         // Column order is presentation: a preference, never a schema edit.
+        // A Firestore collection has no preferences: its order is its definition's.
         updatePropertiesOrder: async ({ collection, newPropertiesOrder }: UpdatePropertiesOrderParams) => {
+            const external = findCollection(collection.slug);
+            if (external?.engine === "firestore") {
+                await saveFirestore(collection.slug, { ...external, propertiesOrder: [...newPropertiesOrder] }, external);
+                return;
+            }
             await writePresentation(collection.slug, { fieldOrder: [...newPropertiesOrder] });
         },
         // The board's column order is the order of the enum's values: presentation too.
         updateKanbanColumnsOrder: async ({ collection, kanbanColumnProperty, newColumnsOrder }: UpdateKanbanColumnsOrderParams) => {
+            const external = findCollection(collection.slug);
+            if (external?.engine === "firestore") {
+                const property = external.properties[kanbanColumnProperty];
+                if (!property || property.type !== "string" || !property.enum) {
+                    throw new Error(`"${kanbanColumnProperty}" of "${collection.slug}" is not a string field with values to order.`);
+                }
+                await saveFirestoreProperties(external, {
+                    ...external.properties,
+                    [kanbanColumnProperty]: { ...property, enum: reorderEnum(property.enum, newColumnsOrder) }
+                });
+                return;
+            }
             await writePresentation(collection.slug, { fields: { [kanbanColumnProperty]: { enumOrder: [...newColumnsOrder] } } });
         },
 
@@ -450,6 +600,8 @@ export function useLocalCollectionsConfigController(
         readOnly,
         readOnlyReason,
         sources,
+        frontendCalls,
+        frontendEditable,
         tablesBySlug,
         options?.getAuthToken,
         liveSchema.dialog,

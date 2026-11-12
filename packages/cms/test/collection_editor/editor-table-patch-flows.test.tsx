@@ -34,12 +34,16 @@ type Posted = { url: string; body: Record<string, unknown> };
 
 interface BackendOptions {
     live?: boolean;
+    /** The schema editor's `/status`: off is production. */
+    sourceEditor?: boolean;
+    /** An answer to the frontend source editor's `/apply`. */
+    frontendApply?: () => Response;
     /** An answer to the source-only `/apply`. */
     apply?: () => Response;
     tablesSummary?: unknown;
 }
 
-function backend({ live = false, apply, tablesSummary }: BackendOptions = {}) {
+function backend({ live = false, apply, tablesSummary, sourceEditor = true, frontendApply }: BackendOptions = {}) {
     const posted: Posted[] = [];
     global.fetch = fakeFetch(async (url, init) => {
         if (init?.method === "POST") posted.push({ url, body: JSON.parse(String(init.body)) });
@@ -54,7 +58,18 @@ function backend({ live = false, apply, tablesSummary }: BackendOptions = {}) {
         if (url.endsWith("/api/admin/schema/apply")) {
             return jsonResponse({ applied: true, committed: { sha: "abc", branch: "main", files: [] }, statements: [], summary: "done", withheldConstraints: [] });
         }
-        if (url.endsWith("/api/admin/schema-editor/status")) return jsonResponse({ enabled: true });
+        if (url.endsWith("/api/admin/schema-editor/status")) {
+            return jsonResponse(sourceEditor ? { enabled: true } : { enabled: false, code: "SCHEMA_EDITOR_PRODUCTION", reason: "The schema editor is off under NODE_ENV=production." });
+        }
+        if (url.includes("/api/admin/schema-editor/frontend/calls")) {
+            return jsonResponse({
+                calls: [{
+                    value: "fs_events", file: "frontend/src/cms/events.ts", version: "v1",
+                    members: { "fields.legacy": "`fields.legacy` is `legacyField`, not an object written in the call." }
+                }]
+            });
+        }
+        if (url.endsWith("/api/admin/schema-editor/frontend/apply")) return frontendApply ? frontendApply() : jsonResponse({ success: true, files: [] });
         if (url.endsWith("/api/admin/schema-editor/tables")) return jsonResponse(tablesSummary ?? { tables: [] });
         if (url.endsWith("/api/admin/schema-editor/apply")) return apply ? apply() : jsonResponse({ success: true, files: [], tables: [] });
         return jsonResponse({}, { status: 404 });
@@ -195,16 +210,6 @@ describe("a save on the source-only editor", () => {
         expect(posted.find(p => p.url.endsWith("/schema-editor/apply"))?.body).toEqual({ patches: [{ op: "deleteTable", table: "posts" }] });
     });
 
-    it("refuses to edit a collection that is not a table: it is defined in the frontend", async () => {
-        const posted = backend();
-        const events: AdminCollection = { slug: "fs_events", name: "Events", engine: "firestore", properties: { title: { type: "string" } } };
-        harness([project(posts), events]);
-        const error = await run(() => controller.saveProperty({ path: "fs_events", propertyKey: "when", property: { type: "date" } }));
-        expect(error).toMatchObject({ code: "EXTERNAL_COLLECTION" });
-        expect(String(error)).toMatch(/frontend\/src\/cms/);
-        expect(schemaPosts(posted)).toEqual([]);
-    });
-
     it("refuses a slug rename as a migration", async () => {
         backend();
         harness([project(posts)]);
@@ -331,5 +336,103 @@ describe("inherited rules", () => {
         expect(posted.find(p => p.url.endsWith("/schema-editor/apply"))?.body).toEqual({
             patches: [{ op: "setRls", table: "notes", rls: [{ operation: "select", access: "authenticated" }, { operation: "insert", access: "authenticated" }] }]
         });
+    });
+});
+
+describe("a Firestore collection, defined in the frontend", () => {
+    const events = (): AdminCollection => ({
+        slug: "fs_events",
+        name: "Events",
+        engine: "firestore",
+        dataSource: "firestore",
+        properties: {
+            title: { name: "Title", type: "string", validation: { required: true } },
+            customerId: { name: "Customer", type: "reference", path: "customers" }
+        }
+    });
+    const frontendPosts = (posted: Posted[]) => posted.filter(p => p.url.includes("/schema-editor/frontend/"));
+
+    it("is editable on a development server, and says what is edited in code", async () => {
+        backend();
+        harness([project(posts), events()]);
+        await waitFor(() => expect(controller.frontendCollectionsEditable).toBe(true));
+        await waitFor(() => expect(controller.tableSource?.("fs_events")).toBeDefined());
+        expect(controller.tableSource?.("fs_events")).toEqual({
+            file: "frontend/src/cms/events.ts",
+            fields: { legacy: "`fields.legacy` is `legacyField`, not an object written in the call." }
+        });
+    });
+
+    it("a label, a type and a rule are one edit of its definition, with the file's version; nothing goes to the schema or the preferences", async () => {
+        const posted = backend();
+        const { saved, presentation } = writer();
+        harness([project(posts), events()], { presentation });
+        await waitFor(() => expect(controller.tableSource?.("fs_events")).toBeDefined());
+        const after = events();
+        after.properties.title = { name: "Headline", type: "string", validation: { required: true, max: 80 } };
+        after.properties.customerId = { name: "Customer", type: "string" };
+        await run(() => controller.saveCollection({ id: "fs_events", baseline: events(), collectionData: after }));
+
+        expect(frontendPosts(posted)).toEqual([{
+            url: "https://api.example.com/api/admin/schema-editor/frontend/apply",
+            body: {
+                target: { callee: "defineFirestoreCollection", key: "slug", value: "fs_events" },
+                version: "v1",
+                operations: [
+                    { op: "set", path: ["fields", "title", "name"], value: "Headline" },
+                    { op: "set", path: ["fields", "title", "validation"], value: { max: 80 } },
+                    { op: "set", path: ["fields", "customerId", "type"], value: "string" },
+                    { op: "remove", path: ["fields", "customerId", "target"] }
+                ]
+            }
+        }]);
+        expect(posted.filter(p => p.url.endsWith("/schema-editor/apply") || p.url.includes("/admin/schema/"))).toEqual([]);
+        expect(saved).toEqual([]);
+    });
+
+    it("adding and removing a field, through saveProperty and deleteProperty", async () => {
+        const posted = backend();
+        harness([project(posts), events()]);
+        await waitFor(() => expect(controller.frontendCollectionsEditable).toBe(true));
+        await run(() => controller.saveProperty({ path: "fs_events", propertyKey: "when", property: { name: "When", type: "date" } }));
+        await run(() => controller.deleteProperty({ path: "fs_events", propertyKey: "customerId" }));
+        expect(frontendPosts(posted).filter(p => p.url.endsWith("/apply")).map(p => p.body.operations)).toEqual([
+            [{ op: "set", path: ["fields", "when"], value: { name: "When", type: "date" } }],
+            [{ op: "remove", path: ["fields", "customerId"] }]
+        ]);
+    });
+
+    it("a refusal of the source editor reaches the editor with its code", async () => {
+        backend({
+            frontendApply: () => jsonResponse({
+                error: { code: "SCHEMA_EDIT_REFUSED", message: "frontend/src/cms/events.ts changed since the edit was prepared.", details: { problems: [] } }
+            }, { status: 400 })
+        });
+        harness([events()]);
+        await waitFor(() => expect(controller.frontendCollectionsEditable).toBe(true));
+        const error = await run(() => controller.updateCollection({ id: "fs_events", collectionData: { name: "Live events" } }));
+        expect(error).toBeInstanceOf(SchemaEditRefused);
+        expect(String(error)).toMatch(/changed since the edit was prepared/);
+    });
+
+    it("is read-only in production: no source editor writes the frontend", async () => {
+        const posted = backend({ sourceEditor: false });
+        harness([project(posts), events()]);
+        await waitFor(() => expect(controller.readOnly).toBe(true));
+        expect(controller.frontendCollectionsEditable).toBe(false);
+        const error = await run(() => controller.saveProperty({ path: "fs_events", propertyKey: "when", property: { type: "date" } }));
+        expect(error).toMatchObject({ code: "EXTERNAL_COLLECTION" });
+        expect(String(error)).toMatch(/frontend\/src\/cms/);
+        expect(frontendPosts(posted)).toEqual([]);
+        expect(schemaPosts(posted)).toEqual([]);
+    });
+
+    it("is never deleted from the editor", async () => {
+        const posted = backend();
+        harness([events()]);
+        const error = await run(() => controller.deleteCollection({ id: "fs_events" }));
+        expect(error).toMatchObject({ code: "EXTERNAL_COLLECTION" });
+        expect(String(error)).toMatch(/externalCollections/);
+        expect(frontendPosts(posted)).toEqual([]);
     });
 });

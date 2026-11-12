@@ -315,10 +315,13 @@ export function CollectionEditor(props: CollectionEditorDialogProps & {
     }
 
     // A collection whose rows live elsewhere (Firestore) is defined in the
-    // frontend, which the schema editor does not write: shown, read-only, with
+    // frontend. A development server's source editor writes its
+    // `defineFirestoreCollection` call, and then it is edited like any other;
+    // without one (production, a deployed API) it is shown read-only, with
     // where to edit it — for the forms below too, which read the controller
     // from context.
-    const external = !props.isNewCollection && initialValues.engine === "firestore";
+    const external = !props.isNewCollection && initialValues.engine === "firestore"
+        && props.configController.frontendCollectionsEditable !== true;
     const configController = external
         ? {
             ...props.configController,

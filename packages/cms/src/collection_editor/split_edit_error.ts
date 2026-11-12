@@ -13,11 +13,14 @@
  *   not write them back.
  * - `NO_PRIMARY_KEY` — a new table has an `id` field that is not its primary key.
  * - `EXTERNAL_COLLECTION` — the collection is not a table of this backend:
- *   it is defined in the frontend, which the schema editor does not write.
+ *   it is defined in the frontend, and this backend cannot write the frontend
+ *   (no dev server's source editor: production, or an older backend).
+ * - `EDITED_IN_CODE` — a Firestore collection's edit changes a value that is
+ *   code (a function, a component): it is changed in the collection's file.
  */
 export class SplitEditError extends Error {
     constructor(
-        readonly code: "MIGRATION_REQUIRED" | "NOT_A_COLUMN" | "REDACTED_RULES" | "NO_PRIMARY_KEY" | "EXTERNAL_COLLECTION",
+        readonly code: "MIGRATION_REQUIRED" | "NOT_A_COLUMN" | "REDACTED_RULES" | "NO_PRIMARY_KEY" | "EXTERNAL_COLLECTION" | "EDITED_IN_CODE",
         message: string,
         readonly key?: string
     ) {

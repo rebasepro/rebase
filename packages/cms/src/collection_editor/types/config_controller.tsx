@@ -29,6 +29,14 @@ export interface CollectionsConfigController {
     readOnlyReason?: string;
 
     /**
+     * Whether collections defined in the frontend (Firestore collections,
+     * `defineFirestoreCollection` in frontend/src/cms) can be edited: the
+     * backend runs a development server's source editor, which writes them.
+     * Absent or false, the editor shows them read-only.
+     */
+    frontendCollectionsEditable?: boolean;
+
+    /**
      * Status information about the automatic collections setup process.
      * Stored in the project config document at `collectionsSetup`.
      */

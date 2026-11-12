@@ -24,6 +24,8 @@ export * from "./collections";
 export * from "./admin_collection";
 // `customizeTable`'s types: the deltas a frontend states over a table's default collection.
 export * from "./table_customization";
+// The collection editor's edits to a `defineFirestoreCollection` call.
+export * from "./firestore_collection_patch";
 export * from "./rebase_context";
 export * from "./types";
 export * from "./controllers";
