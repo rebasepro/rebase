@@ -37,6 +37,7 @@ import {
     planMove,
     planWorkspace,
     findConfigImporters,
+    findLegacyApiUses,
     readRawManifest,
     unmovedConfigFiles
 } from "./project-files";
@@ -293,6 +294,23 @@ export async function migrateCollectionsToTables(options: MigrateOptions): Promi
         plan.manualSteps.push({
             title: `Repoint the imports of ${relativeToRoot(plan, file)}`,
             detail: `It imports from ${relativeToRoot(plan, configDir)}/, which the migration replaces: ${lines.join("; ")}. A collection is a table now (\`defineTable\` / \`defineAuthTable\`), and a backend entry passes \`tables\` / \`schemaDir\` instead of \`collections\` / \`collectionsDir\`.`,
+            file: relativeToRoot(plan, file)
+        });
+    }
+
+    // Server APIs of the collection model in the project's own code.
+    const apiUses = new Map<string, { api: string; replacement: string; lines: number[] }>();
+    for (const use of findLegacyApiUses(root, configDir, new Set(plan.files.keys()))) {
+        const key = `${use.file}\0${use.api}`;
+        const entry = apiUses.get(key) ?? { api: use.api, replacement: use.replacement, lines: [] };
+        entry.lines.push(use.line);
+        apiUses.set(key, entry);
+    }
+    for (const [key, { api, replacement, lines }] of apiUses) {
+        const file = key.slice(0, key.indexOf("\0"));
+        plan.manualSteps.push({
+            title: `Replace ${api} in ${relativeToRoot(plan, file)}`,
+            detail: `\`${api}\` (line${lines.length > 1 ? "s" : ""} ${lines.join(", ")}) belongs to the collection model. Use ${replacement}.`,
             file: relativeToRoot(plan, file)
         });
     }

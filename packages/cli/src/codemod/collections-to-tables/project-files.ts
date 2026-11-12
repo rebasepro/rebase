@@ -311,7 +311,34 @@ const SPECIFIER = /(?:\bfrom\s*|\bimport\s*\(\s*|\bimport\s+|\brequire\s*\(\s*)[
  * @param skip files the run rewrites itself
  */
 export function findConfigImporters(root: string, configDir: string, skip: ReadonlySet<string>): ConfigImporter[] {
+    return scanSources(root, configDir, skip).importers;
+}
+
+/** A use of a server API the table model renamed. */
+export interface LegacyApiUse {
+    file: string;
+    line: number;
+    /** The legacy name as written. */
+    api: string;
+    /** What it is now. */
+    replacement: string;
+}
+
+/** Server APIs of the collection model, and what replaces each. */
+const LEGACY_APIS: readonly { pattern: RegExp; api: string; replacement: string }[] = [
+    { pattern: /\bsetCollectionCallbacks\s*\(/g, api: "setCollectionCallbacks", replacement: "`backend.setTableHooks(slug, hooks)` — table hooks get `table` for `collection`, and `values` for `row` in afterRead / beforeDelete / afterDelete" },
+    { pattern: /\bcollectionRegistry\b/g, api: "collectionRegistry", replacement: "`backend.getTableDescriptor(slug)` / `backend.getTableDescriptors()` to read a table, and `backend.setTableHooks(slug, hooks)` to attach hooks" },
+    { pattern: /\bcollectionsDir\s*:/g, api: "collectionsDir", replacement: "`schemaDir` (the directory whose index exports the tables) or `tables`" }
+];
+
+/** Every use of a renamed collection-model server API in the project's own code (outside `config/`). */
+export function findLegacyApiUses(root: string, configDir: string, skip: ReadonlySet<string>): LegacyApiUse[] {
+    return scanSources(root, configDir, skip).apis;
+}
+
+function scanSources(root: string, configDir: string, skip: ReadonlySet<string>): { importers: ConfigImporter[]; apis: LegacyApiUse[] } {
     const out: ConfigImporter[] = [];
+    const apis: LegacyApiUse[] = [];
     const ignored = new Set(["node_modules", "dist", "build", ".git", "coverage", ".turbo", ".next"]);
     const inConfig = (file: string): boolean => {
         const relative = path.relative(configDir, file);
@@ -327,6 +354,11 @@ export function findConfigImporters(root: string, configDir: string, skip: Reado
             }
             if (!SOURCE_FILE.test(entry.name) || entry.name.endsWith(".d.ts") || skip.has(full)) continue;
             const text = fs.readFileSync(full, "utf8");
+            for (const legacy of LEGACY_APIS) {
+                for (const match of text.matchAll(legacy.pattern)) {
+                    apis.push({ file: full, line: text.slice(0, match.index).split("\n").length, api: legacy.api, replacement: legacy.replacement });
+                }
+            }
             if (!text.includes("config")) continue;
             for (const match of text.matchAll(SPECIFIER)) {
                 const specifier = match[1];
@@ -338,5 +370,5 @@ export function findConfigImporters(root: string, configDir: string, skip: Reado
         }
     };
     walk(root);
-    return out;
+    return { importers: out, apis };
 }
