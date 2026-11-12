@@ -130,28 +130,6 @@ importers:
         specifier: ^6.0.3
         version: 6.0.3
 
-  app/config:
-    dependencies:
-      '@rebasepro/cms':
-        specifier: workspace:*
-        version: link:../../packages/cms
-      '@rebasepro/cms-types':
-        specifier: workspace:*
-        version: link:../../packages/cms-types
-      '@rebasepro/common':
-        specifier: workspace:*
-        version: link:../../packages/common
-      '@rebasepro/types':
-        specifier: workspace:*
-        version: link:../../packages/types
-    devDependencies:
-      '@types/node':
-        specifier: ^26.1.2
-        version: 26.1.2
-      typescript:
-        specifier: ^6.0.3
-        version: 6.0.3
-
   app/frontend:
     dependencies:
       '@fontsource-variable/instrument-sans':
