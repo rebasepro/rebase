@@ -48,7 +48,7 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
 - **`customizeTable`** and zero-config `<RebaseCMS />`; `frontend/src/cms/`.
 - **UI preferences**: `rebase.ui_preferences`, `/api/admin/ui-config`, `frontend/src/cms/ui-config.json` passed as `<RebaseCMS uiConfig>`, `useUiPreferences`; codes `UI_PREFERENCES_NEED_A_PERSON`, `UI_PREFERENCES_UNSUPPORTED`, `UI_CONFIG_FILE_INVALID`. The collection editor asks before a table that inherits `defaultRls` takes rules of its own, and says why a field or table is read-only.
 - **New projects ship `frontend/src/cms/ui-config.json`** and pass it as `uiConfig` (every `rebase init` preset, the demo and `examples/hybrid`): presentation the collection editor saves in development is reviewed and deployed with the frontend.
-- **`rebase verify` checks `frontend/src/cms`**: `cms-unknown-table`, `cms-unknown-field`, `cms-hidden-required`, `cms-duplicate-customization`, `cms-not-static`. Findings carry `line`.
+- **`rebase verify` checks `frontend/src/cms`**: `cms-unknown-table`, `cms-unknown-field`, `cms-hidden-required`, `cms-duplicate-customization`, `cms-not-static`, `cms-ui-config-not-mounted`. Findings carry `line`.
 - **The codemod rewrites rule sources**: `existsIn` and `membership` take `table` instead of `collection` (`collections-to-tables` and `sdk-calls`).
 - **The codemod ends with a manual step to run `rebase skills install`** when the project holds installed agent skills.
 - **`TablePatch`** (`@rebasepro/types`); `SCHEMA_EDIT_DOES_NOT_COMPILE`; a live apply serves the change without a restart.
