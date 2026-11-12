@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { loadOpenApiGenerator, mountOpenApiDocs } from "./docs";
 import type { CollectionConfig } from "@rebasepro/types";
 import type { HonoEnv } from "../api/types";
+import { tablesFromCollections } from "../../test/helpers/tables";
 import { createRequireAuth, requireAdmin } from "../auth/middleware";
 
 /**
@@ -23,7 +24,7 @@ const adminGate = [createRequireAuth({}), requireAdmin];
 function app(enableSwagger: boolean | undefined) {
     const a = new Hono<HonoEnv>();
     return loadOpenApiGenerator().then((generate) => {
-        mountOpenApiDocs(a, "/api", { enableSwagger, serverCollections: collections, requireAuth: false, adminGate, generate });
+        mountOpenApiDocs(a, "/api", { enableSwagger, serverTables: tablesFromCollections(collections).descriptors, requireAuth: false, adminGate, generate });
         return a;
     });
 }
@@ -58,7 +59,7 @@ describe("mountOpenApiDocs", () => {
         // generated headless README points every new project at `/api/swagger`.
         // Same code and remedy `/api/data` gives, so the two cannot drift.
         const a = new Hono<HonoEnv>();
-        mountOpenApiDocs(a, "/api", { enableSwagger: true, serverCollections: [], requireAuth: false, adminGate, generate: undefined });
+        mountOpenApiDocs(a, "/api", { enableSwagger: true, serverTables: [], requireAuth: false, adminGate, generate: undefined });
 
         for (const path of ["/api/docs", "/api/swagger"]) {
             const res = await a.request(path);

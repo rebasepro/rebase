@@ -1,14 +1,14 @@
 import { Hono, type Context } from "hono";
 import { HonoEnv } from "../api/types";
-import { BackendCollectionRegistry } from "../collections/BackendCollectionRegistry";
 import { ApiError, errorHandler } from "../api/errors";
 import { resolveListLimitParam } from "../api/rest/query-parser";
-import { CollectionConfig, DataDriver, scopeGrants, type ResolvedBelongsTo } from "@rebasepro/types";
+import { DataDriver, scopeGrants, type TableDescriptor } from "@rebasepro/types";
 import { httpMethodToOperation } from "../auth/api-keys/http-operation";
 import { refuseSimulatedWrite } from "../auth/simulation-read-only";
-import { type FieldViewer, fieldKeyForColumn, resolveCollectionRelations, restrictedFieldNames, withRelationReferencesOnly } from "@rebasepro/common";
+import { type FieldViewer, relationsOfKind, restrictedKeys, withRelationReferencesOnly } from "@rebasepro/common";
 import { requestViewer } from "../api/rest/field-access-query";
 import { assertNoClosedFields } from "../api/rest/write-validation";
+import type { RestTables, ServedTable } from "../api/rest/served-table";
 
 /**
  * The row snapshots a history entry stores. An update entry carries the row on
@@ -37,10 +37,10 @@ const HISTORY_SNAPSHOT_KEYS = ["values", "previous_values"] as const;
  */
 function stripHistoryValues(
     entries: Record<string, unknown>[],
-    collection: CollectionConfig,
+    table: TableDescriptor,
     viewer: { roles?: readonly string[] } | undefined
 ): Record<string, unknown>[] {
-    const { refused } = restrictedFieldNames(collection, viewer, "read");
+    const { refused } = restrictedKeys(table, viewer, "read");
 
     return entries.map(entry => {
         const stripped: Record<string, unknown> = { ...entry };
@@ -63,7 +63,7 @@ function stripHistoryValues(
  * The part of a stored version a revert writes, under the field write rules
  * every other write door applies.
  *
- * A revert is a write, so `access.write` and `excludeFromApi` hold through it:
+ * A revert is a write, so `access.write` and `.private()` hold through it:
  * without this, a caller refused `PATCH { discountPercent: 50 }` could set the
  * same value by reverting to a version that carried it, and a server-owned
  * column went back to whatever the snapshot held.
@@ -82,17 +82,17 @@ function stripHistoryValues(
  *  - one the caller cannot read is left as it is. The history list strips it
  *    from their view of the version, so it is not part of what they chose to
  *    restore, and `current` — read through their scoped driver — does not carry
- *    it to compare against. `excludeFromApi` columns fall here for everyone.
+ *    it to compare against. Private columns fall here for everyone.
  */
 function restorableValues(
     stored: Record<string, unknown>,
     current: Record<string, unknown>,
-    collection: CollectionConfig,
+    table: TableDescriptor,
     viewer: FieldViewer
 ): Record<string, unknown> {
-    const closed = restrictedFieldNames(collection, viewer, "write").refused;
+    const closed = restrictedKeys(table, viewer, "write").refused;
     if (closed.size === 0) return stored;
-    const unreadable = restrictedFieldNames(collection, viewer, "read").refused;
+    const unreadable = restrictedKeys(table, viewer, "read").refused;
 
     const restorable: Record<string, unknown> = {};
     const changed: Record<string, unknown> = {};
@@ -103,7 +103,7 @@ function restorableValues(
             changed[key] = value;
         }
     }
-    assertNoClosedFields(changed, collection, "Cannot revert to this version: ", viewer);
+    assertNoClosedFields(changed, table, "Cannot revert to this version: ", viewer);
     return restorable;
 }
 
@@ -170,17 +170,13 @@ function withoutDateEnvelopes(values: Record<string, unknown>): Record<string, u
 function columnValuesOf(
     stored: Record<string, unknown>,
     current: Record<string, unknown>,
-    collection: CollectionConfig,
+    table: TableDescriptor,
     viewer: FieldViewer
 ): { values: Record<string, unknown>; dropped: string[] } {
-    const unreadable = restrictedFieldNames(collection, viewer, "read").refused;
-    /** Owning relation name → the foreign key's wire name. */
+    const unreadable = restrictedKeys(table, viewer, "read").refused;
+    /** Owning relation name → the foreign key's column key. */
     const foreignKeyOf = new Map<string, string>();
-    for (const [name, relation] of Object.entries(resolveCollectionRelations(collection))) {
-        if (relation.kind === "belongsTo") {
-            foreignKeyOf.set(name, fieldKeyForColumn(collection, (relation as ResolvedBelongsTo).localKey));
-        }
-    }
+    for (const relation of relationsOfKind(table, "belongsTo")) foreignKeyOf.set(relation.name, relation.localField);
 
     const values: Record<string, unknown> = {};
     const dropped: string[] = [];
@@ -232,8 +228,12 @@ const HISTORY_MAX_LIMIT = 100;
 
 export function createHistoryRoutes(params: {
     historyService: HistoryService;
-    /** Only its collections are read: where an entity's history lives, and who may see which field. */
-    registry: Pick<BackendCollectionRegistry, "getCollections">;
+    /**
+     * The tables served now — a live schema edit included: their descriptors
+     * say which keep history and who may see which column; their collections
+     * are what the data driver is handed for a revert (until slice B-R7).
+     */
+    tables: () => RestTables;
     /**
      * The unscoped driver, still accepted so the call in `init.ts` and any
      * embedder's keeps compiling — and deliberately not read. Every read and
@@ -242,7 +242,17 @@ export function createHistoryRoutes(params: {
      */
     driver: DataDriver;
 }): Hono<HonoEnv> {
-    const { historyService, registry } = params;
+    const { historyService } = params;
+
+    /** The served table at this slug, with history on; a 404 or a 400 otherwise. */
+    const historyTable = (slug: string): ServedTable => {
+        const { descriptors, collections } = params.tables();
+        const table = descriptors.find(candidate => candidate.slug === slug);
+        const driverCollection = collections.find(candidate => candidate.slug === slug);
+        if (!table || !driverCollection) throw ApiError.notFound(`Table '${slug}' not found`);
+        if (!table.history) throw ApiError.badRequest(`History is not enabled for table '${slug}'`);
+        return { table, driverCollection };
+    };
     const router = new Hono<HonoEnv>();
     router.onError(errorHandler);
 
@@ -279,17 +289,18 @@ export function createHistoryRoutes(params: {
      */
     async function authorizeEntityRead(
         c: Context<HonoEnv>,
-        collection: CollectionConfig,
+        served: ServedTable,
         id: string
     ): Promise<Record<string, unknown>> {
+        const slug = served.table.slug;
         // A revert is a write: refused while simulating access.
         refuseSimulatedWrite(c, httpMethodToOperation(c.req.method));
         const narrowed = c.get("scopes");
         const scope = `data:${httpMethodToOperation(c.req.method)}`;
-        if (narrowed && !scopeGrants(narrowed, scope, collection.slug)) {
+        if (narrowed && !scopeGrants(narrowed, scope, slug)) {
             throw new ApiError(403, "SCOPE_MISSING",
-                `This credential does not hold "${scope}" for collection "${collection.slug}".`,
-                { requiredScope: `${scope}:${collection.slug}` });
+                `This credential does not hold "${scope}" for table "${slug}".`,
+                { requiredScope: `${scope}:${slug}` });
         }
 
         const scoped = c.get("driver") as DataDriver | undefined;
@@ -301,10 +312,10 @@ export function createHistoryRoutes(params: {
         // whether one row may be read. It is also the rendering a history
         // entry is stored in, which is what a revert compares it against.
         const row = scoped.restFetchService
-            ? await scoped.restFetchService.fetchOneForRest(collection.slug, id, undefined, undefined, { withDeleted: true }) ?? undefined
-            : await scoped.fetchOne({ path: collection.slug, id, collection, withDeleted: true });
+            ? await scoped.restFetchService.fetchOneForRest(slug, id, undefined, undefined, { withDeleted: true }) ?? undefined
+            : await scoped.fetchOne({ path: slug, id, collection: served.driverCollection, withDeleted: true });
         if (!row) {
-            throw ApiError.notFound(`Entity '${id}' not found in table '${collection.slug}'`);
+            throw ApiError.notFound(`No row with id '${id}' in table '${slug}'`);
         }
         return row;
     }
@@ -331,22 +342,10 @@ export function createHistoryRoutes(params: {
         const parsedOffset = parseInt(c.req.query("offset") ?? "0", 10);
         const offset = Number.isNaN(parsedOffset) ? 0 : parsedOffset;
 
-        // Resolve the collection to get the actual table name
-        const collection = registry.getCollections().find(
-            col => col.slug === slug || false
-        );
+        const served = historyTable(slug);
+        await authorizeEntityRead(c, served, id);
 
-        if (!collection) {
-            throw ApiError.notFound(`Table '${slug}' not found`);
-        }
-
-        if (!collection.history) {
-            throw ApiError.badRequest(`History is not enabled for table '${slug}'`);
-        }
-
-        await authorizeEntityRead(c, collection, id);
-
-        const tableName = collection.slug;
+        const tableName = served.table.slug;
 
         // Echo back the offset that was actually applied, not the one asked
         // for. A client paginating on `meta` — which is what `meta` is for —
@@ -362,7 +361,7 @@ export function createHistoryRoutes(params: {
         });
 
         return c.json({
-            data: stripHistoryValues(result.data, collection, requestViewer(c)),
+            data: stripHistoryValues(result.data, served.table, requestViewer(c)),
             meta: {
                 total: result.total,
                 limit: appliedLimit,
@@ -382,22 +381,13 @@ export function createHistoryRoutes(params: {
         const id = c.req.param("id");
         const historyId = c.req.param("historyId");
 
-        const collection = registry.getCollections().find(
-            col => col.slug === slug || false
-        );
-
-        if (!collection) {
-            throw ApiError.notFound(`Table '${slug}' not found`);
-        }
-
-        if (!collection.history) {
-            throw ApiError.badRequest(`History is not enabled for table '${slug}'`);
-        }
+        const served = historyTable(slug);
+        const table = served.table;
 
         // Before looking the entry up at all: the lookup is by history id alone,
         // across every table, so answering "no such entry" vs "not yours" for an
         // id the caller cannot see is itself a read of the history table.
-        const current = await authorizeEntityRead(c, collection, id);
+        const current = await authorizeEntityRead(c, served, id);
 
         // Fetch the history entry
         const historyEntry = await historyService.fetchHistoryEntry(historyId);
@@ -407,7 +397,7 @@ export function createHistoryRoutes(params: {
         }
 
         // Verify the history entry belongs to this entity (prevent cross-entity revert)
-        const tableName = collection.slug;
+        const tableName = table.slug;
         if (historyEntry.entity_id !== String(id) || historyEntry.table_name !== tableName) {
             throw ApiError.badRequest("History entry does not belong to this entity");
         }
@@ -421,9 +411,9 @@ export function createHistoryRoutes(params: {
         // not the columns.
         const restRow = Boolean((c.get("driver") as DataDriver | undefined)?.restFetchService);
         const { values: columnValues, dropped } = restRow
-            ? columnValuesOf(withoutDateEnvelopes(historyEntry.values), current, collection, viewer)
+            ? columnValuesOf(withoutDateEnvelopes(historyEntry.values), current, table, viewer)
             : { values: withoutDateEnvelopes(historyEntry.values), dropped: [] };
-        const values = restorableValues(columnValues, current, collection, viewer);
+        const values = restorableValues(columnValues, current, table, viewer);
 
         // Revert by saving through the normal driver path — this will
         // itself create another history entry, giving a full audit trail.
@@ -436,13 +426,13 @@ export function createHistoryRoutes(params: {
         // request, so the fallback was unreachable; it is gone rather than left
         // armed for whoever moves the authorization call.
         const authDriver = c.get("driver") as DataDriver;
-        const path = collection.slug;
+        const path = table.slug;
 
         const savedEntity = await authDriver.save({
             path,
             id: String(id),
             values,
-            collection,
+            collection: served.driverCollection,
             status: "existing"
         });
 

@@ -2,6 +2,7 @@ import { describe, expect, it } from "@jest/globals";
 import type { CollectionConfig } from "@rebasepro/types";
 
 import { projectResponseFields } from "../src/api/rest/write-validation";
+import { tableFrom } from "./helpers/tables";
 
 /**
  * `?fields=id,title` is documented in the generated OpenAPI — "Comma-separated
@@ -31,7 +32,7 @@ const row = () => ({ id: "p1", title: "Hello", content: "…long…", status: "p
 
 describe("response field selection", () => {
     it("returns only the fields asked for", () => {
-        const [projected] = projectResponseFields([row()], ["title"], posts);
+        const [projected] = projectResponseFields([row()], ["title"], tableFrom(posts));
 
         expect(Object.keys(projected).sort()).toEqual(["id", "title"]);
     });
@@ -40,7 +41,7 @@ describe("response field selection", () => {
         // Rows are addressed by id everywhere above this layer — the admin
         // table, realtime reconciliation, the offline cache. A row without one
         // is not a smaller row, it is an unusable one.
-        const [projected] = projectResponseFields([row()], ["title"], posts);
+        const [projected] = projectResponseFields([row()], ["title"], tableFrom(posts));
 
         expect(projected.id).toBe("p1");
     });
@@ -48,18 +49,18 @@ describe("response field selection", () => {
     it("changes nothing when no fields are given", () => {
         const original = row();
 
-        expect(projectResponseFields([original], undefined, posts)[0]).toEqual(original);
-        expect(projectResponseFields([original], [], posts)[0]).toEqual(original);
+        expect(projectResponseFields([original], undefined, tableFrom(posts))[0]).toEqual(original);
+        expect(projectResponseFields([original], [], tableFrom(posts))[0]).toEqual(original);
     });
 
     it("refuses a field the collection does not have, naming the ones it does", () => {
-        expect(() => projectResponseFields([row()], ["titel"], posts))
-            .toThrow(/'posts' has no field 'titel' to return\. Known fields: /);
+        expect(() => projectResponseFields([row()], ["titel"], tableFrom(posts)))
+            .toThrow(/Table 'posts' has no column or relation 'titel' to return\. Known columns and relations: /);
     });
 
     it("carries a machine-readable code", () => {
         try {
-            projectResponseFields([row()], ["titel"], posts);
+            projectResponseFields([row()], ["titel"], tableFrom(posts));
             throw new Error("expected projectResponseFields to throw");
         } catch (err) {
             expect((err as { code?: string }).code).toBe("UNKNOWN_RESPONSE_FIELD");
@@ -73,7 +74,7 @@ describe("response field selection", () => {
         const withAuthor = { ...row(), author: { id: "a1", name: "Ada" } };
 
         const [projected] = projectResponseFields(
-            [withAuthor], ["title", "author"], posts, { include: ["author"] }
+            [withAuthor], ["title", "author"], tableFrom(posts), { include: ["author"] }
         );
 
         expect(Object.keys(projected).sort()).toEqual(["author", "id", "title"]);
@@ -86,7 +87,7 @@ describe("response field selection", () => {
         const withAuthor = { ...row(), author: { id: "a1", name: "Ada" } };
 
         const [projected] = projectResponseFields(
-            [withAuthor], ["title"], posts, { include: ["author"] }
+            [withAuthor], ["title"], tableFrom(posts), { include: ["author"] }
         );
 
         expect(Object.keys(projected).sort()).toEqual(["author", "id", "title"]);
@@ -106,7 +107,7 @@ describe("response field selection", () => {
         };
         const withAuthor = { ...row(), author: { id: "a1" } };
 
-        const [projected] = projectResponseFields([withAuthor], ["title"], postsWithAuthor, { include: ["*"] });
+        const [projected] = projectResponseFields([withAuthor], ["title"], tableFrom(postsWithAuthor), { include: ["*"] });
 
         expect(Object.keys(projected).sort()).toEqual(["author", "id", "title"]);
     });
@@ -116,7 +117,7 @@ describe("response field selection", () => {
         // is not the claim "no fields are allowed".
         const bare: CollectionConfig = { slug: "raw", name: "Raw", table: "raw", properties: {} };
 
-        const [projected] = projectResponseFields([row()], ["title"], bare);
+        const [projected] = projectResponseFields([row()], ["title"], tableFrom(bare));
 
         expect(Object.keys(projected).sort()).toEqual(["id", "title"]);
     });
@@ -124,7 +125,7 @@ describe("response field selection", () => {
     it("projects every row, not just the first", () => {
         const rows = [row(), { ...row(), id: "p2", title: "Second" }];
 
-        const projected = projectResponseFields(rows, ["title"], posts);
+        const projected = projectResponseFields(rows, ["title"], tableFrom(posts));
 
         expect(projected.map(r => Object.keys(r).sort())).toEqual([["id", "title"], ["id", "title"]]);
     });
@@ -165,7 +166,7 @@ describe("field selection on a collection not keyed on `id`", () => {
         const [projected] = projectResponseFields(
             [{ slug: "hello-world", title: "Hello", body: "…" }],
             ["title"],
-            articles
+            tableFrom(articles)
         );
 
         // Without its key this row cannot be opened, cached or reconciled —
@@ -178,7 +179,7 @@ describe("field selection on a collection not keyed on `id`", () => {
         const [projected] = projectResponseFields(
             [{ user_id: "u1", role_id: "r1", granted_at: "2026-01-01", note: "n" }],
             ["note"],
-            memberships
+            tableFrom(memberships)
         );
 
         expect(projected.user_id).toBe("u1");
@@ -189,7 +190,7 @@ describe("field selection on a collection not keyed on `id`", () => {
         const [projected] = projectResponseFields(
             [{ slug: "hello-world", title: "Hello", body: "…" }],
             ["title"],
-            articles
+            tableFrom(articles)
         );
 
         expect("id" in projected).toBe(false);

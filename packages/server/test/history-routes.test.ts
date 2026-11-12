@@ -17,6 +17,7 @@ import type { BackendCollectionRegistry } from "../src/collections/BackendCollec
 import type { CollectionConfig } from "@rebasepro/types";
 import type { HonoEnv } from "../src/api/types";
 import { fakeDataDriver } from "./helpers/server-a-fakes";
+import { tablesFromCollections } from "./helpers/tables";
 
 type Registry = Pick<BackendCollectionRegistry, "getCollections">;
 
@@ -67,7 +68,7 @@ function mount(entry: Entry | null) {
     });
     app.route("/api/data", createHistoryRoutes({
         historyService,
-        registry,
+        tables: () => tablesFromCollections(registry.getCollections()),
         driver: fakeDataDriver({ save: jest.fn() })
     }));
 
@@ -164,7 +165,7 @@ describe("GET /:slug/:id/history serves relations as references", () => {
         const scopedDriver = fakeDataDriver({ fetchOne: jest.fn(async ({ id }: { id: string | number }) => ({ id })) });
         const app = new Hono<HonoEnv>();
         app.use("/*", async (c, next) => { c.set("driver", scopedDriver); await next(); });
-        app.route("/api/data", createHistoryRoutes({ historyService, registry, driver: fakeDataDriver() }));
+        app.route("/api/data", createHistoryRoutes({ historyService, tables: () => tablesFromCollections(registry.getCollections()), driver: fakeDataDriver() }));
 
         const res = await app.request("/api/data/posts/post-1/history");
         expect(res.status).toBe(200);
@@ -205,7 +206,7 @@ describe("reverting an entry that holds keys the row has no column for", () => {
             fetchHistory: jest.fn().mockResolvedValue({ data: [], total: 0 }),
             fetchHistoryEntry: jest.fn().mockResolvedValue({ id: "h1", entity_id: "post-1", table_name: "posts", values })
         };
-        const registry: Registry = { getCollections: () => [posts] };
+        const registry: Registry = { getCollections: () => [posts, authors] };
         // The REST row: its columns, the owning relation as its foreign key.
         const scopedDriver = fakeDataDriver({
             restFetchService: {
@@ -216,7 +217,7 @@ describe("reverting an entry that holds keys the row has no column for", () => {
         });
         const app = new Hono<HonoEnv>();
         app.use("/*", async (c, next) => { c.set("driver", scopedDriver); await next(); });
-        app.route("/api/data", createHistoryRoutes({ historyService, registry, driver: fakeDataDriver() }));
+        app.route("/api/data", createHistoryRoutes({ historyService, tables: () => tablesFromCollections(registry.getCollections()), driver: fakeDataDriver() }));
         return { app, save };
     }
 

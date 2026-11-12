@@ -27,6 +27,7 @@ import type { BackendCollectionRegistry } from "../src/collections/BackendCollec
 import type { CollectionConfig } from "@rebasepro/types";
 import type { HonoEnv } from "../src/api/types";
 import { fakeDataDriver } from "./helpers/server-a-fakes";
+import { tablesFromCollections } from "./helpers/tables";
 
 const customers: CollectionConfig = {
     name: "customers",
@@ -100,7 +101,7 @@ function mount(roles: string[] | undefined, entry = snapshot()) {
         fetchHistory: jest.fn().mockResolvedValue({ data: [], total: 0 }),
         fetchHistoryEntry: jest.fn().mockResolvedValue(entry)
     };
-    const registry: Pick<BackendCollectionRegistry, "getCollections"> = { getCollections: () => [orders] };
+    const registry: Pick<BackendCollectionRegistry, "getCollections"> = { getCollections: () => [orders, customers] };
 
     const fetchOne = jest.fn(async () => {
         const { stripe_intent: _excluded, internalNote, ...row } = CURRENT;
@@ -117,7 +118,7 @@ function mount(roles: string[] | undefined, entry = snapshot()) {
     });
     app.route("/api/data", createHistoryRoutes({
         historyService,
-        registry,
+        tables: () => tablesFromCollections(registry.getCollections()),
         driver: fakeDataDriver()
     }));
     return { app, save };

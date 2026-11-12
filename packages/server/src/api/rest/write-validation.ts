@@ -1,35 +1,64 @@
-import { CollectionConfig, INCLUDE_COUNT_KEY, JUNCTION_PIVOT_KEY, isFieldOperation, isManyToMany, type EnumValues, type IncludeSpec, type Property, type ResolvedBelongsTo } from "@rebasepro/types";
+import {
+    INCLUDE_COUNT_KEY,
+    JUNCTION_PIVOT_KEY,
+    isNumericColumnType,
+    isTemporalColumnType,
+    isTextColumnType,
+    type ColumnDescriptor,
+    type ColumnType,
+    type ColumnValidation,
+    type IncludeSpec,
+    type JsonShape,
+    type TableDescriptor
+} from "@rebasepro/types";
 import {
     type FieldViewer,
-    enumToObjectEntries,
-    fieldKeyForColumn,
-    getJunctionConfigForRelation,
+    type RelationOfKind,
+    fieldOperationKind,
+    isColumnFieldOperation,
+    isIntegerFamilyType,
     normalizeInclude,
-    resolveCollectionRelations,
-    resolvePrimaryKeys,
-    restrictedFieldNames
+    pivotTable,
+    relationsOfKind,
+    restrictedKeys,
+    textMaxLength,
+    validationPattern
 } from "@rebasepro/common";
-import { hydrateRegExp } from "@rebasepro/utils";
 import { ApiError } from "../errors";
 
 /**
- * The relations of `collection` that reach through a junction carrying its own
- * columns, each with the synthetic collection those columns are declared on.
+ * What the API checks of a write before it reaches the data driver, read from
+ * the table's descriptor: which columns a body may name, and what each value
+ * must satisfy.
  *
- * Keyed by the relation's wire name, which is what a membership write names
- * (`{ tags: [...] }`). A junction with no `through.properties` is not here at
- * all: there is nothing a `_pivot` could legally say about it, and the write
- * path refuses one with the relation named.
+ * Every rule is a fact of a {@link ColumnDescriptor}: `nullable: false` (and no
+ * default, stamp or generation) is required on create; `validate` is checked
+ * per column type; `oneOf` and an enum type's values are a closed set;
+ * `readOnly`, `generated` and `private` close a column to every caller, and
+ * `access.write` to the callers without a listed role; a `json` shape is
+ * walked field by field. A key the table does not declare is refused unless
+ * the table says `strictWrites: false`.
+ *
+ * @module
  */
-function junctionsWithPayload(collection: CollectionConfig): Array<[string, CollectionConfig]> {
-    const out: Array<[string, CollectionConfig]> = [];
-    for (const [key, relation] of Object.entries(resolveCollectionRelations(collection))) {
-        if (!isManyToMany(relation)) continue;
-        if (Object.keys(relation.through.properties).length === 0) continue;
-        out.push([key, getJunctionConfigForRelation(relation.through)]);
-    }
-    return out;
+
+/**
+ * The `manyToMany` relations of `table` whose link carries columns of its own,
+ * each with those columns as a table.
+ *
+ * Keyed by the relation's name, which is what a membership write names
+ * (`{ tags: [...] }`). A junction with no `pivot` is not here at all: there is
+ * nothing a `_pivot` could legally say about it, and the write path refuses
+ * one with the relation named.
+ */
+function junctionsWithPayload(table: TableDescriptor): Array<[string, TableDescriptor]> {
+    return relationsOfKind(table, "manyToMany")
+        .filter((relation: RelationOfKind<"manyToMany">) => relation.through.pivot.length > 0)
+        .map(relation => [relation.name, pivotTable(table, relation)]);
 }
+
+const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+    typeof value === "object" && value !== null && !Array.isArray(value) && !(value instanceof Date);
 
 /**
  * The `_pivot` objects in a membership value, with the index each came from.
@@ -44,60 +73,60 @@ function junctionsWithPayload(collection: CollectionConfig): Array<[string, Coll
 function pivotsIn(value: unknown): Array<{ index: number; pivot: Record<string, unknown> }> {
     if (!Array.isArray(value)) return [];
     const out: Array<{ index: number; pivot: Record<string, unknown> }> = [];
-    value.forEach((element, index) => {
-        if (!element || typeof element !== "object" || Array.isArray(element)) return;
-        const pivot = (element as Record<string, unknown>)[JUNCTION_PIVOT_KEY];
-        if (!pivot || typeof pivot !== "object" || Array.isArray(pivot)) return;
-        out.push({ index, pivot: pivot as Record<string, unknown> });
+    value.forEach((element: unknown, index) => {
+        if (!isPlainObject(element)) return;
+        const pivot = element[JUNCTION_PIVOT_KEY];
+        if (!isPlainObject(pivot)) return;
+        out.push({ index, pivot });
     });
     return out;
 }
 
+/** The column of `table` with this key. */
+function columnOf(table: TableDescriptor, key: string): ColumnDescriptor | undefined {
+    return table.columns.find(column => column.key === key);
+}
+
 /**
- * The two ways a field can be closed to a write, told apart.
+ * The two ways a column can be closed to a write, told apart.
  *
- * `excluded` is `access.write: []` — the server's own column, closed to every
- * caller at every privilege, which is what `excludeFromApi` expands to.
+ * `excluded` is closed to every caller at every privilege: a `.private()`
+ * column, a `.readOnly()` one, a generated one, and a list `access.write: []`.
  * `unwritable` is a non-empty role list this caller does not satisfy. They are
- * one rule and two answers: the first is a property of the *collection* and the
+ * one rule and two answers: the first is a property of the *table* and the
  * same for everybody, the second is a property of the *caller* and would be a
  * 200 for their colleague. A client that retries after acquiring a role should
  * be able to tell which it hit without parsing English.
  *
- * Both are `restrictedFieldNames`, which is the one list of the names a closed
- * field can be written under: its key, its column, and — for a to-one relation —
- * the foreign key that sets the same column (`bandId: 7` is `band: { id: 7 }`).
- * Asked for the trusted plane, which satisfies every role list but the empty
- * one, it answers exactly the `[]` half.
+ * Both are `restrictedKeys`, which is the one list of the names a closed
+ * column can be written under: its key, its SQL name, and — for a to-one
+ * relation — the foreign key that sets the same column (`bandId: 7` is
+ * `band: { id: 7 }`). Asked for the trusted plane, which satisfies every role
+ * list but the empty one, it answers exactly the closed-to-all half.
  */
 function closedWriteNames(
-    collection: CollectionConfig,
+    table: TableDescriptor,
     viewer: FieldViewer | undefined
 ): { excluded: Set<string>; unwritable: Set<string> } {
-    const excluded = restrictedFieldNames(collection, undefined, "write").refused;
+    const excluded = restrictedKeys(table, undefined, "write").refused;
     const unwritable = new Set<string>();
     if (!viewer) return { excluded, unwritable };
-    for (const name of restrictedFieldNames(collection, viewer, "write").refused) {
+    for (const name of restrictedKeys(table, viewer, "write").refused) {
         if (!excluded.has(name)) unwritable.add(name);
     }
     return { excluded, unwritable };
 }
 
 /**
- * Refuse a write naming a field this caller may not set.
+ * Refuse a write naming a column this caller may not set.
  *
- * `excludeFromApi` means what the generated SDK already says it means: "absent
+ * `.private()` means what the generated SDK already says it means: "absent
  * from Row, Insert and Update — the API surface does not mention it, in either
- * direction". The server only ever enforced the read half, so the column a
- * collection had declared unservable was still writable by anyone whose
- * policies let them write the row.
- *
- * On the user store that is the sharp one. `users_write_own` lets you update
- * your own row, `password_hash` is a column on it, and setting it directly is a
- * password change that does not need the old password — so a stolen access
- * token, which expires within the hour, becomes a password the attacker chose.
- * Everything else the flag protects is the same shape: a verification token, a
- * rotation counter, a secret the server owns.
+ * direction". On the user store that is the sharp one: `users_write_own` lets
+ * you update your own row, `password_hash` is a column on it, and setting it
+ * directly is a password change that does not need the old password. A
+ * `.readOnly()` or generated column is the database's or the server's to fill,
+ * the same for every caller.
  *
  * `access.write: ["editor"]` is the same rule with a role list instead of an
  * empty one, and answers `FIELD_NOT_WRITABLE` rather than
@@ -105,36 +134,35 @@ function closedWriteNames(
  * write that silently discards a field reports success for an edit that did not
  * happen, which is the one outcome a form cannot recover from.
  *
- * The empty-list half is refused for every caller, not only unprivileged ones,
- * and regardless of `strictWrites`. The framework's own auth paths do not come
- * through here — `prepareUserCreation` builds the row itself — so what is left
- * is callers the rule was written to exclude.
+ * The closed-to-all half is refused for every caller, not only unprivileged
+ * ones, and regardless of `strictWrites`. The framework's own auth paths do not
+ * come through here — `prepareUserCreation` builds the row itself — so what is
+ * left is callers the rule was written to exclude.
  *
  * Exported for the history revert, which writes a stored version rather than a
- * body and so asks this question of the fields the revert would change, not of
- * every key the snapshot holds. `where` prefixes the message.
+ * body and so asks this question of the columns the revert would change, not
+ * of every key the snapshot holds. `where` prefixes the message.
  */
 export function assertNoClosedFields(
     values: Record<string, unknown>,
-    collection: CollectionConfig,
+    table: TableDescriptor,
     where: string,
     viewer: FieldViewer | undefined
 ): void {
-    const { excluded, unwritable } = closedWriteNames(collection, viewer);
+    const { excluded, unwritable } = closedWriteNames(table, viewer);
     if (excluded.size === 0 && unwritable.size === 0) return;
 
     const named = Object.keys(values).filter(key => excluded.has(key));
     if (named.length > 0) {
-        // Named separately from "no such field", because it is a different fact
-        // and the generic message would send the reader looking for a typo in a
-        // name that is spelled correctly.
+        // Named separately from "no such column", because it is a different
+        // fact and the generic message would send the reader looking for a typo
+        // in a name that is spelled correctly.
         throw ApiError.badRequest(
-            `${where}${named.map(f => `'${f}'`).join(", ")} ` +
-            `${named.length > 1 ? "are" : "is"} excluded from the API on '${collection.slug}' ` +
-            `and cannot be written through it. ${named.length > 1 ? "These columns are" : "This column is"} ` +
-            "the server's to set.",
+            `${where}${named.map(f => `'${f}'`).join(", ")} on table '${table.slug}' ` +
+            `cannot be written through the API: ${named.length > 1 ? "these columns are" : "the column is"} ` +
+            "private, read-only or generated — the server's to set.",
             "VALIDATION_EXCLUDED_FIELDS",
-            { collection: collection.slug, fields: named }
+            { collection: table.slug, fields: named }
         );
     }
 
@@ -142,17 +170,17 @@ export function assertNoClosedFields(
     if (refused.length === 0) return;
 
     // The wire name the caller sent, in `field`, so a form can mark the input it
-    // owns rather than the property key it may never have seen.
+    // owns rather than the column key it may never have seen.
     const violations: WriteViolation[] = refused.map(field => ({
         field,
         code: "access",
-        message: `'${field}' on '${collection.slug}' is not writable with your roles.`
+        message: `'${field}' on table '${table.slug}' is not writable with your roles.`
     }));
     throw ApiError.badRequest(
         `${where}${violations.map(v => v.message).join(" ")}`,
         "FIELD_NOT_WRITABLE",
         {
-            collection: collection.slug,
+            collection: table.slug,
             fields: refused,
             violations,
             messages: violations.map(v => v.message)
@@ -161,45 +189,43 @@ export function assertNoClosedFields(
 }
 
 /**
- * Refuse a field operation on a field this caller may not read.
+ * Refuse a field operation on a column this caller may not read.
  *
  * An operation reads the stored value — `$inc` adds to it, `$push` appends to
- * it — and its result is held to the property's declared bounds by the same
+ * it — and its result is held to the column's declared bounds by the same
  * statement. So the answer to one is a measurement of the value: a refused
  * `{ score: { $inc: -40 } }` against `min: 0` says the hidden score is below
  * 40, an accepted one is undone with `$inc: 40`, and a binary search recovers
- * the value exactly. `max` on an array does the same for its length, and a
- * column's own type range does it with no declared bound at all. A plain value
- * reads nothing, so it stays the write rule's alone.
+ * the value exactly. A plain value reads nothing, so it stays the write rule's
+ * alone.
  *
- * The same refusal, with the same code, a filter on the field gets from the
+ * The same refusal, with the same code, a filter on the column gets from the
  * read side (`assertQueryFieldsReadable`): a column no response can carry is a
  * column no request may interrogate, whichever verb the request uses.
  */
 function assertFieldOpsReadable(
     values: Record<string, unknown>,
-    collection: CollectionConfig,
+    table: TableDescriptor,
     where: string,
     viewer: FieldViewer | undefined
 ): void {
-    const properties = (collection.properties ?? {}) as Record<string, Property>;
-    const operated = Object.keys(values).filter(key => isFieldOperation(values[key], properties[key]?.type));
+    const operated = Object.keys(values).filter(key => isColumnFieldOperation(values[key], columnOf(table, key)));
     if (operated.length === 0) return;
-    const { refused } = restrictedFieldNames(collection, viewer, "read");
+    const { refused } = restrictedKeys(table, viewer, "read");
     const named = operated.filter(key => refused.has(key));
     if (named.length === 0) return;
 
     const violations: WriteViolation[] = named.map(field => ({
         field,
         code: "access",
-        message: `'${field}' on '${collection.slug}' is not readable with your roles, so it cannot be changed ` +
+        message: `'${field}' on table '${table.slug}' is not readable with your roles, so it cannot be changed ` +
             "by a field operation, which reads the stored value. Send the value itself."
     }));
     throw ApiError.badRequest(
         `${where}${violations.map(v => v.message).join(" ")}`,
         "FIELD_NOT_READABLE",
         {
-            collection: collection.slug,
+            collection: table.slug,
             fields: named,
             violations,
             messages: violations.map(v => v.message)
@@ -208,91 +234,66 @@ function assertFieldOpsReadable(
 }
 
 /**
- * Reject a write naming a field the collection does not have.
+ * Reject a write naming a column the table does not have.
  *
- * An unknown key does *not* reach the INSERT and come back as `column "titel"
- * does not exist`, which is what this comment used to claim. Drizzle builds
- * INSERT and UPDATE from the table's own column list, so a key the table does
- * not carry is left out of the statement: the write answers 201 having stored
- * nothing under that name. A typo is a request problem, it belongs in a 400,
- * and nothing below this was ever going to raise one.
+ * An unknown key does not reach the INSERT and come back as `column "titel"
+ * does not exist`: Drizzle builds INSERT and UPDATE from the table's own column
+ * list, so a key the table does not carry is left out of the statement and the
+ * write answers 201 having stored nothing under that name. A typo is a request
+ * problem, it belongs in a 400.
  *
- * This is the config-level check and it is skipped on several paths (see the
- * `strictWrites` bail below, and the auth-adapter contract at the call site).
+ * `strictWrites: false` on the table skips the unknown-key half (see below);
  * `assertWritableColumns` in the Postgres driver is the backstop every write
- * passes through, including in-process `rebase.data` writes that never come
- * near this layer.
+ * passes through, including in-process `rebase.data` writes.
  *
  * What counts as known:
- * - a declared property (for an introspected BaaS collection these *are* the
- *   columns, so the set is exact);
- * - the foreign-key column behind an owning relation, which callers may write
- *   directly instead of through the relation property;
- * - anything named in `options.extraKnownFields` — for an auth collection the
+ * - a column (the foreign key of a `belongsTo` is a column of the table);
+ * - a relation, which a write sets by name (`author: { id }`, `tags: [...]`);
+ * - anything named in `options.extraKnownFields` — for the auth table the
  *   credential keys the auth adapter consumes before a row is ever built;
  * - nothing else. `id` in particular is not automatically known — see below.
  */
 export function assertKnownWriteFields(
     values: Record<string, unknown>,
-    collection: CollectionConfig,
+    table: TableDescriptor,
     options?: { rowIndex?: number; extraKnownFields?: readonly string[]; viewer?: FieldViewer }
 ): void {
-    // A collection that declares no properties describes nothing, so there is
-    // nothing to check against — "no declared fields" is not the same claim as
-    // "no fields are allowed", and reading it as the latter would turn every
-    // write to such a collection into a 400. The driver's column check has the
-    // last word.
-    if (!collection.properties || Object.keys(collection.properties).length === 0) return;
+    // A table that describes no column has nothing to check against — "no
+    // declared columns" is not the claim "no columns are allowed". The
+    // driver's column check has the last word.
+    if (table.columns.length === 0 && table.relations.length === 0) return;
 
     const where = options?.rowIndex !== undefined ? `Row ${options.rowIndex}: ` : "";
 
-    // Checked BEFORE the `strictWrites` opt-out, and that ordering is the whole
-    // point of hoisting it.
-    //
-    // `strictWrites: false` says one thing: "this config does not list every
-    // column, so do not reject a key merely because I did not declare it". It
-    // is a convenience flag, set on introspected and hand-written configs all
-    // the time. It was also the single early return standing above every other
-    // rule in this function, so switching it off also switched off the refusal
-    // below — and that refusal is a *security* rule, not a typo check. A
-    // convenience flag must not be able to turn off a security rule; the two
-    // facts are unrelated.
-    assertNoClosedFields(values, collection, where, options?.viewer);
-    assertFieldOpsReadable(values, collection, where, options?.viewer);
+    // Checked BEFORE the `strictWrites` opt-out: that flag says "accept a key
+    // this table does not declare", a convenience. The refusal below is a
+    // security rule, and a convenience flag must not be able to turn it off.
+    assertNoClosedFields(values, table, where, options?.viewer);
+    assertFieldOpsReadable(values, table, where, options?.viewer);
 
-    // The opt-out lets a key through that this config does not describe; the
+    // The opt-out lets a key through that this table does not describe; the
     // driver still requires a real column behind it.
-    if (collection.strictWrites === false) return;
+    if (table.strictWrites === false) return;
 
-    const known = new Set<string>(Object.keys(collection.properties));
+    const known = new Set<string>([
+        ...table.columns.map(column => column.key),
+        ...table.relations.map(relation => relation.name)
+    ]);
 
-    // A field this caller cannot write is not among the fields they may name,
-    // so it is absent from the "Known fields:" list the error prints. That list
-    // is an offer, and offering a field the next request would refuse is worse
-    // than saying nothing.
-    const restricted = restrictedFieldNames(collection, options?.viewer, "write");
+    // A column this caller cannot write is not among the names they may use,
+    // so it is absent from the "Known columns" list the error prints. That
+    // list is an offer, and offering a name the next request would refuse is
+    // worse than saying nothing.
+    const restricted = restrictedKeys(table, options?.viewer, "write");
     for (const name of restricted.declared) known.delete(name);
-
-    // An owning relation stores its target in a local FK column that usually
-    // has no property of its own; writing it directly is legitimate. Under its
-    // *wire* name — `authorId` — which is the key the row is served under and
-    // therefore the only one a caller can be expected to send back. Not offered
-    // to a caller who may not write the relation: the key is the relation.
-    for (const relation of Object.values(resolveCollectionRelations(collection))) {
-        if (relation.kind === "belongsTo") {
-            const key = fieldKeyForColumn(collection, (relation as ResolvedBelongsTo).localKey);
-            if (!restricted.refused.has(key)) known.add(key);
-        }
-    }
 
     for (const field of options?.extraKnownFields ?? []) known.add(field);
 
-    // A membership element may name the link's own columns under `_pivot`. They
-    // belong to the junction, not to this collection, so they are checked
-    // against the junction's properties — by the same function, so a payload
-    // column with `access.write: ["admin"]` or `excludeFromApi` is refused on
-    // exactly the terms a collection column with the same declaration is.
-    for (const [key, junction] of junctionsWithPayload(collection)) {
+    // A membership element may name the link's own columns under `_pivot`.
+    // They belong to the junction, so they are checked against its columns —
+    // by the same function, so a pivot column with `access.write: ["admin"]`
+    // or `.private()` is refused on exactly the terms a table's column is.
+    for (const [key, junction] of junctionsWithPayload(table)) {
         for (const { pivot } of pivotsIn(values[key])) {
             assertKnownWriteFields(pivot, junction, { viewer: options?.viewer });
         }
@@ -305,28 +306,25 @@ export function assertKnownWriteFields(
     // certainly did not choose to send it — `create(data, id)` puts it there,
     // which is right for a table keyed on `id` and meaningless for any other.
     if (unknown.includes("id") && !known.has("id")) {
-        const keys = Object.entries(collection.properties ?? {})
-            .filter(([, prop]) => "isId" in (prop as object) && Boolean((prop as { isId?: unknown }).isId))
-            .map(([name]) => `'${name}'`);
+        const keys = table.primaryKey.map(name => `'${name}'`);
         const keyDesc = keys.length > 0 ? keys.join(" + ") : "its own key column";
         throw ApiError.badRequest(
-            `${where}'${collection.slug}' has no 'id' column — it is keyed on ${keyDesc}. ` +
-            `The \`id\` argument of \`create(data, id)\` is written as an \`id\` column, so for this ` +
-            `collection put the key in \`data\` instead.`,
+            `${where}Table '${table.slug}' has no 'id' column — it is keyed on ${keyDesc}. ` +
+            "The `id` argument of `create(data, id)` is written as an `id` column, so for this " +
+            "table put the key in `data` instead.",
             "VALIDATION_UNKNOWN_FIELDS"
         );
     }
 
     throw ApiError.badRequest(
-        `${where}'${collection.slug}' has no field${unknown.length > 1 ? "s" : ""} ` +
-        `${unknown.map(f => `'${f}'`).join(", ")}. ` +
-        `Known fields: ${[...known].sort().map(f => `'${f}'`).join(", ")}.`,
+        `${where}Table '${table.slug}' has no column ${unknown.map(f => `'${f}'`).join(", ")}. ` +
+        `Known columns: ${[...known].sort().map(f => `'${f}'`).join(", ")}.`,
         "VALIDATION_UNKNOWN_FIELDS"
     );
 }
 
 /**
- * The number a constraint should judge, or `undefined` if the value is not one.
+ * The number a rule should judge, or `undefined` if the value is not one.
  *
  * A JSON body may carry `"5"` for a number column and Postgres accepts it, so
  * the string form is judged too — refusing to look at it would leave the exact
@@ -341,7 +339,7 @@ function asNumber(value: unknown): number | undefined {
     return undefined;
 }
 
-/** The instant a constraint should judge, or `undefined` if the value is not one. */
+/** The instant a rule should judge, or `undefined` if the value is not one. */
 function asDate(value: unknown): Date | undefined {
     if (value instanceof Date) return Number.isNaN(value.getTime()) ? undefined : value;
     if (typeof value === "string" || typeof value === "number") {
@@ -352,55 +350,13 @@ function asDate(value: unknown): Date | undefined {
 }
 
 /**
- * `validation.matches` as a regex that can be tested repeatedly.
- *
- * A `RegExp` carrying `g` or `y` keeps `lastIndex` between calls, so the same
- * pattern would accept and reject the same value on alternate rows of a bulk
- * write. Rebuilt without those flags.
- *
- * A *string* `matches` is hydrated with the same `hydrateRegExp` the admin form
- * uses, so `"/^[A-Z]{2}$/i"` means one thing on both sides. `new RegExp(str)`
- * read that serialized form literally: the leading and trailing slashes became
- * characters the value had to contain, and the `i` became a letter — so a
- * pattern the form accepted `US` under was one the server rejected `US` under,
- * and the only value that passed was the impossible `/us/i`-shaped literal. The
- * serialized spelling is not exotic: `serializeRegExp` in `@rebasepro/utils`
- * produces exactly it, and every config that round-trips through the Studio's
- * collection editor stores `matches` that way.
- */
-function toPattern(matches: string | RegExp): RegExp | undefined {
-    try {
-        if (typeof matches === "string") {
-            const hydrated = hydrateRegExp(matches);
-            if (!hydrated) return undefined;
-            // Same flag strip as below: hydration preserves whatever flags were
-            // serialized, `g` and `y` included.
-            return new RegExp(hydrated.source, hydrated.flags.replace(/[gy]/g, ""));
-        }
-        return new RegExp(matches.source, matches.flags.replace(/[gy]/g, ""));
-    } catch {
-        // A pattern the config author wrote wrong is their bug, not the
-        // caller's; refusing every write over it would be the wrong blame.
-        //
-        // Which leaves the rule silently not running, so this is no longer
-        // where the problem is caught: `checkValidationPattern` in
-        // `collections/validate-config.ts` compiles every `matches` at boot and
-        // refuses to start on one that will not. A booted server does not reach
-        // this branch, and it stays lenient for the paths that build a config
-        // by hand.
-        return undefined;
-    }
-}
-
-/**
  * One broken rule, in the shape a client can branch on.
  *
- * `field` is the **wire** name — the property key, dotted through maps and
- * indexed through arrays (`address.zip`, `tags[2]`) — because that is the name
- * the caller sent and the only one they can map back onto their form. `code` is
- * stable and machine-readable; `message` is the sentence a human reads. A form
- * that has to regex-match an English sentence to find out which input to mark
- * red is a form that will break on the first wording change.
+ * `field` is the **wire** name — the column key, dotted through JSON objects
+ * and indexed through arrays (`address.zip`, `tags[2]`) — because that is the
+ * name the caller sent and the only one they can map back onto their form.
+ * `code` is stable and machine-readable; `message` is the sentence a human
+ * reads.
  */
 export interface WriteViolation {
     field: string;
@@ -408,204 +364,167 @@ export interface WriteViolation {
     message: string;
 }
 
-/** The ids an `EnumValues` accepts, compared as strings. */
-function enumIds(values: EnumValues): string[] {
-    return enumToObjectEntries(values)
-        .filter(entry => entry && (entry.id || entry.id === 0))
-        .map(entry => String(entry.id));
-}
-
 /**
  * A deliberately plain email shape: something, `@`, something with a dot.
  *
  * Not RFC 5322 — that grammar accepts addresses no mail server will deliver to
  * and is not what `format: "email"` in the published OpenAPI leads anyone to
- * expect. This rejects the mistakes people actually make (a missing `@`, a bare
- * hostname, whitespace) and accepts everything deliverable.
+ * expect. This rejects the mistakes people actually make and accepts
+ * everything deliverable.
  */
 const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /** Is this an absolute URL — the thing `format: "uri"` promises? */
 function isAbsoluteUrl(value: string): boolean {
     try {
-        // Rejects `/images/a.png` and `example.com`, which is the point: a
-        // relative reference is not a URL a consumer of the row can fetch.
         return Boolean(new URL(value).protocol);
     } catch {
         return false;
     }
 }
 
-function collectViolations(
-    key: string,
-    property: Property,
-    value: unknown,
-    into: WriteViolation[]
-): void {
-    // `null` states a value's absence, and whether that is allowed is
-    // `required`'s question — which the database answers with NOT NULL. A range
-    // has nothing to say about a value that is not there.
-    if (value === null || value === undefined) return;
+/**
+ * The rules one scalar value answers to, whatever declared them: a column, the
+ * items of an array column, or a field of a JSON document.
+ */
+interface ScalarRules {
+    kind: "text" | "number" | "temporal" | "geopoint" | "none";
+    validate?: ColumnValidation;
+    /** A closed set: an enum type's labels, or `oneOf`. */
+    oneOf?: readonly (string | number)[];
+    /** The value must be whole: an integer column, or `validate({ integer })`. */
+    integer?: boolean;
+    /** The longest text accepted. */
+    maxLength?: number;
+}
 
-    if (isFieldOperation(value, property.type) && typeof value === "object") {
-        collectFieldOperationViolations(key, property, value, into);
-        return;
+/** The scalar rules of a value of `type`, with the rules that came with it. */
+function scalarRulesOf(type: ColumnType, rules: { validate?: ColumnValidation; oneOf?: readonly (string | number)[] }, maxLength?: number): ScalarRules {
+    if (type.kind === "enum") return { kind: "text", validate: rules.validate, oneOf: rules.oneOf ?? type.values, maxLength };
+    if (isTextColumnType(type) || type.kind === "uuid" || type.kind === "other") {
+        return { kind: "text", validate: rules.validate, oneOf: rules.oneOf, maxLength };
     }
+    if (isNumericColumnType(type)) {
+        return {
+            kind: "number",
+            validate: rules.validate,
+            oneOf: rules.oneOf,
+            integer: rules.validate?.integer === true || isIntegerFamilyType(type)
+        };
+    }
+    if (isTemporalColumnType(type)) return { kind: "temporal", validate: rules.validate };
+    return { kind: "none" };
+}
 
-    switch (property.type) {
+/** The scalar rules of a JSON shape node, or `undefined` for a node that is not a scalar. */
+function scalarRulesOfNode(node: JsonShape): ScalarRules | undefined {
+    switch (node.kind) {
         case "string": {
-            if (typeof value !== "string") return;
+            const max = node.validate?.max;
+            return { kind: "text", validate: node.validate, oneOf: node.oneOf, maxLength: typeof max === "number" ? max : undefined };
+        }
+        case "number":
+            return { kind: "number", validate: node.validate, oneOf: node.oneOf, integer: node.validate?.integer === true };
+        case "date":
+            return { kind: "temporal", validate: node.validate };
+        case "geopoint":
+            return { kind: "geopoint" };
+        case "boolean":
+            return { kind: "none" };
+        default:
+            return undefined;
+    }
+}
 
-            // Enum membership. Postgres does enforce it for a real `enum`
-            // column — as `22P02`, which aborts the transaction and is rendered
-            // to the caller as `Invalid data format in "posts".` with no field
-            // named. Where the column is plain `text` (an introspected table, a
-            // `text[]` of enum values) nothing enforced it at all and the row
-            // stored a label the collection does not define. Checked here so
-            // both spellings answer the same 400, naming the field and the
-            // labels it accepts.
-            if (property.enum) {
-                const ids = enumIds(property.enum);
-                if (ids.length > 0 && !ids.includes(value)) {
+/** Judge one scalar value by its rules. `null`/`undefined` is `required`'s question, not a range's. */
+function collectScalarViolations(key: string, rules: ScalarRules, value: unknown, into: WriteViolation[]): void {
+    if (value === null || value === undefined) return;
+    switch (rules.kind) {
+        case "text": {
+            if (typeof value !== "string") return;
+            // A closed set. Postgres enforces it for a real `enum` column — as
+            // `22P02`, which names no field — and nothing enforces it for a text
+            // column with `.oneOf()`. Checked here so both answer the same 400,
+            // naming the column and the values it accepts. The value is echoed
+            // because a label is a declared constant, already in the OpenAPI
+            // and the generated SDK.
+            if (rules.oneOf && rules.oneOf.length > 0) {
+                const ids = rules.oneOf.map(String);
+                if (!ids.includes(value)) {
                     into.push({
                         field: key,
                         code: "enum",
-                        // The value is echoed because an enum label is a
-                        // *declared* constant, not caller data: it is already
-                        // in the config, the OpenAPI and the generated SDK.
                         message: `'${key}' must be one of ${ids.map(id => `'${id}'`).join(", ")} (received '${value}').`
                     });
                 }
             }
-
-            // `email` and `url` are published as `format: "email"` / `"uri"` in
-            // the generated OpenAPI, so every client and gateway built from that
-            // spec believed the server was checking. It was not.
-            if (property.email && value !== "" && !EMAIL_SHAPE.test(value)) {
+            const validate = rules.validate;
+            if (validate?.email && value !== "" && !EMAIL_SHAPE.test(value)) {
                 into.push({ field: key, code: "email", message: `'${key}' must be an email address.` });
             }
-            if (property.url && value !== "" && !isAbsoluteUrl(value)) {
+            if (validate?.url && value !== "" && !isAbsoluteUrl(value)) {
                 into.push({ field: key, code: "url", message: `'${key}' must be an absolute URL, including the scheme (e.g. https://).` });
             }
-
-            const rules = property.validation;
-            if (!rules) return;
-            if (rules.length !== undefined && value.length !== rules.length) {
-                into.push({ field: key, code: "length", message: `'${key}' must be exactly ${rules.length} character${rules.length === 1 ? "" : "s"} long (received ${value.length}).` });
+            if (validate?.length !== undefined && value.length !== validate.length) {
+                into.push({ field: key, code: "length", message: `'${key}' must be exactly ${validate.length} character${validate.length === 1 ? "" : "s"} long (received ${value.length}).` });
             }
-            if (rules.min !== undefined && value.length < rules.min) {
-                into.push({ field: key, code: "min_length", message: `'${key}' must be at least ${rules.min} character${rules.min === 1 ? "" : "s"} long (received ${value.length}).` });
+            const min = typeof validate?.min === "number" ? validate.min : undefined;
+            if (min !== undefined && value.length < min) {
+                into.push({ field: key, code: "min_length", message: `'${key}' must be at least ${min} character${min === 1 ? "" : "s"} long (received ${value.length}).` });
             }
-            if (rules.max !== undefined && value.length > rules.max) {
-                into.push({ field: key, code: "max_length", message: `'${key}' must be at most ${rules.max} character${rules.max === 1 ? "" : "s"} long (received ${value.length}).` });
+            const max = rules.maxLength;
+            if (max !== undefined && value.length > max) {
+                into.push({ field: key, code: "max_length", message: `'${key}' must be at most ${max} character${max === 1 ? "" : "s"} long (received ${value.length}).` });
             }
-            if (rules.matches !== undefined) {
-                const pattern = toPattern(rules.matches);
-                // The value is not echoed: a pattern usually guards an
-                // identifier, a token or a phone number, and the message ends
-                // up in logs.
-                if (pattern && !pattern.test(value)) {
-                    into.push({ field: key, code: "pattern", message: rules.matchesMessage ?? `'${key}' does not match the required pattern ${pattern}.` });
-                }
+            const pattern = validationPattern(validate);
+            // The value is not echoed: a pattern usually guards an identifier,
+            // a token or a phone number, and the message ends up in logs.
+            if (pattern && !pattern.test(value)) {
+                into.push({ field: key, code: "pattern", message: validate?.matchesMessage ?? `'${key}' does not match the required pattern ${pattern}.` });
             }
             return;
         }
-
         case "number": {
             const num = asNumber(value);
             if (num === undefined) return;
-
-            // Same rule as the string case. A number enum is stored in an
-            // ordinary integer column, so nothing anywhere rejected `99` for a
-            // property whose declared ids are 1, 2 and 3.
-            if (property.enum) {
-                const ids = enumIds(property.enum);
-                if (ids.length > 0 && !ids.includes(String(num))) {
-                    into.push({
-                        field: key,
-                        code: "enum",
-                        message: `'${key}' must be one of ${ids.join(", ")} (received ${num}).`
-                    });
+            if (rules.oneOf && rules.oneOf.length > 0) {
+                const ids = rules.oneOf.map(String);
+                if (!ids.includes(String(num))) {
+                    into.push({ field: key, code: "enum", message: `'${key}' must be one of ${ids.join(", ")} (received ${num}).` });
                 }
             }
-
-            // An integer column takes a whole number whether or not the
-            // property says `validation.integer`. Left to Postgres, a fraction
-            // came back as `Invalid data format in "products".` naming no field.
-            const integerColumn = property.columnType === "integer" || property.columnType === "bigint"
-                || property.columnType === "serial" || property.columnType === "bigserial";
-            const rules = property.validation;
-            if ((rules?.integer || integerColumn) && !Number.isInteger(num)) into.push({ field: key, code: "integer", message: `'${key}' must be a whole number (received ${num}).` });
-            if (!rules) return;
-            if (rules.positive && !(num > 0)) into.push({ field: key, code: "positive", message: `'${key}' must be positive (received ${num}).` });
-            if (rules.negative && !(num < 0)) into.push({ field: key, code: "negative", message: `'${key}' must be negative (received ${num}).` });
-            if (rules.min !== undefined && num < rules.min) into.push({ field: key, code: "min", message: `'${key}' must be at least ${rules.min} (received ${num}).` });
-            if (rules.max !== undefined && num > rules.max) into.push({ field: key, code: "max", message: `'${key}' must be at most ${rules.max} (received ${num}).` });
-            if (rules.moreThan !== undefined && !(num > rules.moreThan)) into.push({ field: key, code: "more_than", message: `'${key}' must be greater than ${rules.moreThan} (received ${num}).` });
-            if (rules.lessThan !== undefined && !(num < rules.lessThan)) into.push({ field: key, code: "less_than", message: `'${key}' must be less than ${rules.lessThan} (received ${num}).` });
+            // An integer column takes a whole number whether or not the column
+            // says `validate({ integer })`. Left to Postgres, a fraction came
+            // back as `Invalid data format` naming no field.
+            if (rules.integer && !Number.isInteger(num)) into.push({ field: key, code: "integer", message: `'${key}' must be a whole number (received ${num}).` });
+            const validate = rules.validate;
+            if (!validate) return;
+            const min = typeof validate.min === "number" ? validate.min : undefined;
+            const max = typeof validate.max === "number" ? validate.max : undefined;
+            if (validate.positive && !(num > 0)) into.push({ field: key, code: "positive", message: `'${key}' must be positive (received ${num}).` });
+            if (validate.negative && !(num < 0)) into.push({ field: key, code: "negative", message: `'${key}' must be negative (received ${num}).` });
+            if (min !== undefined && num < min) into.push({ field: key, code: "min", message: `'${key}' must be at least ${min} (received ${num}).` });
+            if (max !== undefined && num > max) into.push({ field: key, code: "max", message: `'${key}' must be at most ${max} (received ${num}).` });
+            if (validate.moreThan !== undefined && !(num > validate.moreThan)) into.push({ field: key, code: "more_than", message: `'${key}' must be greater than ${validate.moreThan} (received ${num}).` });
+            if (validate.lessThan !== undefined && !(num < validate.lessThan)) into.push({ field: key, code: "less_than", message: `'${key}' must be less than ${validate.lessThan} (received ${num}).` });
             return;
         }
-
-        case "date": {
-            const rules = property.validation;
-            if (!rules) return;
+        case "temporal": {
+            const validate = rules.validate;
+            if (!validate) return;
             const date = asDate(value);
             if (date === undefined) return;
-            const min = rules.min !== undefined ? asDate(rules.min) : undefined;
-            const max = rules.max !== undefined ? asDate(rules.max) : undefined;
+            const min = validate.min !== undefined ? asDate(validate.min) : undefined;
+            const max = validate.max !== undefined ? asDate(validate.max) : undefined;
             if (min && date.getTime() < min.getTime()) into.push({ field: key, code: "date_min", message: `'${key}' must not be before ${min.toISOString()}.` });
             if (max && date.getTime() > max.getTime()) into.push({ field: key, code: "date_max", message: `'${key}' must not be after ${max.toISOString()}.` });
             return;
         }
-
-        case "array": {
-            if (!Array.isArray(value)) return;
-            const rules = property.validation;
-            if (rules?.min !== undefined && value.length < rules.min) {
-                into.push({ field: key, code: "min_items", message: `'${key}' must have at least ${rules.min} item${rules.min === 1 ? "" : "s"} (received ${value.length}).` });
-            }
-            if (rules?.max !== undefined && value.length > rules.max) {
-                into.push({ field: key, code: "max_items", message: `'${key}' must have at most ${rules.max} item${rules.max === 1 ? "" : "s"} (received ${value.length}).` });
-            }
-            // The generated OpenAPI puts the element schema in `items`, so the
-            // element rules are published too and have to hold.
-            const of = property.of;
-            if (of && !Array.isArray(of)) {
-                value.forEach((item, index) => collectViolations(`${key}[${index}]`, of as Property, item, into));
-            } else if (!of && property.oneOf?.properties) {
-                // Blocks: `{ type, value }` items whose value answers to the
-                // property its type names, as an `of` item answers to `of`.
-                const typeField = property.oneOf.typeField ?? "type";
-                const valueField = property.oneOf.valueField ?? "value";
-                const blockProperties = property.oneOf.properties as Record<string, Property>;
-                value.forEach((item, index) => {
-                    if (typeof item !== "object" || item === null || Array.isArray(item)) return;
-                    const type = (item as Record<string, unknown>)[typeField];
-                    if (typeof type !== "string" || !Object.prototype.hasOwnProperty.call(blockProperties, type)) return;
-                    const blockProperty = blockProperties[type];
-                    if (!blockProperty || typeof blockProperty !== "object") return;
-                    collectViolations(`${key}[${index}].${valueField}`, blockProperty, (item as Record<string, unknown>)[valueField], into);
-                });
-            }
-            return;
-        }
-
-        case "map": {
-            if (typeof value !== "object" || value === null || Array.isArray(value)) return;
-            const properties = property.properties;
-            if (!properties) return;
-            for (const [subKey, subValue] of Object.entries(value as Record<string, unknown>)) {
-                const subProperty = (properties as Record<string, Property>)[subKey];
-                if (subProperty) collectViolations(`${key}.${subKey}`, subProperty, subValue, into);
-            }
-            return;
-        }
-
         case "geopoint": {
             // The shape is the data transformer's to refuse; a point with
             // numeric coordinates off the globe is this rule's.
-            if (typeof value !== "object" || value === null) return;
-            const { latitude, longitude } = value as { latitude?: unknown; longitude?: unknown };
+            if (!isPlainObject(value)) return;
+            const { latitude, longitude } = value;
             if (typeof latitude !== "number" || typeof longitude !== "number") return;
             if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
                 into.push({
@@ -616,11 +535,156 @@ function collectViolations(
             }
             return;
         }
-
-        default:
-            // boolean, relation, reference, vector, binary carry only
-            // `required`/`unique`, both of which the database enforces.
+        case "none":
+            return;
     }
+}
+
+/** A value as a key two equal values share: JSON with sorted object keys. */
+function sameValueKey(value: unknown): string {
+    const stable = (v: unknown): unknown => {
+        if (Array.isArray(v)) return v.map(stable);
+        if (isPlainObject(v)) return Object.fromEntries(Object.keys(v).sort().map(k => [k, stable(v[k])]));
+        if (v instanceof Date) return v.toISOString();
+        return v;
+    };
+    return `${typeof value}:${JSON.stringify(stable(value))}`;
+}
+
+/** The list-level rules: `minItems`, `maxItems`, `uniqueItems`. */
+function collectListViolations(key: string, validate: ColumnValidation | undefined, items: readonly unknown[], into: WriteViolation[]): void {
+    if (!validate) return;
+    const { minItems, maxItems, uniqueItems } = validate;
+    if (minItems !== undefined && items.length < minItems) {
+        into.push({ field: key, code: "min_items", message: `'${key}' must have at least ${minItems} item${minItems === 1 ? "" : "s"} (received ${items.length}).` });
+    }
+    if (maxItems !== undefined && items.length > maxItems) {
+        into.push({ field: key, code: "max_items", message: `'${key}' must have at most ${maxItems} item${maxItems === 1 ? "" : "s"} (received ${items.length}).` });
+    }
+    if (uniqueItems) {
+        const seen = new Map<string, number>();
+        for (const [index, item] of items.entries()) {
+            const sameAs = seen.get(sameValueKey(item));
+            if (sameAs !== undefined) {
+                // Positions rather than the value: the item is caller data.
+                into.push({ field: key, code: "unique_items", message: `'${key}' must not hold the same value twice (items ${sameAs} and ${index} are equal).` });
+                return;
+            }
+            seen.set(sameValueKey(item), index);
+        }
+    }
+}
+
+/**
+ * Judge a value by a JSON shape node, recursing into objects, arrays and typed
+ * blocks.
+ *
+ * `partial` is a `$merge` operand: it names the keys it sets, so a required
+ * field it leaves out is the stored document's, not missing.
+ */
+function collectJsonViolations(key: string, node: JsonShape, value: unknown, into: WriteViolation[], partial = false): void {
+    if (value === null || value === undefined) return;
+    const scalar = scalarRulesOfNode(node);
+    if (scalar) {
+        collectScalarViolations(key, scalar, value, into);
+        return;
+    }
+    switch (node.kind) {
+        case "object": {
+            if (!isPlainObject(value)) return;
+            for (const [field, child] of Object.entries(node.fields)) {
+                const path = `${key}.${field}`;
+                const fieldValue = value[field];
+                const absent = fieldValue === undefined || fieldValue === null || (child.kind === "string" && fieldValue === "");
+                // Required inside a document: a value written to the column
+                // replaces the whole document, so a key it leaves out is
+                // missing — unless the server fills it (a default, a stamp).
+                if (absent && child.required && !partial && !serverFills(child)) {
+                    into.push({ field: path, code: "required", message: `'${path}' is required.` });
+                    continue;
+                }
+                collectJsonViolations(path, child, fieldValue, into);
+            }
+            return;
+        }
+        case "array": {
+            if (!Array.isArray(value)) return;
+            collectListViolations(key, node.validate, value, into);
+            value.forEach((item: unknown, index) => collectJsonViolations(`${key}[${index}]`, node.of, item, into));
+            return;
+        }
+        case "oneOf": {
+            // A typed block: `{ type, value }`, the value answering to the
+            // shape its type names.
+            if (!isPlainObject(value)) return;
+            // A type that names no variant is left to the database, as a
+            // block's value always was: nothing here describes it.
+            const type = value[node.typeField];
+            if (typeof type !== "string" || !Object.prototype.hasOwnProperty.call(node.variants, type)) return;
+            const variant = node.variants[type];
+            const path = `${key}.${node.valueField}`;
+            const blockValue = value[node.valueField];
+            const absent = blockValue === undefined || blockValue === null || (variant.kind === "string" && blockValue === "");
+            if (absent && variant.required && !serverFills(variant)) {
+                into.push({ field: path, code: "required", message: `'${path}' is required.` });
+                return;
+            }
+            collectJsonViolations(path, variant, blockValue, into);
+            return;
+        }
+        default:
+            // `json.unknown()`: anything.
+            return;
+    }
+}
+
+/** Whether the server writes a JSON field a write leaves out: a default, or a stamp. */
+function serverFills(node: JsonShape): boolean {
+    if (node.default !== undefined) return true;
+    return (node.kind === "string" || node.kind === "date") && node.stamp !== undefined;
+}
+
+/** Judge one column's value. */
+function collectColumnViolations(column: ColumnDescriptor, key: string, value: unknown, into: WriteViolation[]): void {
+    if (value === null || value === undefined) return;
+    if (isColumnFieldOperation(value, column) && isPlainObject(value)) {
+        collectFieldOperationViolations(column, key, value, into);
+        return;
+    }
+    if (column.semantic === "geopoint") {
+        collectScalarViolations(key, { kind: "geopoint" }, value, into);
+        return;
+    }
+    const type = column.type;
+    if (type.kind === "array") {
+        if (!Array.isArray(value)) return;
+        collectListViolations(key, column.validate, value, into);
+        const element = scalarRulesOf(type.of, { validate: column.element?.validate, oneOf: column.element?.oneOf },
+            typeof column.element?.validate?.max === "number" ? column.element.validate.max : undefined);
+        value.forEach((item: unknown, index) => collectScalarViolations(`${key}[${index}]`, element, item, into));
+        return;
+    }
+    if (type.kind === "other" && /\]\s*$/.test(type.sqlType)) {
+        if (Array.isArray(value)) collectListViolations(key, column.validate, value, into);
+        return;
+    }
+    if (type.kind === "json" || type.kind === "jsonb") {
+        const shape = documentShape(column);
+        if (shape) collectJsonViolations(key, shape, value, into);
+        return;
+    }
+    collectScalarViolations(key, scalarRulesOf(type, column, textMaxLength(column)), value, into);
+}
+
+/**
+ * A JSON column's shape, with the column's own list rules folded into a
+ * top-level `json.array()`: `col.jsonb(json.array(…)).validate({ maxItems })`
+ * and `json.array(…).validate({ maxItems })` say the same thing.
+ */
+function documentShape(column: ColumnDescriptor): JsonShape | undefined {
+    const shape = column.json;
+    if (shape?.kind === "array" && column.validate) return { ...shape, validate: { ...shape.validate, ...column.validate } };
+    return shape;
 }
 
 /**
@@ -628,103 +692,97 @@ function collectViolations(
  * of answers to.
  *
  * `{ tags: { $push: "bogus" } }` stores `"bogus"` in `tags` as surely as
- * `{ tags: [..., "bogus"] }` does, so each pushed element answers to the
- * element rules — an `enum`, a string's length and pattern — and pushing more
- * elements than `validation.max` allows is over it whatever the array held.
- * `$merge` sets the keys it names, so those answer to the map's properties, and
- * an `$inc` of a whole-number property is a whole number. Checked only on the
- * plain values, an operation was a way around every one of these.
+ * `{ tags: [..., "bogus"] }` does, so each pushed item answers to the item
+ * rules, and pushing more items than `maxItems` allows is over it whatever the
+ * array held. `$merge` sets the keys it names, so those answer to the
+ * document's fields, and an `$inc` of a whole-number column is a whole number.
  *
- * What an operation *produces* — the stored array plus the pushed elements, the
+ * What an operation *produces* — the stored array plus the pushed items, the
  * stored number plus the increment — depends on the stored row, which this
- * request never sees, so it is not judged here: holding an `$inc` to a `min` or
- * `max` takes a guard in the statement that does the arithmetic. A malformed
- * operation is `assertFieldOpsValid`'s to refuse, so one is skipped here rather
- * than judged.
+ * request never sees: holding an `$inc` to a `min` or `max` takes a guard in
+ * the statement that does the arithmetic (the driver's). A malformed operation
+ * is `assertFieldOpsValid`'s to refuse, so one is skipped here.
  */
 function collectFieldOperationViolations(
+    column: ColumnDescriptor,
     key: string,
-    property: Property,
-    operation: object,
+    operation: Record<string, unknown>,
     into: WriteViolation[]
 ): void {
     const entries = Object.entries(operation);
     if (entries.length !== 1) return;
     const [operator, operand] = entries[0];
+    const kind = fieldOperationKind(column);
 
-    if (operator === "$push" && property.type === "array" && operand !== undefined) {
-        const pushed = Array.isArray(operand) ? operand : [operand];
-        const of = property.of;
-        if (of && !Array.isArray(of)) {
-            pushed.forEach(item => collectViolations(key, of as Property, item, into));
+    if (operator === "$push" && kind === "array" && operand !== undefined) {
+        const pushed: unknown[] = Array.isArray(operand) ? operand : [operand];
+        const type = column.type;
+        if (type.kind === "array") {
+            const element = scalarRulesOf(type.of, { validate: column.element?.validate, oneOf: column.element?.oneOf },
+                typeof column.element?.validate?.max === "number" ? column.element.validate.max : undefined);
+            pushed.forEach(item => collectScalarViolations(key, element, item, into));
         }
-        const max = property.validation?.max;
-        if (max !== undefined && pushed.length > max) {
-            into.push({ field: key, code: "max_items", message: `'${key}' must have at most ${max} item${max === 1 ? "" : "s"}; $push adds ${pushed.length}.` });
+        const shape = documentShape(column);
+        if (shape?.kind === "array") pushed.forEach(value => collectJsonViolations(key, shape.of, value, into));
+        const listRules = shape?.kind === "array" ? shape.validate : column.validate;
+        const maxItems = listRules?.maxItems;
+        if (maxItems !== undefined && pushed.length > maxItems) {
+            into.push({ field: key, code: "max_items", message: `'${key}' must have at most ${maxItems} item${maxItems === 1 ? "" : "s"}; $push adds ${pushed.length}.` });
         }
+        if (listRules?.uniqueItems) collectListViolations(key, { uniqueItems: true }, pushed, into);
         return;
     }
 
-    if (operator === "$merge" && property.type === "map" && typeof operand === "object" && operand !== null && !Array.isArray(operand)) {
-        collectViolations(key, property, operand, into);
+    if (operator === "$merge" && kind === "document" && isPlainObject(operand)) {
+        if (column.json?.kind === "object") collectJsonViolations(key, column.json, operand, into, true);
         return;
     }
 
-    if (operator === "$inc" && property.type === "number" && property.validation?.integer
-        && typeof operand === "number" && !Number.isInteger(operand)) {
+    if (operator === "$inc" && kind === "number" && typeof operand === "number" && !Number.isInteger(operand)
+        && (column.validate?.integer === true || isIntegerFamilyType(column.type))) {
         into.push({ field: key, code: "integer", message: `'${key}' must be a whole number, so $inc on it takes one (received ${operand}).` });
     }
 }
 
 /**
- * Does the write itself supply this property, or does something else?
+ * Does the write itself supply this column, or does something else?
  *
- * `required` on create is only a real requirement for keys the *caller* has to
- * send. A key column the database generates, a `defaultValue` the create path
- * fills in, an `autoValue` timestamp the driver stamps, and a column
- * `excludeFromApi` reserves for the server, and a column whose DEFAULT the
- * database fills (`databaseDefault`) are all values that exist by the time the
- * INSERT runs — demanding them in the request would refuse writes that are
- * entirely correct.
+ * `nullable: false` on create is only a real requirement for keys the
+ * *caller* has to send. A key column, a column with a default (the driver
+ * applies a literal one, the database the rest), a stamp the server writes, a
+ * generated column, and a column closed to the API (`.private()`,
+ * `.readOnly()`) are all values that exist by the time the INSERT runs —
+ * demanding them in the request would refuse writes that are entirely correct.
  */
-function isCallerSupplied(property: Property): boolean {
-    const p = property as Property & {
-        isId?: unknown;
-        autoValue?: unknown;
-        excludeFromApi?: boolean;
-        defaultValue?: unknown;
-    };
-    if (p.databaseDefault) return false;
-    if (p.isId) return false;
-    if (p.autoValue) return false;
-    if (p.excludeFromApi) return false;
-    if (p.defaultValue !== undefined) return false;
+function isCallerSupplied(column: ColumnDescriptor): boolean {
+    if (column.primaryKey) return false;
+    if (column.default !== undefined) return false;
+    if (column.stamp !== undefined) return false;
+    if (column.generated !== undefined) return false;
+    if (column.private || column.readOnly) return false;
     return true;
 }
 
 /**
- * Collect the `required` properties a write leaves unset or sends empty.
+ * Collect the required columns a write leaves unset or sends empty.
  *
- * On every write, a required `string` sent as `""` is a `required` violation,
- * as a missing value is on a create: an empty title is no more a title than an
- * absent one, and `NOT NULL` lets `""` through. A create (`create: true`) also
- * reports the required keys it leaves out or sends as `null`.
+ * On every write, a required text column sent as `""` is a `required`
+ * violation, as a missing value is on a create: an empty title is no more a
+ * title than an absent one, and `NOT NULL` lets `""` through. A create
+ * (`create: true`) also reports the required keys it leaves out or sends as
+ * `null`.
  *
- * `required` used to be left entirely to the database's NOT NULL, and that is
- * two problems rather than one. The 400 names the *column* (`author_id`), not
- * the field the caller sent (`authorId`); and it arrives only after every
- * `beforeSave` hook has run, so a hook that charged a card or sent a mail did so
- * for a write that was never going to land. `23502` is still the backstop for
- * everything this cannot see — a hook that nulls a column, a concurrent schema
- * change — and it now carries a field too (see the pg error renderer).
+ * Checked here rather than left to the database's NOT NULL, whose 400 names the
+ * SQL column (`author_id`) and arrives only after every `beforeSave` hook has
+ * run. `23502` stays the backstop for everything this cannot see.
  *
- * A `belongsTo` relation is satisfied by either spelling: the relation property
- * (`author`) or the foreign-key column under its wire name (`authorId`). Both
- * put the same value in the same column.
+ * A `belongsTo` foreign key is satisfied by either spelling: the column
+ * (`authorId`) or the relation (`author`). Both put the same value in the same
+ * column.
  */
 function collectMissingRequired(
     values: Record<string, unknown>,
-    collection: CollectionConfig,
+    table: TableDescriptor,
     into: WriteViolation[],
     options: {
         /** The write inserts the row, so an absent key is certainly absent. */
@@ -734,43 +792,30 @@ function collectMissingRequired(
     }
 ): void {
     const { create, at } = options;
-    // A `beforeSave` can supply a required field, and this runs before it. The
-    // canonical case is a slug derived from a title — the reference app's own
-    // `posts` does exactly that — and demanding `slug` in the request refuses a
-    // write that was always going to be complete by the time it reached the
-    // INSERT.
-    //
-    // There is no way to know *which* fields a hook fills, so the whole check
-    // steps aside for a collection that declares one and `NOT NULL` is the
-    // backstop — which is what this function's own docblock already says for
-    // the symmetric case of a hook that *nulls* a column. A collection with no
-    // hook, which is the majority, keeps the boundary error that names the
-    // field rather than the column.
-    if ((collection as { callbacks?: { beforeSave?: unknown } }).callbacks?.beforeSave) return;
+    // A `beforeSave` can supply a required column, and this runs before it —
+    // a slug derived from a title is the canonical case. There is no way to
+    // know *which* columns a hook fills, so the whole check steps aside for a
+    // table that declares one, and `NOT NULL` is the backstop.
+    if (table.hooks?.beforeSave) return;
 
-    const properties = (collection.properties ?? {}) as Record<string, Property>;
-
-    /** Relation property name → the FK wire key that also satisfies it. */
+    /** Foreign-key column key → the relation name that also satisfies it. */
     const relationAlias = new Map<string, string>();
-    for (const [name, relation] of Object.entries(resolveCollectionRelations(collection))) {
-        if (relation.kind === "belongsTo") {
-            relationAlias.set(name, fieldKeyForColumn(collection, (relation as ResolvedBelongsTo).localKey));
-        }
-    }
+    for (const relation of relationsOfKind(table, "belongsTo")) relationAlias.set(relation.localField, relation.name);
 
     const supplied = (key: string): boolean => {
         const value = values[key];
         return value !== undefined && value !== null;
     };
 
-    for (const [key, property] of Object.entries(properties)) {
-        if (!property?.validation?.required) continue;
-        // Sent empty: the caller supplied the key, so no `defaultValue` fills
-        // it, and the row would store `""`.
-        const sentEmpty = property.type === "string" && values[key] === "";
+    for (const column of table.columns) {
+        if (column.nullable || column.primaryKey) continue;
+        const key = column.key;
+        // Sent empty: the caller supplied the key, so no default fills it, and
+        // the row would store `""`.
+        const sentEmpty = isTextColumnType(column.type) && values[key] === "";
         if (!sentEmpty) {
             if (!create) continue;
-            if (!isCallerSupplied(property)) continue;
+            if (!isCallerSupplied(column)) continue;
             if (supplied(key)) continue;
             const alias = relationAlias.get(key);
             if (alias && supplied(alias)) continue;
@@ -780,97 +825,80 @@ function collectMissingRequired(
         into.push({
             field,
             code: "required",
-            message: property.validation.requiredMessage ?? `'${field}' is required.`
+            message: column.validate?.requiredMessage ?? `'${field}' is required.`
         });
     }
 }
 
 /**
- * Reject a write whose values break the constraints the collection declares.
+ * Reject a write whose values break the rules the table's columns declare.
  *
- * `validation.min`, `max`, `matches`, `positive`, `integer` and the date and
- * array bounds were read by exactly three things: the DDL generators (for
- * `integer` and for a `varchar` width), and the admin's client-side form. No
- * layer on the write path looked at them, no `CHECK` constraint was emitted,
- * and the generated OpenAPI published every one of them as `minimum`,
- * `maximum`, `minLength`, `maxLength` and `pattern`. So the docs' own example —
- * `price: { type: "number", validation: { min: 0 } }` — accepted `-5000` with a
- * 201 while the spec said it would not, and any client or gateway generated
- * from that spec believed the server was checking. Enum membership, `email` and
- * `url` were published the same way and enforced the same amount.
+ * Every rule `validate()` states, `oneOf` and an enum type's labels, the
+ * per-item rules of an array column and the fields of a JSON document's shape
+ * are checked here, at the request boundary, before any hook runs: the
+ * generated OpenAPI publishes them as `minimum`, `maxLength`, `pattern`,
+ * `enum`, `uniqueItems`…, and a client or gateway generated from it believes
+ * the server is checking.
  *
- * A missing `required` key is checked only when `options.status` says this
+ * A missing required key is checked only when `options.status` says this
  * write creates a row. A `PATCH` legitimately omits keys — this function sees
- * one request's values, not the row they land on — so demanding them there
- * would refuse every partial update. Callers that do not pass a status get the
- * old behaviour and leave a missing key to the database's NOT NULL. A required
- * string sent as `""` is refused on every write, whatever the status: NOT NULL
- * would store it.
+ * one request's values, not the row they land on. A required text value sent
+ * as `""` is refused on every write, whatever the status: NOT NULL would store
+ * it.
  *
  * A value of the wrong *type* is not this function's business — that reaches
  * Postgres, which types every column and gives a 400 through the driver's
- * SQLSTATE mapping. Constraints are checked against values of the right type,
- * plus the numeric-string form a JSON body may carry for a number column.
+ * SQLSTATE mapping. Rules are checked against values of the right type, plus
+ * the numeric-string form a JSON body may carry for a number column.
  *
  * Every failing field is reported at once, as a message list *and* as
- * `details.violations` — `{ field, code, message }` per rule. A form that fixes
- * one field per round trip is the reason validation errors get ignored, and a
- * form that has to parse English to find the field is the reason they get
- * shown on the wrong input.
+ * `details.violations` — `{ field, code, message }` per rule.
  *
  * ## In-process writes are exempt, by design
  *
- * This runs at the request boundary, on what a *caller sent*, before
- * `beforeSave` gets a chance to fill in or rewrite anything. Server code
- * writing through `rebase.data` is trusted and does not come through here: a
- * hook that stamps a moderation flag, a migration that backfills a column, a
- * seed script — none of them are a caller, and none of them should be judged
- * against rules written to describe a public API. The database's own
- * constraints (NOT NULL, the enum type, a CHECK) are what hold for those, and
- * they hold for every path. Moving this into the driver would change that
- * contract, which is why it has not moved.
+ * This runs on what a *caller sent*, before `beforeSave` gets a chance to fill
+ * in or rewrite anything. Server code writing through `rebase.data` is trusted
+ * and does not come through here: a hook that stamps a moderation flag, a
+ * migration that backfills a column, a seed script. The database's own
+ * constraints (NOT NULL, the enum type, a CHECK) hold for those, and for every
+ * path.
  */
 export function assertWriteValuesValid(
     values: Record<string, unknown>,
-    collection: CollectionConfig,
+    table: TableDescriptor,
     options?: { rowIndex?: number; status?: "new" | "existing" | "copy" }
 ): void {
-    const properties = collection.properties;
-    if (!properties || !values) return;
+    if (!values) return;
 
     const isCreate = options?.status === "new" || options?.status === "copy";
     const violations: WriteViolation[] = [];
     for (const [key, value] of Object.entries(values)) {
-        const property = (properties as Record<string, Property>)[key];
-        if (property) collectViolations(key, property, value, violations);
+        const column = columnOf(table, key);
+        if (column) collectColumnViolations(column, key, value, violations);
     }
 
-    // The link's own columns, on a membership element that names them. Judged
-    // by the same `collectViolations` — `enum`, `min`, `max`, `matches`,
-    // `email`, `url` — because "declared exactly like collection properties" is
-    // a claim about what the server enforces, not only about what it creates.
+    // The link's own columns, on a membership element that names them, judged
+    // by the same rules a table's columns are.
     //
     // `required` is checked only where it is knowable. A membership array is a
-    // set operation: an element may be adding a link (nothing has a value yet)
-    // or restating one that already exists (everything does), and this function
-    // sees one request, not the rows it lands on. On a `status: "new"` write the
-    // parent row does not exist, so neither does any of its links, and every
-    // element is an insert — that is the one case where a missing required
-    // payload column is certainly missing. Everywhere else the database's NOT
-    // NULL has the last word, exactly as it does for a `PATCH` of a row. A
-    // required pivot string sent as `""` is refused on every write.
-    for (const [key, junction] of junctionsWithPayload(collection)) {
+    // set operation: an element may be adding a link or restating one, and
+    // this function sees one request, not the rows it lands on. On a create
+    // the parent row does not exist, so neither does any of its links, and
+    // every element is an insert — the one case where a missing required pivot
+    // column is certainly missing. A required pivot text sent as `""` is
+    // refused on every write.
+    for (const [key, junction] of junctionsWithPayload(table)) {
         for (const { index, pivot } of pivotsIn(values[key])) {
             const at = `${key}[${index}].${JUNCTION_PIVOT_KEY}`;
             for (const [pivotKey, pivotValue] of Object.entries(pivot)) {
-                const property = (junction.properties as Record<string, Property>)?.[pivotKey];
-                if (property) collectViolations(`${at}.${pivotKey}`, property, pivotValue, violations);
+                const column = columnOf(junction, pivotKey);
+                if (column) collectColumnViolations(column, `${at}.${pivotKey}`, pivotValue, violations);
             }
             collectMissingRequired(pivot, junction, violations, { create: isCreate, at });
         }
     }
 
-    collectMissingRequired(values, collection, violations, { create: isCreate });
+    collectMissingRequired(values, table, violations, { create: isCreate });
 
     if (violations.length === 0) return;
 
@@ -880,7 +908,7 @@ export function assertWriteValuesValid(
         `${where}${messages.join(" ")}`,
         "VALIDATION_CONSTRAINT",
         {
-            collection: collection.slug,
+            collection: table.slug,
             violations,
             messages
         }
@@ -888,83 +916,56 @@ export function assertWriteValuesValid(
 }
 
 /**
- * Narrow response rows to the fields the caller asked for.
- *
- * `?fields=id,title` is documented in the generated OpenAPI — "Comma-separated
- * list of fields to return (field selection)" — and it is the first thing shown
- * on every endpoint in the API Explorer. It was parsed into `options.fields`
- * and then read by nothing at all: no driver referenced it, and every request
- * came back with every column. A caller asking for two fields of a `posts` row
- * still received its whole `content`.
+ * Narrow response rows to the fields the caller asked for (`?fields=id,title`).
  *
  * This shapes the *response*, which is what the parameter says it does; it is
  * not a column pushdown, so it saves bandwidth rather than database work.
  *
- * The collection's key always survives. Rows are addressed by it everywhere
- * above this layer — the admin table, realtime reconciliation, the offline
- * cache — and a row that arrives without one is not a smaller row, it is an
- * unusable one. Asking for `fields=title` and being unable to open the record
- * you clicked is a worse answer than one extra key.
- *
- * That is a statement about the key, not about the name `id`: a collection
- * keyed on `slug`, or on `user_id + role_id`, was projected down to the fields
- * asked for and nothing else, which is the very outcome the paragraph above
- * describes. `assertKnownWriteFields` one function up already has a dedicated
- * error for collections with no `id` column, so this layer had no excuse for
- * assuming one.
+ * The table's key always survives. Rows are addressed by it everywhere above
+ * this layer — the admin table, realtime reconciliation, the offline cache —
+ * and a row that arrives without one is not a smaller row, it is an unusable
+ * one.
  */
 export function projectResponseFields<T extends Record<string, unknown>>(
     rows: T[],
     fields: readonly string[] | undefined,
-    collection: CollectionConfig,
+    table: TableDescriptor,
     options?: { include?: IncludeSpec }
 ): T[] {
     if (!fields || fields.length === 0) return rows;
 
-    const relations = resolveCollectionRelations(collection);
-    const declared = new Set<string>(Object.keys(collection.properties ?? {}));
-    // The record is keyed by the property name the relation is reached under,
-    // which is the name a caller would put in `fields`.
-    for (const [key, relation] of Object.entries(relations)) {
-        declared.add(key);
-        if (relation.kind === "belongsTo") {
-            declared.add(fieldKeyForColumn(collection, (relation as ResolvedBelongsTo).localKey));
-        }
-    }
+    const declared = new Set<string>([
+        ...table.columns.map(column => column.key),
+        ...table.relations.map(relation => relation.name)
+    ]);
     // A relation named in `include` is returned whether or not `fields` names
     // it: `fields` narrows the row's own columns, and asking for a relation is
-    // already saying to return it. It used to be loaded and then dropped here
-    // unless `fields` named it too, while the socket and `listen()` returned
-    // it — so `find()` and `listen()` answered one query with two rows, and the
-    // SDK's documentation described the one this route did not serve. `*` is
+    // already saying to return it — as the socket and `listen()` do. `*` is
     // every relation. Naming one in `fields` without including it returns
     // nothing for it: there was nothing loaded to return.
     const include = normalizeInclude(options?.include);
     const included = include
-        ? [...Object.keys(include.tree), ...(include.wildcard ? Object.keys(relations) : [])]
+        ? [...Object.keys(include.tree), ...(include.wildcard ? table.relations.map(relation => relation.name) : [])]
         : [];
     for (const name of included) declared.add(name);
     declared.add("id");
 
-    // A collection that declares nothing describes nothing to check against —
-    // the same reasoning `assertKnownWriteFields` applies one function up.
+    // A table that declares nothing describes nothing to check against.
     if (declared.size > 1) {
         const unknown = fields.filter(field => !declared.has(field));
         if (unknown.length > 0) {
             throw ApiError.badRequest(
-                `'${collection.slug}' has no field${unknown.length > 1 ? "s" : ""} ` +
-                `${unknown.map(f => `'${f}'`).join(", ")} to return. ` +
-                `Known fields: ${[...declared].sort().map(f => `'${f}'`).join(", ")}.`,
+                `Table '${table.slug}' has no column or relation ${unknown.map(f => `'${f}'`).join(", ")} to return. ` +
+                `Known columns and relations: ${[...declared].sort().map(f => `'${f}'`).join(", ")}.`,
                 "UNKNOWN_RESPONSE_FIELD",
-                { fields: unknown, collection: collection.slug }
+                { fields: unknown, collection: table.slug }
             );
         }
     }
 
-    // Whatever addresses a row here. `resolvePrimaryKeys` returns nothing when
-    // a collection declares no key at all; drivers other than Postgres still
-    // serve rows with a literal `id`, so that stays the fallback.
-    const primaryKeys = resolvePrimaryKeys(collection).map(key => key.fieldName);
+    // Whatever addresses a row here: its key, or a literal `id` for a table
+    // introspected without one.
+    const primaryKeys = table.primaryKey;
     const keep = new Set<string>([...fields, ...included, ...(primaryKeys.length > 0 ? primaryKeys : ["id"])]);
     // A counted relation's total travels beside its rows, so it goes where
     // they go: the include asked for it, as it asked for the rows.
@@ -979,39 +980,29 @@ export function projectResponseFields<T extends Record<string, unknown>>(
 }
 
 /**
- * Both write checks, as one call, for a transport that is not the REST router.
- *
- * The REST routes run `assertKnownWriteFields` and `assertWriteValuesValid`
- * back to back on the caller's body, seven times over — and they were the only
- * place either ran. The WebSocket `SAVE` handler took a client payload straight
- * to `driver.save`, so the same write arrived validated through one door and
- * unvalidated through the other: `PATCH /api/data/users/1 { age: 999 }` was a
- * 400, and the socket wrote it.
- *
- * Exported for the socket in `@rebasepro/server-postgres`, which is the other
- * request boundary. Not the
- * route builder — `index.ts` keeps that internal, and this is a rule rather
- * than wiring.
+ * Both write checks, as one call, for a transport that is not the REST router:
+ * the realtime socket's `SAVE` and MCP's write tools. The same write is then
+ * judged by the same rules whichever door it came through.
  *
  * It stays at the boundary rather than moving into the driver deliberately: it
  * validates what a *caller sent*, before `beforeSave` gets a chance to fill in
  * or rewrite anything. In-process writes through `rebase.data` are trusted
- * server code and are not run through it, which is the placement the REST layer
- * already chose — and which is why `excludeFromApi` and `access.write` are
- * enforceable at all: something has to be able to store the password hash.
+ * server code and are not run through it — which is why `.private()` and
+ * `access.write` are enforceable at all: something has to be able to store the
+ * password hash.
  *
- * @param values     the caller's payload, exactly as it arrived
- * @param collection resolved from the registry by path — never the copy the
- *                   client sent, or the rules would be the caller's to pick
- * @param options.viewer the caller's roles, for per-field `access.write`.
- *                   Omitted is the trusted plane, which satisfies every
- *                   non-empty role list; an API boundary always has one.
+ * @param values the caller's payload, exactly as it arrived
+ * @param table  the table's descriptor, resolved by path on the server — never
+ *               a copy the client sent, or the rules would be the caller's to pick
+ * @param options.viewer the caller's roles, for per-column `access.write`.
+ *               Omitted is the trusted plane, which satisfies every non-empty
+ *               role list; an API boundary always has one.
  */
 export function assertWriteRequestValid(
     values: Record<string, unknown>,
-    collection: CollectionConfig,
+    table: TableDescriptor,
     options?: { status?: "new" | "existing" | "copy"; viewer?: FieldViewer }
 ): void {
-    assertKnownWriteFields(values, collection, { viewer: options?.viewer });
-    assertWriteValuesValid(values, collection, options);
+    assertKnownWriteFields(values, table, { viewer: options?.viewer });
+    assertWriteValuesValid(values, table, options);
 }

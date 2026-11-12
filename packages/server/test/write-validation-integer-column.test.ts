@@ -1,5 +1,6 @@
 import { CollectionConfig } from "@rebasepro/types";
 import { assertWriteValuesValid, type WriteViolation } from "../src/api/rest/write-validation";
+import { tableFrom } from "./helpers/tables";
 
 /**
  * `columnType: "integer"` without `validation.integer`: nothing checked the
@@ -20,7 +21,7 @@ const products: CollectionConfig = {
 
 function violationsOf(values: Record<string, unknown>): WriteViolation[] {
     try {
-        assertWriteValuesValid(values, products);
+        assertWriteValuesValid(values, tableFrom(products));
     } catch (error) {
         return ((error as { details?: { violations?: WriteViolation[] } }).details?.violations) ?? [];
     }

@@ -6,6 +6,7 @@ import { errorHandler } from "../errors";
 import type { HonoEnv } from "../types";
 import { queryDictFromBody } from "./query-body";
 import { generateOpenApiSpec } from "../openapi-generator";
+import { tablesFromCollections } from "../../../test/helpers/tables";
 
 /**
  * `POST /<collection>/query` is the `GET` listing with its parameters in the
@@ -86,7 +87,7 @@ function appFor(driver: DataDriver, scopes?: string[]): Hono<HonoEnv> {
         if (scopes) c.set("scopes", scopes);
         await next();
     });
-    app.route("/", new RestApiGenerator([authors, posts], driver).generateRoutes());
+    app.route("/", new RestApiGenerator(tablesFromCollections([authors, posts]), driver).generateRoutes());
     return app;
 }
 
@@ -309,7 +310,7 @@ describe("queryDictFromBody", () => {
 });
 
 describe("the OpenAPI document", () => {
-    const spec = generateOpenApiSpec([authors, posts]);
+    const spec = generateOpenApiSpec(tablesFromCollections([authors, posts]).descriptors);
     /** The node at `keys` under `node`, or undefined. */
     const at = (node: unknown, ...keys: string[]): unknown =>
         keys.reduce<unknown>((n, key) => (typeof n === "object" && n !== null ? (n as Record<string, unknown>)[key] : undefined), node);

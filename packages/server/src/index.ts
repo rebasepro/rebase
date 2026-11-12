@@ -284,10 +284,13 @@ export { declaredUniqueTargets, resolveConflictTarget } from "./api/rest/conflic
 // nested paths too, and asks the question REST's nested routes ask.
 export { assertNestedWriteAllowed } from "./api/rest/nested-write-access";
 export type { NestedWriteHop, NestedWriteKind } from "./api/rest/nested-write-access";
-// A create on the auth collection is a user creation, whichever door it comes
+// A create on the auth table is a user creation, whichever door it comes
 // through; the socket creates users through the same two steps REST does.
-export { assertNoUserUpsert, assertUserCreationBodyValid, createUserThroughAuthCollection } from "./api/rest/auth-collection-writes";
-export { ETAG_HEADER, IF_MATCH_HEADER, assertIfMatch, rowETag, versionProperty } from "./api/rest/etag";
+export { assertNoUserUpsert, assertUserCreationBodyValid, createUserThroughAuthTable, isAuthTable } from "./api/rest/auth-table-writes";
+// The seam between what the REST layer decides (the table's descriptor) and
+// what the data driver is handed (its lowered collection), until slice B-R7.
+export type { RestTables, ServedTable, TableLookup } from "./api/rest/served-table";
+export { ETAG_HEADER, IF_MATCH_HEADER, assertIfMatch, rowETag, versionColumn } from "./api/rest/etag";
 
 // =============================================================================
 // Email

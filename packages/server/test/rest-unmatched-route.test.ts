@@ -18,6 +18,7 @@ import { logger } from "../src/utils/logger";
 import type { CollectionConfig } from "@rebasepro/types";
 import type { HonoEnv } from "../src/api/types";
 import { fakeDataDriver } from "./helpers/server-b-fakes";
+import { tablesFromCollections } from "./helpers/tables";
 
 const collections: CollectionConfig[] = [
     { slug: "users", name: "Users", singularName: "User", properties: {} },
@@ -40,7 +41,7 @@ function createApp(): Hono<HonoEnv> {
         c.set("driver", driver);
         await next();
     });
-    app.route("/api/data", new RestApiGenerator(collections, driver).generateRoutes());
+    app.route("/api/data", new RestApiGenerator(tablesFromCollections(collections), driver).generateRoutes());
     return app;
 }
 

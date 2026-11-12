@@ -7,6 +7,7 @@ import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
 import type { HonoEnv } from "../src/api/types";
 import { fakeDataDriver } from "./helpers/server-b-fakes";
+import { tablesFromCollections } from "./helpers/tables";
 
 /**
  * The SDK, sent through the REST routes it talks to — not through a mocked
@@ -114,7 +115,7 @@ function createHarness(
         c.set("user", { uid: "user-1", roles: [] });
         await next();
     });
-    app.route("/api/data", new RestApiGenerator(collections, driver).generateRoutes());
+    app.route("/api/data", new RestApiGenerator(tablesFromCollections(collections), driver).generateRoutes());
 
     const client = createRebaseClient({
         baseUrl: "http://rebase.test",

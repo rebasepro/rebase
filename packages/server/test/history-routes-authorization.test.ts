@@ -33,6 +33,7 @@ import type { BackendCollectionRegistry } from "../src/collections/BackendCollec
 import type { ApiKeyMasked, CollectionConfig } from "@rebasepro/types";
 import type { HonoEnv } from "../src/api/types";
 import { fakeDataDriver } from "./helpers/server-a-fakes";
+import { tablesFromCollections } from "./helpers/tables";
 
 /** The masked key the API-key middleware puts on the request. */
 function apiKey(scopes: string[]): ApiKeyMasked {
@@ -112,7 +113,7 @@ function mount(options: {
     });
     app.route("/api/data", createHistoryRoutes({
         historyService,
-        registry,
+        tables: () => tablesFromCollections(registry.getCollections()),
         // The unscoped driver the route is handed at construction. Nothing
         // should ever reach it for a read.
         driver: fakeDataDriver({ fetchOne: jest.fn(), save: jest.fn() })

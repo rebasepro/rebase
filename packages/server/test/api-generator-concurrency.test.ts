@@ -1,10 +1,11 @@
 import { Hono } from "hono";
 import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
-import { rowETag, versionProperty } from "../src/api/rest/etag";
+import { rowETag, versionColumn } from "../src/api/rest/etag";
 import type { CollectionConfig, DeleteProps, FetchOneProps, IncludeSpec, RestFetchService, SaveProps } from "@rebasepro/types";
 import { fakeDataDriver } from "./helpers/server-a-fakes";
 import type { HonoEnv } from "../src/api/types";
+import { descriptorOf, tablesFromCollections } from "./helpers/tables";
 
 /**
  * Optimistic concurrency: an edit that names the version it was made against.
@@ -26,6 +27,10 @@ import type { HonoEnv } from "../src/api/types";
  */
 
 /** Stamped by the database on every write, so the tag is the row's version. */
+/** The descriptors the routes decide from (`docs` points at `notes`, so both are compiled together). */
+const docsTable = () => descriptorOf(tablesFromCollections([docs, notes]), "docs");
+const notesTable = () => descriptorOf(tablesFromCollections([docs, notes]), "notes");
+
 const docs: CollectionConfig = {
     slug: "docs",
     name: "Docs",
@@ -127,7 +132,7 @@ function createHarness(options: { restRead?: boolean } = {}) {
         async save({ path, id, values }: SaveProps) {
             const { slug, row } = locate(path, String(id));
             const next: Stored = { ...(row ?? {}), ...values, id };
-            if (versionProperty(collections[slug])) next.updated_at = tick();
+            if (versionColumn(descriptorOf(tablesFromCollections([docs, notes]), slug))) next.updated_at = tick();
             tables[slug].set(String(id), next);
             return flatRow(next);
         },
@@ -151,7 +156,7 @@ function createHarness(options: { restRead?: boolean } = {}) {
         c.set("user", { uid: "user-1" });
         await next();
     });
-    app.route("/", new RestApiGenerator([docs, notes], driver).generateRoutes());
+    app.route("/", new RestApiGenerator(tablesFromCollections([docs, notes]), driver).generateRoutes());
     return { app, tables, deleted };
 }
 
@@ -226,22 +231,22 @@ describe("ETag", () => {
         // A row's key order is whatever the SELECT produced, and the two read
         // paths in this file produce different ones. Hashing insertion order
         // would give the same row two tags and make every If-Match a coin toss.
-        const a = await rowETag({ id: "x", body: "b", n: 1 }, notes);
-        const b = await rowETag({ n: 1, id: "x", body: "b" }, notes);
+        const a = await rowETag({ id: "x", body: "b", n: 1 }, notesTable());
+        const b = await rowETag({ n: 1, id: "x", body: "b" }, notesTable());
 
         expect(a).toBe(b);
     });
 
     it("is taken from the version column when the collection declares one", async () => {
-        expect(versionProperty(docs)).toBe("updated_at");
-        expect(versionProperty(notes)).toBeUndefined();
+        expect(versionColumn(docsTable())).toBe("updated_at");
+        expect(versionColumn(notesTable())).toBeUndefined();
 
         // Only the stamp decides it: two rows differing everywhere else but
         // sharing a stamp are the same version of the same row as far as a
         // conditional write is concerned, and the tag is derived from the
         // column precisely so two backends serving one table agree.
-        const a = await rowETag({ id: "d1", title: "one", updated_at: "2026-01-01T00:00:00.000Z" }, docs);
-        const b = await rowETag({ id: "d1", title: "two", updated_at: "2026-01-01T00:00:00.000Z" }, docs);
+        const a = await rowETag({ id: "d1", title: "one", updated_at: "2026-01-01T00:00:00.000Z" }, docsTable());
+        const b = await rowETag({ id: "d1", title: "two", updated_at: "2026-01-01T00:00:00.000Z" }, docsTable());
 
         expect(a).toBe(b);
     });
@@ -251,8 +256,8 @@ describe("ETag", () => {
         // version read as an object gave every version of the row one tag — a
         // stale `If-Match` then matched, and the write it should have refused
         // went through.
-        const v1 = await rowETag({ id: "d1", updated_at: { __type: "date", value: "2026-01-01T00:00:00.000Z" } }, docs);
-        const v2 = await rowETag({ id: "d1", updated_at: { __type: "date", value: "2026-02-02T00:00:00.000Z" } }, docs);
+        const v1 = await rowETag({ id: "d1", updated_at: { __type: "date", value: "2026-01-01T00:00:00.000Z" } }, docsTable());
+        const v2 = await rowETag({ id: "d1", updated_at: { __type: "date", value: "2026-02-02T00:00:00.000Z" } }, docsTable());
 
         expect(v1).not.toBe(v2);
     });
@@ -261,8 +266,8 @@ describe("ETag", () => {
         // A collection that gained the column after its rows were written has
         // NULL there; hashing `null` for all of them would hand every such row
         // one tag, so every If-Match would pass against every other row.
-        const a = await rowETag({ id: "1", title: "one", updated_at: null }, docs);
-        const b = await rowETag({ id: "2", title: "two", updated_at: null }, docs);
+        const a = await rowETag({ id: "1", title: "one", updated_at: null }, docsTable());
+        const b = await rowETag({ id: "2", title: "two", updated_at: null }, docsTable());
 
         expect(a).not.toBe(b);
     });

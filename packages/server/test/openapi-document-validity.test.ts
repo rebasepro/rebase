@@ -2,6 +2,7 @@ import { describe, expect, it } from "@jest/globals";
 import type { CollectionConfig } from "@rebasepro/types";
 
 import { generateOpenApiSpec } from "../src/api/openapi-generator";
+import { tablesFromCollections } from "./helpers/tables";
 
 /**
  * Is the emitted document valid OpenAPI at all?
@@ -166,33 +167,35 @@ const plans: CollectionConfig = {
 
 describe("the emitted document", () => {
     it("is structurally valid OpenAPI for an ordinary project", () => {
-        expect(openApiProblems(generateOpenApiSpec([orders, tags]) as Json)).toEqual([]);
+        expect(openApiProblems(generateOpenApiSpec(tablesFromCollections([orders, tags]).descriptors) as Json)).toEqual([]);
     });
 
     it("is structurally valid for a hostile one", () => {
-        expect(openApiProblems(generateOpenApiSpec([orders, tags, plans]) as Json)).toEqual([]);
+        expect(openApiProblems(generateOpenApiSpec(tablesFromCollections([orders, tags, plans]).descriptors) as Json)).toEqual([]);
     });
 
     it("is valid with auth off, when the security block is absent entirely", () => {
-        expect(openApiProblems(generateOpenApiSpec([orders, tags, plans], { requireAuth: false }) as Json)).toEqual([]);
+        expect(openApiProblems(generateOpenApiSpec(tablesFromCollections([orders, tags, plans]).descriptors, { requireAuth: false }) as Json)).toEqual([]);
     });
 
     it("still resolves a schema for a collection named in a non-ASCII script", () => {
         // The name PascalCased to "", so the component was stored under `""`
-        // and every reference to it read `#/components/schemas/`.
-        const spec = generateOpenApiSpec([orders, tags]) as Json;
+        // and every reference to it read `#/components/schemas/`. A table has
+        // no labels of its own any more — the panel's `customizeTable` holds
+        // them — so the document names it from its slug: `orders` → `Order`.
+        const spec = generateOpenApiSpec(tablesFromCollections([orders, tags]).descriptors) as Json;
 
         expect(Object.keys(spec.components.schemas)).not.toContain("");
         expect(spec.paths["/data/orders"].get.responses[200]
             .content["application/json"].schema.properties.data.items.$ref)
-            .toBe("#/components/schemas/Orders");
+            .toBe("#/components/schemas/Order");
     });
 
     it("does not document a filter on a column the query parser spends on paging", () => {
         // `?limit=gte.100` is read as pagination, so the filter could never
         // fire — and declaring it put two `query:limit` parameters on one
         // operation, which several generators refuse to load.
-        const names = (generateOpenApiSpec([plans]) as Json)
+        const names = (generateOpenApiSpec(tablesFromCollections([plans]).descriptors) as Json)
             .paths["/data/plans"].get.parameters.map((p: { name: string }) => p.name);
 
         expect(names.filter((n: string) => n === "limit")).toHaveLength(1);
@@ -202,7 +205,7 @@ describe("the emitted document", () => {
 });
 
 describe("the security schemes", () => {
-    const spec = generateOpenApiSpec([tags]) as Json;
+    const spec = generateOpenApiSpec(tablesFromCollections([tags]).descriptors) as Json;
 
     it("offers the bearer token the data middleware reads", () => {
         expect(spec.components.securitySchemes.bearerAuth).toMatchObject({ type: "http", scheme: "bearer" });

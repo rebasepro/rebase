@@ -4,6 +4,7 @@ import { errorHandler } from "../src/api/errors";
 import type { CollectionConfig, DataDriver, SaveManyProps } from "@rebasepro/types";
 import { mockDataDriver } from "./helpers/server-a-fakes";
 import type { HonoEnv } from "../src/api/types";
+import { tablesFromCollections } from "./helpers/tables";
 
 function buildApp(driverOverrides: Pick<DataDriver, "saveMany"> = {}, maxBulkRows?: number) {
     const driver = mockDataDriver({
@@ -13,7 +14,7 @@ function buildApp(driverOverrides: Pick<DataDriver, "saveMany"> = {}, maxBulkRow
     });
 
     const collections: CollectionConfig[] = [
-        { slug: "products", name: "Products", singularName: "Product", properties: {} }
+        { slug: "products", name: "Products", singularName: "Product", properties: { title: { name: "Title", type: "string" } } }
     ];
 
     const app = new Hono<HonoEnv>();
@@ -24,7 +25,7 @@ function buildApp(driverOverrides: Pick<DataDriver, "saveMany"> = {}, maxBulkRow
         c.set("driver", driver);
         await next();
     });
-    app.route("/", new RestApiGenerator(collections, driver, undefined, maxBulkRows).generateRoutes());
+    app.route("/", new RestApiGenerator(tablesFromCollections(collections), driver, undefined, maxBulkRows).generateRoutes());
     return { app, driver };
 }
 

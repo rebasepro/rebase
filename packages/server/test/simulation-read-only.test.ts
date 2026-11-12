@@ -15,7 +15,6 @@
 import { describe, it, expect, jest } from "@jest/globals";
 import { Hono } from "hono";
 import type { AuthAdapter, AuthenticatedUser, CollectionConfig, DataDriver } from "@rebasepro/types";
-import { BackendCollectionRegistry } from "../src/collections/BackendCollectionRegistry";
 import type { ScopeIdentity } from "../src/auth/rls-scope";
 import { fakeAuthAdapter } from "./helpers/server-b-g1-auth-adapter";
 import type { HonoEnv } from "../src/api/types";
@@ -24,6 +23,7 @@ import { createAdapterAuthMiddleware } from "../src/auth/adapter-middleware";
 import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { createHistoryRoutes, type HistoryService } from "../src/history/history-routes";
 import { createFunctionScopeGuard } from "../src/auth/api-keys/api-key-middleware";
+import { tablesFromCollections } from "./helpers/tables";
 
 jest.mock("../src/utils/logger", () => ({
     logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn(), child: jest.fn().mockReturnThis() }
@@ -69,14 +69,14 @@ function build() {
     const app = new Hono<HonoEnv>();
     app.onError(errorHandler);
     app.use("/*", createAdapterAuthMiddleware({ adapter, driver }));
-    app.route("/data", new RestApiGenerator([posts], driver).generateRoutes());
+    app.route("/data", new RestApiGenerator(tablesFromCollections([posts]), driver).generateRoutes());
     const historyService: HistoryService = {
         fetchHistory: async () => ({ data: [], total: 0 }),
         fetchHistoryEntry: async () => ({ id: "h1", entity_id: "p1", table_name: "posts", values: { title: "old" } })
     };
     app.route("/history", createHistoryRoutes({
         historyService,
-        registry: new BackendCollectionRegistry([posts]),
+        tables: () => tablesFromCollections([posts]),
         driver
     }));
     const functions = new Hono<HonoEnv>();

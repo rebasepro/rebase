@@ -25,6 +25,7 @@ jest.mock("../api/openapi-generator", () => {
 });
 
 import { loadOpenApiGenerator, mountOpenApiDocs } from "./docs";
+import { tablesFromCollections } from "../../test/helpers/tables";
 
 const posts: CollectionConfig[] = [{ name: "posts", slug: "posts", properties: { title: { name: "Title", type: "string" } } }];
 const tags: CollectionConfig[] = [{ name: "tags", slug: "tags", properties: { label: { name: "Label", type: "string" } } }];
@@ -33,7 +34,7 @@ async function mounted(collections: CollectionConfig[]): Promise<Hono<HonoEnv>> 
     const app = new Hono<HonoEnv>();
     mountOpenApiDocs(app, "/api", {
         enableSwagger: true,
-        serverCollections: collections,
+        serverTables: tablesFromCollections(collections).descriptors,
         requireAuth: false,
         adminGate: [createRequireAuth({}), requireAdmin],
         generate: await loadOpenApiGenerator()

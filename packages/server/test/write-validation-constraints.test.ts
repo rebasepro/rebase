@@ -2,6 +2,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { CollectionConfig } from "@rebasepro/types";
 import { assertKnownWriteFields, assertWriteValuesValid, type WriteViolation } from "../src/api/rest/write-validation";
+import { tableFrom } from "./helpers/tables";
 
 /** The `details` an `ApiError` carries, in the shape these rules put there. */
 type ConstraintDetails = {
@@ -42,27 +43,27 @@ describe("excludeFromApi is independent of strictWrites", () => {
     });
 
     it("refuses an excluded property when strictWrites is on", () => {
-        const error = thrown(() => assertKnownWriteFields({ passwordHash: "x" }, users()));
+        const error = thrown(() => assertKnownWriteFields({ passwordHash: "x" }, tableFrom(users())));
         expect(error.code).toBe("VALIDATION_EXCLUDED_FIELDS");
     });
 
     it("still refuses it when strictWrites is off", () => {
         // The bug: `strictWrites: false` returned before this rule ran, so an
         // hour-long access token became a password the attacker chose.
-        const error = thrown(() => assertKnownWriteFields({ passwordHash: "x" }, users(false)));
+        const error = thrown(() => assertKnownWriteFields({ passwordHash: "x" }, tableFrom(users(false))));
         expect(error.code).toBe("VALIDATION_EXCLUDED_FIELDS");
         expect(error.statusCode).toBe(400);
     });
 
     it("refuses the physical column spelling too", () => {
-        const error = thrown(() => assertKnownWriteFields({ password_hash: "x" }, users(false)));
+        const error = thrown(() => assertKnownWriteFields({ password_hash: "x" }, tableFrom(users(false))));
         expect(error.code).toBe("VALIDATION_EXCLUDED_FIELDS");
     });
 
     it("keeps letting undeclared keys through when strictWrites is off", () => {
         // The flag's actual job, unchanged.
-        expect(() => assertKnownWriteFields({ nickname: "ada" }, users(false))).not.toThrow();
-        expect(() => assertKnownWriteFields({ nickname: "ada" }, users())).toThrow(/has no field/);
+        expect(() => assertKnownWriteFields({ nickname: "ada" }, tableFrom(users(false)))).not.toThrow();
+        expect(() => assertKnownWriteFields({ nickname: "ada" }, tableFrom(users()))).toThrow(/has no column/);
     });
 });
 
@@ -81,21 +82,21 @@ describe("matches parity with the form", () => {
     });
 
     it("reads a serialized pattern with flags the way the form does", () => {
-        expect(() => assertWriteValuesValid({ country: "US" }, codes("/^[A-Z]{2}$/i"))).not.toThrow();
-        expect(() => assertWriteValuesValid({ country: "us" }, codes("/^[A-Z]{2}$/i"))).not.toThrow();
-        expect(() => assertWriteValuesValid({ country: "USA" }, codes("/^[A-Z]{2}$/i"))).toThrow(/pattern/);
+        expect(() => assertWriteValuesValid({ country: "US" }, tableFrom(codes("/^[A-Z]{2}$/i")))).not.toThrow();
+        expect(() => assertWriteValuesValid({ country: "us" }, tableFrom(codes("/^[A-Z]{2}$/i")))).not.toThrow();
+        expect(() => assertWriteValuesValid({ country: "USA" }, tableFrom(codes("/^[A-Z]{2}$/i")))).toThrow(/pattern/);
     });
 
     it("still reads a bare pattern as a pattern", () => {
-        expect(() => assertWriteValuesValid({ country: "US" }, codes("^[A-Z]{2}$"))).not.toThrow();
-        expect(() => assertWriteValuesValid({ country: "usa" }, codes("^[A-Z]{2}$"))).toThrow(/pattern/);
+        expect(() => assertWriteValuesValid({ country: "US" }, tableFrom(codes("^[A-Z]{2}$")))).not.toThrow();
+        expect(() => assertWriteValuesValid({ country: "usa" }, tableFrom(codes("^[A-Z]{2}$")))).toThrow(/pattern/);
     });
 
     it("strips g and y out of a serialized pattern, so repeated rows agree", () => {
         const collection = codes("/[a-z]+/g");
-        expect(() => assertWriteValuesValid({ country: "abc" }, collection)).not.toThrow();
-        expect(() => assertWriteValuesValid({ country: "abc" }, collection)).not.toThrow();
-        expect(() => assertWriteValuesValid({ country: "abc" }, collection)).not.toThrow();
+        expect(() => assertWriteValuesValid({ country: "abc" }, tableFrom(collection))).not.toThrow();
+        expect(() => assertWriteValuesValid({ country: "abc" }, tableFrom(collection))).not.toThrow();
+        expect(() => assertWriteValuesValid({ country: "abc" }, tableFrom(collection))).not.toThrow();
     });
 });
 
@@ -115,14 +116,14 @@ describe("enum membership", () => {
     };
 
     it("accepts a declared label", () => {
-        expect(() => assertWriteValuesValid({ status: "draft" }, posts)).not.toThrow();
+        expect(() => assertWriteValuesValid({ status: "draft" }, tableFrom(posts))).not.toThrow();
     });
 
     it("refuses an undeclared string label, naming the field and the options", () => {
         // Postgres raises 22P02 for a real enum column, which aborts the
         // transaction and renders as `Invalid data format in "posts".` with no
         // field named. On a plain `text` column nothing rejected it at all.
-        const error = thrown(() => assertWriteValuesValid({ status: "archived" }, posts));
+        const error = thrown(() => assertWriteValuesValid({ status: "archived" }, tableFrom(posts)));
         expect(error.code).toBe("VALIDATION_CONSTRAINT");
         expect(error.message).toContain("'draft'");
         expect(error.message).toContain("'published'");
@@ -132,21 +133,21 @@ describe("enum membership", () => {
     });
 
     it("refuses an undeclared number", () => {
-        const error = thrown(() => assertWriteValuesValid({ priority: 99 }, posts));
+        const error = thrown(() => assertWriteValuesValid({ priority: 99 }, tableFrom(posts)));
         expect(details(error).violations?.[0]).toMatchObject({ field: "priority", code: "enum" });
     });
 
     it("accepts a number enum id sent as a JSON number", () => {
-        expect(() => assertWriteValuesValid({ priority: 2 }, posts)).not.toThrow();
+        expect(() => assertWriteValuesValid({ priority: 2 }, tableFrom(posts))).not.toThrow();
     });
 
     it("refuses an undeclared element of an array of enums, naming the index", () => {
-        const error = thrown(() => assertWriteValuesValid({ tags: ["news", "gossip"] }, posts));
+        const error = thrown(() => assertWriteValuesValid({ tags: ["news", "gossip"] }, tableFrom(posts)));
         expect(details(error).violations?.[0]).toMatchObject({ field: "tags[1]", code: "enum" });
     });
 
     it("accepts the array form of EnumValues", () => {
-        expect(() => assertWriteValuesValid({ tags: ["news", "tech"] }, posts)).not.toThrow();
+        expect(() => assertWriteValuesValid({ tags: ["news", "tech"] }, tableFrom(posts))).not.toThrow();
     });
 });
 
@@ -162,25 +163,25 @@ describe("email and url", () => {
     };
 
     it("refuses a value that is not an email, though the OpenAPI said format: email", () => {
-        const error = thrown(() => assertWriteValuesValid({ email: "ada at example.com" }, contacts));
+        const error = thrown(() => assertWriteValuesValid({ email: "ada at example.com" }, tableFrom(contacts)));
         expect(details(error).violations?.[0]).toMatchObject({ field: "email", code: "email" });
     });
 
     it("accepts an ordinary address", () => {
-        expect(() => assertWriteValuesValid({ email: "ada@example.com" }, contacts)).not.toThrow();
+        expect(() => assertWriteValuesValid({ email: "ada@example.com" }, tableFrom(contacts))).not.toThrow();
     });
 
     it("refuses a relative reference for a url property", () => {
-        const error = thrown(() => assertWriteValuesValid({ website: "example.com/about" }, contacts));
+        const error = thrown(() => assertWriteValuesValid({ website: "example.com/about" }, tableFrom(contacts)));
         expect(details(error).violations?.[0]).toMatchObject({ field: "website", code: "url" });
     });
 
     it("accepts an absolute URL", () => {
-        expect(() => assertWriteValuesValid({ website: "https://example.com/about" }, contacts)).not.toThrow();
+        expect(() => assertWriteValuesValid({ website: "https://example.com/about" }, tableFrom(contacts))).not.toThrow();
     });
 
     it("says nothing about an empty string, which is an unset field", () => {
-        expect(() => assertWriteValuesValid({ email: "", website: "" }, contacts)).not.toThrow();
+        expect(() => assertWriteValuesValid({ email: "", website: "" }, tableFrom(contacts))).not.toThrow();
     });
 });
 
@@ -212,7 +213,7 @@ describe("required on create", () => {
     it("names the missing field, in the wire spelling, before any hook runs", () => {
         // The old answer was a 23502 naming the *column* — and only after
         // `beforeSave` had already charged the card.
-        const error = thrown(() => assertWriteValuesValid({ authorId: 1 }, posts, { status: "new" }));
+        const error = thrown(() => assertWriteValuesValid({ authorId: 1 }, tableFrom(posts), { status: "new" }));
         expect(error.code).toBe("VALIDATION_CONSTRAINT");
         expect(details(error).violations).toEqual([
             expect.objectContaining({ field: "title", code: "required" })
@@ -222,7 +223,7 @@ describe("required on create", () => {
     it("skips a property the create path or the server fills in", () => {
         // `id` (generated), `slug` (defaultValue), `createdAt` (autoValue) and
         // `secret` (excludeFromApi) all have a value by the time the INSERT runs.
-        expect(() => assertWriteValuesValid({ title: "Hello", authorId: 1 }, posts, { status: "new" })).not.toThrow();
+        expect(() => assertWriteValuesValid({ title: "Hello", authorId: 1 }, tableFrom(posts), { status: "new" })).not.toThrow();
     });
 
     it("leaves a databaseDefault column to the database on create, and only on create", () => {
@@ -235,39 +236,39 @@ describe("required on create", () => {
                 code: { type: "string", validation: { required: true }, databaseDefault: true }
             }
         } as CollectionConfig;
-        expect(() => assertWriteValuesValid({ title: "Hello", authorId: 1 }, withCode, { status: "new" })).not.toThrow();
-        expect(() => assertWriteValuesValid({ title: "Hello", authorId: 1, code: null }, withCode, { status: "new" })).not.toThrow();
+        expect(() => assertWriteValuesValid({ title: "Hello", authorId: 1 }, tableFrom(withCode), { status: "new" })).not.toThrow();
+        expect(() => assertWriteValuesValid({ title: "Hello", authorId: 1, code: null }, tableFrom(withCode), { status: "new" })).not.toThrow();
 
         // Without the flag, the same column is the caller's to send.
         const withoutFlag = {
             ...posts,
             properties: { ...posts.properties, code: { type: "string", validation: { required: true } } }
         } as CollectionConfig;
-        const error = thrown(() => assertWriteValuesValid({ title: "Hello", authorId: 1 }, withoutFlag, { status: "new" }));
+        const error = thrown(() => assertWriteValuesValid({ title: "Hello", authorId: 1 }, tableFrom(withoutFlag), { status: "new" }));
         expect(details(error).violations?.[0]).toMatchObject({ field: "code", code: "required" });
 
         // Sent empty is still refused: the caller named the key.
-        const empty = thrown(() => assertWriteValuesValid({ title: "Hello", authorId: 1, code: "" }, withCode, { status: "existing" }));
+        const empty = thrown(() => assertWriteValuesValid({ title: "Hello", authorId: 1, code: "" }, tableFrom(withCode), { status: "existing" }));
         expect(details(empty).violations?.[0]).toMatchObject({ field: "code", code: "required" });
     });
 
     it("accepts either spelling of an owning relation", () => {
-        expect(() => assertWriteValuesValid({ title: "Hello", author: 1 }, posts, { status: "new" })).not.toThrow();
-        expect(() => assertWriteValuesValid({ title: "Hello", authorId: 1 }, posts, { status: "new" })).not.toThrow();
-        const error = thrown(() => assertWriteValuesValid({ title: "Hello" }, posts, { status: "new" }));
-        expect(details(error).violations?.[0]).toMatchObject({ field: "author", code: "required" });
+        expect(() => assertWriteValuesValid({ title: "Hello", author: 1 }, tableFrom(posts), { status: "new" })).not.toThrow();
+        expect(() => assertWriteValuesValid({ title: "Hello", authorId: 1 }, tableFrom(posts), { status: "new" })).not.toThrow();
+        const error = thrown(() => assertWriteValuesValid({ title: "Hello" }, tableFrom(posts), { status: "new" }));
+        expect(details(error).violations?.[0]).toMatchObject({ field: "authorId", code: "required" });
     });
 
     it("treats an explicit null as absent", () => {
-        const error = thrown(() => assertWriteValuesValid({ title: null, authorId: 1 }, posts, { status: "new" }));
+        const error = thrown(() => assertWriteValuesValid({ title: null, authorId: 1 }, tableFrom(posts), { status: "new" }));
         expect(details(error).violations?.[0]).toMatchObject({ field: "title", code: "required" });
     });
 
     it("says nothing on a partial update, which omits keys legitimately", () => {
-        expect(() => assertWriteValuesValid({ title: "Hi" }, posts, { status: "existing" })).not.toThrow();
+        expect(() => assertWriteValuesValid({ title: "Hi" }, tableFrom(posts), { status: "existing" })).not.toThrow();
         // And nothing at all without a status: the caller has not said which
         // this is, so `required` stays the database's NOT NULL.
-        expect(() => assertWriteValuesValid({ title: "Hi" }, posts)).not.toThrow();
+        expect(() => assertWriteValuesValid({ title: "Hi" }, tableFrom(posts))).not.toThrow();
     });
 
     it("steps aside for a collection whose `beforeSave` may supply the value", () => {
@@ -291,11 +292,11 @@ describe("required on create", () => {
             }
         } as CollectionConfig;
 
-        expect(() => assertWriteValuesValid({ title: "Hello", authorId: 1 }, withHook, { status: "new" })).not.toThrow();
+        expect(() => assertWriteValuesValid({ title: "Hello", authorId: 1 }, tableFrom(withHook), { status: "new" })).not.toThrow();
 
         // The same collection without the hook still answers at the boundary.
         const { callbacks: _dropped, ...withoutHook } = withHook as CollectionConfig & { callbacks?: unknown };
-        const error = thrown(() => assertWriteValuesValid({ title: "Hello", authorId: 1 }, withoutHook as CollectionConfig, { status: "new" }));
+        const error = thrown(() => assertWriteValuesValid({ title: "Hello", authorId: 1 }, tableFrom(withoutHook as CollectionConfig), { status: "new" }));
         expect(details(error).violations?.[0]).toMatchObject({ field: "slug", code: "required" });
     });
 
@@ -304,7 +305,7 @@ describe("required on create", () => {
             slug: "t", name: "T", table: "t",
             properties: { name: { type: "string", validation: { required: true, requiredMessage: "Every widget needs a name." } } }
         };
-        const error = thrown(() => assertWriteValuesValid({}, collection, { status: "new" }));
+        const error = thrown(() => assertWriteValuesValid({}, tableFrom(collection), { status: "new" }));
         expect(error.message).toContain("Every widget needs a name.");
     });
 });
@@ -327,7 +328,7 @@ describe("an empty string on a required string", () => {
     };
 
     it("is refused on a create, as the required violation", () => {
-        const error = thrown(() => assertWriteValuesValid({ title: "" }, posts, { status: "new" }));
+        const error = thrown(() => assertWriteValuesValid({ title: "" }, tableFrom(posts), { status: "new" }));
         expect(error.statusCode).toBe(400);
         expect(details(error).violations).toEqual([
             expect.objectContaining({ field: "title", code: "required", message: "'title' is required." })
@@ -336,26 +337,26 @@ describe("an empty string on a required string", () => {
 
     it("is refused on an update and without a status, where a missing key is not", () => {
         for (const options of [{ status: "existing" as const }, undefined]) {
-            const error = thrown(() => assertWriteValuesValid({ title: "" }, posts, options));
+            const error = thrown(() => assertWriteValuesValid({ title: "" }, tableFrom(posts), options));
             expect(details(error).violations).toEqual([expect.objectContaining({ field: "title", code: "required" })]);
-            expect(() => assertWriteValuesValid({ subtitle: "x" }, posts, options)).not.toThrow();
+            expect(() => assertWriteValuesValid({ subtitle: "x" }, tableFrom(posts), options)).not.toThrow();
         }
     });
 
     it("is refused even where a defaultValue would have filled a missing key", () => {
         // A `defaultValue` applies to an absent key; `""` is stored as sent.
-        const error = thrown(() => assertWriteValuesValid({ title: "Hi", slug: "" }, posts, { status: "new" }));
+        const error = thrown(() => assertWriteValuesValid({ title: "Hi", slug: "" }, tableFrom(posts), { status: "new" }));
         expect(details(error).violations).toEqual([expect.objectContaining({ field: "slug", code: "required" })]);
     });
 
     it("is reported once on a create, not as both missing and empty", () => {
-        const error = thrown(() => assertWriteValuesValid({ title: "" }, posts, { status: "copy" }));
+        const error = thrown(() => assertWriteValuesValid({ title: "" }, tableFrom(posts), { status: "copy" }));
         expect(details(error).violations?.filter(v => v.field === "title")).toHaveLength(1);
     });
 
     it("is still accepted on a string that is not required", () => {
-        expect(() => assertWriteValuesValid({ title: "Hi", subtitle: "" }, posts, { status: "new" })).not.toThrow();
-        expect(() => assertWriteValuesValid({ subtitle: "" }, posts, { status: "existing" })).not.toThrow();
+        expect(() => assertWriteValuesValid({ title: "Hi", subtitle: "" }, tableFrom(posts), { status: "new" })).not.toThrow();
+        expect(() => assertWriteValuesValid({ subtitle: "" }, tableFrom(posts), { status: "existing" })).not.toThrow();
     });
 
     it("steps aside, like a missing value, for a collection whose beforeSave may fill it", () => {
@@ -363,8 +364,8 @@ describe("an empty string on a required string", () => {
             ...posts,
             callbacks: { beforeSave: ({ values }: { values: Record<string, unknown> }) => values }
         } as CollectionConfig;
-        expect(() => assertWriteValuesValid({ title: "" }, withHook, { status: "new" })).not.toThrow();
-        expect(() => assertWriteValuesValid({ title: "" }, withHook, { status: "existing" })).not.toThrow();
+        expect(() => assertWriteValuesValid({ title: "" }, tableFrom(withHook), { status: "new" })).not.toThrow();
+        expect(() => assertWriteValuesValid({ title: "" }, tableFrom(withHook), { status: "existing" })).not.toThrow();
     });
 });
 
@@ -380,7 +381,7 @@ describe("the 400 carries structured violations alongside the message list", () 
     };
 
     it("reports every failing field at once, each with a field and a code", () => {
-        const error = thrown(() => assertWriteValuesValid({ price: -5, sku: "abc" }, products));
+        const error = thrown(() => assertWriteValuesValid({ price: -5, sku: "abc" }, tableFrom(products)));
         const d = details(error);
         expect(d.collection).toBe("products");
         expect(d.violations).toEqual([
@@ -403,7 +404,7 @@ describe("the 400 carries structured violations alongside the message list", () 
                 }
             }
         };
-        const error = thrown(() => assertWriteValuesValid({ address: { zip: "1" } }, collection));
+        const error = thrown(() => assertWriteValuesValid({ address: { zip: "1" } }, tableFrom(collection)));
         expect(details(error).violations?.[0]).toMatchObject({ field: "address.zip", code: "length" });
     });
 });

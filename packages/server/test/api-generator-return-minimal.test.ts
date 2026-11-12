@@ -4,6 +4,7 @@ import { errorHandler } from "../src/api/errors";
 import type { CollectionConfig, FetchOneProps, SaveManyProps, SaveProps, UpdateManyProps } from "@rebasepro/types";
 import { fakeDataDriver } from "./helpers/server-a-fakes";
 import type { HonoEnv } from "../src/api/types";
+import { tablesFromCollections } from "./helpers/tables";
 
 /**
  * `Prefer: return=minimal` (RFC 7240).
@@ -70,7 +71,7 @@ function createHarness() {
         c.set("user", { uid: "user-1" });
         await next();
     });
-    app.route("/", new RestApiGenerator([posts, memberships], driver).generateRoutes());
+    app.route("/", new RestApiGenerator(tablesFromCollections([posts, memberships]), driver).generateRoutes());
     return { app };
 }
 

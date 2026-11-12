@@ -6,6 +6,7 @@ import { fakeDataDriver } from "./helpers/server-b-fakes";
 import { encodeCursor } from "@rebasepro/common";
 import type { DataDriver } from "@rebasepro/types";
 import type { CollectionConfig } from "@rebasepro/types";
+import { tablesFromCollections } from "./helpers/tables";
 
 /**
  * The read side of the HTTP API: the capabilities the SDK exposes and the REST
@@ -68,7 +69,7 @@ describe("the REST read surface", () => {
             c.set("driver", driver);
             await next();
         });
-        hono.route("/", new RestApiGenerator([posts], driver).generateRoutes());
+        hono.route("/", new RestApiGenerator(tablesFromCollections([posts]), driver).generateRoutes());
         return hono;
     };
 

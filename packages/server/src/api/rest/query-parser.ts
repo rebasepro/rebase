@@ -1,4 +1,5 @@
-import type { CollectionConfig, FilterValues, ListLimitBounds, LogicalCondition, NullsPlacement, OrderByTuple, VectorSearchParams } from "@rebasepro/types";
+import type { TableDescriptor, FilterValues, ListLimitBounds, LogicalCondition, NullsPlacement, OrderByTuple, VectorSearchParams } from "@rebasepro/types";
+import type { TableLookup } from "./served-table";
 import { toCanonicalOp, resolveClientListLimit, ListLimitError, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT, AGGREGATE_FUNCTIONS, AGGREGATE_GROUP_TRANSFORMS, FIELDLESS_AGGREGATES, aggregateAlias, aggregateGroupKey, isPercentileFraction, isTimeZoneName, type DriverAggregate, type DriverAggregateGroup } from "@rebasepro/types";
 import type { DecodedCursor } from "@rebasepro/common";
 import {
@@ -156,6 +157,15 @@ function parseWhereParam(raw: unknown): FilterValues<string> | undefined {
 }
 
 /**
+ * The table a query reads, and how its relations' targets are found: what the
+ * field-access check of a parsed query needs.
+ */
+export interface QueryAccess {
+    table: TableDescriptor;
+    lookup: TableLookup;
+}
+
+/**
  * The filter of a filtered write — `PATCH /<slug>/bulk` and
  * `POST /<slug>/bulk/delete` with `{ where, logical }` — in the dialects a
  * listing takes: `where` as the `?where=` JSON object, `logical` as the
@@ -166,7 +176,7 @@ function parseWhereParam(raw: unknown): FilterValues<string> | undefined {
  */
 export function parseWriteFilter(
     body: { where?: unknown; logical?: unknown },
-    access: { collection: CollectionConfig; viewer: FieldViewer | undefined }
+    access: QueryAccess & { viewer: FieldViewer | undefined }
 ): { filter?: FilterValues<string>; logical?: LogicalCondition } {
     if (body.where !== undefined && (typeof body.where !== "object" || body.where === null || Array.isArray(body.where))) {
         throw invalidParam("`where` must be a JSON object mapping fields to conditions, e.g. {\"status\":[\"==\",\"draft\"]}.", "INVALID_WHERE");
@@ -189,7 +199,7 @@ export function parseWriteFilter(
             "FILTER_REQUIRED"
         );
     }
-    assertQueryFieldsReadable({ where: filter, logical }, access.collection, access.viewer);
+    assertQueryFieldsReadable({ where: filter, logical }, access.table, access.viewer, access.lookup);
     return { filter, logical };
 }
 
@@ -576,14 +586,14 @@ export function parseQueryOptions(
     query: Record<string, unknown>,
     limits: ListLimitOptions = {},
     /**
-     * The collection being read and who is reading it. Optional so the parser
+     * The table being read and who is reading it. Optional so the parser
      * stays a pure parser for the callers that have neither (tests, the WS
      * ingress, anything parsing a query it is not about to run); when present,
      * a `where`, `orderBy` or `fields` naming a field the caller cannot read is
      * a 400 rather than a query the driver would happily answer. See
      * {@link assertQueryFieldsReadable}.
      */
-    access?: { collection: CollectionConfig; viewer?: FieldViewer }
+    access?: QueryAccess & { viewer?: FieldViewer }
 ): QueryOptions {
     const options: QueryOptions = {};
     const rawLimit = getLastValue(query.limit) as number | string | null | undefined;
@@ -873,7 +883,7 @@ export function parseQueryOptions(
     // Every field the request named, against what this caller may read. Last,
     // so a malformed parameter is still answered as malformed rather than as a
     // permission problem.
-    if (access) assertQueryFieldsReadable(options, access.collection, access.viewer);
+    if (access) assertQueryFieldsReadable(options, access.table, access.viewer, access.lookup);
 
     return options;
 }

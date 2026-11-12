@@ -7,6 +7,7 @@ import { errorHandler } from "../src/api/errors";
 import type { HonoEnv } from "../src/api/types";
 import { fakeDataDriver } from "./helpers/server-b-fakes";
 import { openApiDocument, operationOf, schemaOf, type OpenApiDocument } from "./helpers/server-b-g1-openapi";
+import { tablesFromCollections } from "./helpers/tables";
 
 /**
  * What the spec claims a request may contain, against what the routes read.
@@ -57,7 +58,7 @@ function parameter(spec: OpenApiDocument, path: string, name: string) {
 }
 
 describe("OpenAPI query parameters", () => {
-    const spec = openApiDocument(generateOpenApiSpec([posts, tags]));
+    const spec = openApiDocument(generateOpenApiSpec(tablesFromCollections([posts, tags]).descriptors));
 
     it("states the page size the server actually applies", () => {
         const limit = parameter(spec, "/data/posts", "limit");
@@ -117,7 +118,7 @@ describe("deeply nested logical groups", () => {
         const app = new Hono<HonoEnv>();
         app.onError(errorHandler);
         app.use("/*", async (c, next) => { c.set("driver", driver); await next(); });
-        app.route("/", new RestApiGenerator([posts, tags], driver).generateRoutes());
+        app.route("/", new RestApiGenerator(tablesFromCollections([posts, tags]), driver).generateRoutes());
 
         const deep = "or(".repeat(200) + "a.eq.1" + ")".repeat(200);
         const res = await app.request(`/posts?or=${encodeURIComponent(deep)}`);

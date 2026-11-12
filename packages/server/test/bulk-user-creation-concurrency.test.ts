@@ -15,7 +15,8 @@
  */
 import { describe, it, expect } from "@jest/globals";
 import type { CollectionConfig, UserCreationPrepareResult, UserCreationWriteContract } from "@rebasepro/types";
-import { prepareUserCreations, type UserCreatingAdapter } from "../src/api/rest/auth-collection-writes";
+import { prepareUserCreations, type UserCreatingAdapter } from "../src/api/rest/auth-table-writes";
+import { servedTableFrom } from "./helpers/tables";
 import { testAuthAdapter } from "./helpers/server-a-g3-auth-adapter";
 
 const usersCollection: CollectionConfig = { slug: "users", name: "Users", auth: true, properties: {} };
@@ -44,7 +45,7 @@ const bodies = Array.from({ length: 12 }, (_, i) => ({ email: `u${i}@example.com
 describe("prepareUserCreations", () => {
     it("prepares independent creations several at a time, and answers in the order given", async () => {
         const { adapter, stats } = countingAdapter({ validate: true, extraFields: ["password"], independent: true });
-        const prepared = await prepareUserCreations(adapter, usersCollection, bodies, { roles: ["admin"] });
+        const prepared = await prepareUserCreations(adapter, servedTableFrom(usersCollection), bodies, { roles: ["admin"] });
 
         expect(prepared.map(result => result.values.email)).toEqual(bodies.map(body => body.email));
         expect(prepared.every(result => result.values.prepared === true)).toBe(true);
@@ -55,7 +56,7 @@ describe("prepareUserCreations", () => {
     it("prepares one at a time, in order, when the adapter does not say they are independent", async () => {
         for (const contract of [undefined, { validate: false, extraFields: [] }]) {
             const { adapter, stats } = countingAdapter(contract);
-            await prepareUserCreations(adapter, usersCollection, bodies, { roles: ["admin"] });
+            await prepareUserCreations(adapter, servedTableFrom(usersCollection), bodies, { roles: ["admin"] });
             expect(stats().maxInFlight).toBe(1);
             expect(stats().started).toEqual(bodies.map(body => body.email));
         }

@@ -30,7 +30,7 @@ import type { CollectionConfig, DataDriver, RelationProperty } from "@rebasepro/
 import { createServer } from "node:http";
 import { fakeApiKeyStore, fakeAuthRepository, fakeUser, maskedApiKey } from "./helpers/server-a-g1-fakes";
 import { fakeDataDriver } from "./helpers/server-a-fakes";
-import { tablesFrom } from "./helpers/tables";
+import { tablesFrom, tablesFromCollections } from "./helpers/tables";
 
 const TEST_SECRET = "test-secret-key-for-api-key-fixes-testing-1234567890";
 const SERVICE_KEY = "service-key-for-api-key-fixes-tests-1234567890";
@@ -304,7 +304,7 @@ properties };
         const notes = createTestCollection("notes");
         const internalNotes = createTestCollection("internal_notes");
         const projects = createTestCollection("projects", { notes: hasMany(() => internalNotes, "project_id") });
-        const generator = new RestApiGenerator([authors, posts, projects, notes, internalNotes], driver);
+        const generator = new RestApiGenerator(tablesFromCollections([authors, posts, projects, notes, internalNotes]), driver);
         parent.route("/", generator.generateRoutes());
         return { app: parent, driver };
     }
@@ -316,7 +316,8 @@ properties };
         expect((await app.request("/authors/1/posts")).status).toBe(200);
         expect((await app.request("/authors/1/posts", {
             method: "POST",
-            body: JSON.stringify({ title: "hi" }),
+            // A table of these fixtures declares only its key: the body names no column.
+            body: JSON.stringify({}),
             headers: { "Content-Type": "application/json" }
         })).status).toBe(201);
     });

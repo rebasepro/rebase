@@ -1,4 +1,5 @@
-import { CollectionConfig, FieldOperation, FIELD_OPERATORS, isFieldOperation, Properties, Property } from "@rebasepro/types";
+import { FieldOperation, FIELD_OPERATORS, isFieldOperation, type ColumnDescriptor, type TableDescriptor } from "@rebasepro/types";
+import { fieldOperationKind, isColumnFieldOperation, type FieldOperationKind } from "@rebasepro/common";
 import { ApiError } from "../errors";
 
 /**
@@ -16,10 +17,10 @@ import { ApiError } from "../errors";
  * there is no window to lose. Same for the array and jsonb forms.
  *
  * This module is the *contract* — what the operators are, what shapes they
- * accept, and which property types they are legal on. Compiling one to SQL is
- * the driver's job (`@rebasepro/server-postgres`), because only the driver
- * knows whether an `array` property is a native `text[]` or a jsonb document,
- * and those need different statements.
+ * accept, and which columns they are legal on (`fieldOperationKind`, read from
+ * the column's descriptor). Compiling one to SQL is the driver's job
+ * (`@rebasepro/server-postgres`): a native `text[]` and a jsonb list need
+ * different statements.
  *
  * @module
  */
@@ -34,13 +35,29 @@ export interface ParsedFieldOp {
 
 const OPERATOR_SET = new Set<string>(FIELD_OPERATORS);
 
-/** The property types each operator is defined on. */
-const LEGAL_ON: Record<FieldOperator, readonly string[]> = {
-    $inc: ["number"],
-    $push: ["array"],
-    $pull: ["array"],
-    $merge: ["map"]
+/** The kind of value each operator is defined on. */
+const LEGAL_ON: Record<FieldOperator, FieldOperationKind> = {
+    $inc: "number",
+    $push: "array",
+    $pull: "array",
+    $merge: "document"
 };
+
+/** What an operator's kind is called in a message. */
+const KIND_NOUN: Record<FieldOperationKind, string> = {
+    number: "a numeric column",
+    array: "an array column (or a JSON list)",
+    document: "a JSON object column"
+};
+
+/** What a column is, in a message about an operator it does not take. */
+function columnNoun(column: ColumnDescriptor): string {
+    const kind = fieldOperationKind(column);
+    if (kind) return KIND_NOUN[kind];
+    if (column.semantic === "geopoint") return "a geopoint column";
+    if (column.json) return `a JSON column whose shape is ${column.json.kind === "oneOf" ? "a `json.oneOf()`" : `a \`json.${column.json.kind}()\``}`;
+    return `a \`${column.type.kind}\` column`;
+}
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null && !Array.isArray(value) && !(value instanceof Date);
@@ -60,12 +77,17 @@ export const looksLikeFieldOp = isFieldOperation;
 
 /**
  * True when any value in the payload is (or is attempting to be) an operation.
- * With `properties`, a `map` value is one only when it is `{ <operator>: … }`;
- * see `isFieldOperation`.
+ * With the `table`, a JSON object value is one only when it is
+ * `{ <operator>: … }`; see `isColumnFieldOperation`.
  */
-export function hasFieldOps(values: Record<string, unknown> | undefined, properties?: Properties): boolean {
+export function hasFieldOps(values: Record<string, unknown> | undefined, table?: TableDescriptor): boolean {
     if (!values) return false;
-    return Object.entries(values).some(([key, value]) => looksLikeFieldOp(value, properties?.[key]?.type));
+    return Object.entries(values).some(([key, value]) => isColumnFieldOperation(value, columnOf(table, key)));
+}
+
+/** The column of `table` with this key, when there is a table and it has one. */
+function columnOf(table: TableDescriptor | undefined, key: string): ColumnDescriptor | undefined {
+    return table?.columns.find(column => column.key === key);
 }
 
 /**
@@ -73,12 +95,12 @@ export function hasFieldOps(values: Record<string, unknown> | undefined, propert
  *
  * Returns `undefined` for an ordinary value. Throws for a value that reads as
  * an operation and is malformed, so a typo cannot be written as data. Given
- * the field's `property`, a `map` value with `$` keys is data unless it is a
+ * the `column`, a JSON object value with `$` keys is data unless it is a
  * single real operator.
  */
-export function parseFieldOp(key: string, value: unknown, property?: Property): ParsedFieldOp | undefined {
-    if (!looksLikeFieldOp(value, property?.type)) return undefined;
-    const entries = Object.entries(value as Record<string, unknown>);
+export function parseFieldOp(key: string, value: unknown, column?: ColumnDescriptor): ParsedFieldOp | undefined {
+    if (!isColumnFieldOperation(value, column) || typeof value !== "object" || value === null) return undefined;
+    const entries = Object.entries(value);
     if (entries.length !== 1) {
         throw ApiError.badRequest(
             `'${key}' mixes ${entries.length} keys in one field operation. ` +
@@ -105,17 +127,17 @@ export function parseFieldOp(key: string, value: unknown, property?: Property): 
  * a single `PATCH` — and are applied in one statement, so a caller never has to
  * choose between setting a column and incrementing another.
  *
- * Pass the collection's `properties`: without them a `map` value carrying `$`
- * keys reads as a (malformed) operation rather than as the document it is.
+ * Pass the `table`: without it a JSON object value carrying `$` keys reads as a
+ * (malformed) operation rather than as the document it is.
  */
-export function splitFieldOps(values: Record<string, unknown>, properties?: Properties): {
+export function splitFieldOps(values: Record<string, unknown>, table?: TableDescriptor): {
     values: Record<string, unknown>;
     fieldOps: Record<string, ParsedFieldOp>;
 } {
     const plain: Record<string, unknown> = {};
     const fieldOps: Record<string, ParsedFieldOp> = {};
     for (const [key, value] of Object.entries(values ?? {})) {
-        const op = parseFieldOp(key, value, properties?.[key]);
+        const op = parseFieldOp(key, value, columnOf(table, key));
         if (op) fieldOps[key] = op;
         else plain[key] = value;
     }
@@ -123,7 +145,7 @@ export function splitFieldOps(values: Record<string, unknown>, properties?: Prop
 }
 
 /**
- * Refuse an operation the collection's own schema says cannot apply.
+ * Refuse an operation the table's own columns say cannot apply.
  *
  * Checked here rather than left to Postgres because the database's answer
  * arrives as a type error naming a generated column expression, from inside a
@@ -136,7 +158,7 @@ export function splitFieldOps(values: Record<string, unknown>, properties?: Prop
  */
 export function assertFieldOpsValid(
     values: Record<string, unknown>,
-    collection: CollectionConfig,
+    table: TableDescriptor,
     options?: { rowIndex?: number; operationIndex?: number }
 ): void {
     const where = options?.rowIndex !== undefined
@@ -146,30 +168,28 @@ export function assertFieldOpsValid(
             : "";
     const bad = (message: string): never => {
         throw ApiError.badRequest(`${where}${message}`, "INVALID_FIELD_OPERATION", {
-            collection: collection.slug
+            collection: table.slug
         });
     };
 
-    const properties = (collection.properties ?? {}) as Record<string, Property>;
-
     for (const [key, value] of Object.entries(values ?? {})) {
-        const op = parseFieldOp(key, value, properties[key]);
+        const column = columnOf(table, key);
+        const op = parseFieldOp(key, value, column);
         if (!op) continue;
 
-        const property = properties[key];
-        if (!property) {
+        if (!column) {
             bad(
-                `'${key}' is not a declared property of '${collection.slug}', so ` +
-                `${op.operator} has no column to apply to.`
+                `'${key}' is not a column of table '${table.slug}', so ` +
+                `${op.operator} has nothing to apply to.`
             );
             continue;
         }
 
         const legal = LEGAL_ON[op.operator];
-        if (!legal.includes(property.type)) {
+        if (fieldOperationKind(column) !== legal) {
             bad(
-                `${op.operator} is not defined on '${key}', which is a ${property.type} property. ` +
-                `${op.operator} applies to ${legal.join(" or ")} properties.`
+                `${op.operator} is not defined on '${key}', which is ${columnNoun(column)}. ` +
+                `${op.operator} applies to ${KIND_NOUN[legal]}.`
             );
             continue;
         }
@@ -204,16 +224,15 @@ export function assertFieldOpsValid(
  * is just `1`, and accepting it would make `$inc` mean two different things
  * depending on a race the caller cannot observe.
  *
- * `collection` decides how a `map` value is read (see {@link splitFieldOps});
+ * `table` decides how a JSON object value is read (see {@link splitFieldOps});
  * every request boundary has it and passes it.
  */
 export function assertNoFieldOpsOnCreate(
     values: Record<string, unknown>,
     context: string,
-    collection?: CollectionConfig
+    table?: TableDescriptor
 ): void {
-    const properties: Properties | undefined = collection?.properties;
-    const offending = Object.entries(values ?? {}).filter(([key, value]) => parseFieldOp(key, value, properties?.[key]));
+    const offending = Object.entries(values ?? {}).filter(([key, value]) => parseFieldOp(key, value, columnOf(table, key)));
     if (offending.length === 0) return;
     throw ApiError.badRequest(
         `${context} cannot carry field operations (${offending.map(([key]) => `'${key}'`).join(", ")}). ` +

@@ -2,6 +2,7 @@ import type { CollectionConfig } from "@rebasepro/types";
 
 import { generateOpenApiSpec } from "../src/api/openapi-generator";
 import { openApiDocument, operationOf } from "./helpers/server-b-g1-openapi";
+import { tablesFromCollections } from "./helpers/tables";
 
 /**
  * The nested-collection routes in the spec are derived from the *resolved*
@@ -71,7 +72,7 @@ foreignKeyOnTarget: "post_id" }]
     };
 
     const nestedPaths = () => {
-        const spec = openApiDocument(generateOpenApiSpec([posts, tags, comments, users]));
+        const spec = openApiDocument(generateOpenApiSpec(tablesFromCollections([posts, tags, comments, users]).descriptors));
         return Object.keys(spec.paths)
             .filter(p => p.includes("{parentId}"))
             .sort();
@@ -93,7 +94,7 @@ foreignKeyOnTarget: "post_id" }]
     });
 
     it("responds with the target's schema, not the parent's", () => {
-        const spec = openApiDocument(generateOpenApiSpec([posts, tags, comments, users]));
+        const spec = openApiDocument(generateOpenApiSpec(tablesFromCollections([posts, tags, comments, users]).descriptors));
         const items = operationOf(spec, "/data/posts/{parentId}/comments", "get")
             .responses[200].content?.["application/json"]?.schema?.properties?.data?.items;
         expect(items).toEqual({ $ref: "#/components/schemas/Comment" });

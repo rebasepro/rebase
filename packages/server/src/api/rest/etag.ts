@@ -1,4 +1,4 @@
-import { CollectionConfig, Property } from "@rebasepro/types";
+import type { TableDescriptor } from "@rebasepro/types";
 import { ApiError } from "../errors";
 import { sha256Hex } from "../../utils/portable-crypto";
 
@@ -24,26 +24,19 @@ export const ETAG_HEADER = "ETag";
 export const IF_MATCH_HEADER = "If-Match";
 
 /**
- * The property whose value is the row's version, when the collection has one.
+ * The column whose value is the row's version, when the table has one.
  *
- * A `date` property with `autoValue: "on_update"` is stamped by the database on
- * every write, so it already *is* a version — deriving the tag from it means
+ * A column stamped `.onUpdateNow()` is stamped by the server on every write, so it already *is* a version — deriving the tag from it means
  * the tag changes when and only when the row does, and two backends serving the
  * same table agree on it. The alternative below (hashing the row) is correct
  * but coarser: it changes when the *serialisation* changes, which includes
  * columns a caller cannot see and excludes nothing.
  *
- * The first such property in declaration order, so a collection with two of
- * them picks deterministically rather than by object-key luck.
+ * The first such column in physical order, so a table with two of them picks
+ * deterministically.
  */
-export function versionProperty(collection: CollectionConfig | undefined): string | undefined {
-    const properties = (collection?.properties ?? {}) as Record<string, Property>;
-    for (const [key, property] of Object.entries(properties)) {
-        if (property?.type === "date" && (property as { autoValue?: string }).autoValue === "on_update") {
-            return key;
-        }
-    }
-    return undefined;
+export function versionColumn(table: TableDescriptor | undefined): string | undefined {
+    return table?.columns.find(column => column.stamp?.on === "update" && column.stamp.value === "now")?.key;
 }
 
 /**
@@ -76,15 +69,15 @@ function stableStringify(value: unknown): string {
  */
 export async function rowETag(
     row: Record<string, unknown> | undefined,
-    collection: CollectionConfig | undefined
+    table: TableDescriptor | undefined
 ): Promise<string | undefined> {
     if (!row) return undefined;
-    const versionKey = versionProperty(collection);
+    const versionKey = versionColumn(table);
     const version = versionKey !== undefined ? row[versionKey] : undefined;
-    // A collection that stamps `on_update` but has not been written since the
+    // A table that stamps `.onUpdateNow()` but has not been written since the
     // column was added has a NULL there, and hashing `null` for every such row
     // would hand them all one tag — so the fallback is taken per row, not per
-    // collection.
+    // table.
     const source = version !== undefined && version !== null
         ? `v:${renderVersion(version)}`
         : `r:${stableStringify(row)}`;
@@ -138,7 +131,7 @@ function parseIfMatch(header: string): { wildcard: boolean; tags: string[] } {
 export async function assertIfMatch(
     ifMatch: string | undefined,
     row: Record<string, unknown> | undefined,
-    collection: CollectionConfig | undefined,
+    table: TableDescriptor | undefined,
     context: { collection: string; id: string }
 ): Promise<void> {
     if (!ifMatch) return;
@@ -147,13 +140,13 @@ export async function assertIfMatch(
     // 404 the route has already raised.
     if (wildcard) return;
 
-    const current = await rowETag(row, collection);
+    const current = await rowETag(row, table);
     if (current && tags.includes(current)) return;
 
     throw new ApiError(
         412,
         "PRECONDITION_FAILED",
-        `The row '${context.id}' in '${context.collection}' has changed since it was read. ` +
+        `The row '${context.id}' in table '${context.collection}' has changed since it was read. ` +
         "Re-read it, re-apply the change, and send the new ETag.",
         { collection: context.collection, id: context.id, expected: tags, current }
     );

@@ -10,6 +10,7 @@ import { errorHandler } from "../src/api/errors";
 import type { HonoEnv } from "../src/api/types";
 import { configureJwt, generateAccessToken } from "../src/auth/jwt";
 import { fakeAuthRepository, fakeUser } from "./helpers/server-a-g1-fakes";
+import { tablesFromCollections } from "./helpers/tables";
 
 const SECRET = "test-secret-for-admin-create-hook-delivery-0123456789";
 
@@ -146,7 +147,7 @@ async function harness(kind: HookKind, scenario: Scenario) {
         c.set("driver", driver);
         await next();
     });
-    app.route("/api/data", new RestApiGenerator([usersCollection], driver, adapter).generateRoutes());
+    app.route("/api/data", new RestApiGenerator(tablesFromCollections([usersCollection]), driver, adapter).generateRoutes());
 
     const token = await generateAccessToken("admin-1", ["admin"]);
     const post = (path: string) => app.request(path, {

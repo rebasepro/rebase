@@ -1,5 +1,4 @@
-import { CollectionConfig, Property } from "@rebasepro/types";
-import { resolvePrimaryKeys } from "@rebasepro/common";
+import type { TableDescriptor, TableIndexKey } from "@rebasepro/types";
 import { ApiError } from "../errors";
 
 /**
@@ -12,10 +11,10 @@ import { ApiError } from "../errors";
  * The caller sees a 500 naming a constraint they never wrote, after work has
  * been rolled back.
  *
- * So the target is checked against the collection's own declarations before the
+ * So the target is checked against the table's own declarations before the
  * statement is built, and the error says which columns *are* available. The
  * declarations are the source of truth on purpose: a unique index that exists
- * in the database but in no config is one `db push` away from being dropped,
+ * in the database but in no definition is one `db push` away from being dropped,
  * and an upsert that silently depends on it would break at that moment rather
  * than at the moment it was written.
  *
@@ -35,39 +34,32 @@ function key(columns: readonly string[]): string {
     return [...columns].map(c => c.trim()).sort().join(KEY_SEPARATOR);
 }
 
+/** The column key an index key names. */
+const indexKeyColumn = (key: string | TableIndexKey): string => (typeof key === "string" ? key : key.column);
+
 /**
- * Every column set this collection declares a uniqueness guarantee over.
+ * Every column set this table declares a uniqueness guarantee over.
  *
  * Three sources, and they are not interchangeable:
  * - the primary key, which is always there and is the default target;
- * - `validation.unique` on a property, which compiles to an inline `UNIQUE`;
- * - a `unique: true` btree index, which is the *only* way to declare a
- *   composite guarantee (see `BtreeIndex.unique`).
+ * - `.unique()` on a column, which compiles to an inline `UNIQUE`;
+ * - a `unique: true` index, which is the *only* way to declare a composite
+ *   guarantee.
  */
-export function declaredUniqueTargets(collection: CollectionConfig): string[][] {
+export function declaredUniqueTargets(table: TableDescriptor): string[][] {
     const targets: string[][] = [];
 
-    const pk = resolvePrimaryKeys(collection).map(info => info.fieldName);
-    if (pk.length > 0) targets.push(pk);
+    if (table.primaryKey.length > 0) targets.push([...table.primaryKey]);
 
-    const properties = (collection.properties ?? {}) as Record<string, Property>;
-    for (const [name, property] of Object.entries(properties)) {
-        if ((property?.validation as { unique?: boolean } | undefined)?.unique) {
-            targets.push([name]);
-        }
+    for (const column of table.columns) {
+        if (column.unique) targets.push([column.key]);
     }
 
-    // Read off a widened view: `CollectionConfig` is a union whose Firebase arm
-    // declares no `indexes`, and narrowing it here would mean this function
-    // knowing about drivers it has no business knowing about.
-    const indexes = (collection as { indexes?: readonly { on?: readonly unknown[]; unique?: boolean }[] }).indexes;
-    for (const index of indexes ?? []) {
-        if (!index?.unique) continue;
-        // An index key may be an object (`{ column, order }`) rather than a
-        // bare name; the guarantee is over the columns either way.
-        const columns = (index.on ?? []).map((entry) =>
-            typeof entry === "string" ? entry : String((entry as { column?: unknown })?.column ?? "")
-        );
+    for (const index of table.indexes ?? []) {
+        if (!index.unique) continue;
+        // An index key may be an object (`{ column, direction }`) rather than
+        // a bare key; the guarantee is over the columns either way.
+        const columns = index.columns.map(indexKeyColumn);
         if (columns.length > 0 && columns.every(Boolean)) targets.push(columns);
     }
 
@@ -82,7 +74,7 @@ export function declaredUniqueTargets(collection: CollectionConfig): string[][] 
  */
 export function resolveConflictTarget(
     raw: unknown,
-    collection: CollectionConfig,
+    table: TableDescriptor,
     options?: { where?: string }
 ): string[] | undefined {
     if (raw === undefined || raw === null || raw === "") return undefined;
@@ -100,27 +92,27 @@ export function resolveConflictTarget(
         );
     }
 
-    const properties = (collection.properties ?? {}) as Record<string, Property>;
-    const unknownColumn = columns.find((column) => !(column in properties));
+    const declared = new Set(table.columns.map(column => column.key));
+    const unknownColumn = columns.find((column) => !declared.has(column));
     if (unknownColumn) {
         throw ApiError.badRequest(
-            `${where}'${unknownColumn}' is not a property of '${collection.slug}', so it cannot be an upsert target.`,
+            `${where}'${unknownColumn}' is not a column of table '${table.slug}', so it cannot be an upsert target.`,
             "INVALID_CONFLICT_TARGET",
-            { collection: collection.slug }
+            { collection: table.slug }
         );
     }
 
-    const available = declaredUniqueTargets(collection);
+    const available = declaredUniqueTargets(table);
     if (!available.some((candidate) => key(candidate) === key(columns))) {
         throw ApiError.badRequest(
-            `${where}[${columns.join(", ")}] carries no uniqueness guarantee on '${collection.slug}', ` +
-            "so an upsert has nothing to match a conflict against. Declare `validation: { unique: true }` " +
-            "on the property, or a `unique: true` index over the columns. " +
+            `${where}[${columns.join(", ")}] carries no uniqueness guarantee on table '${table.slug}', ` +
+            "so an upsert has nothing to match a conflict against. Declare `.unique()` on the column, " +
+            "or a `unique: true` index over the columns. " +
             (available.length > 0
                 ? `Targets available today: ${available.map(t => `[${t.join(", ")}]`).join(", ")}.`
-                : "This collection declares none."),
+                : "This table declares none."),
             "INVALID_CONFLICT_TARGET",
-            { collection: collection.slug, requested: columns, available }
+            { collection: table.slug, requested: columns, available }
         );
     }
 

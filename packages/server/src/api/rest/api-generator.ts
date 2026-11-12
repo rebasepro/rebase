@@ -1,10 +1,10 @@
 import { Hono, type Context, type MiddlewareHandler } from "hono";
-import { AuthAdapter, DataDriver, CollectionConfig, JUNCTION_PIVOT_KEY, ResolvedRelation, getCollectionDataPath, isManyToMany, isPostgresCollectionConfig, scopeGrants, type RowPrecondition, type UserCreationFinalizeResult, type UserCreationPrepareResult } from "@rebasepro/types";
+import { AuthAdapter, DataDriver, JUNCTION_PIVOT_KEY, getCollectionDataPath, scopeGrants, type CollectionConfig, type RelationDescriptor, type RowPrecondition, type TableDescriptor, type UserCreationFinalizeResult, type UserCreationPrepareResult } from "@rebasepro/types";
 import { QueryOptions, HonoEnv } from "../types";
 import { ApiError } from "../errors";
 import { hostEnv } from "../../utils/host";
 import { parseQueryOptions, orderByEntriesToTuples, parseAggregateSelect, parseGroupBy, parseWriteFilter, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT, type ListLimitOptions } from "./query-parser";
-import { cursorToStartAfter, restoresSoftDeletedRow } from "@rebasepro/common";
+import { apiHiddenKeys, cursorToStartAfter, isSoftDeleteRestore, pivotTable, relationOf } from "@rebasepro/common";
 import { isObject } from "@rebasepro/utils";
 import { assertNoHiddenAggregateNames, assertQueryFieldsReadable, assertReadableFields, requestViewer } from "./field-access-query";
 import { assertKnownWriteFields, assertWriteRequestValid, assertWriteValuesValid, projectResponseFields } from "./write-validation";
@@ -19,15 +19,15 @@ import {
     assertNoUserUpsert,
     assertUserCreationBodyValid,
     completeUserCreations,
-    createUserThroughAuthCollection,
+    createUserThroughAuthTable,
     createsUsers,
-    deletingAuthCollectionUsers,
-    isAuthCollection,
-    prepareAuthCollectionUpdates,
+    deletingAuthTableUsers,
+    isAuthTable,
+    prepareAuthTableUpdates,
     prepareUserCreations,
     type UserCreatingAdapter
-} from "./auth-collection-writes";
-import { apiHiddenFieldNames, findRelation, getJunctionConfigForRelation, getTableName, isJunctionBackedRelation, resolveCollectionRelations, resolvePrimaryKeys } from "@rebasepro/common";
+} from "./auth-table-writes";
+import { servedTables, type RestTables, type ServedTable, type TableLookup } from "./served-table";
 import type { FieldViewer } from "@rebasepro/common";
 import {
     createIdempotencyStore,
@@ -109,8 +109,8 @@ function minimalResponse(c: Context<HonoEnv>): Response {
  * columns, because there is no correct way to flatten two columns into one
  * value that a caller could then use as an address.
  */
-function rowIdentity(row: Record<string, unknown>, collection: CollectionConfig): unknown {
-    const keys = resolvePrimaryKeys(collection).map(info => info.fieldName);
+function rowIdentity(row: Record<string, unknown>, table: TableDescriptor): unknown {
+    const keys = table.primaryKey;
     if (keys.length === 0) return null;
     if (keys.length === 1) return row[keys[0]] ?? null;
     return Object.fromEntries(keys.map(key => [key, row[key] ?? null]));
@@ -142,17 +142,17 @@ function idempotencyKeyReused(key: string): ApiError {
 interface NestedPath {
     /**
      * The path to hand the driver: the caller's, with its first segment spelled
-     * as the collection's slug. The driver then resolves the collection this
-     * route resolved, rather than re-deriving it from a spelling.
+     * as the table's slug. The driver then resolves the table this route
+     * resolved, rather than re-deriving it from a spelling.
      */
     path: string;
     /**
-     * Every collection the path passes through, root first. The last is the
-     * one the path addresses — whose rows it reads and writes.
+     * Every table the path passes through, root first. The last is the one the
+     * path addresses — whose rows it reads and writes.
      */
-    chain: CollectionConfig[];
-    /** The relation the path's last relation segment names. */
-    relation: ResolvedRelation;
+    chain: ServedTable[];
+    /** The relation the path's last relation segment names, on the table before the last. */
+    relation: RelationDescriptor;
 }
 
 /**
@@ -165,34 +165,35 @@ interface NestedPath {
  * re-listed two of the root's checks by hand and skipped the rest.
  */
 export interface RowAddress {
-    /** The collection the row belongs to: what a body is checked against and an `ETag` computed for. */
-    collection: CollectionConfig;
+    /** The table the row belongs to: what a body is checked against and an `ETag` computed for. */
+    served: ServedTable;
     /**
-     * The path the driver reads and writes at: the collection's own, or a
-     * nested one, which the driver resolves and scopes to its parent row.
+     * The path the driver reads and writes at: the table's own, or a nested
+     * one, which the driver resolves and scopes to its parent row.
      */
     path: string;
     /**
-     * Handed to the driver beside `path`. Unset for a nested path, whose
-     * collection the driver resolves from the path itself.
+     * Set for a nested path, whose table the driver resolves from the path
+     * itself: the driver is then handed no collection beside it.
      */
-    driverCollection?: CollectionConfig;
+    nested?: true;
     /** What a 404 calls the address. */
     name: string;
 }
 
+/** What the driver is handed beside an address's path: the table's collection, or nothing for a nested path. */
+function driverCollectionOf(address: RowAddress): CollectionConfig | undefined {
+    return address.nested ? undefined : address.served.driverCollection;
+}
+
 /**
- * The synthetic collection standing in for the junction a relation reaches
- * through, or `undefined` when it is not a `manyToMany` carrying
- * `through.properties`.
- *
- * The same `getJunctionConfigForRelation` the schema planner and the driver
- * use, so the shape validated here is the shape the columns were emitted from.
+ * The link columns of the junction a relation of `owner` reaches through, as
+ * a table, or `undefined` when it is not a `manyToMany` carrying `pivot`
+ * columns.
  */
-function junctionCollectionFor(relation: ResolvedRelation): CollectionConfig | undefined {
-    if (!isManyToMany(relation)) return undefined;
-    if (Object.keys(relation.through.properties).length === 0) return undefined;
-    return getJunctionConfigForRelation(relation.through);
+function junctionTableFor(owner: TableDescriptor, relation: RelationDescriptor): TableDescriptor | undefined {
+    if (relation.kind !== "manyToMany" || relation.through.pivot.length === 0) return undefined;
+    return pivotTable(owner, relation);
 }
 
 /**
@@ -203,7 +204,10 @@ function junctionCollectionFor(relation: ResolvedRelation): CollectionConfig | u
 export const DEFAULT_MAX_BULK_ROWS = 1000;
 
 export class RestApiGenerator {
-    private collections: CollectionConfig[];
+    /** Every served table: its descriptor for the routes' decisions, its collection for the driver. */
+    private served: ServedTable[];
+    /** Any table's descriptor by slug: what a relation's target names. */
+    private lookup: TableLookup;
     private router: Hono<HonoEnv>;
     private driver: DataDriver;
     private maxBulkRows: number;
@@ -212,7 +216,8 @@ export class RestApiGenerator {
     private authAdapter?: AuthAdapter;
 
     constructor(
-        collections: CollectionConfig[],
+        /** The tables to serve; see {@link RestTables}. */
+        tables: RestTables,
         driver: DataDriver,
         authAdapter?: AuthAdapter,
         maxBulkRows: number = DEFAULT_MAX_BULK_ROWS,
@@ -223,7 +228,9 @@ export class RestApiGenerator {
          */
         storeOptions: { provision?: boolean } = {}
     ) {
-        this.collections = collections;
+        const { served, lookup } = servedTables(tables);
+        this.served = served;
+        this.lookup = lookup;
         this.driver = driver;
         this.authAdapter = authAdapter;
         this.maxBulkRows = maxBulkRows;
@@ -259,10 +266,11 @@ export class RestApiGenerator {
          * is refused here rather than answered. Optional only for the one route
          * that resolves its collection *after* parsing (see `_batch`).
          */
-        access?: { collection: CollectionConfig; c: Context<HonoEnv> }
+        access?: { table: TableDescriptor; c: Context<HonoEnv> }
     ): QueryOptions {
         return parseQueryOptions(queryDict, this.listLimits, access && {
-            collection: access.collection,
+            table: access.table,
+            lookup: this.lookup,
             viewer: requestViewer(access.c)
         });
     }
@@ -279,8 +287,8 @@ export class RestApiGenerator {
         // collection slug — the same ordering `/bulk` relies on one level down.
         this.createBatchRoute();
 
-        this.collections.forEach(collection => {
-            this.createCollectionRoutes(collection);
+        this.served.forEach(served => {
+            this.createTableRoutes(served);
         });
 
         // Catch-all routes for subcollection paths like
@@ -316,7 +324,7 @@ export class RestApiGenerator {
      * the same callbacks, the same row-level security, as the same role.
      */
     private createBatchRoute(): void {
-        const bySlug = new Map(this.collections.map(collection => [collection.slug, collection]));
+        const bySlug = new Map(this.served.map(served => [served.table.slug, served]));
         const knownTables = new Set(bySlug.keys());
 
         this.router.post("/_batch", async (c) => {
@@ -352,44 +360,45 @@ export class RestApiGenerator {
             const batchViewer = requestViewer(c);
             // The creates on the auth collection: user creations, whose rows
             // the adapter prepares and whose credentials it delivers.
-            const userCreations: { index: number; adapter: UserCreatingAdapter; collection: CollectionConfig }[] = [];
+            const userCreations: { index: number; adapter: UserCreatingAdapter; served: ServedTable }[] = [];
             operations.forEach((operation, index) => {
                 this.enforceApiKeyPermission(
                     { get: c.get, req: { method: operation.op === "delete" ? "DELETE" : "POST" } },
                     operation.table,
                     operation.op === "delete" ? "delete" : "write"
                 );
-                const collection = bySlug.get(operation.table)!;
-                if (operation.op === "upsert") assertNoUserUpsert(this.authAdapter, collection, `Operation ${index}`);
-                this.assertNoUserAdministrationRef(collection, operation, index);
+                const served = bySlug.get(operation.table)!;
+                const table = served.table;
+                if (operation.op === "upsert") assertNoUserUpsert(this.authAdapter, table, `Operation ${index}`);
+                this.assertNoUserAdministrationRef(table, operation, index);
                 if (!operation.values) return;
-                if (operation.op === "create" && createsUsers(this.authAdapter, collection)) {
+                if (operation.op === "create" && createsUsers(this.authAdapter, table)) {
                     // A user creation, as on `POST /users`: what it consumes,
                     // `password` included, is the adapter's to say.
-                    assertUserCreationBodyValid(this.authAdapter, collection, operation.values, batchViewer);
-                    assertNoFieldOpsOnCreate(operation.values, `Operation ${index}`, collection);
-                    userCreations.push({ index, adapter: this.authAdapter, collection });
+                    assertUserCreationBodyValid(this.authAdapter, served, operation.values, batchViewer);
+                    assertNoFieldOpsOnCreate(operation.values, `Operation ${index}`, table);
+                    userCreations.push({ index, adapter: this.authAdapter, served });
                     return;
                 }
-                assertKnownWriteFields(operation.values, collection, { viewer: batchViewer });
+                assertKnownWriteFields(operation.values, table, { viewer: batchViewer });
                 // A create or an upsert may insert, so `required` holds for it,
                 // as it does on `POST` and `POST /bulk` — here, before the
                 // transaction opens, rather than as the INSERT's NOT NULL error
                 // after the operations before it have written.
-                assertWriteValuesValid(operation.values, collection, {
+                assertWriteValuesValid(operation.values, table, {
                     status: operation.op === "update" ? undefined : "new"
                 });
                 if (operation.op === "update") {
-                    assertFieldOpsValid(operation.values, collection, { operationIndex: index });
+                    assertFieldOpsValid(operation.values, table, { operationIndex: index });
                 } else {
                     // A create or an upsert may insert, so there is no stored
                     // value for an operation to act on.
-                    assertNoFieldOpsOnCreate(operation.values, `Operation ${index}`, collection);
+                    assertNoFieldOpsOnCreate(operation.values, `Operation ${index}`, table);
                 }
                 if (operation.op === "upsert") {
                     operation.onConflict = resolveConflictTarget(
                         operation.onConflict,
-                        collection,
+                        table,
                         { where: `Operation ${index}` }
                     );
                 }
@@ -401,38 +410,38 @@ export class RestApiGenerator {
                 // before the transaction opens.
                 const userUpdates: ParsedBatchOperation[] = [];
                 const userDeletes: string[] = [];
-                let usersCollection: CollectionConfig | undefined;
+                let usersTable: TableDescriptor | undefined;
                 for (const operation of operations) {
-                    const collection = bySlug.get(operation.table)!;
-                    if (!isAuthCollection(collection) || operation.id === undefined) continue;
-                    usersCollection = collection;
+                    const table = bySlug.get(operation.table)!.table;
+                    if (!isAuthTable(table) || operation.id === undefined) continue;
+                    usersTable = table;
                     if (operation.op === "update" && operation.values) userUpdates.push(operation);
                     if (operation.op === "delete") userDeletes.push(String(operation.id));
                 }
-                if (usersCollection && userUpdates.length > 0) {
-                    const prepared = await this.prepareUserUpdates(usersCollection, userUpdates.map(operation => ({
+                if (usersTable && userUpdates.length > 0) {
+                    const prepared = await this.prepareUserUpdates(usersTable, userUpdates.map(operation => ({
                         uid: String(operation.id),
                         values: operation.values!
                     })));
                     userUpdates.forEach((operation, index) => { operation.values = prepared[index]; });
                 }
                 const creations: UserCreationPrepareResult[] = [];
-                const written = await this.deletingUsers(usersCollection, userDeletes, async () => {
+                const written = await this.deletingUsers(usersTable, userDeletes, async () => {
                     // The user creations' own step (a create hook among it)
                     // last, once every check that can refuse the batch has.
                     for (const creation of userCreations) {
                         const operation = operations[creation.index];
-                        const [prepared] = await prepareUserCreations(creation.adapter, creation.collection, [operation.values!], batchViewer);
+                        const [prepared] = await prepareUserCreations(creation.adapter, creation.served, [operation.values!], batchViewer);
                         operation.values = prepared.values;
                         creations.push(prepared);
                     }
                     return driver.batchWrite!({
                         operations: operations.map((operation: ParsedBatchOperation) => ({
                             op: operation.op,
-                            path: getCollectionDataPath(bySlug.get(operation.table)!),
+                            path: getCollectionDataPath(bySlug.get(operation.table)!.driverCollection),
                             id: operation.id,
                             values: operation.values,
-                            collection: bySlug.get(operation.table),
+                            collection: bySlug.get(operation.table)?.driverCollection,
                             onConflict: operation.onConflict,
                             ref: operation.ref
                         }))
@@ -462,7 +471,7 @@ export class RestApiGenerator {
                 c.header("Preference-Applied", "return=minimal");
                 return c.json({
                     data: rows.map((row, index) =>
-                        row ? rowIdentity(row, bySlug.get(operations[index].table)!) : null),
+                        row ? rowIdentity(row, bySlug.get(operations[index].table)!.table) : null),
                     meta: (result as { meta?: unknown })?.meta
                 });
             };
@@ -488,18 +497,18 @@ export class RestApiGenerator {
      * sessions left alive. So such an operation is refused before anything runs.
      */
     private assertNoUserAdministrationRef(
-        collection: CollectionConfig,
+        table: TableDescriptor,
         operation: ParsedBatchOperation,
         index: number
     ): void {
-        if (!isAuthCollection(collection)) return;
+        if (!isAuthTable(table)) return;
         const judged = operation.op === "delete"
             ? !!this.authAdapter?.prepareUserDeletions || !!this.authAdapter?.finalizeUserDeletions
             : operation.op === "update" && !!this.authAdapter?.prepareUserUpdates;
         if (!judged) return;
         if (!containsBatchRef(operation.id) && !(operation.op === "update" && containsBatchRef(operation.values))) return;
         throw ApiError.badRequest(
-            `Operation ${index}: an ${operation.op} on "${collection.slug}", whose rows are the users, cannot carry a ` +
+            `Operation ${index}: an ${operation.op} on table "${table.slug}", whose rows are the users, cannot carry a ` +
             "`$ref`. Its user-administration checks run before the batch's transaction opens, where a reference is " +
             "not yet a value. Name the user and the values directly.",
             "INVALID_BATCH_REF"
@@ -514,10 +523,10 @@ export class RestApiGenerator {
      * a filter does not name the users until it runs. Name them: `updateMany`
      * and `deleteMany` with their ids.
      */
-    private assertNoFilteredUserWrite(collection: CollectionConfig): void {
-        if (!isAuthCollection(collection)) return;
+    private assertNoFilteredUserWrite(table: TableDescriptor): void {
+        if (!isAuthTable(table)) return;
         throw ApiError.badRequest(
-            `"${collection.slug}" holds the users, whose updates and deletes are checked user by user before they run. ` +
+            `Table "${table.slug}" holds the users, whose updates and deletes are checked user by user before they run. ` +
             "A filter names no user until it runs: read the users, then update or delete them by id.",
             "FILTERED_USER_WRITE"
         );
@@ -565,7 +574,7 @@ export class RestApiGenerator {
      * unmatched-route handler already says the collection does not exist.
      */
     private nameTheCollection(): void {
-        const known = new Set(this.collections.map(collection => collection.slug));
+        const known = new Set(this.served.map(served => served.table.slug));
         // A route param, not `c.req.path`: inside a mounted sub-app the latter
         // is still the FULL request path (`/api/data/posts`), so splitting it
         // yields `api`. `:maybeSlug` is matched relative to where this router
@@ -604,7 +613,7 @@ export class RestApiGenerator {
      * envelope is the fix; the log volume is not part of it.
      */
     private createUnmatchedRoute(): void {
-        const known = new Set(this.collections.map(collection => collection.slug));
+        const known = new Set(this.served.map(served => served.table.slug));
         const notFound = (message: string): ApiError =>
             new ApiError(404, "NOT_FOUND", message, undefined, true);
 
@@ -688,8 +697,8 @@ export class RestApiGenerator {
         nested: NestedPath
     ): void {
         const target = nested.chain[nested.chain.length - 1];
-        this.enforceApiKeyPermission(c, target.slug);
-        nested.chain.slice(0, -1).forEach(parent => this.enforceApiKeyPermission(c, parent.slug, "read"));
+        this.enforceApiKeyPermission(c, target.table.slug);
+        nested.chain.slice(0, -1).forEach(parent => this.enforceApiKeyPermission(c, parent.table.slug, "read"));
     }
 
     /**
@@ -702,11 +711,11 @@ export class RestApiGenerator {
      * in nothing here, so a nested request spelled either way was checked
      * against no collection at all.
      */
-    private collectionNamed(segment: string): CollectionConfig | undefined {
-        const bySlug = (slug: string) => this.collections.find(c => c.slug === slug);
+    private tableNamed(segment: string): ServedTable | undefined {
+        const bySlug = (slug: string) => this.served.find(served => served.table.slug === slug);
         return bySlug(segment)
             ?? (segment.includes("-") ? bySlug(segment.replace(/-/g, "_")) : undefined)
-            ?? this.collections.find(c => getTableName(c) === segment);
+            ?? this.served.find(served => served.table.table === segment);
     }
 
     /**
@@ -727,7 +736,7 @@ export class RestApiGenerator {
      */
     private resolveNestedPath(collectionPath: string): NestedPath {
         const segments = collectionPath.split("/").filter(Boolean);
-        const root = this.collectionNamed(segments[0]);
+        const root = this.tableNamed(segments[0]);
         if (!root) {
             throw new ApiError(
                 404,
@@ -740,31 +749,40 @@ export class RestApiGenerator {
         }
 
         const chain = [root];
-        let relation: ResolvedRelation | undefined;
+        let relation: RelationDescriptor | undefined;
         for (let i = 2; i < segments.length; i += 2) {
-            const current = chain[chain.length - 1];
-            // An `excludeFromApi` relation is one the API does not have: a
-            // segment naming it names nothing, in the same words as a typo.
-            relation = apiHiddenFieldNames(current).has(segments[i])
-                ? undefined
-                : findRelation(resolveCollectionRelations(current), segments[i]);
+            const current = chain[chain.length - 1].table;
+            // A private relation is one the API does not have: a segment
+            // naming it names nothing, in the same words as a typo.
+            relation = apiHiddenKeys(current).has(segments[i]) ? undefined : relationOf(current, segments[i]);
             if (!relation) {
                 throw new ApiError(
                     404,
                     "UNKNOWN_RELATION",
-                    `Collection '${current.slug}' has no relation '${segments[i]}'.`,
+                    `Table '${current.slug}' has no relation '${segments[i]}'.`,
                     undefined,
                     true
                 );
             }
-            const target = relation.target();
-            chain.push(this.collections.find(c => c.slug === target.slug) ?? target);
+            const targetSlug = relation.target;
+            const target = this.served.find(served => served.table.slug === targetSlug);
+            if (!target) {
+                throw new ApiError(
+                    404,
+                    "UNKNOWN_RELATION",
+                    `The relation '${segments[i]}' of table '${current.slug}' points at table '${targetSlug}', ` +
+                    "which this API does not serve.",
+                    undefined,
+                    true
+                );
+            }
+            chain.push(target);
         }
         if (!relation) {
             throw ApiError.notFound(`'${collectionPath}' names a collection, not a relation of one.`);
         }
 
-        return { path: [root.slug, ...segments.slice(1)].join("/"), chain, relation };
+        return { path: [root.table.slug, ...segments.slice(1)].join("/"), chain, relation };
     }
 
     /**
@@ -774,9 +792,9 @@ export class RestApiGenerator {
      */
     private assertNestedRelationWritable(c: Context<HonoEnv>, nested: NestedPath, kind: NestedWriteKind): void {
         assertNestedWriteAllowed({
-            parentCollection: nested.chain[nested.chain.length - 2],
+            parent: nested.chain[nested.chain.length - 2].table,
             relation: nested.relation,
-            targetCollection: nested.chain[nested.chain.length - 1]
+            target: nested.chain[nested.chain.length - 1].table
         }, kind, nested.path, requestViewer(c));
     }
 
@@ -825,11 +843,11 @@ export class RestApiGenerator {
             );
         }
 
-        const junction = junctionCollectionFor(nested.relation);
+        const junction = junctionTableFor(nested.chain[nested.chain.length - 2].table, nested.relation);
         if (!junction) {
             throw ApiError.badRequest(
                 `'${collectionPath}' does not reach its target through a \`manyToMany\` that declares ` +
-                "`through.properties`, so there is no link payload to write.",
+                "`pivot` columns, so there is no link payload to write.",
                 "RELATION_HAS_NO_PIVOT",
                 { path: collectionPath }
             );
@@ -862,10 +880,10 @@ export class RestApiGenerator {
      * an adapter with no such step, pass through unchanged.
      */
     private async prepareUserUpdates(
-        collection: CollectionConfig,
+        table: TableDescriptor,
         updates: { uid: string; values: Record<string, unknown> }[]
     ): Promise<Record<string, unknown>[]> {
-        return prepareAuthCollectionUpdates(this.authAdapter, collection, updates);
+        return prepareAuthTableUpdates(this.authAdapter, table, updates);
     }
 
     /**
@@ -874,11 +892,11 @@ export class RestApiGenerator {
      * cleanup and `afterUserDelete` after. See {@link prepareUserUpdates}.
      */
     private async deletingUsers<T>(
-        collection: CollectionConfig | undefined,
+        table: TableDescriptor | undefined,
         uids: string[],
         remove: () => Promise<T>
     ): Promise<T> {
-        return deletingAuthCollectionUsers(this.authAdapter, collection, uids, remove);
+        return deletingAuthTableUsers(this.authAdapter, table, uids, remove);
     }
 
     /**
@@ -894,15 +912,15 @@ export class RestApiGenerator {
         driver: DataDriver,
         adapter: UserCreatingAdapter,
         path: string,
-        collection: CollectionConfig,
+        served: ServedTable,
         rows: Record<string, unknown>[],
         caller: FieldViewer
     ): Promise<{ data: Record<string, unknown>[]; meta: { written: number } }> {
-        const prepared = await prepareUserCreations(adapter, collection, rows, caller, true);
+        const prepared = await prepareUserCreations(adapter, served, rows, caller, true);
         const written = await driver.saveMany!({
             path,
             rows: prepared.map(creation => creation.values),
-            collection
+            collection: served.driverCollection
         });
         const deliveries = await completeUserCreations(adapter, prepared, written);
         return {
@@ -1058,10 +1076,10 @@ export class RestApiGenerator {
             const row = await driver.fetchOne({
                 path: address.path,
                 id,
-                collection: address.driverCollection,
+                collection: driverCollectionOf(address),
                 withDeleted
             });
-            return row ? { row, etag: await rowETag(row, address.collection) } : undefined;
+            return row ? { row, etag: await rowETag(row, address.served.table) } : undefined;
         }
 
         const narrowed = queryOptions.fields !== undefined || queryOptions.include !== undefined;
@@ -1074,7 +1092,7 @@ export class RestApiGenerator {
         );
         if (!narrowed) {
             const row = await readNarrowed(driver);
-            return row ? { row, etag: await rowETag(row, address.collection) } : undefined;
+            return row ? { row, etag: await rowETag(row, address.served.table) } : undefined;
         }
 
         // Both reads in one transaction where the driver can run them so: they
@@ -1093,7 +1111,7 @@ export class RestApiGenerator {
             ? await driver.readTogether(readBoth)
             : await readBoth(driver);
         if (!row) return undefined;
-        return { row, etag: await rowETag(tagged, address.collection) };
+        return { row, etag: await rowETag(tagged, address.served.table) };
     }
 
     /**
@@ -1107,14 +1125,14 @@ export class RestApiGenerator {
     private respondBulk(
         c: Context<HonoEnv>,
         result: unknown,
-        collection: CollectionConfig
+        table: TableDescriptor
     ): Response {
         if (!prefersMinimal(c)) return c.json(result);
         const rows = ((result as { data?: unknown })?.data ?? []) as Record<string, unknown>[];
         const meta = (result as { meta?: unknown })?.meta;
         c.header("Preference-Applied", "return=minimal");
         return c.json({
-            data: rows.map((row) => rowIdentity(row, collection)),
+            data: rows.map((row) => rowIdentity(row, table)),
             meta
         });
     }
@@ -1136,7 +1154,8 @@ export class RestApiGenerator {
         address: RowAddress,
         body: Record<string, unknown>
     ): Promise<Response> {
-        const { collection, path } = address;
+        const { served, path } = address;
+        const table = served.table;
 
         // `?on_conflict=email` turns the create into an upsert on a natural
         // key. A query parameter rather than a body field because the body
@@ -1144,10 +1163,10 @@ export class RestApiGenerator {
         // column of the same name the day someone declares one.
         const onConflict = resolveConflictTarget(
             c.req.query("on_conflict"),
-            collection,
+            table,
             { where: "`on_conflict`" }
         );
-        if (onConflict) assertNoUserUpsert(this.authAdapter, collection);
+        if (onConflict) assertNoUserUpsert(this.authAdapter, table);
 
         // Auth signups carry credential fields (`password`, provider
         // bits) that the users collection does not declare as columns —
@@ -1156,20 +1175,20 @@ export class RestApiGenerator {
         // for everything else. Skipping the check outright (as this used
         // to) meant a typo on the users table was silently dropped and
         // answered 201, while the same typo on `posts` was a 400.
-        if (!isAuthCollection(collection)) {
-            assertKnownWriteFields(body, collection, { viewer: requestViewer(c) });
-            assertWriteValuesValid(body, collection, { status: "new" });
-            assertNoFieldOpsOnCreate(body, "A create", collection);
+        if (!isAuthTable(table)) {
+            assertKnownWriteFields(body, table, { viewer: requestViewer(c) });
+            assertWriteValuesValid(body, table, { status: "new" });
+            assertNoFieldOpsOnCreate(body, "A create", table);
         } else {
-            assertUserCreationBodyValid(this.authAdapter, collection, body, requestViewer(c));
+            assertUserCreationBodyValid(this.authAdapter, served, body, requestViewer(c));
         }
 
         // A create on the auth collection is a user creation, through the
         // same steps as `POST /admin/users` and MCP's `create_document`.
-        const created = await createUserThroughAuthCollection(this.authAdapter, collection, body, requestViewer(c), values => driver.save({
+        const created = await createUserThroughAuthTable(this.authAdapter, served, body, requestViewer(c), values => driver.save({
             path,
             values,
-            collection: address.driverCollection,
+            collection: driverCollectionOf(address),
             status: "new"
         }));
         if (created) {
@@ -1185,7 +1204,7 @@ export class RestApiGenerator {
             const entity = await driver.save({
                 path,
                 values: body,
-                collection: address.driverCollection,
+                collection: driverCollectionOf(address),
                 status: "new",
                 // An upsert only when a target was named. Left off, this is
                 // the plain insert it has always been, and a duplicate key
@@ -1209,15 +1228,16 @@ export class RestApiGenerator {
         id: string,
         body: Record<string, unknown>
     ): Promise<Response> {
-        const { collection, path } = address;
+        const { path } = address;
+        const table = address.served.table;
 
-        assertKnownWriteFields(body, collection, { viewer: requestViewer(c) });
-        assertWriteValuesValid(body, collection);
+        assertKnownWriteFields(body, table, { viewer: requestViewer(c) });
+        assertWriteValuesValid(body, table);
         // `{ views: { $inc: 1 } }` and the rest. Validated here, against the
-        // collection's own property types, so a `$push` on a number is a
-        // 400 naming the field rather than a Postgres type error raised
-        // from inside the driver's transaction.
-        assertFieldOpsValid(body, collection);
+        // table's own columns, so a `$push` on a number is a 400 naming
+        // the column rather than a Postgres type error raised from inside
+        // the driver's transaction.
+        assertFieldOpsValid(body, table);
 
         // The SDK has sent `Idempotency-Key` on `update()` since the option
         // existed; this route read it off no request at all. A `PATCH` is
@@ -1235,18 +1255,18 @@ export class RestApiGenerator {
         // update of a row every default read hides, so it looks the row up with
         // the trashed ones included, as `?hard=true` does for the purge.
         // Anything else stays an edit of live rows: a trashed one is a 404.
-        const restoring = restoresSoftDeletedRow(collection, body) ? true : undefined;
+        const restoring = isSoftDeleteRestore(table, body) ? true : undefined;
 
         return this.runIdempotent(c, body, async () => {
             const ifMatch = c.req.header(IF_MATCH_HEADER);
             const precondition = await this.storedRowPrecondition(driver, address, id, restoring, ifMatch);
 
-            const [values] = await this.prepareUserUpdates(collection, [{ uid: id, values: body }]);
+            const [values] = await this.prepareUserUpdates(table, [{ uid: id, values: body }]);
             const entity = await driver.save({
                 path,
                 id,
                 values,
-                collection: address.driverCollection,
+                collection: driverCollectionOf(address),
                 status: "existing",
                 ...(precondition ? { precondition } : {})
             });
@@ -1256,7 +1276,7 @@ export class RestApiGenerator {
             // hashes — a read after the commit could already be someone
             // else's version, and handing that out with this body would let
             // the next `If-Match` pass over a change the caller never saw.
-            const etag = await rowETag(entity as Record<string, unknown> | undefined, collection);
+            const etag = await rowETag(entity as Record<string, unknown> | undefined, table);
             if (etag) c.header(ETAG_HEADER, etag);
             return this.formatResponse(entity);
         }, async (result, replayed) => {
@@ -1264,7 +1284,7 @@ export class RestApiGenerator {
             // write answered with: its tag is that row's tag, so the retry of
             // a lost answer names the same version the answer did.
             if (replayed && result && typeof result === "object") {
-                const etag = await rowETag(result as Record<string, unknown>, collection);
+                const etag = await rowETag(result as Record<string, unknown>, table);
                 if (etag) c.header(ETAG_HEADER, etag);
             }
             return prefersMinimal(c) ? minimalResponse(c) : c.json(result);
@@ -1300,11 +1320,11 @@ export class RestApiGenerator {
         withDeleted: true | undefined,
         ifMatch: string | undefined
     ): Promise<RowPrecondition | undefined> {
-        const { collection } = address;
+        const table = address.served.table;
         const judge = async (stored: Record<string, unknown> | undefined): Promise<void> => {
             if (!stored) throw this.entityNotFound(address.name, id);
             if (ifMatch) {
-                await assertIfMatch(ifMatch, stored, collection, { collection: collection.slug, id });
+                await assertIfMatch(ifMatch, stored, table, { collection: table.slug, id });
             }
         };
 
@@ -1314,7 +1334,7 @@ export class RestApiGenerator {
             const existing = await driver.fetchOne({
                 path: address.path,
                 id,
-                collection: address.driverCollection,
+                collection: driverCollectionOf(address),
                 withDeleted
             });
             if (!existing) throw this.entityNotFound(address.name, id);
@@ -1322,7 +1342,7 @@ export class RestApiGenerator {
             return undefined;
         }
 
-        if (isAuthCollection(collection)) {
+        if (isAuthTable(table)) {
             await judge(await RestApiGenerator.rowForETag(driver, address, id, undefined, withDeleted));
         }
         return { lock: ifMatch !== undefined, check: judge };
@@ -1345,7 +1365,8 @@ export class RestApiGenerator {
          */
         unlinks = false
     ): Promise<Response> {
-        const { collection, path } = address;
+        const { path } = address;
+        const table = address.served.table;
 
         // The header the SDK sends and this route ignored.
         //
@@ -1373,7 +1394,7 @@ export class RestApiGenerator {
                 driver, address, id, hardDelete ? true : undefined, c.req.header(IF_MATCH_HEADER)
             );
 
-            await this.deletingUsers(unlinks ? undefined : collection, [id], () => driver.delete({
+            await this.deletingUsers(unlinks ? undefined : table, [id], () => driver.delete({
                 hard: hardDelete,
                 ...(precondition ? { precondition } : {}),
                 row: {
@@ -1385,7 +1406,7 @@ export class RestApiGenerator {
                     id,
                     path
                 },
-                collection: address.driverCollection
+                collection: driverCollectionOf(address)
             }));
             return null;
         }, () => new Response(null, { status: 204 }));
@@ -1406,11 +1427,11 @@ export class RestApiGenerator {
      */
     private async listRows(
         c: Context<HonoEnv>,
-        collection: CollectionConfig,
+        served: ServedTable,
         queryDict: Record<string, string[]>,
         collectionPath?: string
     ): Promise<Response> {
-        const queryOptions = this.parseQuery(queryDict, { collection, c });
+        const queryOptions = this.parseQuery(queryDict, { table: served.table, c });
         const searchString = Array.isArray(queryDict.searchString) ? queryDict.searchString[queryDict.searchString.length - 1] : undefined;
         // `?searchExplain=true` asks each row which declared field matched.
         // Opt-in per request because it costs a `ts_headline` per field per
@@ -1419,7 +1440,7 @@ export class RestApiGenerator {
 
         const page = await RestApiGenerator.readPage(
             this.getScopedDriver(c),
-            collection,
+            served,
             queryOptions,
             searchString,
             searchExplainRaw === "true",
@@ -1444,14 +1465,14 @@ export class RestApiGenerator {
      */
     private async countRows(
         c: Context<HonoEnv>,
-        collection: CollectionConfig,
+        served: ServedTable,
         queryDict: Record<string, string[]>,
         collectionPath?: string
     ): Promise<Response> {
-        const queryOptions = this.parseQuery(queryDict, { collection, c });
+        const queryOptions = this.parseQuery(queryDict, { table: served.table, c });
         const searchString = Array.isArray(queryDict.searchString) ? queryDict.searchString[queryDict.searchString.length - 1] : undefined;
         const total = await RestApiGenerator.countRawEntities(
-            this.getScopedDriver(c), collection, queryOptions, searchString, collectionPath
+            this.getScopedDriver(c), served, queryOptions, searchString, collectionPath
         );
         return c.json({ count: total });
     }
@@ -1463,26 +1484,27 @@ export class RestApiGenerator {
     }
 
     /**
-     * Create REST routes for a collection using existing Rebase patterns
+     * Create the REST routes of one served table.
      */
-    private createCollectionRoutes(collection: CollectionConfig): void {
-        const basePath = `/${collection.slug}`;
-        const resolvedCollection = collection;
+    private createTableRoutes(served: ServedTable): void {
+        const table = served.table;
+        const basePath = `/${table.slug}`;
+        // What the driver is handed for this table; every decision reads `table`.
+        const driverCollection = served.driverCollection;
 
-        // This collection's rows at their own address. The nested routes reach
-        // the same rows through a parent, and read and write them through the
+        // This table's rows at their own address. The nested routes reach the
+        // same rows through a parent, and read and write them through the
         // same methods.
         const ownRow = (path: string): RowAddress => ({
-            collection: resolvedCollection,
+            served,
             path,
-            driverCollection: resolvedCollection,
-            name: collection.slug
+            name: table.slug
         });
 
         // GET /collection/count - Count entities (with optional filters)
         this.router.get(`${basePath}/count`, async (c) => {
-            this.enforceApiKeyPermission(c, collection.slug);
-            return this.countRows(c, resolvedCollection, c.req.queries());
+            this.enforceApiKeyPermission(c, table.slug);
+            return this.countRows(c, served, c.req.queries());
         });
 
         // POST /collection/count — the same count, its parameters in the body,
@@ -1490,8 +1512,8 @@ export class RestApiGenerator {
         // the `find()` it describes, so a vector search's embedding or a long
         // `in` list makes its URL just as long. A read: `data:read`, as the GET.
         this.router.post(`${basePath}/count`, async (c) => {
-            this.enforceApiKeyPermission(c, collection.slug, "read");
-            return this.countRows(c, resolvedCollection, await this.queryDictFromRequest(c));
+            this.enforceApiKeyPermission(c, table.slug, "read");
+            return this.countRows(c, served, await this.queryDictFromRequest(c));
         });
 
         // GET /collection/aggregate - count/sum/avg/min/max, optionally grouped
@@ -1499,42 +1521,43 @@ export class RestApiGenerator {
         // Beside `/count` and before `/:id`, or "aggregate" is read as an id
         // and the endpoint 404s for a row that was never asked for.
         this.router.get(`${basePath}/aggregate`, async (c) => {
-            this.enforceApiKeyPermission(c, collection.slug);
+            this.enforceApiKeyPermission(c, table.slug);
             const queryDict = c.req.queries();
-            const queryOptions = this.parseQuery(queryDict, { collection: resolvedCollection, c });
+            const queryOptions = this.parseQuery(queryDict, { table, c });
             const searchString = Array.isArray(queryDict.searchString) ? queryDict.searchString[queryDict.searchString.length - 1] : undefined;
             const { rows, meta } = await RestApiGenerator.aggregate(
                 this.getScopedDriver(c),
-                resolvedCollection,
+                served,
                 queryOptions,
                 queryDict.select,
                 queryDict.groupBy,
                 requestViewer(c),
+                this.lookup,
                 searchString
             );
             return c.json(meta ? { data: rows, meta } : { data: rows });
         });
 
         // POST /collection/refresh — recompute a materialized view's rows.
-        // Only on a collection that serves one, so no other collection's
-        // namespace gains a route; the driver judges the caller's roles.
-        if (isPostgresCollectionConfig(resolvedCollection) && resolvedCollection.view?.materialized) {
+        // Only on a table that is one, so no other table's namespace gains a
+        // route; the driver judges the caller's roles.
+        if (table.kind === "view" && table.view?.materialized) {
             this.router.post(`${basePath}/refresh`, async (c) => {
-                this.enforceApiKeyPermission(c, collection.slug, "write");
+                this.enforceApiKeyPermission(c, table.slug, "write");
                 const driver = this.getScopedDriver(c);
                 if (!driver.refreshView) {
                     throw new ApiError(501, "REFRESH_NOT_SUPPORTED", "This backend's data driver has no materialized views to refresh.");
                 }
                 const body = await c.req.json().catch(() => ({})) as { concurrently?: unknown };
-                await driver.refreshView(resolvedCollection.slug, { concurrently: body?.concurrently === true });
+                await driver.refreshView(table.slug, { concurrently: body?.concurrently === true });
                 return c.json({ refreshed: true });
             });
         }
 
         // GET /collection - List entities
         this.router.get(basePath, async (c) => {
-            this.enforceApiKeyPermission(c, collection.slug);
-            return this.listRows(c, resolvedCollection, c.req.queries());
+            this.enforceApiKeyPermission(c, table.slug);
+            return this.listRows(c, served, c.req.queries());
         });
 
         // POST /collection/query — the same listing, its parameters in the
@@ -1545,21 +1568,21 @@ export class RestApiGenerator {
         // would map to: a key scoped to read must be able to search, and one
         // scoped to write must not read through it.
         this.router.post(`${basePath}/query`, async (c) => {
-            this.enforceApiKeyPermission(c, collection.slug, "read");
-            return this.listRows(c, resolvedCollection, await this.queryDictFromRequest(c));
+            this.enforceApiKeyPermission(c, table.slug, "read");
+            return this.listRows(c, served, await this.queryDictFromRequest(c));
         });
 
         // GET /collection/:id - Get single entity
         this.router.get(`${basePath}/:id`, async (c) => {
-            this.enforceApiKeyPermission(c, collection.slug);
+            this.enforceApiKeyPermission(c, table.slug);
             const id = c.req.param("id");
             const queryDict = c.req.queries();
-            const queryOptions = this.parseQuery(queryDict, { collection: resolvedCollection, c });
+            const queryOptions = this.parseQuery(queryDict, { table, c });
             const driver = this.getScopedDriver(c);
 
-            const read = await RestApiGenerator.readRow(driver, ownRow(getCollectionDataPath(collection)), String(id), queryOptions);
+            const read = await RestApiGenerator.readRow(driver, ownRow(getCollectionDataPath(driverCollection)), String(id), queryOptions);
             if (!read) {
-                throw this.entityNotFound(collection.slug, String(id));
+                throw this.entityNotFound(table.slug, String(id));
             }
 
             // The version this read saw, so the write that follows can name it
@@ -1572,7 +1595,7 @@ export class RestApiGenerator {
             const body = projectResponseFields(
                 [read.row],
                 queryOptions.fields,
-                resolvedCollection,
+                table,
                 { include: queryOptions.include }
             )[0];
 
@@ -1619,9 +1642,9 @@ export class RestApiGenerator {
         // Registered before POST /collection/:id-shaped routes so "bulk" is never
         // read as an id.
         this.router.post(`${basePath}/bulk`, async (c) => {
-            this.enforceApiKeyPermission(c, collection.slug);
+            this.enforceApiKeyPermission(c, table.slug);
             const driver = this.getScopedDriver(c);
-            const path = collection.slug;
+            const path = table.slug;
 
             const body = await parseJsonBody(c) as { rows?: unknown; upsert?: unknown; onConflict?: unknown; where?: unknown; ignoreDuplicates?: unknown };
 
@@ -1633,11 +1656,11 @@ export class RestApiGenerator {
             if (body.upsert !== undefined && typeof body.upsert !== "boolean") {
                 throw ApiError.badRequest("`upsert` must be a boolean.", "INVALID_BULK_BODY");
             }
-            if (body.upsert === true) assertNoUserUpsert(this.authAdapter, resolvedCollection);
+            if (body.upsert === true) assertNoUserUpsert(this.authAdapter, table);
             // Checked whether or not `upsert` is set, so naming a target and
             // forgetting the flag is an error rather than a silently ignored
             // field that turns a re-runnable import into a duplicating one.
-            const onConflict = resolveConflictTarget(body.onConflict, resolvedCollection);
+            const onConflict = resolveConflictTarget(body.onConflict, table);
             if (onConflict && body.upsert !== true) {
                 throw ApiError.badRequest(
                     "`onConflict` names where an upsert matches, but `upsert` is not set. " +
@@ -1653,7 +1676,7 @@ export class RestApiGenerator {
                 throw ApiError.badRequest("`ignoreDuplicates` must be a boolean.", "INVALID_BULK_BODY");
             }
             const conflictWhere = body.where !== undefined
-                ? parseWriteFilter({ where: body.where }, { collection: resolvedCollection, viewer: requestViewer(c) }).filter
+                ? parseWriteFilter({ where: body.where }, { table, lookup: this.lookup, viewer: requestViewer(c) }).filter
                 : undefined;
             if ((conflictWhere || body.ignoreDuplicates === true) && body.upsert !== true) {
                 throw ApiError.badRequest(
@@ -1672,7 +1695,7 @@ export class RestApiGenerator {
             // On the auth collection, each row is a user creation, as on
             // `POST /users`: the adapter's step, not a plain insert. (An
             // upsert there was refused above: it may update a user instead.)
-            const userAdapter = body.upsert !== true && createsUsers(this.authAdapter, resolvedCollection)
+            const userAdapter = body.upsert !== true && createsUsers(this.authAdapter, table)
                 ? this.authAdapter
                 : undefined;
 
@@ -1682,19 +1705,19 @@ export class RestApiGenerator {
             rows.forEach((row, rowIndex) => {
                 if (userAdapter) {
                     // What a user creation consumes, `password` included.
-                    assertUserCreationBodyValid(userAdapter, resolvedCollection, row, requestViewer(c), rowIndex);
+                    assertUserCreationBodyValid(userAdapter, served, row, requestViewer(c), rowIndex);
                 } else {
-                    assertKnownWriteFields(row, resolvedCollection, { rowIndex, viewer: requestViewer(c) });
-                    assertWriteValuesValid(row, resolvedCollection, { rowIndex, status: "new" });
+                    assertKnownWriteFields(row, table, { rowIndex, viewer: requestViewer(c) });
+                    assertWriteValuesValid(row, table, { rowIndex, status: "new" });
                 }
                 // This route inserts (or upserts), and an operation over a
                 // value that is not there yet has nothing to mean. Refused here
                 // rather than in the driver so the message names the row.
-                assertNoFieldOpsOnCreate(row, `Row ${rowIndex} of a bulk create`, resolvedCollection);
+                assertNoFieldOpsOnCreate(row, `Row ${rowIndex} of a bulk create`, table);
             });
 
             if (userAdapter) {
-                return c.json(await this.createUsers(driver, userAdapter, path, resolvedCollection, rows, requestViewer(c)));
+                return c.json(await this.createUsers(driver, userAdapter, path, served, rows, requestViewer(c)));
             }
 
             // A client that never sees the response cannot know whether the
@@ -1705,7 +1728,7 @@ export class RestApiGenerator {
                 const written = await driver.saveMany!({
                     path,
                     rows,
-                    collection: resolvedCollection,
+                    collection: driverCollection,
                     upsert: body.upsert === true,
                     onConflict,
                     ...(conflictWhere ? { conflictWhere } : {}),
@@ -1715,7 +1738,7 @@ export class RestApiGenerator {
                     data: written.map((row) => this.formatResponse(row)),
                     meta: { written: written.length }
                 };
-            }, (result) => this.respondBulk(c, result, resolvedCollection));
+            }, (result) => this.respondBulk(c, result, table));
         });
 
         // PATCH /collection/bulk — update many rows as one transaction.
@@ -1725,34 +1748,34 @@ export class RestApiGenerator {
         // say whether a column is the address or a value to write. This mirrors
         // single-row `update(id, data)` and leaves nothing to infer.
         this.router.patch(`${basePath}/bulk`, async (c) => {
-            this.enforceApiKeyPermission(c, collection.slug);
+            this.enforceApiKeyPermission(c, table.slug);
             const driver = this.getScopedDriver(c);
-            const path = collection.slug;
+            const path = table.slug;
 
             const body = await parseJsonBody(c) as { updates?: unknown; where?: unknown; logical?: unknown; data?: unknown };
 
             // `{ where, logical, data }`: every row the filter matches, in one
             // statement — `updateWhere`.
             if (body?.updates === undefined && (body?.where !== undefined || body?.logical !== undefined)) {
-                this.assertNoFilteredUserWrite(resolvedCollection);
-                const { filter, logical } = parseWriteFilter(body, { collection: resolvedCollection, viewer: requestViewer(c) });
+                this.assertNoFilteredUserWrite(table);
+                const { filter, logical } = parseWriteFilter(body, { table, lookup: this.lookup, viewer: requestViewer(c) });
                 if (typeof body.data !== "object" || body.data === null || Array.isArray(body.data)) {
                     throw ApiError.badRequest("A filtered update needs `data`: an object of the fields to set.", "INVALID_BULK_BODY");
                 }
                 const data = body.data as Record<string, unknown>;
-                assertKnownWriteFields(data, resolvedCollection, { viewer: requestViewer(c) });
-                assertWriteValuesValid(data, resolvedCollection, {});
-                assertFieldOpsValid(data, resolvedCollection, {});
+                assertKnownWriteFields(data, table, { viewer: requestViewer(c) });
+                assertWriteValuesValid(data, table, {});
+                assertFieldOpsValid(data, table, {});
                 if (!driver.updateWhere) {
                     throw ApiError.badRequest("This collection's data source does not support filtered updates.", "BULK_UNSUPPORTED");
                 }
                 return this.runIdempotent(c, body, async () => {
-                    const written = await driver.updateWhere!({ path, filter, logical, values: data, collection: resolvedCollection });
+                    const written = await driver.updateWhere!({ path, filter, logical, values: data, collection: driverCollection });
                     return {
                         data: written.map((row) => this.formatResponse(row)),
                         meta: { written: written.length }
                     };
-                }, (result) => this.respondBulk(c, result, resolvedCollection));
+                }, (result) => this.respondBulk(c, result, table));
             }
 
             assertBulkShape(body?.updates, "updates", true);
@@ -1781,13 +1804,13 @@ export class RestApiGenerator {
                         "INVALID_BULK_BODY"
                     );
                 }
-                assertKnownWriteFields(entry.data as Record<string, unknown>, resolvedCollection, { rowIndex, viewer: requestViewer(c) });
-                assertWriteValuesValid(entry.data as Record<string, unknown>, resolvedCollection, { rowIndex });
-                assertFieldOpsValid(entry.data as Record<string, unknown>, resolvedCollection, { rowIndex });
+                assertKnownWriteFields(entry.data as Record<string, unknown>, table, { rowIndex, viewer: requestViewer(c) });
+                assertWriteValuesValid(entry.data as Record<string, unknown>, table, { rowIndex });
+                assertFieldOpsValid(entry.data as Record<string, unknown>, table, { rowIndex });
             });
 
             return this.runIdempotent(c, body, async () => {
-                const values = await this.prepareUserUpdates(resolvedCollection, updates.map((entry) => ({
+                const values = await this.prepareUserUpdates(table, updates.map((entry) => ({
                     uid: String(entry.id),
                     values: entry.data as Record<string, unknown>
                 })));
@@ -1797,13 +1820,13 @@ export class RestApiGenerator {
                         id: entry.id as string | number,
                         values: values[index]
                     })),
-                    collection: resolvedCollection
+                    collection: driverCollection
                 });
                 return {
                     data: written.map((row) => this.formatResponse(row)),
                     meta: { written: written.length }
                 };
-            }, (result) => this.respondBulk(c, result, resolvedCollection));
+            }, (result) => this.respondBulk(c, result, table));
         });
 
         // POST /collection/bulk/delete — delete many rows as one transaction.
@@ -1817,17 +1840,17 @@ export class RestApiGenerator {
         // outcome of that bet. Registered before `/bulk` cannot shadow it because
         // the path is longer and more specific.
         this.router.post(`${basePath}/bulk/delete`, async (c) => {
-            this.enforceApiKeyPermission(c, collection.slug, "delete");
+            this.enforceApiKeyPermission(c, table.slug, "delete");
             const driver = this.getScopedDriver(c);
-            const path = collection.slug;
+            const path = table.slug;
 
             const body = await parseJsonBody(c) as { ids?: unknown; where?: unknown; logical?: unknown };
 
             // `{ where, logical }`: every row the filter matches, in one
             // statement — `deleteWhere`.
             if (body?.ids === undefined && (body?.where !== undefined || body?.logical !== undefined)) {
-                this.assertNoFilteredUserWrite(resolvedCollection);
-                const { filter, logical } = parseWriteFilter(body, { collection: resolvedCollection, viewer: requestViewer(c) });
+                this.assertNoFilteredUserWrite(table);
+                const { filter, logical } = parseWriteFilter(body, { table, lookup: this.lookup, viewer: requestViewer(c) });
                 if (!driver.deleteWhere) {
                     throw ApiError.badRequest("This collection's data source does not support filtered deletes.", "BULK_UNSUPPORTED");
                 }
@@ -1837,10 +1860,10 @@ export class RestApiGenerator {
                         path,
                         filter,
                         logical,
-                        collection: resolvedCollection
+                        collection: driverCollection
                     });
                     return { meta: { deleted } };
-                }, (result) => this.respondBulk(c, result, resolvedCollection));
+                }, (result) => this.respondBulk(c, result, table));
             }
 
             assertBulkShape(body?.ids, "ids", false);
@@ -1862,11 +1885,11 @@ export class RestApiGenerator {
             }
 
             return this.runIdempotent(c, body, async () => {
-                await this.deletingUsers(resolvedCollection, ids.map(String), () => driver.deleteMany!({
+                await this.deletingUsers(table, ids.map(String), () => driver.deleteMany!({
                     hard: parseHardDelete(c.req.query(HARD_DELETE_QUERY_PARAM)),
                     path,
                     ids: ids as (string | number)[],
-                    collection: resolvedCollection
+                    collection: driverCollection
                 }));
                 return { meta: { deleted: ids.length } };
             }, (result) => c.json(result));
@@ -1874,19 +1897,19 @@ export class RestApiGenerator {
 
         // POST /collection - Create entity
         this.router.post(basePath, async (c) => {
-            this.enforceApiKeyPermission(c, collection.slug);
+            this.enforceApiKeyPermission(c, table.slug);
             const driver = this.getScopedDriver(c);
             const body = await parseJsonBody(c);
-            return this.createRow(c, driver, ownRow(collection.slug), body);
+            return this.createRow(c, driver, ownRow(table.slug), body);
         });
 
         // PATCH /collection/:id — partial update. PUT is mounted on the same
         // handler for compatibility; see the note on `updateEntity` below.
         const updateEntity = async (c: Context<HonoEnv>) => {
-            this.enforceApiKeyPermission(c, collection.slug);
+            this.enforceApiKeyPermission(c, table.slug);
             const driver = this.getScopedDriver(c);
             const body = await parseJsonBody(c);
-            return this.updateRow(c, driver, ownRow(getCollectionDataPath(collection)), String(c.req.param("id")), body);
+            return this.updateRow(c, driver, ownRow(getCollectionDataPath(driverCollection)), String(c.req.param("id")), body);
         };
 
         /**
@@ -1932,9 +1955,9 @@ export class RestApiGenerator {
 
         // DELETE /collection/:id - Delete entity
         this.router.delete(`${basePath}/:id`, async (c) => {
-            this.enforceApiKeyPermission(c, collection.slug);
+            this.enforceApiKeyPermission(c, table.slug);
             const driver = this.getScopedDriver(c);
-            return this.deleteRow(c, driver, ownRow(getCollectionDataPath(collection)), String(c.req.param("id")));
+            return this.deleteRow(c, driver, ownRow(getCollectionDataPath(driverCollection)), String(c.req.param("id")));
         });
     }
 
@@ -1999,8 +2022,9 @@ id };
         // collection from the path, which is also what scopes the row to its
         // parent.
         const nestedRow = (nested: NestedPath): RowAddress => ({
-            collection: nested.chain[nested.chain.length - 1],
+            served: nested.chain[nested.chain.length - 1],
             path: nested.path,
+            nested: true,
             name: nested.path
         });
 
@@ -2020,8 +2044,8 @@ id };
             // refusal is part of parsing, and the branch below already needed
             // this collection to narrow its response.
             const nested = this.resolveNestedPath(parsed.collectionPath);
-            const nestedCollection = nested.chain[nested.chain.length - 1];
-            const nestedAccess = { collection: nestedCollection, c };
+            const nestedTable = nested.chain[nested.chain.length - 1];
+            const nestedAccess = { table: nestedTable.table, c };
 
             this.enforceSubcollectionApiKeyPermission(c, nested);
 
@@ -2033,7 +2057,7 @@ id };
                 // added to the others was missed here in turn — the logical
                 // group first, then `?deleted=`, so a trash view's count
                 // reported the live rows.
-                return this.countRows(c, nestedCollection, c.req.queries(), nested.path);
+                return this.countRows(c, nestedTable, c.req.queries(), nested.path);
             } else if (parsed.id) {
                 // GET /parent/:parentId/child/:id — single entity
                 const queryOptions = this.parseQuery(c.req.queries(), nestedAccess);
@@ -2053,7 +2077,7 @@ id };
                 return c.json(projectResponseFields(
                     [read.row],
                     queryOptions.fields,
-                    nestedCollection,
+                    nestedTable.table,
                     { include: queryOptions.include }
                 )[0]);
             } else {
@@ -2071,7 +2095,7 @@ id };
                 // The collection hoisted above, not a second lookup of the
                 // same path: one resolve, so the access check and the read
                 // are answered about the same collection.
-                return this.listRows(c, nestedCollection, c.req.queries(), nested.path);
+                return this.listRows(c, nestedTable, c.req.queries(), nested.path);
             }
         });
 
@@ -2117,7 +2141,7 @@ id };
             if (c.req.query("on_conflict") !== undefined) {
                 throw ApiError.badRequest(
                     "`on_conflict` is not accepted on a nested path: a row it matched would be moved " +
-                    `under this parent. Send the upsert to '${row.collection.slug}' directly.`,
+                    `under this parent. Send the upsert to '${row.served.table.slug}' directly.`,
                     "INVALID_CONFLICT_TARGET"
                 );
             }
@@ -2189,7 +2213,7 @@ id };
             // parent's relation.
             this.assertNestedRelationWritable(c, nested, "unlink");
 
-            return this.deleteRow(c, driver, nestedRow(nested), parsed.id, isJunctionBackedRelation(nested.relation));
+            return this.deleteRow(c, driver, nestedRow(nested), parsed.id, nested.relation.kind === "manyToMany" || nested.relation.kind === "via");
         });
     }
 
@@ -2223,13 +2247,13 @@ id };
      */
     static async readPage(
         driver: DataDriver,
-        collection: CollectionConfig,
+        served: ServedTable,
         queryOptions: QueryOptions,
         searchString?: string,
         searchExplain?: boolean,
         collectionPath?: string
     ): Promise<{ rows: Record<string, unknown>[]; meta: Record<string, unknown> }> {
-        const path = collectionPath ?? collection.slug;
+        const path = collectionPath ?? served.table.slug;
         const orderBy = orderByEntriesToTuples(queryOptions.orderBy);
         const startAfter = queryOptions.cursor ? cursorToStartAfter(queryOptions.cursor) : undefined;
         const seeking = startAfter !== undefined;
@@ -2297,10 +2321,10 @@ id };
                     queryOptions.include
                 )
                 : await RestApiGenerator.fetchRawCollection(
-                    reader, collection, { ...queryOptions, limit: probeLimit }, searchString, searchExplain, path, startAfter
+                    reader, served.driverCollection, { ...queryOptions, limit: probeLimit }, searchString, searchExplain, path, startAfter
                 );
             const total = counting
-                ? await RestApiGenerator.countRawEntities(reader, collection, queryOptions, searchString, path)
+                ? await RestApiGenerator.countRawEntities(reader, served, queryOptions, searchString, path)
                 : undefined;
             return { fetched, total };
         };
@@ -2316,7 +2340,7 @@ id };
         const rows = projectResponseFields(
             entities,
             queryOptions.fields,
-            collection,
+            served.table,
             { include: queryOptions.include }
         );
 
@@ -2354,7 +2378,8 @@ id };
     }
 
     /**
-     * Fetch raw collection data without Entity wrapper (fallback for non-Postgres)
+     * Fetch raw rows through the driver's `fetchCollection` (the fallback for a
+     * driver without a REST read). Takes only what the driver is handed.
      */
     static async fetchRawCollection(
         driver: DataDriver,
@@ -2403,18 +2428,18 @@ id };
     }
 
     /**
-     * Count raw entities for a collection
+     * Count the rows of a served table a query matches.
      */
     static async countRawEntities(
         driver: DataDriver,
-        collection: CollectionConfig,
+        served: ServedTable,
         queryOptions: QueryOptions,
         searchString?: string,
         collectionPath?: string
     ): Promise<number> {
         return driver.count ? await driver.count({
-            path: collectionPath ?? getCollectionDataPath(collection),
-            collection,
+            path: collectionPath ?? getCollectionDataPath(served.driverCollection),
+            collection: served.driverCollection,
             filter: queryOptions.where,
             // Counted as well as fetched, or `total` describes a different set
             // of rows from the one that was served. `vectorSearch` was the
@@ -2440,14 +2465,17 @@ id };
      * @param select `?select=` as it arrived — `"count(),sum(total)"`.
      * @param groupBy `?groupBy=` as it arrived — `"status,country"`.
      * @param viewer the caller every field rule is judged against.
+     * @param lookup any table's descriptor by slug, for an aggregate filter
+     *   that reads through a relation.
      */
     static async aggregate(
         driver: DataDriver,
-        collection: CollectionConfig,
+        served: ServedTable,
         queryOptions: QueryOptions,
         select: unknown,
         groupBy: unknown,
         viewer: FieldViewer,
+        lookup: TableLookup,
         searchString?: string
     ): Promise<{ rows: Record<string, unknown>[]; meta?: { limit: number; offset: number; hasMore: boolean } }> {
         const aggregates = parseAggregateSelect(select);
@@ -2478,12 +2506,13 @@ id };
         const columnOf = (field: string): string => field.split("->")[0].trim();
         const groupFields = (groups ?? []).map(group => columnOf(typeof group === "string" ? group : group.field));
         const selected = aggregates.map(a => ({ fn: a.fn, field: a.field === undefined ? undefined : columnOf(a.field) }));
-        assertReadableFields(selected.map(a => a.field), collection, viewer, "select");
-        assertReadableFields(groupFields, collection, viewer, "groupBy");
-        assertNoHiddenAggregateNames(selected, groupFields, collection);
+        const table = served.table;
+        assertReadableFields(selected.map(a => a.field), table, viewer, "select");
+        assertReadableFields(groupFields, table, viewer, "groupBy");
+        assertNoHiddenAggregateNames(selected, groupFields, table);
         // An aggregate's own filter reads what it filters on, as `where` does.
         for (const aggregate of aggregates) {
-            if (aggregate.filter) assertQueryFieldsReadable({ where: aggregate.filter }, collection, viewer);
+            if (aggregate.filter) assertQueryFieldsReadable({ where: aggregate.filter }, table, viewer, lookup);
         }
 
         // The groups are paged like a listing's rows: `limit` bounds them,
@@ -2508,7 +2537,7 @@ id };
         // One group past the page, so `hasMore` is known rather than
         // guessed from a page that happened to come back full.
         const limit = queryOptions.limit;
-        const rows = await fetchService.aggregate(collection.slug, {
+        const rows = await fetchService.aggregate(table.slug, {
             aggregates,
             groupBy: groups,
             filter: queryOptions.where,

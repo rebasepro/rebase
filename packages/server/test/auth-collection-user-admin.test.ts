@@ -36,6 +36,7 @@ import type {
 } from "@rebasepro/types";
 import { fakeDataDriver } from "./helpers/server-a-fakes";
 import { fakeAuthRepository, fakeUser } from "./helpers/server-a-g1-fakes";
+import { tablesFromCollections } from "./helpers/tables";
 
 /** The default `users` collection, with the auth settings a test gives it. */
 const usersCollection = (auth: AuthCollectionConfig): CollectionConfig => ({
@@ -143,7 +144,7 @@ function harness(options: {
         c.set("user", { uid: options.caller ?? "admin-1", roles: ["admin"] });
         await next();
     });
-    app.route("/", new RestApiGenerator(options.collections ?? [users, posts], driver, adapter).generateRoutes());
+    app.route("/", new RestApiGenerator(tablesFromCollections(options.collections ?? [users, posts]), driver, adapter).generateRoutes());
 
     const writes = () => calls.filter(([method]) => ["save", "delete", "updateMany", "deleteMany", "saveMany", "batchWrite"].includes(method));
     return { app, calls, writes, sent, deleteAllRefreshTokensForUser };

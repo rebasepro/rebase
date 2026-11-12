@@ -5,6 +5,7 @@ import { declaredUniqueTargets, resolveConflictTarget } from "../src/api/rest/co
 import type { CollectionConfig, SaveManyProps, SaveProps } from "@rebasepro/types";
 import { fakeDataDriver } from "./helpers/server-a-fakes";
 import type { HonoEnv } from "../src/api/types";
+import { tablesFromCollections, tableFrom } from "./helpers/tables";
 
 /**
  * Upserting on a natural key.
@@ -64,7 +65,7 @@ function createHarness() {
         c.set("user", { uid: "user-1" });
         await next();
     });
-    app.route("/", new RestApiGenerator([users], driver).generateRoutes());
+    app.route("/", new RestApiGenerator(tablesFromCollections([users]), driver).generateRoutes());
     return { app, saves, bulk };
 }
 
@@ -77,7 +78,7 @@ const post = (app: Hono<HonoEnv>, path: string, body: unknown) =>
 
 describe("declaredUniqueTargets", () => {
     it("reports the primary key, single-column uniques, and composite unique indexes", () => {
-        expect(declaredUniqueTargets(users)).toEqual([
+        expect(declaredUniqueTargets(tableFrom(users))).toEqual([
             ["id"],
             ["email"],
             ["tenant_id", "slug"]
@@ -87,16 +88,16 @@ describe("declaredUniqueTargets", () => {
     it("does not report a non-unique index", () => {
         // `on: ["name"]` has no `unique`, so `ON CONFLICT (name)` would be
         // 42P10 — the whole thing this list exists to keep out.
-        expect(declaredUniqueTargets(users)).not.toContainEqual(["name"]);
+        expect(declaredUniqueTargets(tableFrom(users))).not.toContainEqual(["name"]);
     });
 
     it("matches a composite target whatever order the columns arrive in", () => {
-        expect(resolveConflictTarget(["slug", "tenant_id"], users)).toEqual(["slug", "tenant_id"]);
+        expect(resolveConflictTarget(["slug", "tenant_id"], tableFrom(users))).toEqual(["slug", "tenant_id"]);
     });
 
     it("returns undefined for no target, which means the primary key", () => {
-        expect(resolveConflictTarget(undefined, users)).toBeUndefined();
-        expect(resolveConflictTarget("", users)).toBeUndefined();
+        expect(resolveConflictTarget(undefined, tableFrom(users))).toBeUndefined();
+        expect(resolveConflictTarget("", tableFrom(users))).toBeUndefined();
     });
 });
 

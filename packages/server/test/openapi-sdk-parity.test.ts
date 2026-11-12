@@ -9,7 +9,7 @@ import { openApiDocument, schemaOf, type JsonSchema, type OpenApiDocument } from
 // the two generators describe the same collection, so it has to run both.
 import { generateTypedefs } from "../../codegen/src/generate-types";
 import { compileTables } from "@rebasepro/common";
-import { tablesFrom } from "./helpers/tables";
+import { tablesFrom, tablesFromCollections } from "./helpers/tables";
 import { compileLoadedSchema, loadBackendSchema } from "../src/schema/load-schema";
 
 /** The SDK generator reads compiled descriptors: the same collections, lifted and compiled. */
@@ -85,7 +85,7 @@ const posts: CollectionConfig = {
 };
 
 const collections = [posts, authors, tags];
-const spec = openApiDocument(generateOpenApiSpec(collections));
+const spec = openApiDocument(generateOpenApiSpec(tablesFromCollections(collections).descriptors));
 
 /** A component schema's properties; throws when it declares none. */
 function propertiesOf(doc: OpenApiDocument, name: string): Record<string, JsonSchema> {
@@ -213,14 +213,14 @@ describe("the scaffold every `rebase init` produces", () => {
     };
 
     it("documents the post's author key, its author and its tags", async () => {
-        const scaffoldSpec = openApiDocument(generateOpenApiSpec((await scaffold()).collections));
+        const scaffoldSpec = openApiDocument(generateOpenApiSpec(tablesFromCollections((await scaffold()).collections).descriptors));
         const documented = Object.keys(propertiesOf(scaffoldSpec, "Post"));
 
         expect(documented).toEqual(expect.arrayContaining(["authorId", "author", "tags"]));
     });
 
     it("gives the post's id one type in all three of its schemas", async () => {
-        const scaffoldSpec = openApiDocument(generateOpenApiSpec((await scaffold()).collections));
+        const scaffoldSpec = openApiDocument(generateOpenApiSpec(tablesFromCollections((await scaffold()).collections).descriptors));
         const types = ["Post", "PostInput", "PostUpdate"].map(
             schema => propertiesOf(scaffoldSpec, schema).id?.type
         );
@@ -230,7 +230,7 @@ describe("the scaffold every `rebase init` produces", () => {
 
     it("describes the same fields as the SDK it ships beside", async () => {
         const { collections, descriptors } = await scaffold();
-        const scaffoldSpec = openApiDocument(generateOpenApiSpec(collections));
+        const scaffoldSpec = openApiDocument(generateOpenApiSpec(tablesFromCollections(collections).descriptors));
         const typedefs = generateTypedefs(descriptors);
 
         expect(new Set(Object.keys(propertiesOf(scaffoldSpec, "Post"))))

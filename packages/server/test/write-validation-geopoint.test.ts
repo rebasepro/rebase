@@ -1,5 +1,6 @@
 import { CollectionConfig } from "@rebasepro/types";
 import { assertWriteValuesValid, type WriteViolation } from "../src/api/rest/write-validation";
+import { tableFrom } from "./helpers/tables";
 
 /** A latitude of 200 is not a place; it was stored as one. */
 const places: CollectionConfig = {
@@ -14,7 +15,7 @@ const places: CollectionConfig = {
 
 function violationsOf(values: Record<string, unknown>): WriteViolation[] {
     try {
-        assertWriteValuesValid(values, places);
+        assertWriteValuesValid(values, tableFrom(places));
     } catch (error) {
         return ((error as { details?: { violations?: WriteViolation[] } }).details?.violations) ?? [];
     }

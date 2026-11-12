@@ -5,6 +5,7 @@ import { resolveBatchRefs } from "../src/api/rest/batch";
 import type { BatchWriteOperation, BatchWriteProps, CollectionConfig } from "@rebasepro/types";
 import { fakeDataDriver } from "./helpers/server-a-fakes";
 import type { HonoEnv } from "../src/api/types";
+import { tablesFromCollections } from "./helpers/tables";
 
 /**
  * `POST /api/data/_batch` — writes across collections, or none of them.
@@ -106,7 +107,7 @@ function createHarness(options?: {
         c.set("user", { uid: "user-1" });
         await next();
     });
-    app.route("/", new RestApiGenerator([orders, items, customers], driver).generateRoutes());
+    app.route("/", new RestApiGenerator(tablesFromCollections([orders, items, customers]), driver).generateRoutes());
     return { app, calls };
 }
 

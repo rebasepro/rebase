@@ -4,6 +4,7 @@ import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
 import type { CollectionConfig, DataDriver } from "@rebasepro/types";
 import type { HonoEnv } from "../src/api/types";
+import { tablesFromCollections } from "./helpers/tables";
 
 /**
  * A vector search must reach the driver from every route that accepts one.
@@ -83,7 +84,7 @@ function createApp() {
         c.set("driver", driver);
         await next();
     });
-    app.route("/", new RestApiGenerator([author, post], driver).generateRoutes());
+    app.route("/", new RestApiGenerator(tablesFromCollections([author, post]), driver).generateRoutes());
     return { app, fetchCollection, count };
 }
 

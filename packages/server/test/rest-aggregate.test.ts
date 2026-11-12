@@ -7,6 +7,7 @@ import { encodeCursor } from "@rebasepro/common";
 import type { CollectionConfig, RestFetchService } from "@rebasepro/types";
 import type { HonoEnv } from "../src/api/types";
 import { fakeDataDriver } from "./helpers/server-b-fakes";
+import { tablesFromCollections } from "./helpers/tables";
 
 /**
  * `GET /data/:slug/aggregate` — count, sum, avg, min, max, optionally grouped.
@@ -55,7 +56,7 @@ function createApp(options: { aggregate?: boolean } = {}) {
         c.set("driver", driver);
         await next();
     });
-    app.route("/", new RestApiGenerator([orders], driver).generateRoutes());
+    app.route("/", new RestApiGenerator(tablesFromCollections([orders]), driver).generateRoutes());
     return { app, aggregate };
 }
 

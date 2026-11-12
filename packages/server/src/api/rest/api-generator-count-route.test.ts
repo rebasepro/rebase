@@ -4,6 +4,7 @@ import { RestApiGenerator } from "./api-generator";
 import { errorHandler } from "../errors";
 import type { HonoEnv } from "../types";
 import { generateOpenApiSpec } from "../openapi-generator";
+import { tablesFromCollections } from "../../../test/helpers/tables";
 
 /**
  * `POST /<collection>/count` is `GET /<collection>/count` with its parameters
@@ -74,7 +75,7 @@ function appFor(driver: DataDriver, scopes?: string[]): Hono<HonoEnv> {
         if (scopes) c.set("scopes", scopes);
         await next();
     });
-    app.route("/", new RestApiGenerator([authors, posts], driver).generateRoutes());
+    app.route("/", new RestApiGenerator(tablesFromCollections([authors, posts]), driver).generateRoutes());
     return app;
 }
 
@@ -209,7 +210,7 @@ describe("what a credential needs for POST /<collection>/count", () => {
 });
 
 describe("the OpenAPI document", () => {
-    const spec = generateOpenApiSpec([authors, posts]);
+    const spec = generateOpenApiSpec(tablesFromCollections([authors, posts]).descriptors);
     const at = (node: unknown, ...keys: string[]): unknown =>
         keys.reduce<unknown>((n, key) => (typeof n === "object" && n !== null ? (n as Record<string, unknown>)[key] : undefined), node);
     const queryNames = (parameters: unknown) => (parameters as { name: string; in: string }[])

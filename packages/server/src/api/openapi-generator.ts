@@ -1,7 +1,22 @@
-import { CollectionConfig, Property, StringProperty, NumberProperty, ArrayProperty, MapProperty, isToMany, ResolvedRelation, VectorProperty, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT } from "@rebasepro/types";
-import { effectiveAccess, fieldKeyForColumn, findRelation, getTenantConfig, isRelationRequired, resolveCollectionRelations, softDeleteFieldOf } from "@rebasepro/common";
+import {
+    DEFAULT_LIST_LIMIT,
+    MAX_LIST_LIMIT,
+    isNumericColumnType,
+    isTemporalColumnType,
+    isTextColumnType,
+    type ColumnAccess,
+    type ColumnDescriptor,
+    type ColumnStorage,
+    type ColumnType,
+    type ColumnValidation,
+    type JsonShape,
+    type RelationDescriptor,
+    type TableDescriptor
+} from "@rebasepro/types";
+import { columnAccess, tenantOf, textMaxLength, validationPattern } from "@rebasepro/common";
+import { labelFromIdentifier, singularLabel } from "@rebasepro/utils";
 import { DELETED_QUERY_PARAM, HARD_DELETE_QUERY_PARAM } from "./rest/soft-delete-params";
-import { hydrateRegExp } from "@rebasepro/utils";
+import type { TableLookup } from "./rest/served-table";
 
 /**
  * OpenAPI 3.0.3 specification generator.
@@ -30,10 +45,52 @@ export interface OpenApiGeneratorOptions {
     listLimits?: { defaultLimit?: number; maxLimit?: number };
 }
 
+/**
+ * A table as the document names it: its descriptor, and the labels its tags,
+ * summaries and component names are built from.
+ */
+interface DocumentedTable {
+    table: TableDescriptor;
+    slug: string;
+    /** "Order Items": the tag, and the plural in summaries. */
+    name: string;
+    /** "Order Item": the singular in summaries, and the stem of the component name. */
+    singularName: string;
+    description?: string;
+}
+
+/**
+ * The labels a table is documented under, from its slug alone.
+ *
+ * A table has no labels of its own (presentation is the panel's,
+ * `customizeTable`); these are the defaults a collection that declared none
+ * was always given — `order_items` → "Order Items" / "Order Item" — through
+ * the same `@rebasepro/utils` helpers, so every component name, `$ref` and
+ * `operationId` in the document stays what it was.
+ */
+function documentedNames(slug: string): Pick<DocumentedTable, "slug" | "name" | "singularName"> {
+    const name = labelFromIdentifier(slug);
+    return { slug, name, singularName: singularLabel(name) };
+}
+
+/**
+ * The OpenAPI document of the data API, built from the served tables'
+ * descriptors.
+ *
+ * @param tables the tables the data routes serve, in the order they are
+ *   documented. A relation's target is described from this list too; one that
+ *   is not in it is documented as an open object.
+ */
 export function generateOpenApiSpec(
-    collections: CollectionConfig[],
+    tables: readonly TableDescriptor[],
     options: OpenApiGeneratorOptions = {}
 ): Record<string, unknown> {
+    const lookup: TableLookup = slug => tables.find(table => table.slug === slug);
+    const collections: DocumentedTable[] = tables.map(table => ({
+        table,
+        ...documentedNames(table.slug),
+        ...(table.description !== undefined ? { description: table.description } : {})
+    }));
     const basePath = options.basePath ?? "/api";
     const requireAuth = options.requireAuth ?? true;
     const defaultLimit = options.listLimits?.defaultLimit ?? DEFAULT_LIST_LIMIT;
@@ -321,8 +378,8 @@ description: "Whether more records exist beyond this page" },
      * asks for them; the list, the single row, the count and the aggregate all
      * honour this. Empty for any other collection.
      */
-    const deletedParameters = (collection: CollectionConfig) => {
-        const field = softDeleteFieldOf(collection);
+    const deletedParameters = (collection: DocumentedTable) => {
+        const field = collection.table.softDelete?.field;
         if (!field) return [];
         return [{
             name: DELETED_QUERY_PARAM,
@@ -340,8 +397,8 @@ description: "Whether more records exist beyond this page" },
      * `?hard=` on the deletes of a `softDelete` collection: delete for good
      * rather than move to the trash. Empty for any other collection.
      */
-    const hardDeleteParameters = (collection: CollectionConfig) => {
-        if (!softDeleteFieldOf(collection)) return [];
+    const hardDeleteParameters = (collection: DocumentedTable) => {
+        if (!collection.table.softDelete) return [];
         return [{
             name: HARD_DELETE_QUERY_PARAM,
             in: "query",
@@ -355,8 +412,8 @@ description: "Whether more records exist beyond this page" },
     };
 
     /** What a delete does to a `softDelete` collection's row, for the delete operations' descriptions. */
-    const softDeleteBehaviour = (collection: CollectionConfig): string | undefined => {
-        const field = softDeleteFieldOf(collection);
+    const softDeleteBehaviour = (collection: DocumentedTable): string | undefined => {
+        const field = collection.table.softDelete?.field;
         if (!field) return undefined;
         return `This collection soft-deletes: a delete moves the row to the trash by stamping \`${field}\`, ` +
             "and every read leaves it out unless it passes `?deleted=include` or `?deleted=only`. A PATCH " +
@@ -572,14 +629,14 @@ description: "Whether more records exist beyond this page" },
         });
 
         // Build component schema for this collection
-        schemas[schemaName] = buildCollectionSchema(collection, registeredSchemas);
+        schemas[schemaName] = buildTableSchema(collection.table, registeredSchemas, lookup);
 
         // Build an "input" schema (no read-only/auto fields like autoValue dates)
-        schemas[`${schemaName}Input`] = buildCollectionInputSchema(collection);
+        schemas[`${schemaName}Input`] = buildTableInputSchema(collection.table, lookup);
 
         // The update body — same columns, no `required`. PATCH and PUT both
         // merge, so a field left out means "unchanged", not "omitted by mistake".
-        schemas[`${schemaName}Update`] = buildCollectionUpdateSchema(collection);
+        schemas[`${schemaName}Update`] = buildTableUpdateSchema(collection.table, lookup);
 
         const dataPath = `/data/${slug}`;
         const softDeleteNote = softDeleteBehaviour(collection);
@@ -612,7 +669,7 @@ description: "Whether more records exist beyond this page" },
                     ? { ...p, description: "Count only the rows within this distance of `vector`." }
                     : p),
             ...deletedParameters(collection),
-            ...buildFilterParameters(collection, reservedParameterNames)
+            ...buildFilterParameters(collection.table, reservedParameterNames)
         ];
         const countResponses = {
             200: {
@@ -711,7 +768,7 @@ description: "Whether more records exist beyond this page" },
                         example: "count:desc"
                     },
                     ...deletedParameters(collection),
-                    ...buildFilterParameters(collection, reservedParameterNames)
+                    ...buildFilterParameters(collection.table, reservedParameterNames)
                 ],
                 responses: {
                     200: {
@@ -750,7 +807,7 @@ description: "Whether more records exist beyond this page" },
         const listParameters = [
             ...listQueryParameters(),
             ...deletedParameters(collection),
-            ...buildFilterParameters(collection, reservedParameterNames)
+            ...buildFilterParameters(collection.table, reservedParameterNames)
         ];
         const listResponses = {
             200: {
@@ -1184,12 +1241,10 @@ content: { "application/json": { schema: { $ref: "#/components/schemas/ErrorResp
     for (const collection of (collections || [])) {
         const slug = collection.slug;
         const schemaName = schemaNameFor(collection);
-        const relations = Object.values(resolveCollectionRelations(collection))
-            .filter(isToMany);
+        const relations = collection.table.relations.filter(relation => relation.cardinality === "many");
         for (const relation of relations) {
-            const relationName = relation.relationName;
-            const targetCollection = relation.target();
-            const targetSchema = schemaNameFor(targetCollection);
+            const relationName = relation.name;
+            const targetSchema = schemaNameFor(documentedNames(relation.target));
 
             const subPath = `/data/${slug}/{parentId}/${relationName}`;
             const nestedParameters = [
@@ -1256,50 +1311,54 @@ description: `${collection.singularName || collection.name} ID` },
 // ── Helpers ──────────────────────────────────────────────────────────────
 
 /**
- * Is this property part of the shape the document may describe?
+ * Is this column (or relation) part of the shape the document may describe?
  *
- * One exclusion, and it is the document telling the truth about what the server
- * does: `excludeFromApi` is a server-side guarantee that the column "is
- * stripped from every row the API serves, for every caller, including admins
- * and service keys" — `stripExcluded` in the row pipeline enforces it. A schema
- * that lists such a column describes a field that is never present, and it
- * describes it to everyone: `/docs` is mounted on the app, not on the data
- * router, so it carries none of the auth middleware `{basePath}/data` does.
- * Every project scaffolded by `rebase init` published its `users` collection's
- * `passwordHash` and `emailVerificationToken` this way.
+ * One exclusion, and it is the document telling the truth about what the
+ * server does: a `.private()` column is stripped from every row the API
+ * serves, for every caller, including admins and service keys, and a list
+ * `access.read: []` closes it to everybody the same way. A schema that lists
+ * such a column describes a field that is never present, and it describes it
+ * to everyone: `/docs` is mounted on the app, not on the data router, so it
+ * carries none of the auth middleware `{basePath}/data` does.
  *
- * A `relation` property used to be excluded here too, on the reasoning that the
- * property is virtual. It is — but the row is not empty where it stands: the
- * owning side carries a foreign key under a *wire* name (`authorId`), and a
- * read that includes the relation carries the target's row under the relation's
- * own name. Excluding both left `/api/docs` describing a strictly smaller
- * collection than `generated/sdk/database.types.ts` did for the same config.
- * Relations are now emitted by {@link emitRelationProperties}, under the same
- * keys and in the same order as the SDK's `Row`; the direct-property loops skip
- * them so the two passes cannot emit one key twice.
+ * The write half adds `.readOnly()` and generated columns: nobody writes them
+ * through the API (`write-validation.ts` refuses them), so an input body that
+ * offered them would offer a 400.
  *
- * Written as one predicate rather than a `continue` per loop because it kept
- * being fixed in one loop at a time: this is the same rule the SDK generator
- * applies to its `Row` type (`packages/codegen/src/generate-types.ts`).
+ * The same rule the SDK generator applies to its `Row` type
+ * (`packages/codegen/src/generate-types.ts`).
  */
-function isDocumentedProperty(property: Property, direction: "read" | "write" = "read"): boolean {
-    const access = effectiveAccess(property);
+function isDocumented(target: Pick<ColumnDescriptor, "private" | "access" | "readOnly">, direction: "read" | "write" = "read"): boolean {
+    if (direction === "write" && target.readOnly) return false;
+    const access = columnAccess(target);
     return access?.[direction]?.length !== 0;
 }
 
 /**
- * The `x-rebase-access` annotation, or nothing for a field with no rule.
+ * The access rules a reader of the document is told about: the column's role
+ * lists, with `.readOnly()` stated as "writable by nobody". A generated column
+ * is left unannotated — its read-only-ness is the database's, not a rule.
+ */
+function documentedAccess(column: Pick<ColumnDescriptor, "private" | "access" | "readOnly" | "generated">): ColumnAccess | undefined {
+    const access = columnAccess(column);
+    if (column.readOnly && column.generated === undefined && !column.private) {
+        return { ...(access?.read !== undefined ? { read: access.read } : {}), write: [] };
+    }
+    return access;
+}
+
+/**
+ * The `x-rebase-access` annotation, or nothing for a column with no rule.
  *
  * A vendor extension rather than a schema keyword because OpenAPI has no way to
  * say "this property is present for some callers" — `readOnly` is about the
  * direction of a field, not about who. Generators ignore what they do not know,
  * so a client built from this spec still compiles; a *human* reading `/docs`, or
  * a gateway that wants to enforce the same rule at the edge, gets the role lists
- * verbatim. Emitted for the role case only: a field closed to everybody is
+ * verbatim. Emitted for the role case only: a column closed to everybody is
  * absent from the document entirely, which is a stronger statement.
  */
-function accessAnnotation(property: Property): Record<string, unknown> | undefined {
-    const access = effectiveAccess(property);
+function accessAnnotation(access: ColumnAccess | undefined): Record<string, unknown> | undefined {
     if (!access) return undefined;
     const annotation: Record<string, unknown> = {};
     if (access.read !== undefined) annotation.read = [...access.read];
@@ -1308,8 +1367,7 @@ function accessAnnotation(property: Property): Record<string, unknown> | undefin
 }
 
 /** The sentence `x-rebase-access` deserves in prose, for a reader of `/docs`. */
-function accessDescription(property: Property): string | undefined {
-    const access = effectiveAccess(property);
+function accessDescription(access: ColumnAccess | undefined): string | undefined {
     if (!access) return undefined;
     const parts: string[] = [];
     const phrase = (roles: readonly string[]) =>
@@ -1321,193 +1379,181 @@ function accessDescription(property: Property): string | undefined {
 }
 
 /**
- * The keys `stripExcluded` deletes: the property name *and* its column name.
- *
- * Seeding the emitted set with both is what stops a foreign key derived from a
- * relation putting an `excludeFromApi` column back on the surface under its
- * other name. Same pair, same reason, as `excludedApiKeys` in the SDK
- * generator.
+ * The names an undocumented column or relation is served under — its key and
+ * its SQL name — so a foreign key derived from a relation cannot put a hidden
+ * column back on the surface under its other name. Same pair, same reason, as
+ * `excludedApiKeys` in the SDK generator.
  */
-function excludedApiKeys(collection: CollectionConfig, direction: "read" | "write" = "read"): Set<string> {
+function excludedApiKeys(table: TableDescriptor, direction: "read" | "write" = "read"): Set<string> {
     const excluded = new Set<string>();
-    for (const [key, property] of Object.entries(collection.properties ?? {})) {
-        if (isDocumentedProperty(property as Property, direction)) continue;
-        excluded.add(key);
-        const columnName = (property as { columnName?: unknown }).columnName;
-        if (typeof columnName === "string") excluded.add(columnName);
+    for (const column of table.columns) {
+        if (isDocumented(column, direction)) continue;
+        excluded.add(column.key);
+        excluded.add(column.column);
+    }
+    for (const relation of table.relations) {
+        if (!isDocumented(relation, direction)) excluded.add(relation.name);
     }
     return excluded;
 }
 
 /**
- * The collection's primary key, as the key it is addressed by on the wire and
- * the property that declares it.
- *
- * `id` was a literal in three places — seeded before the read loop, assigned
- * after the input loop, inherited by the update schema from the input one — and
- * the two spellings disagreed: a declared `id: { type: "number" }` overwrote
- * the read seed and was overwritten by the input assignment, so the same field
- * was `integer` in `Post` and `string` in `PostInput`. One helper now answers
- * the question for all three.
+ * The column a table is addressed by on the wire: the first of its key.
+ * `undefined` for a table introspected without a key.
  */
-export function idPropertyEntry(collection: CollectionConfig | undefined): [string, Property] | undefined {
-    for (const [key, property] of Object.entries(collection?.properties ?? {})) {
-        if ((property as Record<string, unknown>)?.isId) return [key, property as Property];
-    }
-    return undefined;
+function keyColumnOf(table: TableDescriptor | undefined): ColumnDescriptor | undefined {
+    const key = table?.primaryKey[0];
+    return key === undefined ? undefined : table?.columns.find(column => column.key === key);
 }
 
 /**
- * The schema of a primary key or of a foreign key pointing at one: the declared
- * property's own type, stripped of the field-level facts (description,
+ * The schema of a primary key or of a foreign key pointing at one: the key
+ * column's own type, stripped of the column-level facts (description,
  * validation bounds) that belong to the column and not to a reference to it.
  *
- * Falls back to `string` for a collection that declares no primary key, which
- * is what every schema here assumed unconditionally before.
+ * Falls back to `string` for a table without a key.
  */
-function idSchemaFor(collection: CollectionConfig | undefined): Record<string, unknown> {
-    const declared = idPropertyEntry(collection);
-    if (!declared) return { type: "string" };
-    const converted = convertPropertyToSchema(declared[1]);
+function idSchemaFor(table: TableDescriptor | undefined): Record<string, unknown> {
+    const key = keyColumnOf(table);
+    if (!key) return { type: "string" };
+    const converted = columnTypeSchema(key);
     const schema: Record<string, unknown> = { type: converted.type ?? "string" };
     if (converted.format) schema.format = converted.format;
     return schema;
 }
 
 /**
- * Relations resolve or they do not; a document is still owed for a collection
- * whose target thunk throws (a circular import, usually). The SDK generator
- * warns and carries on with no relation fields, and so does this — the
- * alternative is `/api/docs` 500ing for the whole project.
+ * Whether a key column is the planner's implicit `id` — text, keyed, filled by
+ * `gen_random_uuid()::text`, declared first. It has always been documented as
+ * a "Unique identifier", with no column facts of its own.
  */
-function resolveRelationsForDocument(collection: CollectionConfig): Record<string, ResolvedRelation> {
-    try {
-        return resolveCollectionRelations(collection);
-    } catch {
-        return {};
-    }
-}
-
-/** Unwrap a target handed back as a module namespace — `() => import("./authors")`. */
-function relationTarget(relation: ResolvedRelation): CollectionConfig | undefined {
-    try {
-        let target = relation.target() as CollectionConfig & { default?: CollectionConfig; __esModule?: boolean };
-        if (target && (target.default || target.__esModule)) {
-            target = (target.default ?? target) as typeof target;
-        }
-        return target;
-    } catch {
-        return undefined;
-    }
+function isImplicitIdColumn(table: TableDescriptor, column: ColumnDescriptor): boolean {
+    return column.key === "id" && table.columns[0] === column && column.type.kind === "text"
+        && column.default?.kind === "sql" && column.default.expression === "gen_random_uuid()::text";
 }
 
 /**
  * The schema an *included* relation arrives as: the target's own row.
  *
- * `$ref` when the target is one of the collections this document describes, and
- * an open object when it is not — a dangling pointer makes Swagger UI render an
+ * `$ref` when the target is one of the tables this document describes, and an
+ * open object when it is not — a dangling pointer makes Swagger UI render an
  * empty model and makes a strict generator abort, which is worse than a vague
  * one.
  */
 function includedRelationSchema(
-    relation: ResolvedRelation,
+    relation: RelationDescriptor,
     registeredSchemas: ReadonlySet<string>
 ): Record<string, unknown> {
-    const target = relationTarget(relation);
-    const targetSchema = target ? schemaNameFor(target) : undefined;
-    const item: Record<string, unknown> = targetSchema && registeredSchemas.has(targetSchema)
+    const targetSchema = schemaNameFor(documentedNames(relation.target));
+    const item: Record<string, unknown> = registeredSchemas.has(targetSchema)
         ? { $ref: `#/components/schemas/${targetSchema}` }
         : { type: "object" };
     return relation.cardinality === "many" ? { type: "array", items: item } : item;
 }
 
 /**
- * Emit a collection's relations onto a read schema: the foreign keys first,
- * then the relations themselves.
+ * Emit a table's relations onto a read schema: the foreign keys first, then
+ * the relations themselves.
  *
  * The order and the keys are the SDK `Row`'s, deliberately — the parity test
- * next door compares the two key sets, and the only way that stays true is for
- * both to be derived the same way rather than kept in step by hand.
+ * next door compares the two key sets.
  *
- * A `belongsTo` reaches the wire under the *field* name of its local column
- * (`author_id` → `authorId`), which is what `fieldKeyForColumn` answers; a
- * relation addressed by the same name as its own foreign key is served as
- * either the scalar or the nested row depending on `include`, so it is
- * documented as both.
+ * A `belongsTo` reaches the wire under its foreign-key column's key
+ * (`authorId`); a relation addressed by the same name as its own foreign key
+ * is served as either the scalar or the nested row depending on `include`, so
+ * it is documented as both.
  */
 function emitRelationProperties(
-    collection: CollectionConfig,
+    table: TableDescriptor,
     properties: Record<string, unknown>,
     required: string[],
     emitted: Set<string>,
-    registeredSchemas: ReadonlySet<string>
+    registeredSchemas: ReadonlySet<string>,
+    lookup: TableLookup
 ): void {
-    const resolved = resolveRelationsForDocument(collection);
-
-    for (const [relationKey, relation] of Object.entries(resolved)) {
-        if (relation.kind !== "belongsTo" || !relation.localKey) continue;
-        const fieldKey = fieldKeyForColumn(collection, relation.localKey);
+    for (const relation of table.relations) {
+        if (relation.kind !== "belongsTo") continue;
+        const fieldKey = relation.localField;
         if (emitted.has(fieldKey)) continue;
 
-        const foreignKey = idSchemaFor(relationTarget(relation));
-        const shadowedByInclude = relationKey === fieldKey;
+        const foreignKey = idSchemaFor(lookup(relation.target));
+        const shadowedByInclude = relation.name === fieldKey;
         properties[fieldKey] = shadowedByInclude
             ? { oneOf: [foreignKey, includedRelationSchema(relation, registeredSchemas)] }
-            : { ...foreignKey, description: `Foreign key into \`${relation.targetSlug}\`` };
+            : { ...foreignKey, description: `Foreign key into \`${relation.target}\`` };
         emitted.add(fieldKey);
 
-        if (isRelationRequired(collection, relation) && !shadowedByInclude) required.push(fieldKey);
+        const column = table.columns.find(candidate => candidate.key === fieldKey);
+        if (column && !column.nullable && !shadowedByInclude) required.push(fieldKey);
     }
 
-    for (const [key, relation] of Object.entries(resolved)) {
-        if (emitted.has(key)) continue;
-        properties[key] = includedRelationSchema(relation, registeredSchemas);
-        emitted.add(key);
-    }
-
-    // A `relation` property whose relation did not resolve. Still a field of the
-    // row, just not a precisely describable one.
-    for (const [key, property] of Object.entries(collection.properties ?? {})) {
-        if ((property as Property)?.type !== "relation") continue;
-        if (emitted.has(key)) continue;
-        properties[key] = { type: "object" };
-        emitted.add(key);
+    for (const relation of table.relations) {
+        if (emitted.has(relation.name)) continue;
+        properties[relation.name] = includedRelationSchema(relation, registeredSchemas);
+        emitted.add(relation.name);
     }
 }
 
 /**
- * Build the component schema for a collection (output / read shape).
- *
- * Every declared property except the ones {@link isDocumentedProperty} rules
- * out, plus the foreign keys and relations {@link emitRelationProperties} adds.
+ * Whether a foreign-key column states anything of its own — a rule, a
+ * default, access, a description, … — beyond being the key a relation points
+ * with. Such a column is documented as the column it is; a plain foreign key
+ * is documented from the relation, typed from its target's key.
  */
-export function buildCollectionSchema(
-    collection: CollectionConfig,
-    registeredSchemas: ReadonlySet<string>
+function isExplicitForeignKey(column: ColumnDescriptor): boolean {
+    if (column.derived) return false;
+    return column.primaryKey !== undefined || column.default !== undefined || column.generated !== undefined
+        || column.readOnly !== undefined || column.private !== undefined || column.access !== undefined
+        || column.stamp !== undefined || column.validate !== undefined || column.oneOf !== undefined
+        || column.description !== undefined || column.storage !== undefined || column.semantic !== undefined
+        || column.vectorIndex !== undefined || column.json !== undefined || column.element !== undefined
+        || column.transforms !== undefined;
+}
+
+/**
+ * The columns a schema lists in the table's own pass, in physical order: every
+ * column but the plain foreign keys of `belongsTo` relations, which
+ * {@link emitRelationProperties} emits after them, in relation order.
+ */
+function ownColumns(table: TableDescriptor): ColumnDescriptor[] {
+    return table.columns.filter(column => column.foreignKeyOf === undefined || isExplicitForeignKey(column));
+}
+
+/**
+ * Build the component schema for a table (output / read shape).
+ *
+ * Every column except the ones {@link isDocumented} rules out, plus the
+ * foreign keys and relations {@link emitRelationProperties} adds.
+ *
+ * @param lookup any table's descriptor by slug, for the type of a foreign key.
+ */
+export function buildTableSchema(
+    table: TableDescriptor,
+    registeredSchemas: ReadonlySet<string>,
+    lookup: TableLookup
 ): Record<string, unknown> {
-    const idKey = idPropertyEntry(collection)?.[0] ?? "id";
+    const keyColumn = keyColumnOf(table);
+    const idKey = keyColumn?.key ?? "id";
     const properties: Record<string, unknown> = {
-        [idKey]: { ...idSchemaFor(collection), description: "Unique identifier" }
+        [idKey]: { ...idSchemaFor(table), description: "Unique identifier" }
     };
     const required: string[] = [idKey];
-    const excluded = excludedApiKeys(collection);
+    const excluded = excludedApiKeys(table);
     const emitted = new Set<string>(excluded);
     emitted.add(idKey);
 
-    for (const [key, property] of Object.entries(collection.properties)) {
-        if (property.type === "relation") continue;
-        if (!isDocumentedProperty(property)) continue;
+    for (const column of ownColumns(table)) {
+        if (!isDocumented(column)) continue;
+        if (column === keyColumn && isImplicitIdColumn(table, column)) continue;
 
-        properties[key] = convertPropertyToSchema(property);
-        emitted.add(key);
+        properties[column.key] = columnSchema(column);
+        emitted.add(column.key);
 
-        if (property.validation?.required && key !== idKey) {
-            required.push(key);
-        }
+        if (!column.nullable && !column.primaryKey) required.push(column.key);
     }
 
-    emitRelationProperties(collection, properties, required, emitted, registeredSchemas);
-    annotateTenantField(collection, properties, "read");
+    emitRelationProperties(table, properties, required, emitted, registeredSchemas, lookup);
+    annotateTenantField(table, properties, "read");
 
     return {
         type: "object",
@@ -1517,32 +1563,25 @@ export function buildCollectionSchema(
 }
 
 /**
- * Mark the tenant field, on whichever schema is being built.
+ * Mark the tenant column, on whichever schema is being built.
  *
  * A vendor extension for the same reason `x-rebase-access` is one: OpenAPI has
  * no keyword for "the server fills this in from who you are, and refuses a
  * value that is not yours". `readOnly` is the closest and it is wrong — the
- * field *is* writable, by a caller sending their own tenant, and a bypass role
- * may send any. Generators ignore what they do not know, so a client built from
- * this document still compiles; a human reading `/docs`, or a gateway wanting
- * to enforce the same boundary at the edge, learns the field is special and
- * why.
- *
- * Applied after the property loops rather than inside `convertPropertyToSchema`
- * because tenancy is a fact about the *collection*, and that function is handed
- * a property with no idea which collection it came from.
+ * column *is* writable, by a caller sending their own tenant, and a bypass role
+ * may send any.
  */
 function annotateTenantField(
-    collection: CollectionConfig,
+    table: TableDescriptor,
     properties: Record<string, unknown>,
     direction: "read" | "write"
 ): void {
-    const tenant = getTenantConfig(collection);
+    const tenant = tenantOf(table);
     if (!tenant) return;
     const schema = properties[tenant.field];
     if (!schema || typeof schema !== "object") return;
 
-    const existing = (schema as { description?: unknown }).description;
+    const existing = "description" in schema ? schema.description : undefined;
     const sentence = direction === "write"
         ? "The tenant this row belongs to. Omit it and the server stamps the tenant you are calling as; " +
           "send another tenant's and the write is refused with `TENANT_MISMATCH`. It cannot be changed " +
@@ -1550,7 +1589,7 @@ function annotateTenantField(
         : "The tenant this row belongs to. Rows of other tenants are not returned at all.";
 
     properties[tenant.field] = {
-        ...(schema as Record<string, unknown>),
+        ...schema,
         description: typeof existing === "string" && existing ? `${existing} — ${sentence}` : sentence,
         "x-rebase-tenant": true
     };
@@ -1568,7 +1607,7 @@ function annotateTenantField(
  * would have rejected partial updates the server accepts.
  */
 function updateOperation(
-    collection: CollectionConfig,
+    collection: DocumentedTable,
     schemaName: string,
     requireAuth: boolean,
     shared: {
@@ -1657,75 +1696,71 @@ function updateOperation(
  * The update body: the create schema with `required` dropped.
  *
  * Derived rather than rebuilt so the two cannot describe different columns —
- * the only difference between creating and updating is which fields you must
+ * the only difference between creating and updating is which columns you must
  * supply, and that is exactly the one thing removed here.
  */
-function buildCollectionUpdateSchema(collection: CollectionConfig): Record<string, unknown> {
-    const { required: _required, ...rest } = buildCollectionInputSchema(collection);
+function buildTableUpdateSchema(table: TableDescriptor, lookup: TableLookup): Record<string, unknown> {
+    const { required: _required, ...rest } = buildTableInputSchema(table, lookup);
     return rest;
 }
 
+/** Whether the database (or the server) fills a column a create leaves out: a non-literal default, or generation. */
+function databaseFills(column: ColumnDescriptor): boolean {
+    const fill = column.default?.kind;
+    return fill === "database" || fill === "sql" || fill === "random-uuid" || fill === "identity" || column.generated !== undefined;
+}
+
 /**
- * Build an input schema (for POST/PUT) — excludes auto-generated fields.
+ * Build an input schema (for POST) — leaves out what the server fills.
  *
- * `excludeFromApi` columns are left out too, and the server now agrees: a write
- * naming one is refused (`write-validation.ts`), which is what the flag's name
- * and the generated SDK's own documentation always said. This comment used to
- * record that such a write was "still accepted" — the document was right and
- * the server was the thing that had not caught up.
+ * Private, read-only and generated columns are left out too, and the server
+ * agrees: a write naming one is refused (`write-validation.ts`).
+ *
+ * @param lookup any table's descriptor by slug, for the type of a foreign key.
  */
-export function buildCollectionInputSchema(collection: CollectionConfig): Record<string, unknown> {
+export function buildTableInputSchema(table: TableDescriptor, lookup: TableLookup): Record<string, unknown> {
     const properties: Record<string, unknown> = {};
     const required: string[] = [];
-    // The write half, not the read half: a field readable by nobody but
-    // writable by an `admin` belongs in the input body and not in the row, and
-    // the two schemas used to share one exclusion set and so got both wrong.
-    const excluded = excludedApiKeys(collection, "write");
+    // The write half, not the read half: a column readable by nobody but
+    // writable by an `admin` belongs in the input body and not in the row.
+    const excluded = excludedApiKeys(table, "write");
     const emitted = new Set<string>(excluded);
-    const idKey = idPropertyEntry(collection)?.[0] ?? "id";
+    const idKey = keyColumnOf(table)?.key ?? "id";
 
-    for (const [key, property] of Object.entries(collection.properties)) {
-        if (property.type === "relation") continue;
-        if (!isDocumentedProperty(property, "write")) continue;
+    for (const column of ownColumns(table)) {
+        if (!isDocumented(column, "write")) continue;
 
-        // Skip auto-value date fields from the input schema
-        if (property.type === "date" && property.autoValue) continue;
+        // A time the server stamps is not the caller's to send.
+        if (column.stamp?.value === "now") continue;
 
-        // Skip auto-generated ID fields
-        if ("isId" in property && property.isId && property.isId !== "manual" && property.isId !== true) continue;
+        // A key the database generates.
+        if (column.primaryKey && (column.default?.kind === "random-uuid" || column.default?.kind === "identity" || column.default?.kind === "sql")) continue;
 
-        properties[key] = convertPropertyToSchema(property);
-        emitted.add(key);
+        properties[column.key] = columnSchema(column);
+        emitted.add(column.key);
 
         // A column the database fills may be left out of a create.
-        if (property.validation?.required && !property.databaseDefault) {
-            required.push(key);
+        if (!column.nullable && !column.primaryKey && !databaseFills(column)) {
+            required.push(column.key);
         }
     }
 
-    // Allow explicit ID for create (optional). Typed from the declared primary
-    // key rather than as a `string` literal: a serial `id` was `integer` on the
-    // read schema and `string` here, for the same column, in every document the
-    // generator has ever produced.
+    // Allow an explicit key on create (optional), typed from the declared key.
     if (!emitted.has(idKey)) {
         properties[idKey] = {
-            ...idSchemaFor(collection),
+            ...idSchemaFor(table),
             description: "Optional: client-assigned ID. If omitted, the server generates one."
         };
         emitted.add(idKey);
     }
 
     // Every relation a write may set, as the generated SDK's `Insert` types
-    // them: both spellings of a `belongsTo`, a `hasOne` or single-hop to-one
-    // `via`, and the to-many memberships. See `emitWritableRelations`.
-    emitWritableRelations(collection, properties, emitted);
-    annotateTenantField(collection, properties, "write");
+    // them. See `emitWritableRelations`.
+    emitWritableRelations(table, properties, emitted, lookup);
+    annotateTenantField(table, properties, "write");
 
-    // The tenant field is never required on input, whatever the property
-    // declares: the column is NOT NULL, and the server is what fills it.
-    // Listing it would tell every generated client to demand a value its caller
-    // is not supposed to compute.
-    const tenantField = getTenantConfig(collection)?.field;
+    // The tenant column is never required on input: the server fills it.
+    const tenantField = tenantOf(table)?.field;
     const requiredOnInput = tenantField ? required.filter(key => key !== tenantField) : required;
 
     return {
@@ -1736,98 +1771,82 @@ export function buildCollectionInputSchema(collection: CollectionConfig): Record
 }
 
 /**
- * The writable half of a collection's relations — the same set the SDK
- * generator's `emitWritableRelations` types on `Insert`, kind for kind:
+ * The writable half of a table's relations — the same set the SDK generator's
+ * `emitWritableRelations` types on `Insert`, kind for kind:
  *
  * - a `belongsTo`, under both spellings the server accepts: the foreign key
- *   (`authorId`) and the relation property (`author`);
- * - a `hasOne`, and a single-hop to-one `via`, under the property: the target's
- *   id, or `null` to unlink — the server points the target's key at this row;
+ *   (`authorId`) and the relation (`author`);
+ * - a `hasOne`, and a single-hop to-one `via`, under the relation: the target's
+ *   id, or `null` to unlink;
  * - a to-many membership — `hasMany`, `manyToMany`, and a single-hop to-many
  *   `via` — under the relation's name: a list of target ids or `{ id }`
- *   objects, a `manyToMany`'s carrying a `_pivot` of its junction columns.
+ *   objects, a `manyToMany`'s carrying a `_pivot` of its link columns.
  *
- * A multi-hop `via` is refused (`RELATION_NOT_WRITABLE`) and left out. This
- * used to offer `belongsTo` only, on the claim that a to-many could not be
- * written through the body; the server has written all of the above through a
- * create or update, and a client generated from the document could set none.
- *
- * None is listed in `required`, even for a relation the collection declares
- * `validation: { required: true }` on: a belongsTo's two keys are
- * alternatives, and a schema naming both would tell a spec-validating gateway
- * to reject a create that the server accepts. (The SDK's `Insert` states the
- * same fact as a type: both keys optional, intersected with
- * `({ authorId } | { author })`. A JSON schema could say it with `anyOf`,
- * which not every gateway reads.)
+ * None is listed in `required`: a belongsTo's two keys are alternatives.
  */
 function emitWritableRelations(
-    collection: CollectionConfig,
+    table: TableDescriptor,
     properties: Record<string, unknown>,
-    emitted: Set<string>
+    emitted: Set<string>,
+    lookup: TableLookup
 ): void {
-    const resolved = resolveRelationsForDocument(collection);
-
     const emit = (key: string, schema: Record<string, unknown>): void => {
         if (emitted.has(key)) return;
         properties[key] = schema;
         emitted.add(key);
     };
-    const belongsTo = (relation: ResolvedRelation): Record<string, unknown> => ({
-        ...idSchemaFor(relationTarget(relation)),
-        description: `The \`${relation.targetSlug}\` row this belongs to.`
+    const belongsTo = (relation: RelationDescriptor): Record<string, unknown> => ({
+        ...idSchemaFor(lookup(relation.target)),
+        description: `The \`${relation.target}\` row this belongs to.`
     });
 
-    for (const relation of Object.values(resolved)) {
-        if (relation.kind === "belongsTo" && relation.localKey) {
-            emit(fieldKeyForColumn(collection, relation.localKey), belongsTo(relation));
-        }
+    for (const relation of table.relations) {
+        if (relation.kind === "belongsTo") emit(relation.localField, belongsTo(relation));
     }
 
-    for (const [key, property] of Object.entries(collection.properties ?? {})) {
-        if ((property as Property)?.type !== "relation") continue;
-        const relation = findRelation(resolved, key);
-        if (!relation) continue;
-        if (relation.kind === "belongsTo" && relation.localKey) {
-            emit(key, belongsTo(relation));
+    for (const relation of table.relations) {
+        if (relation.kind === "belongsTo") {
+            emit(relation.name, belongsTo(relation));
         } else if (relation.kind === "hasOne" || (relation.kind === "via" && relation.cardinality === "one" && relation.writable)) {
-            emit(key, {
-                ...idSchemaFor(relationTarget(relation)),
+            emit(relation.name, {
+                ...idSchemaFor(lookup(relation.target)),
                 nullable: true,
-                description: `The \`${relation.targetSlug}\` row to link to this one; \`null\` unlinks it.`
+                description: `The \`${relation.target}\` row to link to this one; \`null\` unlinks it.`
             });
         }
     }
 
-    for (const [key, relation] of Object.entries(resolved)) {
-        if (relation.cardinality !== "many" || !relation.writable) continue;
-        const id = idSchemaFor(relationTarget(relation));
-        const pivotProperties = relation.kind === "manyToMany" ? relation.through.properties : {};
-        const pivot = Object.keys(pivotProperties).length > 0
+    for (const relation of table.relations) {
+        if (relation.cardinality !== "many") continue;
+        if (relation.kind === "via" && !relation.writable) continue;
+        const id = idSchemaFor(lookup(relation.target));
+        const pivotColumns = relation.kind === "manyToMany" ? relation.through.pivot : [];
+        const pivot = pivotColumns.length > 0
             ? {
                 _pivot: {
                     type: "object",
-                    properties: Object.fromEntries(Object.entries(pivotProperties)
-                        .map(([name, prop]) => [name, convertPropertyToSchema(prop as Property)]))
+                    properties: Object.fromEntries(pivotColumns.map(column => [column.key, columnSchema(column)]))
                 }
             }
             : {};
-        emit(key, {
+        emit(relation.name, {
             type: "array",
-            description: `The \`${relation.targetSlug}\` rows linked to this one — the whole set, replacing the current links.`,
+            description: `The \`${relation.target}\` rows linked to this one — the whole set, replacing the current links.`,
             items: { oneOf: [id, { type: "object", required: ["id"], properties: { id, ...pivot } }] }
         });
     }
 }
 
 /**
- * Convert a Rebase Property to an OpenAPI 3.0 schema object.
+ * A column as an OpenAPI 3.0 schema object, with its access rules annotated.
  */
-function convertPropertyToSchema(property: Property): Record<string, unknown> {
-    const schema = convertPropertyTypeToSchema(property);
-    const annotation = accessAnnotation(property);
+function columnSchema(column: ColumnDescriptor): Record<string, unknown> {
+    const schema = columnTypeSchema(column);
+    const access = documentedAccess(column);
+    const annotation = accessAnnotation(access);
     if (!annotation) return schema;
 
-    const sentence = accessDescription(property);
+    const sentence = accessDescription(access);
     return {
         ...schema,
         ...(sentence
@@ -1837,254 +1856,273 @@ function convertPropertyToSchema(property: Property): Record<string, unknown> {
     };
 }
 
-/** The JSON Schema a property's *type* compiles to, before any access annotation. */
-function convertPropertyTypeToSchema(property: Property): Record<string, unknown> {
-    const base: Record<string, unknown> = {};
-
-    if (property.name) {
-        base.description = property.name;
+/** A text value's rules as JSON Schema keywords: lengths, pattern, format, closed set. */
+function textSchema(
+    base: Record<string, unknown>,
+    rules: { validate?: ColumnValidation; oneOf?: readonly (string | number)[]; maxLength?: number; storage?: ColumnStorage }
+): Record<string, unknown> {
+    base.type = "string";
+    if (rules.oneOf && rules.oneOf.length > 0) base.enum = [...rules.oneOf];
+    const validate = rules.validate;
+    if (typeof validate?.min === "number") base.minLength = validate.min;
+    if (rules.maxLength !== undefined) base.maxLength = rules.maxLength;
+    if (validate?.length !== undefined) {
+        base.minLength = validate.length;
+        base.maxLength = validate.length;
     }
+    const pattern = jsonSchemaPattern(validate);
+    if (pattern !== undefined) base.pattern = pattern;
+    if (validate?.email) base.format = "email";
+    if (validate?.url) base.format = "uri";
+    if (rules.storage) base.format = "uri";
+    return base;
+}
 
-    switch (property.type) {
+/** A number's rules as JSON Schema keywords. */
+function numberSchema(
+    base: Record<string, unknown>,
+    rules: { validate?: ColumnValidation; oneOf?: readonly (string | number)[]; integer: boolean }
+): Record<string, unknown> {
+    base.type = rules.integer ? "integer" : "number";
+    if (rules.oneOf && rules.oneOf.length > 0) base.enum = [...rules.oneOf];
+    const validate = rules.validate;
+    if (typeof validate?.min === "number") base.minimum = validate.min;
+    if (typeof validate?.max === "number") base.maximum = validate.max;
+    if (validate?.moreThan !== undefined) {
+        base.minimum = validate.moreThan;
+        base.exclusiveMinimum = true;
+    }
+    if (validate?.lessThan !== undefined) {
+        base.maximum = validate.lessThan;
+        base.exclusiveMaximum = true;
+    }
+    return base;
+}
+
+/** A list's rules as JSON Schema keywords. */
+function listRules(base: Record<string, unknown>, validate: ColumnValidation | undefined): Record<string, unknown> {
+    if (validate?.minItems !== undefined) base.minItems = validate.minItems;
+    if (validate?.maxItems !== undefined) base.maxItems = validate.maxItems;
+    if (validate?.uniqueItems) base.uniqueItems = true;
+    return base;
+}
+
+/** A point on Earth. */
+function geopointSchema(base: Record<string, unknown>): Record<string, unknown> {
+    base.type = "object";
+    base.properties = { latitude: { type: "number" }, longitude: { type: "number" } };
+    base.required = ["latitude", "longitude"];
+    return base;
+}
+
+/** A time the server stamps: read-only, and said so. */
+function stampedSchema(base: Record<string, unknown>, on: "create" | "update"): Record<string, unknown> {
+    base.readOnly = true;
+    base.description = (base.description || "") + (on === "create" ? " (Auto-set on creation)" : " (Auto-updated)");
+    return base;
+}
+
+/** The items of a native array column. */
+function elementSchema(column: ColumnDescriptor, of: ColumnType): Record<string, unknown> {
+    const element = column.element;
+    const base: Record<string, unknown> = {};
+    if (isTextColumnType(of) || of.kind === "uuid" || of.kind === "enum") {
+        const max = element?.validate?.max;
+        return textSchema(base, {
+            validate: element?.validate,
+            oneOf: element?.oneOf ?? (of.kind === "enum" ? of.values : undefined),
+            maxLength: typeof max === "number" ? max : undefined,
+            storage: element?.storage ?? column.storage
+        });
+    }
+    if (of.kind === "boolean") {
+        base.type = "boolean";
+        return base;
+    }
+    if (isTemporalColumnType(of)) {
+        base.type = "string";
+        base.format = "date-time";
+        return base;
+    }
+    return numberSchema(base, { validate: element?.validate, oneOf: element?.oneOf, integer: element?.validate?.integer === true });
+}
+
+/** One typed block of a `json.oneOf()`. */
+function variantSchema(node: Extract<JsonShape, { kind: "oneOf" }>, name: string, variant: JsonShape): Record<string, unknown> {
+    return {
+        type: "object",
+        properties: {
+            [node.typeField]: { type: "string", enum: [name] },
+            [node.valueField]: jsonNodeSchema(variant)
+        },
+        required: [node.typeField, node.valueField]
+    };
+}
+
+/** A node of a JSON document's shape. */
+function jsonNodeSchema(node: JsonShape, listValidate?: ColumnValidation): Record<string, unknown> {
+    const base: Record<string, unknown> = {};
+    if (node.description !== undefined) base.description = node.description;
+    switch (node.kind) {
         case "string": {
-            const sp = property as StringProperty;
-            base.type = "string";
-
-            if (sp.enum) {
-                const enumValues = resolveEnumValues(sp.enum);
-                if (enumValues.length > 0) {
-                    base.enum = enumValues;
-                }
-            }
-
-            if (sp.validation) {
-                if (sp.validation.min !== undefined) base.minLength = sp.validation.min;
-                if (sp.validation.max !== undefined) base.maxLength = sp.validation.max;
-                if (sp.validation.length !== undefined) {
-                    base.minLength = sp.validation.length;
-                    base.maxLength = sp.validation.length;
-                }
-                if (sp.validation.matches !== undefined) {
-                    const pattern = jsonSchemaPattern(sp.validation.matches);
-                    if (pattern !== undefined) base.pattern = pattern;
-                }
-            }
-
-            if (sp.email) base.format = "email";
-            if (sp.url) base.format = "uri";
-            if (sp.storage) base.format = "uri";
-
-            return base;
+            const max = node.validate?.max;
+            return textSchema(base, { validate: node.validate, oneOf: node.oneOf, maxLength: typeof max === "number" ? max : undefined, storage: node.storage });
         }
-
-        case "number": {
-            const np = property as NumberProperty;
-            // `isId` is on this list because the DDL generator puts it there:
-            // a numeric primary key is `INTEGER GENERATED BY DEFAULT AS
-            // IDENTITY` for `"increment"` and `INTEGER` for every other form
-            // (`generate-postgres-ddl-logic.ts`), so the column the scaffold's
-            // `posts.id` creates is an integer and the document called it a
-            // `number` — which lets a generated client send `1.5` for a row id.
-            const isInteger = np.validation?.integer
-                || Boolean(np.isId)
-                || np.columnType === "integer" || np.columnType === "serial"
-                || np.columnType === "bigserial" || np.columnType === "bigint";
-            base.type = isInteger ? "integer" : "number";
-
-            if (np.enum) {
-                const enumValues = resolveEnumValues(np.enum);
-                if (enumValues.length > 0) {
-                    base.enum = enumValues;
-                }
-            }
-
-            if (np.validation) {
-                if (np.validation.min !== undefined) base.minimum = np.validation.min;
-                if (np.validation.max !== undefined) base.maximum = np.validation.max;
-                if (np.validation.moreThan !== undefined) {
-                    base.minimum = np.validation.moreThan;
-                    base.exclusiveMinimum = true;
-                }
-                if (np.validation.lessThan !== undefined) {
-                    base.maximum = np.validation.lessThan;
-                    base.exclusiveMaximum = true;
-                }
-            }
-
-            return base;
-        }
-
+        case "number":
+            return numberSchema(base, { validate: node.validate, oneOf: node.oneOf, integer: node.validate?.integer === true });
         case "boolean":
             base.type = "boolean";
             return base;
-
-        case "date": {
+        case "date":
             base.type = "string";
-            if (property.mode === "date") {
-                base.format = "date";
-            } else {
-                base.format = "date-time";
-            }
-            if (property.autoValue) {
-                base.readOnly = true;
-                base.description = (base.description || "") +
-                    (property.autoValue === "on_create" ? " (Auto-set on creation)" : " (Auto-updated)");
-            }
-            return base;
-        }
-
+            base.format = "date-time";
+            return node.stamp ? stampedSchema(base, node.stamp) : base;
         case "geopoint":
+            return geopointSchema(base);
+        case "object": {
             base.type = "object";
-            base.properties = {
-                latitude: { type: "number" },
-                longitude: { type: "number" }
-            };
-            base.required = ["latitude", "longitude"];
-            return base;
-
-        case "reference":
-            base.type = "string";
-            base.description = (base.description || "") + " (Reference ID)";
-            return base;
-
-        case "array": {
-            const ap = property as ArrayProperty;
-            base.type = "array";
-
-            if (ap.oneOf) {
-                // Discriminated union (e.g., content blocks)
-                const typeField = ap.oneOf.typeField || "type";
-                const valueField = ap.oneOf.valueField || "value";
-                const variants: Record<string, unknown>[] = [];
-
-                for (const [variantKey, variantProp] of Object.entries(ap.oneOf.properties)) {
-                    variants.push({
-                        type: "object",
-                        properties: {
-                            [typeField]: { type: "string",
-enum: [variantKey] },
-                            [valueField]: convertPropertyToSchema(variantProp)
-                        },
-                        required: [typeField, valueField]
-                    });
-                }
-
-                base.items = { oneOf: variants };
-            } else if (ap.of) {
-                if (Array.isArray(ap.of)) {
-                    base.items = { oneOf: ap.of.map(p => convertPropertyToSchema(p)) };
-                } else {
-                    base.items = convertPropertyToSchema(ap.of);
-                }
-            } else {
-                base.items = {};
-            }
-
-            if (ap.validation) {
-                if (ap.validation.min !== undefined) base.minItems = ap.validation.min;
-                if (ap.validation.max !== undefined) base.maxItems = ap.validation.max;
-            }
-
-            return base;
-        }
-
-        case "map": {
-            const mp = property as MapProperty;
-            base.type = "object";
-
-            if (mp.properties) {
-                const props: Record<string, unknown> = {};
-                const req: string[] = [];
-
-                for (const [key, subProp] of Object.entries(mp.properties)) {
-                    props[key] = convertPropertyToSchema(subProp);
-                    if (subProp.validation?.required) {
-                        req.push(key);
-                    }
-                }
-
-                base.properties = props;
-                if (req.length > 0) base.required = req;
-            } else if (mp.keyValue) {
+            const fields = Object.entries(node.fields);
+            if (fields.length > 0) {
+                base.properties = Object.fromEntries(fields.map(([key, field]) => [key, jsonNodeSchema(field)]));
+                const required = fields.filter(([, field]) => field.required).map(([key]) => key);
+                if (required.length > 0) base.required = required;
+            } else if (node.additional) {
                 base.additionalProperties = true;
             }
-
             return base;
         }
+        case "array": {
+            base.type = "array";
+            const item = node.of;
+            base.items = item.kind === "oneOf"
+                ? { oneOf: Object.entries(item.variants).map(([name, variant]) => variantSchema(item, name, variant)) }
+                : jsonNodeSchema(item);
+            return listRules(base, { ...node.validate, ...listValidate });
+        }
+        case "oneOf":
+            base.oneOf = Object.entries(node.variants).map(([name, variant]) => variantSchema(node, name, variant));
+            return base;
+        case "unknown":
+            return base;
+    }
+}
 
-        case "vector": {
-            const vp = property as VectorProperty;
+/** The JSON Schema a column's *type* compiles to, before any access annotation. */
+function columnTypeSchema(column: ColumnDescriptor): Record<string, unknown> {
+    const base: Record<string, unknown> = {};
+    if (column.description !== undefined) base.description = column.description;
+    if (column.semantic === "geopoint") return geopointSchema(base);
+
+    const type = column.type;
+    switch (type.kind) {
+        case "text":
+        case "varchar":
+        case "char":
+        case "uuid":
+        case "enum":
+            return textSchema(base, {
+                validate: column.validate,
+                oneOf: type.kind === "enum" ? type.values : column.oneOf,
+                maxLength: textMaxLength(column),
+                storage: column.storage
+            });
+        case "smallint":
+        case "integer":
+        case "bigint":
+        case "smallserial":
+        case "serial":
+        case "bigserial":
+        case "real":
+        case "doublePrecision":
+        case "numeric":
+            // A key is an integer however it is declared, as are the integer
+            // kinds the API has always called integers.
+            return numberSchema(base, {
+                validate: column.validate,
+                oneOf: column.oneOf,
+                integer: column.validate?.integer === true || column.primaryKey === true
+                    || type.kind === "integer" || type.kind === "bigint" || type.kind === "serial" || type.kind === "bigserial"
+            });
+        case "boolean":
+            base.type = "boolean";
+            return base;
+        case "timestamptz":
+        case "date":
+        case "time":
+            base.type = "string";
+            base.format = "date-time";
+            return column.stamp?.value === "now" ? stampedSchema(base, column.stamp.on) : base;
+        case "json":
+        case "jsonb": {
+            const shape = column.json;
+            if (shape === undefined || shape.kind === "unknown") {
+                base.type = "object";
+                return base;
+            }
+            const schema = jsonNodeSchema(shape, shape.kind === "array" ? column.validate : undefined);
+            return base.description !== undefined ? { ...schema, description: base.description } : schema;
+        }
+        case "vector":
             base.type = "array";
             base.items = { type: "number" };
-            base.description = (base.description || "") + ` (Vector(${vp.dimensions}))`;
+            base.description = (base.description || "") + ` (Vector(${type.dimensions}))`;
             return base;
-        }
-        case "binary": {
+        case "bytea":
             base.type = "string";
             base.description = (base.description || "") + " (Binary/Base64)";
             return base;
-        }
-        default:
+        case "array":
+            base.type = "array";
+            base.items = elementSchema(column, type.of);
+            return listRules(base, column.validate);
+        case "other":
+            if (/\]\s*$/.test(type.sqlType)) {
+                base.type = "array";
+                base.items = {};
+                return base;
+            }
             base.type = "string";
             return base;
     }
 }
 
 /**
- * Resolve EnumValues (array or record) into a flat array of enum values.
- */
-function resolveEnumValues(enumDef: Record<string | number, unknown> | Array<{ id: string | number }>): Array<string | number> {
-    if (Array.isArray(enumDef)) {
-        return enumDef.map(e => (typeof e === "object" && e !== null && "id" in e) ? e.id : e as string | number);
-    }
-    return Object.keys(enumDef).map(k => {
-        // Preserve numeric keys as numbers
-        const num = Number(k);
-        return isNaN(num) ? k : num;
-    });
-}
-
-/**
- * Build PostgREST-style filter parameters for a collection.
+ * Build PostgREST-style filter parameters for a table.
  * These are additional query parameters like `?status=eq.active&price=gte.100`.
  *
- * `excludeFromApi` columns are not offered: the server does filter on them, and
- * that is exactly the problem — a filter on a column no response can contain
- * answers questions about the value one row at a time, which is a worse
- * disclosure than the column name alone.
+ * Private columns are not offered: a filter on a column no response can
+ * contain answers questions about the value one row at a time. A plain
+ * foreign key is filterable and is still not offered here; JSON documents,
+ * lists and points have no single value to compare.
  */
 function buildFilterParameters(
-    collection: CollectionConfig,
+    table: TableDescriptor,
     reservedNames: ReadonlySet<string> = new Set()
 ): Array<Record<string, unknown>> {
     const params: Array<Record<string, unknown>> = [];
 
-    for (const [key, property] of Object.entries(collection.properties)) {
-        if (!isDocumentedProperty(property)) continue;
-        // A `relation` property is not a column, so there is nothing to compare
-        // against. The foreign key beside it is filterable and is still not
-        // offered here — a separate gap from the schema one, and one the query
-        // layer has to answer first.
-        if (property.type === "relation") continue;
-        if (property.type === "map" || property.type === "array" || property.type === "geopoint") {
-            continue;
-        }
+    for (const column of ownColumns(table)) {
+        if (!isDocumented(column)) continue;
+        const kind = column.type.kind;
+        if (column.semantic === "geopoint" || kind === "json" || kind === "jsonb" || kind === "array") continue;
+        if (column.type.kind === "other" && /\]\s*$/.test(column.type.sqlType)) continue;
         // A column whose name a list parameter already owns is unfilterable
         // over the wire — see `reservedParameterNames`.
-        if (reservedNames.has(key)) continue;
+        if (reservedNames.has(column.key)) continue;
 
+        const text = isTextColumnType(column.type) || kind === "uuid" || kind === "enum" || kind === "other";
         params.push({
-            name: key,
+            name: column.key,
             in: "query",
             required: false,
             schema: { type: "string" },
             description:
-                `Filter by \`${key}\`. Supports PostgREST operators: ` +
+                `Filter by \`${column.key}\`. Supports PostgREST operators: ` +
                 "`eq.value`, `neq.value`, `gt.value`, `gte.value`, `lt.value`, `lte.value`, " +
                 "`in.(a,b,c)`, `nin.(a,b,c)`, `cs.value` (array-contains), `csa.(a,b)` (array-contains-any), " +
                 "`csall.(a,b)` (array-contains-all), `cd.(a,b)` (array-contained-by). " +
                 "Plain values imply equality.",
-            example: property.type === "string" ? "eq.active" : property.type === "number" ? "gte.100" : undefined
+            example: text ? "eq.active" : isNumericColumnType(column.type) ? "gte.100" : undefined
         });
     }
 
@@ -2205,7 +2243,7 @@ function withIndefiniteArticle(noun: string): string {
  * Two collections whose names PascalCase identically still share one component;
  * that needs a disambiguation rule, not a fallback.
  */
-function schemaNameFor(collection: CollectionConfig): string {
+function schemaNameFor(collection: Pick<DocumentedTable, "singularName" | "name" | "slug">): string {
     return toPascalCase(collection.singularName || "")
         || toPascalCase(collection.name || "")
         || toPascalCase(collection.slug || "")
@@ -2225,20 +2263,16 @@ function toPascalCase(str: string): string {
 }
 
 /**
- * A `validation.matches` as a JSON Schema `pattern`, or `undefined` when it
- * cannot be stated as one.
+ * A text column's `validate({ matches })` as a JSON Schema `pattern`, or
+ * `undefined` when it cannot be stated as one.
  *
  * A pattern is a regex's source and nothing else: no delimiting slashes and no
- * flags. `matches` is a `RegExp` or a string the server reads with
- * `hydrateRegExp` (`/^[a-z]{2}$/i` included), so it is read the same way here.
- * Written out as `String(matches)`, the slashes and flags became characters a
- * value had to contain, and a generated client refused every valid value. A
- * flag that changes what the source matches (`i`, `m`, `s`) has no JSON
- * Schema spelling; the source alone would refuse values the server accepts,
- * so no pattern is stated.
+ * flags. A flag that changes what the source matches (`i`, `m`, `s`) has no
+ * JSON Schema spelling; the source alone would refuse values the server
+ * accepts, so no pattern is stated.
  */
-function jsonSchemaPattern(matches: string | RegExp): string | undefined {
-    const regExp = typeof matches === "string" ? hydrateRegExp(matches) : matches;
+function jsonSchemaPattern(validate: ColumnValidation | undefined): string | undefined {
+    const regExp = validationPattern(validate);
     if (!regExp) return undefined;
     return /[ims]/.test(regExp.flags) ? undefined : regExp.source;
 }

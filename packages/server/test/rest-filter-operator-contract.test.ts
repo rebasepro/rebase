@@ -23,6 +23,7 @@ import type { HonoEnv } from "../src/api/types";
 import { logger } from "../src/utils/logger";
 import { DataDriver } from "../../types/src/controllers/data_driver";
 import { CollectionConfig } from "../../types/src/types/collections";
+import { tablesFromCollections } from "./helpers/tables";
 
 const collections: CollectionConfig[] = [
     { slug: "posts", name: "Posts", singularName: "Post", properties: {} }
@@ -54,7 +55,7 @@ function harness(): { app: Hono<HonoEnv>; fetches: unknown[] } {
         c.set("driver", driver);
         await next();
     });
-    app.route("/api/data", new RestApiGenerator(collections, driver).generateRoutes());
+    app.route("/api/data", new RestApiGenerator(tablesFromCollections(collections), driver).generateRoutes());
     return { app, fetches };
 }
 

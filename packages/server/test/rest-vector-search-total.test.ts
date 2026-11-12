@@ -32,6 +32,7 @@ import { fakeDataDriver } from "./helpers/server-b-fakes";
 import { DataDriver } from "../../types/src/controllers/data_driver";
 import { CollectionConfig } from "../../types/src/types/collections";
 import { VectorSearchParams } from "../../types/src/controllers/data_driver";
+import { tablesFromCollections } from "./helpers/tables";
 
 const collections: CollectionConfig[] = [
     { slug: "docs", name: "Docs", singularName: "Doc", properties: {} }
@@ -89,7 +90,7 @@ function harness(): { app: Hono<HonoEnv>; recorded: Recorded } {
         c.set("driver", driver);
         await next();
     });
-    app.route("/api/data", new RestApiGenerator(collections, driver).generateRoutes());
+    app.route("/api/data", new RestApiGenerator(tablesFromCollections(collections), driver).generateRoutes());
     return { app, recorded };
 }
 

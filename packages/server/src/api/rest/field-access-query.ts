@@ -1,15 +1,14 @@
-import type { CollectionConfig, IncludeSpec } from "@rebasepro/types";
+import type { IncludeSpec, TableDescriptor } from "@rebasepro/types";
 import { type FilterCondition, type LogicalCondition, parseCaseFoldedFieldPath, parseRelationAggregateSort } from "@rebasepro/types";
 import {
-    apiHiddenFieldNames,
+    apiHiddenKeys,
     type FieldViewer,
-    findRelation,
-    includableRelationNames,
+    includableRelations,
     type IncludeNode,
     normalizeInclude,
-    queryableFieldNames,
-    resolveCollectionRelations,
-    restrictedFieldNames,
+    queryableColumnKeys,
+    relationOf,
+    restrictedKeys,
     type UnknownFieldAnswer,
     unknownAggregateField,
     unknownFilterField,
@@ -18,9 +17,10 @@ import {
     unknownProjectionField,
     unknownRelationTargetField,
     unknownVectorProperty,
-    vectorPropertyNames
+    vectorColumnKeys
 } from "@rebasepro/common";
 import { ApiError } from "../errors";
+import type { TableLookup } from "./served-table";
 
 /**
  * A read may not name a field the caller cannot read.
@@ -120,16 +120,16 @@ function orderByColumn(field: string): string | undefined {
  */
 export function assertReadableFields(
     names: readonly (string | undefined)[],
-    collection: CollectionConfig,
+    table: TableDescriptor,
     viewer: FieldViewer | undefined,
     where: Where
 ): void {
     if (names.length === 0) return;
-    const { refused } = restrictedFieldNames(collection, viewer, "read");
+    const { refused } = restrictedKeys(table, viewer, "read");
     if (refused.size === 0) return;
-    // An `excludeFromApi` name is answered as an unknown one, by
-    // `assertNoHiddenNames` or `assertNoHiddenAggregateNames`, never here.
-    const hidden = apiHiddenFieldNames(collection);
+    // A private name is answered as an unknown one, by `assertNoHiddenNames`
+    // or `assertNoHiddenAggregateNames`, never here.
+    const hidden = apiHiddenKeys(table);
 
     const named = [...new Set(names.filter((n): n is string =>
         n !== undefined && refused.has(n) && !hidden.has(n)))];
@@ -137,11 +137,11 @@ export function assertReadableFields(
 
     throw ApiError.badRequest(
         `${named.map(f => `'${f}'`).join(", ")} ${named.length > 1 ? "are" : "is"} not readable ` +
-        `on '${collection.slug}' with your roles, so ${named.length > 1 ? "they" : "it"} cannot be used in ` +
+        `on table '${table.slug}' with your roles, so ${named.length > 1 ? "they" : "it"} cannot be used in ` +
         `${WHERE_LABEL[where]}.`,
         "FIELD_NOT_READABLE",
         {
-            collection: collection.slug,
+            collection: table.slug,
             fields: named,
             violations: named.map(field => ({
                 field,
@@ -168,15 +168,16 @@ export function assertQueryFieldsReadable(
         include?: IncludeSpec;
         vectorSearch?: { property: string };
     },
-    collection: CollectionConfig,
-    viewer: FieldViewer | undefined
+    table: TableDescriptor,
+    viewer: FieldViewer | undefined,
+    lookup: TableLookup
 ): void {
-    const filtered = assertRestrictedFieldsUnused(options, collection, viewer);
+    const filtered = assertRestrictedFieldsUnused(options, table, viewer, lookup);
 
     // After every refusal, as the driver's unknown-field answers come after
     // them: a hidden name is a typo the driver has not reached yet.
     const include = options.include !== undefined ? normalizeInclude(options.include) : undefined;
-    assertNoHiddenNames({ ...options, filtered, include: include?.tree }, collection);
+    assertNoHiddenNames({ ...options, filtered, include: include?.tree }, table, lookup);
 }
 
 /**
@@ -189,17 +190,17 @@ export function assertQueryFieldsReadable(
 export function assertNoHiddenAggregateNames(
     aggregates: readonly { fn: string; field?: string }[],
     groupBy: readonly string[],
-    collection: CollectionConfig
+    table: TableDescriptor
 ): void {
-    const hidden = apiHiddenFieldNames(collection);
+    const hidden = apiHiddenKeys(table);
     if (hidden.size === 0) return;
     const asked = [
         ...aggregates.flatMap(({ fn, field }) => field === undefined ? [] : [{ name: field, forWhat: `${fn}()` }]),
         ...groupBy.map(name => ({ name, forWhat: "groupBy" }))
     ];
     if (!asked.some(({ name }) => hidden.has(name))) return;
-    const valid = queryableFieldNames(collection);
-    const known = (name: string) => !hidden.has(name) && (valid.includes(name) || name in (collection.properties ?? {}));
+    const valid = queryableColumnKeys(table);
+    const known = (name: string) => !hidden.has(name) && valid.includes(name);
     for (const { name, forWhat } of asked) {
         if (known(name)) continue;
         const answer = unknownAggregateField(name, forWhat, valid);
@@ -213,34 +214,41 @@ export function assertNoHiddenAggregateNames(
  */
 function assertRestrictedFieldsUnused(
     options: Parameters<typeof assertQueryFieldsReadable>[0],
-    collection: CollectionConfig,
-    viewer: FieldViewer | undefined
+    table: TableDescriptor,
+    viewer: FieldViewer | undefined,
+    lookup: TableLookup
 ): string[] {
     const filtered: string[] = [];
     if (options.where) filtered.push(...Object.keys(options.where));
     logicalColumns(options.logical, filtered);
-    assertReadableFields(filtered.map(filterHead), collection, viewer, "filter");
-    assertRelationPathsReadable(filtered, collection, viewer);
+    assertReadableFields(filtered.map(filterHead), table, viewer, "filter");
+    assertRelationPathsReadable(filtered, table, viewer, lookup);
 
     assertReadableFields(
         (options.orderBy ?? []).map(entry => orderByColumn(entry.field)),
-        collection, viewer, "orderBy"
+        table, viewer, "orderBy"
     );
-    assertAggregateSortsReadable(options.orderBy ?? [], collection, viewer);
+    assertAggregateSortsReadable(options.orderBy ?? [], table, viewer, lookup);
 
-    assertReadableFields(options.fields ?? [], collection, viewer, "fields");
+    assertReadableFields(options.fields ?? [], table, viewer, "fields");
 
     // A similarity search reads the vector it ranks by: `_distance` from a
     // point the caller chose is a measurement of it, enough of them locate it,
     // and `vector_threshold` alone answers "is it within r of here".
     assertReadableFields(
         options.vectorSearch ? [options.vectorSearch.property] : [],
-        collection, viewer, "vector_search"
+        table, viewer, "vector_search"
     );
 
     const include = options.include !== undefined ? normalizeInclude(options.include) : undefined;
-    if (include) assertIncludeFieldsReadable(include.tree, collection, viewer);
+    if (include) assertIncludeFieldsReadable(include.tree, table, viewer, lookup);
     return filtered;
+}
+
+/** The table a relation of `table` points at, when the relation exists and its target is described. */
+function relationTarget(table: TableDescriptor, name: string, lookup: TableLookup): TableDescriptor | undefined {
+    const relation = relationOf(table, name);
+    return relation ? lookup(relation.target) : undefined;
 }
 
 /**
@@ -268,17 +276,16 @@ function filterHead(name: string): string {
  */
 function assertAggregateSortsReadable(
     orderBy: readonly { field: string }[],
-    collection: CollectionConfig,
-    viewer: FieldViewer | undefined
+    table: TableDescriptor,
+    viewer: FieldViewer | undefined,
+    lookup: TableLookup
 ): void {
-    let relations: ReturnType<typeof resolveCollectionRelations> | undefined;
     for (const { field } of orderBy) {
         const spec = parseRelationAggregateSort(field);
         if (!spec?.field) continue;
-        relations ??= resolveCollectionRelations(collection);
-        const relation = findRelation(relations, spec.relation);
-        if (!relation) continue;
-        assertReadableFields([spec.field], relation.target(), viewer, "orderBy");
+        const target = relationTarget(table, spec.relation, lookup);
+        if (!target) continue;
+        assertReadableFields([spec.field], target, viewer, "orderBy");
     }
 }
 
@@ -290,17 +297,16 @@ function assertAggregateSortsReadable(
  */
 function assertRelationPathsReadable(
     filtered: readonly string[],
-    collection: CollectionConfig,
-    viewer: FieldViewer | undefined
+    table: TableDescriptor,
+    viewer: FieldViewer | undefined,
+    lookup: TableLookup
 ): void {
-    let relations: ReturnType<typeof resolveCollectionRelations> | undefined;
     for (const name of filtered) {
         const dot = name.indexOf(".");
         if (dot <= 0 || name.indexOf("->") >= 0) continue;
-        relations ??= resolveCollectionRelations(collection);
-        const relation = findRelation(relations, name.slice(0, dot));
-        if (!relation) continue;
-        assertReadableFields([name.slice(dot + 1)], relation.target(), viewer, "filter");
+        const target = relationTarget(table, name.slice(0, dot), lookup);
+        if (!target) continue;
+        assertReadableFields([name.slice(dot + 1)], target, viewer, "filter");
     }
 }
 
@@ -325,9 +331,10 @@ function assertNoHiddenNames(
         include?: Record<string, IncludeNode>;
         vectorSearch?: { property: string };
     },
-    collection: CollectionConfig
+    table: TableDescriptor,
+    lookup: TableLookup
 ): void {
-    const hidden = apiHiddenFieldNames(collection);
+    const hidden = apiHiddenKeys(table);
     if (hidden.size > 0) {
         const asked: { kind: "fields" | "filter" | "orderBy"; name: string }[] = [
             ...(options.fields ?? []).map(name => ({ kind: "fields" as const, name })),
@@ -337,29 +344,28 @@ function assertNoHiddenNames(
                 return name === undefined ? [] : [{ kind: "orderBy" as const, name }];
             })
         ];
-        const shapes = asked.map(({ kind, name }) => ({ kind, name, shape: nameShape(name, collection, hidden) }));
+        const shapes = asked.map(({ kind, name }) => ({ kind, name, shape: nameShape(name, table, hidden, lookup) }));
         const vectorHidden = options.vectorSearch !== undefined && hidden.has(options.vectorSearch.property);
         if (vectorHidden || shapes.some(entry => entry.shape.hidden)) {
             for (const { kind, name, shape } of shapes) {
                 if (shape.known && !shape.hidden) continue;
-                const answer = unknownAnswer(kind, name, shape, collection);
+                const answer = unknownAnswer(kind, name, shape, table);
                 throw ApiError.badRequest(answer.message, answer.code, answer.details);
             }
         }
         if (vectorHidden && options.vectorSearch) {
-            const answer = unknownVectorProperty(options.vectorSearch.property, vectorPropertyNames(collection));
+            const answer = unknownVectorProperty(options.vectorSearch.property, vectorColumnKeys(table));
             throw ApiError.badRequest(answer.message, answer.code, answer.details);
         }
     }
 
-    const relations = resolveCollectionRelations(collection);
     for (const [key, node] of Object.entries(options.include ?? {})) {
         if (hidden.has(key)) {
-            const answer = unknownIncludeRelation(key, collection.slug ?? collection.name, includableRelationNames(collection));
+            const answer = unknownIncludeRelation(key, table.slug, includableRelations(table));
             throw ApiError.badRequest(answer.message, answer.code, answer.details);
         }
-        const relation = relations[key];
-        if (!relation) continue;
+        const target = relationTarget(table, key, lookup);
+        if (!target) continue;
         const filtered: string[] = [];
         if (node.where) filtered.push(...Object.keys(node.where));
         logicalColumns(node.logical, filtered);
@@ -368,7 +374,7 @@ function assertNoHiddenNames(
             orderBy: node.orderBy?.map(([field]) => ({ field })),
             fields: node.fields,
             include: node.children
-        }, relation.target());
+        }, target, lookup);
     }
 }
 
@@ -381,14 +387,13 @@ function assertNoHiddenNames(
 type NameShape = {
     hidden: boolean;
     known: boolean;
-    path?: { relationKey: string; fieldKey: string; target: CollectionConfig };
+    path?: { relationKey: string; fieldKey: string; target: TableDescriptor };
 };
 
-function nameShape(name: string, collection: CollectionConfig, hidden: ReadonlySet<string>): NameShape {
+function nameShape(name: string, table: TableDescriptor, hidden: ReadonlySet<string>, lookup: TableLookup): NameShape {
     if (hidden.has(name)) return { hidden: true, known: false };
-    const columns = new Set(queryableFieldNames(collection));
-    const relations = resolveCollectionRelations(collection);
-    if (columns.has(name) || name in (collection.properties ?? {})) return { hidden: false, known: true };
+    const columns = new Set(queryableColumnKeys(table));
+    if (columns.has(name) || relationOf(table, name) !== undefined) return { hidden: false, known: true };
 
     // `lower(email)`: the column it folds is what it names.
     const folded = parseCaseFoldedFieldPath(name);
@@ -407,13 +412,12 @@ function nameShape(name: string, collection: CollectionConfig, hidden: ReadonlyS
         const relationKey = name.slice(0, dot);
         const fieldKey = name.slice(dot + 1);
         if (hidden.has(relationKey)) return { hidden: true, known: false };
-        const relation = findRelation(relations, relationKey);
-        if (!relation) return { hidden: false, known: false };
-        const target = relation.target();
-        const targetHidden = apiHiddenFieldNames(target);
+        const target = relationTarget(table, relationKey, lookup);
+        if (!target) return { hidden: false, known: false };
+        const targetHidden = apiHiddenKeys(target);
         const path = { relationKey, fieldKey, target };
         if (targetHidden.has(fieldKey)) return { hidden: true, known: false, path };
-        const known = queryableFieldNames(target).includes(fieldKey) || fieldKey in (target.properties ?? {});
+        const known = queryableColumnKeys(target).includes(fieldKey) || relationOf(target, fieldKey) !== undefined;
         return { hidden: false, known, path };
     }
     return { hidden: false, known: false };
@@ -423,19 +427,19 @@ function unknownAnswer(
     kind: "fields" | "filter" | "orderBy",
     name: string,
     shape: NameShape,
-    collection: CollectionConfig
+    table: TableDescriptor
 ): UnknownFieldAnswer {
-    const slug = collection.slug ?? collection.name;
-    if (kind === "fields") return unknownProjectionField(name, slug, queryableFieldNames(collection));
-    if (kind === "orderBy") return unknownOrderByField(name, slug, queryableFieldNames(collection));
+    const slug = table.slug;
+    if (kind === "fields") return unknownProjectionField(name, slug, queryableColumnKeys(table));
+    if (kind === "orderBy") return unknownOrderByField(name, slug, queryableColumnKeys(table));
     if (shape.path) {
         return unknownRelationTargetField(
             { field: name, relationKey: shape.path.relationKey, fieldKey: shape.path.fieldKey },
-            { slug: shape.path.target.slug, validFields: queryableFieldNames(shape.path.target) },
+            { slug: shape.path.target.slug, validFields: queryableColumnKeys(shape.path.target) },
             slug
         );
     }
-    return unknownFilterField(name, slug, queryableFieldNames(collection));
+    return unknownFilterField(name, slug, queryableColumnKeys(table));
 }
 
 /**
@@ -454,20 +458,19 @@ function unknownAnswer(
  */
 function assertIncludeFieldsReadable(
     tree: Record<string, IncludeNode>,
-    collection: CollectionConfig,
-    viewer: FieldViewer | undefined
+    table: TableDescriptor,
+    viewer: FieldViewer | undefined,
+    lookup: TableLookup
 ): void {
-    const relations = resolveCollectionRelations(collection);
     for (const [key, node] of Object.entries(tree)) {
-        const relation = relations[key];
-        if (!relation) continue;
-        const target = relation.target();
+        const target = relationTarget(table, key, lookup);
+        if (!target) continue;
         assertRestrictedFieldsUnused({
             where: node.where,
             logical: node.logical,
             orderBy: node.orderBy?.map(([field]) => ({ field })),
             fields: node.fields
-        }, target, viewer);
-        assertIncludeFieldsReadable(node.children, target, viewer);
+        }, target, viewer, lookup);
+        assertIncludeFieldsReadable(node.children, target, viewer, lookup);
     }
 }

@@ -1,5 +1,6 @@
 import { CollectionConfig } from "@rebasepro/types";
 import { assertKnownWriteFields, assertWriteValuesValid } from "../src/api/rest/write-validation";
+import { tableFrom } from "./helpers/tables";
 
 /**
  * A write naming a field the collection does not have is a request problem, and
@@ -76,27 +77,27 @@ isId: true },
         };
 
         it("refuses a write naming one", () => {
-            expect(() => assertKnownWriteFields({ passwordHash: "scrypt$…" }, users))
-                .toThrow(/excluded from the API/i);
+            expect(() => assertKnownWriteFields({ passwordHash: "scrypt$…" }, tableFrom(users)))
+                .toThrow(/cannot be written through the API/i);
         });
 
         it("refuses it under its column name too", () => {
-            expect(() => assertKnownWriteFields({ password_hash: "scrypt$…" }, users))
-                .toThrow(/excluded from the API/i);
+            expect(() => assertKnownWriteFields({ password_hash: "scrypt$…" }, tableFrom(users)))
+                .toThrow(/cannot be written through the API/i);
         });
 
         it("says it is excluded rather than unknown, which would read as a typo", () => {
-            expect(() => assertKnownWriteFields({ passwordHash: "x" }, users))
-                .toThrow(/is the server's to set/i);
+            expect(() => assertKnownWriteFields({ passwordHash: "x" }, tableFrom(users)))
+                .toThrow(/the server's to set/i);
         });
 
         it("leaves the rest of the collection writable", () => {
-            expect(() => assertKnownWriteFields({ email: "a@b.c" }, users)).not.toThrow();
+            expect(() => assertKnownWriteFields({ email: "a@b.c" }, tableFrom(users))).not.toThrow();
         });
     });
 
     it("accepts declared fields", () => {
-        expect(() => assertKnownWriteFields({ title: "Hello" }, posts)).not.toThrow();
+        expect(() => assertKnownWriteFields({ title: "Hello" }, tableFrom(posts))).not.toThrow();
     });
 
     it("accepts an owning relation's foreign key, which has no property", () => {
@@ -104,25 +105,25 @@ isId: true },
         // the relation property, and the field is real. Under its wire name:
         // `author_id` is the column, `authorId` is what the API serves and
         // therefore the only spelling a caller can send back.
-        expect(() => assertKnownWriteFields({ authorId: 3 }, posts)).not.toThrow();
+        expect(() => assertKnownWriteFields({ authorId: 3 }, tableFrom(posts))).not.toThrow();
     });
 
     it("rejects the raw column name of a derived foreign key", () => {
         // The wire is camelCase throughout. Accepting the column as a second
         // spelling would be the two-conventions defect kept alive in the write
         // path after the read path stopped emitting it.
-        expect(() => assertKnownWriteFields({ author_id: 3 }, posts))
-            .toThrow(/has no field 'author_id'/);
+        expect(() => assertKnownWriteFields({ author_id: 3 }, tableFrom(posts)))
+            .toThrow(/has no column 'author_id'/);
     });
 
     it("rejects a typo, naming it and what was available", () => {
-        expect(() => assertKnownWriteFields({ titel: "Hello" }, posts))
-            .toThrow(/'posts' has no field 'titel'.*Known fields:.*'title'/s);
+        expect(() => assertKnownWriteFields({ titel: "Hello" }, tableFrom(posts)))
+            .toThrow(/Table 'posts' has no column 'titel'.*Known columns:.*'title'/s);
     });
 
     it("names every unknown field, not just the first", () => {
         expect(() => assertKnownWriteFields({ titel: "x",
-autor: "y" }, posts))
+autor: "y" }, tableFrom(posts)))
             .toThrow(/'titel', 'autor'/);
     });
 
@@ -131,28 +132,31 @@ autor: "y" }, posts))
         // an id-keyed table; meaningless here, and a bare "no field 'id'" would
         // send the reader hunting through their own code for it.
         expect(() => assertKnownWriteFields({ id: "ABC-1",
-label: "Widget" }, skuItems))
+label: "Widget" }, tableFrom(skuItems)))
             .toThrow(/has no 'id' column — it is keyed on 'sku'.*put the key in `data`/s);
     });
 
     it("accepts `id` where `id` really is a column", () => {
         expect(() => assertKnownWriteFields({ id: 1,
-title: "Hello" }, posts)).not.toThrow();
+title: "Hello" }, tableFrom(posts))).not.toThrow();
     });
 
     it("names the row index for a bulk write", () => {
-        expect(() => assertKnownWriteFields({ titel: "x" }, posts, { rowIndex: 3 }))
+        expect(() => assertKnownWriteFields({ titel: "x" }, tableFrom(posts), { rowIndex: 3 }))
             .toThrow(/^Row 3: /);
     });
 
-    it("says nothing about a collection that declares no properties", () => {
-        // An empty property set describes nothing, so there is nothing to check
-        // against — that is not the same claim as "no fields are allowed".
+    it("judges a table that declares only its key by that key", () => {
+        // A collection with an empty property set used to describe nothing,
+        // and so be checked against nothing. A table always declares its
+        // columns — this one its implicit `id` — so a write naming any other
+        // is a write naming a column the table does not have.
         const opaque: CollectionConfig = { slug: "opaque",
 name: "Opaque",
 table: "opaque",
 properties: {} };
-        expect(() => assertKnownWriteFields({ anything: 1 }, opaque)).not.toThrow();
+        expect(() => assertKnownWriteFields({ anything: 1 }, tableFrom(opaque))).toThrow(/has no column 'anything'/);
+        expect(() => assertKnownWriteFields({ id: "a" }, tableFrom(opaque))).not.toThrow();
     });
 
     it("lets everything through when the collection opts out", () => {
@@ -160,13 +164,13 @@ properties: {} };
         // populates. The driver still requires the column to exist — see
         // `assertWritableColumns` — which is what makes the opt-out mean
         // something; skipping this check alone dropped the value regardless.
-        expect(() => assertKnownWriteFields({ titel: "x" }, { ...posts,
-strictWrites: false })).not.toThrow();
+        expect(() => assertKnownWriteFields({ titel: "x" }, tableFrom({ ...posts,
+strictWrites: false }))).not.toThrow();
     });
 
     it("carries a stable code for clients to branch on", () => {
         try {
-            assertKnownWriteFields({ titel: "x" }, posts);
+            assertKnownWriteFields({ titel: "x" }, tableFrom(posts));
             throw new Error("should have thrown");
         } catch (error) {
             expect((error as { code?: string }).code).toBe("VALIDATION_UNKNOWN_FIELDS");
@@ -218,63 +222,63 @@ validation: { positive: true } } } },
     };
 
     it("rejects a number below `min` — the docs' own example", () => {
-        expect(() => assertWriteValuesValid({ price: -5000 }, products))
+        expect(() => assertWriteValuesValid({ price: -5000 }, tableFrom(products)))
             .toThrow(/'price' must be at least 0 \(received -5000\)/);
     });
 
     it("accepts a value inside the range", () => {
-        expect(() => assertWriteValuesValid({ price: 0 }, products)).not.toThrow();
-        expect(() => assertWriteValuesValid({ price: 19.99 }, products)).not.toThrow();
+        expect(() => assertWriteValuesValid({ price: 0 }, tableFrom(products))).not.toThrow();
+        expect(() => assertWriteValuesValid({ price: 19.99 }, tableFrom(products))).not.toThrow();
     });
 
     it("judges the numeric-string form a JSON body may carry", () => {
         // Postgres accepts `"-5"` for a numeric column, so refusing to look at
         // a string here would leave the constraint bypassable by quoting.
-        expect(() => assertWriteValuesValid({ price: "-5" }, products))
+        expect(() => assertWriteValuesValid({ price: "-5" }, tableFrom(products)))
             .toThrow(/'price' must be at least 0/);
     });
 
     it("enforces integer, max, moreThan and lessThan", () => {
-        expect(() => assertWriteValuesValid({ stock: 3.7 }, products)).toThrow(/must be a whole number/);
-        expect(() => assertWriteValuesValid({ stock: 1000 }, products)).toThrow(/must be at most 999/);
-        expect(() => assertWriteValuesValid({ discount: 0 }, products)).toThrow(/must be greater than 0/);
-        expect(() => assertWriteValuesValid({ discount: 1 }, products)).toThrow(/must be less than 1/);
+        expect(() => assertWriteValuesValid({ stock: 3.7 }, tableFrom(products))).toThrow(/must be a whole number/);
+        expect(() => assertWriteValuesValid({ stock: 1000 }, tableFrom(products))).toThrow(/must be at most 999/);
+        expect(() => assertWriteValuesValid({ discount: 0 }, tableFrom(products))).toThrow(/must be greater than 0/);
+        expect(() => assertWriteValuesValid({ discount: 1 }, tableFrom(products))).toThrow(/must be less than 1/);
         expect(() => assertWriteValuesValid({ stock: 12,
-discount: 0.25 }, products)).not.toThrow();
+discount: 0.25 }, tableFrom(products))).not.toThrow();
     });
 
     it("enforces string length bounds and `matches`", () => {
-        expect(() => assertWriteValuesValid({ slug: "ab" }, products)).toThrow(/at least 3 characters/);
-        expect(() => assertWriteValuesValid({ slug: "a".repeat(41) }, products)).toThrow(/at most 40 characters/);
-        expect(() => assertWriteValuesValid({ slug: "Not A Slug!" }, products)).toThrow(/does not match the required pattern/);
-        expect(() => assertWriteValuesValid({ code: "abc" }, products)).toThrow(/exactly 4 characters/);
+        expect(() => assertWriteValuesValid({ slug: "ab" }, tableFrom(products))).toThrow(/at least 3 characters/);
+        expect(() => assertWriteValuesValid({ slug: "a".repeat(41) }, tableFrom(products))).toThrow(/at most 40 characters/);
+        expect(() => assertWriteValuesValid({ slug: "Not A Slug!" }, tableFrom(products))).toThrow(/does not match the required pattern/);
+        expect(() => assertWriteValuesValid({ code: "abc" }, tableFrom(products))).toThrow(/exactly 4 characters/);
         expect(() => assertWriteValuesValid({ slug: "a-real-slug",
-code: "AB12" }, products)).not.toThrow();
+code: "AB12" }, tableFrom(products))).not.toThrow();
     });
 
     it("does not echo the value that failed a pattern", () => {
         // The message reaches logs, and a pattern usually guards an identifier,
         // a token or a phone number.
-        expect(() => assertWriteValuesValid({ slug: "s3cret token" }, products))
+        expect(() => assertWriteValuesValid({ slug: "s3cret token" }, tableFrom(products)))
             .toThrow(/^(?!.*s3cret).*$/);
     });
 
     it("enforces date bounds against an ISO string", () => {
-        expect(() => assertWriteValuesValid({ releasedAt: "2019-06-01T00:00:00.000Z" }, products))
+        expect(() => assertWriteValuesValid({ releasedAt: "2019-06-01T00:00:00.000Z" }, tableFrom(products)))
             .toThrow(/must not be before 2020-01-01T00:00:00.000Z/);
-        expect(() => assertWriteValuesValid({ releasedAt: "2024-06-01T00:00:00.000Z" }, products)).not.toThrow();
+        expect(() => assertWriteValuesValid({ releasedAt: "2024-06-01T00:00:00.000Z" }, tableFrom(products))).not.toThrow();
     });
 
     it("enforces array bounds, and the element rules the spec publishes as `items`", () => {
-        expect(() => assertWriteValuesValid({ tags: ["a", "b", "c", "d"] }, products))
+        expect(() => assertWriteValuesValid({ tags: ["a", "b", "c", "d"] }, tableFrom(products)))
             .toThrow(/'tags' must have at most 3 items/);
-        expect(() => assertWriteValuesValid({ tags: ["news", "elections2024"] }, products))
+        expect(() => assertWriteValuesValid({ tags: ["news", "elections2024"] }, tableFrom(products)))
             .toThrow(/'tags\[1\]' must be at most 8 characters/);
-        expect(() => assertWriteValuesValid({ tags: ["news"] }, products)).not.toThrow();
+        expect(() => assertWriteValuesValid({ tags: ["news"] }, tableFrom(products))).not.toThrow();
     });
 
     it("reaches into a map's declared sub-properties", () => {
-        expect(() => assertWriteValuesValid({ dimensions: { width: -1 } }, products))
+        expect(() => assertWriteValuesValid({ dimensions: { width: -1 } }, tableFrom(products)))
             .toThrow(/'dimensions.width' must be positive/);
     });
 
@@ -282,30 +286,30 @@ code: "AB12" }, products)).not.toThrow();
         // One field per round trip is how validation errors get ignored.
         expect(() => assertWriteValuesValid({ price: -1,
 stock: 3.7,
-slug: "no" }, products))
+slug: "no" }, tableFrom(products)))
             .toThrow(/'price'.*'stock'.*'slug'/s);
     });
 
     it("says nothing about a key the collection does not declare", () => {
         // Whether it is allowed at all is `assertKnownWriteFields`' question.
-        expect(() => assertWriteValuesValid({ whatever: -1 }, products)).not.toThrow();
+        expect(() => assertWriteValuesValid({ whatever: -1 }, tableFrom(products))).not.toThrow();
     });
 
     it("says nothing about an absent or null value", () => {
         // A partial update omits keys legitimately, and `required` is a NOT
         // NULL the database enforces on the row, not on this request.
-        expect(() => assertWriteValuesValid({}, products)).not.toThrow();
-        expect(() => assertWriteValuesValid({ price: null }, products)).not.toThrow();
+        expect(() => assertWriteValuesValid({}, tableFrom(products))).not.toThrow();
+        expect(() => assertWriteValuesValid({ price: null }, tableFrom(products))).not.toThrow();
     });
 
     it("leaves a wrong-typed value to the database, which types every column", () => {
-        expect(() => assertWriteValuesValid({ price: "not a number" }, products)).not.toThrow();
-        expect(() => assertWriteValuesValid({ slug: 12 }, products)).not.toThrow();
+        expect(() => assertWriteValuesValid({ price: "not a number" }, tableFrom(products))).not.toThrow();
+        expect(() => assertWriteValuesValid({ slug: 12 }, tableFrom(products))).not.toThrow();
     });
 
     it("names the row index for a bulk write, and carries a stable code", () => {
         try {
-            assertWriteValuesValid({ price: -1 }, products, { rowIndex: 7 });
+            assertWriteValuesValid({ price: -1 }, tableFrom(products), { rowIndex: 7 });
             throw new Error("should have thrown");
         } catch (error) {
             expect((error as Error).message).toMatch(/^Row 7: /);
@@ -324,7 +328,7 @@ validation: { matches: "([unclosed" } } }
         };
         // Their bug, not the caller's — refusing every write over it would put
         // the blame in the wrong place.
-        expect(() => assertWriteValuesValid({ ref: "anything" }, broken)).not.toThrow();
+        expect(() => assertWriteValuesValid({ ref: "anything" }, tableFrom(broken))).not.toThrow();
     });
 
     it("does not let a `g`-flagged pattern accept and reject the same value in turn", () => {
@@ -337,7 +341,7 @@ validation: { matches: "([unclosed" } } }
             properties: { ref: { type: "string",
 validation: { matches: /[a-z]+/g } } }
         };
-        expect(() => assertWriteValuesValid({ ref: "abc" }, collection)).not.toThrow();
-        expect(() => assertWriteValuesValid({ ref: "abc" }, collection)).not.toThrow();
+        expect(() => assertWriteValuesValid({ ref: "abc" }, tableFrom(collection))).not.toThrow();
+        expect(() => assertWriteValuesValid({ ref: "abc" }, tableFrom(collection))).not.toThrow();
     });
 });

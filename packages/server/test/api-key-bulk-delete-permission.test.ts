@@ -5,6 +5,7 @@ import type { CollectionConfig, DeleteManyProps } from "@rebasepro/types";
 import { fakeDataDriver } from "./helpers/server-a-fakes";
 import { maskedApiKey } from "./helpers/server-a-g1-fakes";
 import type { HonoEnv } from "../src/api/types";
+import { tablesFromCollections } from "./helpers/tables";
 
 /**
  * `POST /:slug/bulk/delete` deletes, whatever its verb says.
@@ -48,7 +49,7 @@ describe("API key scopes on bulk delete", () => {
             c.set("scopes", scopes);
             await next();
         });
-        app.route("/", new RestApiGenerator(collections, driver, undefined, 3).generateRoutes());
+        app.route("/", new RestApiGenerator(tablesFromCollections(collections), driver, undefined, 3).generateRoutes());
         return app;
     }
 

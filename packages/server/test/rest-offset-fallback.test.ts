@@ -21,6 +21,7 @@ import { errorHandler } from "../src/api/errors";
 import type { HonoEnv } from "../src/api/types";
 import type { DataDriver, FetchCollectionProps } from "../../types/src/controllers/data_driver";
 import type { CollectionConfig } from "../../types/src/types/collections";
+import { tablesFromCollections } from "./helpers/tables";
 
 const collections: CollectionConfig[] = [
     { slug: "posts", name: "Posts", singularName: "Post", properties: {} }
@@ -59,7 +60,7 @@ function harness(): { app: Hono<HonoEnv>; fetches: FetchCollectionProps[] } {
         c.set("driver", driver);
         await next();
     });
-    app.route("/api/data", new RestApiGenerator(collections, driver).generateRoutes());
+    app.route("/api/data", new RestApiGenerator(tablesFromCollections(collections), driver).generateRoutes());
     return { app, fetches };
 }
 

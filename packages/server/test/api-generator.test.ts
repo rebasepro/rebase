@@ -4,6 +4,7 @@ import { errorHandler } from "../src/api/errors";
 import type { AuthAdapter, CollectionConfig, RelationProperty } from "@rebasepro/types";
 import type { HonoEnv } from "../src/api/types";
 import { mockDataDriver, type MockDataDriver } from "./helpers/server-a-fakes";
+import { tablesFromCollections } from "./helpers/tables";
 
 describe("RestApiGenerator", () => {
     let mockDriver: MockDataDriver;
@@ -45,7 +46,7 @@ describe("RestApiGenerator", () => {
                 slug: "users",
                 name: "Users",
                 singularName: "User",
-                properties: {}
+                properties: { name: { name: "Name", type: "string" } }
             },
             posts,
             authors,
@@ -66,7 +67,7 @@ describe("RestApiGenerator", () => {
             c.set("driver", mockDriver);
             await next();
         });
-        const generator = new RestApiGenerator(mockCollections, mockDriver);
+        const generator = new RestApiGenerator(tablesFromCollections(mockCollections), mockDriver);
         app.route("/api", generator.generateRoutes());
         return app;
     }
@@ -82,7 +83,7 @@ describe("RestApiGenerator", () => {
             c.set("driver", mockDriver);
             await next();
         });
-        const generator = new RestApiGenerator(mockCollections, mockDriver);
+        const generator = new RestApiGenerator(tablesFromCollections(mockCollections), mockDriver);
         app.route("/", generator.generateRoutes());
         return app;
     }
@@ -580,7 +581,7 @@ passwordHash: "custom-hash" },
                 }
             ];
 
-            const generator = new RestApiGenerator(authCollections, mockDriver, mockAuthAdapter);
+            const generator = new RestApiGenerator(tablesFromCollections(authCollections), mockDriver, mockAuthAdapter);
             app.route("/api", generator.generateRoutes());
 
             mockDriver.save.mockResolvedValue({
@@ -606,7 +607,7 @@ name: "Original Name" })
             expect(mockPrepare).toHaveBeenCalledWith(
                 expect.objectContaining({ email: "original@example.com",
 name: "Original Name" }),
-                undefined, // auth: true → collectionAuthConfig is undefined
+                { enabled: true }, // the auth table's settings as lowered for the adapter
                 // No caller set on this request, so nobody to waive the policy.
                 { mayWaivePasswordPolicy: false }
             );
@@ -659,7 +660,7 @@ passwordHash: "hash" },
                 }
             ];
 
-            const generator = new RestApiGenerator(authCollections, mockDriver, mockAuthAdapter);
+            const generator = new RestApiGenerator(tablesFromCollections(authCollections), mockDriver, mockAuthAdapter);
             app.route("/api", generator.generateRoutes());
 
             const savedRow = {
@@ -715,8 +716,8 @@ describe("RestApiGenerator — update verbs", () => {
             c.set("driver", mockDriver);
             await next();
         });
-        const collections: CollectionConfig[] = [{ slug: "users", name: "Users", singularName: "User", properties: {} }];
-        a.route("/api", new RestApiGenerator(collections, mockDriver).generateRoutes());
+        const collections: CollectionConfig[] = [{ slug: "users", name: "Users", singularName: "User", properties: { name: { name: "Name", type: "string" } } }];
+        a.route("/api", new RestApiGenerator(tablesFromCollections(collections), mockDriver).generateRoutes());
         return a;
     }
 

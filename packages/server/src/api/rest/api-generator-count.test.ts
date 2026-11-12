@@ -4,6 +4,7 @@ import { RestApiGenerator } from "./api-generator";
 import { errorHandler } from "../errors";
 import type { DataDriver, CollectionConfig, FetchCollectionProps } from "@rebasepro/types";
 import type { HonoEnv } from "../types";
+import { tablesFromCollections } from "../../../test/helpers/tables";
 
 /**
  * Minimal mock DataDriver for testing.
@@ -38,7 +39,7 @@ function createApp(collections: CollectionConfig[], driver: DataDriver): Hono<Ho
         c.set("driver", driver);
         await next();
     });
-    const generator = new RestApiGenerator(collections, driver);
+    const generator = new RestApiGenerator(tablesFromCollections(collections), driver);
     parent.route("/", generator.generateRoutes());
     return parent;
 }

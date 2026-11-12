@@ -6,6 +6,7 @@ import type { CollectionConfig, DataDriver, FilterCondition, WhereFilterOp } fro
 import { RestApiGenerator } from "../src/api/rest/api-generator";
 import type { HonoEnv } from "../src/api/types";
 import { fakeDataDriver } from "./helpers/server-a-fakes";
+import { tablesFromCollections } from "./helpers/tables";
 
 /**
  * `?or=(...)` and `?and=(...)` reached the driver.
@@ -55,7 +56,7 @@ async function listWith(query: string): Promise<{ fetch?: unknown; count?: unkno
     const app = new Hono<HonoEnv>();
     // The routes read the request-scoped driver, never the constructor's.
     app.use("/*", async (c, next) => { c.set("driver", driver); await next(); });
-    app.route("/", new RestApiGenerator([authors], driver).generateRoutes());
+    app.route("/", new RestApiGenerator(tablesFromCollections([authors]), driver).generateRoutes());
 
     const res = await app.request(`/authors${query}`);
     expect(res.status).toBe(200);

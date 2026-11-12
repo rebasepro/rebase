@@ -5,6 +5,7 @@ import type { CollectionConfig } from "@rebasepro/types";
 import { generateOpenApiSpec } from "../src/api/openapi-generator";
 import { compileLoadedSchema, loadBackendSchema } from "../src/schema/load-schema";
 import { openApiDocument, operationOf, schemaOf } from "./helpers/server-b-g1-openapi";
+import { tablesFromCollections } from "./helpers/tables";
 
 /**
  * What the published document is allowed to name.
@@ -42,7 +43,7 @@ const excludedKeys = Object.entries(vaults.properties)
     .filter(([, property]) => property.excludeFromApi)
     .map(([key]) => key);
 
-const spec = openApiDocument(generateOpenApiSpec([vaults]));
+const spec = openApiDocument(generateOpenApiSpec(tablesFromCollections([vaults]).descriptors));
 
 const schemaProperties = (name: string): string[] =>
     Object.keys(schemaOf(spec, name).properties ?? {});
@@ -113,7 +114,7 @@ describe("relation properties", () => {
     };
 
     it("reach the read schema as a foreign key and a resolved row", () => {
-        const relSpec = openApiDocument(generateOpenApiSpec([posts, authors]));
+        const relSpec = openApiDocument(generateOpenApiSpec(tablesFromCollections([posts, authors]).descriptors));
         const post = schemaOf(relSpec, "Post").properties ?? {};
 
         expect(Object.keys(post)).toEqual(["id", "title", "authorId", "author"]);
@@ -122,7 +123,7 @@ describe("relation properties", () => {
     });
 
     it("reach the write schemas as the two keys the server accepts", () => {
-        const relSpec = openApiDocument(generateOpenApiSpec([posts, authors]));
+        const relSpec = openApiDocument(generateOpenApiSpec(tablesFromCollections([posts, authors]).descriptors));
         const input = schemaOf(relSpec, "PostInput").properties ?? {};
 
         expect(Object.keys(input)).toEqual(["title", "id", "authorId", "author"]);
@@ -132,7 +133,7 @@ describe("relation properties", () => {
     });
 
     it("are not offered as filters — a relation is not a column", () => {
-        const relSpec = openApiDocument(generateOpenApiSpec([posts, authors]));
+        const relSpec = openApiDocument(generateOpenApiSpec(tablesFromCollections([posts, authors]).descriptors));
 
         expect((operationOf(relSpec, "/data/posts", "get").parameters ?? [])
             .map(p => p.name)).not.toContain("author");
@@ -154,7 +155,7 @@ describe("the scaffolded users table", () => {
         expect(properties.passwordHash?.excludeFromApi).toBe(true);
         expect(properties.emailVerificationToken?.excludeFromApi).toBe(true);
 
-        const serialized = JSON.stringify(generateOpenApiSpec([users]));
+        const serialized = JSON.stringify(generateOpenApiSpec(tablesFromCollections([users]).descriptors));
 
         expect(serialized).not.toContain("passwordHash");
         expect(serialized).not.toContain("password_hash");

@@ -1,5 +1,5 @@
 import { Hono, type MiddlewareHandler } from "hono";
-import { CollectionConfig } from "@rebasepro/types";
+import type { TableDescriptor } from "@rebasepro/types";
 import { HonoEnv } from "../api/types";
 import { logger } from "../utils/logger";
 import { noCollectionsCause } from "../backend/no-collections";
@@ -20,17 +20,15 @@ export async function loadOpenApiGenerator(): Promise<OpenApiGenerator> {
 export interface OpenApiDocsOptions {
     enableSwagger: boolean | undefined;
     /**
-     * The collections the REST routes were generated from — the ones whose
-     * data source has a `"server"` transport — not every active collection. A
-     * direct-transport collection is served by the client against its own
-     * backend; documenting it here publishes a full set of CRUD paths that
-     * 404, with a Try-It button next to each.
+     * The descriptors of the tables the REST routes serve, in route order.
+     * Only those: documenting a table the routes do not serve publishes a full
+     * set of CRUD paths that 404, with a Try-It button next to each.
      */
-    serverCollections: CollectionConfig[];
+    serverTables: readonly TableDescriptor[];
     requireAuth: boolean;
     /** The runtime's admin gate — the middlewares every admin surface sits behind — for the spec when it is not public. */
     adminGate: MiddlewareHandler<HonoEnv>[];
-    /** The document builder. Only read when there are collections to document. */
+    /** The document builder. Only read when there are tables to document. */
     generate: OpenApiGenerator | undefined;
     /** Whether to log where Swagger UI is. Default `true`. */
     announce?: boolean;
@@ -45,8 +43,8 @@ export interface OpenApiDocsOptions {
  * Serve the OpenAPI document, and Swagger UI outside production when swagger is on.
  */
 export function mountOpenApiDocs(app: Hono<HonoEnv>, basePath: string, options: OpenApiDocsOptions): void {
-    const { enableSwagger, serverCollections, requireAuth, adminGate, generate, unprotectedTables = [] } = options;
-    if (serverCollections.length === 0) {
+    const { enableSwagger, serverTables, requireAuth, adminGate, generate, unprotectedTables = [] } = options;
+    if (serverTables.length === 0) {
         // Still routed, and still a 404 — but one that says which 404 it is.
         //
         // A bare `404 Not Found` here is indistinguishable from a wrong URL, a
@@ -86,7 +84,7 @@ export function mountOpenApiDocs(app: Hono<HonoEnv>, basePath: string, options: 
     const isPublic = enableSwagger !== false;
 
     if (!generate) {
-        throw new Error("mountOpenApiDocs: collections to document, and no document builder — pass `generate` (`await loadOpenApiGenerator()`).");
+        throw new Error("mountOpenApiDocs: tables to document, and no document builder — pass `generate` (`await loadOpenApiGenerator()`).");
     }
     const generateSpec = generate;
 
@@ -96,7 +94,7 @@ export function mountOpenApiDocs(app: Hono<HonoEnv>, basePath: string, options: 
      * string at 200 collections, per request, on a route that is public
      * whenever Swagger is on.
      *
-     * Key: this mount — `serverCollections`, `basePath`, `requireAuth`. The
+     * Key: this mount — `serverTables`, `basePath`, `requireAuth`. The
      * document says nothing about the caller, so one copy serves every
      * request; whether a caller may read it is still the gate's question,
      * asked per request. Invalidation: none within the mount, because nothing
@@ -107,7 +105,7 @@ export function mountOpenApiDocs(app: Hono<HonoEnv>, basePath: string, options: 
      */
     let serialized: Uint8Array<ArrayBuffer> | undefined;
     const spec = (c: { body: (data: Uint8Array<ArrayBuffer>, status: 200, headers: Record<string, string>) => Response }) => {
-        serialized ??= new TextEncoder().encode(JSON.stringify(generateSpec(serverCollections, { basePath, requireAuth })));
+        serialized ??= new TextEncoder().encode(JSON.stringify(generateSpec(serverTables, { basePath, requireAuth })));
         return c.body(serialized, 200, { "Content-Type": "application/json" });
     };
 

@@ -4,6 +4,7 @@ import { errorHandler } from "../src/api/errors";
 import type { CollectionConfig, DeleteManyProps, SaveManyProps, SaveProps } from "@rebasepro/types";
 import { fakeDataDriver } from "./helpers/server-a-fakes";
 import type { HonoEnv } from "../src/api/types";
+import { tablesFromCollections } from "./helpers/tables";
 
 /**
  * A replayed create must not insert a second row.
@@ -158,7 +159,7 @@ describe("create with an Idempotency-Key", () => {
         });
 
         const collections: CollectionConfig[] = [{
-            slug: "posts", name: "Posts", singularName: "Post", properties: {}
+            slug: "posts", name: "Posts", singularName: "Post", properties: { title: { type: "string" }, draft: { type: "boolean" } }
         }];
 
         const app = new Hono<HonoEnv>();
@@ -169,7 +170,7 @@ describe("create with an Idempotency-Key", () => {
             if (uid !== undefined) c.set("user", { uid });
             await next();
         });
-        app.route("/", new RestApiGenerator(collections, driver).generateRoutes());
+        app.route("/", new RestApiGenerator(tablesFromCollections(collections), driver).generateRoutes());
         return {
             app,
             saved,
@@ -412,7 +413,7 @@ describe("createMany with an Idempotency-Key", () => {
         });
 
         const collections: CollectionConfig[] = [{
-            slug: "posts", name: "Posts", singularName: "Post", properties: {}
+            slug: "posts", name: "Posts", singularName: "Post", properties: { title: { type: "string" } }
         }];
 
         const app = new Hono<HonoEnv>();
@@ -422,7 +423,7 @@ describe("createMany with an Idempotency-Key", () => {
             c.set("user", { uid: "user-1" });
             await next();
         });
-        app.route("/", new RestApiGenerator(collections, driver).generateRoutes());
+        app.route("/", new RestApiGenerator(tablesFromCollections(collections), driver).generateRoutes());
         return { app, saved, deleted, attempts: () => saveManyAttempts };
     }
 

@@ -16,6 +16,7 @@ import type {
 } from "@rebasepro/types";
 import { compileSchemaDefs } from "../../src/schema/load-schema";
 import type { DriverCollectionOf } from "../../src/schema/driver-seam";
+import type { ServedTable } from "../../src/api/rest/served-table";
 
 /**
  * The temporary lift for test fixtures.
@@ -71,8 +72,50 @@ export function tablesFromCollections(
     collections: readonly (CollectionConfig | AnyCollectionConfig)[],
     options: { defaultSecurityRules?: readonly SecurityRule[] } = {}
 ): FixtureTables {
-    const { tables, defaultRls } = tablesFrom(collections, options);
+    const { tables, defaultRls } = tablesFrom(withRelationTargets(collections), options);
     return compileTables(tables, defaultRls);
+}
+
+/** The target of a legacy relation thunk, or `undefined` when it throws or is not a collection. */
+function relationTargetOf(target: unknown): CollectionConfig | undefined {
+    if (typeof target !== "function") return undefined;
+    try {
+        const resolved: unknown = target();
+        return isFixtureCollection(resolved) ? resolved : undefined;
+    } catch {
+        return undefined;
+    }
+}
+
+/**
+ * The fixtures, followed by every collection their relations point at that
+ * they do not list (transitively): a table compiles only beside the tables
+ * its relations target, and a fixture usually names just the one under test.
+ */
+function withRelationTargets(collections: readonly (CollectionConfig | AnyCollectionConfig)[]): (CollectionConfig | AnyCollectionConfig)[] {
+    const out = [...collections];
+    const seen = new Set(out.map(collection => collection.slug));
+    for (let index = 0; index < out.length; index++) {
+        const collection = out[index];
+        const thunks: unknown[] = [];
+        if ("relations" in collection && Array.isArray(collection.relations)) {
+            for (const relation of collection.relations) thunks.push(relation?.target);
+        }
+        for (const property of Object.values(collection.properties ?? {})) {
+            if (typeof property === "object" && property !== null && "relation" in property) {
+                const relation: unknown = property.relation;
+                if (typeof relation === "object" && relation !== null && "target" in relation) thunks.push(relation.target);
+            }
+        }
+        for (const thunk of thunks) {
+            const target = relationTargetOf(thunk);
+            if (target && !seen.has(target.slug)) {
+                seen.add(target.slug);
+                out.push(target);
+            }
+        }
+    }
+    return out;
 }
 
 /** Compile and lower table definitions, as the boot does. */
@@ -80,11 +123,34 @@ export function compileTables(defs: readonly (AnyTableDef | AnyViewDef)[], defau
     return compileSchemaDefs(defs, defaultRls);
 }
 
+/**
+ * What `parseQueryOptions` / `parseWriteFilter` take to check a query's field
+ * access: the table being read (the first fixture) and every table's
+ * descriptor by slug, for its relations' targets.
+ */
+export function queryAccessFor(
+    collections: readonly (CollectionConfig | AnyCollectionConfig)[]
+): { table: TableDescriptor; lookup: (slug: string) => TableDescriptor | undefined } {
+    const fixture = tablesFromCollections(collections);
+    return { table: descriptorOf(fixture, collections[0].slug), lookup: slug => fixture.descriptors.find(table => table.slug === slug) };
+}
+
 /** The descriptor of the table with this slug, from a fixture; throws when there is none. */
 export function descriptorOf(fixture: Pick<FixtureTables, "descriptors">, slug: string): TableDescriptor {
     const found = fixture.descriptors.find(descriptor => descriptor.slug === slug);
     if (!found) throw new Error(`The fixture has no table "${slug}".`);
     return found;
+}
+
+/**
+ * One legacy fixture collection as the REST layer's seam holds a served table:
+ * its descriptor, and the collection it was lowered into for the driver.
+ */
+export function servedTableFrom(collection: CollectionConfig | AnyCollectionConfig): ServedTable {
+    const fixture = tablesFromCollections([collection]);
+    const driverCollection = fixture.collections.find(candidate => candidate.slug === collection.slug);
+    if (!driverCollection) throw new Error(`The fixture has no table "${collection.slug}".`);
+    return { table: descriptorOf(fixture, collection.slug), driverCollection };
 }
 
 /** The descriptor one legacy fixture collection compiles to. */

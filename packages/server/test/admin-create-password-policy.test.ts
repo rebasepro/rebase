@@ -28,6 +28,7 @@ import type { HonoEnv } from "../src/api/types";
 import { configureAccess } from "../src/auth/access";
 import { configureJwt, generateAccessToken } from "../src/auth/jwt";
 import { fakeAuthRepository, fakeUser } from "./helpers/server-a-g1-fakes";
+import { tablesFromCollections } from "./helpers/tables";
 
 const SECRET = "test-secret-for-admin-create-password-policy-0123456789";
 const WEAK = "short";
@@ -102,7 +103,7 @@ function harness(hooks?: AuthHooks) {
         c.set("user", { uid: caller, roles: ROLES[caller] ?? [] });
         await next();
     });
-    app.route("/api/data", new RestApiGenerator([usersCollection], driver, adapter).generateRoutes());
+    app.route("/api/data", new RestApiGenerator(tablesFromCollections([usersCollection]), driver, adapter).generateRoutes());
 
     const post = async (as: string, path: string, body: unknown) => {
         caller = as;

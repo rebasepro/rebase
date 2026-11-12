@@ -4,6 +4,7 @@ import { errorHandler } from "../src/api/errors";
 import type { CollectionConfig, DataDriver, DeleteManyProps, SaveProps, UpdateManyProps } from "@rebasepro/types";
 import { fakeDataDriver } from "./helpers/server-a-fakes";
 import type { HonoEnv } from "../src/api/types";
+import { tablesFromCollections } from "./helpers/tables";
 
 /**
  * `PATCH /<collection>/bulk` and `POST /<collection>/bulk/delete`.
@@ -54,7 +55,7 @@ describe("bulk update and delete routes", () => {
             c.set("user", { uid: "user-1" });
             await next();
         });
-        app.route("/", new RestApiGenerator(collections, driver, undefined, 3).generateRoutes());
+        app.route("/", new RestApiGenerator(tablesFromCollections(collections), driver, undefined, 3).generateRoutes());
         return app;
     }
 

@@ -8,6 +8,7 @@ import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
 import type { HonoEnv } from "../src/api/types";
 import { fakeDataDriver } from "./helpers/server-b-fakes";
+import { tablesFromCollections } from "./helpers/tables";
 
 /**
  * One `find()`, two doors: the SDK over HTTP, and the in-process data plane a
@@ -104,7 +105,7 @@ function overHttp(driver: DataDriver) {
         c.set("user", { uid: "user-1", roles: [] });
         await next();
     });
-    app.route("/api/data", new RestApiGenerator([authors, posts], driver).generateRoutes());
+    app.route("/api/data", new RestApiGenerator(tablesFromCollections([authors, posts]), driver).generateRoutes());
     return createRebaseClient({
         baseUrl: "http://rebase.test",
         realtime: false,

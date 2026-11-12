@@ -5,6 +5,7 @@ import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { ApiError, errorHandler } from "../src/api/errors";
 import type { HonoEnv } from "../src/api/types";
 import { fakeDataDriver } from "./helpers/server-a-fakes";
+import { tablesFromCollections, tableFrom } from "./helpers/tables";
 
 /**
  * Per-field `access.write`, at the write boundary.
@@ -56,48 +57,48 @@ const anon = { roles: ["anon"] };
 
 describe("access.write on a create", () => {
     it("accepts the field from a caller holding the role", () => {
-        expect(() => assertKnownWriteFields({ salary: 90_000 }, staff, { viewer: hr })).not.toThrow();
+        expect(() => assertKnownWriteFields({ salary: 90_000 }, tableFrom(staff), { viewer: hr })).not.toThrow();
     });
 
     it("refuses it from a caller who does not, naming the field", () => {
-        const error = thrown(() => assertKnownWriteFields({ salary: 90_000 }, staff, { viewer: clerk }));
+        const error = thrown(() => assertKnownWriteFields({ salary: 90_000 }, tableFrom(staff), { viewer: clerk }));
         expect(error.code).toBe("FIELD_NOT_WRITABLE");
         expect(error.statusCode).toBe(400);
         expect(error.message).toContain("'salary'");
     });
 
     it("carries `details.violations` keyed by the wire name the caller sent", () => {
-        const error = thrown(() => assertKnownWriteFields({ salary: 1 }, staff, { viewer: clerk }));
+        const error = thrown(() => assertKnownWriteFields({ salary: 1 }, tableFrom(staff), { viewer: clerk }));
         expect((error.details as { violations: unknown[] }).violations).toEqual([
             { field: "salary", code: "access", message: expect.stringContaining("'salary'") }
         ]);
     });
 
     it("lets `admin` through any non-empty role list", () => {
-        expect(() => assertKnownWriteFields({ salary: 1 }, staff, { viewer: admin })).not.toThrow();
+        expect(() => assertKnownWriteFields({ salary: 1 }, tableFrom(staff), { viewer: admin })).not.toThrow();
     });
 
     it("refuses an anonymous caller, who holds no application role", () => {
-        expect(thrown(() => assertKnownWriteFields({ salary: 1 }, staff, { viewer: anon })).code)
+        expect(thrown(() => assertKnownWriteFields({ salary: 1 }, tableFrom(staff), { viewer: anon })).code)
             .toBe("FIELD_NOT_WRITABLE");
     });
 
     it("leaves a field with no rule alone", () => {
-        expect(() => assertKnownWriteFields({ nickname: "ada" }, staff, { viewer: anon })).not.toThrow();
+        expect(() => assertKnownWriteFields({ nickname: "ada" }, tableFrom(staff), { viewer: anon })).not.toThrow();
     });
 
     it("treats an absent viewer as the trusted server plane", () => {
         // `rebase.data` in a hook, a migration, the auth adapter. This is the
         // exemption that makes the rule enforceable at all — something has to be
         // able to write the column.
-        expect(() => assertKnownWriteFields({ salary: 1 }, staff)).not.toThrow();
+        expect(() => assertKnownWriteFields({ salary: 1 }, tableFrom(staff))).not.toThrow();
     });
 });
 
 describe("the empty list", () => {
     it("refuses every caller, including admin, with the excluded code", () => {
         for (const viewer of [hr, clerk, admin, anon]) {
-            const error = thrown(() => assertKnownWriteFields({ rating: 5 }, staff, { viewer }));
+            const error = thrown(() => assertKnownWriteFields({ rating: 5 }, tableFrom(staff), { viewer }));
             expect(error.code).toBe("VALIDATION_EXCLUDED_FIELDS");
         }
     });
@@ -107,14 +108,14 @@ describe("the empty list", () => {
         // `excludeFromApi`: this rule is about the API surface, not about who is
         // calling. In-process writes bypass this function entirely; a write that
         // *reaches* it is an API write.
-        expect(thrown(() => assertKnownWriteFields({ rating: 5 }, staff)).code)
+        expect(thrown(() => assertKnownWriteFields({ rating: 5 }, tableFrom(staff))).code)
             .toBe("VALIDATION_EXCLUDED_FIELDS");
     });
 
     it("is what `excludeFromApi` expands to, under either spelling of the name", () => {
-        expect(thrown(() => assertKnownWriteFields({ passwordHash: "x" }, staff, { viewer: admin })).code)
+        expect(thrown(() => assertKnownWriteFields({ passwordHash: "x" }, tableFrom(staff), { viewer: admin })).code)
             .toBe("VALIDATION_EXCLUDED_FIELDS");
-        expect(thrown(() => assertKnownWriteFields({ password_hash: "x" }, staff, { viewer: admin })).code)
+        expect(thrown(() => assertKnownWriteFields({ password_hash: "x" }, tableFrom(staff), { viewer: admin })).code)
             .toBe("VALIDATION_EXCLUDED_FIELDS");
     });
 });
@@ -122,7 +123,7 @@ describe("the empty list", () => {
 describe("every write door", () => {
     it("refuses a bulk row, naming the row index", () => {
         const error = thrown(() =>
-            assertKnownWriteFields({ salary: 1 }, staff, { rowIndex: 3, viewer: clerk }));
+            assertKnownWriteFields({ salary: 1 }, tableFrom(staff), { rowIndex: 3, viewer: clerk }));
         expect(error.code).toBe("FIELD_NOT_WRITABLE");
         expect(error.message).toContain("Row 3");
     });
@@ -131,18 +132,18 @@ describe("every write door", () => {
         // `{ salary: { $inc: 1000 } }` is a write to `salary`; the key is the
         // field, so the rule needs no special case for it — and must not.
         const error = thrown(() =>
-            assertKnownWriteFields({ salary: { $inc: 1000 } }, staff, { viewer: clerk }));
+            assertKnownWriteFields({ salary: { $inc: 1000 } }, tableFrom(staff), { viewer: clerk }));
         expect(error.code).toBe("FIELD_NOT_WRITABLE");
     });
 
     it("refuses through `assertWriteRequestValid`, which is the socket's door", () => {
         const error = thrown(() =>
-            assertWriteRequestValid({ salary: 1 }, staff, { viewer: clerk }));
+            assertWriteRequestValid({ salary: 1 }, tableFrom(staff), { viewer: clerk }));
         expect(error.code).toBe("FIELD_NOT_WRITABLE");
     });
 
     it("accepts through the socket's door for a caller holding the role", () => {
-        expect(() => assertWriteRequestValid({ salary: 1 }, staff, { viewer: hr })).not.toThrow();
+        expect(() => assertWriteRequestValid({ salary: 1 }, tableFrom(staff), { viewer: hr })).not.toThrow();
     });
 });
 
@@ -172,7 +173,7 @@ describe("a field operation on a field the caller cannot read", () => {
     const editor = { roles: ["editor"] };
 
     it("refuses $inc before anything reads the row, naming the field", () => {
-        const error = thrown(() => assertKnownWriteFields({ score: { $inc: -37 } }, posts, { viewer: editor }));
+        const error = thrown(() => assertKnownWriteFields({ score: { $inc: -37 } }, tableFrom(posts), { viewer: editor }));
         expect(error.code).toBe("FIELD_NOT_READABLE");
         expect(error.statusCode).toBe(400);
         expect(error.message).toContain("'score'");
@@ -180,26 +181,26 @@ describe("a field operation on a field the caller cannot read", () => {
     });
 
     it("refuses an array operation too, whose bound is the array's hidden length", () => {
-        const error = thrown(() => assertKnownWriteFields({ tags: { $push: ["x"] } }, posts, { viewer: editor }));
+        const error = thrown(() => assertKnownWriteFields({ tags: { $push: ["x"] } }, tableFrom(posts), { viewer: editor }));
         expect(error.code).toBe("FIELD_NOT_READABLE");
         expect(error.message).toContain("'tags'");
     });
 
     it("refuses it through the socket's and MCP's door", () => {
-        const error = thrown(() => assertWriteRequestValid({ score: { $inc: 1 } }, posts, { viewer: editor }));
+        const error = thrown(() => assertWriteRequestValid({ score: { $inc: 1 } }, tableFrom(posts), { viewer: editor }));
         expect(error.code).toBe("FIELD_NOT_READABLE");
     });
 
     it("still accepts a plain value for the same field, which reads nothing", () => {
-        expect(() => assertKnownWriteFields({ score: 5 }, posts, { viewer: editor })).not.toThrow();
+        expect(() => assertKnownWriteFields({ score: 5 }, tableFrom(posts), { viewer: editor })).not.toThrow();
     });
 
     it("accepts the operation from a caller who may read the field", () => {
-        expect(() => assertKnownWriteFields({ score: { $inc: -37 } }, posts, { viewer: admin })).not.toThrow();
+        expect(() => assertKnownWriteFields({ score: { $inc: -37 } }, tableFrom(posts), { viewer: admin })).not.toThrow();
     });
 
     it("leaves the trusted server plane alone", () => {
-        expect(() => assertKnownWriteFields({ score: { $inc: -37 } }, posts)).not.toThrow();
+        expect(() => assertKnownWriteFields({ score: { $inc: -37 } }, tableFrom(posts))).not.toThrow();
     });
 });
 
@@ -209,14 +210,14 @@ describe("the known-fields list", () => {
      * next request would refuse is worse than saying nothing.
      */
     it("does not name a field this caller cannot write", () => {
-        const error = thrown(() => assertKnownWriteFields({ titel: "x" }, staff, { viewer: clerk }));
+        const error = thrown(() => assertKnownWriteFields({ titel: "x" }, tableFrom(staff), { viewer: clerk }));
         expect(error.code).toBe("VALIDATION_UNKNOWN_FIELDS");
         expect(error.message).not.toContain("'salary'");
         expect(error.message).toContain("'nickname'");
     });
 
     it("names it for a caller who can", () => {
-        const error = thrown(() => assertKnownWriteFields({ titel: "x" }, staff, { viewer: hr }));
+        const error = thrown(() => assertKnownWriteFields({ titel: "x" }, tableFrom(staff), { viewer: hr }));
         expect(error.message).toContain("'salary'");
     });
 });
@@ -230,17 +231,17 @@ describe("strictWrites: false", () => {
     const loose: CollectionConfig = { ...staff, strictWrites: false };
 
     it("still refuses a field the caller cannot write", () => {
-        expect(thrown(() => assertKnownWriteFields({ salary: 1 }, loose, { viewer: clerk })).code)
+        expect(thrown(() => assertKnownWriteFields({ salary: 1 }, tableFrom(loose), { viewer: clerk })).code)
             .toBe("FIELD_NOT_WRITABLE");
     });
 
     it("still refuses an excluded one", () => {
-        expect(thrown(() => assertKnownWriteFields({ rating: 1 }, loose, { viewer: admin })).code)
+        expect(thrown(() => assertKnownWriteFields({ rating: 1 }, tableFrom(loose), { viewer: admin })).code)
             .toBe("VALIDATION_EXCLUDED_FIELDS");
     });
 
     it("still lets an undeclared key through, which is what the flag is for", () => {
-        expect(() => assertKnownWriteFields({ whatever: 1 }, loose, { viewer: clerk })).not.toThrow();
+        expect(() => assertKnownWriteFields({ whatever: 1 }, tableFrom(loose), { viewer: clerk })).not.toThrow();
     });
 });
 
@@ -283,34 +284,34 @@ describe("the foreign key of a to-one relation", () => {
 
     it.each(["bandId", "band_id"])("refuses `%s` from a caller who may not write the relation", (key) => {
         for (const collection of [banded, loose]) {
-            const error = thrown(() => assertKnownWriteFields({ [key]: 7 }, collection, { viewer: clerk }));
+            const error = thrown(() => assertKnownWriteFields({ [key]: 7 }, tableFrom(collection), { viewer: clerk }));
             expect(error.code).toBe("FIELD_NOT_WRITABLE");
             expect((error.details as { fields: string[] }).fields).toEqual([key]);
         }
     });
 
     it("accepts it from a caller who may", () => {
-        expect(() => assertKnownWriteFields({ bandId: 7 }, banded, { viewer: hr })).not.toThrow();
-        expect(() => assertKnownWriteFields({ band_id: 7 }, loose, { viewer: hr })).not.toThrow();
+        expect(() => assertKnownWriteFields({ bandId: 7 }, tableFrom(banded), { viewer: hr })).not.toThrow();
+        expect(() => assertKnownWriteFields({ band_id: 7 }, tableFrom(loose), { viewer: hr })).not.toThrow();
     });
 
     it.each(["officeId", "office_id"])("refuses `%s` to everyone when the relation is `excludeFromApi`", (key) => {
         for (const viewer of [admin, hr, undefined]) {
-            const error = thrown(() => assertKnownWriteFields({ [key]: 3 }, loose, { viewer }));
+            const error = thrown(() => assertKnownWriteFields({ [key]: 3 }, tableFrom(loose), { viewer }));
             expect(error.code).toBe("VALIDATION_EXCLUDED_FIELDS");
             expect((error.details as { fields: string[] }).fields).toEqual([key]);
         }
     });
 
     it("refuses it through `assertWriteRequestValid`, which is the socket's and MCP's door", () => {
-        expect(thrown(() => assertWriteRequestValid({ bandId: 7 }, banded, { viewer: clerk })).code)
+        expect(thrown(() => assertWriteRequestValid({ bandId: 7 }, tableFrom(banded), { viewer: clerk })).code)
             .toBe("FIELD_NOT_WRITABLE");
     });
 
     it("is not offered in the known-fields list to a caller who may not write it", () => {
-        expect(thrown(() => assertKnownWriteFields({ titel: "x" }, banded, { viewer: clerk })).message)
+        expect(thrown(() => assertKnownWriteFields({ titel: "x" }, tableFrom(banded), { viewer: clerk })).message)
             .not.toContain("'bandId'");
-        expect(thrown(() => assertKnownWriteFields({ titel: "x" }, banded, { viewer: hr })).message)
+        expect(thrown(() => assertKnownWriteFields({ titel: "x" }, tableFrom(banded), { viewer: hr })).message)
             .toContain("'bandId'");
     });
 
@@ -331,7 +332,7 @@ describe("the foreign key of a to-one relation", () => {
                 c.set("user", { uid: "u1", roles });
                 await next();
             });
-            app.route("/", new RestApiGenerator([banded, bands, offices], driver).generateRoutes());
+            app.route("/", new RestApiGenerator(tablesFromCollections([banded, bands, offices]), driver).generateRoutes());
             const send = (method: string, path: string, body: unknown) => app.request(path, {
                 method,
                 headers: { "Content-Type": "application/json" },

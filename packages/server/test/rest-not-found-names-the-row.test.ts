@@ -6,6 +6,7 @@ import { errorHandler } from "../src/api/errors";
 import type { HonoEnv } from "../src/api/types";
 import type { CollectionConfig } from "@rebasepro/types";
 import { fakeDataDriver } from "./helpers/server-b-fakes";
+import { tablesFromCollections } from "./helpers/tables";
 
 /**
  * A 404 on a row says which row, and names the other reason it can happen.
@@ -51,7 +52,7 @@ function app(): Hono<HonoEnv> {
     const hono = new Hono<HonoEnv>();
     hono.onError(errorHandler);
     hono.use("/*", async (c, next) => { c.set("driver", driver); await next(); });
-    hono.route("/api/data", new RestApiGenerator([orders, lines], driver).generateRoutes());
+    hono.route("/api/data", new RestApiGenerator(tablesFromCollections([orders, lines]), driver).generateRoutes());
     return hono;
 }
 

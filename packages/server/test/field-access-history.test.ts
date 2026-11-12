@@ -16,6 +16,7 @@ import { createHistoryRoutes, type HistoryService } from "../src/history/history
 import type { CollectionConfig } from "@rebasepro/types";
 import type { HonoEnv } from "../src/api/types";
 import { fakeDataDriver } from "./helpers/server-a-fakes";
+import { tablesFromCollections } from "./helpers/tables";
 
 const staff: CollectionConfig = {
     name: "staff",
@@ -60,7 +61,7 @@ function mount(roles: string[] | undefined) {
     });
     app.route("/api/data", createHistoryRoutes({
         historyService,
-        registry,
+        tables: () => tablesFromCollections(registry.getCollections()),
         // Accepted and deliberately not read by these routes: any member reached would throw.
         driver: fakeDataDriver()
     }));

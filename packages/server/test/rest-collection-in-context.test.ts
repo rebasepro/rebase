@@ -5,6 +5,7 @@ import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
 import type { HonoEnv } from "../src/api/types";
 import type { CollectionConfig, DataDriver, RestFetchService } from "@rebasepro/types";
+import { tablesFromCollections } from "./helpers/tables";
 
 /**
  * The data routes say which collection the request is about.
@@ -53,7 +54,7 @@ function mount(): { app: Hono<HonoEnv>; seen: () => string | undefined } {
     });
     // Mounted under a prefix on purpose: inside a sub-app `c.req.path` is still
     // the FULL path, so a naive first-segment split would answer "api".
-    app.route("/api/data", new RestApiGenerator([orders], driver).generateRoutes());
+    app.route("/api/data", new RestApiGenerator(tablesFromCollections([orders]), driver).generateRoutes());
 
     return { app, seen: () => seen };
 }

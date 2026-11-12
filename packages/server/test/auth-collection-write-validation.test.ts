@@ -5,6 +5,7 @@ import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
 import type { HonoEnv } from "../src/api/types";
 import { fakeDataDriver } from "./helpers/server-a-fakes";
+import { tablesFromCollections } from "./helpers/tables";
 
 /** An adapter that is only the user-creation half the routes call; it authenticates nobody. */
 function creationAdapter(members: Partial<AuthAdapter>): AuthAdapter {
@@ -66,7 +67,7 @@ describe("auth-collection creates still reject unknown fields", () => {
             c.set("driver", mockDriver);
             await next();
         });
-        const generator = new RestApiGenerator([users], mockDriver, adapter);
+        const generator = new RestApiGenerator(tablesFromCollections([users]), mockDriver, adapter);
         app.route("/", generator.generateRoutes());
         return app;
     };

@@ -6,6 +6,7 @@ import { rowETag } from "../src/api/rest/etag";
 import type { HonoEnv } from "../src/api/types";
 import type { DataDriver } from "../../types/src/controllers/data_driver";
 import type { CollectionConfig } from "../../types/src/types/collections";
+import { tablesFromCollections, tableFrom } from "./helpers/tables";
 
 /**
  * A nested route is the root route reached by another address.
@@ -75,7 +76,7 @@ function createHarness() {
         c.set("user", { uid: "u1", roles: ["viewer"] });
         await next();
     });
-    app.route("/", new RestApiGenerator([blogPosts, comments], driver).generateRoutes());
+    app.route("/", new RestApiGenerator(tablesFromCollections([blogPosts, comments]), driver).generateRoutes());
     return { app, calls, writes: () => calls.filter(([method]) => method === "save" || method === "delete") };
 }
 
@@ -214,7 +215,7 @@ describe("a nested write", () => {
 
     it("applies an update whose If-Match is the row's current tag", async () => {
         const { app, writes } = createHarness();
-        const current = await rowETag({ id: 7, body: "hello", views: 1 }, comments);
+        const current = await rowETag({ id: 7, body: "hello", views: 1 }, tableFrom(comments));
 
         const res = await send(app, "PATCH", "/blog_posts/1/comments/7", { body: "x" }, { "If-Match": current! });
 
@@ -276,7 +277,7 @@ describe("a nested count", () => {
         expect(calls).toEqual([["count", expect.objectContaining({
             path: "blog_posts/1/comments",
             withDeleted: "only",
-            collection: comments
+            collection: expect.objectContaining({ slug: "comments" })
         })]]);
     });
 });
@@ -376,7 +377,7 @@ describe("a write through a parent's relation", () => {
             c.set("user", { uid: "u1", roles });
             await next();
         });
-        app.route("/", new RestApiGenerator([bands, members, posts, tags], driver).generateRoutes());
+        app.route("/", new RestApiGenerator(tablesFromCollections([bands, members, posts, tags]), driver).generateRoutes());
         const writes = () => calls.filter(([method]) => ["save", "delete", "updateRelationPivot"].includes(method));
         return { app, writes };
     }

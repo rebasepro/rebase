@@ -5,6 +5,7 @@ import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
 import type { HonoEnv } from "../src/api/types";
 import { fakeDataDriver } from "./helpers/server-b-fakes";
+import { tablesFromCollections } from "./helpers/tables";
 
 /** The driver methods these routes call, each a mock the test can read. */
 function driverMocks() {
@@ -42,7 +43,7 @@ isId: true },
             c.set("driver", driver);
             await next();
         });
-        const generator = new RestApiGenerator([skuItems], driver);
+        const generator = new RestApiGenerator(tablesFromCollections([skuItems]), driver);
         app.route("/", generator.generateRoutes());
         return app;
     };

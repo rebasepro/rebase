@@ -8,7 +8,8 @@
  * types all of them; a client generated from the document could set none.
  * A multi-hop `via` is refused (RELATION_NOT_WRITABLE) and stays out.
  */
-import { buildCollectionInputSchema } from "../src/api/openapi-generator";
+import { buildTableInputSchema } from "../src/api/openapi-generator";
+import { descriptorOf, tablesFromCollections } from "./helpers/tables";
 import { CollectionConfig } from "../../types/src/types/collections";
 
 const profiles: CollectionConfig = { slug: "profiles", name: "Profiles", table: "profiles", properties: { id: { name: "ID", type: "number", isId: "increment" } } };
@@ -62,7 +63,8 @@ const posts: CollectionConfig = {
 };
 
 describe("the OpenAPI create body's relations", () => {
-    const schema = buildCollectionInputSchema(posts) as { required?: string[]; properties: Record<string, Record<string, unknown>> };
+    const fixture = tablesFromCollections([profiles, tags, authors, posts]);
+    const schema = buildTableInputSchema(descriptorOf(fixture, "posts"), slug => fixture.descriptors.find(t => t.slug === slug)) as { required?: string[]; properties: Record<string, Record<string, unknown>> };
 
     it("still offers both spellings of a belongsTo", () => {
         expect(schema.properties.authorId).toMatchObject({ type: "integer" });

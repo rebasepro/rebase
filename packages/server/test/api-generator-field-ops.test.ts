@@ -8,6 +8,7 @@ import { fakeDataDriver } from "./helpers/server-a-fakes";
 /** What a harness records of each write: the values that reached the driver. */
 type RecordedWrite = { values: Partial<Record<string, unknown>> };
 import type { HonoEnv } from "../src/api/types";
+import { tableFrom, tablesFromCollections } from "./helpers/tables";
 
 /**
  * `{ views: { $inc: 1 } }` — a change to the stored value, not a value.
@@ -62,7 +63,7 @@ function createHarness() {
         c.set("user", { uid: "user-1" });
         await next();
     });
-    app.route("/", new RestApiGenerator([posts], driver).generateRoutes());
+    app.route("/", new RestApiGenerator(tablesFromCollections([posts]), driver).generateRoutes());
     return { app, saves };
 }
 
@@ -256,7 +257,7 @@ describe("field operations against the property's declared rules", () => {
             c.set("user", { uid: "user-1" });
             await next();
         });
-        app.route("/", new RestApiGenerator([products], driver).generateRoutes());
+        app.route("/", new RestApiGenerator(tablesFromCollections([products]), driver).generateRoutes());
         return { app, saves };
     }
 
@@ -422,7 +423,7 @@ describe("a map value whose keys start with `$`", () => {
     });
 
     it("is split as data by the parser the driver uses, given the properties", () => {
-        const { values, fieldOps } = splitFieldOps({ meta: { $schema: "s" }, views: { $inc: 1 } }, posts.properties);
+        const { values, fieldOps } = splitFieldOps({ meta: { $schema: "s" }, views: { $inc: 1 } }, tableFrom(posts));
         expect(values).toEqual({ meta: { $schema: "s" } });
         expect(fieldOps).toEqual({ views: { operator: "$inc", operand: 1 } });
     });

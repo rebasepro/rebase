@@ -1,12 +1,12 @@
-import { type CollectionConfig, type ResolvedRelation, hasForeignKeyOnTarget, isManyToMany } from "@rebasepro/types";
-import { type FieldViewer, fieldKeyForColumn, relationDeclaringProperty } from "@rebasepro/common";
+import type { RelationDescriptor, TableDescriptor } from "@rebasepro/types";
+import { type FieldViewer, keyForColumn } from "@rebasepro/common";
 import { assertNoClosedFields } from "./write-validation";
 
-/** The last hop of a nested path: the parent, the relation it names, and that relation's target. */
+/** The last hop of a nested path: the parent table, the relation it names, and that relation's target table. */
 export interface NestedWriteHop {
-    parentCollection: CollectionConfig;
-    relation: ResolvedRelation;
-    targetCollection: CollectionConfig;
+    parent: TableDescriptor;
+    relation: RelationDescriptor;
+    target: TableDescriptor;
 }
 
 /**
@@ -36,8 +36,8 @@ export type NestedWriteKind = "create" | "update" | "pivot" | "unlink";
  *  - A create is also a new member of the parent's relation, and every write
  *    through a many-to-many path is set membership: it links on create and on
  *    update, edits the link with `_pivot`, and drops it on delete. That is a
- *    write of the parent's relation property — `PATCH /posts/1 { tags: [5] }`
- *    when `posts.tags` is closed — and its rules hold here.
+ *    write of the parent's relation — `PATCH /posts/1 { tags: [5] }` when
+ *    `posts.tags` is closed — and its rules hold here.
  *
  * An update through an owning parent changes neither: the driver refuses it
  * unless the row is already the parent's, and does not write the key.
@@ -45,7 +45,7 @@ export type NestedWriteKind = "create" | "update" | "pivot" | "unlink";
  * One rule for every door that takes a nested path — the REST routes and the
  * realtime socket — asked of the same fields `assertNoClosedFields` judges a
  * body by, so the answer (`FIELD_NOT_WRITABLE`, or `VALIDATION_EXCLUDED_FIELDS`
- * for an `excludeFromApi` relation) is the one the root route gives.
+ * for a private relation) is the one the root route gives.
  */
 export function assertNestedWriteAllowed(
     hop: NestedWriteHop,
@@ -53,26 +53,16 @@ export function assertNestedWriteAllowed(
     path: string,
     viewer: FieldViewer | undefined
 ): void {
-    const { parentCollection, relation, targetCollection } = hop;
+    const { parent, relation, target } = hop;
     const where = `A write through '${path}' sets a relation: `;
 
-    const changesMembership = kind === "create" || isManyToMany(relation);
+    const changesMembership = kind === "create" || relation.kind === "manyToMany";
     if (changesMembership) {
-        const relationKey = declaringPropertyKey(parentCollection, relation);
-        if (relationKey !== undefined) {
-            assertNoClosedFields({ [relationKey]: true }, parentCollection, where, viewer);
-        }
+        assertNoClosedFields({ [relation.name]: true }, parent, where, viewer);
     }
 
-    if (kind === "create" && hasForeignKeyOnTarget(relation)) {
-        const foreignKey = fieldKeyForColumn(targetCollection, relation.foreignKeyOnTarget);
-        assertNoClosedFields({ [foreignKey]: true }, targetCollection, where, viewer);
+    if (kind === "create" && (relation.kind === "hasOne" || relation.kind === "hasMany")) {
+        const foreignKey = keyForColumn(target, relation.foreignKey) ?? relation.foreignKey;
+        assertNoClosedFields({ [foreignKey]: true }, target, where, viewer);
     }
-}
-
-/** The key of the property that declares `relation` on `collection`, if a property does. */
-function declaringPropertyKey(collection: CollectionConfig, relation: ResolvedRelation): string | undefined {
-    const declaring = relationDeclaringProperty(collection, relation);
-    if (!declaring) return undefined;
-    return Object.entries(collection.properties ?? {}).find(([, property]) => property === declaring)?.[0];
 }

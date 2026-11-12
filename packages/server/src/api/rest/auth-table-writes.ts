@@ -1,23 +1,29 @@
 /**
- * A write to the auth collection is user administration.
+ * A write to the auth table is user administration.
  *
- * The auth collection's rows are the users. `/admin/users` holds a change to
- * one to the auth adapter's rules: a create goes through the adapter's user
- * creation (the password hashed, the email normalized, the collection's
- * `onCreateUser`, the invitation), an update may not leave the project without
+ * The auth table's rows are the users (the table defined with
+ * `defineAuthTable`; its descriptor carries `auth`). `/admin/users` holds a
+ * change to one to the auth adapter's rules: a create goes through the
+ * adapter's user creation (the password hashed, the email normalized, the
+ * table's `onCreateUser`, the invitation), an update may not leave the project without
  * an administrator and stores an email the way sign-in looks it up, and a
  * deletion runs `beforeUserDelete` (a veto), ends the sessions and runs
  * `afterUserDelete`. The data doors that write the same rows — the REST routes
  * and MCP's write tools — call these, so that no door writes a user by rules
  * of its own. (The Postgres socket calls the adapter's methods directly.)
  *
- * Every function here leaves any other collection, and an adapter without the
+ * Every function here leaves any other table, and an adapter without the
  * step, exactly as it was: the rows are then written like any table's.
+ *
+ * Whether a table is the auth table is read from its descriptor. The auth
+ * adapter is still handed the auth settings in their lowered form
+ * (`ServedTable.driverCollection.auth`, with the `onCreateUser` hook it runs),
+ * as the data driver is handed the collection — the one seam slice B-R7 cuts.
  */
 import { hasAdminRole } from "@rebasepro/types";
 import type {
     AuthAdapter,
-    CollectionConfig,
+    TableDescriptor,
     UserCreationFinalizeResult,
     UserCreationOptions,
     UserCreationPrepareResult
@@ -26,41 +32,46 @@ import type { FieldViewer } from "@rebasepro/common";
 import { completeUserCreation } from "../../auth/admin-user-ops";
 import { ApiError } from "../errors";
 import { assertKnownWriteFields, assertWriteValuesValid } from "./write-validation";
+import type { ServedTable } from "./served-table";
 
-/** Whether `collection` is the auth collection — its rows are the users. */
-export function isAuthCollection(collection: CollectionConfig): boolean {
-    const auth = collection.auth;
-    return auth === true || (!!auth && typeof auth === "object" && auth.enabled === true);
+/** Whether `table` is the auth table — its rows are the users. */
+export function isAuthTable(table: TableDescriptor): boolean {
+    return table.auth !== undefined;
 }
 
-/** The collection's own auth settings, when it declares them as an object. */
-function collectionAuthConfig(collection: CollectionConfig): unknown {
-    return typeof collection.auth === "object" ? collection.auth : undefined;
+/**
+ * The auth settings the adapter is handed: the lowered auth table's, with the
+ * `onCreateUser` hook it runs. Read off the driver's collection, the seam B-R7
+ * cuts (see `served-table.ts`).
+ */
+function adapterAuthConfig(served: ServedTable): unknown {
+    const auth = served.driverCollection.auth;
+    return typeof auth === "object" ? auth : undefined;
 }
 
 /** An adapter that performs user creation (`prepareUserCreation`). */
 export type UserCreatingAdapter = AuthAdapter & Required<Pick<AuthAdapter, "prepareUserCreation">>;
 
 /**
- * Whether a create on `collection` is a user creation `adapter` performs: the
- * collection is the auth collection and the adapter has the step. When not,
- * the door writes the row like any other.
+ * Whether a create on `table` is a user creation `adapter` performs: the table
+ * is the auth table and the adapter has the step. When not, the door writes
+ * the row like any other.
  */
 export function createsUsers(
     adapter: AuthAdapter | undefined,
-    collection: CollectionConfig
+    table: TableDescriptor
 ): adapter is UserCreatingAdapter {
-    return !!adapter?.prepareUserCreation && isAuthCollection(collection);
+    return !!adapter?.prepareUserCreation && isAuthTable(table);
 }
 
 /**
- * Refuse an upsert on the auth collection.
+ * Refuse an upsert on the auth table.
  *
  * An upsert is a create or an update, decided inside the write by whether the
- * row is already there, and on the auth collection the two follow different
+ * row is already there, and on the auth table the two follow different
  * rules: a create sets the password and sends the invitation
- * ({@link createUserThroughAuthCollection}), an update may not demote the last
- * administrator and normalizes the email ({@link prepareAuthCollectionUpdates}).
+ * ({@link createUserThroughAuthTable}), an update may not demote the last
+ * administrator and normalizes the email ({@link prepareAuthTableUpdates}).
  * Neither can be applied before the branch is known, so an upsert took
  * neither — `{ id: <the last admin>, roles: ["viewer"] }` demoted them.
  *
@@ -69,13 +80,13 @@ export function createsUsers(
  */
 export function assertNoUserUpsert(
     adapter: AuthAdapter | undefined,
-    collection: CollectionConfig,
+    table: TableDescriptor,
     where?: string
 ): void {
-    if (!isAuthCollection(collection)) return;
+    if (!isAuthTable(table)) return;
     if (!adapter?.prepareUserCreation && !adapter?.prepareUserUpdates) return;
     throw ApiError.badRequest(
-        `${where ? `${where}: ` : ""}An upsert is not accepted on "${collection.slug}", whose rows are the users. ` +
+        `${where ? `${where}: ` : ""}An upsert is not accepted on table "${table.slug}", whose rows are the users. ` +
         "It creates or updates depending on whether the row exists, and the two follow different rules: a create " +
         "sets the password and sends the invitation, an update may not demote the last administrator. " +
         "Send the create with POST and the update with PATCH.",
@@ -84,33 +95,33 @@ export function assertNoUserUpsert(
 }
 
 /**
- * Check a create body for the auth collection against what the adapter says a
+ * Check a create body for the auth table against what the adapter says a
  * create consumes (`describeUserCreationContract`).
  *
- * Signups carry credential fields (`password`) the collection does not declare
- * as columns, so the body is checked for everything else. A custom
+ * Signups carry credential fields (`password`) the table does not declare as
+ * columns, so the body is checked for everything else. A custom
  * `onCreateUser` owns the body's shape, and then the adapter asks for no check:
- * the collection's fields do not describe what arrived.
+ * the table's columns do not describe what arrived.
  *
  * `rowIndex` names the row in a bulk write's message.
  */
 export function assertUserCreationBodyValid(
     adapter: AuthAdapter | undefined,
-    collection: CollectionConfig,
+    served: ServedTable,
     body: Record<string, unknown>,
     viewer: FieldViewer,
     rowIndex?: number
 ): void {
-    const contract = adapter?.describeUserCreationContract?.(collectionAuthConfig(collection));
+    const contract = adapter?.describeUserCreationContract?.(adapterAuthConfig(served));
     if (!contract?.validate) return;
-    assertKnownWriteFields(body, collection, { extraKnownFields: contract.extraFields, viewer, rowIndex });
-    assertWriteValuesValid(body, collection, { rowIndex });
+    assertKnownWriteFields(body, served.table, { extraKnownFields: contract.extraFields, viewer, rowIndex });
+    assertWriteValuesValid(body, served.table, { rowIndex });
 }
 
 /**
  * The first half of creating users, before anything is written: each body
  * through the adapter's `prepareUserCreation` (the password hashed or
- * generated, the email normalized, the collection's `onCreateUser`), in order.
+ * generated, the email normalized, the table's `onCreateUser`), in order.
  * The `values` of each result are what the door writes.
  *
  * `caller` is who the door is writing for: an administrator may waive the
@@ -123,12 +134,12 @@ export function assertUserCreationBodyValid(
  */
 export async function prepareUserCreations(
     adapter: UserCreatingAdapter,
-    collection: CollectionConfig,
+    served: ServedTable,
     bodies: readonly Record<string, unknown>[],
     caller: FieldViewer,
     nameRows = false
 ): Promise<UserCreationPrepareResult[]> {
-    const auth = collectionAuthConfig(collection);
+    const auth = adapterAuthConfig(served);
     const options: UserCreationOptions = { mayWaivePasswordPolicy: hasAdminRole(caller.roles) };
     const prepare = async (body: Record<string, unknown>, index: number) => {
         try {
@@ -222,58 +233,58 @@ export async function completeUserCreations(
 }
 
 /**
- * Create one user through the auth collection, for `caller`:
+ * Create one user through the auth table, for `caller`:
  * {@link prepareUserCreations}, then `save` (the door's own driver write),
  * then {@link completeUserCreations}.
  *
  * `undefined` when the create is not a user creation ({@link createsUsers}) —
  * the door then writes the row like any other.
  */
-export async function createUserThroughAuthCollection(
+export async function createUserThroughAuthTable(
     adapter: AuthAdapter | undefined,
-    collection: CollectionConfig,
+    served: ServedTable,
     body: Record<string, unknown>,
     caller: FieldViewer,
     save: (values: Record<string, unknown>) => Promise<Record<string, unknown>>
 ): Promise<{ row: Record<string, unknown>; delivery: UserCreationFinalizeResult } | undefined> {
-    if (!createsUsers(adapter, collection)) return undefined;
+    if (!createsUsers(adapter, served.table)) return undefined;
 
-    const prepared = await prepareUserCreations(adapter, collection, [body], caller);
+    const prepared = await prepareUserCreations(adapter, served, [body], caller);
     const row = await save(prepared[0].values);
     const [delivery] = await completeUserCreations(adapter, prepared, [row]);
     return { row, delivery };
 }
 
 /**
- * Updates to rows of the auth collection, checked and put in stored form by
+ * Updates to rows of the auth table, checked and put in stored form by
  * the adapter's `prepareUserUpdates`: judged together, so a bulk demotion of
  * every administrator is refused although each row alone would pass.
  *
  * @returns Each update's values, as they should be written, in order.
  */
-export async function prepareAuthCollectionUpdates(
+export async function prepareAuthTableUpdates(
     adapter: AuthAdapter | undefined,
-    collection: CollectionConfig,
+    table: TableDescriptor,
     updates: { uid: string; values: Record<string, unknown> }[]
 ): Promise<Record<string, unknown>[]> {
-    if (updates.length === 0 || !adapter?.prepareUserUpdates || !isAuthCollection(collection)) {
+    if (updates.length === 0 || !adapter?.prepareUserUpdates || !isAuthTable(table)) {
         return updates.map(update => update.values);
     }
     return adapter.prepareUserUpdates(updates);
 }
 
 /**
- * Delete rows of the auth collection as user administration: the adapter's
+ * Delete rows of the auth table as user administration: the adapter's
  * checks and `beforeUserDelete` before `remove` runs (either may refuse), its
  * session cleanup and `afterUserDelete` after.
  */
-export async function deletingAuthCollectionUsers<T>(
+export async function deletingAuthTableUsers<T>(
     adapter: AuthAdapter | undefined,
-    collection: CollectionConfig | undefined,
+    table: TableDescriptor | undefined,
     uids: string[],
     remove: () => Promise<T>
 ): Promise<T> {
-    const userAdmin = collection && isAuthCollection(collection) && uids.length > 0 ? adapter : undefined;
+    const userAdmin = table && isAuthTable(table) && uids.length > 0 ? adapter : undefined;
     await userAdmin?.prepareUserDeletions?.(uids);
     const result = await remove();
     await userAdmin?.finalizeUserDeletions?.(uids);

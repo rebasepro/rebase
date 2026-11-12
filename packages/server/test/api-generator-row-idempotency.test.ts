@@ -4,6 +4,7 @@ import { errorHandler } from "../src/api/errors";
 import type { CollectionConfig, DeleteProps, FetchOneProps, SaveProps } from "@rebasepro/types";
 import { fakeDataDriver } from "./helpers/server-a-fakes";
 import type { HonoEnv } from "../src/api/types";
+import { tablesFromCollections } from "./helpers/tables";
 
 /**
  * `Idempotency-Key` on the single-row `PATCH` and `DELETE`.
@@ -136,7 +137,7 @@ function createHarness(options?: { gateFirstWrite?: boolean; failFirstWrite?: bo
         c.set("user", { uid: "user-1" });
         await next();
     });
-    app.route("/", new RestApiGenerator([posts, comments], driver).generateRoutes());
+    app.route("/", new RestApiGenerator(tablesFromCollections([posts, comments]), driver).generateRoutes());
     return { app, saves, deletes, writeCount: () => writes };
 }
 

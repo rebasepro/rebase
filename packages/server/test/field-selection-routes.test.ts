@@ -4,6 +4,7 @@ import { errorHandler } from "../src/api/errors";
 import type { HonoEnv } from "../src/api/types";
 import type { CollectionConfig } from "@rebasepro/types";
 import { mockDataDriver } from "./helpers/server-a-fakes";
+import { tablesFromCollections } from "./helpers/tables";
 
 /**
  * `?fields=` over HTTP, on every route that returns rows.
@@ -60,7 +61,7 @@ function createApp() {
         c.set("driver", driver);
         await next();
     });
-    app.route("/", new RestApiGenerator([author, post], driver).generateRoutes());
+    app.route("/", new RestApiGenerator(tablesFromCollections([author, post]), driver).generateRoutes());
     return app;
 }
 

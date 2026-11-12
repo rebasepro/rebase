@@ -3,6 +3,7 @@ import type { CollectionConfig } from "@rebasepro/types";
 
 import { generateOpenApiSpec } from "../src/api/openapi-generator";
 import { openApiDocument, type JsonSchema } from "./helpers/server-b-g1-openapi";
+import { tablesFromCollections } from "./helpers/tables";
 
 /**
  * A string's `validation.matches` as the spec's `pattern`.
@@ -24,7 +25,7 @@ const codes: CollectionConfig = {
 };
 
 function propertySchemas(): Record<string, JsonSchema> {
-    const spec = openApiDocument(generateOpenApiSpec([codes]));
+    const spec = openApiDocument(generateOpenApiSpec(tablesFromCollections([codes]).descriptors));
     const schema = Object.values(spec.components.schemas).find(s => s.properties?.literal);
     if (!schema?.properties) throw new Error("no schema holds the codes properties");
     return schema.properties;

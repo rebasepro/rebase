@@ -5,6 +5,7 @@ import type { HonoEnv } from "../src/api/types";
 import { fakeDataDriver } from "./helpers/server-b-fakes";
 import type { DataDriver } from "../../types/src/controllers/data_driver";
 import type { CollectionConfig } from "../../types/src/types/collections";
+import { tablesFromCollections } from "./helpers/tables";
 
 /**
  * What status a failed write reports.
@@ -29,7 +30,7 @@ function harness(save: () => Promise<Record<string, unknown>>) {
     });
 
     const collections: CollectionConfig[] = [{
-        slug: "posts", name: "Posts", singularName: "Post", properties: {}
+        slug: "posts", name: "Posts", singularName: "Post", properties: { title: { type: "string" } }
     }];
 
     const app = new Hono<HonoEnv>();
@@ -39,7 +40,7 @@ function harness(save: () => Promise<Record<string, unknown>>) {
         c.set("user", { uid: "user-1" });
         await next();
     });
-    app.route("/", new RestApiGenerator(collections, driver).generateRoutes());
+    app.route("/", new RestApiGenerator(tablesFromCollections(collections), driver).generateRoutes());
 
     return {
         post: () => app.request("/posts", {

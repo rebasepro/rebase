@@ -1,5 +1,6 @@
 import { CollectionConfig } from "@rebasepro/types";
 import { assertWriteValuesValid, type WriteViolation } from "../src/api/rest/write-validation";
+import { tableFrom } from "./helpers/tables";
 
 /**
  * A `oneOf` array (blocks) declares one property per block type, and each
@@ -37,7 +38,7 @@ const pages: CollectionConfig = {
 
 function violationsOf(values: Record<string, unknown>): WriteViolation[] {
     try {
-        assertWriteValuesValid(values, pages);
+        assertWriteValuesValid(values, tableFrom(pages));
     } catch (error) {
         return ((error as { details?: { violations?: WriteViolation[] } }).details?.violations) ?? [];
     }

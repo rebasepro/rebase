@@ -2,6 +2,7 @@ import type { CollectionConfig } from "@rebasepro/types";
 import { parseQueryOptions } from "../src/api/rest/query-parser";
 import { assertNoHiddenAggregateNames, assertReadableFields, requestViewer } from "../src/api/rest/field-access-query";
 import { ApiError } from "../src/api/errors";
+import { queryAccessFor, tableFrom } from "./helpers/tables";
 
 /**
  * A field no response can carry must be a field no query can interrogate.
@@ -28,9 +29,9 @@ const staff: CollectionConfig = {
     }
 };
 
-const hr = { collection: staff, viewer: { roles: ["hr"] } };
-const clerk = { collection: staff, viewer: { roles: ["staff"] } };
-const admin = { collection: staff, viewer: { roles: ["admin"] } };
+const hr = { ...queryAccessFor([staff]), viewer: { roles: ["hr"] } };
+const clerk = { ...queryAccessFor([staff]), viewer: { roles: ["staff"] } };
+const admin = { ...queryAccessFor([staff]), viewer: { roles: ["admin"] } };
 
 function refusal(fn: () => unknown): ApiError {
     try {
@@ -97,12 +98,12 @@ describe("a query naming an unreadable field", () => {
     });
 
     it("answers an `excludeFromApi` column in an aggregate as an unknown one", () => {
-        expect(() => assertReadableFields(["passwordHash"], staff, { roles: ["admin"] }, "groupBy")).not.toThrow();
+        expect(() => assertReadableFields(["passwordHash"], tableFrom(staff), { roles: ["admin"] }, "groupBy")).not.toThrow();
         for (const [aggregates, groupBy] of [
             [[{ fn: "sum", field: "passwordHash" }], []],
             [[{ fn: "count" }], ["passwordHash"]]
         ] as const) {
-            const error = refusal(() => assertNoHiddenAggregateNames(aggregates, groupBy, staff));
+            const error = refusal(() => assertNoHiddenAggregateNames(aggregates, groupBy, tableFrom(staff)));
             expect(error.code).toBe("UNKNOWN_AGGREGATE_FIELD");
             expect(error.message).toContain("'passwordHash'");
             expect(error.message).not.toMatch(/Valid fields:.*password/i);
@@ -158,14 +159,14 @@ describe("the foreign key of a withheld to-one relation", () => {
 
     it("is refused as a filter, under its wire name and its column name", () => {
         const viewer = { roles: ["staff"] };
-        expect(refusal(() => parseQueryOptions({ bandId: "eq.7" }, {}, { collection: banded, viewer })).code)
+        expect(refusal(() => parseQueryOptions({ bandId: "eq.7" }, {}, { ...queryAccessFor([banded]), viewer })).code)
             .toBe("FIELD_NOT_READABLE");
-        expect(refusal(() => parseQueryOptions({ band_id: "eq.7" }, {}, { collection: banded, viewer })).code)
+        expect(refusal(() => parseQueryOptions({ band_id: "eq.7" }, {}, { ...queryAccessFor([banded]), viewer })).code)
             .toBe("FIELD_NOT_READABLE");
     });
 
     it("is answered for a caller who may read the relation", () => {
-        expect(() => parseQueryOptions({ bandId: "eq.7" }, {}, { collection: banded, viewer: { roles: ["hr"] } }))
+        expect(() => parseQueryOptions({ bandId: "eq.7" }, {}, { ...queryAccessFor([banded]), viewer: { roles: ["hr"] } }))
             .not.toThrow();
     });
 });
@@ -209,19 +210,19 @@ describe("a vector search", () => {
     const search = (property: string) => ({ vector_search: property, vector: "[1,0,0]", vector_distance: "l2" });
 
     it("refuses a property the caller cannot read", () => {
-        const error = refusal(() => parseQueryOptions(search("secretEmbedding"), {}, { collection: docs, viewer: { roles: ["user"] } }));
+        const error = refusal(() => parseQueryOptions(search("secretEmbedding"), {}, { ...queryAccessFor([docs]), viewer: { roles: ["user"] } }));
         expect(error.code).toBe("FIELD_NOT_READABLE");
         expect(error.message).toContain("'secretEmbedding'");
         expect(error.message).toContain("`vector_search`");
     });
 
     it("refuses one under its column name too", () => {
-        expect(refusal(() => parseQueryOptions(search("secret_embedding"), {}, { collection: docs, viewer: { roles: ["user"] } })).code)
+        expect(refusal(() => parseQueryOptions(search("secret_embedding"), {}, { ...queryAccessFor([docs]), viewer: { roles: ["user"] } })).code)
             .toBe("FIELD_NOT_READABLE");
     });
 
     it("answers an `excludeFromApi` property as an unknown one, even for admin", () => {
-        const error = refusal(() => parseQueryOptions(search("internalEmbedding"), {}, { collection: docs, viewer: { roles: ["admin"] } }));
+        const error = refusal(() => parseQueryOptions(search("internalEmbedding"), {}, { ...queryAccessFor([docs]), viewer: { roles: ["admin"] } }));
         expect(error.code).toBe("UNKNOWN_VECTOR_PROPERTY");
         expect(error.message).toBe(
             "Unknown vector property \"internalEmbedding\". This collection's vector properties are: embedding, secretEmbedding."
@@ -229,9 +230,9 @@ describe("a vector search", () => {
     });
 
     it("answers a caller who may read it", () => {
-        expect(parseQueryOptions(search("secretEmbedding"), {}, { collection: docs, viewer: { roles: ["admin"] } }).vectorSearch?.property)
+        expect(parseQueryOptions(search("secretEmbedding"), {}, { ...queryAccessFor([docs]), viewer: { roles: ["admin"] } }).vectorSearch?.property)
             .toBe("secretEmbedding");
-        expect(() => parseQueryOptions(search("embedding"), {}, { collection: docs, viewer: { roles: ["user"] } })).not.toThrow();
+        expect(() => parseQueryOptions(search("embedding"), {}, { ...queryAccessFor([docs]), viewer: { roles: ["user"] } })).not.toThrow();
     });
 });
 
@@ -267,7 +268,7 @@ describe("a relation an include loads", () => {
             }
         }
     };
-    const as = (roles: string[]) => ({ collection: departments, viewer: { roles } });
+    const as = (roles: string[]) => ({ ...queryAccessFor([departments]), viewer: { roles } });
     const include = (spec: unknown) => ({ include: JSON.stringify(spec) });
 
     it("refuses a filter on a field of the target the caller cannot read", () => {
@@ -276,7 +277,7 @@ describe("a relation an include loads", () => {
         ));
         expect(error.code).toBe("FIELD_NOT_READABLE");
         expect(error.statusCode).toBe(400);
-        expect(error.message).toContain("'salary' is not readable on 'staff'");
+        expect(error.message).toContain("'salary' is not readable on table 'staff'");
     });
 
     it("refuses a logical group over one", () => {
@@ -329,18 +330,18 @@ describe("a relation an include loads", () => {
 describe("assertReadableFields, which the aggregate route calls directly", () => {
     it("refuses an aggregate over a withheld column", () => {
         const error = refusal(() =>
-            assertReadableFields(["salary"], staff, { roles: ["staff"] }, "select"));
+            assertReadableFields(["salary"], tableFrom(staff), { roles: ["staff"] }, "select"));
         expect(error.code).toBe("FIELD_NOT_READABLE");
         expect(error.message).toContain("`select`");
     });
 
     it("refuses a groupBy over one — bucketing reads the value a range at a time", () => {
-        expect(refusal(() => assertReadableFields(["salary"], staff, { roles: ["staff"] }, "groupBy")).code)
+        expect(refusal(() => assertReadableFields(["salary"], tableFrom(staff), { roles: ["staff"] }, "groupBy")).code)
             .toBe("FIELD_NOT_READABLE");
     });
 
     it("ignores a `count()` with no field", () => {
-        expect(() => assertReadableFields([undefined], staff, { roles: ["staff"] }, "select")).not.toThrow();
+        expect(() => assertReadableFields([undefined], tableFrom(staff), { roles: ["staff"] }, "select")).not.toThrow();
     });
 });
 

@@ -15,6 +15,7 @@
 import { generateOpenApiSpec } from "../src/api/openapi-generator";
 import type { CollectionConfig } from "../../types/src/types/collections";
 import { openApiDocument, schemaOf } from "./helpers/server-b-g1-openapi";
+import { tablesFromCollections } from "./helpers/tables";
 
 const collection: CollectionConfig = {
     slug: "users", name: "Users", singularName: "User", table: "users",
@@ -25,7 +26,7 @@ const collection: CollectionConfig = {
 };
 
 describe("openapi update contract", () => {
-    const spec = openApiDocument(generateOpenApiSpec([collection]));
+    const spec = openApiDocument(generateOpenApiSpec(tablesFromCollections([collection]).descriptors));
     const op = spec.paths["/data/users/{id}"];
 
     it("describes the update under one verb", () => {

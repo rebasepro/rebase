@@ -3,6 +3,7 @@ import type { CollectionConfig } from "@rebasepro/types";
 
 import { generateOpenApiSpec } from "../src/api/openapi-generator";
 import { openApiDocument, schemaOf } from "./helpers/server-b-g1-openapi";
+import { tablesFromCollections } from "./helpers/tables";
 
 /**
  * What `/api/docs` says about a field with an `access` block.
@@ -27,7 +28,7 @@ const staff: CollectionConfig = {
     properties: {
         id: { name: "ID", type: "number", isId: "serial", columnType: "serial" },
         name: { name: "Name", type: "string" },
-        salary: { name: "Salary", type: "number", access: { read: ["hr"], write: ["hr"] } },
+        salary: { name: "Salary", description: "Salary", type: "number", access: { read: ["hr"], write: ["hr"] } },
         // Set by the server, read by anyone.
         rating: { name: "Rating", type: "number", access: { write: [] } },
         // Written through the API by an admin, never served back.
@@ -36,10 +37,10 @@ const staff: CollectionConfig = {
     }
 };
 
-const spec = openApiDocument(generateOpenApiSpec([staff], {}));
+const spec = openApiDocument(generateOpenApiSpec(tablesFromCollections([staff]).descriptors, {}));
 
-const readSchema = schemaOf(spec, "Member").properties ?? {};
-const inputSchema = schemaOf(spec, "MemberInput").properties ?? {};
+const readSchema = schemaOf(spec, "Staff").properties ?? {};
+const inputSchema = schemaOf(spec, "StaffInput").properties ?? {};
 
 describe("the read schema", () => {
     it("carries a role-restricted field, annotated", () => {
@@ -54,7 +55,7 @@ describe("the read schema", () => {
         expect(readSchema.salary.description).toContain("absent, not null");
     });
 
-    it("keeps the property's own name in front of that sentence", () => {
+    it("keeps the column's own description in front of that sentence", () => {
         expect(readSchema.salary.description).toMatch(/^Salary — /);
     });
 

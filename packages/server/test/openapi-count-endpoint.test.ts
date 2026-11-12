@@ -4,6 +4,7 @@ import { RestApiGenerator } from "../src/api/rest/api-generator";
 import type { CollectionConfig } from "../../types/src/types/collections";
 import { fakeDataDriver } from "./helpers/server-b-fakes";
 import { openApiDocument, operationOf } from "./helpers/server-b-g1-openapi";
+import { tablesFromCollections } from "./helpers/tables";
 
 /**
  * `GET /data/{slug}/count` is served for every collection and was in no spec.
@@ -26,7 +27,7 @@ const collection: CollectionConfig = {
 };
 
 describe("the spec describes the count endpoint", () => {
-    const spec = openApiDocument(generateOpenApiSpec([collection]));
+    const spec = openApiDocument(generateOpenApiSpec(tablesFromCollections([collection]).descriptors));
     const count = () => operationOf(spec, "/data/users/count", "get");
 
     it("has a path for it", () => {
@@ -62,14 +63,14 @@ describe("every data route the server registers appears in the spec", () => {
      * endpoint went undocumented in the first place.
      */
     const registered = () => {
-        const generator = new RestApiGenerator([collection], fakeDataDriver({ key: "postgres", initialised: true }));
+        const generator = new RestApiGenerator(tablesFromCollections([collection]), fakeDataDriver({ key: "postgres", initialised: true }));
         return generator.generateRoutes().routes
             .filter(r => r.method !== "ALL")
             .map(r => ({ method: r.method.toLowerCase(), path: r.path }));
     };
 
     it("describes each collection-level route", () => {
-        const spec = openApiDocument(generateOpenApiSpec([collection]));
+        const spec = openApiDocument(generateOpenApiSpec(tablesFromCollections([collection]).descriptors));
 
         // Router paths are Hono patterns (`/users/:id`); spec paths are
         // OpenAPI templates (`/data/users/{id}`). Normalise to compare.

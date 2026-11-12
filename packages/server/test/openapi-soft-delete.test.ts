@@ -2,6 +2,7 @@ import { describe, expect, it } from "@jest/globals";
 import type { CollectionConfig } from "@rebasepro/types";
 
 import { generateOpenApiSpec } from "../src/api/openapi-generator";
+import { tablesFromCollections } from "./helpers/tables";
 
 /**
  * What the spec says a delete does on a `softDelete` collection.
@@ -32,7 +33,7 @@ const tags: CollectionConfig = {
 };
 
 type Json = Record<string, any>;
-const spec = generateOpenApiSpec([notes, tags]) as Json;
+const spec = generateOpenApiSpec(tablesFromCollections([notes, tags]).descriptors) as Json;
 
 const params = (op: Json): Json[] => op.parameters ?? [];
 const param = (op: Json, name: string): Json | undefined => params(op).find(p => p.name === name);
