@@ -1,7 +1,8 @@
 /**
  * Every project in this repository has a resource graph that matches its code.
  *
- * `rebase.resources.json` is generated from `config/resources.ts` and committed,
+ * `rebase.resources.json` is generated from `backend/resources.ts` (and the tables
+ * that name a bucket or a database) and committed,
  * because a host reads it to decide what to provision *before* it runs
  * anything. `rebase build` rewrites it, so a project that builds is honest by
  * construction — and a `runtime: "custom"` project never runs `rebase build`.
@@ -24,11 +25,12 @@ import { spawnSync } from "node:child_process";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 /**
- * Projects to check: a `rebase.json` with an installed config package beside it.
+ * Projects to check: a `rebase.json` with an installed workspace beside it.
  *
  * The templates under `packages/cli/templates` are deliberately excluded. They
  * are skeletons with placeholder package names and no `node_modules`, so their
- * config cannot be evaluated — `check:templates` compiles them instead.
+ * backend cannot be evaluated — `check:templates` compiles them instead, and
+ * `init-resource-graph.test.ts` holds their shipped graphs.
  */
 function projects() {
     const found = [];

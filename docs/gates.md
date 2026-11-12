@@ -136,7 +136,7 @@ this list, in this order.
 | `check:api-surface` | The public export surface of the runtime-provided packages, as a committed contract. A removed export or a lost member fails; an addition passes and the check writes it into the baseline, so it shows in the diff beside the export — commit it. The stable release banks whatever is left before its bump check; the canary runs `--strict`, which refuses an unbanked addition. | `pnpm write:api-surface` |
 | `check:types-headless:dts` | The same guard's declaration half: the built `.d.ts`, where thirteen shipped files began with `import React`. Refuses to run when a core package has no `dist`, rather than scanning nothing and passing. | — |
 | `check:dts` | Published `.d.ts` resolve under `nodenext`, where they were silently `any`. | — |
-| `check:templates` | The scaffolded collection files compile, once per preset, laid out as `rebase init` lays them out. | — |
+| `check:templates` | Every scaffold `rebase init` writes compiles, once per preset and for `--headless`, laid out as `rebase init` lays it out — tables, resources, storage, functions, and every `customizeTable` against its table — and starts from the invariants a project must have: every table states its `rls`, the frontend imports the backend as types only, a headless scaffold installs no React. | — |
 | `check:eject` | An ejected project typechecks against built output. | — |
 | `check:examples` | `examples/*` compile against built output, like a real user. | — |
 | `check:resource-graphs` | The resource graph a project declares matches what the runtime reads. | — |

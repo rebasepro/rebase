@@ -47,16 +47,19 @@ const BIG_HEAP = { NODE_OPTIONS: "--max_old_space_size=4096" };
 const GATES = [
     {
         run: "check:templates",
-        why: `The scaffolded collection files, compiled once per preset as \`rebase init\`
-lays them out, plus a probe that adds what a user adds first: a custom
-component with an image inside it, attached by a lazy import thunk. Nothing
-else checks them fast: the only thing that compiled them was the CMS init
-e2e, inside a Docker build ~15 minutes in, so a template carrying a stale
-collection shape stayed invisible until the very last gate.`
+        why: `Every scaffold \`rebase init\` writes, compiled once per preset as it lays
+them out (backend/schema tables, resources, storage, functions; frontend
+App.tsx and every customizeTable checked against its table), and the
+invariants a new project starts with: every table states its rls, the
+frontend imports the backend as types only, a headless scaffold has no
+React anywhere it installs. Nothing else checks them fast: the only thing
+that compiled them was the CMS init e2e, inside a Docker build ~15 minutes
+in, so a template carrying a stale shape stayed invisible until the very
+last gate.`
     },
     {
         run: "check:resource-graphs",
-        why: `\`rebase.resources.json\` is generated from \`config/resources.ts\` and
+        why: `\`rebase.resources.json\` is generated from \`backend/resources.ts\` and
 committed, because a host reads it to decide what to provision before it
 runs anything. \`rebase build\` rewrites it — but a \`runtime: "custom"\`
 project never runs \`rebase build\`, it builds its own image. So for exactly
