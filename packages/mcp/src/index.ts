@@ -2703,13 +2703,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             const body = await res.text();
             if (!res.ok) {
                 // 501 is the one refusal worth translating: the surface is
-                // mounted but the server was started without a collections
+                // mounted but the server was started without a schema
                 // directory or a repository, so there is nothing to plan
                 // against. Every other status carries the server's own message,
                 // which is written for a person.
                 const hint = res.status === 501
-                    ? "\n\nThis backend was started without `collectionsDir` or `liveSchema.repository`, " +
-                      "so it has no collection source to plan against. `rebase dev` supplies one; a " +
+                    ? "\n\nThis backend was started without `schemaDir` or `liveSchema.repository`, " +
+                      "so it has no schema source to plan against. `rebase dev` supplies one; a " +
                       "deployment running from a built bundle does not."
                     : "";
                 return untrustedTextResult(
@@ -3165,10 +3165,10 @@ roles });
  * A `rebase init` project has `backend/` at its root. This monorepo nests
  * everything under `app/`. Three separate places already handled both by trying
  * candidates — `detectPackageManager`, `readEnvVarFromProject`,
- * `findCollectionsDir` — and three others assumed the monorepo's shape and were
+ * `findSchemaDir` — and three others assumed the monorepo's shape and were
  * simply absent for every scaffolded project.
  *
- * `null` when neither exists, like `findCollectionsDir`. Returning a plausible
+ * `null` when neither exists, like `findSchemaDir`. Returning a plausible
  * path instead would be worse in two ways: a caller cannot tell a discovery
  * from a guess, and neither can a test — a first version of this returned the
  * scaffold's path as a fallback, and deleting the scaffold candidate entirely
@@ -3196,14 +3196,43 @@ export function findDevDir(projectDir: string = getProjectDir()): string {
     return existsSync(nested) ? nested : projectDir;
 }
 
-function findCollectionsDir(): string | null {
-    const projectDir = getProjectDir();
-    const candidates = [
-        resolve(projectDir, "app", "config", "collections"),
-        resolve(projectDir, "config", "collections"),
-        resolve(projectDir, "collections")
-    ];
-    for (const dir of candidates) {
+/** Where the tables are by default, relative to the project root — as `rebase init` lays them out. */
+const DEFAULT_TABLES_DIR = "backend/schema";
+
+/**
+ * The tables directory a project's `rebase.json` declares: the backend app's
+ * `tables`, else `backend/schema`. The same rule the CLI's layout resolver
+ * applies, read here from the file so this server needs no CLI to answer.
+ * `null` when the manifest cannot be read as one.
+ */
+function declaredTablesDir(root: string): string | null {
+    const manifestPath = resolve(root, "rebase.json");
+    if (!existsSync(manifestPath)) return DEFAULT_TABLES_DIR;
+    let manifest: unknown;
+    try {
+        manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
+    } catch {
+        return null;
+    }
+    const apps = typeof manifest === "object" && manifest !== null && "apps" in manifest ? manifest.apps : undefined;
+    if (typeof apps !== "object" || apps === null) return DEFAULT_TABLES_DIR;
+    for (const app of Object.values(apps)) {
+        if (typeof app !== "object" || app === null || !("type" in app) || app.type !== "backend") continue;
+        return "tables" in app && typeof app.tables === "string" && app.tables ? app.tables : DEFAULT_TABLES_DIR;
+    }
+    return DEFAULT_TABLES_DIR;
+}
+
+/**
+ * The project's schema directory — the one whose `index.ts` exports the
+ * tables — across the two layouts (`<project>/` and the monorepo's
+ * `<project>/app/`), or `null` when neither has one.
+ */
+export function findSchemaDir(projectDir: string = getProjectDir()): string | null {
+    for (const root of [projectDir, resolve(projectDir, "app")]) {
+        const tables = declaredTablesDir(root);
+        if (tables === null) continue;
+        const dir = resolve(root, tables);
         if (existsSync(dir)) return dir;
     }
     return null;
@@ -3212,16 +3241,16 @@ function findCollectionsDir(): string | null {
 server.setRequestHandler(ListResourcesRequestSchema, async () => {
     const resources: Array<{ uri: string; name: string; description: string; mimeType: string }> = [];
 
-    // Collection files
-    const collectionsDir = findCollectionsDir();
-    if (collectionsDir) {
-        const files = readdirSync(collectionsDir).filter((f) => f.endsWith(".ts") && f !== "index.ts");
+    // Table modules: every file of the schema directory but its index.
+    const schemaDir = findSchemaDir();
+    if (schemaDir) {
+        const files = readdirSync(schemaDir).filter((f) => f.endsWith(".ts") && f !== "index.ts" && !f.endsWith(".d.ts"));
         for (const file of files) {
             const name = file.replace(/\.ts$/, "");
             resources.push({
-                uri: `rebase://collections/${name}`,
-                name: `Collection: ${name}`,
-                description: `TypeScript collection definition for "${name}"`,
+                uri: `rebase://tables/${name}`,
+                name: `Table: ${name}`,
+                description: `TypeScript table definition (defineTable) in ${name}.ts`,
                 mimeType: "text/typescript"
             });
         }
@@ -3234,7 +3263,7 @@ server.setRequestHandler(ListResourcesRequestSchema, async () => {
         resources.push({
             uri: "rebase://schema",
             name: "Generated Drizzle Schema",
-            description: "Auto-generated Drizzle ORM schema from collection definitions",
+            description: "Auto-generated Drizzle ORM schema from the tables in backend/schema",
             mimeType: "text/typescript"
         });
     }
@@ -3269,20 +3298,24 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
         };
     }
 
-    const collectionMatch = uri.match(/^rebase:\/\/collections\/(.+)$/);
-    if (collectionMatch) {
-        const name = collectionMatch[1];
-        const collectionsDir = findCollectionsDir();
-        if (!collectionsDir) throw new Error("Collections directory not found.");
+    const tableMatch = uri.match(/^rebase:\/\/tables\/(.+)$/);
+    if (tableMatch) {
+        const name = tableMatch[1];
+        const schemaDir = findSchemaDir();
+        if (!schemaDir) {
+            throw new Error(
+                `No schema directory found under ${getProjectDir()}: looked for the backend's "tables" in ` +
+                `rebase.json, else ${DEFAULT_TABLES_DIR}.`
+            );
+        }
 
-        const absoluteCollectionsDir = resolve(collectionsDir);
-        const filePath = resolve(absoluteCollectionsDir, `${name}.ts`);
-        // With the separator: `…/collections_private/x.ts` starts with
-        // `…/collections` too.
-        if (!filePath.startsWith(absoluteCollectionsDir + sep)) {
+        const absoluteSchemaDir = resolve(schemaDir);
+        const filePath = resolve(absoluteSchemaDir, `${name}.ts`);
+        // With the separator: `…/schema_private/x.ts` starts with `…/schema` too.
+        if (!filePath.startsWith(absoluteSchemaDir + sep)) {
             throw new Error("Access denied: path traversal detected");
         }
-        if (!existsSync(filePath)) throw new Error(`Collection "${name}" not found.`);
+        if (!existsSync(filePath)) throw new Error(`Table module "${name}" not found in ${absoluteSchemaDir}.`);
 
         return {
             contents: [{

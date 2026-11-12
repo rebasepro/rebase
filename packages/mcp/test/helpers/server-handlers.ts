@@ -95,3 +95,22 @@ export function readResourceHandler(server: Server): (request: McpRequest) => Pr
         return answer;
     };
 }
+
+/** What `resources/list` answers. */
+export interface ListResourcesResult {
+    resources: Array<{ uri: string; name: string }>;
+}
+
+function isListResourcesResult(value: unknown): value is ListResourcesResult {
+    return isRecord(value) && isListOf(value.resources, ["uri", "name"]);
+}
+
+/** The `resources/list` handler. */
+export function listResourcesHandler(server: Server): (request: McpRequest) => Promise<ListResourcesResult> {
+    const handle = requestHandler(server, "resources/list");
+    return async (request) => {
+        const answer = await handle(request);
+        if (!isListResourcesResult(answer)) throw new Error(`Not a resource list: ${JSON.stringify(answer)}`);
+        return answer;
+    };
+}

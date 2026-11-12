@@ -17,6 +17,7 @@ import {
     LOCAL_ONLY_TOOLS,
     findBackendDir,
     findDevDir,
+    findSchemaDir,
     envDeclaredProject,
     envAppToken,
     autoDiscoverLocal,
@@ -32,7 +33,7 @@ import {
 } from "../src/index";
 import type { PackageManager } from "../src/index";
 import { spawn } from "node:child_process";
-import { listToolsHandler, readResourceHandler, toolCallHandler } from "./helpers/server-handlers";
+import { listResourcesHandler, listToolsHandler, readResourceHandler, toolCallHandler } from "./helpers/server-handlers";
 import { mkdtempSync, writeFileSync, rmSync, mkdirSync, existsSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { tmpdir } from "node:os";
@@ -1104,7 +1105,7 @@ describe("the db gate checks the DSN the child would actually use", () => {
     });
 });
 
-describe("collection resources stay inside the collections directory", () => {
+describe("table resources stay inside the schema directory", () => {
     const tools = () => toolCallHandler(server);
     const read = (uri: string) => readResourceHandler(server)({
         method: "resources/read",
@@ -1112,12 +1113,7 @@ describe("collection resources stay inside the collections directory", () => {
     });
     let projectDir: string;
 
-    beforeEach(async () => {
-        projectDir = mkdtempSync(join(tmpdir(), "rebase-mcp-resources-"));
-        mkdirSync(join(projectDir, "config", "collections"), { recursive: true });
-        mkdirSync(join(projectDir, "config", "collections_private"), { recursive: true });
-        writeFileSync(join(projectDir, "config", "collections", "posts.ts"), "export const posts = 1;\n");
-        writeFileSync(join(projectDir, "config", "collections_private", "secrets.ts"), "export const key = 'sk_live';\n");
+    const addProject = async (): Promise<void> => {
         await tools()({
             method: "tools/call",
             params: {
@@ -1126,6 +1122,16 @@ describe("collection resources stay inside the collections directory", () => {
             }
         });
         await tools()({ method: "tools/call", params: { name: "rebase_project_switch", arguments: { name: "resources" } } });
+    };
+
+    beforeEach(async () => {
+        projectDir = mkdtempSync(join(tmpdir(), "rebase-mcp-resources-"));
+        mkdirSync(join(projectDir, "backend", "schema"), { recursive: true });
+        mkdirSync(join(projectDir, "backend", "schema_private"), { recursive: true });
+        writeFileSync(join(projectDir, "backend", "schema", "index.ts"), "export { posts } from \"./posts\";\n");
+        writeFileSync(join(projectDir, "backend", "schema", "posts.ts"), "export const posts = 1;\n");
+        writeFileSync(join(projectDir, "backend", "schema_private", "secrets.ts"), "export const key = 'sk_live';\n");
+        await addProject();
     });
 
     afterEach(async () => {
@@ -1133,19 +1139,39 @@ describe("collection resources stay inside the collections directory", () => {
         rmSync(projectDir, { recursive: true, force: true });
     });
 
-    it("reads a collection file", async () => {
-        const result = await read("rebase://collections/posts");
+    it("lists every table module of backend/schema, not its index", async () => {
+        const listed = await listResourcesHandler(server)({ method: "resources/list", params: {} });
+        const uris = listed.resources.map(resource => resource.uri);
+        expect(uris).toContain("rebase://tables/posts");
+        expect(uris).not.toContain("rebase://tables/index");
+    });
+
+    it("reads a table module", async () => {
+        const result = await read("rebase://tables/posts");
         expect(result.contents[0].text).toContain("posts");
     });
 
-    it("refuses a sibling directory whose name starts with the collections directory's", async () => {
-        // `startsWith(dir)` without a separator let `collections_private`
-        // through, because its path begins with `…/collections`.
-        await expect(read("rebase://collections/../collections_private/secrets")).rejects.toThrow(/path traversal/);
+    it("reads the directory rebase.json names as the backend's tables", async () => {
+        mkdirSync(join(projectDir, "db", "tables"), { recursive: true });
+        writeFileSync(join(projectDir, "db", "tables", "orders.ts"), "export const orders = 1;\n");
+        writeFileSync(join(projectDir, "rebase.json"), JSON.stringify({
+            rebase: "^1",
+            apps: { api: { type: "backend", runtime: "managed", tables: "db/tables" } }
+        }));
+        expect(findSchemaDir(projectDir)).toBe(resolve(projectDir, "db", "tables"));
+        const result = await read("rebase://tables/orders");
+        expect(result.contents[0].text).toContain("orders");
+        await expect(read("rebase://tables/posts")).rejects.toThrow(/not found/);
+    });
+
+    it("refuses a sibling directory whose name starts with the schema directory's", async () => {
+        // `startsWith(dir)` without a separator let `schema_private` through,
+        // because its path begins with `…/schema`.
+        await expect(read("rebase://tables/../schema_private/secrets")).rejects.toThrow(/path traversal/);
     });
 
     it("refuses a path that climbs out altogether", async () => {
-        await expect(read("rebase://collections/../../package")).rejects.toThrow(/path traversal/);
+        await expect(read("rebase://tables/../../package")).rejects.toThrow(/path traversal/);
     });
 });
 
@@ -1940,7 +1966,7 @@ describe("showing a schema change before making it", () => {
                 verdict: "applicable",
                 changes: [],
                 statements: ["ALTER TABLE posts ADD COLUMN subtitle text"],
-                files: ["config/collections/posts.ts"],
+                files: ["backend/schema/posts.ts"],
                 message: "1 statement",
                 withheldConstraints: [],
                 followUp: []
@@ -1981,7 +2007,7 @@ describe("showing a schema change before making it", () => {
                 }
             });
             expect(result.isError).toBe(true);
-            expect(result.content[0].text).toContain("collectionsDir");
+            expect(result.content[0].text).toContain("schemaDir");
         } finally {
             vi.unstubAllGlobals();
         }
