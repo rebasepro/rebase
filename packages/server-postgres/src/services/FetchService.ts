@@ -2,6 +2,8 @@ import { and, asc, count, desc, eq, getTableColumns, getTableName, gt, is, isNot
 import { AnyPgColumn, PgTable, PgTimestamp, PgTimestampString } from "drizzle-orm/pg-core";
 import { CollectionConfig, FilterValues, INCLUDE_COUNT_KEY, isPercentileFraction, isPostgresCollectionConfig, JUNCTION_PIVOT_KEY, MAX_INCLUDE_DEPTH, OrderByTuple, type RelationDescriptor, LogicalCondition, parseRelationAggregateSort } from "@rebasepro/types";
 import { isTimeZoneName } from "@rebasepro/types";
+import type { ColumnDescriptor } from "@rebasepro/types";
+import { isJsNumberType } from "@rebasepro/common";
 import type { DriverAggregate, DriverAggregateGroup, IncludeSpec, NullsPlacement, ReadOperation, ReadQuery, VectorSearchParams } from "@rebasepro/types";
 import { includableRelations, queryableFieldNames, unknownAggregateField, unknownIncludeRelation, unknownOrderByField, unknownProjectionField, createRelationRefWithData, normalizeDriverOrderBy, normalizeInclude, encodeCursor, type IncludeNode, type NormalizedInclude } from "@rebasepro/common";
 import { generateForeignKeyName, toWireKey } from "@rebasepro/utils";
@@ -75,7 +77,8 @@ type ResolvedOrderKey = {
  * so they do it too — but only over a numeric column, and those are the two
  * functions that also apply to text and dates.
  *
- * Decided by the column's DECLARED type, not by trying `Number()` on the value.
+ * Decided by the column's Postgres type (a numeric kind), not by trying
+ * `Number()` on the value.
  * `?select=avg(price),max(price)` used to answer `{avg_price: 5,
  * max_price: "8.5"}` — one column, two functions, two JSON types, and
  * arithmetic on the second one silently concatenates. Parsing whatever looks
@@ -87,10 +90,12 @@ type ResolvedOrderKey = {
  */
 export function numericAggregateAliases(
     aggregates: DriverAggregate[],
-    properties: Record<string, { type?: string }>
+    columns: ReadonlyMap<string, ColumnDescriptor>
 ): Set<string> {
-    const isNumberField = (field?: string): boolean =>
-        Boolean(field) && properties[field as string]?.type === "number";
+    const isNumberField = (field?: string): boolean => {
+        const column = field === undefined ? undefined : columns.get(field);
+        return column !== undefined && isJsNumberType(column.type);
+    };
     return new Set(
         aggregates
             .filter(a =>
@@ -2185,7 +2190,7 @@ target });
         // value, and the `Number.isNaN` guard below would not catch it.
         const numericAliases = numericAggregateAliases(
             options.aggregates,
-            (collection?.properties ?? {}) as Record<string, { type?: string }>
+            this.registry.requireTable(collection.slug).columnsByKey
         );
         return rows.map(row => {
             const out: Record<string, unknown> = { ...row };

@@ -619,7 +619,7 @@ export class PersistService {
                     // declared bounds by the same statement — see
                     // `compileFieldOpBounds` for why it cannot be a read first.
                     const bounds = fieldOpKeys.length > 0
-                        ? compileFieldOpBounds(table, fieldOps, collection.properties ?? {}, { collectionPath: effectiveCollectionPath })
+                        ? compileFieldOpBounds(table, fieldOps, this.registry.requireTable(collection.slug), { collectionPath: effectiveCollectionPath })
                         : [];
                     const condition = rowIdentityCondition(table, idInfoArray, id, effectiveCollectionPath);
                     if (scalarKeys.length > 0 || compiledOps) {
@@ -1227,7 +1227,7 @@ export class PersistService {
         }
         const compiledOps = fieldOpKeys.length > 0 ? compileFieldOps(table, fieldOps, { collectionPath }) : {};
         const bounds = fieldOpKeys.length > 0
-            ? compileFieldOpBounds(table, fieldOps, collection.properties ?? {}, { collectionPath })
+            ? compileFieldOpBounds(table, fieldOps, this.registry.requireTable(collection.slug), { collectionPath })
             : [];
         const conditions = this.fetchService.buildWriteConditions(filter, logical, table, collectionPath);
         if (conditions.length === 0) throw filterRequired(collectionPath);

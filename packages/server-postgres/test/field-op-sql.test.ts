@@ -1,7 +1,8 @@
 import { describe, expect, it } from "@jest/globals";
 import { pgTable, text, integer, jsonb, json, boolean } from "drizzle-orm/pg-core";
 import { PgDialect } from "drizzle-orm/pg-core";
-import type { Properties } from "@rebasepro/types";
+import { col, defineTable, json as jsonShape } from "@rebasepro/types";
+import { runtimeTableOfDef } from "./helpers/codec-columns";
 import type { ParsedFieldOp } from "@rebasepro/server";
 import { compileFieldOp, compileFieldOpBounds, compileFieldOps } from "../src/services/field-op-sql";
 
@@ -134,16 +135,24 @@ describe("compileFieldOpBounds", () => {
      * behaviour over a real row is pinned in `field-op-bounds.test.ts`; this is
      * the mapping from each declared rule to its comparison.
      */
-    const properties = {
-        views: { name: "Views", type: "number", validation: { min: 0, max: 10, moreThan: -1, lessThan: 11, positive: true, negative: true } },
-        tags: { name: "Tags", type: "array", of: { name: "Tag", type: "string" }, validation: { min: 1, max: 3 } },
-        jsonTags: { name: "Tags", type: "array", of: { name: "Tag", type: "string" }, validation: { min: 1, max: 3 } },
-        legacyTags: { name: "Tags", type: "array", of: { name: "Tag", type: "string" }, validation: { max: 3 } },
-        meta: { name: "Meta", type: "map", properties: {} }
-    } as Properties;
+    const posts = runtimeTableOfDef(defineTable("posts", {
+        columns: {
+            id: col.integer().primaryKey(),
+            views: col.integer().validate({ min: 0, max: 10, moreThan: -1, lessThan: 11, positive: true, negative: true }),
+            tags: col.array(col.text()).validate({ minItems: 1, maxItems: 3 }),
+            jsonTags: col.jsonb(jsonShape.array(jsonShape.string())).validate({ minItems: 1, maxItems: 3 }),
+            legacyTags: col.json(jsonShape.array(jsonShape.string())).validate({ maxItems: 3 }),
+            meta: col.jsonb(jsonShape.object({}))
+        },
+        rls: "admin-only"
+    }));
+    const unbounded = runtimeTableOfDef(defineTable("posts", {
+        columns: { id: col.integer().primaryKey(), views: col.integer(), meta: col.jsonb(jsonShape.object({})) },
+        rls: "admin-only"
+    }));
 
     const boundsFor = (field: string, operator: ParsedFieldOp["operator"], operand: unknown) =>
-        compileFieldOpBounds(table, { [field]: { operator, operand } }, properties, context)
+        compileFieldOpBounds(table, { [field]: { operator, operand } }, posts, context)
             .map(bound => ({ code: bound.code, sql: dialect.sqlToQuery(bound.holds).sql }));
 
     it("compares an increment's result with each of a number's rules", () => {
@@ -170,11 +179,11 @@ describe("compileFieldOpBounds", () => {
         ]);
     });
 
-    it("has nothing to hold for a property without bounds, or for $merge", () => {
+    it("has nothing to hold for a column without bounds, or for $merge", () => {
         expect(compileFieldOpBounds(table, {
             views: { operator: "$inc", operand: 1 },
             meta: { operator: "$merge", operand: { a: 1 } }
-        }, { views: { name: "Views", type: "number" }, meta: properties.meta } as Properties, context)).toEqual([]);
+        }, unbounded, context)).toEqual([]);
         expect(boundsFor("meta", "$merge", { a: 1 })).toEqual([]);
     });
 });

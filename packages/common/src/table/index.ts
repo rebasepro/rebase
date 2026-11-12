@@ -16,6 +16,7 @@ export * from "./relations";
 export * from "./table-options";
 export * from "./json-shape";
 export * from "./field-operations";
+export * from "./field-operation-bounds";
 export * from "./validation";
 export * from "./query-names";
 export * from "./junction";

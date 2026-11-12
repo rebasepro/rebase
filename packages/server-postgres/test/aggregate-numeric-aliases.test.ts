@@ -19,15 +19,21 @@
  */
 import { describe, expect, it } from "@jest/globals";
 
+import { col, defineTable } from "@rebasepro/types";
 import { numericAggregateAliases } from "../src/services/FetchService";
+import { runtimeTableOfDef } from "./helpers/codec-columns";
 
-const properties = {
-    price: { type: "number" },
-    quantity: { type: "number" },
-    sku: { type: "string" },
-    name: { type: "string" },
-    createdAt: { type: "date" }
-};
+const properties = runtimeTableOfDef(defineTable("products", {
+    columns: {
+        id: col.integer().primaryKey(),
+        price: col.numeric(10, 2),
+        quantity: col.bigint(),
+        sku: col.text(),
+        name: col.varchar(),
+        createdAt: col.timestamptz()
+    },
+    rls: "admin-only"
+})).columnsByKey;
 
 /** `select` as the route parses it, for one function over one field. */
 const agg = (fn: "count" | "sum" | "avg" | "min" | "max", field?: string) =>
@@ -45,7 +51,7 @@ describe("numericAggregateAliases", () => {
         expect([...aliases].sort()).toEqual(["avg_price", "count", "sum_price"]);
     });
 
-    it("parses min and max over a number column — the case that was missing", () => {
+    it("parses min and max over a numeric column — the case that was missing", () => {
         const aliases = numericAggregateAliases(
             [agg("min", "price"), agg("max", "price"), agg("max", "quantity")],
             properties
@@ -77,15 +83,15 @@ describe("numericAggregateAliases", () => {
         expect([...aliases].sort()).toEqual(["avg_price", "count", "max_price"]);
     });
 
-    it("does not parse a field the collection does not declare", () => {
+    it("does not parse a field the table does not declare", () => {
         // An unknown field is refused earlier, but this must not guess `number`
         // for something it cannot see.
         expect([...numericAggregateAliases([agg("max", "nope")], properties)]).toEqual([]);
     });
 
-    it("does not parse min or max when there are no properties at all", () => {
-        // A derived or nested path can resolve to a collection this method
-        // cannot read. Leaving the value untouched is the conservative answer.
-        expect([...numericAggregateAliases([agg("max", "price")], {})]).toEqual([]);
+    it("does not parse min or max when there are no columns at all", () => {
+        // Leaving a value untouched is the conservative answer for a field
+        // this method cannot see.
+        expect([...numericAggregateAliases([agg("max", "price")], new Map())]).toEqual([]);
     });
 });

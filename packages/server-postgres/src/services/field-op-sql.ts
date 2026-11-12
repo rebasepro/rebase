@@ -2,27 +2,28 @@ import { and, sql, SQL } from "drizzle-orm";
 import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 import { ApiError } from "@rebasepro/server";
 import type { ParsedFieldOp } from "@rebasepro/server";
-import type { ArrayPropertyValidationSchema, NumberPropertyValidationSchema, Properties } from "@rebasepro/types";
+import { fieldOperationBounds, type ArrayOperationBounds, type NumberOperationBounds } from "@rebasepro/common";
+import type { RuntimeTable } from "../model/runtime-table";
 import type { DrizzleClient } from "../interfaces";
 
 /**
  * Turning `{ views: { $inc: 1 } }` into the `SET` clause that cannot lose a
  * concurrent write.
  *
- * The contract — which operators exist, what they accept, which property types
- * they are legal on — lives in `@rebasepro/server`. What is here is the part
- * only this driver can know: an `array` property is a native `text[]` on one
- * collection and a jsonb document on the next (see the DDL generator's `array`
- * arm), and the two need entirely different statements. Compiling from the
- * property type alone would emit `array_append` against a jsonb column, which
- * Postgres rejects at plan time with a function-does-not-exist error naming
- * neither the collection nor the field.
+ * The contract — which operators exist, what they accept, which columns they
+ * are legal on — lives in `@rebasepro/server`. What is here is the part only
+ * this driver can know: a list is a native `text[]` on one table and a jsonb
+ * document on the next, and the two need entirely different statements, so
+ * each is compiled from the catalogue column's SQL type. Emitting
+ * `array_append` against a jsonb column would be refused by Postgres at plan
+ * time with a function-does-not-exist error naming neither the table nor the
+ * column.
  *
  * Every expression is NULL-safe. `NULL + 1` is `NULL`, and a counter that
  * silently empties itself the first time it is incremented from an unset column
  * is worse than one that never worked.
  *
- * What an operation produces answers to the property's declared bounds, and
+ * What an operation produces answers to the column's declared bounds, and
  * that check is compiled here too, as conditions for the same UPDATE — see
  * {@link compileFieldOpBounds}.
  *
@@ -54,7 +55,7 @@ function asList(operand: unknown): unknown[] {
 /**
  * The expression one operation compiles to, or a 400 saying why it cannot.
  *
- * `field` is the property key; it is already known to be a column of `table`
+ * `field` is the column key; it is already known to be a column of `table`
  * (the caller checks that against the same table it builds the statement from).
  */
 export function compileFieldOp(
@@ -171,7 +172,7 @@ export function compileFieldOps(
  * `{ stock: -5 }` are refused with one answer.
  */
 export interface FieldOpBound {
-    /** The property key. */
+    /** The column key. */
     field: string;
     code: "min" | "max" | "more_than" | "less_than" | "positive" | "negative" | "min_items" | "max_items";
     /**
@@ -188,7 +189,7 @@ export interface FieldOpBound {
  * The declared bounds each operation's *result* must satisfy, as conditions
  * for the UPDATE that applies it.
  *
- * `{ stock: -5 }` on `stock: { validation: { min: 0 } }` is refused before the
+ * `{ stock: -5 }` on `stock: col.integer().validate({ min: 0 })` is refused before the
  * statement is built, because the value is in the request. What
  * `{ stock: { $inc: -1000 } }` produces depends on the stored row, which the
  * request never sees, so it can only be judged where the row is: in the WHERE
@@ -201,35 +202,38 @@ export interface FieldOpBound {
  * committed, so the second decrement sees `0 - 1` and matches nothing.
  *
  * The bound is the whole declared range, applied to the result the way it
- * applies to a value: a number's `min`, `max`, `moreThan`, `lessThan`,
- * `positive` and `negative`, an array's `min` and `max` items. `integer` is not
- * here: a whole increment of a whole number stays whole, and the request
- * already refuses a fractional one. `$merge` has no bounds to hold.
+ * applies to a value (`fieldOperationBounds`): a number's `min`, `max`,
+ * `moreThan`, `lessThan`, `positive` and `negative`, a list's `minItems` and
+ * `maxItems`. `$merge` has no bounds to hold.
+ *
+ * @param columns The table the operations write, whose column descriptors
+ *   state the bounds; `table` is its catalogue table, which the SQL is built on.
  */
 export function compileFieldOpBounds(
     table: PgTable,
     fieldOps: Record<string, ParsedFieldOp>,
-    properties: Properties,
+    columns: RuntimeTable,
     context: { collectionPath: string }
 ): FieldOpBound[] {
     const bounds: FieldOpBound[] = [];
     for (const [field, op] of Object.entries(fieldOps)) {
-        const property = properties[field];
-        if (!property?.validation) continue;
-        if (property.type === "number" && op.operator === "$inc" && typeof op.operand === "number") {
+        const column = columns.columnsByKey.get(field);
+        const declared = column ? fieldOperationBounds(column) : undefined;
+        if (!declared) continue;
+        if (declared.kind === "number" && op.operator === "$inc" && typeof op.operand === "number") {
             const result = compileFieldOp(table, field, op, context);
-            bounds.push(...numberBounds(field, property.validation, result, op.operand));
-        } else if (property.type === "array" && (op.operator === "$push" || op.operator === "$pull")) {
-            const column = table[field as keyof typeof table] as AnyPgColumn | undefined;
+            bounds.push(...numberBounds(field, declared, result, op.operand));
+        } else if (declared.kind === "array" && (op.operator === "$push" || op.operator === "$pull")) {
+            const pgColumn = table[field as keyof typeof table] as AnyPgColumn | undefined;
             const result = compileFieldOp(table, field, op, context);
             // A native array is counted with `cardinality` (not `array_length`,
             // which is NULL for an empty array); a json document with
             // `jsonb_array_length`, through jsonb so one function serves both
             // `json` and `jsonb` columns.
-            const size = column && isNativeArray(sqlTypeOf(column))
+            const size = pgColumn && isNativeArray(sqlTypeOf(pgColumn))
                 ? sql`cardinality(${result})`
                 : sql`jsonb_array_length((${result})::jsonb)`;
-            bounds.push(...arrayBounds(field, property.validation, size, op.operator));
+            bounds.push(...arrayBounds(field, declared, size, op.operator));
         }
     }
     return bounds;
@@ -237,7 +241,7 @@ export function compileFieldOpBounds(
 
 function numberBounds(
     field: string,
-    rules: NumberPropertyValidationSchema,
+    rules: NumberOperationBounds,
     result: SQL,
     operand: number
 ): FieldOpBound[] {
@@ -269,7 +273,7 @@ function numberBounds(
 
 function arrayBounds(
     field: string,
-    rules: ArrayPropertyValidationSchema,
+    rules: ArrayOperationBounds,
     size: SQL,
     operator: "$push" | "$pull"
 ): FieldOpBound[] {
@@ -278,11 +282,11 @@ function arrayBounds(
     // and a range has nothing to say about a value that is not there — the
     // same rule a plain `null` gets.
     const bounds: FieldOpBound[] = [];
-    if (rules.min !== undefined) {
-        bounds.push({ field, code: "min_items", holds: sql`COALESCE(${size} >= ${rules.min}::numeric, TRUE)`, message: `'${field}' must have at least ${items(rules.min)}, and ${operator} would leave it with fewer.` });
+    if (rules.minItems !== undefined) {
+        bounds.push({ field, code: "min_items", holds: sql`COALESCE(${size} >= ${rules.minItems}::numeric, TRUE)`, message: `'${field}' must have at least ${items(rules.minItems)}, and ${operator} would leave it with fewer.` });
     }
-    if (rules.max !== undefined) {
-        bounds.push({ field, code: "max_items", holds: sql`COALESCE(${size} <= ${rules.max}::numeric, TRUE)`, message: `'${field}' must have at most ${items(rules.max)}, and ${operator} would leave it with more.` });
+    if (rules.maxItems !== undefined) {
+        bounds.push({ field, code: "max_items", holds: sql`COALESCE(${size} <= ${rules.maxItems}::numeric, TRUE)`, message: `'${field}' must have at most ${items(rules.maxItems)}, and ${operator} would leave it with more.` });
     }
     return bounds;
 }
