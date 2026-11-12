@@ -28,9 +28,9 @@ const __dirname = path.dirname(__filename);
  * `seed-assets/` and `uploads/` folders (siblings of `backend/`). This must
  * work in two very different layouts:
  *   - source / manual run (`npx tsx src/seed.ts`): __dirname = app/backend/src
- *   - compiled container run (cron): __dirname = app/backend/dist/backend/src
+ *   - compiled container run (cron): __dirname = app/backend/dist/src
  * Anchoring paths off __dirname directly breaks in the compiled layout because
- * tsc nests the output under dist/backend/ and never copies the data files.
+ * tsc emits the code under dist/ and never copies the data files.
  * Walking up to the nearest ancestor that has `seed-assets/` resolves both.
  */
 function findAppRoot(start: string): string {
