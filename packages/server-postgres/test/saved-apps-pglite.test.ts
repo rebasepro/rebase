@@ -121,7 +121,7 @@ describe("the saved-app tools", () => {
                 }
             }),
             tables: TABLES,
-            collections: COLLECTIONS,
+            driverCollection: (slug: string) => COLLECTIONS.find(collection => collection.slug === slug),
             caller: { ...caller, scopes: ["data:read", "data:write"], clientId: "test" },
             compileApp: async (source: string) => source.includes("syntax error")
                 ? { ok: false as const, error: "Line 1: syntax error" }

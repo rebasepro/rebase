@@ -77,7 +77,23 @@ export function tablesFromCollections(
     collections: readonly (CollectionConfig | AnyCollectionConfig)[],
     options: { defaultSecurityRules?: readonly SecurityRule[] } = {}
 ): FixtureTables {
-    const { tables: defs, defaultRls } = tablesFrom(collections, options);
+    const { defs, defaultRls, tables } = compileFixtures(collections, options);
+    const descriptors = tables.map(table => table.descriptor);
+    const descriptorBySlug = new Map(descriptors.map(descriptor => [descriptor.slug, descriptor]));
+    const collectionsOut = lowerTables(defs, { ...(defaultRls ? { defaultRls } : {}), describe: slug => descriptorBySlug.get(slug) });
+    return { tables, descriptors, collections: collectionsOut };
+}
+
+/**
+ * Lift and compile fixture collections, without lowering them again: what a
+ * registry needs. (Lowering follows every relation target it meets; a fixture
+ * whose targets are factories building a new object per call would never end.)
+ */
+function compileFixtures(
+    collections: readonly (CollectionConfig | AnyCollectionConfig)[],
+    options: { defaultSecurityRules?: readonly SecurityRule[] }
+): { defs: (AnyTableDef | AnyViewDef)[]; defaultRls?: DefaultRls; tables: CompiledTable[] } {
+    const { tables: defs, defaultRls } = tablesFrom(withCanonicalTargets(collections), options);
     // `compileSchemaDefs` (`@rebasepro/server`) composed the same way, without
     // the server (several suites mock `@rebasepro/server` wholesale), and with
     // relation targets resolved by slug: a fixture often holds two copies of
@@ -96,10 +112,39 @@ export function tablesFromCollections(
         return compiledTable(def, descriptor);
     });
     if (problems.length > 0) throw new SchemaDefinitionError(problems);
-    const descriptors = tables.map(table => table.descriptor);
-    const descriptorBySlug = new Map(descriptors.map(descriptor => [descriptor.slug, descriptor]));
-    const collectionsOut = lowerTables(defs, { ...(defaultRls ? { defaultRls } : {}), describe: slug => descriptorBySlug.get(slug) });
-    return { tables, descriptors, collections: collectionsOut };
+    return defaultRls ? { defs, defaultRls, tables } : { defs, tables };
+}
+
+/**
+ * The collections with every relation target pointed at the one collection of
+ * that slug in the set (the first given wins). Many fixtures write targets as
+ * factories — `target: () => docs()` — building a new object per call, and the
+ * lift converts each target object once: a factory pair would convert forever.
+ */
+function withCanonicalTargets(collections: readonly (CollectionConfig | AnyCollectionConfig)[]): CollectionConfig[] {
+    const given: CollectionConfig[] = collections.map(collection => collection);
+    const bySlug = new Map<string, CollectionConfig>();
+    const canonical = (target: CollectionConfig): CollectionConfig => bySlug.get(target.slug) ?? target;
+    const retarget = <R extends { target: () => CollectionConfig }>(relation: R): R => {
+        const target = relation.target();
+        return { ...relation, target: () => canonical(target) };
+    };
+    const copies = given.map(collection => {
+        const copy: CollectionConfig = { ...collection };
+        if (!bySlug.has(copy.slug)) bySlug.set(copy.slug, copy);
+        return copy;
+    });
+    for (const copy of copies) {
+        if ("relations" in copy && copy.relations) copy.relations = copy.relations.map(retarget);
+        const properties: CollectionConfig["properties"] = {};
+        for (const [key, property] of Object.entries(copy.properties ?? {})) {
+            properties[key] = property.type === "relation" && property.relation
+                ? { ...property, relation: retarget(property.relation) }
+                : property;
+        }
+        copy.properties = properties;
+    }
+    return copies;
 }
 
 /**
@@ -144,20 +189,20 @@ export class FixtureTableRegistry extends PostgresTableRegistry {
     constructor(...args: ConstructorParameters<typeof PostgresTableRegistry>) {
         super(...args);
         const [collections] = args;
-        if (collections && collections.length > 0) this.registerTables(tablesFromCollections(withRelationTargets(...collections)).tables);
+        if (collections && collections.length > 0) this.registerTables(compileFixtures(withRelationTargets(...collections), {}).tables);
     }
 
     registerMultiple(collections: CollectionConfig[]): boolean {
         const changed = super.registerMultiple(collections);
         if (this.constructed && collections.length > 0) {
-            this.registerTables(tablesFromCollections(withRelationTargets(...collections)).tables);
+            this.registerTables(compileFixtures(withRelationTargets(...collections), {}).tables);
         }
         return changed;
     }
 
     register(collection: CollectionConfig, rawCollection?: CollectionConfig): void {
         super.register(collection, rawCollection);
-        this.registerTables(tablesFromCollections(withRelationTargets(collection)).tables);
+        this.registerTables(compileFixtures(withRelationTargets(collection), {}).tables);
     }
 
     /** Tables compiled on first ask, by the collection object they were compiled from. */
@@ -177,7 +222,7 @@ export class FixtureTableRegistry extends PostgresTableRegistry {
             const pg = this.getPgTable(name);
             if (pg) scratch.registerPgTable(pg, name);
         }
-        scratch.registerTables(tablesFromCollections(withRelationTargets(collection)).tables);
+        scratch.registerTables(compileFixtures(withRelationTargets(collection), {}).tables);
         const table = scratch.getTable(slug);
         if (table) this.compiledOnAsk.set(collection, table);
         return table;

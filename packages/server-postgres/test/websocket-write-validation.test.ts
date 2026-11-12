@@ -47,11 +47,13 @@ jest.mock("@rebasepro/server", () => ({
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     assertNestedWriteAllowed: require("../../server/src/api/rest/nested-write-access").assertNestedWriteAllowed,
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    assertUserCreationBodyValid: require("../../server/src/api/rest/auth-collection-writes").assertUserCreationBodyValid,
+    assertUserCreationBodyValid: require("../../server/src/api/rest/auth-table-writes").assertUserCreationBodyValid,
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    assertNoUserUpsert: require("../../server/src/api/rest/auth-collection-writes").assertNoUserUpsert,
+    assertNoUserUpsert: require("../../server/src/api/rest/auth-table-writes").assertNoUserUpsert,
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    createUserThroughAuthCollection: require("../../server/src/api/rest/auth-collection-writes").createUserThroughAuthCollection
+    createUserThroughAuthTable: require("../../server/src/api/rest/auth-table-writes").createUserThroughAuthTable,
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    isAuthTable: require("../../server/src/api/rest/auth-table-writes").isAuthTable
 }));
 
 import type { AuthAdapter, CollectionConfig, SaveProps } from "@rebasepro/types";

@@ -34,7 +34,7 @@ import { PgTable } from "drizzle-orm/pg-core";
 import { Hono } from "hono";
 import type { CollectionConfig } from "@rebasepro/types";
 import * as schemaBuilders from "@rebasepro/types";
-import { lowerTables } from "@rebasepro/common";
+import { compileSchema, lowerTables } from "@rebasepro/common";
 import { createRebaseClient } from "@rebasepro/client";
 
 import { planSchema } from "../src/schema/plan/plan-schema";
@@ -63,10 +63,23 @@ const SCAFFOLD_DEFAULT_RLS: schemaBuilders.DefaultRls = [
     { operations: ["insert", "update", "delete"], roles: ["admin"] }
 ];
 
-/** One table definition, lowered into the collection the planner and runtime read — as boot does. */
+/** The compiled table each lowered collection came from: what the planner takes. */
+const compiledOf = new WeakMap<CollectionConfig, schemaBuilders.CompiledTable>();
+
+/** One table definition, lowered into the collection the runtime reads — as boot does. */
 function lowered(def: schemaBuilders.AnyTableDef): CollectionConfig {
     const [collection] = lowerTables([def], { defaultRls: SCAFFOLD_DEFAULT_RLS });
+    compiledOf.set(collection, compileSchema([def], { defaultRls: SCAFFOLD_DEFAULT_RLS })[0]);
     return collection;
+}
+
+/** The compiled tables of lowered collections, for the planner's doors. */
+function compiled(collections: CollectionConfig[]): schemaBuilders.CompiledTable[] {
+    return collections.map(collection => {
+        const table = compiledOf.get(collection);
+        if (!table) throw new Error(`"${collection.slug}" was not lowered here`);
+        return table;
+    });
 }
 
 /**
@@ -108,7 +121,7 @@ interface GeneratedModule {
 
 /** `schema.generated.ts` for the collection, compiled and loaded inside this package. */
 function loadGenerated(collection: CollectionConfig): GeneratedModule {
-    const source = renderDrizzleSchema(planSchema([collection]), { policies: false });
+    const source = renderDrizzleSchema(planSchema(compiled([collection])), { policies: false });
     const dir = fs.mkdtempSync(path.join(PACKAGE_ROOT, ".schema-run-"));
     try {
         const file = path.join(dir, "schema.generated.cjs");
@@ -152,7 +165,7 @@ function doors(db: PGlite, collection: CollectionConfig) {
         c.set("driver", await driver.withAuth(ADMIN));
         await next();
     });
-    app.route("/api/data", new RestApiGenerator([collection], driver).generateRoutes());
+    app.route("/api/data", new RestApiGenerator({ descriptors: compiled([collection]).map(table => table.descriptor), collections: [collection] }, driver).generateRoutes());
 
     const client = createRebaseClient({
         baseUrl: "http://quickstart.test",
@@ -212,7 +225,7 @@ describe("the quickstart's `products` table, read from the page", () => {
 
     it("takes a row over REST and through the SDK after boot creates the table", async () => {
         const collection = quickstartCollection();
-        await ensureCollectionTables(queryable(db), [collection]);
+        await ensureCollectionTables(queryable(db), compiled([collection]));
         await createProducts(db, collection);
     });
 
@@ -243,7 +256,7 @@ describe("the quickstart's `products` table, read from the page", () => {
                 "created_at" TIMESTAMP WITH TIME ZONE DEFAULT now()
             );
         `);
-        const outcome = await ensureCollectionTables(queryable(db), [collection]);
+        const outcome = await ensureCollectionTables(queryable(db), compiled([collection]));
         expect(outcome.failures).toEqual([]);
         await createProducts(db, collection);
     });
@@ -251,7 +264,7 @@ describe("the quickstart's `products` table, read from the page", () => {
     it("takes a row in a database built from `schema.sql`, the state `db push` converges to", async () => {
         const collection = quickstartCollection();
         await db.exec('CREATE SCHEMA IF NOT EXISTS "rebase";');
-        await db.exec(renderPostgresDdl(planSchema([collection]), { includePolicies: false }));
+        await db.exec(renderPostgresDdl(planSchema(compiled([collection])), { includePolicies: false }));
         await createProducts(db, collection);
     });
 });
