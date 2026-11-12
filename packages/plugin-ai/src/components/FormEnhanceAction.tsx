@@ -18,8 +18,7 @@ import {
     AIIcon
 } from "@rebasepro/app";
 import { EntityStatus, Properties, Property } from "@rebasepro/types";
-import { PluginFormActionProps } from "@rebasepro/cms-types";
-import { isPropertyBuilder, stripCollectionPath } from "@rebasepro/common";
+import { PluginFormActionProps, isPropertyBuilder, stripCollectionPath } from "@rebasepro/cms-types";
 import { useDataEnhancementController } from "./DataEnhancementControllerProvider";
 import { AutofillReviewDialog } from "./AutofillReviewDialog";
 import { SamplePrompt } from "../types/data_enhancement_controller";

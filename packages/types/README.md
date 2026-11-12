@@ -14,7 +14,7 @@ of it resolves too: Node has supported `require(esm)` since 22.12.
 
 ## What This Package Does
 
-Provides the canonical type definitions used across all Rebase packages — both client-side and server-side. It has no runtime dependencies, but it is not types-only: it also exports the constants and small runtime helpers those packages share (`ADMIN_PROPERTY_KEYS`, `GeoPoint`, `declaredDataSources`, …). Every other `@rebasepro/*` package depends on it.
+Provides the canonical type definitions used across all Rebase packages — both client-side and server-side. It has no runtime dependencies, but it is not types-only: it also exports the constants and small runtime helpers those packages share (`GeoPoint`, `declaredDataSources`, …). Every other `@rebasepro/*` package depends on it.
 
 ## Key Exports
 

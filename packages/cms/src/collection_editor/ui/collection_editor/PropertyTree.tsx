@@ -4,8 +4,7 @@ import { deepEqual as equal } from "fast-equals"
 
 import { AIModifiedIndicator, useTranslation } from "@rebasepro/app";
 import { Properties, Property } from "@rebasepro/types";
-import { AdditionalFieldDelegate } from "@rebasepro/cms-types";
-import { isPropertyBuilder } from "@rebasepro/common";
+import { AdditionalFieldDelegate, isPropertyBuilder } from "@rebasepro/cms-types";
 import {
     ArrowDownToLineIcon,
     ArrowUpToLineIcon,

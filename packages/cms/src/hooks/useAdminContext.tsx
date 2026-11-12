@@ -10,11 +10,9 @@ import type {
     SidePanelController
 } from "@rebasepro/cms-types";
 import type {
-    CollectionRegistryController
-} from "@rebasepro/types";
-import type {
     NavigationStateController,
-    UrlController
+    UrlController,
+    CollectionRegistryController
 } from "@rebasepro/cms-types";
 import { useSidePanel } from "./useSidePanel";
 import { useSideDialogsController } from "./useSideDialogsController";

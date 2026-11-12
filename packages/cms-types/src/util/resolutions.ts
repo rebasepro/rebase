@@ -1,0 +1,412 @@
+import {
+    ArrayProperty,
+    AuthState,
+    CollectionConfig,
+    EnumValueConfig,
+    EnumValues,
+    NumberProperty,
+    Properties,
+    Property,
+    RelationProperty,
+    ResolvedRelation,
+    StringProperty,
+    getDataSourceCapabilities,
+    getDeclaredSubcollections,
+    type EntityChildView
+} from "@rebasepro/types";
+import { enumToObjectEntries, withDeprecatedAlias, isJunctionBackedRelation, resolveCollectionRelations, resolveRelation, getSubcollections, getEntityChildViews, resolveRelationProperty } from "@rebasepro/common";
+import { isPropertyBuilder } from "./entities";
+import { DEFAULT_ONE_OF_TYPE } from "./one_of";
+import { isDefaultFieldConfigId } from "@rebasepro/utils";
+import { getIn, mergeDeep } from "@rebasepro/utils";
+
+type PropertyConfig = { property: unknown; [key: string]: unknown };
+
+/**
+ * Resolve property builders, enums and arrays.
+ */
+
+export type ResolvePropertyProps<M extends Record<string, unknown> = Record<string, unknown>> = {
+    property: Property
+    propertyKey?: string,
+    values?: Partial<M>,
+    previousValues?: Partial<M>,
+    path?: string,
+    entityId?: string | number,
+    index?: number,
+    propertyConfigs?: Record<string, PropertyConfig>;
+    ignoreMissingFields?: boolean;
+    authController: AuthState;
+}
+
+/**
+ * A builder's props as released in 0.28 named the record's id `entityId`; it
+ * is `id` now. Untyped configs still reading `entityId` get the id (and one
+ * warning) instead of `undefined`, which made every existing record's
+ * `readOnly: Boolean(entityId)` field editable.
+ */
+function withDeprecatedBuilderEntityId<T extends { id?: string | number }>(builderProps: T): T {
+    return withDeprecatedAlias(builderProps, "entityId", "id", "PropertyBuilderProps.entityId",
+        "`entityId` in the props a `dynamicProps` builder receives is deprecated; use `id` instead.");
+}
+
+export function resolveProperty<M extends Record<string, unknown> = Record<string, unknown>>(props: ResolvePropertyProps<M>): Property | null {
+
+    const {
+        property,
+        ignoreMissingFields = false,
+        ...rest
+    } = props;
+
+    let resultProperty: Property;
+    // What a `dynamicProps` builder is handed: the record's id as `id`.
+    const { entityId, ...builderProps } = rest;
+
+    if (isPropertyBuilder(property)) {
+        const path = rest.path;
+        if (!path) {
+            // When path is not available (e.g. in preview contexts), skip dynamic
+            // resolution and use the property as-is without dynamic modifications.
+            resultProperty = property as Property;
+        } else {
+            const usedPropertyValue = rest.propertyKey ? getIn(rest.values, rest.propertyKey) : undefined;
+            const dynamicProps = property.dynamicProps?.(withDeprecatedBuilderEntityId({
+                ...builderProps,
+                id: entityId,
+                path,
+                propertyValue: usedPropertyValue,
+                values: rest.values ?? {},
+                previousValues: rest.previousValues ?? rest.values ?? {}
+            }));
+            resultProperty = mergeDeep(property, dynamicProps ?? {});
+        }
+    } else {
+        resultProperty = property as Property;
+    }
+
+    // Apply dynamic properties if they exist
+    if (resultProperty?.dynamicProps && rest.path) {
+        const path = rest.path;
+        const usedPropertyValue = rest.propertyKey ? getIn(rest.values, rest.propertyKey) : undefined;
+        const dynamicPropsResult = resultProperty.dynamicProps(withDeprecatedBuilderEntityId({
+            ...builderProps,
+            id: entityId,
+            path,
+            propertyValue: usedPropertyValue,
+            values: rest.values ?? {},
+            previousValues: rest.previousValues ?? rest.values ?? {}
+        }));
+
+        if (dynamicPropsResult) {
+            resultProperty = mergeDeep(resultProperty, dynamicPropsResult);
+        }
+    }
+
+    let resolvedProperty: Property | null;
+
+    if (resultProperty?.type === "map" && resultProperty.properties) {
+        const properties = resolveProperties({
+            ignoreMissingFields,
+            ...rest,
+            properties: resultProperty.properties
+        });
+        resolvedProperty = {
+            ...resultProperty,
+            properties
+        } as Property;
+    } else if (resultProperty?.type === "array") {
+        resolvedProperty = resultProperty;
+    } else if ((resultProperty?.type === "string" || resultProperty?.type === "number") && resultProperty.enum) {
+        resolvedProperty = resolvePropertyEnum(resultProperty);
+    } else {
+        resolvedProperty = resultProperty;
+    }
+
+    if (resolvedProperty?.propertyConfig && !isDefaultFieldConfigId(resolvedProperty.propertyConfig)) {
+        const cmsFields = rest.propertyConfigs;
+        if (!cmsFields && !ignoreMissingFields) {
+            throw Error(`Trying to resolve a property with key '${resolvedProperty.propertyConfig}' that inherits from a custom property config but no custom property configs were provided. Use the property 'propertyConfigs' in your app config to provide them`);
+        }
+        const customField: PropertyConfig | undefined = cmsFields?.[resolvedProperty.propertyConfig];
+        if (!customField) {
+            console.warn(`Trying to resolve a property with key '${resolvedProperty.propertyConfig}' that inherits from a custom property config but no custom property config with that key was found. Check the 'propertyConfigs' in your app config`)
+            return resolvedProperty;
+        }
+        if (customField.property) {
+            const restConfigProperty = { ...customField.property } as Record<string, unknown>;
+            delete restConfigProperty.propertyConfig;
+            const customFieldProperty = resolveProperty({
+                property: { name: "",
+...restConfigProperty } as Property,
+                ignoreMissingFields,
+                ...rest
+            });
+            if (customFieldProperty) {
+                resolvedProperty = mergeDeep(customFieldProperty, resolvedProperty);
+            }
+        }
+
+    }
+
+    return resolvedProperty;
+}
+
+/**
+ * Resolve enum aliases for a string or number property
+ * @param property
+ */
+export function resolvePropertyEnum(property: StringProperty | NumberProperty): StringProperty | NumberProperty {
+    if (typeof property.enum === "object") {
+        return {
+            ...property,
+            enum: enumToObjectEntries(property.enum)?.filter((value) => value && (value.id || value.id === 0) && value.label) ?? []
+        };
+    }
+    return property as StringProperty | NumberProperty;
+}
+
+/**
+ * Resolve enums and arrays for properties
+ * @param properties
+ * @param value
+ */
+export function resolveProperties<M extends Record<string, unknown>>({
+    propertyKey,
+    properties,
+    ignoreMissingFields,
+    ...props
+}: {
+    propertyKey?: string,
+    properties: Properties,
+    values?: Partial<M>,
+    previousValues?: Partial<M>,
+    path?: string,
+    entityId?: string | number,
+    index?: number,
+    propertyConfigs?: Record<string, PropertyConfig>;
+    ignoreMissingFields?: boolean;
+    authController: AuthState;
+}): Properties {
+    return Object.entries<Property>(properties as Record<string, Property>)
+        .map(([key, property]) => {
+            const childResolvedProperty = resolveProperty({
+                propertyKey: propertyKey ? `${propertyKey}.${key}` : undefined,
+                property: property,
+                ignoreMissingFields,
+                ...props
+            });
+            if (!childResolvedProperty) return {};
+            return {
+                [key]: childResolvedProperty
+            };
+        })
+        .filter((a) => a !== null)
+        .reduce((a, b) => ({ ...a,
+...b }), {}) as Properties;
+}
+
+export function resolveArrayProperties<M>({
+    propertyKey,
+    property,
+    ignoreMissingFields = false,
+    ...props
+}: {
+    propertyKey?: string,
+    property: ArrayProperty,
+    values?: Partial<M>,
+    previousValues?: Partial<M>,
+    path?: string,
+    entityId?: string | number,
+    index?: number,
+    propertyConfigs?: Record<string, PropertyConfig>;
+    ignoreMissingFields?: boolean;
+    authController: AuthState;
+}): Property[] {
+    const propertyValue = propertyKey ? getIn(props.values, propertyKey) : undefined;
+
+    if (property.of) {
+        if (Array.isArray(property.of)) {
+            return property.of.map((p, index) => {
+                return resolveProperty({
+                    propertyKey: `${propertyKey}.${index}`,
+                    property: p as Property,
+                    ignoreMissingFields,
+                    ...props,
+                    index
+                });
+            }) as Property[];
+        } else {
+            const of = property.of;
+            const resolvedProperties = getArrayResolvedProperties({
+                propertyValue,
+                propertyKey,
+                property,
+                ignoreMissingFields,
+                ...props
+            });
+            // Destructured to be *excluded* from `...rest`, not to be used —
+            // see the comment below. Said explicitly so the discarded-value
+            // ratchet does not carry a finding that is working as intended.
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            const { values, previousValues, ...rest } = props;
+            const ofProperty = resolveProperty({ // we don't want to pass the values of the parent entity
+                property: of,
+                ignoreMissingFields,
+                ...rest
+            });
+            if (!ofProperty && !ignoreMissingFields)
+                throw Error("When using a property builder as the 'of' prop of an ArrayProperty, you must return a valid child property")
+            return resolvedProperties;
+        }
+    } else if (property.oneOf) {
+        const typeField = property.oneOf?.typeField ?? DEFAULT_ONE_OF_TYPE;
+        const resolvedProperties: Property[] = Array.isArray(propertyValue)
+            ? propertyValue.map((v, index) => {
+                const type = v && v[typeField];
+                const childProperty = property.oneOf?.properties[type];
+                if (!type || !childProperty) return null;
+                return resolveProperty({
+                    propertyKey: `${propertyKey}.${index}`,
+                    property: childProperty,
+                    ignoreMissingFields,
+                    ...props
+                });
+            }).filter(e => Boolean(e)) as Property[]
+            : [];
+        return resolvedProperties;
+    } else if (!property.columnType) {
+        // An array with neither `of`/`oneOf` nor a `columnType` describes no element
+        // type, so nothing can be generated or rendered from it.
+        //
+        // The escape hatch used to be `ui.Field` — "a custom component can render
+        // anything" — which made a *presentation* field decide whether a schema was
+        // valid, in code the Postgres generator runs. `columnType` is the same escape
+        // hatch stated as data: `columnType: "text[]"` says what the column holds,
+        // which is what both the generator and the form actually need.
+        throw Error(`The array property (${propertyKey}) needs to declare an 'of' or a 'oneOf' property, or a \`columnType\` such as "text[]"`);
+    } else {
+        return [];
+    }
+
+}
+
+export function getArrayResolvedProperties({
+    propertyKey,
+    propertyValue,
+    property,
+    ...props
+}: {
+    propertyValue: unknown,
+    propertyKey?: string,
+    property: ArrayProperty,
+    ignoreMissingFields: boolean,
+    values?: object;
+    previousValues?: object;
+    path?: string;
+    entityId?: string | number;
+    index?: number;
+    propertyConfigs?: Record<string, PropertyConfig>;
+    authController: AuthState;
+}) {
+
+    const of = property.of;
+    if (!of)
+        throw Error(
+            `Trying to resolve an array property (${propertyKey}) without providing an 'of' property`
+        )
+    return Array.isArray(propertyValue)
+        ? propertyValue.map((v: unknown, index: number) => {
+            return resolveProperty({
+                propertyKey: `${propertyKey}.${index}`,
+                property: Array.isArray(of) ? of[index] : of,
+                ...props,
+                index
+            });
+        }).filter(e => Boolean(e)) as Property[]
+        : [];
+}
+
+/**
+ * An enum as `{ id, label }` entries, or `undefined` when it is not one.
+ *
+ * {@link enumToObjectEntries} is the reading: an array is a list of entries or
+ * of plain values (`["draft", "published"]`, whose ids are the values, not
+ * their positions), and a map entry's id is its key even when its value is a
+ * config that does not repeat it.
+ */
+export function resolveEnumValues(input: EnumValues | Array<string | number>): EnumValueConfig[] | undefined {
+    if (typeof input !== "object" || input === null) return undefined;
+    return enumToObjectEntries(input);
+}
+
+/**
+ * Each of `collection`'s tabs paired with the property that declared it, when a
+ * property declared it: child view key → property key.
+ *
+ * A many-relation can only be declared as a property — that is the documented
+ * and only mechanism — and {@link getEntityChildViews} promotes it to a tab. So
+ * one declaration reaches the panel twice, and neither surface knew about the
+ * other. The form rendered a relation picker beside the tab, and the collection
+ * table rendered *two* columns under one heading: the relation's own column,
+ * showing the child rows, and a jump-to-tab button carrying the same name.
+ *
+ * The pairing is what lets each surface decide which half is redundant, and it
+ * has to be a pairing rather than two sets because the two keys differ whenever
+ * a relation is named. The match is on the resolved `relationName` — the
+ * identity `getEntityChildViews` itself dedupes on — so a relation declared in
+ * `relations` and pointed at by a differently-named property is recognised too.
+ *
+ * A relation with no property of its own is absent here, which is the point: it
+ * has exactly one surface already, and nothing to weigh it against.
+ *
+ * Only top-level properties: a relation nested inside a `map` gets no tab.
+ */
+export function getChildViewDeclaringProperties<M extends Record<string, unknown> = Record<string, unknown>>(
+    collection: CollectionConfig<M>
+): Map<string, string> {
+    const pairs = new Map<string, string>();
+
+    const relationProperties = Object.entries((collection.properties ?? {}) as Record<string, Property>)
+        .filter(([, property]) => property?.type === "relation");
+    if (relationProperties.length === 0) return pairs;
+
+    const relationViews = getEntityChildViews(collection)
+        .filter(view => view.source.kind === "relation");
+    if (relationViews.length === 0) return pairs;
+
+    const resolvedRelations = resolveCollectionRelations(collection);
+    const identityOf = (relationKey: string): string =>
+        resolvedRelations[relationKey]?.relationName ?? relationKey;
+
+    const declaringPropertyByIdentity = new Map<string, string>();
+    for (const [propertyKey, property] of relationProperties) {
+        const relation = (property as RelationProperty).resolvedRelation ?? resolvedRelations[propertyKey];
+        // A to-one relation is a foreign key the author edits, never a tab. No
+        // view will match it — the views here are many-relations only — but
+        // reading the cardinality says so where someone is looking.
+        if (relation?.cardinality !== "many") continue;
+        const identity = relation.relationName ?? propertyKey;
+        if (!declaringPropertyByIdentity.has(identity)) declaringPropertyByIdentity.set(identity, propertyKey);
+    }
+
+    for (const view of relationViews) {
+        const propertyKey = declaringPropertyByIdentity.get(
+            identityOf((view.source as { relationKey: string }).relationKey));
+        if (propertyKey) pairs.set(view.key, propertyKey);
+    }
+
+    return pairs;
+}
+
+/**
+ * The property keys of `collection` whose relation is already one of its tabs.
+ *
+ * What a form asks: the tab is the treatment for a list of child rows, so the
+ * picker beside it is the redundant half. See
+ * {@link getChildViewDeclaringProperties}.
+ */
+export function getChildViewRelationPropertyKeys<M extends Record<string, unknown> = Record<string, unknown>>(
+    collection: CollectionConfig<M>
+): Set<string> {
+    return new Set(getChildViewDeclaringProperties(collection).values());
+}

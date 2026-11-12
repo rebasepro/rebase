@@ -1,10 +1,10 @@
 
 import type { Property } from "@rebasepro/types";
-import { hasEntityId, warnDeprecated } from "@rebasepro/common";
+import { warnDeprecated } from "@rebasepro/common";
+import { hasEntityId } from "../util/identity";
 import type { CustomizationController, SidePanelBindingProps, SideDialogPanelProps, SideDialogsController, SidePanelController, UrlController, NavigationStateController, AdminCollection } from "@rebasepro/cms-types";
 import { useCallback, useEffect, useRef, useMemo } from "react";
-import { CollectionRegistryController } from "@rebasepro/types";
-import { AuthController } from "@rebasepro/cms-types";
+import { AuthController, CollectionRegistryController } from "@rebasepro/cms-types";
 import { useLocation } from "react-router";
 import { NavigationViewInternal } from "@rebasepro/app";
 import { getNavigationEntriesFromPath, removeInitialAndTrailingSlashes, removeTrailingSlash, resolveDefaultSelectedView } from "@rebasepro/app";

@@ -1,7 +1,8 @@
 import type { Property, MapProperty, Properties, RelationProperty } from "@rebasepro/types";
 import { useMemo } from "react";
 ;
-import { getChildViewDeclaringProperties, getDeclaredPrimaryKeys, getSubcollections } from "@rebasepro/common";
+import { getDeclaredPrimaryKeys, getSubcollections } from "@rebasepro/common";
+import { getChildViewDeclaringProperties } from "@rebasepro/cms-types";
 import { getAdminEntityChildViews } from "../../collections/collection_view_config";
 import type { AdminCollection } from "@rebasepro/cms-types";
 import { getPropertyInPath } from "../../collections/property-path";

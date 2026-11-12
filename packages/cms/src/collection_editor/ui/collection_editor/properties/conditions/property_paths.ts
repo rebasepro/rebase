@@ -1,5 +1,5 @@
 import { Properties, Property } from "@rebasepro/types";
-import { isPropertyBuilder } from "@rebasepro/common";
+import { isPropertyBuilder } from "@rebasepro/cms-types";
 
 /**
  * Recursively extract all property paths from a Properties object.

@@ -1,7 +1,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Entity, EnumValueConfig, MAX_LIST_LIMIT } from "@rebasepro/types";
-import { EntityTableController, EntitySelectionController, AdminCollection } from "@rebasepro/cms-types";
+import { EntityTableController, EntitySelectionController, AdminCollection, resolveEnumValues } from "@rebasepro/cms-types";
 import { BoardCardBinding } from "./BoardCardBinding";
 import {
     Alert,
@@ -24,7 +24,6 @@ import {
     BoardItemViewProps,
     ColumnLoadingState
 } from "@rebasepro/ui";
-import { resolveEnumValues } from "@rebasepro/common";
 import { getPropertyInPath } from "../../util/property_utils";
 import {
     saveEntityWithCallbacks,

@@ -6,12 +6,12 @@ import { deepEqual as equal } from "fast-equals"
 
 import { RelationPreview } from "../../../preview";
 import { Entity, EntityRelation, FilterValues, Relation } from "@rebasepro/types";
-import { CollectionSize, AdminCollection } from "@rebasepro/cms-types";
+import { CollectionSize, AdminCollection, getRelationFrom } from "@rebasepro/cms-types";
 
 import { getPreviewSizeFrom } from "../../../preview/util";
 import { } from "@rebasepro/app";
 import { ErrorView } from "@rebasepro/app";
-import { getRelationFrom, normalizeToEntityRelation } from "@rebasepro/common";
+import { normalizeToEntityRelation } from "@rebasepro/common";
 import { TableMultipleRelationField } from "./TableMultipleRelationField";
 import { CompactEntityCellField } from "./CompactEntityCellField";
 

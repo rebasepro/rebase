@@ -1,6 +1,8 @@
 import type { AuthState, Properties, Property } from "@rebasepro/types";
-import type { FieldViewer, ResolvePropertyProps } from "@rebasepro/common";
-import { buildConditionContext, canReadField, canWriteField, resolveProperty } from "@rebasepro/common";
+import type { FieldViewer } from "@rebasepro/common";
+import type { ResolvePropertyProps } from "@rebasepro/cms-types";
+import { canReadField, canWriteField } from "@rebasepro/common";
+import { buildConditionContext, resolveProperty } from "@rebasepro/cms-types";
 import { deepEqual as equal } from "fast-equals";
 import { applyPropertyConditions, isDisabled, isHidden, isReadOnly } from "@rebasepro/app";
 

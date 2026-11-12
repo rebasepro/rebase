@@ -5,7 +5,7 @@ import { useAuthController, useCustomizationController } from "@rebasepro/app";
 import { PropertyPreview } from "../PropertyPreview";
 import { cls, defaultBorderMixin } from "@rebasepro/ui";
 import { ErrorBoundary } from "@rebasepro/ui";
-import { DEFAULT_ONE_OF_TYPE, DEFAULT_ONE_OF_VALUE } from "@rebasepro/common";
+import { DEFAULT_ONE_OF_TYPE, DEFAULT_ONE_OF_VALUE } from "@rebasepro/cms-types";
 
 /**
  * @group Preview components

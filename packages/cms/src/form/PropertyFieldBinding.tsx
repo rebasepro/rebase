@@ -14,7 +14,7 @@ import { ReadOnlyFieldBinding } from "./field_bindings/ReadOnlyFieldBinding";
 import { resolveFormProperty } from "./resolve_form_properties";
 import { useClearRestoreValue } from "./useClearRestoreValue";
 
-import { isPropertyBuilder, resolveProperty } from "@rebasepro/common";
+import { isPropertyBuilder, resolveProperty } from "@rebasepro/cms-types";
 import { isDisabled, isHidden, isReadOnly } from "@rebasepro/app";
 import { useAuthController, useCustomizationController, useRebaseContext, useSlot, useTranslation } from "@rebasepro/app";
 import { Typography } from "@rebasepro/ui";

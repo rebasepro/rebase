@@ -1,8 +1,10 @@
 import {
-    resolvePropertyEnum,
-    resolveEnumValues,
     getSubcollections
-} from "../src/util/resolutions";
+} from "@rebasepro/common";
+import {
+    resolvePropertyEnum,
+    resolveEnumValues
+} from "@rebasepro/cms-types";
 import { CollectionConfig, NumberProperty, StringProperty, EnumValueConfig, EnumValues } from "@rebasepro/types";
 
 // ─────────────────────────────────────────────────────────────

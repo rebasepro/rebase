@@ -24,9 +24,11 @@ import { useAggregate, useRow, useRowCount, useRows, useRowWrites, type UseRowWr
 import type { SidePanelBindingProps, SidePanelController } from "@rebasepro/cms-types";
 import {
     getCollectionDataPath,
-    type McpAppModule,
-    type McpAppModuleExport
+    type McpAppModule
 } from "@rebasepro/types";
+import {
+    type McpAppModuleExport
+} from "@rebasepro/cms-types";
 import { CollectionPanel, type CollectionPanelProps } from "../components/CollectionPanel";
 import { RecordForm, type RecordFormProps } from "../components/RecordForm";
 import { RecordDetail, type RecordDetailProps } from "../components/RecordDetail";

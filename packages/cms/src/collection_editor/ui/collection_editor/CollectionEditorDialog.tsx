@@ -37,8 +37,7 @@ import {
     Typography
 } from "@rebasepro/ui";
 import { EngineProperties, Entity, getDataSourceCapabilities, MapProperty, Properties, Property, TableMetadata, User } from "@rebasepro/types";
-import { PropertyConfig, AdminCollection } from "@rebasepro/cms-types";
-import { getSubcollections, getTableName, isPropertyBuilder } from "@rebasepro/common";
+import { PropertyConfig, AdminCollection, isPropertyBuilder } from "@rebasepro/cms-types";
 import { removeInitialAndTrailingSlashes } from "@rebasepro/app";
 import { isSchemaChangeCancelled } from "../../liveSchemaClient";
 import { CollectionEditorSchema } from "./CollectionYupValidation";
@@ -58,7 +57,7 @@ import { AICollectionGeneratorPopover } from "./AICollectionGeneratorPopover";
 import { AIModifiedPathsProvider, useAIModifiedPaths } from "./AIModifiedPathsContext";
 import { CollectionGenerationCallback, CollectionOperation } from "../../api/generateCollectionApi";
 import { CollectionRLSTab } from "./CollectionRLSTab";
-import { buildCollectionFromTableMetadata } from "@rebasepro/common";
+import { buildCollectionFromTableMetadata, getSubcollections, getTableName } from "@rebasepro/common";
 import { mergeDeep, randomString, removeUndefined } from "@rebasepro/utils";
 import type { CollectionEditorExtensionProps, CollectionEditorTab } from "../../extensibility_types";
 

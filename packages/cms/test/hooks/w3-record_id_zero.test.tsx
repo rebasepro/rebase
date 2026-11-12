@@ -19,9 +19,9 @@ import type {
     SideDialogPanelProps,
     SideDialogsController,
     SidePanelController,
-    UrlController
+    UrlController,
+    CollectionRegistryController
 } from "@rebasepro/cms-types";
-import type { CollectionRegistryController } from "@rebasepro/types";
 
 jest.mock("@rebasepro/app", () => {
     const overrides: Record<string, unknown> = {
@@ -40,7 +40,7 @@ jest.mock("@rebasepro/app", () => {
 import { useBuildSidePanel } from "../../src/hooks/useBuildSidePanel";
 import { useBuildUrlController } from "../../src/hooks/navigation/useBuildUrlController";
 import { navigateToEntity } from "../../src/util/navigation_utils";
-import { hasEntityId } from "@rebasepro/common";
+import { hasEntityId } from "@rebasepro/cms";
 import { fakeAuthController, fakeCollectionRegistry, fakeNavigationState, fakeUrlController } from "../helpers/fakes";
 
 const statuses: (string | undefined)[] = [];

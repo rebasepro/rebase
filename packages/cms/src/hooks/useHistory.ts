@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, useMemo } from "react";
-import { hasEntityId } from "@rebasepro/common";
+import { hasEntityId } from "../util/identity";
 import { useApiBase, useApiConfig, useRlsSimulation } from "@rebasepro/app";
 import { simulationHeaders } from "@rebasepro/types";
 import type { EntityHistoryEntry } from "@rebasepro/types";

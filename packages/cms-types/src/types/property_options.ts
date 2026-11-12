@@ -8,7 +8,7 @@
  */
 import type React from "react";
 import type { FilterValues, WhereFilterOp } from "@rebasepro/types";
-import { ADMIN_PROPERTY_KEYS as CORE_ADMIN_PROPERTY_KEYS } from "@rebasepro/types";
+import type { ADMIN_PROPERTY_KEYS } from "../admin_block";
 import type { PropertySpan } from "./form_layout";
 
 /**
@@ -448,25 +448,26 @@ type AnyAdminPropertyOptionKey =
     | keyof AdminArrayOptions
     | keyof AdminMapOptions;
 
-/**
- * Core's list, re-exported through the same `satisfies` agreement check that
- * {@link ADMIN_COLLECTION_KEYS} gets: core owns the data because the boot-time
- * collection validator in `@rebasepro/server` needs it and may not import this
- * package, and this clause is what stops the data from drifting off the types.
- */
-export const ADMIN_PROPERTY_KEYS = CORE_ADMIN_PROPERTY_KEYS satisfies readonly AnyAdminPropertyOptionKey[];
+/** Compiles only when every key in `T` is a property option. */
+type AssertPropertyOptionKey<T extends AnyAdminPropertyOptionKey> = T;
 
 /**
- * And the reverse direction: an option key these types declare that core's list
+ * The agreement check between `ADMIN_PROPERTY_KEYS` (`../admin_block`) and these
+ * types, first direction: a listed key that is not an option fails to compile.
+ */
+type _EveryListedAdminPropertyKeyIsAnOption = AssertPropertyOptionKey<typeof ADMIN_PROPERTY_KEYS[number]>;
+
+/**
+ * And the reverse direction: an option key these types declare that the list
  * does not name.
  *
- * The `satisfies` above only closes one side. This one matters since the boot
+ * The check above only closes one side. This one matters since the boot
  * validator started warning about unrecognised keys inside a property's `admin`
  * block: an option missing from the list would make the server call a correct
  * config a typo, and a check that cries wolf is a check people turn off.
  */
 type _EveryAdminPropertyOptionIsListed =
-    AssertNeverPropertyKey<Exclude<AnyAdminPropertyOptionKey, typeof CORE_ADMIN_PROPERTY_KEYS[number]>>;
+    AssertNeverPropertyKey<Exclude<AnyAdminPropertyOptionKey, typeof ADMIN_PROPERTY_KEYS[number]>>;
 
 /** Compiles only when `T` is `never`. */
 type AssertNeverPropertyKey<T extends never = never> = T;

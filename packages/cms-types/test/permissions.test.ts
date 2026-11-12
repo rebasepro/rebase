@@ -4,7 +4,7 @@ import {
     canCreateEntity,
     canDeleteEntity,
     checkOperation
-} from "../src/util/permissions";
+} from "@rebasepro/cms-types";
 import { AuthState, Entity, CollectionConfig, SecurityRule, User } from "@rebasepro/types";
 
 // ── Helpers ──────────────────────────────────────────────────

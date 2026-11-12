@@ -1,32 +1,21 @@
 /**
- * The keys of a collection's admin block, as data.
+ * The keys of a collection's and a property's admin block, as data, and the way
+ * back from the panel's flat view model to the block.
  *
- * There is no *type* for the block in this package any more, and that is the point:
- * `admin` is not declared on `BaseCollectionConfig` or on any property here, so a
- * BaaS install cannot even write one. `@rebasepro/cms-types` adds the field back by
- * declaration merging, which is why installing it is what makes the admin surface
- * appear.
- *
- * The *list* still has to live here, because three runtime consumers need it and two
- * of them are core — see below.
+ * The types that describe these fields are `AdminCollectionOptions` and the
+ * `Admin*Options` property types in this package; `admin_collection.ts` and
+ * `types/property_options.ts` hold both lists to them in both directions, so a
+ * key cannot be added to one side and forgotten on the other. Nothing on the
+ * backend reads the admin block any more, which is why the lists live here and
+ * not in `@rebasepro/types`.
  */
 
 /**
  * Every key that belongs inside a collection's `admin` block, as data.
  *
- * The type that describes these fields is `AdminCollectionOptions` in
- * `@rebasepro/cms-types`, and it is erased at build time — but three runtime
- * consumers need the list, and two of them are core:
- *
- * - `serializeCollections`, to drop the block from the contract
- * - the ts-morph schema editor in `@rebasepro/server`, which rewrites collection
- *   files on disk from the admin panel and has to know where each key goes. A key
- *   missing from this list gets written to the *top level* of the file, where the
- *   backend ignores it and the panel never finds it again.
- * - the `collections-admin-block` codemod
- *
- * `@rebasepro/cms-types` re-exports this and asserts it names only real option
- * keys; the count is pinned by a test there.
+ * Read by the collection editor (which writes edited collections back with the
+ * block nested), by `nestAdminCollectionKeys` below, and by the repository's
+ * `collections-admin-block` / `docs-admin-block` codemods, which read this file.
  *
  * @group Models
  */
@@ -79,19 +68,9 @@ export const ADMIN_COLLECTION_KEYS = [
 export type AdminCollectionKey = typeof ADMIN_COLLECTION_KEYS[number];
 
 /**
- * Every key that belongs inside a *property's* `admin` block, as data.
- *
- * The union of `AdminPropertyOptions` and its per-type extensions
- * (`AdminStringOptions`, `AdminArrayOptions`, …) in `@rebasepro/cms-types`.
- * It lives here for the same reason {@link ADMIN_COLLECTION_KEYS} does: the
- * runtime consumers are core packages that the BaaS guard forbids from
- * importing `@rebasepro/cms-types`. Here it is the boot-time collection
- * validator in `@rebasepro/server`, which has to tell "you left `readOnly` at
- * the top of the property, where nothing reads it" apart from "you invented a
- * key we have never heard of".
- *
- * `@rebasepro/cms-types` re-exports this and asserts it names only real
- * option keys.
+ * Every key that belongs inside a *property's* `admin` block, as data: the union
+ * of `AdminPropertyOptions` and its per-type extensions (`AdminStringOptions`,
+ * `AdminArrayOptions`, …).
  *
  * @group Models
  */
@@ -141,9 +120,7 @@ export type AdminPropertyKey = typeof ADMIN_PROPERTY_KEYS[number];
  * the copy the collection was loaded with, and preferring it resolves every edit
  * in favour of the value the user changed away from.
  *
- * This lives here, next to the key lists, because it had two implementations —
- * `toAdminCollectionConfig` in `@rebasepro/cms-types` and `nestAdminKeys` in
- * `@rebasepro/server`'s schema editor — that agreed on everything except that
+ * It lives next to the key lists so there is one implementation of that
  * precedence, which is the only part that decides whether a save is visible.
  *
  * @group Models

@@ -2,7 +2,6 @@ import jsonLogic from "json-logic-js";
 import {
     ArrayProperty,
     AuthState,
-    ConditionContext,
     ConditionRule,
     EnumValueConfig,
     NumberProperty,
@@ -167,3 +166,63 @@ export function buildConditionContext(params: {
 /**
  * Apply PropertyConditions to a resolved property, evaluating all JSON Logic rules.
  */
+
+/**
+ * Context available during JSON Logic condition evaluation.
+ * Mirrors PropertyBuilderProps but adapted for JSON serialization.
+ * @group Entity properties
+ */
+export interface ConditionContext {
+    /**
+     * Current form/entity values.
+     * Date values are converted to Unix timestamps (milliseconds).
+     */
+    values: Record<string, unknown>;
+
+    /**
+     * Previous values before the current edit session.
+     */
+    previousValues: Record<string, unknown>;
+
+    /**
+     * Current value of this property specifically.
+     */
+    propertyValue: unknown;
+
+    /**
+     * Collection path (e.g., "products", "users/uid123/orders")
+     */
+    path: string;
+
+    /**
+     * Entity ID. Undefined for new entities.
+     */
+    entityId?: string;
+
+    /**
+     * Whether this is a new entity being created.
+     */
+    isNew: boolean;
+
+    /**
+     * Index of this property (only for array items).
+     */
+    index?: number;
+
+    /**
+     * Current authenticated user information.
+     */
+    user: {
+        uid: string;
+        email: string | null;
+        displayName: string | null;
+        photoURL: string | null;
+        /** Role IDs the user has (extracted from Role[].id) */
+        roles: string[];
+    };
+
+    /**
+     * Current timestamp as Unix milliseconds.
+     */
+    now: number;
+}

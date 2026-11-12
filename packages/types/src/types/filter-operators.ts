@@ -381,32 +381,6 @@ export type WireFilterValues<Key extends string> =
     Partial<Record<Key, [WhereFilterOp, unknown] | [WhereFilterOp, unknown][] | string>>;
 
 /**
- * A pre-defined filter preset for quick access in the collection toolbar.
- * Users can select a preset to instantly apply a set of filters and
- * optionally a sort order.
- *
- * @group Models
- */
-export interface FilterPreset<Key extends string = string> {
-    /**
-     * Display label shown in the preset menu.
-     * If omitted, a summary is auto-generated from the filter keys.
-     */
-    label?: string;
-
-    /**
-     * The filter values to apply when this preset is selected.
-     */
-    filterValues: FilterValues<Key>;
-
-    /**
-     * Optional sort override to apply alongside the filter values.
-     * One key, or several in order of significance.
-     */
-    sort?: OrderBySpec<Key>;
-}
-
-/**
  * PostgREST short-code operators. Wire format only — these never appear
  * in application code. Used by `serializeFilter`/`deserializeFilter`
  * in `@rebasepro/common`.

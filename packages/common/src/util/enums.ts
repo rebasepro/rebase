@@ -33,8 +33,3 @@ export function enumToObjectEntries(enumValues: EnumValues | Array<string | numb
         });
     }
 }
-
-export function getLabelOrConfigFrom(enumValues: EnumValueConfig[], key?: string | number): EnumValueConfig | undefined {
-    if (key === null || key === undefined) return undefined;
-    return enumValues.find((entry) => String(entry.id) === String(key));
-}

@@ -1,6 +1,6 @@
 import type { AuthController, PropertyConfig } from "@rebasepro/cms-types";
 import type { Entity, Properties, Property } from "@rebasepro/types";
-import { isPropertyBuilder } from "@rebasepro/common";
+import { isPropertyBuilder } from "@rebasepro/cms-types";
 import { resolveFormProperty, resolvePropertiesForValidation } from "./resolve_form_properties";
 
 /**

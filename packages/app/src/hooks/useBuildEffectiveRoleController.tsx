@@ -1,4 +1,4 @@
-import type { EffectiveRoleController } from "@rebasepro/types";
+import type { EffectiveRoleController } from "@rebasepro/cms-types";
 import { warnDeprecated } from "@rebasepro/common";
 import { useEffectiveRoleState } from "../core/effective_role_state";
 

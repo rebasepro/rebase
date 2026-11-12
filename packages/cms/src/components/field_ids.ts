@@ -1,5 +1,5 @@
 import type { ArrayProperty, NumberProperty, Property, StringProperty } from "@rebasepro/types";
-import { isPropertyBuilder } from "@rebasepro/common";
+import { isPropertyBuilder } from "@rebasepro/cms-types";
 
 /**
  * The id of the widget a property is edited with, decided from the property

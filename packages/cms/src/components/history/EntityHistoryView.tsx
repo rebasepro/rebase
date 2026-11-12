@@ -1,7 +1,7 @@
 
 import type { EntityCustomViewParams } from "@rebasepro/cms-types";
 import type { Entity } from "@rebasepro/types";
-import { hasEntityId } from "@rebasepro/common";
+import { hasEntityId } from "../../util/identity";
 import { useRef, useEffect } from "react";
 import { cls, IconButton, Label, Tooltip, Typography } from "@rebasepro/ui";
 import { ErrorBoundary, HistoryIcon } from "@rebasepro/ui";

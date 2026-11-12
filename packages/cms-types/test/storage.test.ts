@@ -1,6 +1,6 @@
-import { resolveStoragePathString, resolveStorageFilenameString, resolveStorageSource } from "../src/util/storage";
+import { resolveStoragePathString, resolveStorageFilenameString, resolveStorageSource } from "@rebasepro/cms-types";
 import { StorageConfig, StringProperty, StorageSource, UploadedFileContext } from "@rebasepro/types";
-import { resetDeprecationWarningsForTests } from "../src/util/deprecation";
+import { resetDeprecationWarningsForTests } from "@rebasepro/common";
 
 // Helpers
 function makeParams(overrides: Partial<{

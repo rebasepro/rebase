@@ -1,4 +1,4 @@
-import type { EffectiveRoleController } from "@rebasepro/types";
+import type { EffectiveRoleController } from "@rebasepro/cms-types";
 import React from "react";
 ;
 

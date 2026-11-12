@@ -20,7 +20,7 @@ import {
 import { getFieldConfig, DEFAULT_FIELD_CONFIGS } from "../../../../_cms_internals";
 import { Properties, Property, EnumValueConfig } from "@rebasepro/types";
 import type { PropertyConditions } from "@rebasepro/types";
-import { isPropertyBuilder } from "@rebasepro/common";
+import { isPropertyBuilder } from "@rebasepro/cms-types";
 import { PropertyWithId } from "../../PropertyEditView";
 import { getPropertyPaths } from "./property_paths";
 

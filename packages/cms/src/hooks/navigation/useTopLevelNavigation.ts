@@ -3,7 +3,7 @@ import type { AppView, UrlController, RebasePlugin, NavigationEntry, NavigationG
 import { useCallback, useMemo, useRef } from "react";
 import { deepEqual as equal } from "fast-equals";
 
-import { CollectionRegistryController } from "@rebasepro/types";
+import { CollectionRegistryController } from "@rebasepro/cms-types";
 import { CollectionRegistry } from "@rebasepro/common";
 
 import { computeNavigationGroups, getGroup, isBottomPinnedGroupName, NAVIGATION_ADMIN_GROUP_NAME, NAVIGATION_DEFAULT_GROUP_NAME } from "./utils";

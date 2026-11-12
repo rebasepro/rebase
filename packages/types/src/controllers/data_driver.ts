@@ -1,5 +1,4 @@
 import { RebaseApiError } from "../errors";
-import type { CollectionRegistryController } from "./collection_registry";
 import type { EntityStatus, EntityValues } from "../types/entities";
 import type { CollectionConfig, FilterValues } from "../types/collections";
 import type { OrderByTuple } from "../types/filter-operators";

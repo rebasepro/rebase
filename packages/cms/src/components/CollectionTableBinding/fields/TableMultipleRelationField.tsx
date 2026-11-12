@@ -4,11 +4,11 @@ import { getCollectionDataPath } from "@rebasepro/types";
 import React, { useCallback, useEffect } from "react";
 import { deepEqual as equal } from "fast-equals";
 
-import { getRelationFrom, normalizeToEntityRelation } from "@rebasepro/common";
+import { normalizeToEntityRelation } from "@rebasepro/common";
 
 import { RelationPreview } from "../../../preview";
 import { Entity, EntityRelation, FilterValues, Relation } from "@rebasepro/types";
-import { AdminCollection } from "@rebasepro/cms-types";
+import { AdminCollection, getRelationFrom } from "@rebasepro/cms-types";
 import { } from "@rebasepro/app";
 import { ErrorView } from "@rebasepro/app";
 import { CompactEntityCellField } from "./CompactEntityCellField";

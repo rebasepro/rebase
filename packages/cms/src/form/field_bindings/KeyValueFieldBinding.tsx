@@ -26,7 +26,7 @@ import {
 import { getIconForProperty } from "../../util/property_utils";
 import { useCustomizationController, useTranslation } from "@rebasepro/app";
 import { getIn } from "@rebasepro/forms";
-import { getDefaultValueFortype } from "@rebasepro/common";
+import { getDefaultValueFortype } from "@rebasepro/cms-types";
 
 type MapEditViewRowState = [number, {
     key: string,

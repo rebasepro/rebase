@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import type { UserConfigurationPersistence } from "@rebasepro/cms-types";
 import type { UiTablePreferences } from "@rebasepro/types";
 import { isUiTablePreferences, mergeUiTablePreferences } from "@rebasepro/types";
-import { stripCollectionPath } from "@rebasepro/common";
+import { stripCollectionPath } from "@rebasepro/cms-types";
 import { isArrayValue, readStoredJson, writeStoredJson } from "@rebasepro/utils";
 
 /** The key a table's preferences are stored under in this browser. */

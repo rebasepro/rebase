@@ -42,14 +42,13 @@ export default defineConfig(() => ({
                 // (package.json says `"sideEffects": false`), but inside one
                 // module it keeps every import that module makes. Shipped as a
                 // single file, an app that only ever calls the client's `find()`
-                // still bundled `object-hash` and `json-logic-js` (40 kB). One
+                // still bundled `object-hash` and the condition evaluator's `json-logic-js` (40 kB). One
                 // file per module lets the bundler leave out the modules that
                 // import them. Guarded by the `sdk-minimal` target of
                 // tooling/scripts/check-bundle-budget.mjs.
                 preserveModules: true,
                 preserveModulesRoot: path.resolve(__dirname, "src"),
                 globals: {
-                    "json-logic-js": "jsonLogic",
                     "fast-equals": "fastEquals"
                 }
             }

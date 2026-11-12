@@ -1,9 +1,9 @@
 import React, { useCallback, useMemo } from "react";
 import { CheckIcon, ChevronsUpDownIcon, cls, FilterChip, Menu, MenuItem, Tooltip } from "@rebasepro/ui";
-import type { FilterValues, FilterPreset, OrderByTuple } from "@rebasepro/types";
+import type { FilterValues, OrderByTuple } from "@rebasepro/types";
 import { normalizeOrderBy } from "@rebasepro/common";
 import { useTranslation } from "@rebasepro/app";
-import type { EntityTableController, PropertyPath } from "@rebasepro/cms-types";
+import type { EntityTableController, PropertyPath, FilterPreset } from "@rebasepro/cms-types";
 
 export interface FilterPresetsButtonProps<M extends Record<string, unknown>> {
     // Matches `admin.filterPresets`, which is keyed by property path — the

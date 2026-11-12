@@ -3,7 +3,6 @@ export * from "./filter-operators";
 export * from "./chips";
 
 export * from "./properties";
-export * from "./admin_block";
 export * from "./collections";
 export * from "./search";
 export * from "./indexes";

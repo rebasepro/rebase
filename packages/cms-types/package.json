@@ -42,7 +42,9 @@
   },
   "dependencies": {
     "@rebasepro/common": "workspace:*",
-    "@rebasepro/types": "workspace:*"
+    "@rebasepro/types": "workspace:*",
+    "@rebasepro/utils": "workspace:*",
+    "json-logic-js": "^2.0.5"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
@@ -93,6 +95,7 @@
     "testEnvironment": "node",
     "moduleNameMapper": {
       "\\\\.(css|less)$": "<rootDir>/test/__mocks__/styleMock.js",
+      "^@rebasepro/cms-types$": "<rootDir>/src/index.ts",
       "^@rebasepro/common$": "<rootDir>/../common/src/index.ts",
       "^@rebasepro/types$": "<rootDir>/../types/src/index.ts",
       "^@rebasepro/utils$": "<rootDir>/../utils/src/index.ts"

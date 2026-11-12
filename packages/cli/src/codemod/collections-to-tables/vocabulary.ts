@@ -8,7 +8,7 @@
  * accepts (`TABLE_CUSTOMIZATION_KEYS` / `FIELD_CUSTOMIZATION_KEYS` in
  * `@rebasepro/cms-types`), every renamed key must agree with the hint
  * `customizeTable` refuses the old name with, and every legacy `admin` key
- * (`ADMIN_COLLECTION_KEYS` / `ADMIN_PROPERTY_KEYS` in `@rebasepro/types`) must
+ * (`ADMIN_COLLECTION_KEYS` / `ADMIN_PROPERTY_KEYS` in `@rebasepro/cms-types`) must
  * have an entry here — a destination, or an explicit `dropped` with why.
  *
  * A destination is a key of the customization (`"fieldOrder"`) or a path into

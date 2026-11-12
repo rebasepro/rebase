@@ -7,7 +7,8 @@ import { FieldHelperText } from "../components/FieldHelperText";
 import { LabelWithIcon } from "../components/LabelWithIcon";
 import { EnumValuesChip } from "../../preview";
 import { getIconForProperty } from "../../util/property_utils";
-import { enumToObjectEntries, getLabelOrConfigFrom } from "@rebasepro/common";
+import { enumToObjectEntries } from "@rebasepro/common";
+import { getLabelOrConfigFrom } from "@rebasepro/cms-types";
 import { iconSize, MultiSelect, MultiSelectItem, XIcon } from "@rebasepro/ui";
 
 /**

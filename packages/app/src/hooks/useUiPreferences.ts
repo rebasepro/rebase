@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { UiPreferencesController, UiPreferencesTarget, UserConfigurationPersistence } from "@rebasepro/cms-types";
 import type { UiPreferences, UiTablePreferences } from "@rebasepro/types";
 import { isUiTablePreferences, mergeUiTablePreferences } from "@rebasepro/types";
-import { stripCollectionPath } from "@rebasepro/common";
+import { stripCollectionPath } from "@rebasepro/cms-types";
 import { DEFAULT_API_PATH } from "./ApiConfigContext";
 
 /** How the hook reaches the server: the Rebase client, or its parts. */

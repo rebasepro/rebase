@@ -17,7 +17,7 @@
 import type { AnyFieldCustomization, EnumLabel, TableCustomizationOptions, UserConfigurationPersistence } from "@rebasepro/cms-types";
 import type { ColorKey, EnumValueConditions, PropertyConditions, UiFieldPreferences, UiPreferences, UiTablePreferences } from "@rebasepro/types";
 import { isUiTablePreferences, mergeUiTablePreferences } from "@rebasepro/types";
-import { stripCollectionPath } from "@rebasepro/common";
+import { stripCollectionPath } from "@rebasepro/cms-types";
 
 import { customizeTable } from "../../tables/customize_table";
 import { applyTableCustomization, type TableCollection } from "../../tables/apply_customization";

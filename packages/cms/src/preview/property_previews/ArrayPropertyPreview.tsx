@@ -6,7 +6,7 @@ import { useAuthController, useCustomizationController } from "@rebasepro/app";
 import { PropertyPreview } from "../PropertyPreview";
 import { cls, defaultBorderMixin } from "@rebasepro/ui";
 import { ErrorBoundary } from "@rebasepro/ui";
-import { resolveArrayProperties } from "@rebasepro/common";
+import { resolveArrayProperties } from "@rebasepro/cms-types";
 
 /**
  * @group Preview components

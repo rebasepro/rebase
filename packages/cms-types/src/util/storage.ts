@@ -1,6 +1,6 @@
 import { ArrayProperty, DEFAULT_STORAGE_SOURCE_KEY, EntityValues, StorageConfig, StorageSource, StorageSourceRegistry, StringProperty, UploadedFileContext } from "@rebasepro/types";
 import { randomString } from "@rebasepro/utils";
-import { withDeprecatedAlias } from "./deprecation";
+import { withDeprecatedAlias } from "@rebasepro/common";
 
 /**
  * Resolve the {@link StorageSource} to use for a property, given the key

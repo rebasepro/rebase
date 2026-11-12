@@ -1,6 +1,6 @@
 
 import type { SidePanelBindingProps, AdminCollection } from "@rebasepro/cms-types";
-import { hasEntityId } from "@rebasepro/common";
+import { hasEntityId } from "../util/identity";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { OnSavedParams } from "../types/components/EntityFormProps";

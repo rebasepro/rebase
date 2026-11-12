@@ -2,10 +2,9 @@
 import type { AppView, NavigationResult, RebasePlugin, NavigationStateController, UrlController, NavigationGroupMapping, AdminCollection } from "@rebasepro/cms-types";
 import { useCallback, useMemo, useRef } from "react";
 
-import { RebaseSdkData, CollectionRegistryController, User } from "@rebasepro/types";
-import { AuthController } from "@rebasepro/cms-types";
-import type { EffectiveRoleController } from "@rebasepro/types";
-import type { CollectionConfigsBuilder, AppViewsBuilder } from "@rebasepro/cms-types";
+import { RebaseSdkData, User } from "@rebasepro/types";
+import { AuthController, CollectionRegistryController } from "@rebasepro/cms-types";
+import type { CollectionConfigsBuilder, AppViewsBuilder, EffectiveRoleController } from "@rebasepro/cms-types";
 import { CollectionRegistry } from "@rebasepro/common";
 
 import { useResolvedCollections } from "./useResolvedCollections";

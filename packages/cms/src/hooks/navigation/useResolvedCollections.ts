@@ -2,8 +2,8 @@
 import type { RebasePlugin, AdminCollection } from "@rebasepro/cms-types";
 import { useRef, useMemo } from "react";
 
-import { CollectionRegistryController, RebaseSdkData, User } from "@rebasepro/types";
-import { AuthController } from "@rebasepro/cms-types";
+import { RebaseSdkData, User } from "@rebasepro/types";
+import { AuthController, CollectionRegistryController } from "@rebasepro/cms-types";
 import type { CollectionConfigsBuilder } from "@rebasepro/cms-types";
 import { CollectionRegistry } from "@rebasepro/common";
 

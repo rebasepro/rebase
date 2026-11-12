@@ -6,7 +6,7 @@ import { FieldHelperText } from "../components/FieldHelperText";
 import { LabelWithIcon } from "../components/LabelWithIcon";
 import { PropertyFieldBinding } from "../PropertyFieldBinding";
 import { ExpandablePanel, Typography } from "@rebasepro/ui";
-import { getArrayResolvedProperties } from "@rebasepro/common";
+import { getArrayResolvedProperties } from "@rebasepro/cms-types";
 import { isDisabled, isReadOnly } from "@rebasepro/app";
 import { getIconForProperty } from "../../util/property_utils";
 import { useAuthController } from "@rebasepro/app";

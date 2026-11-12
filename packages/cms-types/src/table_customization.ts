@@ -49,7 +49,6 @@ import type {
     CollectionCallbacks,
     EntityRelation,
     ColumnsShape,
-    FilterPreset,
     FilterValues,
     InferRow,
     TableSlugOf,
@@ -66,6 +65,9 @@ import type {
     User,
     WhereFilterOp
 } from "@rebasepro/types";
+import type {
+    FilterPreset
+} from "./types/filter_preset";
 import type { AdditionalFieldKey } from "./admin_collection";
 import type {
     AdditionalFieldDelegateProps,

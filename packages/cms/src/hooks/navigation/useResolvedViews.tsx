@@ -1,5 +1,4 @@
 
-import type { EffectiveRoleController } from "@rebasepro/types";
 import type { AppView, AppViewsBuilder, RebasePlugin } from "@rebasepro/cms-types";
 import { useMemo, useRef } from "react";
 
@@ -19,7 +18,7 @@ function viewSlugsEqual(a: AppView[] | undefined, b: AppView[] | undefined): boo
 }
 
 import type { RebaseSdkData, User } from "@rebasepro/types";
-import type { AuthController } from "@rebasepro/cms-types";
+import type { AuthController, EffectiveRoleController } from "@rebasepro/cms-types";
 
 import { resolveAppViews } from "./useNavigationResolution";
 import { useAsyncResolver } from "./useAsyncResolver";

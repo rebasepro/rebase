@@ -1,6 +1,6 @@
 import { deleteField, DocumentSnapshot } from "firebase/firestore";
 import { CollectionConfig, FirebaseCollectionConfig, Properties, Property } from "@rebasepro/types";
-import { COLLECTION_PATH_SEPARATOR, sortProperties, stripCollectionPath } from "@rebasepro/common";
+import { COLLECTION_PATH_SEPARATOR, sortProperties, stripCollectionPath } from "@rebasepro/cms-types";
 
 export function buildCollectionId(idOrPath: string, parentCollectionSlugs?: string[], parentEntityIds?: string[]): string {
     if (!parentCollectionSlugs)

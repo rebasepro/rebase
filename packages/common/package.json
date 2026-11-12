@@ -26,7 +26,7 @@
   "license": "MIT",
   "author": "Rebase",
   "type": "module",
-  "//sideEffects": "No module of this package does anything just by being imported, so a bundler may drop the ones whose exports nobody uses. That is what keeps `json-logic-js` (imported by the conditions module) out of a client app that never evaluates a condition: the dist has one file per module (preserveModules), and this lets a bundler skip the whole file. test/module-side-effects.test.ts holds every module to that.",
+  "//sideEffects": "No module of this package does anything just by being imported, so a bundler may drop the ones whose exports nobody uses. That is what keeps a module's own dependencies out of a client app that never imports from it: the dist has one file per module (preserveModules), and this lets a bundler skip the whole file. test/module-side-effects.test.ts holds every module to that.",
   "sideEffects": false,
   "main": "./dist/index.es.js",
   "module": "./dist/index.es.js",
@@ -56,8 +56,7 @@
   "dependencies": {
     "@rebasepro/types": "workspace:*",
     "@rebasepro/utils": "workspace:*",
-    "fast-equals": "6.0.2",
-    "json-logic-js": "^2.0.5"
+    "fast-equals": "6.0.2"
   },
   "devDependencies": {
     "@jest/globals": "^30.4.1",

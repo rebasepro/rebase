@@ -42,8 +42,8 @@ const repoRoot = path.resolve(import.meta.dirname, "..", "..", "..");
  */
 function loadAdminKeys() {
     const candidates = [
-        path.join(repoRoot, "packages/types/src/types/admin_block.ts"),
-        path.join(repoRoot, "node_modules/@rebasepro/types/src/types/admin_block.ts")
+        path.join(repoRoot, "packages/cms-types/src/admin_block.ts"),
+        path.join(repoRoot, "node_modules/@rebasepro/cms-types/src/admin_block.ts")
     ];
     for (const file of candidates) {
         if (!fs.existsSync(file)) continue;
@@ -52,7 +52,7 @@ function loadAdminKeys() {
         const keys = [...block.matchAll(/^\s{4}"(\w+)",?$/gm)].map((m) => m[1]);
         if (keys.length > 0) return keys;
     }
-    throw new Error("Could not locate ADMIN_COLLECTION_KEYS — is @rebasepro/types installed?");
+    throw new Error("Could not locate ADMIN_COLLECTION_KEYS — is @rebasepro/cms-types installed?");
 }
 
 const ADMIN_KEYS = new Set(loadAdminKeys());

@@ -24,8 +24,7 @@ import { CircularProgressCenter, lazyChunk } from "@rebasepro/ui";
 
 import type { AppView, CollectionCustomView, CollectionEditorOptions, EntityCustomView, EntityAction, RebasePlugin, AdminCollection, TableCustomization } from "@rebasepro/cms-types";
 import { RebaseApiError } from "@rebasepro/types";
-import type { CollectionRegistryController } from "@rebasepro/types";
-import type { UrlController, NavigationStateController } from "@rebasepro/cms-types";
+import type { UrlController, NavigationStateController, CollectionRegistryController } from "@rebasepro/cms-types";
 
 const EMPTY_PLUGINS: RebasePlugin[] = [];
 const NO_COLLECTIONS: AdminCollection[] = [];

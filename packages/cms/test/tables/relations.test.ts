@@ -6,10 +6,12 @@
 import { describe, expect, it } from "@jest/globals";
 import type { RelationDescriptor, TableDescriptor } from "@rebasepro/types";
 import {
-    getChildViewRelationPropertyKeys,
     getEntityChildViews,
     resolveCollectionRelations
 } from "@rebasepro/common";
+import {
+    getChildViewRelationPropertyKeys
+} from "@rebasepro/cms-types";
 import { getDefaultFieldId } from "../../src/components/field_ids";
 import { collectionFromTable, collectionsFromTables } from "../../src/tables";
 import { column, posts, table, tags, users, uuidId } from "./fixtures";

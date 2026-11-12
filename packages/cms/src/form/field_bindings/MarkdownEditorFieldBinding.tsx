@@ -4,7 +4,7 @@ import { FieldHelperText } from "../components/FieldHelperText";
 import { LabelWithIcon } from "../components/LabelWithIcon";
 import { useAuthController, useStorageSource, useTranslation } from "@rebasepro/app";
 import { useStorageSources } from "@rebasepro/app";
-import { resolveStorageSource } from "@rebasepro/common";
+import { resolveStorageSource } from "@rebasepro/cms-types";
 import { getIconForProperty } from "../../util/property_utils";
 import type { FieldProps } from "../../types/fields";
 import type { ArrayProperty, StringProperty } from "@rebasepro/types";
@@ -19,7 +19,7 @@ import {
     XIcon
 } from "@rebasepro/ui";
 import type { RichTextEditorProps } from "../../editor";
-import { resolveStorageFilenameString, resolveStoragePathString } from "@rebasepro/common";
+import { resolveStorageFilenameString, resolveStoragePathString } from "@rebasepro/cms-types";
 import { randomString } from "@rebasepro/utils";
 import { useImageSrcResolver } from "../../hooks/useStorageReferenceResolver";
 import { useProvidedEditorAIController } from "../../contexts/EditorAIControllerContext";

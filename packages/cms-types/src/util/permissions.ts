@@ -1,6 +1,6 @@
 import { AuthState, Entity, CollectionConfig, isPostgresCollectionConfig, SecurityOperation, SecurityRule, User } from "@rebasepro/types";
-import { securityRuleToConditions } from "./policy/securityRuleToConditions";
-import { evaluatePolicy, PolicyEvalContext, TriState } from "./policy/evaluatePolicy";
+import { securityRuleToConditions } from "@rebasepro/common";
+import { evaluatePolicy, PolicyEvalContext, TriState } from "@rebasepro/common";
 
 /**
  * Minimal auth context for permission checking.

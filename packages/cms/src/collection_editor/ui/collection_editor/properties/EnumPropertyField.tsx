@@ -3,7 +3,7 @@ import { getIn, useFormex } from "@rebasepro/forms";
 import { useTranslation } from "@rebasepro/app";
 import { useSafeSnackbarController } from "../../../useSafeSnackbarController";
 import { EnumValueConfig, EnumValues } from "@rebasepro/types";
-import { resolveEnumValues } from "@rebasepro/common";
+import { resolveEnumValues } from "@rebasepro/cms-types";
 import { Select, SelectItem } from "@rebasepro/ui";
 import { EnumForm, hasEnumId } from "../EnumForm";
 import { StringPropertyValidation } from "./validation/StringPropertyValidation";

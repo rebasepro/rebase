@@ -310,8 +310,8 @@ export const PROBES = {
             {
                 test: /node_modules\/(?:\.pnpm\/[^/]+\/node_modules\/)?json-logic-js\//,
                 label: "json-logic-js",
-                why: "only the conditions module of @rebasepro/common uses it; the package must stay one file per " +
-                    "module (preserveModules) with `\"sideEffects\": false`, so a client that evaluates no condition leaves it out"
+                why: "only the panel's condition evaluator (@rebasepro/cms-types) uses it; nothing a client SDK bundle " +
+                    "reaches may import it"
             }
         ]
     },

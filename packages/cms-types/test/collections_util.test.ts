@@ -1,4 +1,4 @@
-import { sortProperties, getPrimaryKeys } from "../src/util/collections";
+import { sortProperties, getPrimaryKeys } from "@rebasepro/cms-types";
 import { CollectionConfig, Properties } from "@rebasepro/types";
 
 describe("collections utils", () => {

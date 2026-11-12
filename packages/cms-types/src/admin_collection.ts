@@ -18,7 +18,6 @@ import type React from "react";
 import type {
     CollectionCallbacks,
     CollectionConfig,
-    FilterPreset,
     FilterValues,
     OrderBySpec,
     PostgresCollectionConfig,
@@ -26,8 +25,11 @@ import type {
     Properties,
     User
 } from "@rebasepro/types";
+import type {
+    FilterPreset
+} from "./types/filter_preset";
 // A value, not a type: the runtime list core owns.
-import { ADMIN_COLLECTION_KEYS as CORE_ADMIN_COLLECTION_KEYS, nestAdminCollectionKeys } from "@rebasepro/types";
+import { type ADMIN_COLLECTION_KEYS, nestAdminCollectionKeys } from "./admin_block";
 
 import type {
     AdditionalFieldDelegate,
@@ -648,33 +650,23 @@ export type AdminCollectionOptions<
  * sits apart from it and the barrel exports both.
  */
 
-/**
- * Re-exported from `@rebasepro/types`, where the list has to live: the ts-morph
- * schema editor in `@rebasepro/server` needs it to know which keys go inside the
- * block when it rewrites a collection file, and a core package may not import
- * this one. The list is plain data, so core is a fine home for it.
- *
- * What core *cannot* do is check the list against the type. That happens here.
- *
- * @group Models
- */
-export type { AdminCollectionKey } from "@rebasepro/types";
-
 /** Compiles only when `T` is `never` — see {@link _EveryAdminCollectionOptionIsListed}. */
 type AssertNeverKey<T extends never = never> = T;
 
-/** Local alias, so the assertion below can name the list's element type. */
-type AdminCollectionKeyName = typeof CORE_ADMIN_COLLECTION_KEYS[number];
+/** Compiles only when every key in `T` is an option. */
+type AssertCollectionOptionKey<T extends keyof AdminCollectionOptions> = T;
+
+/** The list's element type (`ADMIN_COLLECTION_KEYS` in `./admin_block`). */
+type AdminCollectionKeyName = typeof ADMIN_COLLECTION_KEYS[number];
 
 /**
- * Core's list, re-exported through a `satisfies` clause that is the agreement
- * check: a key core names that is not an option here fails to compile, and
- * `satisfies` keeps the literal tuple type rather than widening it to `string[]`.
+ * The agreement check between the list and the type, first direction: a key
+ * the list names that is not an option here fails to compile.
  */
-export const ADMIN_COLLECTION_KEYS = CORE_ADMIN_COLLECTION_KEYS satisfies readonly (keyof AdminCollectionOptions)[];
+type _EveryListedAdminCollectionKeyIsAnOption = AssertCollectionOptionKey<AdminCollectionKeyName>;
 
 /**
- * And the reverse: an option declared here that core's list does not name.
+ * And the reverse: an option declared here that the list does not name.
  *
  * This direction was believed to have no type-level expression — `keyof` over
  * optional properties does in fact yield them all, so it does. A test counted

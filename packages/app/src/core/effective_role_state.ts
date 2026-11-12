@@ -1,4 +1,4 @@
-import type { EffectiveRoleController } from "@rebasepro/types";
+import type { EffectiveRoleController } from "@rebasepro/cms-types";
 import { useCallback, useState, useMemo } from "react";
 import { readStoredString, removeStoredString, writeStoredString } from "../util/local_storage";
 

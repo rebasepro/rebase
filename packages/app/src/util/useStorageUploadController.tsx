@@ -6,7 +6,7 @@ import { deepEqual as equal } from "fast-equals";
 import { resourceKeyOf } from "@rebasepro/types";
 import { EntityValues, StorageConfig, StorageSource, StorageSourceRegistry, UploadFileProps } from "@rebasepro/types";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { resolveStorageFilenameString, resolveStoragePathString, resolveStorageSource } from "@rebasepro/common";
+import { resolveStorageFilenameString, resolveStoragePathString, resolveStorageSource } from "@rebasepro/cms-types";
 import { useAuthController } from "../hooks";
 import { useStorageSources } from "../contexts/StorageSourcesContext";
 import { randomString } from "@rebasepro/utils";

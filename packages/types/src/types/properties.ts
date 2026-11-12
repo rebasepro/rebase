@@ -1,7 +1,7 @@
 import type { ResourceRef } from "./resources";
 
 import type { EntityReference, EntityRelation, EntityValues, GeoPoint, Vector } from "./entities";
-import type { JoinStep, OnAction, Relation, ResolvedRelation } from "./relations";
+import type { Relation, ResolvedRelation } from "./relations";
 import type { ColorKey, ColorScheme } from "./chips";
 import type { AuthState } from "../controllers/auth_state";
 import type { AfterReadProps, BeforeSaveProps } from "./entity_callbacks";
@@ -1764,64 +1764,4 @@ export interface PropertyConditions {
      * A number, or a rule that evaluates to one.
      */
     maxFileSize?: number | JsonLogicRule;
-}
-
-/**
- * Context available during JSON Logic condition evaluation.
- * Mirrors PropertyBuilderProps but adapted for JSON serialization.
- * @group Entity properties
- */
-export interface ConditionContext {
-    /**
-     * Current form/entity values.
-     * Date values are converted to Unix timestamps (milliseconds).
-     */
-    values: Record<string, unknown>;
-
-    /**
-     * Previous values before the current edit session.
-     */
-    previousValues: Record<string, unknown>;
-
-    /**
-     * Current value of this property specifically.
-     */
-    propertyValue: unknown;
-
-    /**
-     * Collection path (e.g., "products", "users/uid123/orders")
-     */
-    path: string;
-
-    /**
-     * Entity ID. Undefined for new entities.
-     */
-    entityId?: string;
-
-    /**
-     * Whether this is a new entity being created.
-     */
-    isNew: boolean;
-
-    /**
-     * Index of this property (only for array items).
-     */
-    index?: number;
-
-    /**
-     * Current authenticated user information.
-     */
-    user: {
-        uid: string;
-        email: string | null;
-        displayName: string | null;
-        photoURL: string | null;
-        /** Role IDs the user has (extracted from Role[].id) */
-        roles: string[];
-    };
-
-    /**
-     * Current timestamp as Unix milliseconds.
-     */
-    now: number;
 }

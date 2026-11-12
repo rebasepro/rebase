@@ -1,6 +1,6 @@
 
 import type { PluginFormActionProps, AdminCollection } from "@rebasepro/cms-types";
-import { hasEntityId } from "@rebasepro/common";
+import { hasEntityId } from "../util/identity";
 import React, { useCallback, useMemo, useState } from "react";
 import { Entity, EntityStatus, EntityValues } from "@rebasepro/types";
 import { AnalyticsEvent } from "@rebasepro/cms-types";

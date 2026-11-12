@@ -4,7 +4,8 @@ import { renderSkeletonImageThumbnail } from "../property_previews/SkeletonPrope
 import { UrlComponentPreview } from "./UrlComponentPreview";
 import { knownStorageRenditionUrl, storageRenditionUrl } from "./storageRenditions";
 import { AuthControllerContext, useStorageSource, useStorageSources, useTranslation } from "@rebasepro/app";
-import { createDownloadUrlCache, resolveStorageSource } from "@rebasepro/common";
+import { createDownloadUrlCache } from "@rebasepro/common";
+import { resolveStorageSource } from "@rebasepro/cms-types";
 import { DownloadConfig, FileType } from "@rebasepro/types";
 import type { PreviewSize } from "../../types/components/PropertyPreviewProps";
 import { cls, ImageOffIcon, iconSize, Skeleton, Tooltip, Typography } from "@rebasepro/ui";

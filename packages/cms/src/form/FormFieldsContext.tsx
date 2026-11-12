@@ -1,11 +1,10 @@
 import React, { useCallback, useContext } from "react";
 import { deepEqual as equal } from "fast-equals";
 import type { Entity } from "@rebasepro/types";
-import type { AdminCollection } from "@rebasepro/cms-types";
+import type { AdminCollection, ResolvePropertyProps } from "@rebasepro/cms-types";
 import type { AuthState, Property } from "@rebasepro/types";
 import type { ResolvedFormField } from "@rebasepro/app";
 import { isHidden, useAuthController, useCustomizationController, useRebaseContext } from "@rebasepro/app";
-import type { ResolvePropertyProps } from "@rebasepro/common";
 import { effectiveAccess } from "@rebasepro/common";
 import { AlignLeftIcon, cls, paperMixin } from "@rebasepro/ui";
 import { FormexController, useFormexSelector } from "@rebasepro/forms";

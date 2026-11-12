@@ -2,7 +2,7 @@ import React from "react";
 import type { PropertyPreviewProps } from "@rebasepro/cms";
 import type { ArrayProperty, EnumValueConfig, StringProperty } from "@rebasepro/types";
 import { cls, Tooltip } from "@rebasepro/ui";
-import { resolveEnumValues } from "@rebasepro/common";
+import { resolveEnumValues } from "@rebasepro/cms-types";
 
 import { HOTSPOT_ZONES } from "./BodyPartsField";
 import bodyFrontImg from "./assets/body_front.png";

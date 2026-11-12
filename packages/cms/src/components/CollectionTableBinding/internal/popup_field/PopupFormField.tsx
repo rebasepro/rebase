@@ -1,5 +1,5 @@
 import type { Properties } from "@rebasepro/types";
-import { hasEntityId } from "@rebasepro/common";
+import { hasEntityId } from "../../../../util/identity";
 
 import type { FormContext, PropertyFieldBindingProps } from "../../../../types/fields";
 import type { Property } from "@rebasepro/types";

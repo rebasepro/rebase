@@ -2,7 +2,7 @@ import React from "react";
 import type { AdminCollection, AnySlotContribution, CollectionWidgetsSlotProps, HomeCardWidgetSlotProps } from "@rebasepro/cms-types";
 import type { createRebaseClient } from "@rebasepro/client";
 import type { FilterValues } from "@rebasepro/types";
-import { resolveEnumValues } from "@rebasepro/common";
+import { resolveEnumValues } from "@rebasepro/cms-types";
 import { useAggregate, useRebaseClient, useRowCount } from "@rebasepro/app";
 import { useSidePanel, useUrlController } from "@rebasepro/cms";
 import { BarChart, ChartCard, KpiGrid, KpiReadout, KpiTile, TimeSeriesChart, type Bar, type KpiProps } from "@rebasepro/ui";

@@ -8,7 +8,7 @@ import { LabelWithIcon } from "../components/LabelWithIcon";
 import { EnumValuesChip } from "../../preview";
 import { getIconForProperty } from "../../util/property_utils";
 import { cls, IconButton, InputLabel, Select, SelectItem, XIcon } from "@rebasepro/ui";
-import { resolveEnumValues } from "@rebasepro/common";
+import { resolveEnumValues } from "@rebasepro/cms-types";
 
 /**
  * If `enumValues` are set in the string config, this field renders a select

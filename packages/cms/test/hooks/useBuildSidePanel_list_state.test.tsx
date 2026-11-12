@@ -19,9 +19,9 @@ import type {
     NavigationStateController,
     SideDialogPanelProps,
     SideDialogsController,
-    UrlController
+    UrlController,
+    CollectionRegistryController
 } from "@rebasepro/cms-types";
-import type { CollectionRegistryController } from "@rebasepro/types";
 
 jest.mock("@rebasepro/app", () => {
     const overrides: Record<string, unknown> = {

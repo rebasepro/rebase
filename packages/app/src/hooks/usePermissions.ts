@@ -1,7 +1,7 @@
 import { useAuthController } from "./useAuthController";
 import { useRlsSimulation } from "../contexts/RlsSimulationContext";
 import { Entity } from "@rebasepro/types";
-import { canCreateEntity, canEditEntity, canDeleteEntity, canReadCollection } from "@rebasepro/common";
+import { canCreateEntity, canEditEntity, canDeleteEntity, canReadCollection } from "@rebasepro/cms-types";
 import { useCallback, useMemo } from "react";
 import type { AdminCollection } from "@rebasepro/cms-types";
 import { idOfRow } from "../util/entity_row";

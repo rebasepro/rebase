@@ -140,6 +140,9 @@ export {
 // Headless collection view adapters
 // Map entity types to the data-agnostic CollectionView from @rebasepro/ui
 export { mapPropertyToConfig, mapPropertiesToConfigs } from "./util/propertyConfigMapper";
+// Moved from @rebasepro/common: only the panel asks these.
+export { hasEntityId } from "./util/identity";
+export { getRelationTargetPath } from "./util/relations";
 export { useCollectionDataController, createStaticDataController } from "./util/dataControllerAdapter";
 
 // Selecting rows across a paginated view: the banner and the select-all

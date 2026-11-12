@@ -3,8 +3,8 @@
  */
 import { renderHook, waitFor, act } from "@testing-library/react";
 import { useBuildNavigationStateController } from "../../src/hooks/navigation/useBuildNavigationStateController";
-import { CollectionRegistryController, RebaseSdkData, CollectionConfig } from "@rebasepro/types";
-import { AuthController, UrlController } from "@rebasepro/cms-types";
+import { RebaseSdkData, CollectionConfig } from "@rebasepro/types";
+import { AuthController, UrlController, CollectionRegistryController } from "@rebasepro/cms-types";
 import { CollectionRegistry } from "@rebasepro/common";
 import { jest } from "@jest/globals";
 import { fakeAuthController, fakeCollectionRegistry, fakeSdkData, fakeUrlController, fakeUser } from "../helpers/fakes";

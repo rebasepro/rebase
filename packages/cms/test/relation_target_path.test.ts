@@ -1,5 +1,5 @@
-import { getRelationTargetPath } from "../src/util/relations";
-import { normalizeToEntityRelation } from "../src/util/entities";
+import { getRelationTargetPath } from "@rebasepro/cms";
+import { normalizeToEntityRelation } from "@rebasepro/common";
 import type { PostgresCollectionConfig, RelationProperty } from "@rebasepro/types";
 
 const companies: PostgresCollectionConfig = {

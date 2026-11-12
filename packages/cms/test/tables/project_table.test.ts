@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import type { TableDescriptor } from "@rebasepro/types";
-import { getPrimaryKeys } from "@rebasepro/common";
+import { getPrimaryKeys } from "@rebasepro/cms-types";
 import { collectionFromTable, collectionsFromTables, defaultDisplay } from "../../src/tables";
 import { column, posts, table, tags, users, uuidId } from "./fixtures";
 

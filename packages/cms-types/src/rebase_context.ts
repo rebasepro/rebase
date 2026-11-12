@@ -27,7 +27,7 @@ export type RebaseContext<USER extends User = User, AuthControllerType extends A
     /**
      * Controller mapping strings to collections
      */
-    collectionRegistryController?: import("@rebasepro/types").CollectionRegistryController;
+    collectionRegistryController?: import("./controllers/collection_registry").CollectionRegistryController;
 
     /**
      * Controller for navigation state

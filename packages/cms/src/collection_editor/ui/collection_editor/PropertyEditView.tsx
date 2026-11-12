@@ -7,11 +7,10 @@ import { ConfirmationDialog, useTranslation } from "@rebasepro/app";
 import { DEFAULT_FIELD_CONFIGS, getFieldConfig, getFieldId } from "../../../components/field_configs";
 import { PropertyConfigBadge } from "../../../components/PropertyConfigBadge";
 import { Property } from "@rebasepro/types";
-import { PropertyConfig, PropertyConfigId, AdminCollection } from "@rebasepro/cms-types";
+import { PropertyConfig, PropertyConfigId, AdminCollection, isPropertyBuilder } from "@rebasepro/cms-types";
 import type { PropertyTypePreset, PropertyType } from "../../extensibility_types";
 import { toSerializableProperty, toSerializableCollectionConfig } from "../../serializable_utils";
 import type { SerializableProperty, SerializableCollectionConfig } from "../../serializable_types";
-import { isPropertyBuilder } from "@rebasepro/common";
 import {
     AlertTriangleIcon,
     Button,

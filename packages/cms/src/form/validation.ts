@@ -3,7 +3,8 @@ import type { ArrayProperty, MapProperty, NumberProperty, Property, BooleanPrope
 ;
 import { z, ZodTypeAny } from "zod";
 import { deepEqual as isDeepEqual } from "fast-equals";
-import { DEFAULT_ONE_OF_TYPE, DEFAULT_ONE_OF_VALUE, enumToObjectEntries, isPropertyBuilder } from "@rebasepro/common";
+import { enumToObjectEntries } from "@rebasepro/common";
+import { DEFAULT_ONE_OF_TYPE, DEFAULT_ONE_OF_VALUE, isPropertyBuilder } from "@rebasepro/cms-types";
 import { getValueInPath, hydrateRegExp, isPlainObject, prettifyIdentifier } from "@rebasepro/utils";
 
 /** Whether an authored relation yields many rows. Derived from its kind. */

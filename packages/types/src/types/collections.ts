@@ -8,7 +8,7 @@ import type { Relation } from "./relations";
 import type { SecurityRule } from "./security_rules";
 import type { RoleDefinition, ScopeDefinition } from "./scopes";
 import { getDataSourceCapabilities } from "./data_source";
-import type { WhereFilterOp, FilterValues, FilterPreset } from "./filter-operators";
+import type { WhereFilterOp, FilterValues } from "./filter-operators";
 import type { SearchConfig } from "./search";
 import type { CollectionIndex } from "./indexes";
 import type { CollectionTenantConfig } from "./tenancy";
@@ -696,7 +696,7 @@ export interface EntityChildView<M extends Record<string, unknown> = Record<stri
 }
 
 
-export type { WhereFilterOp, FilterValues, WireFilterValues, FilterPreset } from "./filter-operators";
+export type { WhereFilterOp, FilterValues, WireFilterValues } from "./filter-operators";
 
 
 export type InferCollectionConfigType<S extends CollectionConfig> = S extends CollectionConfig<infer M> ? M : never;

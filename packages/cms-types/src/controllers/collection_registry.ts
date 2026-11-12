@@ -1,5 +1,5 @@
-import type { CollectionConfig } from "../types/collections";
-import type { EntityReference } from "../types/entities";
+import type { CollectionConfig } from "@rebasepro/types";
+import type { EntityReference } from "@rebasepro/types";
 
 /**
  * Controller that provides access to the registered entity collections.

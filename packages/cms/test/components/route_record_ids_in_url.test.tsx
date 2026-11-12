@@ -16,8 +16,7 @@ import { act } from "react";
 import { describe, expect, it, jest, beforeEach } from "@jest/globals";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router";
-import type { AdminCollection } from "@rebasepro/cms-types";
-import type { CollectionRegistryController } from "@rebasepro/types";
+import type { AdminCollection, CollectionRegistryController } from "@rebasepro/cms-types";
 
 type BlockerArgs = {
     currentLocation: { pathname: string, hash: string },

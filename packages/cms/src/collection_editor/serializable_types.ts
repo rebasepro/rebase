@@ -15,7 +15,6 @@ import type {
     ArrayPropertyValidationSchema,
     EnumValues,
     FileType,
-    FilterPreset,
     FilterValues,
     ImageResize,
     JoinStep,
@@ -30,7 +29,8 @@ import type {
 import type {
     CollectionSize,
     KanbanConfig,
-    ViewMode
+    ViewMode,
+    FilterPreset
 } from "@rebasepro/cms-types";
 
 // ═══════════════════════════════════════════════════════════════════════

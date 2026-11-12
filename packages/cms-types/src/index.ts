@@ -22,6 +22,8 @@ export * from "./define_collection";
 export { composeCallbacks } from "@rebasepro/common";
 export * from "./collections";
 export * from "./admin_collection";
+// The admin block's keys as data, and the way back from the flat view model to the block.
+export * from "./admin_block";
 // `customizeTable`'s types: the deltas a frontend states over a table's default collection.
 export * from "./table_customization";
 // The collection editor's edits to a `defineFirestoreCollection` call.
@@ -29,3 +31,5 @@ export * from "./firestore_collection_patch";
 export * from "./rebase_context";
 export * from "./types";
 export * from "./controllers";
+// The view-model helpers the panel runs on (resolution, defaults, conditions, permissions).
+export * from "./util";

@@ -1,14 +1,12 @@
 import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
 import type { TablePatch } from "@rebasepro/types";
 import type {
-    CollectionRegistryController
-} from "@rebasepro/types";
-import type {
     SidePanelController,
     UrlController,
     NavigationStateController,
     BreadcrumbEntry,
-    BreadcrumbsController
+    BreadcrumbsController,
+    CollectionRegistryController
 } from "@rebasepro/cms-types";
 
 export type { BreadcrumbEntry, BreadcrumbsController };

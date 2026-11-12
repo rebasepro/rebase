@@ -1,6 +1,6 @@
 import type { Property, PropertyBuilderProps, StringProperty } from "@rebasepro/types";
-import { resolveProperty } from "../src/util/resolutions";
-import { resetDeprecationWarningsForTests } from "../src/util/deprecation";
+import { resolveProperty } from "@rebasepro/cms-types";
+import { resetDeprecationWarningsForTests } from "@rebasepro/common";
 
 /** A `dynamicProps` builder is handed the record's id as `id`. */
 describe("resolveProperty: what a dynamicProps builder is handed", () => {

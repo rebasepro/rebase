@@ -12,7 +12,8 @@
  */
 import { describe, expect, it } from "@jest/globals";
 import { col, defineAuthTable, defineTable, rel, type AnyTableDef, type Entity, type TableDescriptor } from "@rebasepro/types";
-import { checkOperation, compileTables } from "@rebasepro/common";
+import { compileTables } from "@rebasepro/common";
+import { checkOperation } from "@rebasepro/cms-types";
 import { schemaViewFor, serializeTables } from "../../../server/src/api/schema-tables";
 import { collectionsFromTables } from "../../src/tables";
 import { signedIn } from "./fixtures";

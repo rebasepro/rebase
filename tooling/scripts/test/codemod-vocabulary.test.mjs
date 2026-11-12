@@ -117,7 +117,7 @@ function record(file, name) {
 const VOCABULARY = "packages/cli/src/codemod/collections-to-tables/vocabulary.ts";
 const CUSTOMIZATION = "packages/cms-types/src/table_customization.ts";
 const CUSTOMIZE = "packages/cms/src/tables/customize_table.ts";
-const ADMIN_BLOCK = "packages/types/src/types/admin_block.ts";
+const ADMIN_BLOCK = "packages/cms-types/src/admin_block.ts";
 
 const TABLE_KEYS = new Set(stringArray(CUSTOMIZATION, "TABLE_CUSTOMIZATION_KEYS"));
 const FIELD_KEYS = new Set(stringArray(CUSTOMIZATION, "FIELD_CUSTOMIZATION_KEYS"));

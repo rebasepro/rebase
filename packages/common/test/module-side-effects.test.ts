@@ -6,10 +6,9 @@ import * as ts from "typescript";
 /**
  * `package.json` declares `"sideEffects": false` for this package, and the
  * build emits one file per source module (`preserveModules`): a bundler may
- * drop any file of it whose exports nobody uses. That is what keeps
- * `json-logic-js` (only util/conditions.ts imports it) out of a client app
- * that never evaluates a condition — the `sdk-minimal` target of
- * tooling/scripts/check-bundle-budget.mjs measures it.
+ * drop any file of it whose exports nobody uses. That is what keeps a
+ * module's dependencies out of a client app that never imports from it — the
+ * `sdk-minimal` target of tooling/scripts/check-bundle-budget.mjs measures it.
  *
  * The flag is a promise about every module, so this holds it: importing a
  * module must not DO anything another module relies on — register something,

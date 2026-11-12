@@ -1,8 +1,7 @@
 import type { AuthCollectionConfig, CollectionCallbacks } from "@rebasepro/types";
 import type { AppView, AppViewsBuilder, EntityAction, CollectionConfigsBuilder, RebaseContext, RebasePlugin, UserCreationResult, AdminCollection } from "@rebasepro/cms-types";
 import { type User, type RebaseSdkData } from "@rebasepro/types";
-import { type AuthController, resolveAdminCollection } from "@rebasepro/cms-types";
-import { canReadCollection } from "@rebasepro/common";
+import { type AuthController, resolveAdminCollection, canReadCollection } from "@rebasepro/cms-types";
 import { accountAccessAction, resetMfaAction, resetPasswordAction } from "../../components/common/default_entity_actions";
 import { CreationResultDialog } from "../../components/admin/CreationResultDialog";
 import React from "react";

@@ -6,7 +6,7 @@ import {
 } from "@rebasepro/app";
 import { getPropertyInPath } from "../_cms_internals";
 import { EnumValueConfig, StringProperty } from "@rebasepro/types";
-import { resolveEnumValues } from "@rebasepro/common";
+import { resolveEnumValues } from "@rebasepro/cms-types";
 import {
     Button,
     cls,

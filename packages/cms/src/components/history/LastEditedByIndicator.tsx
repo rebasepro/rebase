@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
-import { hasEntityId } from "@rebasepro/common";
+import { hasEntityId } from "../../util/identity";
 import { useApiBase, useApiConfig, useAuthController, useRlsSimulation } from "@rebasepro/app";
 import { simulationHeaders } from "@rebasepro/types";
 import { formatRelativeTime, type RelativeTimeLabels } from "@rebasepro/utils";

@@ -1,6 +1,6 @@
 
 import React, { createContext } from "react";
-import { CollectionRegistryController } from "@rebasepro/types";
+import { CollectionRegistryController } from "@rebasepro/cms-types";
 import type { AdminCollection } from "@rebasepro/cms-types";
 
 export const CollectionRegistryContext = createContext<CollectionRegistryController>({

@@ -8,7 +8,7 @@ import {
     getReferenceFrom,
     traverseValuesProperties,
     traverseValueProperty
-} from "../src/util/entities";
+} from "@rebasepro/cms-types";
 import {
     type Entity,
     Property,

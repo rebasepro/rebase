@@ -6,7 +6,7 @@ import { renderHook } from "@testing-library/react";
 import React from "react";
 import { MemoryRouter } from "react-router";
 import { useBuildUrlController } from "../../src/hooks/navigation/useBuildUrlController";
-import { CollectionRegistryController } from "@rebasepro/types";
+import { CollectionRegistryController } from "@rebasepro/cms-types";
 import { CollectionRegistry } from "@rebasepro/common";
 import { fakeCollectionRegistry } from "../helpers/fakes";
 

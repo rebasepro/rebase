@@ -3,7 +3,7 @@ import { getFieldConfig } from "../../../components/field_configs";
 import { PropertyConfigBadge } from "../../../components/PropertyConfigBadge";
 import { ErrorBoundary } from "@rebasepro/ui";
 import { Property } from "@rebasepro/types";
-import { isPropertyBuilder } from "@rebasepro/common";
+import { isPropertyBuilder } from "@rebasepro/cms-types";
 import { cls, Paper, Typography } from "@rebasepro/ui";
 import { FunctionSquareIcon, iconSize, MinusCircleIcon } from "@rebasepro/ui";
 

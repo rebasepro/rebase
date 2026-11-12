@@ -1,6 +1,6 @@
 import React from "react";
-import { User, DataDriver, DataSourceDefinition, StorageSource, StorageSourceDefinition, CollectionRegistryController, DatabaseAdmin, RebaseClient } from "@rebasepro/types";
-import { Locale, AuthController, AnalyticsEvent, UserConfigurationPersistence, UrlController, NavigationStateController, RebaseContext, EntityLinkBuilder, RebasePlugin, AnySlotContribution, PropertyConfig, EntityCustomView, CollectionCustomView, EntityAction, RebaseTranslations, ComponentOverrideMap } from "@rebasepro/cms-types";
+import { User, DataDriver, DataSourceDefinition, StorageSource, StorageSourceDefinition, DatabaseAdmin, RebaseClient } from "@rebasepro/types";
+import { Locale, AuthController, AnalyticsEvent, UserConfigurationPersistence, UrlController, NavigationStateController, RebaseContext, EntityLinkBuilder, RebasePlugin, AnySlotContribution, PropertyConfig, EntityCustomView, CollectionCustomView, EntityAction, RebaseTranslations, ComponentOverrideMap, CollectionRegistryController } from "@rebasepro/cms-types";
 
 /**
  * A data source registered on `<Rebase>`. Extends the shared
@@ -47,8 +47,8 @@ type DeepPartial<T> = T extends object
  * Controller to simulate different roles when dev mode is active.
  * @group Models
  */
-export type { EffectiveRoleController } from "@rebasepro/types";
-import type { EffectiveRoleController } from "@rebasepro/types";
+export type { EffectiveRoleController } from "@rebasepro/cms-types";
+import type { EffectiveRoleController } from "@rebasepro/cms-types";
 import type { ModeController } from "../hooks/useModeController";
 
 

@@ -47,7 +47,3 @@ export const MCP_APP_MODULES = {
 
 /** A module an app may import. */
 export type McpAppModule = keyof typeof MCP_APP_MODULES;
-
-/** The names a module with a served list hands out. */
-export type McpAppModuleExport<M extends McpAppModule> =
-    (typeof MCP_APP_MODULES)[M] extends readonly (infer N extends string)[] ? N : string;

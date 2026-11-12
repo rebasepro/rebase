@@ -1,4 +1,4 @@
-import { hasEntityId } from "@rebasepro/common";
+import { hasEntityId } from "../util/identity";
 import type { EntityCustomViewParams, AdminCollection } from "@rebasepro/cms-types";
 import type { FormContext } from "../types/fields";
 import type { PluginFormActionProps } from "@rebasepro/cms-types";

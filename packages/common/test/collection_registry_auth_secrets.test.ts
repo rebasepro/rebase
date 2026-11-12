@@ -1,7 +1,6 @@
 import { CollectionConfig, Property } from "@rebasepro/types";
 import { CollectionRegistry } from "../src/collections/CollectionRegistry";
 import { authSecretsMissingExclusion } from "../src/collections/auth-secrets";
-import { getDefaultValuesFor } from "../src/util/entities";
 
 /**
  * The panel builds its registry from the project's collection files as written.
@@ -54,16 +53,6 @@ describe("CollectionRegistry — auth collection secrets", () => {
         expect(excluded(users, "emailVerificationToken")).toBe(true);
         expect(excluded(users, "email")).toBeUndefined();
         expect(excluded(users, "emailVerified")).toBeUndefined();
-    });
-
-    it("leaves them out of the form baseline for a new user", () => {
-        const registry = new CollectionRegistry([redeclaredUsersCollection()]);
-        const baseline = getDefaultValuesFor(registry.get("users")!.properties);
-
-        expect(baseline).not.toHaveProperty("passwordHash");
-        expect(baseline).not.toHaveProperty("emailVerificationToken");
-        expect(baseline).toHaveProperty("email", null);
-        expect(baseline).toHaveProperty("emailVerified", false);
     });
 
     it("does not write the flag back into the collection it was given", () => {

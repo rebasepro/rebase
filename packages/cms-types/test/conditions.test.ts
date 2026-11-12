@@ -2,8 +2,9 @@ import {
     buildConditionContext,
     evaluateCondition,
     registerConditionOperations
-} from "../src/util/conditions";
-import { AuthState, ConditionContext, EnumValueConfig, Property, StringProperty } from "@rebasepro/types";
+} from "@rebasepro/cms-types";
+import { AuthState, EnumValueConfig, Property, StringProperty } from "@rebasepro/types";
+import { ConditionContext } from "@rebasepro/cms-types";
 
 describe("Property Conditions", () => {
 

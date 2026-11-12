@@ -1,7 +1,8 @@
 import { useCallback } from "react";
 import type { Entity, EntityReference } from "@rebasepro/types";
 import { useCollectionScope } from "@rebasepro/app";
-import { getReferenceFrom, resolveDataSource } from "@rebasepro/common";
+import { resolveDataSource } from "@rebasepro/common";
+import { getReferenceFrom } from "@rebasepro/cms-types";
 import { useCollectionRegistryController } from "./navigation/contexts/CollectionRegistryContext";
 
 /**

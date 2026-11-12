@@ -18,9 +18,9 @@
  * gates are consulted everywhere a field is laid out — including places with
  * no entity to evaluate a rule against.
  */
-import type { ConditionContext, ConditionRule, EnumValueConfig, Property, PropertyConditions, ReferenceProperty } from "@rebasepro/types";
-import type { AdminArrayOptions, AdminReferenceOptions } from "@rebasepro/cms-types";
-import { evaluateCondition } from "@rebasepro/common";
+import type { ConditionRule, EnumValueConfig, Property, PropertyConditions, ReferenceProperty } from "@rebasepro/types";
+import type { AdminArrayOptions, AdminReferenceOptions, ConditionContext } from "@rebasepro/cms-types";
+import { evaluateCondition } from "@rebasepro/cms-types";
 
 /**
  * A condition stated as a literal rather than as a rule.

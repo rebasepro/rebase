@@ -8,7 +8,9 @@ import { deepEqual as equal } from "fast-equals";
 
 import { ErrorBoundary, isKeyHandled } from "@rebasepro/ui";
 import { useDebouncedCallback } from "@rebasepro/ui";
-import { getCopyValues, getDefaultValuesFor, hasEntityId } from "@rebasepro/common";
+import { getCopyValues } from "@rebasepro/common";
+import { getDefaultValuesFor } from "@rebasepro/cms-types";
+import { hasEntityId } from "../util/identity";
 import { isDisabled, isReadOnly } from "@rebasepro/app";
 import { useAuthController, useCustomizationController, useTranslation } from "@rebasepro/app";
 

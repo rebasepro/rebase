@@ -1,6 +1,6 @@
 
 import type { Property } from "@rebasepro/types";
-import { hasEntityId } from "@rebasepro/common";
+import { hasEntityId } from "../util/identity";
 import * as React from "react";
 import { useEffect, useMemo } from "react";
 

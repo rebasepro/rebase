@@ -1,5 +1,5 @@
 import type { PluginFormActionProps } from "@rebasepro/cms-types";
-import { hasEntityId } from "@rebasepro/common";
+import { hasEntityId } from "../../util/identity";
 import React from "react";
 ;
 import { LastEditedByIndicator } from "./LastEditedByIndicator";

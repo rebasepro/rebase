@@ -1,6 +1,6 @@
 import { MAX_LIST_LIMIT } from "@rebasepro/types";
 import type { TableAccessor, CollectionConfig, Entity, WhereFor } from "@rebasepro/types";
-import { getPrimaryKeys } from "@rebasepro/common";
+import { getPrimaryKeys } from "@rebasepro/cms-types";
 
 /**
  * The rows of one collection with these ids, in as few requests as its key

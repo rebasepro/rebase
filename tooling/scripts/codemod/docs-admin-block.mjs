@@ -24,7 +24,7 @@ import path from "node:path";
 const repoRoot = path.resolve(import.meta.dirname, "..", "..", "..");
 
 function loadAdminKeys() {
-    const file = path.join(repoRoot, "packages/types/src/types/admin_block.ts");
+    const file = path.join(repoRoot, "packages/cms-types/src/admin_block.ts");
     const src = fs.readFileSync(file, "utf8");
     const block = src.slice(src.indexOf("export const ADMIN_COLLECTION_KEYS"));
     return [...block.matchAll(/^\s{4}"(\w+)",?$/gm)].map((m) => m[1]);

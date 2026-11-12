@@ -6,7 +6,7 @@ import { FieldHelperText } from "../components/FieldHelperText";
 import { LabelWithIcon } from "../components/LabelWithIcon";
 import { ArrayContainer, ArrayEntryParams } from "../../components/ArrayContainer";
 import { ErrorBoundary } from "@rebasepro/ui";
-import { getArrayResolvedProperties, getDefaultValueFor } from "@rebasepro/common";
+import { getArrayResolvedProperties, getDefaultValueFor } from "@rebasepro/cms-types";
 import { getIconForProperty } from "../../util/property_utils";
 import { PropertyFieldBinding } from "../PropertyFieldBinding";
 import { ExpandablePanel, Typography } from "@rebasepro/ui";

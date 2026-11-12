@@ -1,7 +1,7 @@
 import type { UrlController, NavigateOptions } from "@rebasepro/cms-types";
 import { useCallback, useMemo } from "react";
 import { removeInitialAndTrailingSlashes, resolveCollectionPathIds } from "@rebasepro/app";
-import { CollectionRegistryController } from "@rebasepro/types";
+import { CollectionRegistryController } from "@rebasepro/cms-types";
 import { useNavigate } from "react-router";
 import { decodeUrlPath, encodeUrlPath } from "./url_segments";
 

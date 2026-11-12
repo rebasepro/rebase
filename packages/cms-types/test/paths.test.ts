@@ -1,4 +1,4 @@
-import { stripCollectionPath, segmentsToStrippedPath, fullPathToCollectionSegments, COLLECTION_PATH_SEPARATOR } from "../src/util/paths";
+import { stripCollectionPath, segmentsToStrippedPath, fullPathToCollectionSegments, COLLECTION_PATH_SEPARATOR } from "@rebasepro/cms-types";
 
 describe("paths utils", () => {
     describe("fullPathToCollectionSegments", () => {

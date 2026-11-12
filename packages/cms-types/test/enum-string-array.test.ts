@@ -1,7 +1,7 @@
 import type { CollectionConfig, EnumValueConfig, StringProperty } from "@rebasepro/types";
-import { enumToObjectEntries } from "../src/util/enums";
-import { resolvePropertyEnum } from "../src/util/resolutions";
-import { CollectionRegistry } from "../src/collections/CollectionRegistry";
+import { enumToObjectEntries } from "@rebasepro/common";
+import { resolvePropertyEnum } from "@rebasepro/cms-types";
+import { CollectionRegistry } from "@rebasepro/common";
 
 /**
  * `enum: ["draft", "published"]` — a plain list of values — is what a JS

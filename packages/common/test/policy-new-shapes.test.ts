@@ -28,15 +28,12 @@ import {
 import { getPolicyNameHash, getPolicyNamesForRule, isNewShapeRule, newShapeHashInput } from "@rebasepro/utils";
 import {
     compileRulePolicies,
-    evaluatePolicy,
     policyConditionToExpression,
     policyShorthandColumns,
     policyToPostgres,
     policyToSecurityRule,
-    securityRuleToConditions,
     sqlToPolicy
 } from "../src/util/policy";
-import { checkOperation } from "../src/util/permissions";
 
 const SIGNED_IN = "(SELECT rebase.uid()) IS NOT NULL AND (SELECT rebase.uid()) NOT IN ('anonymous', 'anon')";
 
@@ -289,73 +286,6 @@ describe("policy names of the new shapes", () => {
             .toEqual(["categories_insert_2faf7c9"]);
         expect(newShapeHashInput({ operation: "insert", access: "authenticated" }))
             .toBe("rls2:{\"a\":\"authenticated\",\"op\":\"insert\"}");
-    });
-});
-
-describe("the client-side evaluator on the new shapes", () => {
-    const collection = withRules(SPEC_RULES);
-    const published = row({ status: "published" });
-    const draft = row({ status: "draft" });
-
-    it("lets an anonymous visitor read published rows and nothing else", () => {
-        expect(checkOperation(collection, anonymous, published, "select")).toBe(true);
-        expect(checkOperation(collection, anonymous, draft, "select")).toBe(false);
-        expect(checkOperation(collection, anonymous, published, "update")).toBe(false);
-        expect(checkOperation(collection, anonymous, published, "delete")).toBe(false);
-    });
-
-    it("lets an editor read every row and write, but not delete; an admin deletes", () => {
-        const editor = user("ed", ["editor"]);
-        expect(checkOperation(collection, editor, draft, "select")).toBe(true);
-        expect(checkOperation(collection, editor, draft, "update")).toBe(true);
-        expect(checkOperation(collection, editor, draft, "insert")).toBe(true);
-        expect(checkOperation(collection, editor, draft, "delete")).toBe(false);
-        expect(checkOperation(collection, user("ad", ["admin"]), draft, "delete")).toBe(true);
-    });
-
-    it("compiles and evaluates bare `access: \"authenticated\"`: every signed-in caller", () => {
-        const rule: SecurityRule = { operations: ["select", "insert"], access: "authenticated" };
-        expect(compileRulePolicies(posts, rule).map(p => [p.operation, p.using, p.withCheck])).toEqual([
-            ["select", SIGNED_IN, null],
-            ["insert", null, SIGNED_IN]
-        ]);
-        const rules = withRules([rule]);
-        for (const op of ["select", "insert"] as const) {
-            expect(checkOperation(rules, user("u1"), null, op)).toBe(true);
-            expect(checkOperation(rules, anonymous, null, op)).toBe(false);
-            expect(checkOperation(rules, user("anon"), null, op)).toBe(false);
-        }
-        expect(checkOperation(rules, user("u1"), null, "delete")).toBe(false);
-    });
-
-    it("tells anonymous from signed-in for `access: \"authenticated\"` + condition", () => {
-        const rules = withRules([{ operation: "update", access: "authenticated", condition: { status: "draft" } }]);
-        expect(checkOperation(rules, user("u1"), draft, "update")).toBe(true);
-        expect(checkOperation(rules, user("u1"), published, "update")).toBe(false);
-        expect(checkOperation(rules, anonymous, draft, "update")).toBe(false);
-        expect(checkOperation(rules, user("anonymous"), draft, "update")).toBe(false);
-    });
-
-    it("stays three-valued without the row: unknown resolves as the caller asks, a failed caller test is a plain no", () => {
-        const rules = withRules([{ operation: "select", access: "authenticated", condition: { status: "published" } }]);
-        expect(checkOperation(rules, user("u1"), null, "select")).toBe(true);
-        expect(checkOperation(rules, user("u1"), null, "select", { onUnknown: "deny" })).toBe(false);
-        // Anonymous fails the caller test whatever the row says.
-        expect(checkOperation(rules, anonymous, null, "select")).toBe(false);
-    });
-
-    it("answers unknown for a `null` shorthand value — `IS NULL` is evaluated by Postgres alone", () => {
-        const { usingExpr } = securityRuleToConditions({ operation: "select", condition: { deletedAt: null } });
-        expect(evaluatePolicy(usingExpr!, { uid: "u1", entity: row({ deletedAt: null }) })).toBe("unknown");
-        const rules = withRules([{ operation: "delete", condition: { deletedAt: null } }]);
-        expect(checkOperation(rules, user("u1"), row({ deletedAt: null }), "delete", { onUnknown: "deny" })).toBe(false);
-    });
-
-    it("evaluates shorthand pairs against the row", () => {
-        const { usingExpr } = securityRuleToConditions({ operation: "select", condition: { status: "published", rank: 2 } });
-        expect(evaluatePolicy(usingExpr!, { entity: row({ status: "published", rank: 2 }) })).toBe(true);
-        expect(evaluatePolicy(usingExpr!, { entity: row({ status: "published", rank: 3 }) })).toBe(false);
-        expect(evaluatePolicy(usingExpr!, { entity: row({ status: "published" }) })).toBe("unknown");
     });
 });
 
