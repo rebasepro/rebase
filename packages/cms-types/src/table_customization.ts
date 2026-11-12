@@ -27,7 +27,9 @@
  * display slot, a kanban column, a form section entry or a sort key that the
  * table does not have is a compile error, an enum label for a value the column
  * cannot hold is a compile error, and an entity action's `row` is the table's
- * `InferRow`. Written without the type parameter
+ * row: its `InferRow` columns, plus each relation the panel loaded, nested
+ * under the relation's name as REST's `include` returns it
+ * (`({ row }) => row.customer?.name`). Written without the type parameter
  * (`customizeTable("posts", { … })`) the same object is accepted, loosely typed.
  *
  * Components are values. A `Field`, `Preview`, `Filter`, `Builder` or override
@@ -45,6 +47,7 @@ import type {
     ColorKey,
     ColorScheme,
     CollectionCallbacks,
+    EntityRelation,
     ColumnsShape,
     FilterPreset,
     FilterValues,
@@ -150,13 +153,75 @@ export type TableFieldPath<T> = TableFieldKey<T> | `${TableFieldKey<T>}.${string
  */
 export type TableColumnId<T> = TableFieldPath<T> | `subcollection:${TableRelationKey<T>}` | AdditionalFieldKey;
 
+type Simplify<O> = { [K in keyof O]: O[K] } & {};
+
+/** A loaded target row. Its columns are not typed: relation targets are thunks, so mutual relations compile. */
+type IncludedRow = Record<string, unknown>;
+/** A to-one relation other than `belongsTo`: its target's row when loaded, else its id, or `null` when there is none. */
+type IncludedOne = IncludedRow | string | number | null;
+/** A to-many relation: its targets' rows when every one was loaded, else their ids. */
+type IncludedMany = IncludedRow[] | (string | number)[];
+
 /**
- * A row of `T` as the server sends it: `InferRow<typeof table>`. A plain record
- * for the untyped form.
+ * What a row carries under a relation's name, as the panel hands it to a
+ * display resolver or an entity action (`toWireRow`):
+ *
+ * - `belongsTo`: the target's row when the panel loaded it; absent otherwise —
+ *   the key itself is in the foreign-key column (`customerId`);
+ * - `hasOne`: the target's row when loaded, else its id, or `null`;
+ * - `hasMany` / `manyToMany`: the targets' rows when loaded, else their ids;
+ * - `via`: as its `cardinality` says; either, when that is not a literal.
+ */
+type IncludedRelationValue<Rel> =
+    Rel extends { readonly kind: "belongsTo" } ? IncludedRow :
+    Rel extends { readonly kind: "hasOne" } ? IncludedOne :
+    Rel extends { readonly kind: "hasMany" | "manyToMany" } ? IncludedMany :
+    Rel extends { readonly kind: "via"; readonly cardinality: "one" } ? IncludedOne :
+    Rel extends { readonly kind: "via"; readonly cardinality: "many" } ? IncludedMany :
+    IncludedOne | IncludedMany;
+
+/**
+ * A row of `T` as the panel hands it to a display resolver or an entity
+ * action: the row as the server sends it (`InferRow<typeof table>`), plus each
+ * relation, optional, under its name — present when the panel loaded it, which
+ * it does for the relations it draws. The related rows' own columns are not
+ * typed. A plain record for the untyped form.
+ *
+ * ```ts
+ * display: { subtitle: ({ row }) => typeof row.customer?.name === "string" ? row.customer.name : undefined }
+ * ```
  *
  * @group Table customization
  */
-export type TableRow<T> = T extends CustomizableTable ? InferRow<T> : Record<string, unknown>;
+export type TableRow<T> = T extends CustomizableTable
+    ? Simplify<InferRow<T> & { [K in TableRelationKey<T>]?: IncludedRelationValue<RelationsOf<T>[K]> }>
+    : Record<string, unknown>;
+
+/** A relation's value in the form: the view model's `EntityRelation`. */
+type FormRelationValue<Rel> =
+    Rel extends { readonly kind: "belongsTo" | "hasOne" } ? EntityRelation | null :
+    Rel extends { readonly kind: "hasMany" | "manyToMany" } ? EntityRelation[] :
+    Rel extends { readonly kind: "via"; readonly cardinality: "one" } ? EntityRelation | null :
+    Rel extends { readonly kind: "via"; readonly cardinality: "many" } ? EntityRelation[] :
+    EntityRelation | EntityRelation[] | null;
+
+/** A column's value in the form: a temporal column holds a `Date` there (a string until it is parsed). */
+type FormColumnValue<Col, V> = KindOf<Col> extends TemporalColumnKind ? Exclude<V, string> | Date | string : V;
+
+/**
+ * The values of a record of `T` as its form holds them — what `dynamicProps`
+ * reads. Not the wire row: the form works on the panel's view model, where a
+ * date column holds a `Date` and a relation an `EntityRelation`. A plain
+ * record for the untyped form.
+ *
+ * @group Table customization
+ */
+export type TableFormValues<T> = T extends CustomizableTable
+    ? Simplify<
+        { [K in keyof InferRow<T>]: FormColumnValue<K extends keyof ColumnsOf<T> ? ColumnsOf<T>[K] : never, InferRow<T>[K]> } &
+        { [K in TableRelationKey<T>]?: FormRelationValue<RelationsOf<T>[K]> }
+    >
+    : Record<string, unknown>;
 
 /**
  * What an update of `T` accepts: `InferUpdate<typeof table>`. A plain record for
@@ -289,7 +354,9 @@ export interface FieldDisabled {
 }
 
 /**
- * What a field's `dynamicProps` is handed: the record as it is being edited.
+ * What a field's `dynamicProps` is handed: the record as it is being edited,
+ * in the form's view model ({@link TableFormValues}) — a date column holds a
+ * `Date`, a relation an `EntityRelation` — not the wire row.
  *
  * @group Table customization
  */
@@ -653,8 +720,8 @@ export type RelationFieldCustomization<Rel = undefined, Row = Record<string, unk
 export type TableFields<T> = T extends CustomizableTable
     ? {
         [K in TableFieldKey<T>]?: K extends TableColumnKey<T>
-            ? FieldCustomization<ColumnsOf<T>[K], TableRow<T>>
-            : RelationFieldCustomization<RelationsOf<T>[K], TableRow<T>>
+            ? FieldCustomization<ColumnsOf<T>[K], TableFormValues<T>>
+            : RelationFieldCustomization<RelationsOf<T>[K], TableFormValues<T>>
     }
     : { [key: string]: AnyFieldCustomization };
 

@@ -10,8 +10,10 @@ import {
     type TableCustomization,
     type TableCustomizationOptions,
     type TableEntityActionProps,
+    type TableFormValues,
     type TableRow
 } from "../src/table_customization";
+import type { EntityRelation } from "@rebasepro/types";
 import type { FieldProps } from "../src/types/plugins";
 
 /**
@@ -292,10 +294,105 @@ const unknownRowKey: TableCustomizationOptions<Posts> = {
     }]
 };
 
-/** `row` is exactly `InferRow<typeof posts>`. */
+/** `row` is `InferRow<typeof posts>`, its relations optional beside it. */
 type ActionRow = NonNullable<TableEntityActionProps<TableRow<Posts>>["row"]>;
 const rowIsInferRow: ActionRow = { id: "1", title: "t", status: "draft", createdAt: "2026-01-01", slug: null, heroImage: null, excerpt: null, content: null, seo: null, priority: null, labels: null, views: null, featured: null, publishDate: null, orgId: null, firestoreDocId: null, __order: null };
 const inferRowIsRow: TableRow<Posts> = rowIsInferRow;
+
+// ── A row carries the relations the panel loaded, untyped beyond their shape ──
+
+const customers = defineTable("customers", {
+    columns: { id: col.uuid().primaryKey().defaultRandom(), name: col.text().notNull() },
+    rls: "admin-only"
+});
+
+const orderLines = defineTable("order_lines", {
+    columns: { id: col.uuid().primaryKey().defaultRandom(), sku: col.text() },
+    rls: "admin-only"
+});
+
+const orders = defineTable("orders", {
+    columns: {
+        id: col.uuid().primaryKey().defaultRandom(),
+        total: col.numeric(10, 2),
+        placedAt: col.timestamptz()
+    },
+    relations: {
+        customer: rel.belongsTo(() => customers),
+        invoice: rel.hasOne(() => orderLines),
+        lines: rel.hasMany(() => orderLines),
+        tags: rel.manyToMany(() => customers),
+        route: rel.via(() => customers, { steps: [{ table: "order_lines", on: { from: "id", to: "order_id" } }] })
+    },
+    rls: "admin-only"
+});
+
+type Orders = typeof orders;
+
+/** The repro: a display resolver reading a loaded `belongsTo`. */
+const relationInDisplay: TableCustomizationOptions<Orders> = {
+    display: {
+        // Reading `row.customer` was TS2551 ("does not exist") while the row was only `InferRow`.
+        subtitle: ({ row }) => row.customer ? String(row.customer.name) : undefined,
+        title: ({ row }) => typeof row.customer?.name === "string" ? row.customer.name : undefined,
+        tags: ({ row }) => (row.lines ?? []).map(line => typeof line === "object" ? String(line.sku) : String(line))
+    }
+};
+
+const relationInAction: TableCustomizationOptions<Orders> = {
+    entityActions: [{
+        name: "Remind",
+        isEnabled: ({ row }) => row?.customer !== undefined && row.invoice !== null,
+        onClick: ({ row }) => {
+            const lines: Record<string, unknown>[] | (string | number)[] | undefined = row?.lines;
+            void lines;
+        }
+    }]
+};
+
+/** The honest shapes: a loaded belongsTo is a row (never an id or `null`: its key is the foreign-key column). */
+type OrderRow = TableRow<Orders>;
+const belongsToShape: OrderRow["customer"] = { name: "Ada" };
+// @ts-expect-error a belongsTo is never its id under the relation's name
+const belongsToNotId: OrderRow["customer"] = "c1";
+const hasOneShapes: OrderRow["invoice"][] = [{ sku: "x" }, "i1", 7, null, undefined];
+const manyShapes: OrderRow["lines"][] = [[{ sku: "x" }], ["l1", 2], undefined];
+// @ts-expect-error a to-many relation is a list
+const manyNotOne: OrderRow["tags"] = { name: "x" };
+const viaEither: OrderRow["route"][] = [{ name: "x" }, [{ name: "y" }], "r1", null];
+
+const unloadedRelation: TableCustomizationOptions<Orders> = {
+    display: {
+        // @ts-expect-error a loaded relation may be absent: read it optionally
+        title: ({ row }) => String(row.customer.name)
+    }
+};
+
+const unknownRelation: TableCustomizationOptions<Orders> = {
+    display: {
+        // @ts-expect-error `supplier` is not a relation of orders
+        title: ({ row }) => String(row.supplier)
+    }
+};
+
+/** `dynamicProps` reads the form's view model: a date is a `Date`, a relation an `EntityRelation`. */
+const formValues: TableCustomizationOptions<Orders> = {
+    fields: {
+        total: {
+            dynamicProps: ({ values }) => {
+                const placed: Date | string | null | undefined = values.placedAt;
+                const customer: EntityRelation | null | undefined = values.customer;
+                const lines: EntityRelation[] | undefined = values.lines;
+                void placed;
+                void lines;
+                return customer ? { readOnly: true } : undefined;
+            }
+        }
+    }
+};
+type OrderForm = TableFormValues<Orders>;
+// @ts-expect-error in the form a relation is an `EntityRelation`, not the loaded row
+const formRelationNotRow: OrderForm["customer"] = { name: "Ada" };
 
 // ── Without a type parameter, anything goes, loosely typed ──────────────────
 
@@ -315,7 +412,8 @@ void [specBlock, relationKeys, unknownField, badDisplay, dottedDisplay, badDotte
     kanbanOrderInNumber, lists, badSubcollection, badOrder, badSection, badSort, badRelationPreview, badEnumValue, oneOfLabels,
     badOneOf, labelsOnText, badEnumOrder, typedOptions, multilineOnNumber, formatOnBoolean, referenceOnDate, badNestedKey,
     badNestedEnum, stringField, thunkField, typedRow, misspeltRowKey, unknownRowKey, inferRowIsRow, loose, asLoose,
-    typedFieldIsAnyField];
+    typedFieldIsAnyField, relationInDisplay, relationInAction, belongsToShape, belongsToNotId, hasOneShapes, manyShapes,
+    manyNotOne, viaEither, unloadedRelation, unknownRelation, formValues, formRelationNotRow];
 
 // ── The data exports ─────────────────────────────────────────────────────────
 
