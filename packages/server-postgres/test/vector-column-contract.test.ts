@@ -30,11 +30,10 @@ import {
     generatePostgresVectorDdl,
     vectorExcludePatterns
 } from "../src/schema/generate-postgres-ddl-logic";
-import { resolveColumnName } from "../src/schema/column-plan-helpers";
 import { planCollectionSchemaEnsure } from "../src/schema/ensure-collection-tables";
 import {
-    buildVectorColumnSpecs,
-    buildVectorIndexPlan,
+    buildTableVectorColumnSpecs,
+    buildTableVectorIndexPlan,
     vectorIndexNames
 } from "../src/schema/vector-index";
 import { compileSet } from "./helpers/plan-tables";
@@ -56,7 +55,7 @@ const collection: PostgresCollectionConfig = {
 };
 
 const collections: CollectionConfig[] = [collection];
-const indexName = vectorIndexNames(buildVectorIndexPlan(collection, resolveColumnName))[0];
+const indexName = vectorIndexNames(buildTableVectorIndexPlan(compileSet([collection])[0].descriptor))[0];
 
 const noVectors: CollectionConfig[] = [{
     slug: "posts",
@@ -381,7 +380,7 @@ describe("boot provisions what the push provisions", () => {
     });
 
     it("names the same column both producers name", () => {
-        const [spec] = buildVectorColumnSpecs(collection, resolveColumnName);
+        const [spec] = buildTableVectorColumnSpecs(compileSet([collection])[0].descriptor);
         const boot = planCollectionSchemaEnsure(compileSet(collections), emptyDb).actions
             .find(a => a.sql.includes(`"${spec.column}"`) && a.sql.includes("ADD COLUMN"));
         expect(boot).toBeDefined();

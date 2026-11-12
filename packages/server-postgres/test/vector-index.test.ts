@@ -10,13 +10,11 @@
  *    database in the field carries whichever one created it;
  *  - a column too wide for pgvector is skipped rather than thrown, and says so.
  */
-import { CollectionConfig, PostgresCollectionConfig, col, defineTable } from "@rebasepro/types";
-import { compileSchema, lowerTables } from "@rebasepro/common";
+import { CollectionConfig, PostgresCollectionConfig, col, defineTable, type VectorIndexOptions } from "@rebasepro/types";
+import { compileSchema } from "@rebasepro/common";
 import {
     buildTableVectorColumnSpecs,
     buildTableVectorIndexPlan,
-    buildVectorColumnSpecs,
-    buildVectorIndexPlan,
     vectorIndexStatement,
     vectorIndexStatements,
     vectorIndexNames,
@@ -24,7 +22,6 @@ import {
     MAX_INDEXABLE_VECTOR_DIMENSIONS
 } from "../src/schema/vector-index";
 import { generatePostgresDdl } from "../src/schema/generate-postgres-ddl-logic";
-import { resolveColumnName } from "../src/schema/column-plan-helpers";
 import { planCollectionSchemaEnsure } from "../src/schema/ensure-collection-tables";
 import { compileSet } from "./helpers/plan-tables";
 
@@ -42,9 +39,10 @@ const collection = (properties: Record<string, unknown>, extra: Record<string, u
 const vector = (over: Record<string, unknown> = {}) =>
     ({ type: "vector", name: "Embedding", dimensions: 1536, ...over });
 
-const plan = (c: CollectionConfig) => buildVectorIndexPlan(c, resolveColumnName);
+/** The plan of a legacy fixture, lifted and compiled as the backend runs it. */
+const plan = (c: CollectionConfig) => buildTableVectorIndexPlan(compileSet([c])[0].descriptor);
 
-describe("buildVectorIndexPlan", () => {
+describe("buildTableVectorIndexPlan", () => {
     it("indexes cosine by default, because that is what vectorSearch defaults to", () => {
         const { specs, skipped } = plan(collection({ embedding: vector() }));
         expect(skipped).toEqual([]);
@@ -156,8 +154,16 @@ describe("configuration errors are refused, not ignored", () => {
     it("rejects an unknown method", () =>
         fails({ method: "brute" }, 'Use "hnsw" or "ivfflat"'));
 
-    it("rejects an unknown distance", () =>
-        fails({ distance: "manhattan" }, "not a pgvector distance"));
+    it("rejects an unknown metric", () => {
+        // A JavaScript config is not held to the `VectorMetric` union.
+        const index: VectorIndexOptions = JSON.parse("{\"metric\":\"manhattan\"}");
+        const [compiled] = compileSchema([defineTable("documents", {
+            columns: { id: col.text().primaryKey(), embedding: col.vector(3, { index }) },
+            rls: "admin-only"
+        })]);
+        expect(() => buildTableVectorIndexPlan(compiled.descriptor)).toThrow(VectorIndexConfigError);
+        expect(() => buildTableVectorIndexPlan(compiled.descriptor)).toThrow("not a pgvector metric");
+    });
 
     it("rejects a duplicated distance, which would collide on the index name", () =>
         fails({ distance: ["cosine", "cosine"] }, 'lists "cosine" twice'));
@@ -169,8 +175,9 @@ describe("configuration errors are refused, not ignored", () => {
         fails({ m: 1.5 }, "positive integer"));
 
     it("rejects dimensions that are not a positive integer", () => {
+        // Refused by the table model, before the plan.
         expect(() => plan(collection({ embedding: vector({ dimensions: 0 }) })))
-            .toThrow("must be a positive integer");
+            .toThrow("takes a positive whole number");
     });
 });
 
@@ -242,19 +249,16 @@ describe("buildTableVectorIndexPlan / buildTableVectorColumnSpecs", () => {
         rls: "admin-only"
     });
     const [compiled] = compileSchema([documents]);
-    const [lowered] = lowerTables([documents]);
 
-    it("plans the indexes the lowered collection plans, metrics renamed to pgvector distances", () => {
+    it("plans the declared indexes, metrics renamed to pgvector distances", () => {
         const fromTable = buildTableVectorIndexPlan(compiled.descriptor);
-        expect(fromTable).toEqual(buildVectorIndexPlan(lowered, resolveColumnName));
         expect(fromTable.specs.map(spec => spec.distance)).toEqual(["cosine", "inner_product", "cosine"]);
         expect(fromTable.specs.map(spec => spec.column)).toEqual(["embedding", "embedding", "summary_embedding"]);
         expect(fromTable.skipped.map(entry => entry.column)).toEqual(["wide"]);
     });
 
-    it("lists every vector column with its modifiers, as the lowered collection does", () => {
+    it("lists every vector column with its modifiers", () => {
         const fromTable = buildTableVectorColumnSpecs(compiled.descriptor);
-        expect(fromTable).toEqual(buildVectorColumnSpecs(lowered, resolveColumnName));
         expect(fromTable.map(spec => [spec.column, spec.modifiers])).toEqual([
             ["embedding", " NOT NULL"], ["summary_embedding", " UNIQUE"], ["wide", ""], ["unindexed", ""]
         ]);

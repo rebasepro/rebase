@@ -41,16 +41,12 @@
  * Rebase applies them itself. See `generatePostgresVectorDdl`.
  */
 import type {
-    CollectionConfig,
-    Property,
     TableDescriptor,
     VectorDistance,
     VectorIndexConfig,
     VectorIndexOptions,
     VectorMetric
 } from "@rebasepro/types";
-import { isPostgresCollectionConfig } from "@rebasepro/types";
-import { getTableName } from "@rebasepro/common";
 import { toPostgresIdentifier } from "@rebasepro/utils";
 
 /**
@@ -114,12 +110,6 @@ export class VectorIndexConfigError extends Error {
         this.name = "VectorIndexConfigError";
     }
 }
-
-const isVectorProperty = (prop: unknown): prop is Property & {
-    type: "vector";
-    dimensions: number;
-    index?: VectorIndexConfig | false;
-} => !!prop && typeof prop === "object" && (prop as { type?: string }).type === "vector";
 
 const asDistances = (config: VectorIndexConfig, label: string): VectorDistance[] => {
     const raw = config.distance ?? DEFAULT_VECTOR_DISTANCE;
@@ -218,15 +208,30 @@ const DISTANCE_OF_METRIC: Record<VectorMetric, VectorDistance> = {
     ip: "inner_product"
 };
 
+/**
+ * pgvector's name for a metric, refusing one the table model does not have —
+ * a JavaScript config is not held to the `VectorMetric` union, and an unknown
+ * metric must not quietly become the default distance.
+ */
+const distanceOfMetric = (metric: VectorMetric, label: string): VectorDistance => {
+    if (!Object.prototype.hasOwnProperty.call(DISTANCE_OF_METRIC, metric)) {
+        throw new VectorIndexConfigError(
+            `${label}: \`index.metric\` is "${String(metric)}", which is not a pgvector metric. ` +
+            `Use ${Object.keys(DISTANCE_OF_METRIC).map(m => `"${m}"`).join(", ")}.`
+        );
+    }
+    return DISTANCE_OF_METRIC[metric];
+};
+
 /** A column's `.vectorIndex()` options, under the index builder's names. */
-const vectorIndexConfigOf = (options: VectorIndexOptions | false): VectorIndexConfig | false => {
+const vectorIndexConfigOf = (options: VectorIndexOptions | false, label: string): VectorIndexConfig | false => {
     if (options === false) return false;
     const config: VectorIndexConfig = {};
     if (options.method !== undefined) config.method = options.method;
     if (options.metric !== undefined) {
         config.distance = typeof options.metric === "string"
-            ? DISTANCE_OF_METRIC[options.metric]
-            : options.metric.map(metric => DISTANCE_OF_METRIC[metric]);
+            ? distanceOfMetric(options.metric, label)
+            : options.metric.map(metric => distanceOfMetric(metric, label));
     }
     if (options.m !== undefined) config.m = options.m;
     if (options.efConstruction !== undefined) config.efConstruction = options.efConstruction;
@@ -242,50 +247,11 @@ const vectorTableOf = (table: TableDescriptor): VectorTableSource => ({
         label: `${table.slug}.${column.key}`,
         column: column.column,
         dimensions: column.type.dimensions,
-        index: column.vectorIndex === undefined ? undefined : vectorIndexConfigOf(column.vectorIndex),
+        index: column.vectorIndex === undefined ? undefined : vectorIndexConfigOf(column.vectorIndex, `${table.slug}.${column.key}`),
         unique: column.unique === true,
         required: !column.nullable
     }])
 });
-
-/**
- * A collection's vector properties.
- *
- * TRANSITIONAL (Postgres-first Stage B): the planner reads the table
- * descriptor ({@link vectorTableOf}); this door stays for the readers outside
- * the planner that still hold a collection (`vectorObjectNames`'s callers).
- */
-const vectorCollectionOf = (
-    collection: CollectionConfig,
-    resolveColumn: (propName: string, prop?: Property | null) => string
-): VectorTableSource => ({
-    schema: isPostgresCollectionConfig(collection) && collection.schema ? collection.schema : "public",
-    table: getTableName(collection),
-    columns: Object.entries(collection.properties ?? {}).flatMap(([propName, prop]) => {
-        if (!isVectorProperty(prop)) return [];
-        const validation = (prop as { validation?: { required?: boolean; unique?: boolean } }).validation;
-        return [{
-            label: `${collection.slug}.${propName}`,
-            column: resolveColumn(propName, prop as Property),
-            dimensions: prop.dimensions,
-            index: prop.index,
-            unique: validation?.unique === true,
-            required: validation?.required === true
-        }];
-    })
-});
-
-/**
- * Every ANN index a collection's vector properties call for.
- *
- * `resolveColumn` is passed in rather than imported so that this module stays
- * free of the DDL generator, which imports *it*. Both callers hand it the same
- * `resolveColumnName`, and a contract test asserts the names agree.
- */
-export const buildVectorIndexPlan = (
-    collection: CollectionConfig,
-    resolveColumn: (propName: string, prop?: Property | null) => string
-): VectorIndexPlan => vectorIndexPlanFrom(vectorCollectionOf(collection, resolveColumn));
 
 /** Every ANN index a table's vector columns call for, read from its descriptor. */
 export const buildTableVectorIndexPlan = (table: TableDescriptor): VectorIndexPlan =>
@@ -479,18 +445,6 @@ export interface VectorColumnSpec {
     modifiers: string;
 }
 
-/**
- * Every vector column a collection declares.
- *
- * Wider than {@link buildVectorIndexPlan} on purpose: that one answers "what
- * gets an ANN index", and skips both a property with `index: false` and one too
- * wide to index. Either still needs its column.
- */
-export const buildVectorColumnSpecs = (
-    collection: CollectionConfig,
-    resolveColumn: (propName: string, prop?: Property | null) => string
-): VectorColumnSpec[] => vectorColumnSpecsFrom(vectorCollectionOf(collection, resolveColumn));
-
 /** Every vector column a table declares, read from its descriptor. */
 export const buildTableVectorColumnSpecs = (table: TableDescriptor): VectorColumnSpec[] =>
     vectorColumnSpecsFrom(vectorTableOf(table));
@@ -558,20 +512,3 @@ BEGIN
 END
 $rebase_vector$;`;
 };
-
-/**
- * The object names a collection's vector properties own, unqualified.
- *
- * What Atlas has to be told to exclude. Only the column and the ANN indexes: a
- * `UNIQUE` or `NOT NULL` on the column is a property *of* the column, and
- * excluding the column takes them with it — measured against Atlas 1.2.3 and
- * 1.3.2, where a target carrying `vector(3) NOT NULL UNIQUE` and a `schema.sql`
- * carrying neither reported "Schema is synced, no changes to be made".
- */
-export const vectorObjectNames = (
-    collection: CollectionConfig,
-    resolveColumn: (propName: string, prop?: Property | null) => string
-): string[] => [
-    ...buildVectorColumnSpecs(collection, resolveColumn).map(spec => spec.column),
-    ...vectorIndexNames(buildVectorIndexPlan(collection, resolveColumn))
-];

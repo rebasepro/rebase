@@ -7,8 +7,7 @@ import {
     fuzzyColumnDefinition,
     searchIndexStatements,
     searchHelperFunctions,
-    SearchConfigError,
-    assertSearchIsPostgresOnly
+    SearchConfigError
 } from "../src/schema/search-column";
 
 const talents = (search: PostgresCollectionConfig["search"]): PostgresCollectionConfig => ({
@@ -202,39 +201,6 @@ describe("rendered SQL", () => {
             const spec = buildSearchColumnSpec(talents({ fields: ["full_name"], fuzzy: true }))!;
             expect(spec.fuzzy!.threshold).toBe(0.3);
         });
-    });
-});
-
-describe("assertSearchIsPostgresOnly", () => {
-    const firestoreWithoutSearch: CollectionConfig = {
-        slug: "notes",
-        name: "Notes",
-        engine: "firestore",
-        properties: { body: { type: "string" } }
-    };
-    // Deliberately invalid: `search` is a Postgres-only field, so no typed
-    // Firestore collection can carry one — refusing it is the guard's job.
-    const firestoreWithSearch = { ...firestoreWithoutSearch, search: { fields: ["body"] } } as unknown as CollectionConfig;
-
-    it("refuses a search block on a collection another engine serves", () => {
-        expect(() => assertSearchIsPostgresOnly([firestoreWithSearch]))
-            .toThrow(/Postgres feature/);
-    });
-
-    it("names the engine, so the message says why", () => {
-        expect(() => assertSearchIsPostgresOnly([firestoreWithSearch]))
-            .toThrow(/firestore/);
-    });
-
-    it("passes a non-Postgres collection that declares no search", () => {
-        expect(() => assertSearchIsPostgresOnly([firestoreWithoutSearch])).not.toThrow();
-    });
-
-    it("passes Postgres collections, with or without a block", () => {
-        expect(() => assertSearchIsPostgresOnly([
-            talents({ fields: ["full_name"] }),
-            talents(undefined)
-        ])).not.toThrow();
     });
 });
 
