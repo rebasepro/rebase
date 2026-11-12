@@ -1,0 +1,9 @@
+export { posts } from "./posts";
+export { authors } from "./authors";
+export { tags } from "./tags";
+export { users } from "./users";
+
+export const defaultRls = [
+    { operation: "select", access: "public" },
+    { operations: ["insert", "update", "delete"], roles: ["admin"] }
+] as const;

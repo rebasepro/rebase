@@ -1,0 +1,8 @@
+{
+    "name": "typed-frontend",
+    "type": "module",
+    "dependencies": {
+        "typed-config": "*",
+        "@rebasepro/cms": "workspace:*"
+    }
+}

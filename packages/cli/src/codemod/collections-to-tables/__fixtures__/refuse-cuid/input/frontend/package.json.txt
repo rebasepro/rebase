@@ -1,0 +1,8 @@
+{
+    "name": "cuid-frontend",
+    "type": "module",
+    "dependencies": {
+        "cuid-config": "*",
+        "@rebasepro/cms": "workspace:*"
+    }
+}

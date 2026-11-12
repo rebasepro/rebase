@@ -1,0 +1,6 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { openTickets } from "../../../backend/schema/open_tickets";
+
+export const openTicketsCms = customizeTable<typeof openTickets>("open_tickets", {
+    name: "Open tickets"
+});

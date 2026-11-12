@@ -1,0 +1,6 @@
+import { postsCms } from "./posts";
+import { authorsCms } from "./authors";
+import { usersCms } from "./users";
+
+/** The table customizations, in the order the panel lists them. */
+export const tableCustomizations = [postsCms, authorsCms, usersCms];

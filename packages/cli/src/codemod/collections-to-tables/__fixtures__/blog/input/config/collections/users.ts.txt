@@ -1,0 +1,33 @@
+import { defineCollection } from "@rebasepro/cms-types";
+
+export default defineCollection({
+    name: "Users",
+    singularName: "User",
+    slug: "users",
+    auth: { enabled: true },
+    table: "users",
+    schema: "rebase",
+    securityRules: [
+        { operation: "select", roles: ["admin"] },
+        { operations: ["insert", "update", "delete"], roles: ["admin"] }
+    ],
+    properties: {
+        id: { name: "ID", type: "string", isId: "uuid" },
+        email: { name: "Email", type: "string", validation: { required: true, unique: true } },
+        displayName: { name: "Name", type: "string", columnName: "display_name" },
+        passwordHash: {
+            name: "Password Hash",
+            type: "string",
+            columnName: "password_hash",
+            excludeFromApi: true,
+            admin: { hideFromCollection: true, disabled: { hidden: true } }
+        },
+        roles: {
+            name: "Roles",
+            type: "array",
+            columnType: "text[]",
+            of: { name: "Role", type: "string", enum: { admin: "Admin", editor: "Editor" } }
+        },
+        createdAt: { name: "Created At", type: "date", columnName: "created_at", autoValue: "on_create" }
+    }
+});

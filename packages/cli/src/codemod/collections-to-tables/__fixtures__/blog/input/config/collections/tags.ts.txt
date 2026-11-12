@@ -1,0 +1,12 @@
+import { defineCollection } from "@rebasepro/cms-types";
+
+/** Nothing here is presentation the CMS would not derive: no customization file. */
+export default defineCollection({
+    name: "Tags",
+    singularName: "Tag",
+    slug: "tags",
+    properties: {
+        id: { name: "ID", type: "number", isId: "increment" },
+        name: { name: "Name", type: "string", validation: { required: true } }
+    }
+});

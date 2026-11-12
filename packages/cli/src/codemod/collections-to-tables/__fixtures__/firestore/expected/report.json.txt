@@ -1,0 +1,52 @@
+{
+  "status": "migrated",
+  "collections": [
+    {
+      "slug": "customers",
+      "file": "config/collections/customers.ts",
+      "kind": "table",
+      "backendFile": "backend/schema/customers.ts"
+    },
+    {
+      "slug": "notes",
+      "file": "config/collections/notes.ts",
+      "kind": "firestore",
+      "frontendFile": "frontend/src/cms/notes.ts"
+    },
+    {
+      "slug": "visits",
+      "file": "config/collections/visits.ts",
+      "kind": "firestore",
+      "frontendFile": "frontend/src/cms/visits.ts"
+    }
+  ],
+  "files": [
+    "update backend/package.json",
+    "create backend/schema/customers.ts",
+    "create backend/schema/index.ts",
+    "update backend/tsconfig.json",
+    "update frontend/package.json",
+    "update frontend/src/App.tsx",
+    "create frontend/src/cms/index.ts",
+    "create frontend/src/cms/notes.ts",
+    "create frontend/src/cms/visits.ts",
+    "update frontend/src/virtual.d.ts",
+    "update frontend/vite.config.ts",
+    "update package.json",
+    "update pnpm-workspace.yaml",
+    "update rebase.json"
+  ],
+  "refusals": [],
+  "notes": [
+    {
+      "file": "",
+      "message": "Firestore collections are moved and rewritten in place; they have no SQL, so the SQL check does not cover them."
+    }
+  ],
+  "manualSteps": [],
+  "verification": {
+    "identical": true,
+    "differences": []
+  },
+  "removeCommand": "git rm -r config"
+}

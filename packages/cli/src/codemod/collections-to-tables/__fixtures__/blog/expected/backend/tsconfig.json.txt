@@ -1,0 +1,8 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "rootDir": ".."
+  },
+  // The program includes the shared config package.
+  "include": ["src/**/*", "functions/**/*", "schema/**/*", "resources.ts", "storage.ts", "lib/**/*"]
+}

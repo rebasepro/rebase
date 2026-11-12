@@ -483,9 +483,11 @@ export const BUNDLE_FORMAT_VERSION = 3;
  * runtime, for a format-2 / contract-1 bundle built from `config/collections`.
  */
 export const LEGACY_LAYOUT_REMEDY =
-    "run the collections-to-tables codemod (tooling/scripts/migrate-collections-to-tables.mts), " +
-    "which rewrites config/collections as backend/schema and moves resources.ts, storage.ts " +
-    "and the collection callbacks to backend/, then rebuild";
+    "run `rebase migrate collections-to-tables` (in the Rebase repository: " +
+    "tooling/scripts/migrate-collections-to-tables.mts), which rewrites config/collections as " +
+    "backend/schema (and the admin presentation as frontend/src/cms), carries the collection " +
+    "callbacks into the tables as hooks, moves resources.ts and storage.ts to backend/, and proves " +
+    "the generated SQL unchanged; then rebuild";
 
 /**
  * The runtime contract major.

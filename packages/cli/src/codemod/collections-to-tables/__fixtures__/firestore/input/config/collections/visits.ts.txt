@@ -1,0 +1,14 @@
+import { defineCollection } from "@rebasepro/cms-types";
+import notesCollection from "./notes";
+
+/** Store visits, with their notes as a subcollection. */
+export default defineCollection({
+    name: "Visits",
+    slug: "visits",
+    engine: "firestore",
+    properties: {
+        when: { name: "When", type: "date" },
+        store: { name: "Store", type: "reference", path: "customers" }
+    },
+    subcollections: () => [notesCollection]
+});

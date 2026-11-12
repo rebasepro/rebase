@@ -1,0 +1,19 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { users } from "../../../backend/schema/users";
+
+export const usersCms = customizeTable<typeof users>("users", {
+    fields: {
+        displayName: {
+            name: "Name"
+        },
+        passwordHash: {
+            hidden: true,
+            hiddenInForm: true
+        },
+        roles: {
+            of: {
+                name: "Role"
+            }
+        }
+    }
+});

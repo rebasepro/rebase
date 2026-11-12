@@ -1,0 +1,12 @@
+import { defineTable, col } from "@rebasepro/server/schema";
+
+export const customers = defineTable("customers", {
+    columns: {
+        id: col.uuid().primaryKey().defaultRandom(),
+        name: col.text().notNull()
+    },
+    rls: [
+        { operation: "select", access: "authenticated" },
+        { operations: ["insert", "update", "delete"], roles: ["admin"] }
+    ]
+});

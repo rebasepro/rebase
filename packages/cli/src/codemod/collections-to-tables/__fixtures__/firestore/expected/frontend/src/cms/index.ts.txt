@@ -1,0 +1,8 @@
+import notesCollection from "./notes";
+import visitsCollection from "./visits";
+
+/** The table customizations, in the order the panel lists them. */
+export const tableCustomizations = [];
+
+/** Collections whose rows live outside the Postgres backend. */
+export const externalCollections = [notesCollection, visitsCollection];

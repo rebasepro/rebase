@@ -1,0 +1,5 @@
+{
+  "name": "refuse-config",
+  "private": true,
+  "type": "module"
+}

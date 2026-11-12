@@ -1,0 +1,37 @@
+{
+  "status": "blocked",
+  "collections": [
+    {
+      "slug": "items",
+      "file": "config/collections/items.ts",
+      "kind": "refused"
+    }
+  ],
+  "files": [
+    "update backend/package.json",
+    "create backend/schema/index.ts",
+    "update backend/tsconfig.json",
+    "update frontend/package.json",
+    "update frontend/src/App.tsx",
+    "update frontend/src/virtual.d.ts",
+    "update frontend/vite.config.ts",
+    "update package.json",
+    "update pnpm-workspace.yaml",
+    "update rebase.json"
+  ],
+  "refusals": [
+    {
+      "file": "config/collections/items.ts",
+      "collection": "items",
+      "key": "callbacks",
+      "reason": "`callbacks` holds functions, and their source could not be found: the collection: `callbacks` may come from `...auditing` (line 7), which the codemod does not read through. Write the callbacks inline in the collection literal (or as a `const` in the same file) and run the codemod again."
+    }
+  ],
+  "notes": [],
+  "manualSteps": [
+    {
+      "title": "Files of config/ nothing moved",
+      "detail": "Nothing the codemod carried imports these, so they were not moved: config/shared.ts. Move what is still used before deleting config/."
+    }
+  ]
+}

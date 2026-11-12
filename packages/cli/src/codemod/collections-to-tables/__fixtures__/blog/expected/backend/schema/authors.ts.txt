@@ -1,0 +1,12 @@
+import { defineTable, col } from "@rebasepro/server/schema";
+
+export const authors = defineTable("authors", {
+    columns: {
+        id: col.uuid().primaryKey().defaultRandom(),
+        name: col.text().notNull().transform({
+            beforeSave: ({ value }) => (typeof value === "string" ? value.trim() : value)
+        }),
+        email: col.text().validate({ email: true })
+    },
+    rls: "inherit"
+});

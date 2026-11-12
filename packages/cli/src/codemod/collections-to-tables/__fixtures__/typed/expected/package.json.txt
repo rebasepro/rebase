@@ -1,0 +1,13 @@
+{
+    "name": "typed",
+    "private": true,
+    "type": "module",
+    "workspaces": [
+        "frontend",
+        "backend"
+    ],
+    "scripts": {
+        "db:push": "rebase db push",
+        "build": "pnpm --filter \"./frontend\" -r run build"
+    }
+}

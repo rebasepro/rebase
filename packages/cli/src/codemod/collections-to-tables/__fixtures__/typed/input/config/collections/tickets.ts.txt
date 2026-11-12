@@ -1,0 +1,44 @@
+import type { PostgresCollectionConfig } from "@rebasepro/types";
+import { PRIORITIES, timestamps } from "../fragments.js";
+import { audit } from "../audit.js";
+
+const PRIORITY_KEY = "priority";
+
+const ticketsCollection: PostgresCollectionConfig = {
+    name: "Support tickets",
+    singularName: "Ticket",
+    slug: "support-tickets",
+    table: "tickets",
+    properties: {
+        id: { name: "ID", type: "string", isId: "uuid" },
+        subject: { name: "Subject", type: "string", validation: { required: true } },
+        [PRIORITY_KEY]: {
+            name: "Priority",
+            type: "string",
+            enum: PRIORITIES.map(id => ({ id, label: id.toUpperCase() })),
+            defaultValue: "normal"
+        },
+        owner_id: { name: "Owner", type: "string", columnType: "uuid" },
+        ...timestamps
+    },
+    callbacks: {
+        async afterSave(props) {
+            await audit(props.collection.slug, props.id);
+        },
+        afterDelete: async ({ row, collection }) => {
+            await audit(collection.slug, String(row.id));
+        },
+        beforeDelete: ({ collection }) => {
+            if (collection.properties.subject) return true;
+            return false;
+        }
+    },
+    childCollections: []
+};
+
+ticketsCollection.securityRules = [
+    { operation: "select", ownerField: "owner_id" },
+    { operations: ["insert", "update", "delete"], roles: ["admin"] }
+];
+
+export default ticketsCollection;

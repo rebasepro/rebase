@@ -1,0 +1,31 @@
+{
+  "status": "blocked",
+  "collections": [
+    {
+      "slug": "codes",
+      "file": "config/collections/codes.ts",
+      "kind": "refused"
+    }
+  ],
+  "files": [
+    "update backend/package.json",
+    "update backend/tsconfig.json",
+    "update frontend/package.json",
+    "update frontend/src/App.tsx",
+    "update frontend/src/virtual.d.ts",
+    "update frontend/vite.config.ts",
+    "update package.json",
+    "update pnpm-workspace.yaml",
+    "update rebase.json"
+  ],
+  "refusals": [
+    {
+      "file": "config/collections/codes.ts",
+      "collection": "codes",
+      "key": "id",
+      "reason": "uses `isId: \"cuid\"`, which Postgres cannot honour: the generated default calls a `cuid()` function Rebase has never created. Use `isId: \"uuid\"`, or give the strategy as SQL and create the function in a migration."
+    }
+  ],
+  "notes": [],
+  "manualSteps": []
+}

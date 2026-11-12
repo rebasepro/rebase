@@ -1,0 +1,8 @@
+{
+    "name": "refuse-backend",
+    "type": "module",
+    "dependencies": {
+        "refuse-config": "*",
+        "@rebasepro/server": "workspace:*"
+    }
+}

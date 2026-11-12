@@ -1,0 +1,90 @@
+/**
+ * Blog posts: the public site reads them, editors write them.
+ */
+import { defineCollection } from "@rebasepro/cms-types";
+import { slugify } from "../slugify";
+import { notify } from "../actions";
+import authorsCollection from "./authors";
+import tagsCollection from "./tags";
+
+const postsCollection = defineCollection({
+    name: "Blog Posts",
+    singularName: "Blog Post",
+    slug: "posts",
+    icon: "FileText",
+    properties: {
+        id: { name: "ID", type: "string", isId: "uuid" },
+        // Shown as the page heading.
+        title: {
+            name: "Title",
+            type: "string",
+            validation: { required: true },
+            admin: { multiline: true }
+        },
+        slug: { name: "Slug", type: "string", validation: { unique: true } },
+        status: {
+            name: "Status",
+            type: "string",
+            enum: [
+                { id: "draft", label: "Draft", color: "grayLight" },
+                { id: "published", label: "Live" }
+            ],
+            defaultValue: "draft"
+        },
+        body: {
+            name: "Body",
+            type: "string",
+            admin: {
+                Field: () => import("../../frontend/src/MarkdownField")
+            }
+        },
+        cover: {
+            name: "Cover image",
+            type: "string",
+            storage: { storagePath: "posts/covers/", acceptedFiles: ["image/*"] },
+            admin: { Preview: "../../frontend/src/CoverPreview" }
+        },
+        author: {
+            name: "Author",
+            type: "relation",
+            relation: { kind: "belongsTo", target: () => authorsCollection, onDelete: "set null" }
+        },
+        tags: { name: "Tags", type: "relation" },
+        __order: { name: "Order", type: "string", admin: { hideFromCollection: true } }
+    },
+    relations: [
+        {
+            relationName: "tags",
+            kind: "manyToMany",
+            target: () => tagsCollection,
+            through: { table: "posts_tags" },
+            overrides: { admin: { hideFromNavigation: false } }
+        }
+    ],
+    callbacks: {
+        beforeSave: ({ values, previousValues }) => {
+            const merged = { ...previousValues, ...values };
+            if (typeof merged.title === "string" && !merged.slug) values.slug = slugify(merged.title);
+            return values;
+        },
+        afterRead({ row }) {
+            return row;
+        }
+    },
+    admin: {
+        group: "Content",
+        defaultViewMode: "cards",
+        kanban: { columnProperty: "status" },
+        orderProperty: "__order",
+        propertiesOrder: ["title", "slug", "status", "body", "cover", "author", "tags"],
+        entityActions: [
+            {
+                key: "publish",
+                name: "Publish",
+                onClick: ({ id }) => notify(`published ${id}`)
+            }
+        ]
+    }
+});
+
+export default postsCollection;

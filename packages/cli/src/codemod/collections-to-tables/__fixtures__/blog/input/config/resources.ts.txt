@@ -1,0 +1,2 @@
+/** The project's declared resources. */
+export const resources: string[] = [];

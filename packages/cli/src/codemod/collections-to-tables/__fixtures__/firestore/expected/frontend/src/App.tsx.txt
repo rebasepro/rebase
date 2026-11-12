@@ -1,0 +1,15 @@
+import { Rebase } from "@rebasepro/app";
+import { RebaseCMS, RebaseShell } from "@rebasepro/cms";
+import { tableCustomizations, externalCollections } from "./cms";
+
+export function App() {
+    return (
+        <Rebase>
+            <RebaseCMS
+                tableCustomizations={tableCustomizations}
+                externalCollections={externalCollections}
+            />
+            <RebaseShell title="Rebase"/>
+        </Rebase>
+    );
+}

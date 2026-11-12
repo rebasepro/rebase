@@ -1,0 +1,7 @@
+{
+    "name": "firestore-frontend",
+    "type": "module",
+    "dependencies": {
+        "@rebasepro/cms": "workspace:*"
+    }
+}

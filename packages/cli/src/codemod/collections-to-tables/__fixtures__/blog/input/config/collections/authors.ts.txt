@@ -1,0 +1,20 @@
+import { defineCollection } from "@rebasepro/cms-types";
+
+export default defineCollection({
+    name: "Authors",
+    singularName: "Author",
+    slug: "authors",
+    properties: {
+        id: { name: "ID", type: "string", isId: "uuid" },
+        name: {
+            name: "Name",
+            type: "string",
+            validation: { required: true },
+            callbacks: {
+                beforeSave: ({ value }) => (typeof value === "string" ? value.trim() : value)
+            }
+        },
+        email: { name: "Email address", type: "string", email: true }
+    },
+    admin: { group: "Content" }
+});

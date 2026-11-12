@@ -1,0 +1,64 @@
+{
+  "status": "migrated",
+  "collections": [
+    {
+      "slug": "authors",
+      "file": "config/collections/authors.ts",
+      "kind": "table",
+      "backendFile": "backend/schema/authors.ts",
+      "frontendFile": "frontend/src/cms/authors.tsx"
+    },
+    {
+      "slug": "posts",
+      "file": "config/collections/posts.ts",
+      "kind": "table",
+      "backendFile": "backend/schema/posts.ts",
+      "frontendFile": "frontend/src/cms/posts.tsx"
+    },
+    {
+      "slug": "tags",
+      "file": "config/collections/tags.ts",
+      "kind": "table",
+      "backendFile": "backend/schema/tags.ts"
+    },
+    {
+      "slug": "users",
+      "file": "config/collections/users.ts",
+      "kind": "auth-table",
+      "backendFile": "backend/schema/users.ts",
+      "frontendFile": "frontend/src/cms/users.tsx"
+    }
+  ],
+  "files": [
+    "create backend/lib/slugify.ts",
+    "update backend/package.json",
+    "create backend/resources.ts",
+    "create backend/schema/authors.ts",
+    "create backend/schema/index.ts",
+    "create backend/schema/posts.ts",
+    "create backend/schema/tags.ts",
+    "create backend/schema/users.ts",
+    "create backend/storage.ts",
+    "update backend/tsconfig.json",
+    "update frontend/package.json",
+    "update frontend/src/App.tsx",
+    "create frontend/src/cms/authors.tsx",
+    "create frontend/src/cms/index.ts",
+    "create frontend/src/cms/lib/actions.ts",
+    "create frontend/src/cms/posts.tsx",
+    "create frontend/src/cms/users.tsx",
+    "update frontend/src/virtual.d.ts",
+    "update frontend/vite.config.ts",
+    "update package.json",
+    "update pnpm-workspace.yaml",
+    "update rebase.json"
+  ],
+  "refusals": [],
+  "notes": [],
+  "manualSteps": [],
+  "verification": {
+    "identical": true,
+    "differences": []
+  },
+  "removeCommand": "git rm -r config"
+}

@@ -1,0 +1,8 @@
+{
+    "name": "cuid-backend",
+    "type": "module",
+    "dependencies": {
+        "cuid-config": "*",
+        "@rebasepro/server": "workspace:*"
+    }
+}

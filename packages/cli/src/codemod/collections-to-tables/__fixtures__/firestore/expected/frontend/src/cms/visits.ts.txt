@@ -1,0 +1,13 @@
+import { defineFirestoreCollection } from "@rebasepro/firebase";
+import notesCollection from "./notes";
+
+/** Store visits, with their notes as a subcollection. */
+export default defineFirestoreCollection({
+    name: "Visits",
+    slug: "visits",
+    fields: {
+        when: { name: "When", type: "date" },
+        store: { name: "Store", type: "reference", target: "customers" }
+    },
+    subcollections: () => [notesCollection]
+});

@@ -53,7 +53,7 @@ export const ROOT_FLAGS = {
  * literal under this name: `help-coverage.test.ts`, `printed-commands.test.ts`
  * and the docs verifier read it out of this file's source.
  */
-const namespacedCommands = ["init", "schema", "db", "console", "dev", "build", "start", "auth", "doctor", "verify", "skills", "api-keys", "storage", "cloud", "apps", "eject", "generate", "generate-sdk", "telemetry", "resources", "status", "upgrade", "normalize-imports"];
+const namespacedCommands = ["init", "schema", "db", "console", "dev", "build", "start", "auth", "doctor", "verify", "skills", "api-keys", "storage", "cloud", "apps", "eject", "generate", "generate-sdk", "telemetry", "resources", "status", "upgrade", "migrate", "normalize-imports"];
 
 /** The words a command group dispatches, and the other spellings it accepts for them. */
 interface CommandVocabulary {
@@ -83,6 +83,7 @@ async function commandVocabulary(command: string): Promise<CommandVocabulary> {
         case "apps": return { subcommands: (await import("./commands/apps")).APPS_SUBCOMMANDS, aliases: {} };
         case "telemetry": return { subcommands: (await import("./commands/telemetry")).TELEMETRY_SUBCOMMANDS, aliases: {} };
         case "generate": return { subcommands: (await import("./commands/generate-view")).GENERATE_SUBCOMMANDS, aliases: {} };
+        case "migrate": return { subcommands: (await import("./commands/migrate")).MIGRATE_SUBCOMMANDS, aliases: {} };
         case "cloud": {
             const cloud = await import("./commands/cloud");
             return { subcommands: cloud.CLOUD_GROUP_NAMES, aliases: cloud.GROUP_ALIASES };
@@ -393,6 +394,12 @@ async function dispatch(
             break;
         }
 
+        case "migrate": {
+            const { migrateCommand } = await import("./commands/migrate");
+            await migrateCommand(effectiveSubcommand, args);
+            break;
+        }
+
         case "apps": {
             const { appsCommand } = await import("./commands/apps");
             await appsCommand(effectiveSubcommand, args);
@@ -498,6 +505,7 @@ ${chalk.green.bold("Commands")}
   ${chalk.blue.bold("normalize-imports")}       Complete compiled output's relative imports for Node ESM
   ${chalk.blue.bold("start")}                   Run the built bundle, as a deployment does ${chalk.gray("(in the NODE_ENV you set)")}
   ${chalk.blue.bold("upgrade")}                 Move every @rebasepro package to one release, then install
+  ${chalk.blue.bold("migrate collections-to-tables")} config/collections → backend/schema, SQL-checked
   ${chalk.blue.bold("apps list")}               Show the apps this repository declares
 
 ${chalk.green.bold("Schema")}

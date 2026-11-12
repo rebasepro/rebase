@@ -1,0 +1,7 @@
+{
+    "name": "typed-frontend",
+    "type": "module",
+    "dependencies": {
+        "@rebasepro/cms": "workspace:*"
+    }
+}

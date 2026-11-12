@@ -1,0 +1,17 @@
+import { defineAuthTable, col } from "@rebasepro/server/schema";
+
+export const users = defineAuthTable("users", {
+    schema: "rebase",
+    columns: {
+        id: col.uuid().primaryKey().defaultRandom(),
+        email: col.text().notNull().unique(),
+        displayName: col.text(),
+        passwordHash: col.text().private(),
+        roles: col.array(col.text().oneOf(["admin", "editor"])),
+        createdAt: col.timestamptz().onCreateNow()
+    },
+    rls: [
+        { operation: "select", roles: ["admin"] },
+        { operations: ["insert", "update", "delete"], roles: ["admin"] }
+    ]
+});

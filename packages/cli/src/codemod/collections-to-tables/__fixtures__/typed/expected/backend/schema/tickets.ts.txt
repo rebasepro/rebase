@@ -1,0 +1,31 @@
+import { defineTable, col } from "@rebasepro/server/schema";
+import { audit } from "../lib/audit.js";
+
+export const tickets = defineTable("tickets", {
+    slug: "support-tickets",
+    columns: {
+        id: col.uuid().primaryKey().defaultRandom(),
+        subject: col.text().notNull(),
+        priority: col.enum(["low", "normal", "high"]).default("normal"),
+        owner_id: col.uuid(),
+        created_at: col.timestamptz().onCreateNow(),
+        updated_at: col.timestamptz().onUpdateNow()
+    },
+    rls: [
+        { operation: "select", ownerField: "owner_id" },
+        { operations: ["insert", "update", "delete"], roles: ["admin"] }
+    ],
+    hooks: {
+        afterSave: async (props) => {
+            await audit(props.table.slug, props.id);
+        },
+        beforeDelete: ({ table: collection }) => {
+            // TODO(rebase-migrate): `collection` is now the table's descriptor, not the collection: check every use but `.slug` (line 2 of the hook).
+            if (collection.properties.subject) return true;
+            return false;
+        },
+        afterDelete: async ({ values: row, table: collection }) => {
+            await audit(collection.slug, String(row.id));
+        }
+    }
+});

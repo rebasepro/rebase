@@ -1,0 +1,13 @@
+import { defineCollection } from "@rebasepro/common";
+
+export default defineCollection({
+    name: "Open tickets",
+    slug: "open_tickets",
+    view: {
+        query: "SELECT id, subject FROM tickets WHERE subject IS NOT NULL"
+    },
+    properties: {
+        id: { name: "ID", type: "string", isId: true },
+        subject: { name: "Subject", type: "string" }
+    }
+});

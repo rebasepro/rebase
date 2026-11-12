@@ -1,0 +1,24 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { tickets } from "../../../backend/schema/tickets";
+
+export const ticketsCms = customizeTable<typeof tickets>("support-tickets", {
+    name: "Support tickets",
+    fields: {
+        priority: {
+            enumLabels: {
+                low: "LOW",
+                normal: "NORMAL",
+                high: "HIGH"
+            }
+        },
+        owner_id: {
+            name: "Owner"
+        },
+        created_at: {
+            name: "Created at"
+        },
+        updated_at: {
+            name: "Updated at"
+        }
+    }
+});

@@ -1,0 +1,79 @@
+{
+  "status": "migrated",
+  "collections": [
+    {
+      "slug": "events",
+      "file": "config/collections/events.ts",
+      "kind": "table",
+      "backendFile": "backend/schema/events.ts"
+    },
+    {
+      "slug": "open_tickets",
+      "file": "config/collections/open_tickets.ts",
+      "kind": "view",
+      "backendFile": "backend/schema/open_tickets.ts",
+      "frontendFile": "frontend/src/cms/open_tickets.tsx"
+    },
+    {
+      "slug": "support-tickets",
+      "file": "config/collections/tickets.ts",
+      "kind": "table",
+      "backendFile": "backend/schema/tickets.ts",
+      "frontendFile": "frontend/src/cms/tickets.tsx"
+    }
+  ],
+  "files": [
+    "create backend/lib/audit.ts",
+    "update backend/package.json",
+    "create backend/schema/events.ts",
+    "create backend/schema/index.ts",
+    "create backend/schema/open_tickets.ts",
+    "create backend/schema/tickets.ts",
+    "update backend/tsconfig.json",
+    "update frontend/package.json",
+    "update frontend/src/App.tsx",
+    "create frontend/src/cms/index.ts",
+    "create frontend/src/cms/open_tickets.tsx",
+    "create frontend/src/cms/tickets.tsx",
+    "update frontend/src/virtual.d.ts",
+    "update frontend/vite.config.ts",
+    "update package.json",
+    "update pnpm-workspace.yaml",
+    "update rebase.json"
+  ],
+  "refusals": [],
+  "notes": [
+    {
+      "file": "config/collections/tickets.ts",
+      "line": 39,
+      "collection": "support-tickets",
+      "message": "`ticketsCollection.securityRules` is assigned after the declaration; the evaluated value is what was carried."
+    },
+    {
+      "file": "config/collections/tickets.ts",
+      "collection": "support-tickets",
+      "message": "tickets: carried code has TODO(rebase-migrate) lines to check."
+    }
+  ],
+  "manualSteps": [
+    {
+      "title": "Check hooks.beforeDelete of tickets",
+      "detail": "hooks.beforeDelete `collection` is now the table's descriptor, not the collection: check every use but `.slug` (line 2 of the hook). The line is marked `TODO(rebase-migrate)`.",
+      "file": "backend/schema/tickets.ts"
+    },
+    {
+      "title": "Child collections of tickets",
+      "detail": "`childCollections` has no `customizeTable` equivalent. A table's `rel.hasMany` / `rel.manyToMany` relations are shown as tabs on its records: declare the relation on the table instead.",
+      "file": "config/collections/tickets.ts"
+    },
+    {
+      "title": "Files of config/ nothing moved",
+      "detail": "Nothing the codemod carried imports these, so they were not moved: config/fragments.ts. Move what is still used before deleting config/."
+    }
+  ],
+  "verification": {
+    "identical": true,
+    "differences": []
+  },
+  "removeCommand": "git rm -r config"
+}

@@ -1,0 +1,8 @@
+{
+    "name": "typed-backend",
+    "type": "module",
+    "dependencies": {
+        "typed-config": "*",
+        "@rebasepro/server": "workspace:*"
+    }
+}

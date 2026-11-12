@@ -1,0 +1,5 @@
+import type { CollectionCallbacks } from "@rebasepro/types";
+
+export const auditing: { callbacks: CollectionCallbacks } = {
+    callbacks: { afterSave: () => undefined }
+};

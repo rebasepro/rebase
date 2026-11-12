@@ -1,0 +1,5 @@
+{
+  "name": "cuid-config",
+  "private": true,
+  "type": "module"
+}

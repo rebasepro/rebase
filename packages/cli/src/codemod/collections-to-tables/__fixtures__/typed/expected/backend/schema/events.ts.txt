@@ -1,0 +1,12 @@
+import { defineTable, col, json } from "@rebasepro/server/schema";
+
+/** Analytics events, in their own database. */
+export const events = defineTable("events", {
+    database: "analytics",
+    columns: {
+        id: col.integer().primaryKey().identity(),
+        kind: col.text().notNull(),
+        payload: col.jsonb(json.object({}, { additional: true }))
+    },
+    rls: "admin-only"
+});

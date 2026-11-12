@@ -1,0 +1,9 @@
+import { defineView, col } from "@rebasepro/server/schema";
+
+export const openTickets = defineView("open_tickets", {
+    query: "SELECT id, subject FROM tickets WHERE subject IS NOT NULL",
+    columns: {
+        id: col.text().primaryKey(),
+        subject: col.text()
+    }
+});

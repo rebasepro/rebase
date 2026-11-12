@@ -1,0 +1,8 @@
+{
+    "name": "blog-backend",
+    "type": "module",
+    "dependencies": {
+        "blog-config": "*",
+        "@rebasepro/server": "workspace:*"
+    }
+}

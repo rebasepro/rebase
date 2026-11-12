@@ -1,0 +1,54 @@
+import { customizeTable } from "@rebasepro/cms";
+import type { posts } from "../../../backend/schema/posts";
+import MarkdownField from "../MarkdownField";
+import CoverPreview from "../CoverPreview";
+import { notify } from "./lib/actions";
+
+export const postsCms = customizeTable<typeof posts>("posts", {
+    name: "Blog Posts",
+    singularName: "Blog Post",
+    icon: "FileText",
+    group: "Content",
+    defaultViewMode: "cards",
+    kanban: {
+        columnField: "status",
+        orderField: "__order"
+    },
+    fieldOrder: ["title", "slug", "status", "body", "cover", "author", "tags"],
+    entityActions: [
+        {
+            key: "publish",
+            name: "Publish",
+            onClick: ({ id }) => notify(`published ${id}`)
+        }
+    ],
+    fields: {
+        title: {
+            multiline: true
+        },
+        status: {
+            enumLabels: {
+                draft: {
+                    label: "Draft",
+                    color: "grayLight"
+                },
+                published: "Live"
+            }
+        },
+        body: {
+            Field: MarkdownField
+        },
+        cover: {
+            name: "Cover image",
+            Preview: CoverPreview
+        },
+        tags: {
+            overrides: {
+                hideFromNavigation: false
+            }
+        },
+        __order: {
+            hidden: true
+        }
+    }
+});

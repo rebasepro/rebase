@@ -1,0 +1,8 @@
+{
+    "name": "refuse-frontend",
+    "type": "module",
+    "dependencies": {
+        "refuse-config": "*",
+        "@rebasepro/cms": "workspace:*"
+    }
+}

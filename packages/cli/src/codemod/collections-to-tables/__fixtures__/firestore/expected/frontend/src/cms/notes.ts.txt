@@ -1,0 +1,14 @@
+import { defineFirestoreCollection } from "@rebasepro/firebase";
+import type { FirebaseCollectionConfig } from "@rebasepro/types";
+
+const notesCollection = defineFirestoreCollection({
+    name: "Notes",
+    slug: "notes",
+    fields: {
+        text: { name: "Text", type: "string", validation: { required: true } },
+        customer: { name: "Customer", type: "reference", target: "customers" },
+        tags: { name: "Tags", type: "array", of: { type: "string" } }
+    }
+});
+
+export default notesCollection;

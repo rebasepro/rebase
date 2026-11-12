@@ -1,0 +1,8 @@
+{
+    "name": "blog-frontend",
+    "type": "module",
+    "dependencies": {
+        "blog-config": "*",
+        "@rebasepro/cms": "workspace:*"
+    }
+}

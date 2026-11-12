@@ -1,0 +1,16 @@
+import type { PostgresCollectionConfig } from "@rebasepro/types";
+
+/** Analytics events, in their own database. */
+const eventsCollection: PostgresCollectionConfig = {
+    name: "Events",
+    singularName: "Event",
+    slug: "events",
+    dataSource: "analytics",
+    properties: {
+        id: { name: "ID", type: "number", isId: "increment" },
+        kind: { name: "Kind", type: "string", validation: { required: true } },
+        payload: { name: "Payload", type: "map", keyValue: true }
+    }
+};
+
+export default eventsCollection;

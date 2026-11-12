@@ -1,0 +1,14 @@
+import type { PostgresCollectionConfig } from "@rebasepro/types";
+import { auditing } from "../shared";
+
+const itemsCollection: PostgresCollectionConfig = {
+    name: "Items",
+    slug: "items",
+    ...auditing,
+    securityRules: [{ operation: "select", access: "public" }],
+    properties: {
+        id: { name: "ID", type: "string", isId: "uuid" }
+    }
+};
+
+export default itemsCollection;

@@ -524,6 +524,9 @@ importers:
       '@rebasepro/codegen':
         specifier: workspace:*
         version: link:../codegen
+      '@rebasepro/common':
+        specifier: workspace:*
+        version: link:../common
       '@rebasepro/rls-check':
         specifier: workspace:*
         version: link:../rls-check
@@ -536,6 +539,9 @@ importers:
       '@rebasepro/types':
         specifier: workspace:*
         version: link:../types
+      '@rebasepro/utils':
+        specifier: workspace:*
+        version: link:../utils
       acorn:
         specifier: ^8.18.0
         version: 8.18.0
@@ -560,6 +566,9 @@ importers:
       pg:
         specifier: ^8.22.0
         version: 8.22.0
+      ts-morph:
+        specifier: 28.0.0
+        version: 28.0.0
     devDependencies:
       '@types/node':
         specifier: ^26.1.2

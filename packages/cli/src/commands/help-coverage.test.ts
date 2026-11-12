@@ -425,6 +425,7 @@ describe("every command the dispatch answers parses its flags strictly", () => {
         resources: "resources.ts",
         status: "status.ts",
         upgrade: "upgrade.ts",
+        migrate: "migrate.ts",
         "normalize-imports": "normalize-imports.ts",
         // The family's parse is `parseCloudArgs`, which lives here and wraps
         // `parseCommandArgs` with the global cloud flags merged in. Which of its
