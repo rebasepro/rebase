@@ -34,11 +34,16 @@
  * - `cms-duplicate-customization` — two `customizeTable` calls for one slug.
  *   The panel refuses to mount with both.
  * - `cms-not-static` — a call this step could not read (warning).
+ * - `cms-ui-config-not-mounted` — `src/cms/ui-config.json` exists, where the
+ *   collection editor saves presentation in development, but no `<RebaseCMS>`
+ *   in the frontend passes `uiConfig`: the editor's changes are lost on
+ *   reload and never ship (warning). Said only when a `<RebaseCMS>` element
+ *   was found and none of them passes `uiConfig` or spreads props into it.
  */
 import fs from "fs";
 import path from "path";
 import type { ColumnDescriptor, TableDescriptor } from "@rebasepro/types";
-import type { Expression, Node, ObjectLiteralExpression, SourceFile } from "ts-morph";
+import type { Expression, Node, ObjectLiteralExpression, Project, SourceFile } from "ts-morph";
 import { loadManifest } from "../manifest";
 
 type TsMorph = typeof import("ts-morph");
@@ -46,6 +51,9 @@ type TsMorph = typeof import("ts-morph");
 /** The package `customizeTable` is imported from. */
 const CMS_PACKAGE = "@rebasepro/cms";
 const CUSTOMIZE = "customizeTable";
+/** The panel's mount, and the file the collection editor writes presentation to in development. */
+const MOUNT = "RebaseCMS";
+const UI_CONFIG_FILE = "ui-config.json";
 const SOURCE = /\.(ts|tsx|mts|js|jsx|mjs)$/;
 const NOT_SOURCE = /\.(d|test|spec)\.[cm]?[jt]sx?$/;
 
@@ -55,7 +63,7 @@ type OffFormOption = typeof OFF_FORM_OPTIONS[number];
 
 /** A finding of this step, in `rebase verify`'s finding shape (step `cms`). */
 export interface CmsFinding {
-    check: "cms-unknown-table" | "cms-unknown-field" | "cms-hidden-required" | "cms-duplicate-customization" | "cms-not-static";
+    check: "cms-unknown-table" | "cms-unknown-field" | "cms-hidden-required" | "cms-duplicate-customization" | "cms-not-static" | "cms-ui-config-not-mounted";
     severity: "error" | "warning";
     message: string;
     fix?: string;
@@ -490,6 +498,56 @@ export async function checkCmsCustomizations(projectRoot: string, tables: readon
             }
             project.removeSourceFile(sf);
         }
+        const unmounted = uiConfigNotMounted(tsm, project, projectRoot, dir);
+        if (unmounted) result.findings.push(unmounted);
     }
     return result;
+}
+
+/**
+ * The `cms-ui-config-not-mounted` finding for one customization directory, or
+ * nothing. Undecided — no `<RebaseCMS>` element found under `src/` (mounted
+ * through a wrapper, rendered without JSX) — is nothing, not a warning.
+ */
+function uiConfigNotMounted(tsm: TsMorph, project: Project, projectRoot: string, cmsDir: string): CmsFinding | undefined {
+    const uiConfig = path.join(cmsDir, UI_CONFIG_FILE);
+    if (!fs.existsSync(uiConfig)) return undefined;
+    const N = tsm.Node;
+    const { SyntaxKind } = tsm;
+    const mounts: { file: string; line: number; passes: boolean }[] = [];
+    for (const file of sourceFiles(path.dirname(cmsDir))) {
+        const text = fs.readFileSync(file, "utf-8");
+        if (!text.includes(MOUNT)) continue;
+        const sf = project.createSourceFile(file, text, { overwrite: true });
+        const names = new Set<string>();
+        for (const declaration of sf.getImportDeclarations()) {
+            if (declaration.getModuleSpecifierValue() !== CMS_PACKAGE) continue;
+            for (const named of declaration.getNamedImports()) {
+                if (named.getName() === MOUNT) names.add(named.getAliasNode()?.getText() ?? MOUNT);
+            }
+        }
+        const elements = [
+            ...sf.getDescendantsOfKind(SyntaxKind.JsxOpeningElement),
+            ...sf.getDescendantsOfKind(SyntaxKind.JsxSelfClosingElement)
+        ];
+        for (const element of elements) {
+            if (!names.has(element.getTagNameNode().getText())) continue;
+            const passes = element.getAttributes().some(attribute =>
+                N.isJsxSpreadAttribute(attribute) || attribute.getNameNode().getText() === "uiConfig");
+            mounts.push({ file: path.relative(projectRoot, file), line: element.getStartLineNumber(), passes });
+        }
+        project.removeSourceFile(sf);
+    }
+    if (mounts.length === 0 || mounts.some(mount => mount.passes)) return undefined;
+    const [first] = mounts;
+    return {
+        check: "cms-ui-config-not-mounted",
+        severity: "warning",
+        file: first.file,
+        line: first.line,
+        message: `${path.relative(projectRoot, uiConfig)} holds what the collection editor saves in development, but \`<RebaseCMS>\` is not given it: ` +
+            "presentation edited in the editor is gone after a reload and never ships.",
+        fix: `Import it and pass it: \`import uiConfig from "./cms/${UI_CONFIG_FILE}";\` and \`<RebaseCMS … uiConfig={uiConfig} />\` ` +
+            "(the frontend's tsconfig needs `resolveJsonModule`)."
+    };
 }

@@ -250,6 +250,51 @@ describe("rebase verify: CMS customizations", () => {
         expect(found).toEqual([]);
     });
 
+    describe("ui-config.json", () => {
+        const app = (mount: string, alias = "RebaseCMS") => [
+            `import { ${alias === "RebaseCMS" ? "RebaseCMS" : `RebaseCMS as ${alias}`} } from "@rebasepro/cms";`,
+            "import { tableCustomizations } from \"./cms\";",
+            "export function App() {",
+            `    return ${mount};`,
+            "}",
+            ""
+        ].join("\n");
+        const writeApp = (source: string) => fs.writeFileSync(path.join(root, "frontend", "src", "App.tsx"), source);
+
+        beforeEach(() => {
+            cms("ui-config.json", "{\n  \"tables\": {}\n}\n");
+        });
+
+        it("warns when it exists and the only <RebaseCMS> does not pass uiConfig", async () => {
+            writeApp(app("<RebaseCMS tableCustomizations={tableCustomizations} />"));
+            const found = await check();
+            expect(found.map(f => [f.check, f.severity, f.file, f.line])).toEqual([
+                ["cms-ui-config-not-mounted", "warning", path.join("frontend", "src", "App.tsx"), 4]
+            ]);
+            expect(found[0].fix).toContain("uiConfig={uiConfig}");
+        });
+
+        it("follows an aliased import of RebaseCMS", async () => {
+            writeApp(app("<Cms tableCustomizations={tableCustomizations}></Cms>", "Cms"));
+            expect((await check()).map(f => f.check)).toEqual(["cms-ui-config-not-mounted"]);
+        });
+
+        it.each([
+            ["passes uiConfig", "<RebaseCMS tableCustomizations={tableCustomizations} uiConfig={uiConfig} />"],
+            ["spreads props into the mount", "<RebaseCMS {...props} />"],
+            ["mounts it through a wrapper (undecided)", "<Panel />"]
+        ])("is quiet when the frontend %s", async (_what, mount) => {
+            writeApp(app(mount));
+            expect(await check()).toEqual([]);
+        });
+
+        it("is quiet when there is no ui-config.json", async () => {
+            fs.rmSync(path.join(root, "frontend", "src", "cms", "ui-config.json"));
+            writeApp(app("<RebaseCMS tableCustomizations={tableCustomizations} />"));
+            expect(await check()).toEqual([]);
+        });
+    });
+
     it("reads the CMS of a static app rebase.json declares", async () => {
         fs.writeFileSync(path.join(root, "rebase.json"), JSON.stringify({
             rebase: "^1",
