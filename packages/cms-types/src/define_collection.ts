@@ -20,9 +20,6 @@ import type {
     FirebaseProperties,
     FirebaseProperty,
     InferEntityType,
-    MongoDBCollectionConfig,
-    MongoProperties,
-    MongoProperty,
     PostgresCollectionConfig,
     PostgresProperties,
     PostgresProperty,
@@ -40,7 +37,7 @@ import { resolveResourceRefs, type ResourceRef } from "@rebasepro/types";
  * The discriminant that replaced three overloads of `defineCollection`. See
  * {@link CollectionConfigForEngine} for why that mattered.
  */
-type CollectionEngine = "postgres" | "firestore" | "mongodb";
+type CollectionEngine = "postgres" | "firestore";
 
 /**
  * The concrete collection type an `engine` selects.
@@ -54,9 +51,9 @@ type CollectionEngine = "postgres" | "firestore" | "mongodb";
  *    collection reported only the first. Fixing it revealed the second on the
  *    next run, one per edit-compile cycle;
  *  - the error landed on `defineCollection(`, not on the key that was wrong;
- *  - and every Postgres collection's error dragged `FirebaseCollectionConfig`
- *    and `MongoDBCollectionConfig` through the message, naming two engines the
- *    author had not mentioned and does not use.
+ *  - and every Postgres collection's error dragged the other engines' config
+ *    types through the message, naming engines the author had not mentioned
+ *    and does not use.
  *
  * With one signature there is no resolution to fail: each error is reported
  * where it is, all of them at once, against the one config type the `engine`
@@ -64,8 +61,7 @@ type CollectionEngine = "postgres" | "firestore" | "mongodb";
  */
 type CollectionConfigForEngine<E, P, USER extends User> =
     E extends "firestore" ? FirebaseCollectionConfig<EntityShapeOf<P>, USER>
-        : E extends "mongodb" ? MongoDBCollectionConfig<EntityShapeOf<P>, USER>
-            : PostgresCollectionConfig<EntityShapeOf<P>, USER>;
+        : PostgresCollectionConfig<EntityShapeOf<P>, USER>;
 
 /**
  * `InferEntityType`, tolerant of a property map that has an error in it.
@@ -89,14 +85,12 @@ type EntityShapeOf<P> = InferEntityType<{
 /** The property union an engine admits — the engine gate, as a type. */
 type PropertyForEngine<E> =
     E extends "firestore" ? FirebaseProperty
-        : E extends "mongodb" ? MongoProperty
-            : PostgresProperty;
+        : PostgresProperty;
 
 /** {@link PropertyForEngine} as a property map, for the `P` constraint. */
 type PropertiesForEngine<E> =
     E extends "firestore" ? FirebaseProperties
-        : E extends "mongodb" ? MongoProperties
-            : PostgresProperties;
+        : PostgresProperties;
 
 /**
  * Define a collection with the admin block type-checked.

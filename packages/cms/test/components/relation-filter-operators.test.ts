@@ -91,7 +91,7 @@ describe("relation filter operators, header to field", () => {
         // Postgres driver, so it is the driver's descriptor that says so.
 
         it("offers nothing on a document store, which has no relations", () => {
-            for (const engine of ["firestore", "mongodb"]) {
+            for (const engine of ["firestore"]) {
                 for (const kind of TO_MANY_AND_ONE) {
                     expect(resolveFilterOperators({
                         property: relationProp(kind), engine

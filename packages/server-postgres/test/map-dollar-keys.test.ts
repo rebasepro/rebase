@@ -2,7 +2,7 @@
  * A `map` value whose keys start with `$` is a document, not an operation.
  *
  * Every `$`-keyed object used to read as an attempted field operation, so a
- * JSON Schema (`$schema`, `$id`) or a MongoDB-style export could not be stored
+ * JSON Schema (`$schema`, `$id`) or a document exported from another database could not be stored
  * in a map at all: the driver refused it as an unknown operator. On a map, only
  * `{ <operator>: … }` with one real operator is an operation now (calls
  * 2026-10-12, S1 / DD-13 option a); every other type keeps the strict reading,

@@ -1,7 +1,7 @@
 /**
  * A collection served by another engine is not this engine's to provision.
  *
- * Firestore and MongoDB collections are declared in the same
+ * Firestore collections are declared in the same
  * `config/collections` directory as the Postgres ones — that is what
  * `dataSource` routing is for — and every stage of the SQL toolchain used to
  * read "the collections" as all of them. So a Firestore collection got a
@@ -52,10 +52,11 @@ const firestoreCollection: CollectionConfig = {
     }
 };
 
-const mongoCollection: CollectionConfig = {
+/** Routed by `engine` alone — no `dataSource` to read. */
+const engineOnlyCollection: CollectionConfig = {
     name: "Events",
     slug: "events",
-    engine: "mongodb",
+    engine: "firestore",
     properties: { id: { name: "ID", type: "string" } }
 };
 
@@ -67,7 +68,7 @@ const dataSourceOnlyCollection: CollectionConfig = {
     properties: { id: { name: "ID", type: "string" } }
 };
 
-const all = [sqlCollection, firestoreCollection, mongoCollection, dataSourceOnlyCollection];
+const all = [sqlCollection, firestoreCollection, engineOnlyCollection, dataSourceOnlyCollection];
 
 describe("the Drizzle schema generator", () => {
     it("emits a table for the Postgres collection only", async () => {

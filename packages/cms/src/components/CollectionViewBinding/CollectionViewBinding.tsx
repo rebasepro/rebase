@@ -23,7 +23,7 @@ export type CollectionViewBindingProps<M extends Record<string, unknown>> = {
     /**
      * The path the collection is addressed by: its slug, or for a
      * subcollection `parentSlug/{id}/slug`. Defaults to the collection's slug.
-     * Not the `path` a Firestore or MongoDB collection declares for its store:
+     * Not the `path` a Firestore collection declares for its store:
      * the data layer translates to that one, and another collection's slug may
      * be spelled the same.
      */

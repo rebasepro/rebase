@@ -42,7 +42,7 @@ export type CollectionRegistryController<
 
     /**
      * The path a collection's rows are stored under, for the path the admin
-     * addresses it by. A Firestore or MongoDB collection may declare a `path`
+     * addresses it by. A Firestore collection may declare a `path`
      * other than its slug — `slug: "fs_diagnosis", path: "diagnosis"` — and
      * `fs_diagnosis/abc/locales` is then stored at `diagnosis/abc/locales`.
      * This is what a reference to one of its records stores. Unchanged for a

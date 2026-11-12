@@ -49,10 +49,6 @@ describe("declaresRelationalCollection", () => {
         `)).toBe(false);
     });
 
-    it("recognises a MongoDB collection", () => {
-        expect(declaresRelationalCollection('const c = { engine: "mongodb" };')).toBe(false);
-    });
-
     it("falls back to the dataSource key when no engine is declared", () => {
         // Matches `resolveDataSource` with no registry, which the CLI never has.
         expect(declaresRelationalCollection('const c = { dataSource: "firestore" };')).toBe(false);

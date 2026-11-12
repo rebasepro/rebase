@@ -114,10 +114,10 @@ describe("<Rebase> data source wiring", () => {
 
     it("treats a '(default)' entry without a driver as definition-only (client.data stays default)", () => {
         const captured = renderWithProbe({
-            dataSources: [{ key: "(default)", engine: "mongodb" }]
+            dataSources: [{ key: "(default)", engine: "postgres" }]
         });
         expect(captured.sources!.registry["(default)"]).toMatchObject({
-            engine: "mongodb",
+            engine: "postgres",
             transport: "server"
         });
         expect(captured.sources!.sources["(default)"]).toBeUndefined();

@@ -6,10 +6,10 @@
  * from two `.where()` calls on the same column. Reading that shape is grammar,
  * not a driver detail, so every compiler reads it through here.
  *
- * It lived only inside the Postgres compiler, and the Mongo one destructured
- * `const [op, value] = filterParam` regardless: given the array-of-tuples form
- * `op` bound to `[">=", 18]`, no operator matched, and the condition was
- * dropped. Both of them. A read asking for adults under 65 returned every row
+ * It lived only inside the Postgres compiler, and another driver's compiler
+ * destructured `const [op, value] = filterParam` regardless: given the
+ * array-of-tuples form `op` bound to `[">=", 18]`, no operator matched, and the
+ * condition was dropped. Both of them. A read asking for adults under 65 returned every row
  * of the collection with a 200.
  *
  * @module

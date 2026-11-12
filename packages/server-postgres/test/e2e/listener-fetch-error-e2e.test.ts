@@ -12,8 +12,7 @@
  * masked text a socket frame carries.
  *
  * A real Postgres, the real driver running the real `afterRead` in the real
- * refetch. The MongoDB half is
- * `packages/server-mongo/test/realtime-subscription-error.test.ts`.
+ * refetch.
  *
  * Requires Docker.
  */

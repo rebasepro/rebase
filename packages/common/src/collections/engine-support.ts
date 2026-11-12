@@ -16,9 +16,9 @@ import { isPostgresCollectionConfig } from "@rebasepro/types";
  * `callbacks` is one engine-agnostic type shared by every collection, and
  * splitting it would fork `afterRead` and the five write hooks along with it.
  *
- * Lives here rather than in either driver because both have to run it: the
- * Postgres schema planner sees every collection in a mixed app, and a
- * Mongo-only app never boots a Postgres planner at all.
+ * Lives here rather than in the Postgres driver because the CMS has to run it
+ * too: the Postgres schema planner sees every collection in a mixed app, and a
+ * Firestore collection never reaches a Postgres planner at all.
  *
  * Called with *every* collection, before an engine filters any out.
  */

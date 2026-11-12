@@ -14,7 +14,7 @@ import * as ts from "typescript";
  * failed overload set: **one** diagnostic at the call site listing each
  * overload's *first* failure. A misspelled `validaton` on a Postgres collection
  * came back as three paragraphs pointing at `defineCollection(` and quoting
- * `MongoDBCollectionConfig` at an author who had named no such engine.
+ * the config types of engines the author had never named.
  *
  * So these assert on the diagnostics themselves: how many, which code, and that
  * the text names nothing the project did not mention. `cms-types` got the
@@ -100,17 +100,15 @@ export default defineCollection({
     });
 
     it("never quotes an engine the collection did not name", () => {
-        // The three-overload wall. `MongoDBCollectionConfig` and
-        // `FirebaseCollectionConfig` appeared in the error for a Postgres
-        // collection, and the author's first move was to go looking for the
-        // MongoDB dependency they had never installed.
+        // The overload wall. `FirebaseCollectionConfig` appeared in the error
+        // for a Postgres collection, and the author's first move was to go
+        // looking for a Firebase dependency they had never installed.
         for (const snippet of [
             `export default defineCollection({ slug: "posts", name: "Posts", properties: { title: { name: "T", type: "string", validaton: true } } });`,
             `export default defineCollection({ slug: "posts", name: "Posts", properties: { title: { name: "T", type: "string", multiline: true } } });`,
             `export default defineCollection({ slug: "posts", name: "Posts", properties: { c: { name: "C", type: "number", storage: { storagePath: "p/" } } } });`
         ]) {
             const text = diagnose(snippet).map(d => d.text).join("\n");
-            expect(text).not.toContain("MongoDBCollectionConfig");
             expect(text).not.toContain("FirebaseCollectionConfig");
             expect(text).not.toContain("No overload matches this call");
         }
@@ -123,7 +121,7 @@ export default defineCollection({
 export default defineCollection({
     name: "Docs",
     slug: "docs",
-    engine: "mongodb",
+    engine: "firestore",
     properties: {
         embedding: { name: "Embedding", type: "vector", dimensions: 3 }
     }

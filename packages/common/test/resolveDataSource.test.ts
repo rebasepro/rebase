@@ -99,9 +99,9 @@ describe("resolveDataSource", () => {
     });
 
     it("an explicit engine but no dataSource and no registry keys by engine", () => {
-        const r = resolveDataSource({ engine: "mongodb" });
+        const r = resolveDataSource({ engine: "firestore" });
         expect(r.key).toBe("(default)");
-        expect(r.engine).toBe("mongodb");
-        expect(r.capabilities.supportsDocumentAdmin).toBe(true);
+        expect(r.engine).toBe("firestore");
+        expect(r.capabilities.supportsSubcollections).toBe(true);
     });
 });

@@ -4,8 +4,7 @@
  * A {@link PolicyExpression} is the single source of truth for a row-level
  * security condition. It is compiled to Postgres `USING`/`WITH CHECK` SQL
  * (authoritative enforcement) and independently evaluated in JavaScript (to
- * drive the admin UI, and — in future — to enforce on engines without native
- * RLS such as MongoDB). Because both the SQL and the JS decision derive from
+ * drive the admin UI). Because both the SQL and the JS decision derive from
  * the *same* expression, the UI matches database enforcement by construction —
  * no drift between two hand-written implementations.
  *

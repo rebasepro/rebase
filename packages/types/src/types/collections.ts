@@ -1,6 +1,6 @@
 import type { CollectionCallbacks } from "./entity_callbacks";
 
-import type { EnumValues, Properties, PostgresProperties, FirebaseProperties, MongoProperties } from "./properties";
+import type { EnumValues, Properties, PostgresProperties, FirebaseProperties } from "./properties";
 
 import type { User } from "../users";
 import type { EmailSendResult } from "../controllers/email";
@@ -104,10 +104,10 @@ export interface BaseCollectionConfig<M extends Record<string, unknown> = Record
 
     /**
      * The database engine backing this collection (`"postgres"`, `"firestore"`,
-     * `"mongodb"`, or a custom id).
+     * or a custom id).
      *
      * On concrete collection types ({@link PostgresCollectionConfig},
-     * {@link FirebaseCollectionConfig}, {@link MongoDBCollectionConfig}) this is a literal
+     * {@link FirebaseCollectionConfig}) this is a literal
      * discriminant. On the base type it is optional and gets stamped
      * automatically during collection normalization from the registered
      * {@link DataSourceDefinition}.
@@ -120,7 +120,6 @@ export interface BaseCollectionConfig<M extends Record<string, unknown> = Record
      * Which database within the engine.
      * - For Firestore: The Firestore database ID (e.g., for multi-database projects)
      * - For PostgreSQL: Schema or database name
-     * - For MongoDB: Database name
      *
      * If not specified, the default database of the engine is used. Resolved
      * from the collection's {@link DataSourceDefinition} when omitted here.
@@ -166,10 +165,6 @@ export interface BaseCollectionConfig<M extends Record<string, unknown> = Record
      * - **Postgres** compiles them to real `CREATE POLICY` statements and lets
      *   the database enforce them (see {@link PostgresCollectionConfig.securityRules},
      *   which narrows this with the raw-SQL details).
-     * - **MongoDB** translates them into a query filter it AND-s into every
-     *   read and write, honouring `access`, `ownerField`, `roles`, `mode` and
-     *   the `operation`/`operations` selectors, and making a best effort at raw
-     *   `using`/`withCheck` SQL.
      * - **Firestore** does not implement them at all; its own rules language is
      *   evaluated by Google, not from here. `supportsRLS` on
      *   {@link DataSourceCapabilities} reports which engines generate policies,
@@ -524,58 +519,15 @@ export interface FirebaseCollectionConfig<M extends Record<string, unknown> = Re
 }
 
 /**
- * A collection backed by MongoDB.
- *
- * Use this type instead of {@link CollectionConfig} when you want
- * compile-time safety that only MongoDB-relevant fields appear.
- *
- * @group Models
- */
-export interface MongoDBCollectionConfig<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User>
-    extends BaseCollectionConfig<M, USER> {
-
-    /**
-     * The database engine for this collection. Must be set to `"mongodb"`.
-     */
-    engine: "mongodb";
-
-    /**
-     * Set of properties that compose a entity.
-     * MongoDB collections support `reference` properties but not `relation`.
-     */
-    properties: MongoProperties;
-
-    /**
-     * The MongoDB collection name to use. Defaults to `slug` if not set.
-     * Use this when the MongoDB collection name differs from the slug
-     * (e.g., when a PostgreSQL collection already uses the same slug).
-     *
-     * @example
-     * ```typescript
-     * const mongoCustomer: MongoDBCollectionConfig = {
-     *     slug: "mongo_customer",      // URL: /c/mongo_customer
-     *     path: "customer",            // MongoDB collection: customer
-     *     name: "Customers (MongoDB)",
-     *     engine: "mongodb",
-     *     properties: { ... }
-     * };
-     * ```
-     */
-    path?: string;
-}
-
-/**
  * A collection backed by any data source.
- * This is a discriminated union — use {@link PostgresCollectionConfig},
- * {@link FirebaseCollectionConfig}, or {@link MongoDBCollectionConfig} for
- * driver-specific type safety.
+ * This is a discriminated union — use {@link PostgresCollectionConfig} or
+ * {@link FirebaseCollectionConfig} for driver-specific type safety.
  *
  * @group Models
  */
 export type CollectionConfig<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User> =
     | PostgresCollectionConfig<M, USER>
-    | FirebaseCollectionConfig<M, USER>
-    | MongoDBCollectionConfig<M, USER>;
+    | FirebaseCollectionConfig<M, USER>;
 
 /**
  * A collection of *any* row type.
@@ -624,13 +576,12 @@ export function isPostgresCollectionConfig<C extends CollectionConfig<any, any>>
  * rather than by naming Postgres.
  *
  * The two halves of this already existed and were never joined. The engine
- * split (`PostgresCollectionConfig` / `FirebaseCollectionConfig` /
- * `MongoDBCollectionConfig`) said which fields belong to which engine at the
- * type level; {@link DataSourceCapabilities} said the same thing at runtime,
- * down to a `supportsRelations` flag. So call sites guarded on the capability
- * and then read a field the base type had to declare for them — which is why
- * those fields were on the base, and why a MongoDB collection could be written
- * with a `table`.
+ * split (`PostgresCollectionConfig` / `FirebaseCollectionConfig`) said which
+ * fields belong to which engine at the type level; {@link DataSourceCapabilities}
+ * said the same thing at runtime, down to a `supportsRelations` flag. So call
+ * sites guarded on the capability and then read a field the base type had to
+ * declare for them — which is why those fields were on the base, and why a
+ * document collection could be written with a `table`.
  *
  * Prefer this over {@link isPostgresCollectionConfig} wherever the question is
  * "does this collection live in a SQL table", so a custom SQL engine
@@ -655,27 +606,14 @@ export function isFirebaseCollectionConfig<C extends CollectionConfig<any, any>>
 }
 
 /**
- * Type guard for MongoDB collections.
- * @group Models
- */
-export function isMongoDBCollectionConfig<C extends CollectionConfig<any, any>>(
-    collection: C
-): collection is C & MongoDBCollectionConfig<any, any> {
-    return collection.engine === "mongodb";
-}
-
-/**
  * Returns the data path for a collection.
- * For Firestore or MongoDB collections with a `path`, returns that value;
+ * For Firestore collections with a `path`, returns that value;
  * otherwise falls back to `slug`.
  */
 export function getCollectionDataPath<M extends Record<string, unknown> = Record<string, unknown>, USER extends User = User>(
     collection: CollectionConfig<M, USER>
 ): string {
     if (isFirebaseCollectionConfig(collection) && collection.path) {
-        return collection.path;
-    }
-    if (isMongoDBCollectionConfig(collection) && collection.path) {
         return collection.path;
     }
     return collection.slug;

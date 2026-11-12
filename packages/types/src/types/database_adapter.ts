@@ -41,7 +41,7 @@ export interface DatabaseAdapter {
     /**
      * Which database engine this adapter handles.
      *
-     * @example "postgres", "mysql", "mongodb", "sqlite"
+     * @example "postgres"
      */
     readonly type: string;
 

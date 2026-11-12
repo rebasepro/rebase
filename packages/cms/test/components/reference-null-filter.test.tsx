@@ -9,12 +9,11 @@ import type { VirtualTableWhereFilterOp } from "@rebasepro/ui";
 /**
  * The same null checkbox, on the path that is not Postgres.
  *
- * `reference` is the document-store property — Firestore and MongoDB declare
+ * `reference` is the document-store property — Firestore declares
  * `supportsReferences` and no relations at all — so this field is the one that
- * actually reaches those drivers. It emitted `[selected operator, null]`, and
- * with `in` selected that is `{ field: { $in: null } }` on Mongo, which the
- * server rejects outright: "$in needs an array". Verified against a real
- * MongoDB, not inferred.
+ * actually reaches that driver. It emitted `[selected operator, null]`, and
+ * with `in` selected that is an `in` query with a null operand, which the
+ * Firestore SDK refuses outright: `in` needs a non-empty array.
  *
  * So the operator itself has to say what is being asked. These pin that it
  * does, and that the field never emits a null operand.
@@ -73,8 +72,8 @@ describe("the null checkbox on a reference filter", () => {
     });
 
     it("never emits a null operand, whichever operator is selected", () => {
-        // The Mongo driver maps `in`/`not-in` straight onto `$in`/`$nin`, and
-        // Mongo rejects either with a non-array. Nothing this field emits may
+        // The Firestore SDK refuses `in`/`not-in` without a non-empty array.
+        // Nothing this field emits may
         // put a null where a value is expected.
         for (const op of ["==", "!=", "in", "not-in"] satisfies VirtualTableWhereFilterOp[]) {
             const setValue = renderField([op, []]);

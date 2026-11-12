@@ -253,11 +253,11 @@ describe("getActiveBackendPlugin", () => {
                 "@rebasepro/server": "workspace:*"
             },
             devDependencies: {
-                "@rebasepro/server-mongo": "^1.0.0"
+                "@rebasepro/server-postgres": "^1.0.0"
             }
         });
 
-        expect(getActiveBackendPlugin(backendDir)).toBe("@rebasepro/server-mongo");
+        expect(getActiveBackendPlugin(backendDir)).toBe("@rebasepro/server-postgres");
     });
 
     it("ignores @rebasepro/server (not a driver)", () => {

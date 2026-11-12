@@ -367,7 +367,7 @@ export class CollectionRegistry {
     /**
      * The collection registered under `path`: by slug, by slug with hyphens
      * for underscores, by table name, and last by the `path` a root Firestore
-     * or MongoDB collection declares for its driver.
+     * collection declares for its driver.
      *
      * One string can name two collections. Declaring `slug: "fs_diagnosis",
      * path: "diagnosis"` is how a Firestore collection sits beside a Postgres
@@ -421,7 +421,7 @@ export class CollectionRegistry {
      *
      * The admin addresses a collection by its slug — in routes, in
      * `data.collection(...)`, in the `path` of every entity it lists — because
-     * the slug is what is unique. A Firestore or MongoDB collection may declare
+     * the slug is what is unique. A Firestore collection may declare
      * a `path` of its own ({@link getCollectionDataPath}), and its driver has to
      * be handed that one, under every record and subcollection too:
      * `fs_diagnosis/abc/locales` is stored at `diagnosis/abc/locales`.

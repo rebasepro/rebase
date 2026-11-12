@@ -11,8 +11,7 @@ import { matchesOperator } from "./offline-query";
  *
  * The pattern arrives over HTTP: `?title=like.%25%25%25…` is a public filter
  * operator, listed in the operator table. On the offline evaluator that freezes
- * the tab; the same translation in the Mongo driver hands the expression to the
- * database, where it occupies a server thread instead.
+ * the tab.
  *
  * Consecutive `%` mean exactly what one `%` means, so collapsing a run is
  * semantics-preserving and removes the ambiguity the backtracking feeds on.

@@ -683,7 +683,7 @@ export interface DataDriver {
      *
      * The rule is here rather than in each driver because the two
      * implementations answered differently and each had a test pinning its own
-     * habit: Postgres threw, Mongo logged a warning and resolved. Three things
+     * habit: one threw, the other logged a warning and resolved. Three things
      * decide it in favour of rejecting.
      *
      * The REST layer already says 404 — `DELETE /api/data/<c>/<id>` reads the
@@ -903,7 +903,7 @@ export interface DataDriver {
     // ── Admin capabilities ─────────────────────────────────────────────
     //
     // Admin operations are now modelled as capability-specific interfaces
-    // (SQLAdmin, DocumentAdmin, SchemaAdmin) in `@rebasepro/types/backend`.
+    // (SQLAdmin, SchemaAdmin, BranchAdmin) in `@rebasepro/types/backend`.
     //
     // Drivers that support admin features should expose them here.
     // Consumers should use the `isSQLAdmin()`, `isSchemaAdmin()` etc.
@@ -912,7 +912,6 @@ export interface DataDriver {
     /**
      * Return the admin capabilities of this driver.
      * @see SQLAdmin
-     * @see DocumentAdmin
      * @see SchemaAdmin
      */
     admin?: import("../types/backend").DatabaseAdmin;

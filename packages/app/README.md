@@ -26,7 +26,7 @@ of it resolves too: Node has supported `require(esm)` since 22.12.
 - **i18n** — built-in locales (de, en, es, fr, hi, it, pt) via `react-i18next`
 - **Studio Bridge** — shared context for optional CMS↔Studio integration
 
-This package is **framework-agnostic** in the sense that it doesn't depend on any specific data backend — it works with any `DataDriver` implementation (PostgreSQL, Firebase, MongoDB, etc.).
+This package is **framework-agnostic** in the sense that it doesn't depend on any specific data backend — it works with any `DataDriver` implementation (PostgreSQL, Firebase, or a custom driver).
 
 ## Key Exports
 

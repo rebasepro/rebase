@@ -123,7 +123,7 @@ describe("comparisons that cannot be ordered", () => {
     });
 
     it("is `unknown` when the row does not have the field, as when it is null", () => {
-        // A MongoDB document that never had `owner`, or a create that did not
+        // A Firestore document that never had `owner`, or a create that did not
         // mention it: the column it stands for is NULL, and the answer is the
         // one the same row with `owner: null` gets.
         const missing = (op: PolicyCompareOperator) => evaluatePolicy(

@@ -157,8 +157,8 @@ export type RebaseProps<USER extends User, DB = unknown> = {
      * client-side {@link DataDriver}.
      *
      * Register the **direct** (e.g. Firestore, talking straight to its backend)
-     * and **custom** sources here. Server-mediated sources (Postgres, MongoDB,
-     * …) do *not* need an entry — they ride the `client` and are routed by the
+     * and **custom** sources here. Server-mediated sources (Postgres) do *not*
+     * need an entry — they ride the `client` and are routed by the
      * Rebase backend.
      *
      * An entry keyed `"(default)"` with a driver **replaces** `client.data`

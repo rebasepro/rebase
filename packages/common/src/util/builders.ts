@@ -4,9 +4,6 @@ import {
     FirebaseProperties,
     FirebaseProperty,
     InferEntityType,
-    MongoDBCollectionConfig,
-    MongoProperties,
-    MongoProperty,
     PostgresCollectionConfig,
     PostgresProperties,
     PostgresProperty,
@@ -26,7 +23,7 @@ import {
 // callbacks, etc. — without writing `as const` or passing manual generics.
 
 /** The engines a collection can declare. `postgres` when it says nothing. */
-type CollectionEngine = "postgres" | "firestore" | "mongodb";
+type CollectionEngine = "postgres" | "firestore";
 
 /**
  * The concrete collection type an `engine` selects.
@@ -35,9 +32,8 @@ type CollectionEngine = "postgres" | "firestore" | "mongodb";
  * resolution is what made its errors unreadable. When no overload matches,
  * TypeScript emits **one** diagnostic at the call site listing each overload's
  * *first* failure, so a misspelled key on a Postgres collection came back as
- * three paragraphs of `No overload matches this call. Overload 1 of 3 … Overload
- * 3 of 3, '(collection: Omit<MongoDBCollectionConfig<…>>)'` — pointing at
- * `defineCollection(` and blaming a database the project does not use.
+ * paragraphs of `No overload matches this call. Overload 1 of 3 …` — pointing
+ * at `defineCollection(` and blaming a database the project does not use.
  *
  * One signature, with the engine as a type parameter, reports the error at the
  * key instead. Same fix as `@rebasepro/cms-types`, and deliberately the same
@@ -47,8 +43,7 @@ type CollectionEngine = "postgres" | "firestore" | "mongodb";
  */
 type CollectionConfigForEngine<E, P, USER extends User> =
     E extends "firestore" ? FirebaseCollectionConfig<EntityShapeOf<P>, USER>
-        : E extends "mongodb" ? MongoDBCollectionConfig<EntityShapeOf<P>, USER>
-            : PostgresCollectionConfig<EntityShapeOf<P>, USER>;
+        : PostgresCollectionConfig<EntityShapeOf<P>, USER>;
 
 /**
  * `InferEntityType`, tolerant of a property map that has an error in it.
@@ -63,14 +58,12 @@ type EntityShapeOf<P> = InferEntityType<{
 /** The property union an engine admits — the engine gate, as a type. */
 type PropertyForEngine<E> =
     E extends "firestore" ? FirebaseProperty
-        : E extends "mongodb" ? MongoProperty
-            : PostgresProperty;
+        : PostgresProperty;
 
 /** {@link PropertyForEngine} as a property map, for the `P` constraint. */
 type PropertiesForEngine<E> =
     E extends "firestore" ? FirebaseProperties
-        : E extends "mongodb" ? MongoProperties
-            : PostgresProperties;
+        : PostgresProperties;
 
 /**
  * Define a collection with full type inference. Postgres unless `engine` says

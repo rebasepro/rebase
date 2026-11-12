@@ -204,28 +204,28 @@ describe("rendered SQL", () => {
 });
 
 describe("assertSearchIsPostgresOnly", () => {
-    const mongoWithoutSearch: CollectionConfig = {
+    const firestoreWithoutSearch: CollectionConfig = {
         slug: "notes",
         name: "Notes",
-        engine: "mongodb",
+        engine: "firestore",
         properties: { body: { type: "string" } }
     };
     // Deliberately invalid: `search` is a Postgres-only field, so no typed
-    // MongoDB collection can carry one — refusing it is the guard's job.
-    const mongoWithSearch = { ...mongoWithoutSearch, search: { fields: ["body"] } } as unknown as CollectionConfig;
+    // Firestore collection can carry one — refusing it is the guard's job.
+    const firestoreWithSearch = { ...firestoreWithoutSearch, search: { fields: ["body"] } } as unknown as CollectionConfig;
 
     it("refuses a search block on a collection another engine serves", () => {
-        expect(() => assertSearchIsPostgresOnly([mongoWithSearch]))
+        expect(() => assertSearchIsPostgresOnly([firestoreWithSearch]))
             .toThrow(/Postgres feature/);
     });
 
     it("names the engine, so the message says why", () => {
-        expect(() => assertSearchIsPostgresOnly([mongoWithSearch]))
-            .toThrow(/mongodb/);
+        expect(() => assertSearchIsPostgresOnly([firestoreWithSearch]))
+            .toThrow(/firestore/);
     });
 
     it("passes a non-Postgres collection that declares no search", () => {
-        expect(() => assertSearchIsPostgresOnly([mongoWithoutSearch])).not.toThrow();
+        expect(() => assertSearchIsPostgresOnly([firestoreWithoutSearch])).not.toThrow();
     });
 
     it("passes Postgres collections, with or without a block", () => {

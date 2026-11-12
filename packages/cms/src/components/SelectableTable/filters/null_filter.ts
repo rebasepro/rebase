@@ -10,12 +10,10 @@ import { WhereFilterOp } from "@rebasepro/types";
  *  - Postgres took `["==", null]` as `IS NULL`, but dropped `["in", null]`
  *    entirely — a dropped condition widens, so ticking the box returned every
  *    row instead of the ones with no value.
- *  - MongoDB maps `in`/`not-in` straight onto `$in`/`$nin`, and Mongo rejects
- *    those with a non-array: `$in needs an array`. The read fails outright.
  *  - A Firestore driver is supplied by the developer, and the Firestore SDK
  *    likewise refuses `in` without a non-empty array.
  *
- * Only `==`/`!=` ever worked, and only because two engines independently chose
+ * Only `==`/`!=` ever worked, and only because the engines independently chose
  * to special-case a null operand. Nothing in the filter contract promises that,
  * and a filter field is shared by every engine the admin can talk to.
  *

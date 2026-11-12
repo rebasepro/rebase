@@ -122,8 +122,8 @@ export interface LiveSchemaStatus {
  *
  * Distinguished from an ordinary failure because both are expected states with
  * their own explanation, and a UI should say which rather than showing a
- * stack: a Mongo backend will never support this, and a bundle deployment has
- * no source to edit.
+ * stack: a backend whose driver cannot plan a schema change will never support
+ * this, and a bundle deployment has no source to edit.
  */
 export type LiveSchemaUnavailable =
     | { reason: "unsupported"; message: string }

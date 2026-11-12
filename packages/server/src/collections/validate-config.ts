@@ -1,5 +1,5 @@
 import { ADMIN_COLLECTION_KEYS, ADMIN_PROPERTY_KEYS, parseEnvBoolean } from "@rebasepro/types";
-import type { AnyCollectionConfig, CollectionConfig, PolicyExpression, PostgresCollectionConfig, FirebaseCollectionConfig, MongoDBCollectionConfig, Property, SecurityRule } from "@rebasepro/types";
+import type { AnyCollectionConfig, CollectionConfig, PolicyExpression, PostgresCollectionConfig, FirebaseCollectionConfig, Property, SecurityRule } from "@rebasepro/types";
 
 import { getEffectiveSecurityRules, getTableName, isRelationalCollection, resolveCollectionRelations, securityRuleToConditions } from "@rebasepro/common";
 import type { DataSourceResolvable } from "@rebasepro/common";
@@ -172,7 +172,7 @@ const COLLECTION_KEY_LIST = [
     "softDelete",
     "tenant",
     "view",
-    // FirebaseCollectionConfig / MongoDBCollectionConfig
+    // FirebaseCollectionConfig
     "path",
     "subcollections",
     // Added back by @rebasepro/cms-types through declaration merging. Its
@@ -198,8 +198,7 @@ type AssertNever<T extends never = never> = T;
 /** Keys the config types declare that {@link COLLECTION_KEY_LIST} does not. */
 type MissingCollectionKeys = Exclude<
     | keyof PostgresCollectionConfig
-    | keyof FirebaseCollectionConfig
-    | keyof MongoDBCollectionConfig,
+    | keyof FirebaseCollectionConfig,
     typeof COLLECTION_KEY_LIST[number]
 >;
 
@@ -1454,7 +1453,7 @@ function checkTenant(
  *   rather than honoured, so this warns instead of failing a boot that has been
  *   working — but it says so, which is the part that was missing.
  *
- * Only for collections a SQL toolchain owns: a Firestore or MongoDB collection
+ * Only for collections a SQL toolchain owns: a Firestore collection
  * has no `CREATE TABLE` for any of this to be wrong in.
  */
 function checkPrimaryKeyStrategy(

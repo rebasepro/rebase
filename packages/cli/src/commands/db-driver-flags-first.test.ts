@@ -160,7 +160,8 @@ it("leaves a driver other than server-postgres to judge its own line", async () 
     project("managed");
     fs.writeFileSync(path.join(state.root, "backend", "package.json"), JSON.stringify({
         name: "backend",
-        dependencies: { "@rebasepro/server": "0.25.0", "@rebasepro/server-mongo": "0.25.0" }
+        // A driver package the CLI does not ship — a fork, or a third party's.
+        dependencies: { "@rebasepro/server": "0.25.0", "@rebasepro/server-custom": "0.25.0" }
     }));
 
     await expect(dbCommand("push", argv("push", "--dry-rn"))).rejects.toThrow(Exit);

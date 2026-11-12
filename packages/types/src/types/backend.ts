@@ -19,7 +19,7 @@ import type { ApiKeyKind } from "./api_keys";
  */
 export interface DatabaseConnection {
     /**
-     * Type identifier for this database (e.g., 'postgres', 'mongodb', 'mysql')
+     * Type identifier for this database (e.g., 'postgres')
      */
     readonly type: string;
 
@@ -99,7 +99,7 @@ export interface CountOptions<M extends Record<string, unknown> = Record<string,
  * Note: This interface can be implemented as instance methods or as a class with static methods.
  * For static implementations (like DrizzleConditionBuilder), use the ConditionBuilderStatic type.
  *
- * @template T The type of condition returned by the builder (e.g., SQL for PostgreSQL, Filter<Document> for MongoDB)
+ * @template T The type of condition returned by the builder (e.g., SQL for PostgreSQL)
  */
 export interface ConditionBuilder<T = unknown> {
     /**
@@ -872,26 +872,7 @@ export interface SQLAdmin {
 }
 
 /**
- * Administrative operations for document-based databases (MongoDB, Firestore, etc.).
- * Used by future document administration tools.
- *
- * @group Admin
- */
-export interface DocumentAdmin {
-    /**
-     * Execute an aggregation pipeline or equivalent query.
-     */
-    executeAggregate?(pipeline: Record<string, unknown>[]): Promise<Record<string, unknown>[]>;
-
-    /**
-     * Fetch statistics for a collection (document count, size, etc.).
-     */
-    fetchCollectionStats?(collectionName: string): Promise<{ count: number; sizeBytes?: number }>;
-}
-
-/**
  * Administrative operations for schema management.
- * Shared across SQL and document databases.
  *
  * @group Admin
  */
@@ -1203,12 +1184,12 @@ export interface BranchMergeResult {
  * Union type for all admin capabilities.
  * A backend may implement any combination of these interfaces.
  *
- * Use type guards (`isSQLAdmin`, `isDocumentAdmin`, `isSchemaAdmin`, `isBranchAdmin`)
+ * Use type guards (`isSQLAdmin`, `isSchemaAdmin`, `isBranchAdmin`)
  * to safely narrow the type before calling methods.
  *
  * @group Admin
  */
-export type DatabaseAdmin = Partial<SQLAdmin> & Partial<DocumentAdmin> & Partial<SchemaAdmin>
+export type DatabaseAdmin = Partial<SQLAdmin> & Partial<SchemaAdmin>
     & Partial<BranchAdmin> & Partial<SchemaEditingAdmin>;
 
 /**
@@ -1232,17 +1213,6 @@ export function isSchemaEditingAdmin(admin: DatabaseAdmin | undefined): admin is
  */
 export function isSQLAdmin(admin: DatabaseAdmin | undefined): admin is SQLAdmin {
     return !!admin && typeof (admin as SQLAdmin).executeSql === "function";
-}
-
-/**
- * Type guard: does this admin support document operations?
- * @group Admin
- */
-export function isDocumentAdmin(admin: DatabaseAdmin | undefined): admin is DocumentAdmin {
-    return !!admin && (
-        typeof (admin as DocumentAdmin).executeAggregate === "function" ||
-        typeof (admin as DocumentAdmin).fetchCollectionStats === "function"
-    );
 }
 
 /**
@@ -1530,7 +1500,7 @@ export interface BackendBootstrapper {
     /**
      * Which driver type this bootstrapper handles.
      * Must match the `type` field on the driver config object
-     * (e.g., `"postgres"`, `"mongodb"`, `"mysql"`).
+     * (e.g., `"postgres"`).
      */
     type: string;
 

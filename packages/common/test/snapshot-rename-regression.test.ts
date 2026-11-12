@@ -57,7 +57,6 @@ const PACKAGE_SRC_DIRS = [
     path.join(REPO_ROOT, "packages/cms/src"),
     path.join(REPO_ROOT, "packages/server/src"),
     path.join(REPO_ROOT, "packages/server-postgres/src"),
-    path.join(REPO_ROOT, "packages/server-mongo/src"),
     path.join(REPO_ROOT, "packages/client/src"),
     path.join(REPO_ROOT, "packages/studio/src"),
 ];

@@ -110,10 +110,10 @@ function resolveTriState(value: TriState, onUnknown: UnknownResolution): boolean
  * data, not about Postgres: the engine decides *who* enforces them (Postgres
  * compiles them to RLS DDL, a document driver applies them in-process), never
  * *whether* they hold. Gating this function on the engine's `supportsRLS`
- * capability is what made every `{ onUnknown: "deny" }` call site in the Mongo
+ * capability is what made every `{ onUnknown: "deny" }` call site in a document
  * driver return `true` before it evaluated anything — and it did so only for
- * collections that spelled their engine out, so declaring `engine: "mongodb"`
- * was what switched authorization off.
+ * collections that spelled their engine out, so naming a document engine was
+ * what switched authorization off.
  *
  * @param options.onUnknown how to treat rules that cannot be decided
  *   client-side (raw SQL, or row predicates with no row). Defaults to `"allow"`

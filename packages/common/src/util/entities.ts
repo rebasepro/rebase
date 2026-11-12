@@ -289,7 +289,7 @@ export function sanitizeData<M extends Record<string, unknown>>
  * A reference to `entity`.
  *
  * @param path where the reference points, when that is not the path the
- * entity is addressed by. A Firestore or MongoDB collection may declare a
+ * entity is addressed by. A Firestore collection may declare a
  * `path` for its store other than its slug, and a reference has to carry the
  * stored one, where `entity.path` is the path the admin addresses it by.
  */

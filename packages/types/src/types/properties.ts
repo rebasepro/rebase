@@ -90,12 +90,12 @@ type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K>
  * `columnType` names a Postgres type (`uuid`, `bigserial`, `jsonb`, `text[]`)
  * and `columnName` overrides the snake_case derivation used to build a column
  * name. `DataSourceCapabilities.supportsColumnTypes` already reported this at
- * runtime — `false` for both document engines — while the types let a MongoDB
- * property declare `columnType: "bigserial"`.
+ * runtime — `false` for Firestore — while the types let a Firestore property
+ * declare `columnType: "bigserial"`.
  *
  * They stay declared on the concrete property interfaces rather than moving,
  * because that is where their per-type value unions live; what changes is that
- * the document engines' property aliases omit them.
+ * the document engine's property alias omits them.
  */
 type SqlColumnFields = "columnType" | "columnName";
 
@@ -104,19 +104,14 @@ export type PostgresProperties = {
     [key: string]: PostgresProperty;
 };
 
-export type FirebaseProperty = DistributiveOmit<Exclude<Property, RelationProperty | VectorProperty>, SqlColumnFields>;
-export type FirebaseProperties = {
-    [key: string]: FirebaseProperty;
-};
-
-// MongoDB is a document store: it uses references (stored pointers), not
-// SQL-style relations/joins. Same gating as Firestore.
+// Firestore is a document store: it uses references (stored pointers), not
+// SQL-style relations/joins.
 //
 // `vector` goes with them: it is pgvector-shaped, only `@rebasepro/server-postgres`
 // reads it, and `supportsVectors` on the engine's capabilities says so.
-export type MongoProperty = DistributiveOmit<Exclude<Property, RelationProperty | VectorProperty>, SqlColumnFields>;
-export type MongoProperties = {
-    [key: string]: MongoProperty;
+export type FirebaseProperty = DistributiveOmit<Exclude<Property, RelationProperty | VectorProperty>, SqlColumnFields>;
+export type FirebaseProperties = {
+    [key: string]: FirebaseProperty;
 };
 
 /**
@@ -124,7 +119,7 @@ export type MongoProperties = {
  * boundaries (collection editor, normalization) where the concrete engine is
  * unknown but the narrowed property constraint must be satisfied.
  */
-export type EngineProperties = PostgresProperties | FirebaseProperties | MongoProperties;
+export type EngineProperties = PostgresProperties | FirebaseProperties;
 
 /**
  * What a key the surrounding shape does not declare resolves to.
@@ -156,8 +151,8 @@ export type NoSuchKey<K extends PropertyKey, Known extends PropertyKey = never> 
 /**
  * What a property whose `type` the engine does not have resolves to.
  *
- * Same trick as {@link NoSuchKey}, for a different mistake: a `relation` on a
- * Firestore collection, a `vector` on MongoDB.
+ * Same trick as {@link NoSuchKey}, for a different mistake: a `relation` or a
+ * `vector` on a Firestore collection.
  *
  * Without it, `ExactProperty<V, never>` is `V & {}` — which is `V`, and
  * therefore no check at all. The gate is normally caught one level up, by the
@@ -882,12 +877,11 @@ export interface GeopointProperty extends BaseProperty {
  * optionally a `driver`/`databaseId` for cross-datasource pointers).
  *
  * This is the native primitive of **document databases** — it maps 1:1 to a
- * Firestore `DocumentReference`, and is persisted by the MongoDB driver as a
- * tagged sub-document. It carries no schema-level relationship (no foreign key,
- * no join, no cascade) and is resolved on demand.
+ * Firestore `DocumentReference`. It carries no schema-level relationship (no
+ * foreign key, no join, no cascade) and is resolved on demand.
  *
  * **Which to use:**
- * - Firestore / MongoDB collection → use `reference`.
+ * - Firestore collection → use `reference`.
  * - Postgres collection → use {@link RelationProperty} (`type: "relation"`),
  *   which models a real foreign key / join with prefetch and cascade.
  *
@@ -929,7 +923,7 @@ export interface ReferenceProperty extends BaseProperty {
  *
  * **Which to use:**
  * - Postgres collection → use `relation`.
- * - Firestore / MongoDB collection → use {@link ReferenceProperty}
+ * - Firestore collection → use {@link ReferenceProperty}
  *   (`type: "reference"`), a stored pointer with no join engine.
  *
  * @group Entity properties

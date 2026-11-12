@@ -7,7 +7,7 @@ import { useCollectionRegistryController } from "./navigation/contexts/Collectio
 /**
  * Where a reference points, as stored and as the admin addresses it.
  *
- * The two differ for a Firestore or MongoDB collection that declares a `path`
+ * The two differ for a Firestore collection that declares a `path`
  * for its store: `slug: "fs_diagnosis", path: "diagnosis"`. A reference stores
  * `diagnosis`, because that is where its driver finds the record. The admin
  * lists, routes and fetches by `fs_diagnosis`, and `diagnosis` can be the slug

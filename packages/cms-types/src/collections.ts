@@ -6,7 +6,7 @@
  * table's controllers, the selection state, the kanban layout, the shape of a
  * toolbar action's props. Every one names `React` or `RebaseContext`, and none is
  * imported by a single backend package — checked across `server`,
- * `server-postgres`, `server-mongo`, `client`, `common`, `utils`, `cli` and
+ * `server-postgres`, `client`, `common`, `utils`, `cli` and
  * `codegen`.
  *
  * That is what made them safe to lift: they were never part of the BaaS surface,

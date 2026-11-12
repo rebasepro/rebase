@@ -2,7 +2,7 @@ import { toFilterTuples } from "../src/data/filter-conditions";
 
 /**
  * The `FilterValues` grammar has two shapes per field, and each driver used to
- * read it for itself. The Postgres compiler normalised both; the Mongo one
+ * read it for itself. The Postgres compiler normalised both; another driver's
  * destructured the param directly, so an array of tuples bound `op` to a tuple,
  * matched no operator, and dropped every condition on that field — a filtered
  * read answering 200 with the whole collection. This is the one reading both

@@ -510,7 +510,7 @@ describe("ensureTables refuses to report success it did not have", () => {
     });
 
     it("returns null for a driver with no SQL at all", () => {
-        // Mongo. The surface declines to mount rather than half-mounting.
+        // A custom driver. The surface declines to mount rather than half-mounting.
         expect(createOAuthStore({ admin: undefined })).toBeNull();
     });
 });

@@ -2,8 +2,7 @@
  * Database Abstraction Interfaces
  *
  * These interfaces define the contracts that any database backend must implement
- * to be used with Rebase. This allows for pluggable database backends like
- * PostgreSQL, MongoDB, MySQL, etc.
+ * to be used with Rebase. This package is their Postgres implementation.
  */
 
 import {

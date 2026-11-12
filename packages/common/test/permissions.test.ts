@@ -581,15 +581,14 @@ status: "draft" });
          * `supportsRLS` says *who* enforces a rule, not *whether* it holds. The
          * capability gate that used to sit at the top of `checkOperation`
          * discarded the rules for any collection carrying an engine whose
-         * capabilities report `supportsRLS: false` — which is every call site in
-         * the MongoDB driver, all of which pass `onUnknown: "deny"` and were
-         * never reached.
+         * capabilities report `supportsRLS: false` — Firestore's, here — so a
+         * caller passing `onUnknown: "deny"` was never reached.
          */
-        // `makeCollection`'s collection, on the Mongo arm of the union:
+        // `makeCollection`'s collection, on the Firestore arm of the union:
         // `checkOperation` reads `securityRules` and the engine tag and nothing
         // else, so this stays comparable with the tests above it.
-        function mongoCollection(securityRules: SecurityRule[]): CollectionConfig {
-            return { name: "Products", slug: "products", engine: "mongodb", properties: {}, securityRules };
+        function firestoreCollection(securityRules: SecurityRule[]): CollectionConfig {
+            return { name: "Products", slug: "products", engine: "firestore", properties: {}, securityRules };
         }
 
         const ownerRule: SecurityRule[] = [
@@ -597,36 +596,36 @@ status: "draft" });
 ownerField: "owner_id" } as SecurityRule
         ];
 
-        it("evaluates the rules of a `engine: \"mongodb\"` collection", () => {
-            const col = mongoCollection(ownerRule);
+        it("evaluates the rules of a `engine: \"firestore\"` collection", () => {
+            const col = firestoreCollection(ownerRule);
             const auth = makeAuthController({ uid: "u1" });
             expect(canEditEntity(col, auth, "products", makeEntity({ owner_id: "someone-else" }))).toBe(false);
             expect(canDeleteEntity(col, auth, "products", makeEntity({ owner_id: "someone-else" }))).toBe(false);
         });
 
         it("still grants the owner — the rule has to discriminate", () => {
-            const col = mongoCollection(ownerRule);
+            const col = firestoreCollection(ownerRule);
             const auth = makeAuthController({ uid: "u1" });
             expect(canEditEntity(col, auth, "products", makeEntity({ owner_id: "u1" }))).toBe(true);
         });
 
         /**
-         * The behaviour used to flip on spelling: `driver: "mongodb"` leaves
+         * The behaviour used to flip on spelling: `driver: "firestore"` leaves
          * `engine` undefined, which resolved to the Postgres capabilities and
          * *did* evaluate the rules. Configuring the collection the documented
          * way was what removed the enforcement.
          */
-        it("answers the same for `engine: \"mongodb\"` and the legacy `driver` spelling", () => {
+        it("answers the same for `engine: \"firestore\"` and the legacy `driver` spelling", () => {
             const auth = makeAuthController({ uid: "u1" });
             const entity = makeEntity({ owner_id: "someone-else" });
-            const byEngine = mongoCollection(ownerRule);
-            // `driver` is the deprecated spelling and is not on the Mongo
+            const byEngine = firestoreCollection(ownerRule);
+            // `driver` is the deprecated spelling and is not on the Firestore
             // config type at all — which is precisely why it used to leave
             // `engine` undefined and pick up Postgres capabilities. A cast
             // is the only way to express the shape a real
             // 0.12-era config still has on disk. Deliberately invalid, then.
             const byDriver = { ...makeCollection(ownerRule),
-driver: "mongodb" } as never;
+driver: "firestore" } as never;
             expect(canEditEntity(byEngine, auth, "products", entity))
                 .toBe(canEditEntity(byDriver, auth, "products", entity));
         });

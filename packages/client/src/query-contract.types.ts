@@ -163,7 +163,7 @@ export const fluentIsNull = (qb: SDKQueryBuilderInterface<ContractRow>) =>
 export const fluentDynamicOp = (qb: SDKQueryBuilderInterface<ContractRow>, op: WhereFilterOp) =>
     qb.where("title", op, "anything");
 
-/** Two conditions on one column: the shape the Mongo compiler used to drop. */
+/** Two conditions on one column: a shape a filter compiler once dropped. */
 export const fluentRange = (qb: SDKQueryBuilderInterface<ContractRow>) =>
     qb.where("age", ">=", 18).where("age", "<", 65);
 

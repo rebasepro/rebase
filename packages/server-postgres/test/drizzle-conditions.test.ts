@@ -1088,8 +1088,8 @@ describe("DrizzleConditionBuilder - Filter Operators", () => {
         });
 
         // The grammar `FilterValues` declares — one tuple, or an array of them —
-        // is read through the shared `toFilterTuples` now, because the Mongo
-        // compiler was reading it a second way and dropping both conditions.
+        // is read through the shared `toFilterTuples` now, because another
+        // driver's compiler was reading it a second way and dropping both conditions.
         // This pins the Postgres side of that contract, which had no test.
         it("compiles an array of tuples on one field into every condition", () => {
             const conditions = DrizzleConditionBuilder.buildFilterConditions(

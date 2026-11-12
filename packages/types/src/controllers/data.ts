@@ -1305,7 +1305,7 @@ export const BATCH_REF_KEY = "$ref";
  *
  * Except on a `map` (pass `propertyType`): a map's value is a JSON document,
  * and one may legitimately carry `$` keys — a JSON Schema's `$schema`, a
- * MongoDB-style export. There, only a single-key object whose key is one of
+ * document exported from another database. There, only a single-key object whose key is one of
  * {@link FIELD_OPERATORS} is an operation, and anything else is data. A caller
  * that does not know the property type gets the strict reading.
  *

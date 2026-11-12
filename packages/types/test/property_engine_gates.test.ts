@@ -19,21 +19,22 @@
  *
  * What the gates are:
  *
- * | | Postgres | Firestore | MongoDB |
- * |---|---|---|---|
- * | `relation` property | yes | no | no |
- * | `reference` property | no | yes | yes |
- * | `columnType` / `columnName` | yes | no | no |
- * | `vector` property | yes | no | no |
- * | `table`, `relations`, `disableDefaultPolicies` | yes | no | no |
- * | `securityRules` | yes (RLS) | no | yes (query filter) |
+ * | | Postgres | Firestore |
+ * |---|---|---|
+ * | `relation` property | yes | no |
+ * | `reference` property | no | yes |
+ * | `columnType` / `columnName` | yes | no |
+ * | `vector` property | yes | no |
+ * | `table`, `relations`, `disableDefaultPolicies` | yes | no |
+ * | `securityRules` | yes (RLS) | declared, not enforced |
+ *
+ * There is no third engine: MongoDB support was removed, and `engine:
+ * "mongodb"` is no longer a member of the `CollectionConfig` union.
  */
 import type {
     CollectionConfig,
     FirebaseCollectionConfig,
     FirebaseProperties,
-    MongoDBCollectionConfig,
-    MongoProperties,
     PostgresCollectionConfig,
     PostgresProperties,
     ReferenceProperty,
@@ -98,30 +99,6 @@ describe("engine gates — property primitives", () => {
         };
         expect(properties).toBeDefined();
     });
-
-    it("MongoDB takes `reference`, not `relation`", () => {
-        const col: MongoDBCollectionConfig = {
-            slug: "mongo_test",
-            name: "Mongo Test",
-            engine: "mongodb",
-            properties: {
-                author: { name: "Author", type: "reference", path: "authors" }
-            }
-        };
-        expect(col.properties.author.type).toBe("reference");
-
-        const relProp: RelationProperty = {
-            name: "Author",
-            type: "relation",
-            relation: { kind: "belongsTo", target: () => authorsCollection }
-        };
-        const properties: MongoProperties = {
-            title: { name: "Title", type: "string" },
-            // @ts-expect-error — MongoDB has no joins
-            author_rel: relProp
-        };
-        expect(properties).toBeDefined();
-    });
 });
 
 describe("engine gates — vectors", () => {
@@ -133,16 +110,12 @@ describe("engine gates — vectors", () => {
         expect(properties.embedding.type).toBe("vector");
     });
 
-    it("the document engines do not — pgvector is the only implementation", () => {
+    it("Firestore does not — pgvector is the only implementation", () => {
         const fs: FirebaseProperties = {
             // @ts-expect-error — `supportsVectors` is false for Firestore
             embedding: { name: "Embedding", type: "vector", dimensions: 1536 }
         };
-        const mongo: MongoProperties = {
-            // @ts-expect-error — `supportsVectors` is false for MongoDB
-            embedding: { name: "Embedding", type: "vector", dimensions: 1536 }
-        };
-        expect([fs, mongo]).toHaveLength(2);
+        expect(fs).toBeDefined();
     });
 });
 
@@ -170,22 +143,10 @@ describe("engine gates — column fields", () => {
         expect([properties, renamed]).toHaveLength(2);
     });
 
-    it("MongoDB properties do not", () => {
-        const properties: MongoProperties = {
-            // @ts-expect-error — MongoDB has no columns; `supportsColumnTypes` is false
-            count: { name: "Count", type: "number", columnType: "bigserial" }
-        };
-        const renamed: MongoProperties = {
-            // @ts-expect-error — nothing derives a column name for MongoDB
-            title: { name: "Title", type: "string", columnName: "legacy_col" }
-        };
-        expect([properties, renamed]).toHaveLength(2);
-    });
-
     it("the omit distributes, so `type` still narrows", () => {
         // A non-distributive Omit collapses the union and widens the
         // discriminant, which would make this switch unreachable.
-        const p: MongoProperties[string] = { name: "Title", type: "string" };
+        const p: FirebaseProperties[string] = { name: "Title", type: "string" };
         if (p.type === "string") {
             const s: Omit<StringProperty, "columnType" | "columnName"> = p;
             expect(s.type).toBe("string");
@@ -208,36 +169,8 @@ describe("engine gates — collection fields", () => {
         expect(c.table).toBe("orders");
     });
 
-    it("MongoDB carries none of the three", () => {
-        const withTable: MongoDBCollectionConfig = {
-            slug: "orders",
-            name: "Orders",
-            engine: "mongodb",
-            properties: {},
-            // @ts-expect-error — MongoDB has no tables
-            table: "orders"
-        };
-        const withRelations: MongoDBCollectionConfig = {
-            slug: "orders",
-            name: "Orders",
-            engine: "mongodb",
-            properties: {},
-            // @ts-expect-error — MongoDB has no joins
-            relations: []
-        };
-        const withOptOut: MongoDBCollectionConfig = {
-            slug: "orders",
-            name: "Orders",
-            engine: "mongodb",
-            properties: {},
-            // @ts-expect-error — nothing injects default policies for MongoDB
-            disableDefaultPolicies: true
-        };
-        expect([withTable, withRelations, withOptOut]).toHaveLength(3);
-    });
-
-    it("Firestore carries none of the three either", () => {
-        const c: FirebaseCollectionConfig = {
+    it("Firestore carries none of the three", () => {
+        const withTable: FirebaseCollectionConfig = {
             slug: "events",
             name: "Events",
             engine: "firestore",
@@ -245,14 +178,30 @@ describe("engine gates — collection fields", () => {
             // @ts-expect-error — Firestore has no tables
             table: "events"
         };
-        expect(c.slug).toBe("events");
+        const withRelations: FirebaseCollectionConfig = {
+            slug: "events",
+            name: "Events",
+            engine: "firestore",
+            properties: {},
+            // @ts-expect-error — Firestore has no joins
+            relations: []
+        };
+        const withOptOut: FirebaseCollectionConfig = {
+            slug: "events",
+            name: "Events",
+            engine: "firestore",
+            properties: {},
+            // @ts-expect-error — nothing injects default policies for Firestore
+            disableDefaultPolicies: true
+        };
+        expect([withTable, withRelations, withOptOut]).toHaveLength(3);
     });
 
-    it("securityRules stay driver-agnostic — MongoDB enforces them as a query filter", () => {
-        const c: MongoDBCollectionConfig = {
-            slug: "orders",
-            name: "Orders",
-            engine: "mongodb",
+    it("securityRules stay declared on the shared base, whatever the engine", () => {
+        const c: FirebaseCollectionConfig = {
+            slug: "events",
+            name: "Events",
+            engine: "firestore",
             properties: {},
             securityRules: [{ ownerField: "user_id" }]
         };
@@ -262,7 +211,7 @@ describe("engine gates — collection fields", () => {
 
 describe("the CollectionConfig union", () => {
 
-    it("admits all three engines", () => {
+    it("admits Postgres and Firestore", () => {
         const pgCol: PostgresCollectionConfig = {
             slug: "pg",
             name: "PG",
@@ -275,14 +224,19 @@ describe("the CollectionConfig union", () => {
             engine: "firestore",
             properties: { title: { name: "Title", type: "string" } }
         };
-        const mongoCol: MongoDBCollectionConfig = {
+
+        const collections: CollectionConfig[] = [pgCol, fsCol];
+        expect(collections).toHaveLength(2);
+    });
+
+    it("no longer admits a MongoDB collection", () => {
+        const retired: CollectionConfig = {
             slug: "mongo",
             name: "Mongo",
+            // @ts-expect-error — MongoDB support was removed; Postgres is the only server engine
             engine: "mongodb",
             properties: { title: { name: "Title", type: "string" } }
         };
-
-        const collections: CollectionConfig[] = [pgCol, fsCol, mongoCol];
-        expect(collections).toHaveLength(3);
+        expect(retired.slug).toBe("mongo");
     });
 });

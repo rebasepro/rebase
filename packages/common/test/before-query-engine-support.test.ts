@@ -6,24 +6,22 @@ import { assertBeforeQueryIsPostgresOnly } from "../src/index";
  *
  * Only `@rebasepro/server-postgres` compiles the hook into the read. On any
  * other engine it would look configured and narrow nothing, and a row filter
- * that narrows nothing serves every row to everybody. Both drivers call this —
- * the Postgres planner for a mixed app, the Mongo bootstrapper for a Mongo-only
- * one — so it is tested here, once, rather than through either.
+ * that narrows nothing serves every row to everybody. The Postgres planner calls
+ * this for a mixed app, so it is tested here, once, rather than through it.
  */
 const scoped: CollectionCallbacks = { beforeQuery: () => undefined };
 
-type Engine = "postgres" | "firestore" | "mongodb";
+type Engine = "postgres" | "firestore";
 
 /** A collection on `engine` (none means Postgres) carrying `callbacks`. */
 function collection(slug: string, { engine, callbacks }: { engine?: Engine; callbacks?: CollectionCallbacks } = {}): CollectionConfig {
     const base = { slug, name: slug, properties: {}, callbacks };
     if (engine === "firestore") return { ...base, engine };
-    if (engine === "mongodb") return { ...base, engine };
     return { ...base, engine };
 }
 
 describe("assertBeforeQueryIsPostgresOnly", () => {
-    it.each<Engine>(["mongodb", "firestore"])("refuses a hook on a %s collection, naming it and the engine", engine => {
+    it.each<Engine>(["firestore"])("refuses a hook on a %s collection, naming it and the engine", engine => {
         expect(() => assertBeforeQueryIsPostgresOnly([collection("events", { engine, callbacks: scoped })]))
             .toThrow(new RegExp(`events\\.callbacks\\.beforeQuery.*served by \`${engine}\``));
     });
@@ -41,14 +39,14 @@ describe("assertBeforeQueryIsPostgresOnly", () => {
         // `afterRead` works on every engine; only the hook that narrows a read
         // before it is compiled is engine-bound.
         expect(() => assertBeforeQueryIsPostgresOnly([
-            collection("events", { engine: "mongodb", callbacks: { afterRead: ({ row }) => row } })
+            collection("events", { engine: "firestore", callbacks: { afterRead: ({ row }) => row } })
         ])).not.toThrow();
     });
 
     it("checks every collection, not only the first", () => {
         expect(() => assertBeforeQueryIsPostgresOnly([
             collection("docs", { callbacks: scoped }),
-            collection("events", { engine: "mongodb", callbacks: scoped })
+            collection("events", { engine: "firestore", callbacks: scoped })
         ])).toThrow(/events/);
     });
 });

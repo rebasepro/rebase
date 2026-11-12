@@ -35,7 +35,7 @@ describe("findUnparseableParams", () => {
     });
 
     it("ignores non-Postgres URLs", () => {
-        expect(findUnparseableParams("mongodb://h:27017/db?a=b=c")).toEqual([]);
+        expect(findUnparseableParams("mysql://h:3306/db?a=b=c")).toEqual([]);
     });
 
     it("reports every offending parameter, not just the first", () => {

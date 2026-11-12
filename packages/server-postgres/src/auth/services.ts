@@ -79,9 +79,8 @@ function getColumn(table: RebasePgTable | undefined, ...keys: string[]): RebaseP
  * Whitespace goes too: a trailing space survives the fold and reproduces the
  * problem exactly.
  *
- * Re-exported rather than defined here: `@rebasepro/server` and
- * `@rebasepro/server-mongo` write this column too, and a second copy of this
- * rule is the defect it exists to prevent.
+ * Re-exported rather than defined here: `@rebasepro/server` writes this column
+ * too, and a second copy of this rule is the defect it exists to prevent.
  */
 import { normalizeEmail } from "@rebasepro/common";
 import type { PgSqlDatabase } from "../interfaces";

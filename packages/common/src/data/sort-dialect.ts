@@ -71,8 +71,8 @@ export function primaryOrderBy(orderBy?: OrderBySpec): OrderByTuple | undefined 
  *
  * An absent direction means ascending — the same thing a bare `?orderBy=name`
  * has always meant over HTTP. The Postgres driver used to read the same pair as
- * *descending* while Mongo read it as ascending, so one field name and no
- * direction described two different queries depending on which database was
+ * *descending* while another driver read it as ascending, so one field name and
+ * no direction described two different queries depending on which database was
  * underneath. Neither had a caller: every path in the workspace passes a
  * direction, which is why the disagreement went unnoticed rather than being
  * load-bearing.

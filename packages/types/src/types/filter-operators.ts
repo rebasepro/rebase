@@ -32,9 +32,8 @@
  * └──────────────────────┴───────────────┴──────────────────────────────┘
  *
  * Pattern matching (`like`/`ilike`) uses SQL wildcard syntax: `%` matches any
- * sequence of characters, `_` matches a single character. On MongoDB these are
- * translated to anchored regular expressions; Firestore has no native pattern
- * matching and rejects these operators (use `searchString` instead).
+ * sequence of characters, `_` matches a single character. Firestore has no
+ * native pattern matching and rejects these operators (use `searchString` instead).
  *
  * @module
  */

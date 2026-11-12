@@ -18,8 +18,8 @@
  *    reads the top level of the collections directory only — no recursion, no
  *    `index`, no tests, no declarations. A file it does not read cannot change
  *    what it returns, and the watcher must not claim otherwise.
- * 2. **Every collection in it is served by another engine.** A Firestore or
- *    MongoDB collection has no table, no migration and no policies.
+ * 2. **Every collection in it is served by another engine.** A Firestore
+ *    collection has no table, no migration and no policies.
  *
  * The engine check reads the source text rather than importing the module: the
  * CLI runs as plain Node and cannot evaluate a project's TypeScript, and a

@@ -724,7 +724,7 @@ export type AdminCollection<
  * Flatten the admin block onto one member of the collection union at a time.
  *
  * `CollectionConfig` is a union discriminated on `engine`
- * (Postgres | Firestore | MongoDB), and a bare `Omit<Union, "admin">` collapses it
+ * (Postgres | Firestore), and a bare `Omit<Union, "admin">` collapses it
  * into a single object type with the discriminant widened. The result stops being
  * assignable back to `CollectionConfig`, so every call that hands a resolved
  * collection to a core function fails — which is exactly what happened. The

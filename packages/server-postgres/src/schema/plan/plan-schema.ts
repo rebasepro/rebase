@@ -654,7 +654,7 @@ export function planSchema(allCollections: CollectionConfig[], options: PlanOpti
     // does nothing is a row filter that does nothing.
     assertBeforeQueryIsPostgresOnly(allCollections);
 
-    // A Firestore or MongoDB collection has no table here, and generating one
+    // A Firestore collection has no table here, and generating one
     // is not merely wasted output: `db push` would create it, and the doctor
     // would then report the store the collection actually reads from as drift.
     const relational = relationalCollections(allCollections);

@@ -3,7 +3,7 @@ import { ALL_WHERE_FILTER_OPS, WhereFilterOp } from "./filter-operators";
 /**
  * Describes the capabilities and features supported by a data source (driver).
  *
- * Each driver (Postgres, Firebase, MongoDB, etc.) declares which features it
+ * Each driver (Postgres, Firebase, etc.) declares which features it
  * supports. The admin uses this descriptor to:
  * - Show/hide editor tabs (e.g. Relations for SQL, Subcollections for Firebase)
  * - Filter the property type picker (e.g. `relation` for SQL, `reference` for Firebase)
@@ -12,7 +12,7 @@ import { ALL_WHERE_FILTER_OPS, WhereFilterOp } from "./filter-operators";
  * @group Models
  */
 export interface DataSourceCapabilities {
-    /** Unique driver key (e.g. "postgres", "firestore", "mongodb") */
+    /** Unique driver key (e.g. "postgres", "firestore") */
     key: string;
 
     /** Human-readable label for the UI (e.g. "PostgreSQL", "Firebase / Firestore") */
@@ -119,9 +119,6 @@ export interface DataSourceCapabilities {
     /** Does this source support SQL admin operations (SQL editor, EXPLAIN, etc.)? */
     supportsSQLAdmin: boolean;
 
-    /** Does this source support document admin operations (aggregation, stats)? */
-    supportsDocumentAdmin: boolean;
-
     /** Does this source support schema admin (unmapped tables, table metadata)? */
     supportsSchemaAdmin: boolean;
 }
@@ -146,8 +143,7 @@ export const DEFAULT_DATA_SOURCE_KEY = "(default)";
  *
  * - `"server"` — through the Rebase backend (the `RebaseClient`). The backend
  *   holds the actual database adapter and routes by data-source key. This is
- *   the default and covers Postgres, MongoDB, and any other server-mediated
- *   engine.
+ *   the default and covers Postgres, the only server engine.
  * - `"direct"` — straight from the client to the external backend via its own
  *   SDK driver (e.g. Firestore). The Rebase backend is not in the data path.
  * - `"custom"` — a developer-supplied {@link DataDriver}, transport unspecified.
@@ -175,7 +171,7 @@ export interface DataSourceDefinition {
     key: string;
 
     /**
-     * The engine backing this data source (e.g. `"postgres"`, `"mongodb"`,
+     * The engine backing this data source (e.g. `"postgres"`,
      * `"firestore"`, or a custom id). Determines the
      * {@link DataSourceCapabilities} surfaced in the editor.
      */
@@ -250,7 +246,6 @@ export const POSTGRES_CAPABILITIES: DataSourceCapabilities = {
     supportsRelationFieldFilters: true,
     relationAggregateSorts: true,
     supportsSQLAdmin: true,
-    supportsDocumentAdmin: false,
     supportsSchemaAdmin: true
 };
 
@@ -277,28 +272,7 @@ export const FIREBASE_CAPABILITIES: DataSourceCapabilities = {
     supportsRelationFieldFilters: false,
     relationAggregateSorts: false,
     supportsSQLAdmin: false,
-    supportsDocumentAdmin: false,
     supportsSchemaAdmin: false
-};
-
-/** @group Models */
-export const MONGODB_CAPABILITIES: DataSourceCapabilities = {
-    key: "mongodb",
-    label: "MongoDB",
-    supportsRelations: false,
-    supportsSubcollections: true,
-    supportsRLS: false,
-    supportsReferences: true,
-    supportsColumnTypes: false,
-    supportsRealtime: false,
-    supportsVectors: false,
-    filterOperators: ALL_WHERE_FILTER_OPS,
-    filterableRelationKinds: [],
-    supportsRelationFieldFilters: false,
-    relationAggregateSorts: false,
-    supportsSQLAdmin: false,
-    supportsDocumentAdmin: true,
-    supportsSchemaAdmin: true
 };
 
 /**
@@ -329,14 +303,12 @@ export const DEFAULT_CAPABILITIES: DataSourceCapabilities = {
     supportsRelationFieldFilters: false,
     relationAggregateSorts: false,
     supportsSQLAdmin: true,
-    supportsDocumentAdmin: true,
     supportsSchemaAdmin: true
 };
 
 const BUILT_IN_CAPABILITIES: ReadonlyMap<string, DataSourceCapabilities> = new Map([
     ["postgres", POSTGRES_CAPABILITIES],
     ["firestore", FIREBASE_CAPABILITIES],
-    ["mongodb", MONGODB_CAPABILITIES],
     ["(default)", DEFAULT_CAPABILITIES]
 ]);
 

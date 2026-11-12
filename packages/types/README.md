@@ -89,6 +89,5 @@ Every `@rebasepro/*` package depends on this one. Key consumers:
 |---------|------|
 | `@rebasepro/server` | `DataDriver`, `DatabaseAdapter`, `BackendBootstrapper`, `AuthAdapter` |
 | `@rebasepro/server-postgres` | `BackendBootstrapper`, `InitializedDriver`, `RealtimeProvider` |
-| `@rebasepro/server-mongo` | `BackendBootstrapper`, `DataDriver`, `CollectionConfig` |
 | `@rebasepro/client` | `RebaseClient`, `StorageSource` |
 | `@rebasepro/cms` | `CollectionConfig`, `Property`, controller interfaces |

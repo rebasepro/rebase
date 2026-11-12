@@ -18,11 +18,6 @@ describe("resolveFilterOperators", () => {
             expect(ops).toEqual(expect.arrayContaining(["like", "ilike", "not-like", "not-ilike"]));
         });
 
-        it("offers the LIKE family on mongodb (regex-backed)", () => {
-            const ops = resolveFilterOperators({ property: stringProp(), engine: "mongodb" });
-            expect(ops).toEqual(expect.arrayContaining(["like", "ilike"]));
-        });
-
         it("never offers the LIKE family on firestore", () => {
             const ops = resolveFilterOperators({ property: stringProp(), engine: "firestore" });
             expect(ops).not.toEqual(expect.arrayContaining(["like"]));
@@ -213,7 +208,7 @@ describe("resolveFilterOperators", () => {
             for (const kind of ["belongsTo", "manyToMany", "hasMany", "hasOne"]) {
                 expect(resolveFilterOperators({ property: relationProp({ kind, target: () => ({}) }), engine: "postgres" }))
                     .not.toEqual([]);
-                for (const engine of ["firestore", "mongodb"]) {
+                for (const engine of ["firestore"]) {
                     expect(resolveFilterOperators({ property: relationProp({ kind, target: () => ({}) }), engine }))
                         .toEqual([]);
                 }

@@ -160,7 +160,7 @@ function evaluateCompare(
     const b = r.value;
 
     // An absent value is NULL too. A document that never had the field — a
-    // MongoDB row, a create that did not mention it — reads `undefined` here,
+    // Firestore document, a create that did not mention it — reads `undefined` here,
     // and the column it stands for is NULL. Both spellings of "no value" get
     // the same answer, so `owner != uid` grants a row with no owner neither
     // when the owner is null nor when it is missing, and two missing fields

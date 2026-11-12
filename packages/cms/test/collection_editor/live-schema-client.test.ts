@@ -6,8 +6,8 @@
  * is largely to keep three different unhappy outcomes distinguishable:
  *
  * - the change is **refused** — the user needs to read why, and what to do;
- * - the feature is **unavailable** — a Mongo backend, or a bundle deployment
- *   with no source. Nothing about the change is wrong;
+ * - the feature is **unavailable** — a backend whose driver cannot plan a
+ *   schema change, or a bundle deployment with no source. Nothing about the change is wrong;
  * - the request **broke** — everything else.
  *
  * Collapsing the second into the first would tell somebody their perfectly good

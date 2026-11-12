@@ -12,9 +12,6 @@
  * - a session authenticated through an `AuthAdapter` never read the flag at
  *   all, so its subscriptions lost it too.
  *
- * The Mongo half, where every socket door had the same gap, is
- * `packages/server-mongo/test/guest-identity-e2e.test.ts`.
- *
  * A real Postgres as a superuser with `rebase_user` provisioned, the real socket
  * handler on a real HTTP server, a raw `ws` client, and real tokens.
  *

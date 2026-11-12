@@ -68,7 +68,7 @@ describe("the null checkbox on a relation filter", () => {
 
     it("emits `is-null`, not a null paired with the selected operator", () => {
         // The to-many default operator is `in`, and `["in", null]` is not
-        // portable — Postgres dropped it and Mongo rejects `$in: null`.
+        // portable — Postgres dropped it and the Firestore SDK rejects it.
         // `is-null` is an operator every driver implements outright.
         const setValue = renderField(manyToMany);
         fireEvent.click(screen.getByRole("checkbox"));

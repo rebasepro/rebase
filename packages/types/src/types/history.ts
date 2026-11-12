@@ -1,16 +1,13 @@
 /**
  * Entity change history — the shape a history entry has on the wire.
  *
- * This was declared three times: once in `@rebasepro/server-postgres`, once in
- * `@rebasepro/server-mongo`, and once again in the admin's `useHistory` hook.
- * The two driver copies disagreed on the one field that matters for a consumer,
- * `updated_at`, which was a `string` in Postgres and a `Date` in MongoDB — so
- * nothing could read history without first choosing a driver.
+ * This was declared once per driver and once again in the admin's `useHistory`
+ * hook, and the copies disagreed on the one field that matters for a consumer,
+ * `updated_at` — so nothing could read history without first choosing a driver.
  *
  * The contract is the wire shape, and on the wire it is an ISO-8601 string.
- * A driver whose stored document differs (MongoDB keeps a `Date` and an
- * `ObjectId`) declares that storage row for itself and maps to this on the way
- * out; it is not the shared type.
+ * A driver whose stored row differs declares that storage row for itself and
+ * maps to this on the way out; it is not the shared type.
  *
  * @group Backend
  */
@@ -21,7 +18,7 @@
  */
 export interface EntityHistoryEntry {
     id: string;
-    /** The table (Postgres) or collection (MongoDB) the row belongs to. */
+    /** The table the row belongs to. */
     table_name: string;
     /** The row's id, as a string regardless of its native type. */
     entity_id: string;

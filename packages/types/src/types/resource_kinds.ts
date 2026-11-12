@@ -41,6 +41,12 @@ registerResourceKind({
     // throwing. Corrections still go in the amendment below; this number moves
     // only when the literal itself has to, and every published copy predating the
     // move is thereby handled.
+    //
+    // The same goes for `engines`. Only "postgres" has a server driver — MongoDB
+    // support was removed after 0.30.1 — but "mongodb" stays in this list because
+    // removing it is an edit to the literal every published copy compares. The
+    // server refuses a `database()` declared with an engine it has no driver
+    // for, naming the engine, so the stale entry cannot be booted.
     revision: 1,
     kind: "database",
     engines: ["postgres", "mongodb", "firestore", "sqlite"],

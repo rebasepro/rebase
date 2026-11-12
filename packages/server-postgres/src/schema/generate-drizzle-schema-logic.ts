@@ -32,7 +32,7 @@ export const generateSchema = (
     allCollections: CollectionConfig[],
     options: DrizzleRenderOptions = {}
 ): string => {
-    // A Firestore or MongoDB collection has no table to generate, and
+    // A Firestore collection has no table to generate, and
     // generating one for it is not merely wasted output: `db push` would create
     // it, and `rebase doctor` would then report the store the collection
     // actually reads from as drift.

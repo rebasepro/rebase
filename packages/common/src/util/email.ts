@@ -16,9 +16,9 @@
  * `.email()` happens to reject surrounding whitespace — a guard on a different
  * layer, for a different reason, that the admin paths do not sit behind.
  *
- * It lives in `common` because `server`, `server-postgres` and `server-mongo`
- * all write this column and must agree exactly, and `common` is the only
- * package all three already depend on.
+ * It lives in `common` because `server` and `server-postgres` both write this
+ * column and must agree exactly, and `common` is the package both already
+ * depend on.
  */
 
 /**

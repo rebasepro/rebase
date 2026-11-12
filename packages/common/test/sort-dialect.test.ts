@@ -126,7 +126,7 @@ describe("sort-dialect — multi-key", () => {
 
         it("reads a missing direction as ascending", () => {
             // This is the disagreement the pair used to hide: Postgres read a
-            // bare field name as DESC and Mongo read it as ASC, so one call
+            // bare field name as DESC and another driver read it as ASC, so one call
             // described two different queries depending on the database
             // underneath. `?orderBy=name` over HTTP has always meant ascending.
             expect(normalizeDriverOrderBy("name")).toEqual([["name", "asc"]]);

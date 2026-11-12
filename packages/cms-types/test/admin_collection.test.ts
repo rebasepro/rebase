@@ -486,8 +486,8 @@ describe("property keys are checked against the property's own type", () => {
 
     // Where the error lands is the assertion. Under the three overloads it
     // landed on `defineCollection(` — one TS2769 for the whole call, listing
-    // `FirebaseCollectionConfig` and `MongoDBCollectionConfig` at an author who
-    // had named neither engine. A directive on the key's own line only compiles
+    // the other engines' config types at an author who had named none of
+    // them. A directive on the key's own line only compiles
     // if the error is reported *there*, which is what makes this a test.
     it("reports an unknown key on the key, not on the call", () => {
         defineCollection({
@@ -561,8 +561,8 @@ describe("property keys are checked against the property's own type", () => {
  * revealed the second only after the first was fixed.
  *
  * On top of that it was three overloads, so a failed call produced exactly one
- * diagnostic naming `FirebaseCollectionConfig` and `MongoDBCollectionConfig` at
- * an author who had mentioned neither.
+ * diagnostic naming the other engines' config types at an author who had
+ * mentioned none of them.
  *
  * `P` is unconstrained now — exactness and the engine gate moved into
  * `StrictProperties`, and the value check into a second, non-inferring

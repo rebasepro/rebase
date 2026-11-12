@@ -20,8 +20,7 @@ import { recordingDb } from "./helpers/spg-c-db";
  * fetch A, B arrives while A is in flight, B's timer fires 300ms later and
  * starts fetch B regardless. The pre-await `has(subscriptionId)` check the
  * refetches ran answers neither that nor an unsubscribe *during* the fetch.
- * Class 44 in `docs/bug-classes.md`; the MongoDB half is
- * `packages/server-mongo/test/realtime-delivery-order.test.ts`.
+ * Class 44 in `docs/bug-classes.md`.
  *
  * Deferred fetches rather than timing: the interleaving is chosen here, so
  * nothing depends on which one a real database would win. The seam is the two
@@ -29,7 +28,7 @@ import { recordingDb } from "./helpers/spg-c-db";
  * deliveries sit behind — the injected driver is not it (`fetchCollectionWithAuth`
  * reads through a `DataService` built over the transaction).
  *
- * Unlike MongoDB, there is no synchronous delivery here: a deletion arrives as
+ * There is no synchronous delivery here: a deletion arrives as
  * a notification like any other and is answered by a refetch that finds no row,
  * so it claims a slot the ordinary way.
  */

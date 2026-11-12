@@ -2,7 +2,6 @@ import {
     CollectionConfig,
     PostgresCollectionConfig,
     FirebaseCollectionConfig,
-    MongoDBCollectionConfig,
     ReferenceProperty,
     RelationProperty,
     StringProperty,
@@ -11,8 +10,8 @@ import {
 import { CollectionRegistry } from "../src/collections/CollectionRegistry";
 
 /**
- * These fixtures used to declare the engine as `driver: "firestore"` /
- * `driver: "mongodb"`. There is no `driver` field — the discriminant is
+ * These fixtures used to declare the engine as `driver: "firestore"`. There is
+ * no `driver` field — the discriminant is
  * `engine` — so every one of them resolved to the default Postgres engine and
  * no engine gate was ever crossed. The file was not in `tsconfig.tests.json`,
  * so nothing caught it. Each test now asserts the resolved engine and its
@@ -96,37 +95,7 @@ type: "string" },
         expect(refProp.path).toBe("users");
     });
 
-    it("registers and retrieves a MongoDB collection with reference properties", () => {
-        const mongoCollection: MongoDBCollectionConfig = {
-            name: "Comments",
-            slug: "comments",
-            engine: "mongodb",
-            properties: {
-                body: { name: "Body",
-type: "string" },
-                post: {
-                    name: "Post",
-                    type: "reference",
-                    path: "posts"
-                }
-            }
-        };
-
-        const registry = new CollectionRegistry([mongoCollection]);
-
-        const result = registry.get("comments");
-        expect(result).toBeDefined();
-        expect(result!.engine).toBe("mongodb");
-        const capabilities = getDataSourceCapabilities(result!.engine);
-        expect(capabilities.supportsReferences).toBe(true);
-        expect(capabilities.supportsRelations).toBe(false);
-        expect(result!.properties.body.type).toBe("string");
-        expect(result!.properties.post.type).toBe("reference");
-        const refProp = result!.properties.post as ReferenceProperty;
-        expect(refProp.path).toBe("posts");
-    });
-
-    it("handles a mixed-engine registry with Postgres, Firestore, and MongoDB collections", () => {
+    it("handles a mixed-engine registry with Postgres and Firestore collections", () => {
         const pgCol: PostgresCollectionConfig = {
             name: "Users",
             slug: "users",
@@ -151,31 +120,16 @@ path: "users" }
             }
         };
 
-        const mongoCol: MongoDBCollectionConfig = {
-            name: "Logs",
-            slug: "logs",
-            engine: "mongodb",
-            properties: {
-                message: { name: "Message",
-type: "string" },
-                user: { name: "User",
-type: "reference",
-path: "users" }
-            }
-        };
-
-        const registry = new CollectionRegistry([pgCol, fsCol, mongoCol]);
+        const registry = new CollectionRegistry([pgCol, fsCol]);
 
         // Each collection keeps its own engine — registering them together does
         // not flatten them all onto the default.
         expect(registry.get("users")!.engine).toBe("postgres");
         expect(registry.get("docs")!.engine).toBe("firestore");
-        expect(registry.get("logs")!.engine).toBe("mongodb");
 
         // Verify engine-specific property types are preserved
         expect(registry.get("users")!.properties.email.type).toBe("string");
         expect(registry.get("docs")!.properties.owner.type).toBe("reference");
-        expect(registry.get("logs")!.properties.user.type).toBe("reference");
     });
 
     it("StringProperty does not carry a reference field", () => {

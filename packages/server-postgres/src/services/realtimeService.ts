@@ -1993,9 +1993,9 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
      * papered over ~300 ms later by the debounced refetch — after the bytes had
      * already reached the browser.
      *
-     * The same defect was found and fixed on the Mongo driver in `065e2b615`
-     * (see `packages/server-mongo/test/realtime-authorization.test.ts`); this is
-     * the Postgres half, stated as one rule rather than three patched branches.
+     * The same defect was found and fixed on another driver in `065e2b615`;
+     * this is the Postgres half, stated as one rule rather than three patched
+     * branches.
      *
      * The cost is the instant row-level patch that used to precede the refetch:
      * cross-tab feedback now waits for the debounce. That is the price of not
@@ -4361,7 +4361,6 @@ export function packEntityChanges(sid: string, changes: Array<{ p: string; eid: 
 }
 
 /**
- * Alias for RealtimeService for consistent naming with other database implementations.
- * This allows code to use PostgresRealtimeProvider alongside future MongoRealtimeProvider, etc.
+ * Alias for RealtimeService, named after the engine it serves.
  */
 export const PostgresRealtimeProvider = RealtimeService;

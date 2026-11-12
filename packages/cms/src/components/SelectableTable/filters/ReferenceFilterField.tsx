@@ -228,7 +228,7 @@ export function ReferenceFilterField({
                   * than pairing a null value with whatever operator is
                   * selected. Only the operator travels to the driver, and a
                   * null *operand* means different things to different ones —
-                  * Mongo rejects `$in: null` outright. See
+                  * the Firestore SDK rejects `in` with a null outright. See
                   * `nullFilterOperatorFor`.
                   */}
                 {!isArray && <Label

@@ -49,12 +49,21 @@ type: "string" } }
     });
 
     it("does not override an explicit engine", () => {
-        const coll = { ...firestoreColl, engine: "mongodb" } as CollectionConfig;
+        // The collection says Postgres outright; the definition it points at
+        // says Firestore. The collection's own word wins.
+        const coll: CollectionConfig = {
+            name: "Events",
+            slug: "events",
+            table: "events",
+            dataSource: "analytics",
+            engine: "postgres",
+            properties: { title: { name: "Title", type: "string" } }
+        };
         const registry = new CollectionRegistry(
             [coll],
             createDataSourceRegistry([{ key: "analytics", engine: "firestore", transport: "direct" }])
         );
-        expect(registry.get("events")?.engine).toBe("mongodb");
+        expect(registry.get("events")?.engine).toBe("postgres");
         expect(registry.get("events")?.dataSource).toBe("analytics");
     });
 });

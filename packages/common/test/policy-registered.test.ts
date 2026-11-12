@@ -87,8 +87,7 @@ describe("policy.registered()", () => {
     });
 
     /**
-     * `checkOperation` is what a caller with a user reaches: the Mongo driver
-     * for every row it holds (`fetchOne`, `save`, `delete`) and the admin UI for
+     * `checkOperation` is what a caller with a user reaches: the admin UI, for
      * what it offers. It built its context from `uid` and `roles` and left the
      * flag behind, so every guest it was handed was an account.
      */

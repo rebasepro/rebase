@@ -1,11 +1,11 @@
 /**
  * E2E: this driver's half of the `DataDriver.delete` contract.
  *
- * The rule is stated on the interface and checked by a kit both server drivers
- * run — see `packages/server/test/contract/delete-contract.ts` for why it lives
- * there rather than in either driver's suite. The short version: Mongo asserted
- * "should not throw for non-existent entity" and Postgres asserted a 404 for
- * the same call, both suites passed forever, and each described its own
+ * The rule is stated on the interface and checked by a kit the server driver
+ * runs — see `packages/server/test/contract/delete-contract.ts` for why it lives
+ * there rather than in the driver's suite. The short version: another driver
+ * asserted "should not throw for non-existent entity" and Postgres asserted a
+ * 404 for the same call, both suites passed forever, and each described its own
  * driver's habit rather than the contract.
  *
  * Against a real database rather than a mock, because the answer this pins

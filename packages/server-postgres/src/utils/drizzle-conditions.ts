@@ -92,9 +92,8 @@ export function listedColumnKeys(table: PgTable<any>, collection: CollectionConf
  *     the page limit does not bound it because the scan happens first.
  *
  * This is the server-side half of the pattern `like-pattern-redos.test.ts`
- * hardened the offline evaluator against; that test's own note ("the same
- * translation in the Mongo driver hands the expression to the database, where
- * it occupies a server thread instead") describes this call site.
+ * hardened the offline evaluator against: here the expression reaches the
+ * database, where it occupies a server process instead of a browser tab.
  *
  * Backslash is the default `ESCAPE` character for LIKE, and the pattern is
  * bound rather than interpolated, so a single backslash here reaches the
@@ -3207,8 +3206,7 @@ const isVectorColumn = (column: unknown): boolean =>
     /^(vector|halfvec|sparsevec)\b/.test(columnSqlType(column));
 
 /**
- * Alias for DrizzleConditionBuilder for consistent naming with other database implementations.
- * This allows code to use PostgresConditionBuilder alongside future MongoConditionBuilder, etc.
+ * Alias for DrizzleConditionBuilder, named after the engine it compiles for.
  */
 export const PostgresConditionBuilder = DrizzleConditionBuilder;
 

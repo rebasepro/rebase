@@ -67,8 +67,8 @@ export interface EntityDataOptions {
      * Translate the path a collection is addressed by into the path its driver
      * stores it under.
      *
-     * The admin addresses every collection by its slug, and a Firestore or
-     * MongoDB collection may declare a `path` of its own: `fs_diagnosis` stored
+     * The admin addresses every collection by its slug, and a Firestore
+     * collection may declare a `path` of its own: `fs_diagnosis` stored
      * at `diagnosis`, and `fs_diagnosis/abc/locales` at `diagnosis/abc/locales`.
      * Only the driver is handed the stored path. Rows keep the address they
      * were asked for by, because that is what the admin resolves their

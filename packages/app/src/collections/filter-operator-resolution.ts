@@ -46,7 +46,7 @@ const ARRAY_ITEM_FILTERABLE_TYPES: readonly DataType[] = ["string", "number", "d
  *
  * Which kinds those are is the *driver's* answer, not this function's, so it
  * comes from {@link DataSourceCapabilities.filterableRelationKinds}. The admin
- * is one UI over Postgres, MongoDB, Firestore and whatever a developer
+ * is one UI over Postgres, Firestore and whatever a developer
  * registers, and "a many-to-many compiles to an `EXISTS` over the junction" is
  * a fact about the Postgres driver — true today, and not the sort of thing to
  * assert on an engine's behalf.

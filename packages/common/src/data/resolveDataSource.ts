@@ -84,7 +84,7 @@ export function resolveDataSource(
  * "Owns the storage" means: something generates a table for it, pushes that
  * table to a database, plans its RLS policies, and reports it as drifted when
  * the two disagree. That is true of a Postgres collection and false of a
- * Firestore or MongoDB one, whose documents live in a store Rebase never
+ * Firestore one, whose documents live in a store Rebase never
  * migrates — and the two were never told apart. Every stage of the SQL
  * toolchain took "the collections" to mean *all* of them, so a Firestore
  * collection declared next to the Postgres ones got a `pgTable` in the

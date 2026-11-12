@@ -108,7 +108,7 @@ async function connectToApp(client: CloudClient, origin: string, projectId: stri
 /**
  * Report a failed call to the app. An older runtime has no guest routes, and
  * its 404 is about the route, not about a guest; a repository without them (a
- * self-hosted Mongo backend) answers 501.
+ * custom auth repository) answers 501.
  */
 function reportAppError(error: unknown, action: string, origin: string): never {
     if (error instanceof RebaseApiError) {
