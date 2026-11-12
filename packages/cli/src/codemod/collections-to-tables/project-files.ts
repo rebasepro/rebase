@@ -7,13 +7,14 @@
  * Arbitrary code is never rewritten. A file in the scaffold's known shape —
  * the `App.tsx`, `vite.config.ts` and `virtual.d.ts` `rebase init` writes — is
  * rewritten exactly; anything else is reported as a manual step with the
- * snippet to apply.
+ * snippet to apply. The Vite config gains `rebaseBackendGuard()` either way.
  */
 import fs from "node:fs";
 import path from "node:path";
 
 import type { PlanContext } from "./plan-context";
 import { note, planFile, relativeToRoot } from "./plan-context";
+import { BACKEND_GUARD_EXPORT, BACKEND_GUARD_SNIPPET } from "../../utils/backend-guard";
 
 type JsonObject = Record<string, unknown>;
 
@@ -349,23 +350,7 @@ export function planFrontendWiring(plan: PlanContext, frontendDir: string, hasEx
     }
 
     const viteFile = ["vite.config.ts", "vite.config.mts", "vite.config.js"].map(name => path.join(frontendDir, name)).find(candidate => fs.existsSync(candidate));
-    if (viteFile) {
-        const text = fs.readFileSync(viteFile, "utf8");
-        const pluginLine = /^[ \t]*rebaseCollectionsPlugin\(\{\s*collectionsDir:\s*["'][^"']*["']\s*\}\),?[ \t]*\r?\n/m;
-        if (pluginLine.test(text) && (text.match(/rebaseCollectionsPlugin/g) ?? []).length === 2) {
-            const next = text
-                .replace(pluginLine, "")
-                .replace(/(import\s*\{[^}]*?)\brebaseCollectionsPlugin\s*,\s*/, "$1")
-                .replace(/(import\s*\{[^}]*?),\s*rebaseCollectionsPlugin\b/, "$1");
-            planFile(plan, viteFile, next, "vite config (drop the collections plugin)");
-        } else if (text.includes("rebaseCollectionsPlugin")) {
-            plan.manualSteps.push({
-                title: "Remove the collections Vite plugin",
-                detail: "`rebaseCollectionsPlugin` built the panel's collections from config/collections, which no longer exists. Remove it from the plugins (and its import); keep `rebaseMcpViewPlugin`.",
-                file: relativeToRoot(plan, viteFile)
-            });
-        }
-    }
+    if (viteFile) planViteConfig(plan, viteFile);
 
     const virtualFile = path.join(frontendDir, "src", "virtual.d.ts");
     if (fs.existsSync(virtualFile)) {
@@ -380,6 +365,55 @@ export function planFrontendWiring(plan: PlanContext, frontendDir: string, hasEx
                 file: relativeToRoot(plan, virtualFile)
             });
         }
+    }
+}
+
+/**
+ * The frontend's Vite config: the collections plugin goes, the backend guard
+ * comes.
+ *
+ * `rebaseCollectionsPlugin` built the panel's collections from
+ * config/collections and kept their server half out of the browser bundle.
+ * Tables now live in backend/ with their hooks, and the frontend references
+ * them as types; `rebaseBackendGuard()` is what refuses a value import of
+ * backend/ in the build (and `rebase build` refuses a frontend without it).
+ * In the scaffold's shape — the plugin on a line of its own, imported from
+ * `@rebasepro/app/vitePlugin` — the one becomes the other in place; any other
+ * shape is a manual step with the exact lines.
+ */
+function planViteConfig(plan: PlanContext, viteFile: string): void {
+    const text = fs.readFileSync(viteFile, "utf8");
+    const guarded = /\brebaseBackendGuard\s*\(/.test(text);
+    const pluginLine = /^([ \t]*)rebaseCollectionsPlugin\(\{\s*collectionsDir:\s*["'][^"']*["']\s*\}\)(,?)[ \t]*(\r?\n)/m;
+    const importLine = /(import\s*\{[^}]*?)\brebaseCollectionsPlugin\b([^}]*\}\s*from\s*["']@rebasepro\/app\/vitePlugin["'])/;
+    const scaffoldShape = pluginLine.test(text) && importLine.test(text) && (text.match(/rebaseCollectionsPlugin/g) ?? []).length === 2;
+    if (scaffoldShape) {
+        const next = guarded
+            ? text
+                .replace(pluginLine, "")
+                .replace(/(import\s*\{[^}]*?)\brebaseCollectionsPlugin\s*,\s*/, "$1")
+                .replace(/(import\s*\{[^}]*?),\s*rebaseCollectionsPlugin\b/, "$1")
+            : text
+                .replace(pluginLine, (_line, indent: string, comma: string, eol: string) => `${indent}${BACKEND_GUARD_EXPORT}()${comma}${eol}`)
+                .replace(importLine, `$1${BACKEND_GUARD_EXPORT}$2`);
+        planFile(plan, viteFile, next, guarded ? "vite config (drop the collections plugin)" : "vite config (the collections plugin → rebaseBackendGuard)");
+        return;
+    }
+    if (text.includes("rebaseCollectionsPlugin")) {
+        plan.manualSteps.push({
+            title: "Remove the collections Vite plugin",
+            detail: "`rebaseCollectionsPlugin` built the panel's collections from config/collections, which no longer exists. Remove it from the plugins (and its import); keep `rebaseMcpViewPlugin`.",
+            file: relativeToRoot(plan, viteFile)
+        });
+    }
+    if (!guarded) {
+        plan.manualSteps.push({
+            title: "Add the backend guard to the Vite config",
+            detail: "The frontend imports the tables in backend/ as types only; a value import would ship their server hooks, and every module and secret they reach, to every visitor. " +
+                "`rebaseBackendGuard()` fails the build and the dev server when anything in the frontend resolves to a file under backend/, and `rebase build` refuses a frontend whose Vite config does not use it.",
+            snippet: BACKEND_GUARD_SNIPPET,
+            file: relativeToRoot(plan, viteFile)
+        });
     }
 }
 

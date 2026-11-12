@@ -636,6 +636,8 @@ export async function runVerify(options: VerifyOptions): Promise<VerifyReport> {
         if (cms.directories.length === 0) {
             cmsStep.status = "skipped";
             cmsStep.detail = "no frontend/src/cms";
+            // A frontend without src/cms still builds without the backend guard.
+            for (const finding of cms.findings) findings.push({ step: "cms", ...finding });
         } else {
             cmsStep.detail = `${cms.customizations} customization${cms.customizations === 1 ? "" : "s"} in ${cms.directories.join(", ")}, read without running them`;
             for (const finding of cms.findings) findings.push({ step: "cms", ...finding });

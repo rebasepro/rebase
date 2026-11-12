@@ -39,12 +39,18 @@
  *   in the frontend passes `uiConfig`: the editor's changes are lost on
  *   reload and never ship (warning). Said only when a `<RebaseCMS>` element
  *   was found and none of them passes `uiConfig` or spreads props into it.
+ * - `cms-backend-guard-missing` — the project has `backend/` and a frontend
+ *   whose Vite config does not use `rebaseBackendGuard()`: nothing refuses a
+ *   value import of a table, which would ship its server hooks to every
+ *   visitor (`utils/backend-guard.ts`). Quiet when the config imports a local
+ *   module that may add it, and checked whether or not `src/cms` exists.
  */
 import fs from "fs";
 import path from "path";
 import type { ColumnDescriptor, TableDescriptor } from "@rebasepro/types";
 import type { Expression, Node, ObjectLiteralExpression, Project, SourceFile } from "ts-morph";
 import { loadManifest } from "../manifest";
+import { BACKEND_GUARD_FIX, backendGuardMissingMessage, backendGuardStates } from "../utils/backend-guard";
 
 type TsMorph = typeof import("ts-morph");
 
@@ -63,7 +69,7 @@ type OffFormOption = typeof OFF_FORM_OPTIONS[number];
 
 /** A finding of this step, in `rebase verify`'s finding shape (step `cms`). */
 export interface CmsFinding {
-    check: "cms-unknown-table" | "cms-unknown-field" | "cms-hidden-required" | "cms-duplicate-customization" | "cms-not-static" | "cms-ui-config-not-mounted";
+    check: "cms-unknown-table" | "cms-unknown-field" | "cms-hidden-required" | "cms-duplicate-customization" | "cms-not-static" | "cms-ui-config-not-mounted" | "cms-backend-guard-missing";
     severity: "error" | "warning";
     message: string;
     fix?: string;
@@ -428,6 +434,7 @@ function checkCustomization(read: CustomizationRead, table: TableDescriptor): Cm
 export async function checkCmsCustomizations(projectRoot: string, tables: readonly TableDescriptor[]): Promise<CmsCheckResult> {
     const directories = cmsDirectories(projectRoot);
     const result: CmsCheckResult = { directories: directories.map(dir => path.relative(projectRoot, dir)), customizations: 0, findings: [] };
+    result.findings.push(...await backendGuardFindings(projectRoot));
     if (directories.length === 0) return result;
 
     const tsm: TsMorph = await import("ts-morph");
@@ -550,4 +557,21 @@ function uiConfigNotMounted(tsm: TsMorph, project: Project, projectRoot: string,
         fix: `Import it and pass it: \`import uiConfig from "./cms/${UI_CONFIG_FILE}";\` and \`<RebaseCMS … uiConfig={uiConfig} />\` ` +
             "(the frontend's tsconfig needs `resolveJsonModule`)."
     };
+}
+
+/**
+ * `cms-backend-guard-missing`, one per frontend whose Vite config does not use
+ * the guard. Nothing for a frontend the static read cannot decide.
+ */
+async function backendGuardFindings(projectRoot: string): Promise<CmsFinding[]> {
+    return (await backendGuardStates(projectRoot))
+        .filter(state => state.state === "missing")
+        .map(state => ({
+            check: "cms-backend-guard-missing",
+            severity: "error",
+            file: state.viteConfig,
+            line: state.line,
+            message: backendGuardMissingMessage(state),
+            fix: BACKEND_GUARD_FIX
+        }));
 }

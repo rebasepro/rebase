@@ -21,6 +21,7 @@
 import fs from "fs";
 import path from "path";
 import { execa } from "execa";
+import { assertBackendGuarded } from "./utils/backend-guard";
 import chalk from "chalk";
 import { foldStaticIntoBundle } from "./bundle";
 import { compareMountOrder, staticAppAddress } from "./manifest";
@@ -243,6 +244,10 @@ export async function foldFrontendIntoBundle(options: FoldOptions): Promise<Fold
     const { apps, skipped } = foldableApps(manifest);
     for (const { reason } of skipped) log(chalk.yellow(`    ⚠ ${reason}`));
     if (apps.length === 0) return [];
+
+    // A frontend that builds without the backend guard can ship backend code.
+    // `rebase build` refused it already; a cloud deploy rebuilds through here.
+    await assertBackendGuarded(projectRoot);
 
     const outcomes: FoldOutcome[] = [];
 

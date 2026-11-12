@@ -128,6 +128,38 @@ describe("what `rebase build` does with each runtime", () => {
 });
 
 /**
+ * The CLI runs the frontend's own build command; it does not drive Vite, so it
+ * cannot add `rebaseBackendGuard()` to the build. It refuses to run a build
+ * whose Vite config lacks it instead, before anything is built.
+ */
+describe("`rebase build` and the backend guard", () => {
+    function frontend(viteConfig: string): void {
+        manifest("managed");
+        fs.mkdirSync(path.join(projectRoot, "backend"), { recursive: true });
+        fs.mkdirSync(path.join(projectRoot, "frontend"), { recursive: true });
+        fs.writeFileSync(path.join(projectRoot, "frontend", "vite.config.ts"), viteConfig);
+    }
+
+    it("refuses a frontend whose Vite config does not use rebaseBackendGuard()", async () => {
+        frontend("export default { plugins: [] };");
+        const exit = vi.spyOn(process, "exit").mockImplementation((code?: string | number | null) => {
+            throw new Error(`exit ${String(code)}`);
+        });
+        const error = vi.spyOn(console, "error").mockImplementation(() => {});
+        await expect(buildCommand(["node", "rebase", "build"])).rejects.toThrow("exit 1");
+        expect(exit).toHaveBeenCalledWith(1);
+        expect(error.mock.calls.flat().join("\n")).toContain("frontend/vite.config.ts does not use rebaseBackendGuard()");
+        expect(buildBundle).not.toHaveBeenCalled();
+    });
+
+    it("builds one that does", async () => {
+        frontend("import { rebaseBackendGuard } from \"@rebasepro/app/vitePlugin\";\nexport default { plugins: [rebaseBackendGuard()] };");
+        await buildCommand(["node", "rebase", "build"]);
+        expect(buildBundle).toHaveBeenCalledTimes(1);
+    });
+});
+
+/**
  * `--output` names one bundle directory.
  *
  * It was handed to every app the build produced a bundle for, and each bundle

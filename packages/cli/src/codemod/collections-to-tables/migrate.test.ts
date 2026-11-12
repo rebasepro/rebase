@@ -248,6 +248,18 @@ describe("modes", () => {
         expect(report.files.map(file => file.path)).not.toContain("frontend/src/App.tsx");
     }, 120_000);
 
+    it("prints the backend guard as a manual step, with the exact lines, when the Vite config is not the scaffold's", async () => {
+        const dir = materialize("blog");
+        const vite = path.join(dir, "frontend", "vite.config.ts");
+        fs.writeFileSync(vite, "import { defineConfig } from \"vite\";\nimport { rebaseMcpViewPlugin } from \"@rebasepro/app/vitePlugin\";\n\nexport default defineConfig({ plugins: [rebaseMcpViewPlugin()] });\n");
+        const report = await run(dir, { dryRun: true });
+        const step = report.manualSteps.find(entry => entry.title === "Add the backend guard to the Vite config");
+        expect(step?.file).toBe("frontend/vite.config.ts");
+        expect(step?.snippet).toContain("import { rebaseBackendGuard } from \"@rebasepro/app/vitePlugin\";");
+        expect(step?.snippet).toContain("rebaseBackendGuard()");
+        expect(report.files.map(file => file.path)).not.toContain("frontend/vite.config.ts");
+    }, 120_000);
+
     it("keeps a ui-config.json the project has, and does not wire uiConfig twice", async () => {
         const dir = materialize("blog");
         fs.mkdirSync(path.join(dir, "frontend", "src", "cms"), { recursive: true });

@@ -1,8 +1,9 @@
 import { defineConfig } from "vite";
-import { rebaseMcpViewPlugin } from "@rebasepro/app/vitePlugin";
+import { rebaseBackendGuard, rebaseMcpViewPlugin } from "@rebasepro/app/vitePlugin";
 
 export default defineConfig({
     plugins: [
+        rebaseBackendGuard(),
         rebaseMcpViewPlugin()
     ]
 });

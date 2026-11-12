@@ -18,6 +18,7 @@ import chalk from "chalk";
 import { execa } from "execa";
 import type { RebaseAppConfig, RebaseStaticAppConfig } from "@rebasepro/types";
 import { requireProjectRoot } from "../utils/project";
+import { assertBackendGuarded } from "../utils/backend-guard";
 import { parseCommandArgs, UsageError, wantsHelp } from "../utils/args";
 import { detectPackageManager, getPMCommands } from "../utils/package-manager";
 import { cliVersion } from "../utils/version";
@@ -209,6 +210,7 @@ export async function buildCommand(rawArgs: string[] = []): Promise<void> {
     const backend = findBackendApp(manifest);
     if (!backend && source === "synthesized") {
         console.log(chalk.dim("No rebase.json found — building workspace packages.\n"));
+        await refuseUnguardedFrontend(projectRoot);
         await runWorkspaceBuilds(projectRoot);
         return;
     }
@@ -230,6 +232,8 @@ export async function buildCommand(rawArgs: string[] = []): Promise<void> {
     }
 
     console.log(`${chalk.bold("Rebase")} — building ${targets.length} app(s)\n`);
+
+    await refuseUnguardedFrontend(projectRoot);
 
     // Each static app is built once per run, whichever consumer gets to it
     // first: folding into the backend bundle, or its own static bundle.
@@ -517,6 +521,23 @@ export async function buildAssetApp(
 function upgradeToThisCli(): string {
     const version = cliVersion();
     return version === "unknown" ? "rebase upgrade" : `rebase upgrade --to ${version}`;
+}
+
+/**
+ * Refuse to build a frontend whose Vite config lacks `rebaseBackendGuard()`.
+ *
+ * The CLI runs each app's own build command rather than driving Vite, so it
+ * cannot add the guard to the build; it refuses to run the build without it.
+ * Without the guard nothing stops a value import of `backend/` from shipping
+ * server hooks to the browser (`utils/backend-guard.ts`).
+ */
+async function refuseUnguardedFrontend(projectRoot: string): Promise<void> {
+    try {
+        await assertBackendGuarded(projectRoot);
+    } catch (err) {
+        console.error(chalk.red(`✗ ${err instanceof Error ? err.message : String(err)}`));
+        process.exit(1);
+    }
 }
 
 /** The pre-manifest behaviour: build every workspace package. */

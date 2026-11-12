@@ -311,6 +311,33 @@ describe("rebase verify: CMS customizations", () => {
     });
 });
 
+describe("cms-backend-guard-missing", () => {
+    function viteConfig(text: string): void {
+        fs.mkdirSync(path.join(root, "frontend"), { recursive: true });
+        fs.writeFileSync(path.join(root, "frontend", "vite.config.ts"), text);
+    }
+
+    it("reports a frontend whose Vite config does not use rebaseBackendGuard(), with no src/cms at all", async () => {
+        viteConfig("import react from \"@vitejs/plugin-react\";\nexport default {\n    plugins: [react()]\n};");
+        const found = await check();
+        expect(found.map(f => [f.check, f.severity, f.file, f.line])).toEqual([["cms-backend-guard-missing", "error", path.join("frontend", "vite.config.ts"), 3]]);
+        expect(found[0].fix).toContain("import { rebaseBackendGuard } from \"@rebasepro/app/vitePlugin\"");
+    });
+
+    it("is quiet for a guarded config, and for one that imports a local module that may add it", async () => {
+        viteConfig("import { rebaseBackendGuard } from \"@rebasepro/app/vitePlugin\";\nexport default { plugins: [rebaseBackendGuard()] };");
+        expect(await check()).toEqual([]);
+        viteConfig("import { shared } from \"./vite.shared\";\nexport default shared();");
+        expect(await check()).toEqual([]);
+    });
+
+    it("reaches `rebase verify`'s findings when the project has no src/cms", async () => {
+        viteConfig("export default { plugins: [] };");
+        const report = await runVerify({ projectRoot: root, schemaDir: path.join(root, "backend", "schema"), backendDir: null, live: false, moduleAliases: ALIASES });
+        expect(report.findings.filter(f => f.step === "cms").map(f => f.check)).toEqual(["cms-backend-guard-missing"]);
+    }, 60_000);
+});
+
 describe("the demo app", () => {
     it("passes the CMS customization step clean", async () => {
         const app = path.join(REPO, "app");

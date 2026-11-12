@@ -23,6 +23,7 @@ import {
     type RebaseStaticAppConfig
 } from "@rebasepro/types";
 import { execa, execaCommandSync, type ResultPromise } from "execa";
+import { BACKEND_GUARD_FIX, backendGuardMissingMessage, backendGuardStates } from "../utils/backend-guard";
 
 import {
     DEV_DATABASE_KIND_ENV,
@@ -1696,6 +1697,14 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
         if (!frontendDir) return;
 
         console.log(`  ${chalk.magenta("▶")} Frontend: ${chalk.gray(frontendDir)}`);
+        // Warned, not refused: `rebase build` refuses. The dev server serves
+        // whatever the frontend imports, backend/ included, without the guard.
+        void backendGuardStates(projectRoot).then(states => {
+            for (const state of states.filter(candidate => candidate.state === "missing")) {
+                console.log(chalk.yellow(`  ⚠ ${backendGuardMissingMessage(state)}`));
+                console.log(chalk.dim(`    ${BACKEND_GUARD_FIX} \`rebase build\` refuses to build it as it is.`));
+            }
+        }).catch(() => undefined);
 
         const frontendEnv: Record<string, string> = { ...process.env as Record<string, string> };
 
