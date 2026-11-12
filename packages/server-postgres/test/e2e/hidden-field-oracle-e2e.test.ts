@@ -138,7 +138,7 @@ describe("a private column answers as a field that does not exist (E2E)", () => 
         return definition.run(args, {
             driver: driver,
             tables: TABLES,
-            collections: ALL,
+            driverCollection: slug => ALL.find(collection => collection.slug === slug),
             caller: { ...EDITOR, scopes: ["data:read"], clientId: "hidden-field-e2e" }
         });
     }
@@ -183,7 +183,7 @@ describe("a private column answers as a field that does not exist (E2E)", () => 
             c.set("driver", await driver.withAuth(EDITOR));
             await next();
         });
-        app.route("/api/data", new RestApiGenerator(ALL, driver).generateRoutes());
+        app.route("/api/data", new RestApiGenerator({ descriptors: TABLES, collections: ALL }, driver).generateRoutes());
     }, 120_000);
 
     afterAll(async () => {

@@ -27,7 +27,7 @@ import { createPostgresAdapter, createPostgresBootstrapper, createPostgresDataba
 import { defineFunction, initializeRebaseBackend, rebase as serverRebase, _resetRebaseMock } from "../../../server/src/index.js";
 import type { HonoEnv } from "../../../server/src/api/types.js";
 import { Hono } from "hono";
-import { tablesFromCollections } from "../helpers/tables.js";
+import { tablesFrom, tablesFromCollections } from "../helpers/tables.js";
 
 const tickets: CollectionConfig = {
     name: "Tickets",
@@ -160,7 +160,7 @@ describe("rebase.sqlAsAdmin in a function, on a backend with auth (E2E)", () => 
         backend = await initializeRebaseBackend({
             app,
             server: createServer(),
-            collections: [tickets],
+            ...tablesFrom([tickets]),
             database: createPostgresAdapter({ connection: connection.db, connectionString: container.connectionString }),
             auth: { jwtSecret: "sql-as-admin-e2e-secret-that-is-long-enough-0123", serviceKey: SERVICE_KEY },
             functions: { probe },
@@ -212,7 +212,7 @@ describe("the users collection, registered, keeps its grant and its policies (E2
         backend = await initializeRebaseBackend({
             app,
             server: createServer(),
-            collections: [tickets, defaultUsersCollection],
+            ...tablesFrom([tickets, defaultUsersCollection]),
             database: createPostgresAdapter({ connection: connection.db, connectionString: container.connectionString }),
             auth: { jwtSecret: "sql-as-admin-e2e-secret-that-is-long-enough-0123", serviceKey: "sql-as-admin-e2e-service-key-0123456789abcdef" },
             cronPersistence: false
