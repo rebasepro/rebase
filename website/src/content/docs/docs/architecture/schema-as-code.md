@@ -1,47 +1,52 @@
 ---
 title: Schema as Code
 sidebar_label: Schema as Code
-description: How Rebase uses TypeScript collections as the single source of truth for your database schema, UI, and API.
+description: How Rebase uses the TypeScript tables in backend/schema as the single source of truth for your database schema, API, SDK and admin panel.
 ---
 
 ## The Core Idea
 
-In Rebase, your **TypeScript collection definitions are the single source of truth**. From one set of TypeScript objects, Rebase generates:
+In Rebase, the **tables you declare with `defineTable` in `backend/schema/` are the single source of truth**. From them, Rebase generates:
 
 - **PostgreSQL tables** via Drizzle ORM schema generation
-- **CRUD UI** — forms, tables, validation, field types
-- **REST API** endpoints with filtering, sorting, and pagination
+- **RLS policies** — Row Level Security in Postgres, from each table's required `rls`
+- **REST API** endpoints with filtering, sorting, and pagination, and realtime and MCP
 - **Typed SDK** — type-safe data operations
-- **RLS policies** — Row Level Security in Postgres
+- **The admin panel's defaults** — forms, lists, validation and field types, rendered from the table descriptors the backend serves at `GET /api/schema/tables`; what the panel shows beyond them lives in `frontend/src/cms/`
 
 This means your schema is:
 - **Version controlled** — every change is a git commit
 - **Type-safe** — TypeScript catches errors at compile time
 - **Reviewable** — schema changes go through pull requests
-- **Portable** — the same definition works across frontend, backend, and CLI
+- **Portable** — the same definition is read by the backend, the CLI, the SDK generator and, as types, the frontend
 
 ## Visual Editing with AST Manipulation
 
-Rebase also provides a **visual collection editor** in Studio mode. When a non-developer uses the visual editor to add a field:
+Rebase also provides a **visual schema editor** in Studio. When someone uses it to add a column:
 
 1. The Studio does **not** directly modify the database
-2. Instead, it uses [ts-morph](https://ts-morph.com/) to parse your TypeScript source file as an AST
-3. It inserts the new property definition precisely into the `properties` block
-4. **All existing code, callbacks, and custom logic are preserved untouched**
+2. Instead, it sends the edit as a `TablePatch`, and the server uses [ts-morph](https://ts-morph.com/) to parse the table's file in `backend/schema/` as an AST
+3. It inserts the new `col.*` builder precisely into the `columns` block
+4. **All existing code, hooks, and custom logic are preserved untouched**; an edit that would reach into code it does not rewrite is refused
 5. The file is saved, triggering hot reload
+
+How a table *looks* in the panel is not part of this: labels, icons and views
+are saved as the panel's preferences or written in `frontend/src/cms/`. See
+[Live schema editing](/docs/backend/live-schema-editing/) for the edits and
+what the editor refuses.
 
 This "UI as Code Generator" approach means visual edits produce the same clean TypeScript a developer would write by hand.
 
 ## Schema Generation Pipeline
 
-Your collections are read once and emitted twice — as a Drizzle schema the
+Your tables are read once and emitted twice — as a Drizzle schema the
 running server queries through, and as SQL that describes the database you meant
 to have. It is the SQL that the database is brought into line with, by
 [Atlas](https://atlasgo.io), which diffs your desired schema against the live one
 and plans the change:
 
 ```
-                        Collections (TypeScript)
+                      Tables (backend/schema)
                                   │
             ┌─────────────────────┴─────────────────────┐
             ▼                                           ▼
@@ -71,33 +76,33 @@ and plans the change:
 
 `db push` is the development loop; `db generate` + `db migrate` is the
 reviewable one, and the one to use in production. Both go through the same
-generated SQL, so they cannot disagree about what your collections mean, and
-both write it afresh from the collections before reading it, so there is no copy
+generated SQL, so they cannot disagree about what your tables mean, and
+both write it afresh from the tables before reading it, so there is no copy
 in your repository to fall behind. The migrations are what you commit. See
 [Schema Generation](/docs/cli/schema) for every flag.
 
 ### Example
 
-Given this collection:
+Given this table:
 
-<!-- schema-sample: collection -->
-```typescript
-import { defineCollection } from "@rebasepro/cms-types";
-const productsCollection = defineCollection({
-    slug: "products",
-    name: "Products",
-    table: "products",
-    properties: {
-        name: { type: "string", name: "Name", validation: { required: true } },
-        price: { type: "number", name: "Price", columnType: "numeric" },
-        active: { type: "boolean", name: "Active", defaultValue: true },
-        createdAt: { type: "date", name: "Created", autoValue: "on_create" }
-    }
+<!-- schema-sample: table -->
+```ts
+import { defineTable, col } from "@rebasepro/server/schema";
+
+export const products = defineTable("products", {
+    columns: {
+        id: col.text().primaryKey().defaultSql("gen_random_uuid()::text"),
+        name: col.text().notNull(),
+        price: col.numeric(),
+        active: col.boolean().default(true),
+        createdAt: col.timestamptz().onCreateNow()
+    },
+    rls: "admin-only"
 });
 ```
 
-Rebase generates this Drizzle schema — the whole file, `id` column, default
-policies and all:
+Rebase generates this Drizzle schema — the whole file, default policies and
+all:
 
 <!-- schema-sample: drizzle -->
 ```typescript
@@ -126,18 +131,16 @@ export const enums = {  };
 export const relations = {  };
 ```
 
-Three things in there are worth reading twice. The `id` column you did not
-declare: every collection gets a `text` primary key unless a property claims
-`isId`, and the database fills it with a uuid (`gen_random_uuid()::text`), so a
-row created from the admin panel, the REST API or the SDK needs no key of its
-own. A key you do send is used as given. The `pgPolicy` block: row level security is enabled on every table, and
-those baseline policies are what keep the trusted server context and the `admin`
-role able to read it at all — see
-[Security Rules](/docs/collections/security-rules). And `active`, which carries
-the `defaultValue` you wrote as a **column** default: a literal `defaultValue`
-compiles to a real `DEFAULT`, so a row inserted by the REST API, a seed script
-or `psql` gets it too, not only one typed into the admin panel. A `reference` or
-`vector` default is not a column literal and stays an application-layer value.
+Three things in there are worth reading twice. The `id` column: the database
+fills it with a uuid (`gen_random_uuid()::text`), so a row created from the
+admin panel, the REST API or the SDK needs no key of its own, and a key you do
+send is used as given. The `pgPolicy` block: `rls: "admin-only"` enables row
+level security and generates only the baseline policies, which keep the trusted
+server context and the `admin` role able to read it — and nobody else; see
+[Row-level security](/docs/collections/security-rules). And `active`, which
+carries the `.default(true)` you wrote as a **column** default: a literal
+default compiles to a real `DEFAULT`, so a row inserted by the REST API, a seed
+script or `psql` gets it too, not only one typed into the admin panel.
 
 And this SQL, which is what Atlas is handed as the desired state:
 
@@ -162,9 +165,9 @@ none of the four.
 
 ## Safety & Unmapped Database Objects
 
-When Rebase updates the database schema, it maps TypeScript collection definitions to database tables. To ensure that **unmapped database objects (e.g., tables, views, enums) are never dropped or modified**, Rebase implements several layers of safety:
+When Rebase updates the database schema, it maps the tables you declare to database tables. To ensure that **unmapped database objects (e.g., tables, views, enums) are never dropped or modified**, Rebase implements several layers of safety:
 
-1. **Unmapped Table Exclusion**: Before every push, the CLI lists every table and view in the database and hands Atlas an `--exclude` for each one that backs no collection (or a collection's junction table), so Atlas never plans a change to it. If the database cannot be read, the push aborts rather than run with a partial list.
+1. **Unmapped Table Exclusion**: Before every push, the CLI lists every table and view in the database and hands Atlas an `--exclude` for each one that no declared table (or a declared table's junction) maps to, so Atlas never plans a change to it. If the database cannot be read, the push aborts rather than run with a partial list.
 2. **Schemas Rebase Owns**: The `rebase` schema (auth tables, RLS helper functions, Atlas's revision table) and any `auth` schema are excluded whole, so a push can never plan a `DROP SCHEMA … CASCADE`.
 3. **Objects Atlas Cannot Model**: Search columns, vector indexes and triggers are excluded from Atlas too, and applied from their own generated files.
 4. **Destructive-Change Gate**: `rebase db push` dry-runs the plan first. A statement that destroys data — a dropped column or table, a lossy type change — stops the push: in a terminal it asks you to type `yes`, and without one (CI, scripts, agents) it refuses unless you pass `--allow-destructive`.
@@ -172,6 +175,6 @@ When Rebase updates the database schema, it maps TypeScript collection definitio
 
 ## Next Steps
 
-- **[Collections](/docs/collections)** — Full collection configuration reference
-- **[Properties](/docs/collections/properties)** — Detailed column type mappings
+- **[Tables](/docs/schema/)** — Every `defineTable` option
+- **[Columns](/docs/schema/columns/)** — Detailed column type mappings
 - **[Indexes](/docs/backend/indexes)** — Declaring the indexes your queries need

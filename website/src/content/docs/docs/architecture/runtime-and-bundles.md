@@ -8,7 +8,7 @@ description: How a Rebase project separates into a project bundle and a versione
 
 A Rebase deployment is two things, not one:
 
-- **The bundle** — your project. Compiled collections, hooks, functions and cron
+- **The bundle** — your project. Compiled tables, hooks, functions and cron
   jobs, plus a generated manifest describing what they need.
 - **The runtime** — the engine. `@rebasepro/server`, shipped as the published
   `rebasepro/server` container image.
@@ -22,8 +22,8 @@ anything you wrote.
 ```
   your repository                 built artifact              running container
   ───────────────                 ──────────────              ─────────────────
-  config/collections/*.ts   ──►   dist-bundle/config/     ──►  rebasepro/server
-  backend/functions/*.ts          dist-bundle/backend/         + /bundle mounted
+  backend/schema/*.ts       ──►   dist-bundle/backend/schema/  ──►  rebasepro/server
+  backend/functions/*.ts          dist-bundle/backend/             + /bundle mounted
   rebase.json                     dist-bundle/manifest.json
 ```
 
@@ -37,7 +37,7 @@ someone running `docker compose up`.
 rebase build
 ```
 
-This regenerates the database schema from your collections, type-checks and
+This regenerates the database schema from your tables, type-checks and
 compiles them, resolves import specifiers so Node can load the output directly,
 and writes `dist-bundle/` containing:
 
@@ -45,7 +45,8 @@ and writes `dist-bundle/` containing:
 | --- | --- |
 | `manifest.json` | Generated. The contract this bundle claims to satisfy. |
 | `package.json` | Generated. Your project's runtime dependencies. |
-| `config/` | Compiled collections. |
+| `backend/schema/` | Compiled tables: the `index` that exports them, and one module per table. |
+| `backend/resources.js`, `backend/storage.js`, `backend/hooks.js` | The compiled modules the runtime reads beside the tables, when the project has them. |
 | `backend/functions/` | Compiled server functions. |
 | `backend/crons/` | Compiled cron jobs. |
 | `backend/src/schema.generated.js` | Compiled database schema. |
@@ -55,25 +56,35 @@ before it agrees to boot:
 
 ```jsonc
 {
-  "bundleFormat": 2,
-  "runtime": { "range": "^1", "builtAgainst": "0.30.1", "contract": 1 },
-  "schemaVersion": "v1:c5d97d0f96b7f87a",
+  "bundleFormat": 3,
+  "runtime": { "range": "^1", "builtAgainst": "0.30.1", "contract": 2 },
+  "schemaVersion": "v2:3f0c9a1e7d2b5c48",
   "kind": "backend",
   "entry": {
-    "config": "config",
+    "tables": "backend/schema",
+    "resources": "backend/resources.js",
+    "storage": "backend/storage.js",
     "functions": "backend/functions",
     "static": [{ "path": "/", "dir": "static/admin", "spa": true }]
   },
+  "tables": ["authors", "posts", "tags", "users"],
   "hooks": { "native": false },
+  "storage": { "authorize": true },
   "deps": { "declared": { "zod": "^4.4.3" } }
 }
 ```
 
+<span class="since-badge" data-since="0.31">Since 0.31</span> `bundleFormat`
+3 and runtime contract 2: the schema is `entry.tables`, the compiled
+`backend/schema` directory, beside `entry.resources`, `entry.storage` and
+`entry.hooks`. `schemaVersion` starts with `v2:` — it is computed from the
+compiled tables.
+
 `kind` is either `backend` — boot the server, plus any static apps in
 `entry.static` — or `static`, which serves those assets and nothing else: no
-database, no auth. Whether a backend declares its collections in code or
+database, no auth. Whether a backend declares its tables in code or
 introspects them from the live database is not a third kind; it is simply
-whether `entry.config` is there.
+whether `entry.tables` is there.
 
 ## Running a bundle
 
@@ -92,14 +103,19 @@ bundle so there is no second install; a deployment installs the bundle's own
 Two version numbers govern whether a bundle and a runtime can work together, and
 they are deliberately not the package version.
 
-**`bundleFormat`** is the on-disk layout. A runtime accepts any bundle whose
-format is less than or equal to its own, and refuses a newer one rather than
-half-loading it. An older bundle on a newer runtime must keep working — that is
-the entire point of the separation, so a runtime reads every format it has ever
-shipped. Format 1 bundles, which named this field `mode` and carried a single
-static directory, still boot unchanged.
+**`bundleFormat`** is the on-disk layout. A runtime refuses a newer format
+rather than half-loading it. An older bundle on a newer runtime keeps working
+where the layout allows it — that is the point of the separation — with one
+break: **a format-1 or format-2 bundle is refused** by a 0.31 runtime. Those
+bundles carry `config/collections` — `defineCollection` objects — and a runtime
+that reads only `backend/schema` has nothing to read them with; booting one
+would introspect the database instead of serving the declared tables. The
+refusal names the fix: run
+[`rebase migrate collections-to-tables`](/docs/cli/#rebase-migrate) on the
+project's source, then rebuild the bundle.
 
-**`runtime.contract`** is the interface between a bundle and the engine. Within
+**`runtime.contract`** is the interface between a bundle and the engine; 0.31
+moved it to `2`. Within
 one contract major, any bundle that validated keeps validating. Patches and
 minors are drop-in; a major is not, and a runtime will refuse a bundle from a
 different one rather than start and misbehave later.
@@ -149,5 +165,6 @@ buckets](/docs/backend/multiple-sources/).
 | `GET /health` | Readiness. Performs a database round-trip. |
 | `GET /livez` | Liveness. Deliberately does *not* touch the database, so a database blip cannot make an orchestrator kill a healthy process. |
 | `GET /api/meta/schema-version` | The current schema version. Unauthenticated — it is a version stamp, not a schema. |
-| `GET /api/meta/contract` | The full collection contract. Needs `schema:read`. |
+| `GET /api/schema/tables` | The tables, as each caller may see them — what the admin panel renders from. See [Endpoints](/docs/backend/endpoints/#schema). |
+| `GET /api/meta/contract` | The schema version, the runtime, and every table as an administrator sees it. Needs `schema:read`. |
 | `GET /metrics` | Prometheus metrics, when `REBASE_METRICS=true`. |

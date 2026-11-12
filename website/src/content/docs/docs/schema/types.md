@@ -98,10 +98,12 @@ type Comment = InferRow<typeof comments>;
 
 `ColumnKeyOf<typeof posts>` is the union of a table's column keys, and
 `RelationKeyOf<typeof posts>` the union of its relation names. Both work on
-views too. Use them to type code that takes a column or a relation by name:
+views too. Use them to type code that takes a column or a relation by name.
+They come from `@rebasepro/types`, which `@rebasepro/server/schema` does not
+re-export them from:
 
 ```ts
-import type { ColumnKeyOf, RelationKeyOf } from "@rebasepro/server/schema";
+import type { ColumnKeyOf, RelationKeyOf } from "@rebasepro/types";
 import type { posts } from "./posts";
 
 type PostColumn = ColumnKeyOf<typeof posts>;     // "id" | "title" | "status" | …

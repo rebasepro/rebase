@@ -15,7 +15,7 @@ already in the panel, behind the toggle in the drawer.
 ![The collection editor, the flagship Studio tool: a visual schema editor that writes your TypeScript back](/img/collection_editor.png)
 
 It exists because the alternative is a second set of credentials. Editing a
-collection, checking what a policy really allows, or running one query against
+table, checking what a policy really allows, or running one query against
 production otherwise means a database client, a copy of the connection string
 and an audit trail that ends at "someone with psql". Studio does all of it as
 the signed-in admin, through the same authorization the API uses.
@@ -24,7 +24,7 @@ the signed-in admin, through the same authorization the API uses.
 
 The panel has two modes — `"cms" | "studio"`:
 
-- **CMS** (`"cms"`) — For content editors and operations teams. Shows collections and data management. This is the default.
+- **CMS** (`"cms"`) — For content editors and operations teams. Shows the tables and data management. This is the default.
 - **Studio** (`"studio"`) — For developers. Unlocks the tools below.
 
 Toggle between them with the admin mode controller or the drawer toggle. The
@@ -36,7 +36,31 @@ migrated to `"cms"` on read.
 
 ### Collection Editor
 
-A visual schema editor that lets you create and modify collections through a drag-and-drop UI. When you save changes, it uses [ts-morph](https://ts-morph.com/) to write the keys you changed — and only those — into your TypeScript source files, leaving the rest of each file as it was: imports, comments, formatting, handlers, shared properties. A change to something the file defines in code, such as a property imported from another module, is refused with the place to make it. It is the screenshot at the top of this page.
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+A visual editor for a table and how the panel shows it. A save is split in two:
+
+- **Schema facts** — a column's type, nullability, default, validation, enum
+  values, storage, relations, rules, description, history — become `TablePatch`
+  edits that the server's schema editor writes into `backend/schema/<table>.ts`
+  with [ts-morph](https://ts-morph.com/), changing only the code an edit names
+  and leaving the rest of the file as it was: imports, comments, formatting,
+  hooks, shared columns. An edit that reaches into code — a column built by a
+  helper, rules held in a variable — is refused with the place to make it. A
+  rule left untouched is sent back exactly as served, so its policy name never
+  changes. See [Live schema editing](/docs/backend/live-schema-editing/#the-edits-tablepatch).
+- **Presentation** — labels, icon, view modes, column order, hidden columns,
+  widths, enum labels and colours, kanban, query defaults — is a UI preference,
+  never a schema edit. An admin's are the workspace's: where the server may
+  write the project's source they go to `frontend/src/cms/ui-config.json`, and
+  on a deployment to the `rebase.ui_preferences` table, through
+  `/api/admin/ui-config`. A user's own resizes and view switches are theirs.
+
+A slug, SQL table or database change is refused as a migration. A table whose
+rules come from `defaultRls` asks before taking rules of its own. A caller
+served redacted rules gets a read-only editor, and a Firestore collection is
+read-only here: it is defined in the frontend. It is the screenshot at the top
+of this page.
 
 The editor is on wherever Studio is mounted — a scaffold's `<RebaseStudio/>` is
 enough, and there is no prop to add. `collectionEditor` tunes it rather than
@@ -49,14 +73,14 @@ import { RebaseStudio } from "@rebasepro/studio";
 // Studio is mounted, so the Collection Editor is available. Nothing else
 // is needed for it.
 <Rebase>
-    <RebaseCMS collections={collections}/>
+    <RebaseCMS tableCustomizations={tableCustomizations}/>
     <RebaseStudio/>
 </Rebase>
 
 // `collectionEditor` is for fine-tuning — a read-only editor, a different
 // token — not for opting in.
 <RebaseCMS
-    collections={collections}
+    tableCustomizations={tableCustomizations}
     collectionEditor={{
         getAuthToken: authController.getAuthToken
     }}
@@ -64,12 +88,23 @@ import { RebaseStudio } from "@rebasepro/studio";
 ```
 
 Whether a *save* lands is the server's decision, not the panel's: the editor
-rewrites collection source files, so it is off under `NODE_ENV=production`, in
-`baas` mode, and on a server with no `collectionsDir`. The panel asks
+rewrites `backend/schema`, so it is off under `NODE_ENV=production` (unless
+[live schema editing](/docs/backend/live-schema-editing/) names a repository),
+in `baas` mode, and on a server with no `schemaDir`. The panel asks
 `GET /api/admin/schema-editor/status` and shows the reason it gets back beside the
 disabled button.
 
 ### Built-in tools
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+Every tool that knows the schema reads the tables the server serves, from
+`GET /api/schema/tables`, with or without the CMS on the page — so Studio works
+as the console of a backend with no admin panel. Against a runtime older than
+0.31, which has no such route, the schema-aware tools say the runtime needs
+upgrading rather than guessing; against a backend with no authentication, or
+when the request fails, each says which. The SQL console, logs, storage and
+the other tools that do not read the schema work regardless.
 
 These ship with Studio and are **lazy-loaded by `RebaseStudio`** — each is a separate
 chunk, fetched the first time you open it. They are not importable on their own:
@@ -79,23 +114,23 @@ open costs nothing.
 | Tab | Slug | Group | What it does |
 |-----|------|-------|--------------|
 | SQL Console | `sql` | Database | Run raw SQL against your PostgreSQL database and read results in a table. The table shows the last statement's result, up to its first 10,000 rows or 32 MB of values; a longer result says how many rows there were, and copy and export include only the rows shown. Such a result also offers **Download full result as CSV**: the server streams the whole of it through a read-only cursor (`POST /api/admin/sql/csv`), one query at a time, on a Postgres server of your own rather than the in-process development database. Values are the database's text, as psql shows them, and **Export JSON** writes them so; **Export typed JSON** writes each value read by its column's type — integers and numerics a JSON number holds exactly, booleans, `json`/`jsonb` as JSON — and keeps every other value as text. In every CSV (export, copy and the full download), a value a spreadsheet would run as a formula (one starting with `=`, `+`, `-`, `@`, a tab or a carriage return, other than a signed number) is written with a leading `'`, as the collection export writes it. While a run is in flight, **Cancel run** gives the console back at once; a server that takes the socket's `CANCEL_SQL` frame (it lists `cancel_sql` in the `hello` it answers the socket with) also stops the statement with `pg_cancel_backend`. The in-process development database cannot be interrupted, and an older server is left to finish the statement within its `statement_timeout` |
-| RLS Policies | `rls` | Database | Inspect and manage Row Level Security policies for your tables. A policy is listed as the database holds it, badged **Differs from code** where that is not what the project declares. A policy Rebase generates cannot be edited straight in the database, and on a table Rebase manages a banner says that each server start and `rebase db push` re-apply the declared policies |
-| Schema Visualizer | `schema-visualizer` | Database | Entity diagram of your collections and their relations, drawn from the collection definitions: tables, columns, types and relations are as the collections declare them. Only the RLS markers are read from the database. The layout runs in a web worker, so the page stays responsive while a large diagram is arranged. A schema of more than 300 tables is drawn one table's neighbourhood at a time — the tables one or two relations away — starting from the most connected table; pick another table in the list to move |
+| RLS Policies | `rls` | Database | Inspect and manage Row Level Security policies for your tables. The declared side is what the server compiled from each table's `rls` (served to callers holding `schema:read`), compared with `pg_policies` the way `rebase doctor` judges drift: a policy is listed as the database holds it, badged **Differs from code** where that is not what the project declares, and a declared rule the database lacks is listed as unapplied. A policy Rebase generates cannot be edited straight in the database, and on a table Rebase manages a banner says that each server start and `rebase db push` re-apply the declared policies. A caller without `schema:read` sees what the database holds and is told why the declaration is not shown |
+| Schema Visualizer | `schema-visualizer` | Database | Entity diagram of your tables and their relations, drawn from the served descriptors: SQL names, Postgres types, nullability, keys, enum values, foreign keys and junctions are as the tables declare them. Only the RLS markers are read from the database. The layout runs in a web worker, so the page stays responsive while a large diagram is arranged. A schema of more than 300 tables is drawn one table's neighbourhood at a time — the tables one or two relations away — starting from the most connected table; pick another table in the list to move |
 | Branches | `branches` | Database | Create and manage [database branches](/docs/backend/branching), and review one like a pull request: its schema and RLS policy changes side by side, the rows it inserted, updated and deleted, and a merge into the database it was made from that says what wins first — see [Reviewing and merging a branch](/docs/backend/branching/#reviewing-and-merging-a-branch) |
 | Backups | `backups` | Database | Browse and download database backups |
 | Logs Explorer | `logs` | Database | Live request log, plus everything the server reports at warn or error — see below |
-| JS Console | `js` | Compute | Write and execute JavaScript through the Rebase SDK |
+| JS Console | `js` | Compute | Write and execute JavaScript through the Rebase SDK. A script receives `context.tables`, the served descriptors (it was `context.collections`), and reaches a table as `client.data.<slug>` or `client.data.table("<slug>")` |
 | Cron Jobs | `cron` | Compute | Inspect and manage [scheduled tasks](/docs/backend/cron-jobs) |
 | Storage | `storage` | Storage | Browse, upload and manage files across your storage backends |
 | API Explorer | `api` | API | Interactive API documentation, with a request runner |
-| API Keys | `api-keys` | Access Control | Create and manage scoped service API keys |
+| API Keys | `api-keys` | Access Control | Create and manage scoped service API keys; a `data:*` scope's targets are the served tables |
 
 ### What the Logs Explorer shows
 
 Two streams into one in-memory ring, held on the server process:
 
 - **Every request** — method, path, status, duration, the `X-Request-ID`, the
-  collection when the request was about one, and, when the request failed, the
+  table when the request was about one, and, when the request failed, the
   error `code` and message the client received. A failed request is recorded at
   `warn` (4xx) or `error` (5xx), so the level filter finds it.
   Its `source` comes from the path: `/api/auth/*` and `/api/oauth/*` are
@@ -126,8 +161,8 @@ another instance replaces the window instead of mixing the two logs.
 
 The **Collection Editor** is a Studio tool too, but it is not in this list because
 it is registered differently: `RebaseStudio` does not lazy-load it. The panel mounts
-it wherever Studio is registered, because unlike the tools above it needs the
-project's collection source at hand to write back to. That is a difference in how it
+it wherever Studio and the CMS are registered, because unlike the tools above it
+edits the presentation the CMS draws as well as the schema. That is a difference in how it
 is mounted, not in what it is — it edits schema, and it belongs beside the SQL and
 RLS editors.
 
@@ -142,7 +177,7 @@ import { RebaseStudio } from "@rebasepro/studio";
 export function App() {
     return (
         <Rebase client={client} authController={authController}>
-            <RebaseCMS collections={collections}/>
+            <RebaseCMS tableCustomizations={tableCustomizations}/>
             <RebaseStudio/>
             <RebaseShell title="My App"/>
         </Rebase>
@@ -205,4 +240,5 @@ re-render of the host does not tear down and remount whichever tool is on screen
 ## Next Steps
 
 - **[Plugins](/docs/plugins)** — Extend the framework with plugins
-- **[Collections](/docs/collections)** — Collection configuration
+- **[Tables](/docs/schema/)** — Declaring the tables Studio reads
+- **[Customizing a table](/docs/frontend/customize-table/)** — How the panel shows them

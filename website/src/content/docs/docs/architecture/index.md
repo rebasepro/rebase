@@ -43,15 +43,25 @@ database: createPostgresAdapter({
 })
 ```
 
-Collections automatically resolve against the configured adapter through the internal dependency injection registry.
+Every table resolves against the configured adapter — the default database, or the one its `database` names in `backend/resources.ts`.
 
 :::tip
 The `createPostgresAdapter` handles database connection pooling, schema resolution, and real-time `LISTEN/NOTIFY` setup automatically.
 :::
 
-### Collection Registry
+### Table descriptors
 
-The `BackendCollectionRegistry` is the runtime index of all collections, their PostgreSQL tables, enums, and Drizzle relations. It's populated at startup from your collection definitions.
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+At boot the backend compiles the tables `backend/schema/index.ts` exports into
+**descriptors**: each column with its Postgres type, nullability, validation and
+storage rules, the relations by slug, and the row-level security posture. A
+problem in any table refuses the boot with one `SchemaDefinitionError` naming
+every problem. The descriptors are what REST, realtime, MCP and the OpenAPI
+document serve from, what the schema version is computed over, and what
+`GET /api/schema/tables` hands the admin panel and the Studio, redacted per
+caller. Hook code never leaves the server. A backend with no `backend/schema`
+introspects the database into the same descriptors instead.
 
 ### Realtime Service
 
@@ -67,40 +77,44 @@ For **multi-instance deployments** (e.g., Cloud Run with multiple replicas), eve
 
 ### Storage Registry
 
-Like drivers, storage backends are registered in a registry. You can have multiple storage providers (local, S3) and route different file fields to different backends using `storage.storageSource`.
+Like drivers, storage backends are registered in a registry. You can have multiple storage providers (local, S3) and route different storage columns to different backends with `col.storage({ source })`.
 
 ## Package Map
 
 | Package | Role | Used By |
 |---------|------|---------|
-| `@rebasepro/types` | TypeScript interfaces for collections, properties, entities, plugins | Everything |
-| `@rebasepro/server` | Backend server initialization, REST API, auth, storage, WebSocket | Backend |
+| `@rebasepro/types` | The table builders (`defineTable`, `col`, `rel`), the descriptors, and the interfaces every package shares | Everything |
+| `@rebasepro/server` | Backend server initialization, REST API, auth, storage, WebSocket; re-exports the builders from `@rebasepro/server/schema`, an entry that loads no server code | Backend |
+| `@rebasepro/server-postgres` | The Postgres driver: schema planning, migrations, RLS policies, realtime | Backend |
+| `@rebasepro/codegen` | Typed SDK generation from the table descriptors | Dev tooling |
 | `@rebasepro/client` | Typed SDK — HTTP transport, WebSocket, auth | Frontend |
 | `@rebasepro/app` | React framework — Scaffold, controllers, forms, routes, hooks, login views, auth controller hooks | Frontend |
 | `@rebasepro/ui` | Standalone UI component library (Tailwind v4 + Radix) | Frontend |
-| `@rebasepro/studio` | Collection editor, SQL console, JS console, RLS editor, storage browser | Frontend |
+| `@rebasepro/studio` | Schema visualizer and editor, SQL console, JS console, RLS editor, storage browser | Frontend |
 | `@rebasepro/cli` | CLI for schema generation, DB migrations, SDK generation | Dev tooling |
 | `@rebasepro/forms` | Lightweight React form state management | Frontend |
 | `@rebasepro/plugin-ai` | AI-powered field autocompletion plugin | Frontend |
-| `@rebasepro/cms` | Content management views, forms and routing, including CSV/JSON/Excel import and export | Frontend |
-| `@rebasepro/inference` | Infer collection properties from sample rows (the admin's "create a collection from a file" import) | Frontend |
+| `@rebasepro/cms` | The admin panel: a view per table from the descriptors, `customizeTable`, forms and routing, CSV/JSON/Excel import and export | Frontend |
+| `@rebasepro/cms-types` | The panel's types: `customizeTable` options, field options, entity actions | Frontend |
+| `@rebasepro/firebase` | Firestore as a source the panel reads directly: `defineFirestoreCollection` | Frontend |
+| `@rebasepro/inference` | Infer fields from sample rows (the admin's "create from a file" import) | Frontend |
 
 ## Data Flow
 
 ### Read Flow
-1. User opens a collection in Rebase CMS
+1. User opens a table in Rebase CMS
 2. Typed SDK sends `GET /api/data/:slug` + opens a WebSocket subscription
 3. Backend queries PostgreSQL via Drizzle ORM
-4. Data transformer deserializes database records into entity format
+4. The response carries the rows as the API serves them; the panel builds its form values from the row and the table's descriptor
 5. Response sent to frontend, components render
 6. WebSocket keeps the view synced in real-time
 
 ### Write Flow
-1. User edits an entity in the form
-2. `beforeSave` callbacks run (validation, transformation)
-3. Typed SDK sends `PATCH /api/data/:slug/:id`
-4. Backend serializes values, runs Drizzle `UPDATE`
-5. `afterSave` callbacks run (side effects)
+1. User edits a row in the form
+2. Typed SDK sends `PATCH /api/data/:slug/:id`
+3. The backend validates the values against the table and runs the `beforeSave` hooks
+4. It runs the `UPDATE` under the caller's row-level security
+5. `afterSave` hooks run, in the same transaction
 6. `NOTIFY` broadcast triggers WebSocket update to all clients
 7. If history is enabled, a snapshot is recorded
 
@@ -108,4 +122,4 @@ Like drivers, storage backends are registered in a registry. You can have multip
 
 - **[Schema as Code](/docs/architecture/schema-as-code)** — The TypeScript-first approach
 - **[Backend Overview](/docs/backend)** — Server configuration
-- **[Collections](/docs/collections)** — Define your data schema
+- **[Tables](/docs/schema/)** — Define your data schema

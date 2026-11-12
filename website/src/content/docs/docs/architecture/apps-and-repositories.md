@@ -11,19 +11,19 @@ functions. An **app** is something that talks to it.
 
 | Type | What it is |
 | --- | --- |
-| `backend` | The collections, hooks and functions that define the API. Exactly one per project. |
+| `backend` | The tables, hooks and functions that define the API. Exactly one per project. |
 | `static` | A built client bundle — an SPA or static site, served at its own path, or on a hostname of its own. |
 
 That is the whole list. The admin panel is a `static` app like any other: it is
-built in your repository, against your collections, which is why custom fields
-and custom views work in it on day one.
+built in your repository, with your `frontend/src/cms` customizations, which is
+why custom fields and custom views work in it on day one.
 
 Who owns the server process is a property of the backend, not a separate app
 type:
 
 | `runtime` | What it means |
 | --- | --- |
-| `managed` | The platform's runtime image runs your bundle. You supply collections, functions, crons and schema. |
+| `managed` | The platform's runtime image runs your bundle. You supply tables, functions, crons and schema. |
 | `custom` | You supply the server: your own Dockerfile and entrypoint. `rebase eject` sets this up. |
 
 This is independent of *where* it runs. Both run on Rebase Cloud and both
@@ -296,7 +296,7 @@ rebase build admin        # just that app's static assets
 ```
 
 The backend builds first, because a client app's build may consume an SDK
-generated from its collections.
+generated from its tables.
 
 ## Multiple repositories
 
@@ -330,22 +330,23 @@ rebase cloud link                           # or pick a Rebase Cloud project
 The link is written to `.rebase/cloud.json` and is **not committed** — it is
 per-checkout, like a git remote. The manifest is committed; the link is not.
 
-## Typed clients without the collections
+## Typed clients without the tables
 
 This is the mechanism that makes multi-repo work. A repository that contains no
-collections generates its typed SDK from the project itself:
+tables generates its typed SDK from the project itself:
 
 ```bash
 rebase generate-sdk --from link
 rebase generate-sdk --from https://api.example.com --token $REBASE_SERVICE_KEY
 ```
 
-The CLI fetches `/api/meta/contract`, rebuilds the collection definitions —
-including relation targets, which the type generator needs to decide whether a
-foreign key is a string or a number — and emits exactly the same output it would
-have produced from local source.
+The CLI fetches `/api/meta/contract` and reads its `tables` — the compiled
+descriptors, relation targets included, which the type generator needs to
+decide whether a foreign key is a string or a number — and emits exactly the
+same output it would have produced from local source.
 
-The contract endpoint needs the `schema:read` scope, which an admin holds. Collection definitions describe every table,
+The contract endpoint needs the `schema:read` scope, which an admin holds. It
+describes every table,
 column and relation in the project, including ones no security rule would ever
 expose; that is a map of the database, not public API documentation.
 

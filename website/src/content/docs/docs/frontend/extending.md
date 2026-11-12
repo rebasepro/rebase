@@ -254,7 +254,7 @@ panel shows, this is the wrong page. The server has its own ladder:
 
 | I want to… | Rung | Reference |
 |---|---|---|
-| Narrow which rows a read returns | `beforeQuery` hook | [Extending the server](/docs/backend/extending#2-collection-callbacks) |
+| Narrow which rows a read returns | `beforeQuery` hook | [Extending the server](/docs/backend/extending#2-table-hooks) |
 | Redact a value on the way out | `afterRead` hook | [Table hooks](/docs/collections/callbacks) |
 | Add an endpoint of my own | custom function | [Custom Functions](/docs/backend/custom-functions) |
 | Make search find substrings *and* fold accents | `search.mode: "hybrid"` | [Search](/docs/backend/search) |

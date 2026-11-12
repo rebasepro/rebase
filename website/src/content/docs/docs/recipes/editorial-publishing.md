@@ -11,56 +11,52 @@ a documented extension point, so you can take only the parts you need:
 
 | You get | Built with |
 |---|---|
-| Writers draft, editors schedule and publish, enforced by Postgres | [Security rules](/docs/collections/security-rules/) |
+| Writers draft, editors schedule and publish, enforced by Postgres | [Row-level security](/docs/collections/security-rules/) |
 | A board by status, with Submit and Publish buttons | [Kanban view](/docs/frontend/view-modes/), [entity actions](/docs/frontend/entity-actions/) |
 | Scheduled publish and unpublish | A [cron job](/docs/backend/cron-jobs/) |
-| Edit a live post without changing it until you publish | A drafts collection and two entity actions |
+| Edit a live post without changing it until you publish | A drafts table and two entity actions |
 | A preview of unsaved changes | An [entity view](/docs/frontend/entity-views/) |
-| Translations, SEO fields, content blocks | `map` and `oneOf` properties ([arrays and maps](/docs/collections/arrays-and-maps/)) |
-| A media library with alt text and credit | A `media` collection and a relation |
+| Translations, SEO fields, content blocks | JSON columns with a shape ([JSON documents](/docs/schema/json/)) |
+| A media library with alt text and credit | A `media` table and a relation |
 | RSS, a sitemap and a public read API | A [custom function](/docs/backend/custom-functions/) |
-| Notes between writer and editor | A notes collection and an entity view |
+| Notes between writer and editor | A notes table and an entity view |
 | Revisions with rollback | [History](/docs/backend/history/) |
 | A WordPress import | A [script](/docs/recipes/import-from-wordpress/) |
 | Two publications in one install | [Tenancy](/docs/collections/tenancy/) |
 
 It extends the role model of the [Blog CMS recipe](/docs/recipes/blog-cms/):
 `writer` and `editor` are entries in a user's `roles`. If you started from the
-scaffold, add `writer` to the role options in `config/collections/users.ts`.
+scaffold, add `writer` to the role options in `backend/schema/users.ts`.
+
+Each table is a file in `backend/schema/`, exported from its `index.ts`; how
+the admin panel presents it — the board, the buttons, the previews — is a
+`customizeTable` in `frontend/src/cms/`, passed to
+`<RebaseCMS tableCustomizations>`.
 
 ## Media
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 One row per image, so a picture is uploaded once and reused, with its alt text
 and credit beside it:
 
-```typescript
-// config/collections/media.ts
-import { defineCollection } from "@rebasepro/cms-types";
+```ts
+// backend/schema/media.ts
+import { defineTable, col } from "@rebasepro/server/schema";
 
-const mediaCollection = defineCollection({
-    slug: "media",
-    name: "Media",
-    singularName: "Image",
-    table: "media",
-    properties: {
-        file: {
-            type: "string",
-            name: "File",
-            storage: { storagePath: "media", acceptedFiles: ["image/*"] },
-            validation: { required: true }
-        },
-        alt: { type: "string", name: "Alt text", validation: { required: true } },
-        credit: { type: "string", name: "Credit" },
-        caption: { type: "string", name: "Caption", admin: { multiline: true } }
+export const media = defineTable("media", {
+    columns: {
+        id:      col.uuid().primaryKey().defaultRandom(),
+        file:    col.storage({ path: "media/", accept: ["image/*"] }).notNull(),
+        alt:     col.text().notNull(),
+        credit:  col.text(),
+        caption: col.text(),
     },
-    securityRules: [
+    rls: [
         { operation: "select", access: "public" },
-        { operations: ["insert", "update"], roles: ["writer", "editor"] }
+        { operations: ["insert", "update"], roles: ["writer", "editor"] },
     ],
-    admin: { icon: "Image" }
 });
-
-export default mediaCollection;
 ```
 
 A post points at a media row with a relation, and the relation picker lists the
@@ -69,128 +65,48 @@ your [storage authorization](/docs/backend/storage-authorization/).
 
 ## Posts
 
-```typescript
-// config/collections/posts.ts
-import { defineCollection } from "@rebasepro/cms-types";
-import { policy } from "@rebasepro/types";
-import mediaCollection from "./media";
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
-const postsCollection = defineCollection({
-    slug: "posts",
-    name: "Posts",
-    singularName: "Post",
-    table: "posts",
-    history: true,
-    properties: {
-        title: { type: "string", name: "Title", validation: { required: true } },
-        slug: { type: "string", name: "Slug", validation: { required: true, unique: true } },
-        status: {
-            type: "string",
-            name: "Status",
-            enum: [
-                { id: "draft", label: "Draft", color: "gray" },
-                { id: "review", label: "In review", color: "orange" },
-                { id: "scheduled", label: "Scheduled", color: "blue" },
-                { id: "published", label: "Published", color: "green" },
-                { id: "archived", label: "Archived", color: "gray" }
-            ],
-            defaultValue: "draft"
-        },
-        publishAt: { type: "date", name: "Publish at" },
-        unpublishAt: { type: "date", name: "Unpublish at" },
-        summary: { type: "string", name: "Summary", admin: { multiline: true } },
-        hero: {
-            type: "relation",
-            name: "Hero image",
-            relation: { kind: "belongsTo", target: () => mediaCollection }
-        },
-        // Content blocks: each entry picks a type and shows that type's form.
-        body: {
-            type: "array",
-            name: "Body",
-            oneOf: {
-                properties: {
-                    text: {
-                        type: "map",
-                        name: "Text",
-                        properties: { markdown: { type: "string", name: "Text", admin: { markdown: true } } }
-                    },
-                    image: {
-                        type: "map",
-                        name: "Image",
-                        properties: {
-                            media: { type: "reference", name: "Image", path: "media" },
-                            caption: { type: "string", name: "Caption" }
-                        }
-                    },
-                    quote: {
-                        type: "map",
-                        name: "Quote",
-                        properties: {
-                            text: { type: "string", name: "Quote", admin: { multiline: true } },
-                            cite: { type: "string", name: "Source" }
-                        }
-                    },
-                    video: {
-                        type: "map",
-                        name: "Video",
-                        properties: { url: { type: "string", name: "URL", url: true, admin: { urlPreview: "video" } } }
-                    },
-                    html: {
-                        type: "map",
-                        name: "HTML",
-                        properties: { html: { type: "string", name: "HTML", admin: { multiline: true } } }
-                    }
-                }
-            }
-        },
+```ts
+// backend/schema/posts.ts
+import { defineTable, col, rel, json, policy } from "@rebasepro/server/schema";
+import { media } from "./media";
+
+export const posts = defineTable("posts", {
+    columns: {
+        id:          col.uuid().primaryKey().defaultRandom(),
+        title:       col.text().notNull(),
+        slug:        col.text().notNull().unique(),
+        status:      col.enum(["draft", "review", "scheduled", "published", "archived"]).default("draft"),
+        publishAt:   col.timestamptz(),
+        unpublishAt: col.timestamptz(),
+        summary:     col.text(),
+        // Content blocks: each entry names its type and holds that type's content.
+        body: col.jsonb(json.array(json.oneOf({
+            text:  json.object({ markdown: json.string() }),
+            image: json.object({ media: json.string(), caption: json.string() }),
+            quote: json.object({ text: json.string(), cite: json.string() }),
+            video: json.object({ url: json.string().validate({ url: true }) }),
+            html:  json.object({ html: json.string() }),
+        }))),
         // One entry per language besides the default.
-        translations: {
-            type: "map",
-            name: "Translations",
-            properties: {
-                es: {
-                    type: "map",
-                    name: "Español",
-                    properties: {
-                        title: { type: "string", name: "Title" },
-                        summary: { type: "string", name: "Summary", admin: { multiline: true } },
-                        body: { type: "string", name: "Body", admin: { markdown: true } }
-                    }
-                },
-                fr: {
-                    type: "map",
-                    name: "Français",
-                    properties: {
-                        title: { type: "string", name: "Title" },
-                        summary: { type: "string", name: "Summary", admin: { multiline: true } },
-                        body: { type: "string", name: "Body", admin: { markdown: true } }
-                    }
-                }
-            }
-        },
-        seo: {
-            type: "map",
-            name: "SEO",
-            properties: {
-                title: { type: "string", name: "SEO title" },
-                description: { type: "string", name: "Meta description", validation: { max: 160 } },
-                canonical: { type: "string", name: "Canonical URL", url: true }
-            }
-        },
-        createdBy: {
-            type: "string",
-            name: "Created by",
-            autoValue: "user_on_create",
-            admin: { readOnly: true }
-        },
-        __order: {
-            type: "string",
-            name: "Order",
-            admin: { disabled: true, hideFromCollection: true }
-        }
+        translations: col.jsonb(json.object({
+            es: json.object({ title: json.string(), summary: json.string(), body: json.string() }),
+            fr: json.object({ title: json.string(), summary: json.string(), body: json.string() }),
+        })),
+        seo: col.jsonb(json.object({
+            title:       json.string(),
+            description: json.string().validate({ max: 160 }),
+            canonical:   json.string().validate({ url: true }),
+        })),
+        createdBy: col.text().onCreateUser(),
+        __order:   col.text(),
     },
-    securityRules: [
+    relations: {
+        hero: rel.belongsTo(() => media),
+    },
+    history: true,
+    rls: [
         // Readers see published posts only
         { operation: "select", using: "{status} = 'published'" },
         // Writers read and edit their own posts; editors read and edit every post
@@ -206,52 +122,73 @@ const postsCollection = defineCollection({
                 policy.rolesOverlap(["editor", "admin"]),
                 policy.compare(policy.field("status"), "eq", policy.literal("draft")),
                 policy.compare(policy.field("status"), "eq", policy.literal("review"))
-            )
+            ),
         },
-        { operation: "delete", roles: ["admin"] }
+        { operation: "delete", roles: ["admin"] },
     ],
-    admin: {
-        icon: "Newspaper",
-        defaultViewMode: "kanban",
-        orderProperty: "__order",
-        kanban: { columnProperty: "status" },
-        entityActions: [
-            {
-                key: "submit",
-                name: "Submit for review",
-                icon: "Send",
-                collapsed: false,
-                isEnabled: ({ row }) => row?.status === "draft",
-                onClick: async ({ id, context }) => {
-                    if (id === undefined || !context) return;
-                    await context.data.collection<Record<string, unknown>>("posts").update(id, { status: "review" });
-                }
-            },
-            {
-                key: "publish",
-                name: "Publish",
-                icon: "Upload",
-                collapsed: false,
-                // A convenience: the restrictive rule is what stops a writer.
-                isEnabled: ({ row, context }) => row?.status === "review"
-                    && (context?.authController.user?.roles ?? []).some(role => role === "editor" || role === "admin"),
-                onClick: async ({ id, row, context }) => {
-                    if (id === undefined || !context) return;
-                    // A post with a future publishAt waits for the cron below.
-                    const later = typeof row?.publishAt === "string" && new Date(row.publishAt) > new Date();
-                    await context.data.collection<Record<string, unknown>>("posts")
-                        .update(id, { status: later ? "scheduled" : "published" });
-                }
-            }
-        ],
-        entityViews: [
-            { key: "preview", name: "Preview", Builder: "../../frontend/src/editorial/PostPreview" },
-            { key: "notes", name: "Notes", Builder: "../../frontend/src/editorial/EditorialNotes" }
-        ]
-    }
 });
+```
 
-export default postsCollection;
+And how the panel shows them — a board by status, two buttons, and two tabs:
+
+```tsx
+// frontend/src/cms/posts.tsx
+import { customizeTable } from "@rebasepro/cms";
+import type { posts } from "../../../backend/schema/posts";
+import PostPreview from "../editorial/PostPreview";
+import EditorialNotes from "../editorial/EditorialNotes";
+
+export const postsCms = customizeTable<typeof posts>("posts", {
+    icon: "Newspaper",
+    defaultViewMode: "kanban",
+    kanban: { columnField: "status", orderField: "__order" },
+    fields: {
+        summary: { multiline: true },
+        createdBy: { readOnly: true },
+        __order: { hidden: true, disabled: true },
+        status: {
+            enumLabels: {
+                draft:     { label: "Draft", color: "gray" },
+                review:    { label: "In review", color: "orange" },
+                scheduled: { label: "Scheduled", color: "blue" },
+                published: { label: "Published", color: "green" },
+                archived:  { label: "Archived", color: "gray" },
+            },
+        },
+    },
+    entityActions: [
+        {
+            key: "submit",
+            name: "Submit for review",
+            icon: "Send",
+            collapsed: false,
+            isEnabled: ({ row }) => row?.status === "draft",
+            onClick: async ({ id, context }) => {
+                if (id === undefined || !context) return;
+                await context.data.table("posts").update(id, { status: "review" });
+            },
+        },
+        {
+            key: "publish",
+            name: "Publish",
+            icon: "Upload",
+            collapsed: false,
+            // A convenience: the restrictive rule is what stops a writer.
+            isEnabled: ({ row, context }) => row?.status === "review"
+                && (context?.authController.user?.roles ?? []).some(role => role === "editor" || role === "admin"),
+            onClick: async ({ id, row, context }) => {
+                if (id === undefined || !context) return;
+                // A post with a future publishAt waits for the cron below.
+                const later = typeof row?.publishAt === "string" && new Date(row.publishAt) > new Date();
+                await context.data.table("posts").update(id, { status: later ? "scheduled" : "published" });
+            },
+        },
+    ],
+    entityViews: [
+        { key: "preview", name: "Preview", Builder: PostPreview },
+        { key: "notes", name: "Notes", Builder: EditorialNotes },
+    ],
+});
 ```
 
 What each part does:
@@ -265,12 +202,13 @@ What each part does:
   dragging a card between columns is the same save, under the same rules.
 - **Revisions.** `history: true` keeps a snapshot of every save, with a revert
   button in the record's History tab.
-- **Translations.** The built-in map field lays out one group of fields per
-  language. To show the languages as tabs instead, give `translations` a
-  [custom field](/docs/frontend/custom-fields/).
-- **Blocks.** `oneOf` gives typed, reorderable blocks stored as JSON. For an
-  inline editor such as BlockNote or TipTap, put it behind a custom field on an
-  `array` with no `of`; the editor's JSON is stored as it is.
+- **Translations.** A JSON column with a shape gets one group of fields per
+  language in the form. To show the languages as tabs instead, give
+  `translations` a [custom field](/docs/frontend/custom-fields/).
+- **Blocks.** `json.oneOf` as the items of a `json.array` gives typed,
+  reorderable blocks stored as JSON. For an inline editor such as BlockNote or
+  TipTap, put it behind a custom field on a `col.jsonb()` with no shape; the
+  editor's JSON is stored as it is.
 
 ## Scheduled publishing
 
@@ -288,7 +226,7 @@ export default defineCron({
     name: "Publish scheduled posts",
 
     async handler(ctx) {
-        const posts = ctx.rebase.dataAsAdmin.collection<Post>("posts");
+        const posts = ctx.rebase.dataAsAdmin.table<Post>("posts");
         const now = new Date().toISOString();
 
         const { data: due } = await posts.find({
@@ -307,63 +245,64 @@ export default defineCron({
 ```
 
 `dataAsAdmin` runs with the `admin` role, so the restrictive rule lets it
-through, and the collection's callbacks and history still run on these saves.
+through, and the table's hooks and history still run on these saves.
 
 ## Editing a live post
 
 Editing a published post changes it live, and the rules above stop a writer
 from editing it at all. To prepare changes and publish them in one step, keep
-them in a second collection with the same fields:
+them in a second table with the same columns:
 
-```typescript
-// config/collections/post_drafts.ts
-import { defineCollection } from "@rebasepro/cms-types";
-import postsCollection from "./posts";
+```ts
+// backend/schema/post_drafts.ts
+import { defineTable, col } from "@rebasepro/server/schema";
+import { posts } from "./posts";
 
-const postDraftsCollection = defineCollection({
-    slug: "post_drafts",
-    name: "Post drafts",
-    singularName: "Post draft",
-    table: "post_drafts",
-    properties: {
-        ...postsCollection.properties,
-        postId: { type: "string", name: "Live post", admin: { readOnly: true } }
+export const postDrafts = defineTable("post_drafts", {
+    columns: {
+        ...posts.config.columns,
+        postId: col.text().readOnly(),
     },
-    securityRules: [
+    rls: [
         { operations: ["select", "insert", "update"], ownerField: "createdBy", roles: ["writer"] },
-        { operations: ["select", "insert", "update", "delete"], roles: ["editor"] }
+        { operations: ["select", "insert", "update", "delete"], roles: ["editor"] },
     ],
-    admin: {
-        icon: "FilePen",
-        entityActions: [
-            {
-                key: "apply",
-                name: "Publish changes",
-                icon: "Upload",
-                collapsed: false,
-                onClick: async ({ id, row, context }) => {
-                    if (id === undefined || !row || !context) return;
-                    // Copy everything except the draft's own bookkeeping onto the live post.
-                    const { id: _draftId, postId, status: _status, createdBy: _createdBy, __order: _order, ...changes } = row;
-                    await context.data.collection<Record<string, unknown>>("posts").update(String(postId), changes);
-                    await context.data.collection<Record<string, unknown>>("post_drafts").delete(id);
-                    context.snackbarController?.open({ type: "success", message: "The live post is updated." });
-                }
-            }
-        ]
-    }
 });
+```
 
-export default postDraftsCollection;
+```tsx
+// frontend/src/cms/post_drafts.tsx
+import { customizeTable } from "@rebasepro/cms";
+import type { postDrafts } from "../../../backend/schema/post_drafts";
+
+export const postDraftsCms = customizeTable<typeof postDrafts>("post_drafts", {
+    icon: "FilePen",
+    entityActions: [
+        {
+            key: "apply",
+            name: "Publish changes",
+            icon: "Upload",
+            collapsed: false,
+            onClick: async ({ id, row, context }) => {
+                if (id === undefined || !row || !context) return;
+                // Copy everything except the draft's own bookkeeping onto the live post.
+                const { id: _draftId, postId, status: _status, createdBy: _createdBy, __order: _order, ...changes } = row;
+                await context.data.table("posts").update(String(postId), changes);
+                await context.data.table("post_drafts").delete(id);
+                context.snackbarController?.open({ type: "success", message: "The live post is updated." });
+            },
+        },
+    ],
+});
 ```
 
 Then give `posts` an action that starts a draft from a published post, and add
-`draftChanges` to its `entityActions`:
+`draftChanges` to the `entityActions` of `postsCms`:
 
 ```typescript
-import type { EntityAction } from "@rebasepro/cms-types";
+import type { TableEntityAction } from "@rebasepro/cms-types";
 
-export const draftChanges: EntityAction = {
+export const draftChanges: TableEntityAction = {
     key: "draft-changes",
     name: "Draft changes",
     icon: "FilePen",
@@ -371,7 +310,7 @@ export const draftChanges: EntityAction = {
     onClick: async ({ id, row, context }) => {
         if (id === undefined || !row || !context) return;
         const { id: _postId, __order: _order, ...fields } = row;
-        await context.data.collection<Record<string, unknown>>("post_drafts").create({ ...fields, postId: String(id) });
+        await context.data.table("post_drafts").create({ ...fields, postId: String(id) });
         context.snackbarController?.open({ type: "success", message: "Draft created in Post drafts." });
     }
 };
@@ -424,29 +363,26 @@ origin.
 
 Notes between writer and editor are rows of their own, shown on the post:
 
-```typescript
-// config/collections/post_notes.ts
-import { defineCollection } from "@rebasepro/cms-types";
+```ts
+// backend/schema/post_notes.ts
+import { defineTable, col } from "@rebasepro/server/schema";
 
-const postNotesCollection = defineCollection({
-    slug: "post_notes",
-    name: "Post notes",
-    table: "post_notes",
-    properties: {
-        id: { type: "number", name: "ID", isId: "increment" },
-        postId: { type: "string", name: "Post", validation: { required: true } },
-        body: { type: "string", name: "Note", validation: { required: true } },
-        createdBy: { type: "string", name: "By", autoValue: "user_on_create" },
-        createdAt: { type: "date", name: "At", autoValue: "on_create" }
+export const postNotes = defineTable("post_notes", {
+    columns: {
+        id:        col.integer().primaryKey().identity(),
+        postId:    col.text().notNull(),
+        body:      col.text().notNull(),
+        createdBy: col.text().onCreateUser(),
+        createdAt: col.timestamptz().onCreateNow(),
     },
-    securityRules: [
-        { operations: ["select", "insert"], roles: ["writer", "editor"] }
+    rls: [
+        { operations: ["select", "insert"], roles: ["writer", "editor"] },
     ],
-    admin: { hideFromNavigation: true }
 });
-
-export default postNotesCollection;
 ```
+
+Keep it out of the drawer with `hideFromNavigation: true` in its
+`customizeTable`.
 
 ```tsx
 // frontend/src/editorial/EditorialNotes.tsx
@@ -482,8 +418,8 @@ export default function EditorialNotes({ id }: EntityCustomViewParams) {
 }
 ```
 
-To tell the other person, send an email from the notes collection's `afterSave`
-[callback](/docs/collections/callbacks/) with `rebase.email`.
+To tell the other person, send an email from the notes table's `afterSave`
+[hook](/docs/collections/callbacks/) with `rebase.email`.
 
 ## Feeds, sitemap and a public read API
 
@@ -511,7 +447,7 @@ const escapeXml = (text: string) => text.replace(/[<>&'"]/g, ch =>
     ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", "'": "&apos;", "\"": "&quot;" })[ch] ?? ch);
 
 export default defineFunction((app, { rebase }) => {
-    const published = () => rebase.dataAsAdmin.collection<Post>("posts").find({
+    const published = () => rebase.dataAsAdmin.table<Post>("posts").find({
         where: { status: ["==", "published"] },
         orderBy: ["publishAt", "desc"],
         limit: 100
@@ -540,7 +476,7 @@ export default defineFunction((app, { rebase }) => {
 
     // GET /api/functions/site/posts/:slug?lang=es — one published post, translated.
     app.get("/posts/:slug", async (c) => {
-        const { data } = await rebase.dataAsAdmin.collection<Post>("posts").find({
+        const { data } = await rebase.dataAsAdmin.table<Post>("posts").find({
             where: { slug: ["==", c.req.param("slug")], status: ["==", "published"] },
             limit: 1
         });
@@ -567,15 +503,15 @@ can run again without duplicating anything: see
 
 ## Two publications in one install
 
-For a blog and a news site sharing one Rebase, add a `site` property to
+For a blog and a news site sharing one Rebase, add a `site` column to
 `posts`, `post_drafts`, `post_notes` and `media`, and declare
-[`tenant`](/docs/collections/tenancy/) on each with a membership collection. An
+[`tenant`](/docs/collections/tenancy/) on each with a membership table. An
 editor who works on both sites then sees both, a writer on one sees only that
 one, and Postgres enforces it.
 
 ## Related
 
 - [Blog CMS recipe](/docs/recipes/blog-cms/): the smaller version of the workflow
-- [Security Rules (RLS)](/docs/collections/security-rules/): what the rules compile to
+- [Row-level security](/docs/collections/security-rules/): what the rules compile to
 - [Entity actions](/docs/frontend/entity-actions/) and [entity views](/docs/frontend/entity-views/)
 - [Cron jobs](/docs/backend/cron-jobs/) and [custom functions](/docs/backend/custom-functions/)

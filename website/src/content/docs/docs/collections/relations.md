@@ -147,7 +147,7 @@ export const authors = defineTable("authors", {
     columns: { id: col.uuid().primaryKey().defaultRandom(), name: col.text().notNull() },
     relations: {
         // reads posts.author_id
-        posts:   rel.hasMany(() => posts, { foreignKey: "author_id", orderBy: ["createdAt", "desc"] }),
+        posts:   rel.hasMany(() => posts, { foreignKey: "author_id" }),
         // reads profiles.author_id, which is unique
         profile: rel.hasOne(() => profiles, { foreignKey: "author_id" }),
     },
@@ -156,8 +156,13 @@ export const authors = defineTable("authors", {
 ```
 
 `foreignKey` is the SQL column on the target, and defaults to
-`<this table's slug in the singular>_id`: on `authors`, `author_id`. `orderBy`
-on `hasMany` is the order related rows come back in when the caller names none.
+`<this table's slug in the singular>_id`: on `authors`, `author_id`.
+
+`hasMany` also declares an `orderBy` option — the order related rows would come
+back in when the caller names none — but the schema compiler does not accept it
+yet: a table that sets it is refused (`has-many-order-by`) by boot,
+`rebase db generate` and `db push`. Until then, related rows come back in the
+order the caller asks for with `include`'s own `orderBy`.
 
 ### Joining on a natural key
 

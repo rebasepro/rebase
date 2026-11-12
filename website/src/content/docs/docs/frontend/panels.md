@@ -1,17 +1,16 @@
 ---
 title: Panels in a page of your own
 sidebar_label: Panels in your own pages
-description: "Show one collection, one record's form, one record or one value in a page of your own: CollectionPanel, RecordForm, RecordDetail, FieldValue and CollectionsProvider, with no admin shell around them."
+description: "Show one table, one record's form, one record or one value in a page of your own: CollectionPanel, RecordForm, RecordDetail, FieldValue and CollectionsProvider, with no admin shell around them."
 ---
 
 You do not need the whole admin to show one table. `<CollectionPanel>` takes
-the collection as a value and works anywhere under `<Rebase>` and a React
-Router router, with no `<RebaseCMS>`, `<RebaseNavigation>` or `<RebaseShell>`:
+a table by its slug and works anywhere under `<Rebase>` and a React Router
+router, with no `<RebaseCMS>`, `<RebaseNavigation>` or `<RebaseShell>`:
 
 ```tsx
 import { Rebase, useRebaseAuthController } from "@rebasepro/app";
 import { CollectionPanel } from "@rebasepro/cms";
-import { postsCollection } from "../config/collections/posts";
 // Plus BrowserRouter, or any other router, from "react-router".
 
 export function App() {
@@ -21,7 +20,7 @@ export function App() {
         <Rebase client={client} authController={authController}>
             <BrowserRouter>
                 <MyPageLayout>
-                    <CollectionPanel collection={postsCollection}/>
+                    <CollectionPanel collection="posts"/>
                 </MyPageLayout>
             </BrowserRouter>
         </Rebase>
@@ -40,8 +39,9 @@ should show Rebase's sign-in first.
 
 ## What a panel shows
 
-A panel draws the collection as the admin does. These props narrow it to what
-your page needs; none of them changes the collection's own page.
+A panel draws the table as the admin does — from the descriptor the server
+serves, with any `customizeTable` you registered. These props narrow it to what
+your page needs; none of them changes the table's own page in the admin.
 
 ```tsx
 import { CollectionPanel } from "@rebasepro/cms";
@@ -61,9 +61,9 @@ import { Button } from "@rebasepro/ui";
     className="max-h-[480px]"/>
 ```
 
-`collection` takes the collection's name, as here, or the collection itself as
-a value (`collection={ordersCollection}`); `path` names it too, and addresses a
-subcollection by its full path.
+`collection` takes the table's slug, as here, or an external collection
+(`defineFirestoreCollection`) as a value; `path` names it too, and addresses a
+nested collection by its full path.
 
 - `fields` — the properties it shows, in this order, and nothing else. In the
   table they are the columns. In the list, on a card and on a kanban card they
@@ -124,9 +124,10 @@ scrolls inside the space it has, up to the window's height. Give it a height to
 fill it. It lays itself out by its own width, not the window's: in a narrow
 column it uses its compact layout, whatever the screen.
 
-`propertiesOrder` reorders and never hides: a property it leaves out is drawn
-after the ones it names. To hide one everywhere, set `admin.hideFromCollection`
-on it; to show only some in one place, pass `fields`.
+`fieldOrder` in the table's `customizeTable` reorders and never hides: a field
+it leaves out is drawn after the ones it names. To keep one out of the list
+everywhere, set `hidden: true` on its field options; to show only some in one
+place, pass `fields`.
 
 ## One record's form
 
@@ -140,18 +141,17 @@ its record is deleted:
 
 ```tsx
 <RecordForm
-    collection={postsCollection}
+    collection="posts"
     id={postId}
     onSaved={({ id }) => console.log("saved", id)}
     onClose={() => navigate("/posts")}/>
 ```
 
-Like `CollectionPanel`, the form and `RecordDetail` take a registered
-collection by its name, with no config object in hand:
-`<RecordForm collection="posts" id={postId}/>` (`path="posts"` works too). Under `<RebaseCMS>` or a
-`CollectionsProvider` that registers it, that is all they need. With no scope
-above, hand the collection over as a value, as here, and the panel brings its
-own; one named by a path nothing registers says the record is not found.
+Like `CollectionPanel`, the form and `RecordDetail` take a table by its slug
+(`path="posts"` works too). Every table the server serves is known to them,
+under `<RebaseCMS>`, under a `CollectionsProvider`, or with no scope above, in
+which case the panel brings its own. An external collection is handed over as
+a value. One named by a path nothing serves says the record is not found.
 
 If someone else deletes the record while the form is open, the form keeps
 what was typed and says the record was deleted elsewhere. Its "Save as new"
@@ -186,7 +186,7 @@ Either way the form validates only the fields it shows; the server still
 checks the whole record. A form that creates a record and leaves out a
 required field with no default value says so when it opens: an error names the
 field, and Save stays blocked until the field is shown or given a default.
-`collectionOverrides` changes the collection for this form only, as it does for
+`collectionOverrides` changes the presentation for this form only, as it does for
 `CollectionPanel`.
 
 Each form scopes its DOM ids, so two forms can share a page. To find a field
@@ -214,8 +214,8 @@ import { RecordDetail } from "@rebasepro/cms";
 value as the server sends it. A belongsTo arrives as its foreign key
 (`order.customerId`), so `field="customer" value={order.customerId}` draws the
 related record's title; naming the foreign key itself, `field="customerId"`,
-does the same. It needs the collection registered above it, by `<RebaseCMS>`
-or a `CollectionsProvider`. An unknown collection or field throws an error
+does the same. It needs the table known above it, by `<RebaseCMS>` or a
+`CollectionsProvider`. An unknown collection or field throws an error
 that names it.
 
 ```tsx
@@ -239,24 +239,26 @@ function OrderList() {
 The three panels bring their own `CollectionsProvider` when none is above them. That is
 the step underneath, and you can mount it yourself to share one scope between
 several panels, or to use the lower-level pieces (`CollectionViewBinding`,
-`useSidePanel`) under it. Inside it, a panel can name its collection by `path`:
+`useSidePanel`) under it. It takes the same inputs as `<RebaseCMS>`:
 
 ```tsx
 import { CollectionPanel, CollectionsProvider } from "@rebasepro/cms";
+import { postsCms } from "./cms/posts";
 
-const collections = [postsCollection, authorsCollection];
+const tableCustomizations = [postsCms];
 
-<CollectionsProvider collections={collections}>
+<CollectionsProvider tableCustomizations={tableCustomizations}>
     <CollectionPanel collection="posts"/>
     <CollectionPanel collection="authors"/>
 </CollectionsProvider>
 ```
 
-`CollectionsProvider` holds a registry of the collections you hand it, with
-your plugins' `modifyCollection` and `injectCollections` applied as in the
-admin, plus the side panels and dialogs records open in, and the
-unsaved-changes guard. Keep the `collections` array stable: a module constant,
-or `useMemo`.
+`CollectionsProvider` holds a registry of the tables the server serves, with
+your `tableCustomizations` and any `externalCollections`, your plugins'
+`modifyCollection` and `injectCollections` applied as in the admin, plus the
+side panels and dialogs records open in, and the unsaved-changes guard. Keep
+the arrays stable: a module constant, or `useMemo`. `tables` replaces the
+served tables with descriptors you pass, for embedding and tests.
 
 ## Next
 

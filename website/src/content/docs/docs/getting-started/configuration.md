@@ -159,10 +159,10 @@ answers.
 ### Storage
 
 :::caution[Storage has no row-level security, so it needs an access model]
-Collections are protected by Postgres RLS. Object storage has no equivalent —
+Tables are protected by Postgres RLS. Object storage has no equivalent —
 keys share one flat namespace — so with a bucket configured and no access model
 the server **refuses to boot in production**. Satisfy it with exactly one of:
-a `storageAuthorize` hook exported from `config/index.ts` (what the scaffold
+a `storageAuthorize` hook exported from `backend/storage.ts` (what the scaffold
 ships), `STORAGE_PUBLIC_READ`, or `STORAGE_ALLOW_ANY_AUTHENTICATED`.
 :::
 
@@ -227,7 +227,7 @@ image. A project that has ejected owns these decisions in its own code instead.
 | `REBASE_RLS_GRANTS` | What Rebase grants the request role: `schema` (every table in the schemas it serves, plus default privileges), `managed` (only the tables it serves) or `none`. | `schema` |
 | `REBASE_RLS_POLICY_TARGET` | `requestRole` narrows Rebase's permissive policies to the request role(s), so other roles reading the same tables get nothing from them. | `public` |
 | `REBASE_RLS_ADMIN_POLICIES` | `public` writes the policies only the server context or an admin can pass `TO public`, and runs admins as the request role. By default they are `TO rebase_admin`, so signed-in users' owner-scoped reads can use the owner index. See [Admin requests and `rebase_admin`](/docs/deployment/existing-database/#admin-requests-and-rebase_admin). | `adminRole` |
-| `REBASE_RLS_DEFAULT_POLICIES` | `false` drops the server-or-admin baseline policy from every collection. | `true` |
+| `REBASE_RLS_DEFAULT_POLICIES` | `false` drops the server-or-admin baseline policy from every table. | `true` |
 | `REBASE_RLS_IDENTITY` | `supabase` also sets `request.jwt.claims` and `request.jwt.claim.*`, so policies written with `auth.uid()` see the caller. | `rebase` |
 | `REBASE_RLS_SHARED_ROLE` | What a boot does when another login can switch into the request role: `warn`, `refuse` or `ignore`. | `warn` |
 | `REBASE_BASE_PATH` | Base path for every API route. The client must be told the same thing — see [Changing `basePath`](#changing-basepath). | `/api` |
@@ -239,9 +239,9 @@ image. A project that has ejected owns these decisions in its own code instead.
 | `REBASE_METRICS` | Expose Prometheus metrics at `/metrics`. | `false` |
 | `REBASE_HSTS_INCLUDE_SUBDOMAINS` | Add `includeSubDomains` to the `Strict-Transport-Security` header, so browsers refuse plain HTTP on every subdomain of the host for six months — hosts this process does not serve included. Turn it on only when every subdomain of the domain is HTTPS-only. Anything but `true`/`false` refuses to boot. See [Security headers](/docs/deployment/self-hosting/#security-headers). | `false` |
 | `REBASE_METRICS_TOKEN` | Bearer token guarding `/metrics`. Unset leaves the endpoint open to anything that can reach the port — fine on a private network, not on a public one, and the boot logs say so. | — |
-| `REBASE_MIGRATE_ON_BOOT` | What the runtime may do to the collection schema at boot. `ensure` (the default, everywhere — production included) runs the **additive** pass: create missing tables, columns and enum types, never drop or rewrite one. `none` leaves the collection schema alone, but the framework's own tables (auth, API keys, jobs, cron) are still created and kept current; `REBASE_PROVISION=false` turns those off too. The published image accepts only those two and **refuses to boot on `push`**. In a [split deployment](/docs/deployment/split-processes) exactly one process may provision, so every other role must set `none` or refuse to boot. | `ensure` |
+| `REBASE_MIGRATE_ON_BOOT` | What the runtime may do to the tables' schema at boot. `ensure` (the default, everywhere — production included) runs the **additive** pass: create missing tables, columns and enum types, never drop or rewrite one. `none` leaves the declared tables' schema alone, but the framework's own tables (auth, API keys, jobs, cron) are still created and kept current; `REBASE_PROVISION=false` turns those off too. The published image accepts only those two and **refuses to boot on `push`**. In a [split deployment](/docs/deployment/split-processes) exactly one process may provision, so every other role must set `none` or refuse to boot. | `ensure` |
 | `REBASE_PROVISION` | `false` makes the runtime change nothing in its database: no table, column, index, function, trigger, policy, role or grant, at boot or later, the framework's own included. It reports what is missing by name instead. For a database that only your change process may change. See [When only your change process may change the database](/docs/deployment/self-hosting/#when-only-your-change-process-may-change-the-database). Only `true` and `false` are accepted. | `true` |
-| `REBASE_REQUIRE_SCHEMA_MATCH` | Refuse to boot when the database was last provisioned from a different set of collections than this process was built from. Unset (or anything other than `true`/`1`) warns instead. | warn |
+| `REBASE_REQUIRE_SCHEMA_MATCH` | Refuse to boot when the database was last provisioned from a different set of tables than this process was built from. Unset (or anything other than `true`/`1`) warns instead. | warn |
 | `REBASE_REQUIRE_FILES_LOADED` | Refuse to boot when a function or cron file throws or does not parse while importing, naming each file and why, so a rolling deploy leaves the old version serving. A restart is held to it too. Unset (or anything other than `true`) skips the file and serves the rest. A file that imports cleanly and exports no function or job is always skipped, not refused. | skip |
 | `REALTIME_CDC` | Database-level change capture: `auto` (enable where the connection supports it, silently fall back otherwise), `trigger` (force it, warn if impossible), `wal` (read changes from the write-ahead log instead of triggers; needs `wal_level=logical` and a role that may replicate, falls back to `trigger` otherwise), `off`. See [Realtime](/docs/backend/realtime-cdc/). Wins over `realtime.cdc`. | `auto` |
 | `REALTIME_CHANNEL_BUS` | Cross-instance transport for broadcast channels and presence: `memory` or `postgres`. Ignored when `realtime.bus` was given a constructed transport. | `memory` |
@@ -251,7 +251,6 @@ image. A project that has ejected owns these decisions in its own code instead.
 | `REALTIME_RECOUNT_INTERVAL_MS` | How long a big list subscription's total may be reused before it is counted again, in ms; frames that reuse it carry `meta.totalAsOf`. Unset, every frame counts. Wins over `realtime.recountIntervalMs`. | Unset |
 | `REALTIME_RECOUNT_MIN_ROWS` | The smallest last total `REALTIME_RECOUNT_INTERVAL_MS` applies to; smaller lists are counted on every frame. Wins over `realtime.recountMinRows`. | `100000` |
 | `ALLOW_LOCALHOST_IN_PRODUCTION` | Permit `localhost`/loopback values under `NODE_ENV=production`. Off, so a production boot fails loudly rather than connecting to a database that is not there. | `false` |
-| `REBASE_STRICT_COLLECTION_CONFIG` | What boot does with a key in your collections that this version does not read: `warn`, `error` (refuse to boot — worth turning on in CI), or `off`. Only governs keys it does not *recognise*, which are usually a typo and occasionally deliberate metadata; a key it knows has moved is always fatal, because the feature it configured is silently absent otherwise. | `warn` |
 | `REBASE_PROVISION_ONLY` | `1`/`true` runs the schema pass and exits without opening a socket — the shape a migration Job wants, from the same image and the same bundle as the server that follows it. It also creates the tables a serving process would otherwise make on first use, and starts no cron or job queue. An empty value is *unset*, so an unsubstituted `${SOMETHING}` in a compose file cannot turn an ordinary deployment into one that migrates and refuses to serve. Refused together with `REBASE_PROVISION=false`. | — |
 | `REBASE_PROVISION_SQL_OUT` | A file path. A provisioning run (`REBASE_PROVISION_ONLY=true`) writes every schema change it made to it, in order, as a SQL script to review and apply with `psql`. Rows it wrote are not included. Refused on a process that serves. | — |
 | `REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY` | `true` lets a machine — an agent, a CI job — *apply* a schema change through `/api/admin/schema`, not only plan one. Off unless asked for: the credential that would make such a change is the one most likely to be sitting in a CI variable. | `false` |
@@ -309,7 +308,7 @@ container's job title.
 ### Live schema editing from a bundle
 
 Off unless `REBASE_LIVE_SCHEMA_REPOSITORY` is set. A built bundle has no
-collection source to edit, so with these set the admin's collection editor reads
+`backend/schema` source to edit, so with these set the schema editor reads
 the source from the repository, commits each change back, and runs its DDL on
 this database. Admin-only, and applied by a person unless
 `REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY` says otherwise. A repository named with
@@ -320,7 +319,7 @@ no usable credential refuses to boot. See
 |----------|-------------|---------|
 | `REBASE_LIVE_SCHEMA_REPOSITORY` | The GitHub repository to commit schema changes to, as `owner/name`. Setting it is what turns the feature on. | — |
 | `REBASE_LIVE_SCHEMA_BRANCH` | The branch the commit lands on. | `main` |
-| `REBASE_LIVE_SCHEMA_COLLECTIONS_PATH` | Where the collection source lives in that repository, repo-relative. | `config/collections` |
+| `REBASE_LIVE_SCHEMA_PATH` | <span class="since-badge" data-since="0.31">Since 0.31</span> Where `backend/schema` lives in that repository, repo-relative. A path that leaves the repository refuses to boot, and so does the removed `REBASE_LIVE_SCHEMA_COLLECTIONS_PATH`. | `backend/schema` |
 | `REBASE_LIVE_SCHEMA_GITHUB_TOKEN` | A fine-grained token with read and write access to the repository's contents. Set this or the three `_GITHUB_APP_*` variables, not both. | — |
 | `REBASE_LIVE_SCHEMA_GITHUB_APP_ID` | A GitHub App's id, to commit as the app instead of with a token. | — |
 | `REBASE_LIVE_SCHEMA_GITHUB_APP_INSTALLATION_ID` | The app's installation on the repository. | — |
@@ -362,7 +361,7 @@ bundle at boot. These decide which one and how.
 
 ### Resource bindings
 
-Every database, bucket and topic a project declares in `config/resources.ts` is
+Every database, bucket and topic a project declares in `backend/resources.ts` is
 bound by environment variables named after it. The base names are below; a
 non-default resource appends `__` and its key in upper case, so a bucket called
 `media` reads `S3_BUCKET__MEDIA`. `rebase status`
@@ -437,7 +436,7 @@ import { env } from "./env";
 await initializeRebaseBackend({
     app,
     server,
-    collectionsDir: "./config/collections",
+    schemaDir: "./schema",     // The backend/schema directory: the tables, and what the schema editor writes
     basePath: "/api",        // Base path for all API routes (default: "/api")
 
     database: createPostgresAdapter({

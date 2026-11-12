@@ -108,10 +108,10 @@ first admin](#your-first-admin).
 
 ### The schema
 
-The runtime creates missing tables at boot, **including your collections'** —
+The runtime creates missing tables at boot, **including the ones `backend/schema` declares** —
 `REBASE_MIGRATE_ON_BOOT` defaults to `ensure`, which is additive across the whole
 schema and applies row-level security with it. A first `docker compose up`
-against an empty database comes up serving your collections.
+against an empty database comes up serving your tables.
 
 What boot never does is change something that already exists: it does not alter
 a column type, drop anything, or edit an existing enum's labels, because a
@@ -195,7 +195,7 @@ Before deploying to production, ensure:
 |------|---------|
 | **First admin** | Set `REBASE_ADMIN_EMAIL` and `REBASE_ADMIN_PASSWORD` **before the first boot**, and `DISABLE_SELF_REGISTRATION=true`. In production the first account to register is not promoted — see [Your first admin](#your-first-admin). |
 | **NODE_ENV** | `NODE_ENV=production`. It is what closes the bootstrap window, refuses local file storage, requires `CORS_ORIGINS`, and turns the OpenAPI docs off. A deployment left at the default is running in development mode. |
-| **Database schema** | Boot creates your collection tables and their RLS additively. Run `pnpm run db:push` (or `pnpm run db:migrate`) for anything not purely additive. |
+| **Database schema** | Boot creates your declared tables and their RLS additively. Run `pnpm run db:push` (or `pnpm run db:migrate`) for anything not purely additive. |
 | **JWT_SECRET** | Use a cryptographically strong random string (≥ 32 chars). Never reuse across environments. |
 | **DATABASE_URL** | Use a managed Postgres instance (Neon, Supabase, RDS) with TLS enabled |
 | **CORS_ORIGINS** | Always, not only when the frontend is on another domain. The runtime refuses to start in production with neither `CORS_ORIGINS` nor `FRONTEND_URL`, because an API that guesses its allowed origins eventually allows the wrong one. |
@@ -346,11 +346,11 @@ The `basename` approach above is the recommended one — react-router strips the
 prefix from the location, so the admin works unchanged. If instead you embed the
 admin inside a **path-prefixed route** of a larger app (e.g. `<Route path="/admin/*">`)
 with no `basename`, the current path keeps its `/admin` prefix. Tell the CMS about
-it so URL⇄collection resolution accounts for the prefix — otherwise views hang on a
+it so URL⇄table resolution accounts for the prefix — otherwise views hang on a
 spinner with no data fetch:
 
 ```tsx
-<RebaseCMS collections={collections} basePath="/admin" />
+<RebaseCMS tableCustomizations={tableCustomizations} basePath="/admin" />
 ```
 
 Set **either** the router `basename` **or** `RebaseCMS basePath` — not both, or the

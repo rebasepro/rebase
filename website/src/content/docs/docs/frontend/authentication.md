@@ -41,7 +41,7 @@ Pass the `authController` to `<Rebase authController>`. `<RebaseShell>` (or `<Re
 If your app signs users in with its own provider (Clerk, Firebase Auth, a
 session of its own), give the client you pass to `<Rebase client>` a token
 getter. The panel's HTTP requests and its realtime socket both send what it
-returns, so live collection views run as the same user:
+returns, so live views run as the same user:
 
 ```typescript
 client.setAuthTokenGetter(() => clerk.session?.getToken() ?? Promise.resolve(null));
@@ -82,31 +82,19 @@ The login view handles:
 
 ## Roles Model
 
-Roles are stored as a `text[]` array column directly on the `rebase.users` table. You define available roles as an enum in your users collection definition:
+Roles are stored as a `text[]` array column on the users table. You state the
+roles a user may hold as a closed set on that column, in the table declared
+with [`defineAuthTable`](/docs/schema/auth-table/):
 
-```typescript title="config/collections/users.ts" no-verify
-roles: {
-    name: "Roles",
-    type: "array",
-    columnType: "text[]",
-    of: {
-        name: "Role",
-        type: "string",
-        enum: {
-            admin: "Admin",
-            editor: "Editor",
-            viewer: "Viewer"
-        }
-    },
-    admin: {
-        readOnly: false
-    }
-}
+```typescript title="backend/schema/users.ts"
+roles: col.array(col.text().oneOf(["admin", "editor", "viewer"])),
 ```
 
-To add or remove role options, update the `enum` map in your users collection and regenerate the schema.
+To add or remove a role, change that list. The labels the panel shows for each
+value belong to the frontend: `enumLabels` on the field in
+`frontend/src/cms/users.tsx` (see [Customizing a table](/docs/frontend/customize-table/)).
 
-A role in this list is a name your [security rules](/docs/collections/security-rules) can match. What it may do beyond its rows (manage users, read logs, change the schema) is declared separately, under `auth.roles` on the same collection. `admin` is built in and holds everything. See [Roles and scopes](/docs/backend/roles-and-scopes).
+A role in this list is a name your [security rules](/docs/collections/security-rules) can match. What it may do beyond its rows (manage users, read logs, change the schema) is declared separately, under `auth.roles` on the same table. `admin` is built in and holds everything. See [Roles and scopes](/docs/backend/roles-and-scopes).
 
 ## Testing access: Simulate access
 
@@ -118,7 +106,7 @@ service key.
 Every data view, and a record's History tab, then reads through the server as
 that identity, against the real row-level security policies: a grid shows
 exactly the rows it can read,
-fields its roles cannot read are masked, and the banner counts the collections
+fields its roles cannot read are masked, and the banner counts the tables
 it sees nothing in. The server checks on every request that you are an
 administrator.
 
@@ -139,7 +127,7 @@ session may use it:
 
 ```typescript
 const asCustomer = client.simulate({ role: "customer", userId: "u_1" });
-const { data } = await asCustomer.data.collection("tickets").find();
+const { data } = await asCustomer.data.table("tickets").find();
 asCustomer.close();
 ```
 
@@ -155,5 +143,5 @@ passed, and Simulate access is the way to test what a role can do.
 ## Next Steps
 
 - **[Backend Authentication](/docs/backend/authentication)** — JWT, OAuth providers, SMTP configuration
-- **[Security Rules (RLS)](/docs/collections/security-rules)** — Row-level access control per collection
+- **[Row-level security](/docs/collections/security-rules)** — Row-level access control per table
 - **[Typed SDK Authentication](/docs/sdk/authentication)** — Programmatic auth methods

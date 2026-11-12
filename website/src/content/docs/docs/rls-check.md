@@ -105,16 +105,16 @@ database.
 ```
 
 **A new Rebase project does not pass that on day one, and it is not meant to.** The
-scaffold's `defaultSecurityRules` open reads to everyone — `{ operation: "select", access:
-"public" }` in `config/collections/index.ts` — so `authors` and `tags` each report a
-critical `policy-always-true`. (`posts` declares its own rules and reads only published rows.) `access: "public"` is about *rows*, not about who may call the
+scaffold's `defaultRls` opens reads to everyone — `{ operation: "select", access:
+"public" }` in `backend/schema/index.ts`, which `authors` and `tags` take with
+`rls: "inherit"` — so each reports a critical `policy-always-true`. (`posts` declares its own rules and reads only published rows.) `access: "public"` is about *rows*, not about who may call the
 API: a request with no token is still answered 401 while `AUTH_REQUIRE` is on. The finding is
 correct all the same, because that is the only thing standing in front of the data.
 
 Decide which of those two it is before you wire this into CI:
 
 - **the rules are a placeholder** — replace them with the ones your data actually needs
-  ([security rules](/docs/collections/security-rules)), and the findings go away;
+  ([row-level security](/docs/collections/security-rules)), and the findings go away;
 - **the rows really are world-readable** — say so once, with
   `npx @rebasepro/rls-check --fail-on high --skip policy-always-true`, and know what you gave
   up: `--skip` turns the check off everywhere, including on the table you add next month.
@@ -135,9 +135,10 @@ the exposed set, and `diagnostics.degraded` is how a consumer tells "nothing was
 `--format agent` prints one JSON document for a coding agent that fixes what it finds. Every
 finding names its check id and failing object (`target.table`, `target.policy`, …) and carries
 a `remediation`: `apply` (`sql`; `rebase-config` when Rebase re-makes the policy from a
-collection's `securityRules` at every boot; or `manual`), runnable `sql` written per check, the
-`placeholders` to fill in first, and `rebase` — the same fix as
-`defineCollection({ securityRules: [...] })`, or why rules cannot express it. Each finding's
+table's `rls` at every boot; or `manual`), runnable `sql` written per check, the
+`placeholders` to fill in first, and `rebase` — the same fix as a list of rules, or why rules
+cannot express it. The rules go in the table's `rls`; the excerpt `rebase` carries still
+shows them in the pre-0.31 `defineCollection({ securityRules })` form. Each finding's
 `key` is stable across runs, so a re-run shows what was cleared. `--json` is unchanged.
 
 ## Running it on a schedule
@@ -179,11 +180,10 @@ scope, and each run logs one line — at `warn` when a finding reaches
 
 ### Why you pass `scan` in
 
-`@rebasepro/server` has no database driver — that is what keeps it usable with
-Postgres, Mongo and Firebase alike. `@rebasepro/rls-check` carries `pg`, because
-it connects to Postgres. Importing it inside the server package would put a
-Postgres driver in every install, for a feature only some of them can use, so
-you hand the function in instead.
+`@rebasepro/server` has no database driver of its own; `@rebasepro/rls-check`
+carries `pg`, because it connects to Postgres. Importing it inside the server
+package would put a second Postgres driver in every install, for a feature only
+some of them use, so you hand the function in instead.
 
 ### In a split deployment
 
@@ -229,7 +229,7 @@ experiences. The findings are about what other roles get.
 
 ### On a Rebase database, change the rule, not the policy
 
-Every policy on a Rebase deployment is compiled from a collection's `securityRules`, and the
+Every policy on a Rebase deployment is compiled from a table's `rls`, and the
 runtime **checks them on every boot**: each generated policy carries a stamp (a
 `rebase:<hash>` comment) of what was compiled and what Postgres stored, and a table whose
 policies no longer match it is re-applied from the config. An `ALTER POLICY` run against one
@@ -240,10 +240,10 @@ it — after you watched it disappear.
 `rebase.uid()` / `rebase.roles()` in the expression) and prescribes the rule instead of SQL.
 When you see a fix that says so:
 
-1. find the collection whose table it names, under `config/collections/`;
-2. change its `securityRules` — see [security rules](/docs/collections/security-rules);
-3. if the collection declares none of its own, it inherits `defaultSecurityRules` from
-   `config/collections/index.ts`, and that is the file to edit;
+1. find the table it names, under `backend/schema/`;
+2. change its `rls` — see [row-level security](/docs/collections/security-rules);
+3. if the table says `rls: "inherit"`, it takes `defaultRls` from
+   `backend/schema/index.ts`, and that is the file to edit;
 4. redeploy — boot re-applies the policies — or run `rebase db push`.
 
 A policy you wrote by hand, in a migration, is not touched by any of this, and its fix is
@@ -310,7 +310,7 @@ ALTER POLICY "your_policy" ON "public"."your_table"
     USING (user_id = rebase.uid());
 ```
 
-On a Rebase database the fix is the collection's rule rather than that statement — see
+On a Rebase database the fix is the table's rule rather than that statement — see
 [change the rule, not the policy](#on-a-rebase-database-change-the-rule-not-the-policy). A
 stock scaffold reports this check on `posts`, `authors` and `tags` by design.
 
@@ -455,7 +455,7 @@ signed-out one when the API admits it (`AUTH_REQUIRE=false`, or `auth.requireAut
 and every guest account from anonymous sign-in. The database cannot see that setting, so on
 Rebase a write that only `rebase_user` reaches is reported as heuristic. With the API gate on
 and guest sign-in off, only signed-in users reach the policy, and they can still write any
-row. Scope the collection's write rule to the caller (an `ownerField`) or to `roles`.
+row. Scope the table's write rule to the caller (an `ownerField`) or to `roles`.
 
 ### unqualified-column-in-subquery
 
@@ -524,7 +524,7 @@ ALTER TABLE "public"."your_table" FORCE ROW LEVEL SECURITY;
 Not a security hole — the opposite. RLS on with zero policies denies every row to everyone
 but the owner. It is reported because it is an *invisible* failure: the API returns `[]`, and
 an empty table is indistinguishable from a filtered one. This configuration has silently
-served empty collections in production for weeks at a time.
+served empty tables in production for weeks at a time.
 
 ### policy-role-unreachable
 
@@ -592,8 +592,8 @@ worse than none.
 
 ## Related
 
-- [Security Rules (RLS)](/docs/collections/security-rules) — defining row-level security in
-  Rebase collections, which compiles to the policies this tool audits.
+- [Row-level security](/docs/collections/security-rules) — a Rebase table's `rls`, which
+  compiles to the policies this tool audits.
 - [Backend only](/docs/getting-started/headless/) — why a table with no policy is not
   served at all in a headless project.
 - [REST API](/docs/backend/api/) — the surface a permissive policy exposes.

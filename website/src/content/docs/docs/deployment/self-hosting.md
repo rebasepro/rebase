@@ -474,7 +474,7 @@ source key (`source="(default)"` in a project that declares no data sources). A
 healthy pool keeps it near zero. A tail that
 grows with traffic means requests are queueing for connections — most often
 held by write callbacks that await something slow; see
-[A callback holds a connection](/docs/collections/context-data-api/#a-callback-holds-a-connection).
+[A hook holds a connection](/docs/collections/context-data-api/#a-hook-holds-a-connection).
 
 The database itself, per data source:
 

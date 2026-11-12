@@ -1,24 +1,41 @@
 ---
 title: Schema Generation
 sidebar_label: Schema Generation
-description: Generate Drizzle ORM schemas from collection definitions, create SQL migrations, and keep your database in sync with the Rebase CLI.
+description: Generate Drizzle ORM schemas from the tables in backend/schema, create SQL migrations, introspect an existing database into defineTable files, and keep your database in sync with the Rebase CLI.
 ---
 
 ## Overview
 
-Rebase uses a **schema-as-code** pipeline where your TypeScript collection definitions are the single source of truth. The CLI transforms them through a deterministic pipeline:
+Rebase uses a **schema-as-code** pipeline where the tables you declare with
+`defineTable` in `backend/schema/` are the single source of truth. The CLI
+transforms them through a deterministic pipeline:
 
 ```
-Collections (TypeScript) → Drizzle Schema → SQL Migrations → PostgreSQL
+Tables (backend/schema) → Drizzle Schema → SQL Migrations → PostgreSQL
 ```
 
 This page covers every CLI command involved in that pipeline.
 
 ## The Pipeline
 
-### 1. Collections → Drizzle Schema
+### 1. Tables → Drizzle Schema
 
-Your collection definitions in `config/collections/` describe tables, columns, types, relations, and enums. The `schema generate` command reads these and outputs a Drizzle ORM schema file.
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+The tables `backend/schema/index.ts` exports describe columns, types, relations,
+enums and row-level security. Every command below reads them through the loader
+the backend boots from, so a schema that does not compile — a table with no
+`rls`, `"inherit"` with no `defaultRls`, a `defineTable` the index does not
+export — stops the command with a `SchemaDefinitionError` naming each problem,
+and nothing is written. The `schema generate` command outputs a Drizzle ORM
+schema file from them.
+
+Every command that reads the schema takes `--schema-dir <dir>` for a project
+that keeps its tables somewhere else; the default is `backend/schema`, or the
+`tables` key of the backend app in `rebase.json`. `--collections` / `-c`, the
+pre-0.31 flag, is refused with a message naming the codemod
+([`rebase migrate collections-to-tables`](/docs/cli/#rebase-migrate)), and so is a
+project that still has `config/collections`.
 
 ### 2. Drizzle Schema → Migrations
 
@@ -32,25 +49,25 @@ The `db migrate` command applies pending migrations to your PostgreSQL database.
 
 ### `rebase schema generate`
 
-Generate a Drizzle ORM schema file from your collection definitions:
+Generate a Drizzle ORM schema file from your tables:
 
 ```bash
 rebase schema generate
 ```
 
 **What it does:**
-- Reads all collections from `config/collections/`
+- Reads the tables `backend/schema/index.ts` exports
 - Generates `backend/src/schema.generated.ts` with Drizzle table definitions, enums, and relations
 
 **Options:**
 
 | Flag | Description |
 |------|-------------|
-| `--collections, -c` | Collections directory (default: `config/collections/`); relative paths are resolved from where you run the command |
+| `--schema-dir` | The schema directory (default: `backend/schema`); relative paths are resolved from where you run the command |
 | `--output, -o` | Output path for the generated schema file; relative paths are resolved from where you run the command |
 | `--watch, -w` | Watch for changes and regenerate automatically |
 
-**Watch mode** is useful during development — edit a collection file and the schema regenerates instantly:
+**Watch mode** is useful during development — edit a table file and the schema regenerates instantly:
 
 ```bash
 rebase schema generate --watch
@@ -58,7 +75,7 @@ rebase schema generate --watch
 
 ### `rebase schema stale`
 
-Check whether the generated schema still matches the collections:
+Check whether the generated schema still matches the tables:
 
 ```bash
 rebase schema stale          # report, and exit 1 if anything is stale
@@ -66,12 +83,12 @@ rebase schema stale --fix    # regenerate the file instead
 ```
 
 **What it does:**
-- Renders what the collections in `config/collections/` generate and compares it, declaration by declaration, with `backend/src/schema.generated.ts`
+- Renders what the tables in `backend/schema/` generate and compares it, declaration by declaration, with `backend/src/schema.generated.ts`
 - Names each difference — a missing table, a retyped column, a dropped enum label, or foreign keys named the way an earlier release derived them — and exits non-zero
 - With `--fix`, regenerates the file instead of reporting
 
 `rebase dev` keeps the file current by itself, so this is the check for a build
-or a CI step. It takes `--collections` and `--output` as `rebase schema generate`
+or a CI step. It takes `--schema-dir` and `--output` as `rebase schema generate`
 does.
 
 ### `rebase schema reconcile`
@@ -79,21 +96,23 @@ does.
 Relax and drop what boot will not, after you have read the plan:
 
 ```bash
-rebase schema reconcile                         # relax NOT NULL on properties made optional or removed
-rebase schema reconcile --drop voice_cache.wav  # and drop a column no property declares
+rebase schema reconcile                         # relax NOT NULL on columns made nullable or removed
+rebase schema reconcile --drop voice_cache.wav  # and drop a column no table declares
 ```
 
 **What it does:**
 - Asks the running backend to plan against its own database. That's the backend `.env` and the cloud link point at, so it works on Rebase Cloud, where nothing else reaches the database.
-- Plans `DROP NOT NULL` for every column a collection declares optional that the database still requires.
-- Lists every column no collection declares. One that is `NOT NULL` with no default blocks every insert, so it is relaxed too, and its data stays. It drops only the columns you name with `--drop <collection>.<column>`, and shows how many rows hold a value in each.
-- Applies once you type `yes`. The server runs the plan only on the digest of the one you read, so if the database or the collections changed in between, it refuses and you review again. `--yes` skips the prompt.
+- Plans `DROP NOT NULL` for every column a table declares nullable that the database still requires.
+- Lists every column no table declares. One that is `NOT NULL` with no default blocks every insert, so it is relaxed too, and its data stays. It drops only the columns you name with `--drop <table>.<column>`, and shows how many rows hold a value in each.
+- Applies once you type `yes`. The server runs the plan only on the digest of the one you read, so if the database or the tables changed in between, it refuses and you review again. `--yes` skips the prompt.
 
-Boot only ever adds, so after you remove a property its column stays, with its data. A `NOT NULL` column with no default then makes every insert fail, and boot's log names this command for it: without `--drop` to keep the data, with it to remove the column. Deploy the collection change first, because reconcile plans against what the backend runs. It needs `REBASE_SERVICE_KEY` in `.env`. Locally, `rebase db push` covers the same through its destructive-change gate.
+Boot only ever adds, so after you remove a column from its `defineTable` its column stays in the database, with its data. A `NOT NULL` column with no default then makes every insert fail, and boot's log names this command for it: without `--drop` to keep the data, with it to remove the column. Deploy the table change first, because reconcile plans against what the backend runs. It needs `REBASE_SERVICE_KEY` in `.env`. Locally, `rebase db push` covers the same through its destructive-change gate.
 
 ### `rebase schema introspect`
 
-Reverse-engineer collection definitions from an existing PostgreSQL database:
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+Write `defineTable` files from an existing PostgreSQL database:
 
 ```bash
 rebase schema introspect
@@ -101,73 +120,58 @@ rebase schema introspect
 
 **What it does:**
 - Connects to this project's database, the one `rebase db url` prints (the managed one is started if that is it); `--database-url` names another, and `--docker` uses the compose one
-- Inspects all tables, columns, types, and foreign keys
-- Generates collection definition files
-- Reads each
-  table's row-level security policies into its collection's `securityRules`:
-  name, command, mode, `TO` list, `USING` and `WITH CHECK`. The
-  `<table>_default_*` policies Rebase adds itself are left out. So the
-  `db push` after it recreates every policy as it was
-- Reads every
-  expression (a policy's `USING`, a CHECK, a column default) under the
-  `search_path` the server uses, `public`, so a function in the `rebase` schema
-  is written `rebase.roles()`. Connected as a role named `rebase`, the default
-  path put that schema first and the rule came back as `roles()`, which the
-  push could not find
-- Keeps a many-to-many
-  junction's policies. A junction's `<junction>_default_edge_write_*` policies
-  are derived from the update rules of the collection that declares the
-  relation, and a junction can inherit only a rule it can read. A role rule
-  comes back as the SQL Postgres stores for it,
-  `string_to_array(rebase.roles(), ','::text) && ARRAY['admin'::text]`, and
-  that reads as the role rule again, so the push derives the same policies
-- Writes
-  `disableDefaultPolicies: true` on a table that has row-level security on and
-  does not hold the whole [admin baseline](/docs/collections/security-rules/#policies-a-collection-gets-without-writing-them),
-  so the push adds no `<table>_default_admin_*` policy and the table's access
-  stays as it was; any part of the baseline the table has is written as a rule.
-  Delete the line to give the server and admins every row. A table with RLS
-  off keeps the baseline, and introspection says, once, which tables those are:
-  the push switches RLS on whatever a collection says
-- Generates a
-  table whose policies give each user their own rows (they read `rebase.uid()`,
-  `app.uid` or the JWT) as an entity in the navigation, however few rows it
-  has
-- Against a
-  database that is not running, prints the same banner `db push` does, once,
-  and creates nothing. It prints the output directory as an absolute path
-- Leaves a
-  table's CHECK and EXCLUDE constraints in the database, where the `db push`
-  after it keeps them. A collection cannot declare either; a CHECK
-  introspection can read (`total >= 0`) also becomes the property's
-  `validation`
+- Reads every table, column, type, foreign key and policy, and writes
+  `backend/schema/<table>.ts` — one `defineTable` per table — and the
+  `backend/schema/index.ts` that exports them (merged into an index that is
+  already there)
+- Declares each column with its Postgres type: `col.uuid()`, `col.varchar(n)`,
+  `col.numeric(p, s)`, an enum with its labels and real type name, an array with
+  its element, `col.vector(d)`, identity and serial keys, defaults. A type no
+  builder names becomes `col.custom("<sql type>")`, which Rebase serves as the
+  driver returns it; `db generate` and `db push` refuse it until the planner
+  can plan it
+- Declares the foreign-key column, the `belongsTo` on it and the reverse
+  `hasMany` on the target; a junction table becomes a `manyToMany`, its own
+  columns the `pivot`
+- Reads each table's row-level security policies into its `rls`: name,
+  command, mode, `TO` list, `USING` and `WITH CHECK`. The `<table>_default_*`
+  policies Rebase adds itself are left out, so the `db push` after it recreates
+  every policy as it was. A table with row-level security on and no policy is
+  written `rls: "admin-only"`
+- Reads every expression (a policy's `USING`, a CHECK, a column default) under
+  the `search_path` the server uses, `public`, so a function in the `rebase`
+  schema is written `rebase.roles()`
+- Turns a CHECK it can read (`total >= 0`) into the column's `.validate()`, and
+  leaves the constraint itself in the database, where the push after it keeps
+  it
+- Puts what it could not state exactly in a comment at the top of the table's
+  file and on the terminal — a closed set of strings on a text column, a
+  generated column whose expression it did not read, a custom type — with what
+  a push would do to it
+- With `--data-inference`, samples up to 100 rows per table and writes what it
+  found that is presentation — titles, icons, boards, sorts, field options — to
+  `frontend/src/cms/<table>.tsx` as a `customizeTable`, when the project's
+  frontend depends on `@rebasepro/cms`. A headless project gets none
+- Against a database that is not running, prints the same banner `db push`
+  does, once, and creates nothing. It prints the output directory as an
+  absolute path
 
 **Options:**
 
 | Flag | Description |
 |------|-------------|
-| `--output, -o` | Output directory for generated collection files |
+| `--schema-dir` | Where to write the table files (default: `backend/schema`). `--output` was removed |
 | `--schema` | The Postgres schema to read (default: `public`) |
-| `--force, -f` | Overwrite collection files that already exist; without it, an existing file is skipped |
+| `--force, -f` | Overwrite table files that already exist; without it, an existing file is skipped |
 | `--database-url` | Read this database instead of the project's own |
 | `--docker` | Read the compose database, starting it if needed |
-| `--data-inference` / `--no-data-inference` | Sample up to 100 rows per table to detect formats, constraints and UI settings, or read the structure only. Without either it asks, and without a terminal it reads the structure only |
+| `--data-inference` / `--no-data-inference` | Sample up to 100 rows per table to detect formats, constraints and panel settings, or read the structure only. Without either it asks, and without a terminal it reads the structure only |
 
-This is useful when adopting Rebase on an existing database — introspect first, then customize the generated collections.
-
-**Introspect, then push, changes nothing.** The generated properties say exactly what each column is — `columnType`, `precision`/`scale`, `defaultValue`, `required`, a key's `isId` (`"increment"` for an integer identity, `columnType: "serial"` for a serial, `"manual"` for a key with no default), a relation's `onDelete` — and its `index: false` where the database lacks the index Rebase would derive on the key column, since a `belongsTo` is [indexed by default](/docs/backend/indexes#foreign-keys-are-indexed-for-you). Where no index serves the column, the line says so (delete it to have one built); where another index already leads with it (`orders_customer_id_idx`, a composite, a unique one), the line names that index, and without it the push would build a second. A collection's `search` block reads back from the column it built, so `rebase db push --dry-run` right after an introspection plans no changes. The exception is a table with row-level security off: the push switches it on, and the dry run lists that and the admin baseline it adds. Where no property can state a column — a `timestamp` without time zone, an `interval`, an `inet`, an enum type not named `<table>_<column>`, a default like `CURRENT_DATE` — introspection says so, per column, on the terminal and at the top of the file, with what a push would do to it and, when there is one, the statement that makes the two agree (`ALTER TYPE "mood" RENAME TO "customers_current_mood";`). A table keyed on more than one column comes back as one composite key, every key column carrying its `isId`. It is left out, with the reason, when a key column cannot carry `isId` (a timestamp, say) or another table's foreign key points at it, which a single-column relation cannot do; `db push` leaves a table that is not a collection alone.
-
-**What the generated files look like**
-
-Introspection writes collections against `defineCollection`, which keeps the property keys *literal* — so `propertiesOrder`, `listProperties`, `sort` and `display.title` complete over your own column names, and a key left behind by a renamed column is a compile error rather than a line that quietly does nothing. Which one it imports depends on what your project depends on, and is decided per run:
-
-| Your project declares | Generated collections use | `admin` block |
-|------|------|------|
-| `@rebasepro/cms-types` (a project with the panel) | `defineCollection` from `@rebasepro/cms-types` | yes |
-| `@rebasepro/common` (a `--headless` project) | `defineCollection` from `@rebasepro/common` | no |
-| neither | a `PostgresCollectionConfig` annotation, with a warning | no |
-
-A headless project has no admin panel, and the core types declare no `admin` field at all — so the block is not emitted there. It is presentation (`icon`, `propertiesOrder`, `multiline`); nothing about the schema, the API or your data depends on it.
+This is useful when adopting Rebase on an existing database — introspect
+first, then edit the generated tables. A table with row-level security off is
+written like any other, with its `rls`; the push switches RLS on, and the dry
+run says so. A backend that runs with no `backend/schema` at all serves the
+database directly instead — see [Backend only](/docs/getting-started/headless/).
 
 ### `rebase db push`
 
@@ -193,12 +197,12 @@ rebase db push
   this release, with a deprecation warning; from the next release it approves
   only pushes that destroy nothing. A push that
   stops there drops its scratch `<db>_dev_diff` database on the way out
-- Switches row-level security on for every collection table, junctions included, right after the
+- Switches row-level security on for every declared table, junctions included, right after the
   schema change and before any step that can fail, so a push that stops part-way leaves a new table
   denying every request rather than open to it
-- Applies your collections' RLS policies, and **removes policies an earlier push superseded**
+- Applies the RLS policies your tables' `rls` compiles to, and **removes policies an earlier push superseded**
 - Leaves every
-  CHECK and EXCLUDE constraint on a collection's table as it is. A collection
+  CHECK and EXCLUDE constraint on a declared table as it is. A table
   cannot declare either, so they are the database's own rules, written by hand
   or carried by a database `schema introspect` adopted; to remove one, drop it
   by hand (`ALTER TABLE … DROP CONSTRAINT …`). Triggers and functions you wrote
@@ -251,15 +255,15 @@ SQL, the RLS lock, search, triggers, policies, the role — take a few seconds a
 that size, over one connection to your database.
 
 **The files it generates on the way**, all under `.rebase/sql/` in the backend
-directory. `db push` and `db generate` write all five from your collections on
+directory. `db push` and `db generate` write all five from your tables on
 every run, before reading any of them, so a committed copy would be read by
 nothing. The directory carries its own `.gitignore` and is never committed.
 
 | File | Holds |
 |------|-------|
 | `schema.sql` | Tables, columns, constraints and indexes — Atlas's desired state, and the only one it diffs |
-| `policies.sql` | The RLS policies your `securityRules` compile to |
-| `search.sql` | The full-text search functions and generated columns, for collections with a `search` block |
+| `policies.sql` | The RLS policies your tables' `rls` compiles to |
+| `search.sql` | The full-text search functions and generated columns, for tables with a `search` block |
 | `vector.sql` | pgvector extensions and ANN indexes |
 | `triggers.sql` | `rebase.set_updated_at()` and the `BEFORE UPDATE` triggers behind `autoValue: "on_update"` |
 
@@ -278,11 +282,11 @@ A rule without an explicit `name` compiles to `<table>_<op>_<hash>`, where the h
 
 That used to matter a great deal: Postgres ORs `PERMISSIVE` policies together, so a superseded `USING (rebase.uid() IS NOT NULL)` kept granting everything no matter how tight its replacement was. Tightening a rule had no effect, and push reported success.
 
-`db push` now reconciles this: it drops generated policies that no longer match any rule, and reports — without dropping — any custom-named policy your collections don't describe, since those are indistinguishable from SQL someone wrote deliberately.
+`db push` now reconciles this: it drops generated policies that no longer match any rule, and reports — without dropping — any custom-named policy your tables don't describe, since those are indistinguishable from SQL someone wrote deliberately.
 
-To audit a database that was pushed before this landed, run `rebase doctor --policies`. It works as a CI gate: it exits non-zero on drift, and also when it could not run the check at all — no `DATABASE_URL`, a `--collections` path that does not resolve, a `pg_policies` read the CI role is not granted. A gate that could not look has not passed.
+To audit a database that was pushed before this landed, run `rebase doctor --policies`. It works as a CI gate: it exits non-zero on drift, and also when it could not run the check at all — no `DATABASE_URL`, a `--schema-dir` path that does not resolve, a `pg_policies` read the CI role is not granted. A gate that could not look has not passed.
 
-`doctor` and `db push` tell the two kinds of orphan apart. A policy with a generated name was superseded, and the next push drops it. Any other name was written by hand or by another tool and is still in force: describe it in its collection's `securityRules` to keep it (Studio's RLS view imports it), or drop it by hand if it is stale.
+`doctor` and `db push` tell the two kinds of orphan apart. A policy with a generated name was superseded, and the next push drops it. Any other name was written by hand or by another tool and is still in force: describe it in its table's `rls` to keep it (Studio's RLS view imports it), or drop it by hand if it is stale.
 :::
 
 :::caution
@@ -316,7 +320,7 @@ rebase db generate
 **A CHECK a migration of yours added is dropped by the next one.** `db generate`
 diffs your migration files, not the database, and Atlas has no way to leave an
 object out of that diff. So a CHECK or EXCLUDE constraint that you wrote into a
-migration by hand, and that no collection can declare, comes back as
+migration by hand, and that no table can declare, comes back as
 `ALTER TABLE … DROP CONSTRAINT …` in the next migration it writes, folded into
 the same statement as the real change. The report above names that drop when
 the database already holds the constraint; it does not take it out of the
@@ -341,7 +345,7 @@ rebase db migrate
 - Stamps the
   row-level security policies the way `db push` and the server's boot do, so
   the first boot after a migrate leaves them alone instead of re-creating every
-  one. A migration was written from the collections of its day, so a policy is
+  one. A migration was written from the tables of its day, so a policy is
   stamped only when it is exactly what its rule makes now: migrate makes it
   again from its rule under another name, in a transaction it rolls back, and
   compares what Postgres stored, as `db push --dry-run` does. A policy that
@@ -375,7 +379,7 @@ rebase db migrate
 
 The version is the numeric prefix of the migration file that describes what is in the database *now*. That migration and everything before it are recorded as applied; everything after it runs. On a database nothing has ever booted against, no baseline is needed — migrate straight away.
 
-The same happens later in the ordinary loop: edit a collection while `rebase dev` runs, and boot adds the column before `rebase db generate` writes the migration that adds it, so `rebase db migrate` stops on `column … already exists (42701)`. Baseline that migration the same way. `--baseline` works on a database that already records migrations: it marks everything up to the version as applied with `atlas migrate set`, and says so, or says there is nothing to record when the history already reaches it. A version no file in `drizzle/migrations` has is refused before anything runs, naming the versions there are.
+The same happens later in the ordinary loop: edit a table while `rebase dev` runs, and boot adds the column before `rebase db generate` writes the migration that adds it, so `rebase db migrate` stops on `column … already exists (42701)`. Baseline that migration the same way. `--baseline` works on a database that already records migrations: it marks everything up to the version as applied with `atlas migrate set`, and says so, or says there is nothing to record when the history already reaches it. A version no file in `drizzle/migrations` has is refused before anything runs, naming the versions there are.
 
 ### `rebase db branch`
 
@@ -399,16 +403,16 @@ so it needs a real PostgreSQL server and it costs the same disk as its source.
 
 ### `rebase doctor`
 
-Detect three-way drift between your collection definitions, the generated Drizzle schema, and the live PostgreSQL database:
+Detect three-way drift between your tables, the generated Drizzle schema, and the live PostgreSQL database:
 
 ```bash
 rebase doctor
 ```
 
 **What it checks:**
-- Collections ↔ Generated schema — are they in sync?
+- Tables ↔ Generated schema — are they in sync?
 - Generated schema ↔ Database — are there unapplied changes?
-- Collections ↔ Database — is there any unexpected drift?
+- Tables ↔ Database — is there any unexpected drift?
 
 Run `doctor` whenever something feels out of sync. It pinpoints exactly where the mismatch is.
 
@@ -416,39 +420,43 @@ The database comparison includes the one boot makes before it warns that `schema
 
 The database comparison reads the project's database, resolved the way `rebase db url` resolves it — on a fresh scaffold the managed one, which `doctor` starts. When none can be resolved, that phase is reported as **skipped** rather than passing, and the run never closes with "All schemas are in sync" — a check that did not happen is not a clean bill of health.
 
-It also names every collection with no [`search` block](/docs/backend/search) whose table holds more than about 10,000 rows. A search there — the admin's search box, `.search()`, `?searchString=` — is `ILIKE '%term%'` over the text columns, which no index can serve, so each one reads the whole table, and its count reads it again (about a third of a second at 100,000 rows, growing with the table). The row count is Postgres's own estimate, so the check scans nothing. It is a hint: it does not change the exit code, and nothing is indexed for you.
+It also names every table with no [`search` block](/docs/backend/search) whose table holds more than about 10,000 rows. A search there — the admin's search box, `.search()`, `?searchString=` — is `ILIKE '%term%'` over the text columns, which no index can serve, so each one reads the whole table, and its count reads it again (about a third of a second at 100,000 rows, growing with the table). The row count is Postgres's own estimate, so the check scans nothing. It is a hint: it does not change the exit code, and nothing is indexed for you.
 
-It names an **orphaned junction**: a `public` table shaped like a many-to-many junction that no collection declares. The shape is two columns that together form the primary key, each a foreign key to a collection's table. Renaming or removing a `manyToMany` leaves its old junction behind, because push and boot only create tables, and every link row is still in it. The note is information only, so it does not change the exit code. Its fix is the `DROP TABLE` statement, which `doctor` shows and never runs.
+It names an **orphaned junction**: a `public` table shaped like a many-to-many junction that no table declares. The shape is two columns that together form the primary key, each a foreign key to a declared table. Renaming or removing a `manyToMany` leaves its old junction behind, because push and boot only create tables, and every link row is still in it. The note is information only, so it does not change the exit code. Its fix is the `DROP TABLE` statement, which `doctor` shows and never runs.
 
 ### `rebase generate-sdk`
 
-Generate a typed SDK from your collection definitions:
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+Generate a typed SDK from your tables:
 
 ```bash
 rebase generate-sdk
 ```
 
 **What it does:**
-- Reads every collection file in `config/collections/` — the files the backend serves, whether or not the `index.ts` barrel lists them — and stops on one that does not load
-- Generates TypeScript types for all entities in `generated/sdk/`
-- Produces a `database.types.ts` file for use with `createRebaseClient<Database>()`
+- Reads the tables `backend/schema/index.ts` exports, through the loader the backend boots from, so the SDK describes exactly the tables served; a schema that does not compile stops it
+- Generates TypeScript types for every table in `generated/sdk/`
+- Produces a `database.types.ts` file for use with `createRebaseClient<Database>()`: the `Database` type, `TableName` (the union of every slug), and `tablesDictionary` / `TablesDictionary`, the map from accessor to slug
 
 `rebase dev` runs this for you on start and on every save under
-`config/collections/`. Run it yourself in CI, in a repository that has no
-collections (see `--from` below), or anywhere `rebase dev` is not running.
+`backend/schema/`. Run it yourself in CI, in a repository that has no
+tables of its own (see `--from` below), or anywhere `rebase dev` is not running.
 
 **Options:**
 
 | Flag | Description |
 |------|-------------|
-| `-c`, `--collections` | Collections directory (default: `config/collections/`); relative paths are resolved from where you run the command. `--collections-dir` is accepted too. |
+| `--schema-dir` | The schema directory (default: `backend/schema`, or the `tables` key in `rebase.json`); relative paths are resolved from where you run the command |
 | `-o`, `--output` | Output directory for the SDK (default: `generated/sdk/`) |
 | `--from <link\|url>` | Read the schema from a running project instead of local source. `link` uses this checkout's linked project. |
 | `--token` | Bearer token for the contract endpoint (default: `$REBASE_SERVICE_KEY` from the shell; `.env` is not read) |
+| `--register` | Also type server-side data: write the types and a `Register` declaration to `backend/generated/`, and remember it in `rebase.json` — see [Typed server-side data](/docs/backend/typed-server-data/) |
 
-`--from` is what lets a repository that contains no collections — a separate
+`--from` is what lets a repository that contains no tables — a separate
 frontend, a second web app, a mobile app — generate a typed client from the
-project it talks to. `REBASE_SERVICE_KEY` is only sent to the project this
+project it talks to: it reads the `tables` of the running backend's
+`/api/meta/contract`. `REBASE_SERVICE_KEY` is only sent to the project this
 checkout is linked to; pass `--token` explicitly for any other host. The key in
 `.env` belongs to your local backend and is never sent.
 A refusal says
@@ -459,11 +467,11 @@ withheld from a host that is not linked, a key only in `.env`, or no key at all.
 
 ```typescript
 import { createRebaseClient } from "@rebasepro/client";
-import { collectionsDictionary, type Database } from "./generated/sdk/database.types";
+import { tablesDictionary, type Database } from "./generated/sdk/database.types";
 
 const client = createRebaseClient<Database>({
     baseUrl: import.meta.env.VITE_API_URL,
-    collections: collectionsDictionary,
+    tables: tablesDictionary,
 });
 
 // Full type safety and autocomplete
@@ -471,11 +479,11 @@ const { data } = await client.data.products.find();
 ```
 
 Field names in the generated types are the ones the API serves. A field's wire
-name is its property key, and the API is camelCase throughout: introspection
-generates a `created_at` column as a `createdAt` property carrying
-`columnName: "created_at"`, and serves it as `row.createdAt`. The column itself
-is untouched. The collection *accessor* is turned into a property name the same
-way (`my-notes` → `client.data.myNotes`), which is what `collectionsDictionary`
+name is its column key, and the API is camelCase throughout: introspection
+writes a `created_at` column as `createdAt: col.timestamptz()`, whose SQL name
+is the snake_case of the key, and serves it as `row.createdAt`. The column
+itself is untouched. The table *accessor* is turned into a property name the
+same way (`my-notes` → `client.data.myNotes`), which is what `tablesDictionary`
 maps back to the slug.
 
 ## Development Workflow
@@ -483,7 +491,7 @@ maps back to the slug.
 The fast-iteration workflow for development:
 
 ```bash
-# 1. Edit your collection in config/collections/
+# 1. Edit a table in backend/schema/
 # 2. Generate the Drizzle schema
 rebase schema generate
 
@@ -496,7 +504,7 @@ rebase db push
 The safe, reviewable workflow for production:
 
 ```bash
-# 1. Edit your collection in config/collections/
+# 1. Edit a table in backend/schema/
 # 2. Generate the Drizzle schema
 rebase schema generate
 
@@ -518,7 +526,7 @@ rebase db migrate
 | Symptom | Solution |
 |---------|----------|
 | `Could not detect an active database plugin` | Install `@rebasepro/server-postgres` in `backend/package.json` |
-| Schema file not updating | Check the `--collections` path points to the right directory |
+| Schema file not updating | Check the `--schema-dir` path (or the `tables` key in `rebase.json`) points to the right directory |
 | Migration shows unexpected changes | Run `rebase doctor` to identify drift |
 | `db push` fails on production | Use `db generate` + `db migrate` instead |
 | A migration must not drop data in CI or production | `rebase db migrate --refuse-destructive` exits 1 and applies nothing when a pending statement destroys data |
@@ -528,6 +536,6 @@ rebase db migrate
 
 ## Next Steps
 
-- **[Collections](/docs/collections)** — Define your data model
+- **[Tables](/docs/schema/)** — Define your data model
 - **[CLI Reference](/docs/cli)** — All CLI commands
 - **[Typed SDK](/docs/sdk)** — Use the generated SDK

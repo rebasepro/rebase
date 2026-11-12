@@ -10,17 +10,14 @@ description: Create a new Rebase project and get it running locally in under 2 m
 pnpm dlx @rebasepro/cli init my-app
 ```
 
-This scaffolds a project with three packages. If any of *collection*, *Studio*,
-*managed runtime*, *bundle* or *resource* is new, the five-word box on
+This scaffolds a project with two packages. If any of *table*, *collection*,
+*Studio*, *managed runtime*, *bundle* or *resource* is new, the box on
 [Project Structure](/docs/getting-started/project-structure/) defines them.
-
-
 
 | Folder | Description |
 |--------|-------------|
-| `frontend/` | React SPA — Vite + TypeScript with the Rebase admin UI |
-| `backend/` | Your custom functions and crons, plus the generated Drizzle schema. There is no server file — the published runtime boots the project |
-| `config/` | Config files and collection definitions shared by both sides |
+| `backend/` | Your tables (`backend/schema/`), what the runtime reads beside them (`resources.ts`, `storage.ts`), your functions and crons, and the generated Drizzle schema. There is no server file — the published runtime boots the project |
+| `frontend/` | React SPA — Vite + TypeScript with the Rebase admin UI, and its table customizations in `src/cms/` |
 
 ## Prerequisites
 
@@ -47,7 +44,7 @@ pnpm run dev
 
 That is the whole first run. There is no database to install and no schema step:
 with no `DATABASE_URL` set, `rebase dev` starts a **managed PostgreSQL (PGlite)**
-in the project directory, generates the Drizzle schema from your collections, and
+in the project directory, generates the Drizzle schema from your tables, and
 creates the tables at boot — including the example `posts`, `authors` and `tags`.
 
 It starts both halves together:
@@ -67,7 +64,7 @@ Pin a port with `rebase dev --port 3001`.
 | Flag | On | What it does |
 |---|---|---|
 | `--yes` | `init` | Never prompt. **Required when there is no terminal to answer**, such as CI. It skips git init and dependency install — the interactive defaults say yes to both, so pass `--git` / `--install` if you want them |
-| `--headless` | `init` | A backend with no collection files and no UI — see [Backend only](/docs/getting-started/headless/) |
+| `--headless` | `init` | A backend with no `backend/schema/` and no UI, serving your database's own tables — see [Backend only](/docs/getting-started/headless/) |
 | `--template <name>` | `init` | Start from a template other than the default |
 | `--install` / `--no-install` | `init` | Run the package manager for you, or leave it |
 | `--docker` | `dev` | Use PostgreSQL in a container instead of the managed one. The other commands follow it until `rebase dev` runs without it. A `DATABASE_URL` outranks it: then it starts nothing, and says so |
@@ -112,13 +109,13 @@ docker compose up -d db
 
 ## Introspect an Existing Database (Optional)
 
-If you are connecting to an existing database with pre-existing tables, you can introspect it to automatically generate your TypeScript collection files:
+If you are connecting to an existing database with pre-existing tables, you can introspect it to generate a `defineTable` file for each one:
 
 ```bash
 pnpm rebase schema introspect
 ```
 
-This will analyze your database tables and generate corresponding TypeScript files in `config/collections/` so you don't have to write them manually.
+This reads every table, column, foreign key and row-level security policy and writes `backend/schema/<table>.ts` and the `index.ts` that exports them, so you don't have to write them by hand. See [`schema introspect`](/docs/cli/schema/#rebase-schema-introspect).
 
 ## First Login
 
@@ -130,68 +127,66 @@ When you open the frontend URL `rebase dev` printed, you'll see the login screen
 
 `rebase init` also wrote `REBASE_ADMIN_EMAIL` and a generated `REBASE_ADMIN_PASSWORD` into `.env`. Those are not your credentials here: `rebase dev` ignores them and says so at boot. They belong to a production boot — `docker compose up`, or anything with `NODE_ENV=production` — where this bootstrap window is closed, because the server answers on a hostname before you have typed anything. See [Your first admin](/docs/getting-started/deployment#your-first-admin).
 
-## Define Your First Collection
+## Define Your First Table
 
-Open `config/collections/` and create a new file. Export the collection as the **default export** — that's what the backend and the admin panel load from each file in the directory. The table name is optional: it defaults to the slug, so set it only when they differ:
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
-```typescript title="config/collections/products.ts"
-import { defineCollection } from "@rebasepro/cms-types";
+Create a file in `backend/schema/`:
 
-const productsCollection = defineCollection({
-    slug: "products",
-    name: "Products",
-    properties: {
-        name: {
-            type: "string",
-            name: "Name",
-            validation: { required: true }
-        },
-        price: {
-            type: "number",
-            name: "Price",
-            validation: { required: true, min: 0 }
-        },
-        description: {
-            type: "string",
-            name: "Description",
-            admin: { multiline: true }
-        },
-        active: {
-            type: "boolean",
-            name: "Active",
-            defaultValue: true
-        },
-        createdAt: {
-            type: "date",
-            name: "Created At",
-            autoValue: "on_create"
-        }
-    }
+```typescript title="backend/schema/products.ts"
+import { defineTable, col } from "@rebasepro/server/schema";
+
+export const products = defineTable("products", {
+    columns: {
+        id:          col.uuid().primaryKey().defaultRandom(),
+        name:        col.text().notNull(),
+        price:       col.numeric().notNull().validate({ min: 0 }),
+        description: col.text(),
+        active:      col.boolean().default(true),
+        createdAt:   col.timestamptz().onCreateNow(),
+    },
+    // Takes the defaultRls the scaffold's index.ts exports: everyone reads, admins write.
+    rls: "inherit",
 });
-
-export default productsCollection;
 ```
 
-Then add it to the `collections` array in `config/collections/index.ts`. That array is a sort order, not a registry: every collection file in the directory is loaded — by the backend, the admin panel and the SDK generator — whether the array lists it or not, and the array decides where it appears in the navigation. To remove a collection, delete its file and its import and entry in `index.ts`; a file the index still imports stops the backend from loading:
+Then export it from `backend/schema/index.ts`. The index is what the backend,
+the CLI and the SDK generator read: a `defineTable` it does not export refuses
+the boot, naming the file.
 
-```typescript title="config/collections/index.ts" {2,5}
-// ...existing imports
-import productsCollection from "./products.js";
-
-export const collections = [
-    postsCollection, authorsCollection, tagsCollection, usersCollection, productsCollection
-];
+```typescript title="backend/schema/index.ts"
+// ...existing exports
+export { products } from "./products";
 ```
 
 ## Create the Table
 
 Save the file. That is the whole step: `rebase dev` regenerates
 `backend/src/schema.generated.ts` and the SDK types in `generated/sdk/` from your
-collections, restarts the backend, and boot creates the new table — so your **Products** collection appears in the
-navigation.
+tables, restarts the backend, and boot creates the new table and its row-level
+security policies — and **Products** appears in the admin panel's navigation,
+with a list, a form and filters derived from the columns.
 
-The same is true of a property added to a collection you already have: save,
-and the column is there.
+The same is true of a column added to a table you already have: save, and the
+column is there.
+
+To change how the table looks in the panel — a multi-line editor for
+`description`, an icon, a group — add a file to `frontend/src/cms/` and pass it
+to `<RebaseCMS tableCustomizations>` in `App.tsx`:
+
+```tsx title="frontend/src/cms/products.tsx"
+import { customizeTable } from "@rebasepro/cms";
+import type { products } from "../../../backend/schema/products";
+
+export const productsCms = customizeTable<typeof products>("products", {
+    icon: "ShoppingCart",
+    fields: {
+        description: { multiline: true },
+    },
+});
+```
+
+See [Customizing a table](/docs/frontend/customize-table/).
 
 `rebase db push` is for the changes boot deliberately leaves alone — a renamed
 column, a narrowed type, a removed field:
@@ -207,8 +202,8 @@ managed database as on your own.
 
 | Command | Description |
 |---------|-------------|
-| `rebase schema generate` | Generate the Drizzle schema from your TypeScript collections. No database needed — `rebase dev` runs it for you |
-| `rebase schema introspect` | Generate TypeScript collections from an existing database |
+| `rebase schema generate` | Generate the Drizzle schema from your tables. No database needed — `rebase dev` runs it for you |
+| `rebase schema introspect` | Write `defineTable` files from an existing database |
 | `rebase db push` | Push schema changes directly to the database, the managed one included |
 | `rebase db generate` | Generate SQL migration files |
 | `rebase db migrate` | Run pending migrations |
@@ -219,6 +214,6 @@ commands work on the managed database.
 ## What's Next
 
 - **[Project Structure](/docs/getting-started/project-structure)** — Understand the generated code
-- **[Collections](/docs/collections)** — Deep dive into schema definition
+- **[Tables](/docs/schema/)** — Deep dive into schema definition
 - **[Environment & Configuration](/docs/getting-started/configuration)** — All configuration options
 - **[Deployment](/docs/getting-started/deployment)** — Deploy to production

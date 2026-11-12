@@ -1,22 +1,22 @@
 ---
 title: "Recipe: Webhook Integration"
 sidebar_label: Webhooks
-description: Use entity callbacks to send webhooks to external services when data changes, without holding the write's transaction open.
+description: Use table hooks to send webhooks to external services when data changes, without holding the write's transaction open.
 ---
 
 ## Overview
 
-Use `afterSave` and `afterDelete` callbacks to notify external services when data changes in Rebase.
+Use the `afterSave` and `afterDelete` [table hooks](/docs/collections/callbacks/) to notify external services when data changes in Rebase.
 
-Two things about those callbacks decide how this recipe is written, and neither is optional:
+Two things about those hooks decide how this recipe is written, and neither is optional:
 
 - **They run inside the write's database transaction.** Anything you `await` there holds a pooled
   connection and the row's locks until it comes back. A receiver that takes ten seconds is a
   ten-second transaction; a receiver that never answers is a transaction that never ends.
 - **A throw from `afterSave` rolls the write back.** The error reaches the caller as a 500 and the
-  row is not saved. Awaiting a third party inside the callback makes their outage your data loss.
+  row is not saved. Awaiting a third party inside the hook makes their outage your data loss.
 
-So: never `await` an outbound HTTP request in a callback. Queue it.
+So: never `await` an outbound HTTP request in a hook. Queue it.
 
 ## Slack Notification on New Order
 
@@ -69,7 +69,7 @@ export function sendOrderWebhooks(backend: RebaseBackendInstance): void {
     // `ctx` lets each attempt send its real `X-Webhook-Attempt`.
     backend.jobQueue?.register<QueuedWebhookDelivery>(WEBHOOK_DELIVERY_TASK, (ctx) => dispatcher.deliverQueuedJob(ctx.payload, ctx));
 
-    backend.setCollectionCallbacks("orders", {
+    backend.setTableHooks("orders", {
         afterSave: async ({ values, id, status }) => {
             if (status === "new") {
                 // Returns void, immediately. The job is written after the
@@ -86,16 +86,15 @@ destination the dispatcher refuses, or a receiver that answers with a redirect, 
 after one attempt with the reason; anything else is retried like any job. See
 [Durable webhooks](/docs/backend/jobs#durable-webhooks).
 
-`setCollectionCallbacks` **replaces** the callbacks the `orders` collection
-declares. If it declares some, keep them:
-pass
-`composeCallbacks(declared, { afterSave })`, with `composeCallbacks` from
-`@rebasepro/server` and `declared` the collection's own `callbacks`. See
-[Combining callback sets](/docs/collections/callbacks/#combining-callback-sets).
+`setTableHooks` **replaces** the hooks the `orders` table declares. If it
+declares some, keep them: pass `composeTableHooks(declared, { afterSave })`,
+with `composeTableHooks` from `@rebasepro/common` and `declared` the table's own
+`hooks` (`orders.config.hooks`). See
+[Combining hook sets](/docs/collections/callbacks/#combining-hook-sets).
 
 ### Without a job queue
 
-Leave out `jobQueue` — or run on a driver with no SQL, where the backend has none — and the
+Leave out `jobQueue` — or run where the backend has no job queue — and the
 deliveries are queued in memory, in the process that made the change. That is simpler, and it is
 enough for a notification you can afford to lose:
 
@@ -123,7 +122,7 @@ export function sendOrderWebhooks(backend: RebaseBackendInstance): void {
         }
     ]);
 
-    backend.setCollectionCallbacks("orders", {
+    backend.setTableHooks("orders", {
         afterSave: async ({ values, id, status }) => {
             if (status === "new") {
                 dispatcher.enqueueEntityChange("orders", "INSERT", String(id), values);
@@ -133,9 +132,9 @@ export function sendOrderWebhooks(backend: RebaseBackendInstance): void {
 }
 ```
 
-Keep the dispatcher out of the collection file itself. A collection file is also bundled into the
-admin, in the browser: the build strips its callbacks, but a dispatcher built at the top of the file
-and its `@rebasepro/server` import would ship to every visitor, and fail the admin build.
+Keep the dispatcher out of the table file itself. `backend/schema` is loaded by every command that
+reads the schema — `rebase db push`, `generate-sdk`, `doctor` — and a dispatcher built at the top of
+the file would be built by each of them. Attach it where the backend is created, as above.
 
 A crash or a deploy between the commit and the delivery drops the event. Each webhook has its own
 queue, so a receiver that is down delays only its own deliveries, never another webhook's.
@@ -178,11 +177,11 @@ If you are posting a hand-built body to one endpoint and do not want the dispatc
 rules still apply — bound the request, and never let its failure reach the caller:
 
 ```typescript
-import type { CollectionCallbacks } from "@rebasepro/types";
+import type { TableHooks } from "@rebasepro/server/schema";
 
 type Order = { customer_name: string; total: number };
 
-const callbacks: CollectionCallbacks<Order> = {
+const hooks: TableHooks<Order> = {
     afterSave: async ({ values, id, status }) => {
         if (status !== "new") return;
         // No `await`: the transaction must not wait for Slack. `AbortSignal.timeout`
@@ -197,7 +196,7 @@ const callbacks: CollectionCallbacks<Order> = {
             signal: AbortSignal.timeout(10_000)
         }).catch((error) => {
             // Swallowed on purpose. A throw here would be an unhandled rejection;
-            // a throw *inside* the callback would roll the order back.
+            // a throw *inside* the hook would roll the order back.
             console.error("Slack notification failed", error);
         });
     }
@@ -214,16 +213,16 @@ once per connection, not once per delivery.
 
 ## Sync to External API
 
-`afterDelete` receives the deleted row flat, as `row` — the table's columns, not an entity wrapper.
+`afterDelete` receives the deleted row flat, as `values` — the table's columns, not an entity wrapper.
 
 ```typescript
-import type { CollectionCallbacks } from "@rebasepro/types";
+import type { TableHooks } from "@rebasepro/server/schema";
 
 type Product = { name: string; description: string; price: number; shopify_id: string };
 
 const syncQueue: Promise<unknown>[] = [];
 
-const callbacks: CollectionCallbacks<Product> = {
+const hooks: TableHooks<Product> = {
     afterSave: async ({ values, id }) => {
         // Queued, not awaited: Shopify being down must not fail the save.
         syncQueue.push(
@@ -246,8 +245,8 @@ const callbacks: CollectionCallbacks<Product> = {
         );
     },
 
-    afterDelete: async ({ row }) => {
-        const shopifyId = row.shopify_id;
+    afterDelete: async ({ values }) => {
+        const shopifyId = values.shopify_id;
         if (!shopifyId) return;
         syncQueue.push(
             fetch(
@@ -265,15 +264,15 @@ const callbacks: CollectionCallbacks<Product> = {
 
 ## Error Handling
 
-`afterSaveError` runs when the save — or any `afterSave` callback — throws. It is a notification
+`afterSaveError` runs when the save — or any `afterSave` hook — throws. It is a notification
 hook, not a rescue: the transaction rolls back, the row is not saved, and **the error is rethrown
 after it runs**. On a request it runs once the rollback is done, outside the failed transaction, so a
 delivery it hands to the dispatcher's queue is kept rather than rolled back with the write.
 
 ```typescript
-import type { CollectionCallbacks } from "@rebasepro/types";
+import type { TableHooks } from "@rebasepro/server/schema";
 
-const callbacks: CollectionCallbacks = {
+const hooks: TableHooks = {
     afterSave: async ({ values }) => {
         // If this throws, the write is rolled back. That is the right behaviour
         // for a validation or an invariant, and the wrong one for a notification.
@@ -281,7 +280,7 @@ const callbacks: CollectionCallbacks = {
     },
     afterSaveError: async ({ id, values }) => {
         // Runs, and then the error is rethrown. Use it to alert, not to recover.
-        console.error(`Save failed for entity ${id}`, values);
+        console.error(`Save failed for row ${id}`, values);
     }
 };
 ```
@@ -291,5 +290,5 @@ it there, or hand the work to the dispatcher's queue.
 
 ## Next Steps
 
-- **[Entity Callbacks](/docs/collections/callbacks)** — Full callback reference
+- **[Table hooks](/docs/collections/callbacks)** — Full hook reference
 - **[Blog CMS Recipe](/docs/recipes/blog-cms)** — Complete blog example

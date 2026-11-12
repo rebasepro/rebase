@@ -30,18 +30,18 @@ Initialize a new Rebase project:
 rebase init [directory]
 ```
 
-Sets up the project structure with frontend, backend, and shared packages.
+Sets up a `backend/` (the tables in `backend/schema/`) and a `frontend/` (the admin panel, with its table customizations in `frontend/src/cms/`); `--headless` scaffolds the `backend/` alone, with no `backend/schema/`. [Project structure](/docs/getting-started/project-structure/) shows both trees.
 
 | Flag | What it does |
 |---|---|
 | `-t, --template <preset>` | `blog`, `ecommerce` or `blank`. Default `blog` |
-| `--headless` | Backend only — no admin panel and no collection files. `--template` has no effect, because there are no collections to seed |
+| `--headless` | Backend only — no admin panel and no `backend/schema/`: the server serves the database's own tables. `--template` has no effect, because there are no tables to seed |
 | `-y, --yes` | Never prompt. **Required wherever there is no terminal to answer**, such as CI. It skips git init and dependency install — the interactive defaults say yes to both, so pass `--git` / `--install` if you want them |
 | `-i, --install` | Install dependencies after scaffolding. Without it, init asks (default yes); under `--yes`, nothing is installed |
 | `--no-install` | Install nothing, and do not ask |
 | `-g, --git` | Initialize a repository and make the first commit. Without it, init asks (default yes); under `--yes`, no repository |
 | `--database-url <url>` | Use an existing database instead of the managed one. It must be a `postgres://` or `postgresql://` URL: anything else is refused before a file is written, and the interactive prompt asks again |
-| `--introspect` | Generate collections from that database. Implies `--template blank` and needs `--install` |
+| `--introspect` | Generate `backend/schema` from that database. Implies `--template blank` and needs `--install` |
 | `--project <slug>` | Link the scaffold to a Rebase Cloud project |
 | `--setup-key <key>` | The one-time key authenticating that link |
 | `-a, --agent <name>` | Set up AI coding agents: the [skills](/docs/ai/skills) and the [MCP server](/docs/ai/mcp). Repeatable or comma-separated — `claude`, `cursor`, `windsurf`, `gemini`, `codex`, `kiro`, `copilot` or `all`. Without it, `init` asks and pre-ticks the agents installed on the machine; under `--yes`, none |
@@ -54,7 +54,7 @@ Start the development server:
 rebase dev
 ```
 
-Starts both frontend and backend with hot reloading, and regenerates the Drizzle schema and the SDK types (`generated/sdk/`) on start and on every collection save.
+Starts both frontend and backend with hot reloading, and regenerates the Drizzle schema and the SDK types (`generated/sdk/`) on start and on every save under `backend/schema/`.
 
 Both ports are derived from the project's path so several Rebase projects can run
 side by side. Use the URLs `rebase dev` prints. Pin one with `rebase dev --port 3001`.
@@ -177,30 +177,23 @@ keeps local uploads in the project's `uploads/`, run from source or compiled, as
 `rebase dev` does. It runs in `backend/`, so a relative `STORAGE_PATH` there is
 read from `backend/`.
 
-### `rebase schema generate`
-
-Generate Drizzle ORM schema from your TypeScript collections:
+### `rebase schema generate` / `rebase schema stale`
 
 ```bash
-rebase schema generate
+rebase schema generate       # backend/schema → backend/src/schema.generated.ts
+rebase schema stale          # name what differs from the tables, exit 1 if anything does
+rebase schema stale --fix    # regenerate the file instead
 ```
 
-This reads your collections from `config/collections/` and generates `backend/src/schema.generated.ts` with Drizzle table definitions, enums, and relations.
-
-### `rebase schema stale`
-
-```bash
-rebase schema stale          # name what differs from the collections, exit 1 if anything does
-rebase schema stale --fix    # regenerate backend/src/schema.generated.ts instead
-```
-
-`rebase dev` keeps the file current by itself, so this is the check for a build
-or a CI step. See [Schema Generation](/docs/cli/schema/#rebase-schema-stale).
+Every command that reads the schema takes `--schema-dir <dir>` for a project
+that keeps it elsewhere; `--collections` was removed. `rebase dev` keeps the
+file current, so `stale` is the check for a build or CI. See
+[Schema Generation](/docs/cli/schema/).
 
 ### `rebase db`
 
 ```bash
-rebase db push                 # apply the collections to the database (development)
+rebase db push                 # apply the tables to the database (development)
 rebase db generate             # write a SQL migration file
 rebase db migrate              # apply the pending migrations
 rebase db url                  # print the connection string this project uses
@@ -226,12 +219,44 @@ rebase console
 rebase console -e "rebase.dataAsAdmin.posts.find({ limit: 5 })"
 ```
 
-`rebase` (`dataAsAdmin`, `sql`, `withAuth(user)`) and `collections` are in
-scope, and top-level `await` works. The database is resolved as `rebase db push`
+`rebase` (`dataAsAdmin`, `sql`, `withAuth(user)`) and `collections` (the
+project's tables, loaded from `backend/schema`) are in scope, and top-level
+`await` works. The database is resolved as `rebase db push`
 resolves it, and opening it changes nothing in it. With `-e`, the awaited result
 is printed as JSON on stdout and a throw exits `1`. Flags: `--eval`/`-e`,
-`--collections`/`-c`, `--database-url`, `--docker`. See
+`--schema-dir`, `--database-url`, `--docker`. See
 [Scripts and the Console](/docs/backend/scripts/).
+
+### `rebase migrate`
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+One-way moves from a layout this release no longer reads:
+
+```bash
+rebase migrate collections-to-tables [dir]   # config/collections → backend/schema + frontend/src/cms
+rebase migrate sdk-calls [dir]               # data.collection("x") → data.table("x") in your own code
+```
+
+`collections-to-tables` writes one `defineTable` per collection in
+`backend/schema/` (every column explicit, at its original position), its
+`index.ts` with `defaultRls`, a `customizeTable` in `frontend/src/cms/` for a
+collection whose presentation was not the default, `defineFirestoreCollection`
+files, and `backend/{resources,storage,hooks}.ts` and
+`backend/generated/register.ts` from `config/`. Then it runs `sdk-calls` over
+your code. Every run reads the result back through the new pipeline: the
+generated SQL — DDL, policies, search, vector, triggers, views, the Drizzle
+schema — must be byte-identical, or every file is put back. What it cannot
+carry exactly is refused with its file and line, and nothing is written; what
+it leaves to you is printed as numbered manual steps. `config/` is never
+deleted — the run prints the `git rm` line. Flags: `--dry-run`, `--check`
+(verify a project already migrated), `--json`, `--force` (a dirty git tree, or
+output files that differ), `--skip-sdk-calls`. The [upgrade
+guide](/docs/upgrading/0-30-to-0-31/#step-1-run-the-codemod) has the details.
+
+`sdk-calls` rewrites `.collection(` to `.table(` on the SDK data surface and
+the other SDK renames, and lists every call it left as written. Flags:
+`--dry-run`, `--json`, `--force`.
 
 ### `rebase apps init` / `rebase apps config`
 
@@ -268,7 +293,7 @@ rebase status --json        # machine-readable
 
 ```
   backend  ·  managed  Rebase's runtime boots your bundle
-  declared in  config/resources.ts
+  declared in  backend/resources.ts
   configured by  .env
 
   buckets
@@ -282,7 +307,7 @@ rebase status --json        # machine-readable
 
 Three files decide what a backend can reach, and this prints all three together:
 `rebase.json` says where your code is and who runs the server,
-`config/resources.ts` says what the project needs, and the environment says how
+`backend/resources.ts` says what the project needs, and the environment says how
 to reach each thing. Everything else — `rebase.resources.json`, the bundle
 manifest — is generated from the middle one for readers that cannot run your
 code, and you never write it.
@@ -300,7 +325,7 @@ nothing to fix.
 ### `rebase resources`
 
 What this project declares it needs — the databases, buckets, topics and
-queues its config code asks for, and the crons and functions its files define:
+queues `backend/resources.ts` asks for, and the crons and functions its files define:
 
 ```bash
 rebase resources            # list them
@@ -310,19 +335,19 @@ rebase resources --json     # machine-readable
 ```
 
 `rebase resources --check` is the flag a CI job uses to fail on a
-`rebase.resources.json` that no longer matches the config code.
+`rebase.resources.json` that no longer matches `backend/resources.ts`.
 `--json` combines
 with it: on drift, `rebase resources --check --json` exits 1 with an error
 envelope (`resource_graph_missing` or `resource_graph_stale`), and on success
 the graph carries `check.status`. `--write --json` writes the file and reports
 `written.changed`.
 
-A resource is declared in config code — `database("analytics")`,
+A resource is declared in `backend/resources.ts` — `database("analytics")`,
 `bucket("media")`, `topic("signups")`, `queue("thumbnails")` — or is a file
 under `backend/crons` or `backend/functions`, and never written by hand in
 `rebase.resources.json`, which is generated from those declarations so a host can
 read what a project needs without building it. Each entry records who uses it
-(`collection:events`, `property:posts.cover`, `function:report`).
+(`table:events`, `column:posts.cover`, `function:report`).
 
 A backend also has a default database and a default storage source that nobody
 declares. Both are listed here, marked `implicit`, and neither is written to
@@ -341,19 +366,19 @@ and to remove a provisioned database the code no longer names, see
 
 ### `rebase generate-sdk`
 
-Generate a typed SDK from your collection definitions:
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
 ```bash
 rebase generate-sdk
 ```
 
-Creates TypeScript types and a type-safe client for all your collections.
-
-`--register` also types server-side data: it writes the types and the
-`Register` declaration to `config/generated/`, and remembers the choice in
-`rebase.json` (`registerDatabase`), so later runs, `rebase dev` and fresh clones
-keep them current.
-See [Typed server-side data](/docs/backend/typed-server-data).
+Writes a typed client for the tables `backend/schema/index.ts` exports to
+`generated/sdk/`, with `TableName` and `tablesDictionary`; `--from <link|url>`
+reads a running backend's contract instead. `--register` also types
+server-side data: it writes the types and the `Register` declaration to
+`backend/generated/` and remembers it in `rebase.json` (`registerDatabase`).
+See [Typed server-side data](/docs/backend/typed-server-data) and
+[Schema Generation](/docs/cli/schema/#rebase-generate-sdk).
 
 ### `rebase doctor`
 
@@ -372,7 +397,7 @@ from working at all happens before a table can be compared:
 | --- | --- |
 | Node version | Against the range the CLI declares. Too old is not reported as "unsupported Node" — it is a syntax error inside a dependency. |
 | Package managers | Two lockfiles in one project. `npm install` in a pnpm workspace rewrites `node_modules` into a layout pnpm disagrees with, and the symptom is `Cannot find module` hours later. |
-| Duplicate slugs | The registry keeps the last collection registered, so the other one is not reported missing — it is served as the winner, under its own name. |
+| Duplicate slugs | Two tables declaring the same slug. The schema refuses to compile on it, and this names both. |
 | `.env` sanity | A `JWT_SECRET` shorter than 32 characters (which production refuses to boot on), and `NODE_ENV=production` with neither `CORS_ORIGINS` nor `FRONTEND_URL`. Values are never printed. |
 | `@rebasepro/*` version skew | The same package pinned to different versions across the project's `package.json` files. Two copies break `instanceof` between them, which fails as a type guard rejecting its own type. |
 | Connection strings | An unencoded `=` in a URL parameter, which PostgreSQL's own tools refuse to parse — so backups and `psql` break while the app keeps working. |
@@ -384,12 +409,12 @@ starts:
 
 | Check | Why |
 | --- | --- |
-| Collections → generated schema | Whether `schema.generated.ts` is stale. |
-| Collections → database | Missing tables, columns, enums, foreign keys and junctions. |
-| Required extensions | A `{ type: "vector" }` property needs pgvector, which Rebase installs only where a project declared it. |
-| Schema stamp | Whether this database was provisioned from these collections. A hash, so it can say the two disagree and never which is ahead. |
-| Collections → SDK types | Whether the generated typed SDK is stale. |
-| RLS policies | Whether the database's policies match the `securityRules` you declared, and whether any policy names a role this server cannot use. |
+| Tables → generated schema | Whether `schema.generated.ts` is stale. |
+| Tables → database | Missing tables, columns, enums, foreign keys and junctions. |
+| Required extensions | A `col.vector()` column needs pgvector, which Rebase installs only where a project declared it. |
+| Schema stamp | Whether this database was provisioned from these tables. A hash, so it can say the two disagree and never which is ahead. A `v1:` stamp from a runtime before 0.31 is reported once, with the restamp: `rebase db push`. |
+| Tables → SDK types | Whether the generated typed SDK is stale. |
+| RLS policies | Whether the database's policies match the `rls` you declared, and whether any policy names a role this server cannot use. |
 
 If the database is unreachable, its phases are reported as skipped with the
 reason and the rest still runs — see [Troubleshooting](/docs/troubleshooting/).
@@ -421,22 +446,27 @@ rebase verify --live
 rebase verify --live --database-url postgresql://…
 ```
 
-Whether the collections are safe to ship, in one fast command for CI and for an
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+Whether the tables are safe to ship, in one fast command for CI and for an
 AI agent's hooks. Offline by default, and it never changes anything.
 
 | Step | What fails it |
 | --- | --- |
-| Collection config | A file under `config/collections/` that does not load, or that the boot validator rejects — with unknown keys as errors, so a misspelt option or a UI option written outside `admin: { … }` (a top-level `widget`) is caught here rather than silently ignored. |
-| RLS coverage | A collection with no `securityRules` that inherits none, or one with a `user_id`, `owner_id`, `organization_id` or `tenant_id` column that relies on directory defaults instead. A rule that lets a role read every row of such a table is a warning. |
-| Migration freshness | A table or column the collections declare that no file in `backend/drizzle/migrations` creates, or one they dropped that a migration still creates. Skipped for a project with no migrations yet. |
-| Live RLS audit | With `--live`: the [`rls-check`](/docs/rls-check) catalogue against the project's database, and whether every migration has been applied. The database is resolved as the `db` commands resolve it — `--database-url`, `DATABASE_URL`, `--docker`, otherwise the managed development database. A database that is not configured or does not answer is an error, not a skip: the audit was asked for. A `USING (true)` read policy compiled from an `access: "public"` rule is a warning while the API requires a token (`AUTH_REQUIRE`, on by default) — every signed-in user reads every row — and an error with `AUTH_REQUIRE=false`, where the rows are anonymous. |
+| Table definitions (`schema`) | `backend/schema` does not load or does not compile, through the loader the backend boots from: a relation to a table the index does not export, `rls: "inherit"` with no `defaultRls`, a table with no primary key — one finding per problem. A table with no `rls` is one of them. |
+| RLS coverage (`rls`) | A table with a `user_id`, `owner_id`, `organization_id` or `tenant_id` column whose rules — its own, or the `defaultRls` it inherits — let a role read every row regardless of it. A warning. |
+| Migration freshness (`migrations`) | A table or column the tables declare that no file in `backend/drizzle/migrations` creates, or one they dropped that a migration still creates. Skipped for a project with no migrations yet. |
+| Live RLS audit (`live`) | With `--live`: the [`rls-check`](/docs/rls-check) catalogue against the project's database, and whether every migration has been applied. The database is resolved as the `db` commands resolve it — `--database-url`, `DATABASE_URL`, `--docker`, otherwise the managed development database. A database that is not configured or does not answer is an error, not a skip: the audit was asked for. A `USING (true)` read policy compiled from an `access: "public"` rule is a warning while the API requires a token (`AUTH_REQUIRE`, on by default) — every signed-in user reads every row — and an error with `AUTH_REQUIRE=false`, where the rows are anonymous. |
 
-`--json` prints one object — every step, and every finding with its `file`, the
-dotted `path` into the collection config, and the `fix` — so an agent can repair
-what it broke. `--quiet` prints nothing when everything passes. Exits non-zero on
+`--json` prints one object, `{ ok, schemaDir, steps, findings, summary }`:
+each step is `{ id, title, status, detail? }` (`status` is `passed`, `failed`,
+`warnings` or `skipped`), and each finding carries `step`, `check` (a stable
+kebab-case kind), `severity`, `message`, and when they apply `fix`, `table`,
+`file` and the dotted `path` into the table (`posts.rls[0]`) — so an agent can
+repair what it broke. `summary` counts `errors` and `warnings`. `--quiet` prints nothing when everything passes. Exits non-zero on
 an error; warnings do not fail.
 
-A scaffolded project runs it for Claude Code after every collection edit: see
+A scaffolded project runs it for Claude Code after every edit under `backend/schema/`: see
 [`rebase skills install`](#rebase-skills-install).
 
 ### `rebase auth`
@@ -480,7 +510,7 @@ rebase storage move --from "(default)" --to media --prefix avatars
 rebase storage move --from "(default)" --to media --prefix avatars --delete-source
 ```
 
-`orphans` reads every row of every collection as stored (soft-deleted rows
+`orphans` reads every row of every table as stored (soft-deleted rows
 included, past every `beforeQuery` and `afterRead` hook) and every
 [history](/docs/backend/history/) entry, since a revert restores what it holds.
 It lists the files of one source (`--source`, the default source when left out)
@@ -489,7 +519,7 @@ reference in a text. Files newer than `--older-than` hours (24 by default) are l
 because the admin panel uploads a file before the row that names it is saved.
 The scan runs on the backend in the background, so a project too big to scan
 inside one request (behind an ingress that times it out) still finishes. The
-CLI starts it, then shows its progress (files listed, rows read, collections
+CLI starts it, then shows its progress (files listed, rows read, tables
 done, and any that could not be read) until it is done. With the
 [job queue](/docs/backend/jobs/) on, the scan is a `storage.orphans` job that
 the job workers run. Without it, the scan runs inside the server process that
@@ -500,13 +530,13 @@ report as before, plus its `scanId`.
 
 `--delete` asks before it deletes (`--yes` skips the question, and is required
 with no terminal). It deletes only from the scan just printed, and only within
-15 minutes of that scan completing. Nothing is deleted while a collection
-cannot be read: a collection with read hooks on a data source whose driver
+15 minutes of that scan completing. Nothing is deleted while a table
+cannot be read: a table with read hooks on a database whose driver
 cannot read past them counts as unread. Before deleting anything, the server
 reads every row and history entry again against the listed files. Then it asks
 for each file again right before deleting it. A file that a row names now,
 that was uploaded again since the scan, or that is gone is kept, and the CLI
-lists it as kept. Files that only your own tables outside collections name look
+lists it as kept. Files that only tables Rebase does not serve name look
 unused: check before deleting. Against a backend from 0.25.1 or earlier, the
 CLI scans the old way, inside one request.
 
@@ -538,7 +568,7 @@ See [Agent Skills](/docs/ai/skills) for the full list and where files are writte
 `--hooks` installs the Claude Code guardrail `rebase init` ships with every
 project: `.claude/hooks/post-edit-collection.sh`, registered as a `PostToolUse`
 hook in `.claude/settings.json`, which runs `rebase verify --quiet` after each edit
-under `config/collections/` and hands any problem back to the agent. Existing
+under `backend/schema/` or `frontend/src/cms/` and hands any problem back to the agent. Existing
 settings and hooks are kept. `rebase skills --hooks` installs the hook alone.
 
 ### `rebase telemetry`
@@ -563,6 +593,6 @@ the other two change it. If you never ran `init`, nothing was ever collected.
 
 ## Next Steps
 
-- **[Schema Generation](/docs/cli/schema/#production-workflow)** — The migration workflow, from collection edit to production
+- **[Schema Generation](/docs/cli/schema/#production-workflow)** — The migration workflow, from a table edit to production
 - **[Schema as Code](/docs/architecture/schema-as-code)** — How schema generation works
 - **[Quickstart](/docs/getting-started/quickstart)** — Get started
