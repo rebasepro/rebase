@@ -2,7 +2,7 @@ import { isPostgresCollectionConfig } from "@rebasepro/types";
 import type { CollectionConfig, PostgresPolicy, SecurityOperation, SecurityRule } from "@rebasepro/types";
 import {
     compileRulePolicies,
-    getEffectiveSecurityRules,
+    getEffectiveSecurityRulesOnce,
     getInjectedSecurityRules,
     getTableName,
     type CompiledRulePolicy
@@ -162,7 +162,8 @@ export function listPolicies(
     const injectedNames = getPolicyNamesForRules(getInjectedSecurityRules(collection), tableName);
     const livePolicies = new Map(live.map(policy => [policy.policyname, policy]));
 
-    for (const rule of getEffectiveSecurityRules(collection)) {
+    // Once: a collection projected from a served table already carries them.
+    for (const rule of getEffectiveSecurityRulesOnce(collection)) {
         const operations = getPolicyOperations(rule);
         let compiled: CompiledRulePolicy[] | undefined;
         try {

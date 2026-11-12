@@ -1,6 +1,6 @@
 
 import { getPolicyNamesForRule, getPolicyNamesForRules } from "@rebasepro/utils";
-import { getGeneratedPolicyNames, getTableName, policyToSecurityRule } from "@rebasepro/common";
+import { getGeneratedPolicyNamesOnce, getTableName, policyToSecurityRule } from "@rebasepro/common";
 import React, { useState, useEffect, useMemo } from "react";
 
 /**
@@ -306,7 +306,8 @@ export function CollectionRLSTab() {
     // exactly how the two came to disagree about which policies were drift.
     const generatedPolicyNames = useMemo(() => {
         if (!tableName) return new Set<string>();
-        return getGeneratedPolicyNames(values as AdminCollection);
+        // Once: a collection projected from a served table already carries its injected rules.
+        return getGeneratedPolicyNamesOnce(values as AdminCollection);
     }, [tableName, values]);
 
     const unmappedPolicies = dbPolicies.filter(dp => !generatedPolicyNames.has(dp.policyname));

@@ -258,3 +258,33 @@ export function getInjectedSecurityRules(collection: CollectionConfig): Security
 export function getGeneratedPolicyNames(collection: CollectionConfig): Set<string> {
     return getPolicyNamesForRules(getEffectiveSecurityRules(collection), getTableName(collection));
 }
+
+/**
+ * {@link getEffectiveSecurityRules} for a collection that may already carry
+ * the injected rules: each injected rule is added only when the collection
+ * does not hold a rule of its name.
+ *
+ * A collection the admin panel projects from a served table
+ * (`GET /api/schema/tables`) already carries its effective rules — the panel
+ * reflects permissions from them — so the panel's editors, which list what
+ * Postgres holds, would otherwise show every injected policy twice. For a
+ * collection declared in code the answer is the same as
+ * `getEffectiveSecurityRules`'s. Every injected rule is named, and Postgres
+ * admits one policy per name on a table.
+ *
+ * For the panel only: the policy generator reads `getEffectiveSecurityRules`.
+ */
+export function getEffectiveSecurityRulesOnce(collection: CollectionConfig): SecurityRule[] {
+    const declared = collection.securityRules ?? [];
+    const held = new Set(declared.flatMap(rule => (rule.name ? [rule.name] : [])));
+    const injected = getInjectedSecurityRules(collection).filter(rule => !rule.name || !held.has(rule.name));
+    return [...declared, ...injected];
+}
+
+/**
+ * {@link getGeneratedPolicyNames} over {@link getEffectiveSecurityRulesOnce}:
+ * for the panel, whose collections may already carry their injected rules.
+ */
+export function getGeneratedPolicyNamesOnce(collection: CollectionConfig): Set<string> {
+    return getPolicyNamesForRules(getEffectiveSecurityRulesOnce(collection), getTableName(collection));
+}

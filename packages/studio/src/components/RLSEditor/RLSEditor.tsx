@@ -30,7 +30,7 @@ import { useRebaseContext, useSnackbarController, ErrorView, useTranslation, Con
 import { isPostgresCollectionConfig } from "@rebasepro/types";
 import { REBASE_INTERNAL_SCHEMAS, REBASE_INTERNAL_PREFIXES, JUNCTION_TABLES_SQL, getTableName } from "@rebasepro/common";
 import { adminRequestPolicyName, getPolicyNamesForRules } from "@rebasepro/utils";
-import { resolveJunctionSpecs, getJunctionSecurityRules, getEffectiveSecurityRules, policyToSecurityRule } from "@rebasepro/common";
+import { resolveJunctionSpecs, getJunctionSecurityRules, getEffectiveSecurityRulesOnce, policyToSecurityRule } from "@rebasepro/common";
 import { PolicyEditor } from "./PolicyEditor";
 import { saveRules, isCancellation } from "./saveRules";
 import { applyPolicyEdit, type PolicyEditRefusal } from "./policyRules";
@@ -878,7 +878,7 @@ totalPolicies };
                                             // the unchanged rules reported as saved.
                                             const edit = applyPolicyEdit(
                                                 existingRules,
-                                                getEffectiveSecurityRules(activeCollection),
+                                                getEffectiveSecurityRulesOnce(activeCollection),
                                                 activeTableData.tableName,
                                                 editingPolicy,
                                                 newPolicy
