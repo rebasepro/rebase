@@ -80,7 +80,7 @@ export function resolveNestedPath(
         // A relation the API does not have is a segment that names nothing,
         // for this caller — and is never offered among the ones there are.
         // An unknown one is a 404 `UNKNOWN_RELATION` listing the others.
-        const relation = requireRelation(parent, relationKey, namesHiddenFromCaller(parentCollection));
+        const relation = requireRelation(parent, relationKey, namesHiddenFromCaller(parent.descriptor));
         const target = relationTarget(registry, relation);
         const targetCollection = getCollectionByPath(target.slug, registry);
 

@@ -5,7 +5,7 @@ import { isTimeZoneName } from "@rebasepro/types";
 import type { ColumnDescriptor } from "@rebasepro/types";
 import { isJsNumberType } from "@rebasepro/common";
 import type { DriverAggregate, DriverAggregateGroup, IncludeSpec, NullsPlacement, ReadOperation, ReadQuery, VectorSearchParams } from "@rebasepro/types";
-import { apiHiddenKeys, includableRelations, queryableFieldNames, unknownAggregateField, unknownIncludeRelation, unknownOrderByField, unknownProjectionField, createRelationRefWithData, normalizeDriverOrderBy, normalizeInclude, encodeCursor, type IncludeNode, type NormalizedInclude } from "@rebasepro/common";
+import { apiHiddenKeys, includableRelations, queryableColumnKeys, unknownAggregateField, unknownIncludeRelation, unknownOrderByField, unknownProjectionField, createRelationRefWithData, normalizeDriverOrderBy, normalizeInclude, encodeCursor, type IncludeNode, type NormalizedInclude } from "@rebasepro/common";
 import { generateForeignKeyName, toWireKey } from "@rebasepro/utils";
 import { DrizzleConditionBuilder, getUnknownFilterFieldsMode, listedColumnKeys, type FilterCompilationOptions } from "../utils/drizzle-conditions";
 import { currentFieldViewer, namesHiddenFromCaller } from "./field-viewer";
@@ -455,7 +455,7 @@ export class FetchService {
         // builder below, which refuses it naming the ones there are.
         // A relation the API does not have is the builder's to refuse too, as
         // the unknown relation it is for this caller.
-        const sorted = namesHiddenFromCaller(collection).has(spec.relation)
+        const sorted = namesHiddenFromCaller(this.registry.requireTable(collection.slug).descriptor).has(spec.relation)
             ? undefined
             : this.registry.getTable(collection.slug)?.relations.get(spec.relation);
         if (sorted) assertRelationReadable(collection, spec.relation, sorted, "`orderBy`");
@@ -667,9 +667,11 @@ target });
             return undefined;
         }
 
-        // The REST check answers an `excludeFromApi` sort key with the same
-        // function, so a hidden field and a typo cannot be told apart.
-        const answer = unknownOrderByField(orderBy, collectionName, listedColumnKeys(table, collection));
+        // The REST check answers a private sort key with the same function, so
+        // a hidden column and a typo cannot be told apart.
+        const answer = unknownOrderByField(
+            orderBy, collectionName, listedColumnKeys(table, collection && this.registry.getTable(collection.slug)?.descriptor)
+        );
         throw ApiError.badRequest(answer.message, "UNKNOWN_ORDER_BY_FIELD", answer.details);
     }
 
@@ -1077,10 +1079,10 @@ target });
             // `fields` too is how a caller says to return it. Read as a typo,
             // `fields=title,author&include=author` was a 400 on every door.
             if (relations?.has(name)) continue;
-            // The REST check answers an `excludeFromApi` field with the same
-            // function, so a hidden field and a typo cannot be told apart.
+            // The REST check answers a private column with the same function,
+            // so a hidden column and a typo cannot be told apart.
             const answer = unknownProjectionField(
-                name, collection.slug ?? collection.name, queryableFieldNames(collection)
+                name, collection.slug ?? collection.name, queryableColumnKeys(this.registry.requireTable(collection.slug).descriptor)
             );
             throw ApiError.badRequest(answer.message, "UNKNOWN_FIELD", answer.details);
         }
@@ -2011,7 +2013,7 @@ target });
             // private column — the REST check answers with the same function.
             const column = hidden.has(field) ? undefined : columns[field as keyof typeof columns] as AnyPgColumn | undefined;
             if (!column) {
-                const answer = unknownAggregateField(field, forWhat, listedColumnKeys(table, collection));
+                const answer = unknownAggregateField(field, forWhat, listedColumnKeys(table, this.registry.requireTable(collection.slug).descriptor));
                 throw ApiError.badRequest(answer.message, "UNKNOWN_AGGREGATE_FIELD", answer.details);
             }
             // An aggregate over a column reads it: a role-restricted one is

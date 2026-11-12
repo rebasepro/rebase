@@ -10,7 +10,7 @@ import {
     apiHiddenKeys,
     canReadColumn,
     isIlikeSearchable,
-    queryableFieldNames,
+    queryableColumnKeys,
     unknownFilterField,
     unknownVectorProperty,
     unknownRelationTargetField,
@@ -58,16 +58,18 @@ export type UnknownFilterFieldsMode = "error" | "warn";
 
 
 /**
- * The fields an unknown-field answer lists, sorted — never an `excludeFromApi`
- * one, for any caller: the list is a hint for a typo, and naming a hidden
- * column there answers the question the unknown-field answer leaves open.
+ * The column keys an unknown-field answer lists, sorted — never a private
+ * (`.private()`) one, for any caller: the list is a hint for a typo, and
+ * naming a hidden column there answers the question the unknown-field answer
+ * leaves open.
  *
- * Read off the collection when there is one, with the function the REST check
- * uses to answer a query on a hidden field — so its answer and this one are
- * the same bytes. Off the table only when no collection is in hand.
+ * Read off the table descriptor when there is one, with the function the REST
+ * check uses to answer a query on a private column (`queryableColumnKeys`) —
+ * so its answer and this one are the same bytes. Off the catalogue table only
+ * when no descriptor is in hand (a bare builder call, which declares no rule).
  */
-export function listedColumnKeys(table: PgTable<any>, collection: CollectionConfig | undefined): string[] {
-    if (collection) return queryableFieldNames(collection);
+export function listedColumnKeys(table: PgTable<any>, described: TableDescriptor | undefined): string[] {
+    if (described) return queryableColumnKeys(described);
     try {
         return Object.keys(getTableColumns(table)).sort();
     } catch {
@@ -883,20 +885,21 @@ export class DrizzleConditionBuilder {
             }
         }
 
-        return this.unknownFilterField(table, field, collectionPath, mode, collection);
+        const described = collection && options.registry ? options.registry.getTable(collection.slug)?.descriptor : undefined;
+        return this.unknownFilterField(table, field, collectionPath, mode, described);
     }
 
     /**
      * The answer to a filter field that names nothing. Built by the function
-     * the REST check answers an `excludeFromApi` field with, so the two cannot
-     * be told apart by a byte.
+     * the REST check answers a private column with, so the two cannot be told
+     * apart by a byte.
      */
     private static unknownFilterField(
         table: PgTable<any>,
         field: string,
         collectionPath: string,
         mode: UnknownFilterFieldsMode,
-        collection: CollectionConfig | undefined
+        described: TableDescriptor | undefined
     ): undefined {
         if (mode === "warn") {
             logger.warn(`Filtering by field '${field}', but it does not exist in table '${collectionPath}'`);
@@ -907,7 +910,7 @@ export class DrizzleConditionBuilder {
         // routine outcome. It means a filter key and the schema have drifted
         // apart, which used to widen results silently — exactly the thing an
         // operator wants in the log at warn.
-        const answer = unknownFilterField(field, collectionPath, listedColumnKeys(table, collection));
+        const answer = unknownFilterField(field, collectionPath, listedColumnKeys(table, described));
         throw ApiError.badRequest(answer.message, "UNKNOWN_FILTER_FIELD", answer.details);
     }
 
@@ -963,7 +966,7 @@ export class DrizzleConditionBuilder {
         if (!targetColumn) {
             const answer = unknownRelationTargetField(
                 { field, relationKey: path.relationKey, fieldKey: path.fieldKey },
-                { slug: target.slug, validFields: listedColumnKeys(targetTable, registry.getCollectionByPath(target.slug)) },
+                { slug: target.slug, validFields: listedColumnKeys(targetTable, target.descriptor) },
                 collectionPath
             );
             throw ApiError.badRequest(answer.message, "UNKNOWN_FILTER_FIELD", answer.details);
@@ -1669,7 +1672,7 @@ export class DrizzleConditionBuilder {
         // A relation the API does not have is not a relation there, for this
         // caller — the same answer, byte for byte, as one never declared.
         const ownerTable = registry.getTable(collection.slug);
-        const relation = namesHiddenFromCaller(collection).has(spec.relation)
+        const relation = namesHiddenFromCaller(ownerTable?.descriptor).has(spec.relation)
             ? undefined
             : ownerTable?.relations.get(spec.relation);
         if (!relation) {
@@ -1691,8 +1694,6 @@ export class DrizzleConditionBuilder {
 
         const target = targetOf(relation, registry);
         const targetTable = target && registry.getPgTable(target.descriptor.table);
-        // The target's lowered collection, for the field checks still read off one.
-        const targetCollection = target ? registry.getCollectionByPath(target.slug) ?? undefined : undefined;
         if (!target || !targetTable) {
             throw new Error(
                 `Table not found for the target of relation '${relation.name}' on '${collectionPath}', ` +
@@ -1706,12 +1707,12 @@ export class DrizzleConditionBuilder {
         // never got this far — `parseRelationAggregateSort` refuses it.
         let aggregand: SQL = sql`*`;
         if (spec.field) {
-            const column = targetCollection && namesHiddenFromCaller(targetCollection).has(spec.field)
+            const column = namesHiddenFromCaller(target.descriptor).has(spec.field)
                 ? undefined
                 : relationColumn(targetTable, target, spec.field)
                     ?? columnAtKey(targetTable, spec.field);
             if (!column) {
-                const validFields = listedColumnKeys(targetTable, targetCollection);
+                const validFields = listedColumnKeys(targetTable, target.descriptor);
                 throw ApiError.badRequest(
                     `Unknown field '${spec.field}' on '${target.slug}', the target of relation ` +
                     `'${spec.relation}' on table '${collectionPath}'` +
@@ -3146,9 +3147,9 @@ whereConditions };
      * (`vector(1536)`) rather than on the declared property, so it holds for an
      * introspected collection too, where the property carries no Rebase type.
      *
-     * The answer for a name that is not a column lists no `excludeFromApi`
-     * property; the REST check answers a hidden one with the same function, so
-     * the two cannot be told apart.
+     * The answer for a name that is not a column lists no private column;
+     * the REST check answers a private one with the same function, so the two
+     * cannot be told apart.
      */
     /**
      * The vector column `property` names. A private column is a column the API

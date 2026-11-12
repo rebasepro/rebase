@@ -1,6 +1,6 @@
 import { AsyncLocalStorage } from "node:async_hooks";
-import { apiHiddenFieldNames, type FieldViewer } from "@rebasepro/common";
-import type { CollectionConfig } from "@rebasepro/types";
+import { apiHiddenKeys, type FieldViewer } from "@rebasepro/common";
+import type { TableDescriptor } from "@rebasepro/types";
 
 /**
  * Who the current read is *for*, available to the row walk without threading it
@@ -65,20 +65,20 @@ export function currentFieldViewer(): FieldViewer | undefined {
 }
 
 /**
- * The names an API caller's query may not see on `collection`: its
- * `excludeFromApi` fields, in every spelling. Empty on the trusted server plane
- * (no viewer), which may filter and sort on those columns — the auth adapter
- * looks rows up by them — and empty with no collection in hand.
+ * The names an API caller's query may not see on `table`: its private columns
+ * and relations (`.private()`, `{ private: true }`) and the foreign key of a
+ * private `belongsTo`, in every spelling (`apiHiddenKeys`). Empty on the
+ * trusted server plane (no viewer), which may filter and sort on those
+ * columns — the auth adapter looks rows up by them — and empty with no table
+ * in hand.
  *
  * A query naming one of these is answered exactly as a query naming a column
- * the table does not have. The REST check passes such a name through to this
- * driver rather than refusing it itself, so the two answers come from one throw
- * and cannot drift: a "not readable" there would confirm a column OpenAPI and
- * `list_collections` hide.
+ * the table does not have: a "not readable" would confirm a column OpenAPI,
+ * `GET /api/schema/tables` and `describe_table` hide.
  */
-export function namesHiddenFromCaller(collection: CollectionConfig | undefined): ReadonlySet<string> {
-    if (!collection || currentFieldViewer() === undefined) return NO_NAMES;
-    return apiHiddenFieldNames(collection);
+export function namesHiddenFromCaller(table: TableDescriptor | undefined): ReadonlySet<string> {
+    if (!table || currentFieldViewer() === undefined) return NO_NAMES;
+    return apiHiddenKeys(table);
 }
 
 const NO_NAMES: ReadonlySet<string> = new Set();
