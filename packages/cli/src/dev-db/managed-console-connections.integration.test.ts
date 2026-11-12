@@ -30,14 +30,14 @@ const REPO = path.resolve(__dirname, "..", "..", "..", "..");
 const DRIVER_CLI = path.join(REPO, "packages", "server-postgres", "src", "cli.ts");
 const TSX = path.join(REPO, "node_modules", ".bin", "tsx");
 
+// From `@rebasepro/types`, which exports the builders and which the driver's
+// tsx resolves to source through the repository's typecheck config.
 const tasks = `
-export default {
-    name: "Tasks", singularName: "Task", slug: "tasks", table: "tasks",
-    properties: {
-        id: { name: "ID", type: "string", isId: "uuid", validation: { required: true } },
-        title: { name: "Title", type: "string" }
-    }
-};
+import { defineTable, col } from "@rebasepro/types";
+export const tasks = defineTable("tasks", {
+    columns: { id: col.uuid().primaryKey(), title: col.varchar() },
+    rls: "admin-only"
+});
 `;
 
 describe("rebase console against the managed database beside other clients", () => {
@@ -78,12 +78,10 @@ describe("rebase console against the managed database beside other clients", () 
 
         project = fs.mkdtempSync(path.join(os.tmpdir(), "managed-console-"));
         fs.mkdirSync(path.join(project, "backend"));
-        fs.mkdirSync(path.join(project, "config", "collections"), { recursive: true });
+        fs.mkdirSync(path.join(project, "backend", "schema"), { recursive: true });
         fs.writeFileSync(path.join(project, "backend", "package.json"), JSON.stringify({ name: "backend", type: "module" }));
-        fs.writeFileSync(path.join(project, "config", "collections", "package.json"), JSON.stringify({ type: "module" }));
-        fs.writeFileSync(path.join(project, "config", "collections", "tasks.js"), tasks);
-        fs.writeFileSync(path.join(project, "config", "collections", "index.js"),
-            "import tasks from \"./tasks.js\";\nexport default [tasks];\n");
+        fs.writeFileSync(path.join(project, "backend", "schema", "tasks.js"), tasks);
+        fs.writeFileSync(path.join(project, "backend", "schema", "index.js"), "export { tasks } from \"./tasks.js\";\n");
         const setup = new pg.Client({ connectionString: url });
         await setup.connect();
         await setup.query("CREATE TABLE public.tasks (id uuid PRIMARY KEY, title varchar)");

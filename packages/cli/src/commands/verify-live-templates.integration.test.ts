@@ -1,7 +1,7 @@
 /**
  * Every preset `rebase init` writes passes its own `rebase verify --live`.
  *
- * The blog scaffold's `defaultSecurityRules` read `access: "public"`, which
+ * The blog scaffold's `defaultRls` reads `access: "public"`, which
  * Rebase compiles to `USING (true)` select policies. rls-check reads those as
  * critical — for the role signed-in requests run as, every row — and the live
  * step mapped critical onto errors, so a fresh scaffold failed `verify --live`
@@ -9,8 +9,8 @@
  * API refuses a request with no token unless `AUTH_REQUIRE=false`, so the
  * policy grants every row to every signed-in user: a warning, as in step 2.
  *
- * Each preset is scaffolded, its collections provisioned into PGlite the way
- * the runtime's boot provisions them (auth tables, collection tables, the
+ * Each preset is scaffolded, its tables provisioned into PGlite the way the
+ * runtime's boot provisions them (auth tables, the tables, the
  * `rebase_user` role, the compiled policies), and `runVerify` run live against
  * it — so a scaffold change that the audit would fail is caught here.
  */
@@ -19,7 +19,6 @@ import path from "path";
 import { fileURLToPath } from "url";
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import type { CollectionConfig } from "@rebasepro/types";
 
 import { ensureAppRole } from "@rebasepro/server-postgres";
 import { RLS_BOOTSTRAP_SQL } from "../../../server-postgres/src/schema/rls-bootstrap-sql";
@@ -30,17 +29,14 @@ import { MANAGED_SERVER_MAX_CONNECTIONS } from "../dev-db/constraints";
 import { findFreePort } from "../dev-db/state";
 import { createRebaseApp, type TemplatePreset } from "./init";
 import { runVerify } from "./verify";
+import { loadProjectSchema } from "../utils/project-schema";
+import { workspaceModuleAliases } from "../../test/helpers/project";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = path.resolve(HERE, "..", "..");
 
-/** The scaffold's collection files import `defineCollection`; a stand-in with the same identity builder. */
-function stubCmsTypes(projectDir: string): void {
-    const pkg = path.join(projectDir, "node_modules", "@rebasepro", "cms-types");
-    fs.mkdirSync(pkg, { recursive: true });
-    fs.writeFileSync(path.join(pkg, "package.json"), JSON.stringify({ name: "@rebasepro/cms-types", type: "module", main: "index.js" }));
-    fs.writeFileSync(path.join(pkg, "index.js"), "export const defineCollection = (collection) => collection;\n");
-}
+/** The scaffold's schema imports `@rebasepro/server/schema`: resolved to this repository's source. */
+const ALIASES = workspaceModuleAliases();
 
 describe.each<TemplatePreset>(["blog", "ecommerce", "blank"])("a fresh %s scaffold, provisioned as boot provisions it", (preset) => {
     let root: string;
@@ -62,7 +58,6 @@ describe.each<TemplatePreset>(["blog", "ecommerce", "blank"])("a fresh %s scaffo
             log.mockRestore();
             warn.mockRestore();
         }
-        stubCmsTypes(project);
 
         const { PGlite } = (await import("@electric-sql/pglite")) as {
             PGlite: { create(options?: unknown): Promise<{ close(): Promise<void> }> };
@@ -77,13 +72,10 @@ describe.each<TemplatePreset>(["blog", "ecommerce", "blank"])("a fresh %s scaffo
         server = socketServer;
         url = `postgresql://postgres:postgres@127.0.0.1:${port}/postgres?sslmode=disable`;
 
-        // The collections as the backend gets them: the directory's `index.ts`
-        // applies `defaultSecurityRules` to the array it exports.
-        const { createJiti } = await import("jiti");
-        const collectionsDir = path.join(project, "config", "collections");
-        const jiti = createJiti(path.join(collectionsDir, "index.ts"), { interopDefault: true, moduleCache: false, fsCache: false });
-        const mod = await jiti.import<{ collections: CollectionConfig[] }>(path.join(collectionsDir, "index.ts"));
-        const collections = mod.collections;
+        // The tables as the backend boots them: loaded and compiled, lowered
+        // into what the provisioning reads, `defaultRls` applied.
+        const { compiled } = await loadProjectSchema(project, path.join(project, "backend", "schema"), ALIASES);
+        const collections = compiled.collections;
         expect(collections.length).toBeGreaterThan(0);
 
         // The boot order of server-postgres's managed-boot acceptance test:
@@ -112,8 +104,9 @@ describe.each<TemplatePreset>(["blog", "ecommerce", "blank"])("a fresh %s scaffo
     it("passes rebase verify --live", async () => {
         const report = await runVerify({
             projectRoot: project,
-            collectionsDir: path.join(project, "config", "collections"),
+            schemaDir: path.join(project, "backend", "schema"),
             backendDir: path.join(project, "backend"),
+            moduleAliases: ALIASES,
             live: true,
             databaseUrl: url
         });
@@ -125,8 +118,9 @@ describe.each<TemplatePreset>(["blog", "ecommerce", "blank"])("a fresh %s scaffo
     it("still fails a compiled public read when AUTH_REQUIRE=false makes the rows anonymous", async () => {
         const report = await runVerify({
             projectRoot: project,
-            collectionsDir: path.join(project, "config", "collections"),
+            schemaDir: path.join(project, "backend", "schema"),
             backendDir: path.join(project, "backend"),
+            moduleAliases: ALIASES,
             live: true,
             databaseUrl: url,
             authRequired: false

@@ -39,14 +39,17 @@ const REPO = path.resolve(__dirname, "..", "..", "..", "..");
 const DRIVER_CLI = path.join(REPO, "packages", "server-postgres", "src", "cli.ts");
 const TSX = path.join(REPO, "node_modules", ".bin", "tsx");
 
+// From `@rebasepro/types`, which exports the builders and which the driver's
+// tsx resolves to source through the repository's typecheck config.
 const tasks = `
-export default {
-    name: "Tasks", singularName: "Task", slug: "tasks", table: "tasks",
-    properties: {
-        id: { name: "ID", type: "string", isId: "uuid", validation: { required: true } },
-        title: { name: "Title", type: "string", validation: { required: true } }
-    }
-};
+import { defineTable, col } from "@rebasepro/types";
+export const tasks = defineTable("tasks", {
+    columns: {
+        id: col.uuid().primaryKey().defaultRandom(),
+        title: col.text().notNull()
+    },
+    rls: "admin-only"
+});
 `;
 
 describe("db push against the managed database while a dev server holds connections", () => {
@@ -88,12 +91,10 @@ describe("db push against the managed database while a dev server holds connecti
 
         project = fs.mkdtempSync(path.join(os.tmpdir(), "managed-push-"));
         fs.mkdirSync(path.join(project, "backend"));
-        fs.mkdirSync(path.join(project, "config", "collections"), { recursive: true });
+        fs.mkdirSync(path.join(project, "backend", "schema"), { recursive: true });
         fs.writeFileSync(path.join(project, "backend", "package.json"), JSON.stringify({ name: "backend", type: "module" }));
-        fs.writeFileSync(path.join(project, "config", "collections", "package.json"), JSON.stringify({ type: "module" }));
-        fs.writeFileSync(path.join(project, "config", "collections", "tasks.js"), tasks);
-        fs.writeFileSync(path.join(project, "config", "collections", "index.js"),
-            "import tasks from \"./tasks.js\";\nexport default [tasks];\n");
+        fs.writeFileSync(path.join(project, "backend", "schema", "tasks.js"), tasks);
+        fs.writeFileSync(path.join(project, "backend", "schema", "index.js"), "export { tasks } from \"./tasks.js\";\n");
     });
 
     afterAll(async () => {
@@ -117,7 +118,7 @@ describe("db push against the managed database while a dev server holds connecti
             TSX_TSCONFIG_PATH: path.join(REPO, "tsconfig.typecheck.json")
         }
     });
-    const collectionsDir = () => path.join(project, "config", "collections");
+    const schemaDir = () => path.join(project, "backend", "schema");
 
     /** Every schema holding a table named `atlas_schema_revisions`. */
     const revisionTables = async (): Promise<string[]> => (await held[0].query<{ table_schema: string }>(
@@ -134,7 +135,7 @@ describe("db push against the managed database while a dev server holds connecti
     };
 
     it("plans the push instead of failing on `Error: EOF`", async () => {
-        const result = await driver("db", "push", "--dry-run", "--collections", collectionsDir());
+        const result = await driver("db", "push", "--dry-run", "--schema-dir", schemaDir());
 
         expect(result.all).not.toContain("Error: EOF");
         expect(result.all).toContain("Planned changes");
@@ -144,7 +145,7 @@ describe("db push against the managed database while a dev server holds connecti
     it("on a database boot provisioned, names --baseline, leaves no revisions table outside `rebase`, and the baseline applies", async () => {
         // What boot does with the collection before any migration exists.
         await held[0].query("CREATE TABLE public.tasks (id uuid PRIMARY KEY, title varchar NOT NULL)");
-        const generated = await driver("db", "generate", "--collections", collectionsDir(), "init");
+        const generated = await driver("db", "generate", "--schema-dir", schemaDir(), "init");
         expect(generated.exitCode).toBe(0);
         const version = newestVersion();
         expect(version).not.toBe("");
@@ -166,12 +167,12 @@ describe("db push against the managed database while a dev server holds connecti
     });
 
     it("applies the next migration beside the dev server's connections, and a second run finds nothing to do", async () => {
-        fs.writeFileSync(path.join(collectionsDir(), "tasks.js"), tasks.replace(
-            "title: { name: \"Title\", type: \"string\", validation: { required: true } }",
-            "title: { name: \"Title\", type: \"string\", validation: { required: true } },\n        done: { name: \"Done\", type: \"boolean\" }"
+        fs.writeFileSync(path.join(schemaDir(), "tasks.js"), tasks.replace(
+            "title: col.text().notNull()",
+            "title: col.text().notNull(),\n        done: col.boolean()"
         ));
         const before = await recorded();
-        const generated = await driver("db", "generate", "--collections", collectionsDir(), "add_done");
+        const generated = await driver("db", "generate", "--schema-dir", schemaDir(), "add_done");
         expect(generated.exitCode).toBe(0);
         const version = newestVersion();
         expect(before).not.toContain(version);
@@ -193,14 +194,14 @@ describe("db push against the managed database while a dev server holds connecti
     // migrate set`, which takes no `--skip-lock`: beside the dev server's two
     // connections it failed on `EOF` every time, and worked with dev stopped.
     it("records a column boot already added with a second --baseline, beside the dev server's connections", async () => {
-        fs.writeFileSync(path.join(collectionsDir(), "tasks.js"), tasks.replace(
-            "title: { name: \"Title\", type: \"string\", validation: { required: true } }",
-            "title: { name: \"Title\", type: \"string\", validation: { required: true } },\n        done: { name: \"Done\", type: \"boolean\" },\n        slug: { name: \"Slug\", type: \"string\" }"
+        fs.writeFileSync(path.join(schemaDir(), "tasks.js"), tasks.replace(
+            "title: col.text().notNull()",
+            "title: col.text().notNull(),\n        done: col.boolean(),\n        slug: col.varchar()"
         ));
-        // What boot does with the new property before any migration does.
+        // What boot does with the new column before any migration does.
         await held[0].query("ALTER TABLE public.tasks ADD COLUMN slug varchar");
         const before = await recorded();
-        const generated = await driver("db", "generate", "--collections", collectionsDir(), "add_slug");
+        const generated = await driver("db", "generate", "--schema-dir", schemaDir(), "add_slug");
         expect(generated.exitCode).toBe(0);
         const version = newestVersion();
         expect(before).not.toContain(version);

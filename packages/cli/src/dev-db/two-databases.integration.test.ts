@@ -3,10 +3,10 @@
  *
  * The end-to-end claim behind `database("analytics")`: the second database is
  * served by the development daemon, bound by its suffixed variable, and gets
- * its OWN tables and policies — the collection routed to it lives there and
- * only there, and reads through the routed data plane reach it.
+ * its OWN tables and policies — the table routed to it lives there and only
+ * there, and reads through the routed data plane reach it.
  *
- * Provisioning used to filter collections by engine, so `events` (routed to
+ * Provisioning used to filter tables by engine, so `events` (routed to
  * `analytics`, also Postgres) was created in the DEFAULT database and the
  * analytics database stayed empty; every query routed there then failed on a
  * missing relation behind a boot that reported the schema up to date. Both
@@ -25,7 +25,7 @@ import { createRequire } from "module";
 import { fileURLToPath, pathToFileURL } from "url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import pg from "pg";
-import { database, resetDeclaredResources, declaredDataSources, resourceEnvSuffix, type CollectionConfig } from "@rebasepro/types";
+import { col, database, defineTable, resetDeclaredResources, declaredDataSources, resourceEnvSuffix } from "@rebasepro/types";
 import { ensureManagedDatabase, stopManagedDatabase } from "./daemon";
 import { MANAGED_POOL_MAX } from "./constraints";
 
@@ -55,17 +55,10 @@ function connect(url: string): pg.Pool {
     return pool;
 }
 
-const collection = (slug: string, dataSource?: string): CollectionConfig => ({
-    name: slug,
-    slug,
-    table: slug,
-    schema: "public",
-    ...(dataSource ? { dataSource } : {}),
-    properties: {
-        id: { name: "ID", type: "string", isId: "uuid" },
-        title: { name: "Title", type: "string" }
-    },
-    securityRules: [{ operation: "all", access: "public" }]
+const table = (name: string, databaseKey?: string) => defineTable(name, {
+    ...(databaseKey ? { database: databaseKey } : {}),
+    columns: { id: col.uuid().primaryKey().defaultRandom(), title: col.text() },
+    rls: [{ operation: "all", access: "public" }]
 });
 
 beforeEach(() => {
@@ -84,7 +77,7 @@ afterEach(async () => {
 }, BOOT_TIMEOUT);
 
 describe("two declared databases", () => {
-    it("provisions each collection in the database it is routed to, and serves it from there", { timeout: BOOT_TIMEOUT }, async () => {
+    it("provisions each table in the database it is routed to, and serves it from there", { timeout: BOOT_TIMEOUT }, async () => {
         database();
         database("analytics");
 
@@ -114,7 +107,7 @@ describe("two declared databases", () => {
             app: new Hono(),
             // Never listened on: the websocket layer attaches to it at boot.
             server: http.createServer(),
-            collections: [collection("posts"), collection("events", "analytics")],
+            tables: [table("posts"), table("events", "analytics")],
             bootstrappers: sources.map(s => s.bootstrapper),
             auth: { jwtSecret: env.JWT_SECRET },
             cronPersistence: false,
