@@ -1,45 +1,77 @@
 /**
- * Typecheck the scaffolded collection files — once per preset, as `rebase init`
- * would actually lay them out.
+ * Typecheck every scaffold `rebase init` writes — once per preset, laid out the
+ * way `applyPreset` lays it out, and the `--headless` shape the way
+ * `applyHeadless` does — and hold the scaffolds to the invariants a new project
+ * must start with.
  *
- * Nothing else checks these quickly. The only thing that compiled them was the CMS
- * init e2e, inside a Docker build about fifteen minutes in, which is how a template
- * carrying a stale collection shape stayed invisible until the last gate. A template
- * is the first code every new project runs.
+ * Nothing else checks these quickly. The only thing that compiled them was the
+ * CMS init e2e, inside a Docker build about fifteen minutes in, which is how a
+ * template carrying a stale shape stayed invisible until the last gate. A
+ * template is the first code every new project runs, and the first an agent
+ * reads.
  *
- * Checking `templates/template/config` in place does not work: the preset directories
- * hold an `index.ts` importing `./users.js`, and `users.ts` only becomes its sibling
- * after `applyPreset` copies the preset up into `collections/`. So each preset is
- * materialized the way init does it, then compiled.
+ * What a preset is: the blog preset is `templates/template/` itself; another
+ * preset removes `BLOG_PRESET_FILES` (exported by commands/init.ts) and lays
+ * `templates/presets/<name>/` over the result. The compile covers the whole
+ * project — `backend/` (tables, resources, storage, functions, scripts) and
+ * `frontend/src/` (App.tsx and every `customizeTable`, checked against the
+ * table it customizes) — against the packages' SOURCES through tsconfig
+ * `paths`. Diagnostics inside package sources are not reported here: they are
+ * `pnpm typecheck`'s, and a scaffold is judged by its own files.
  *
- * Kept in step with `applyPreset` in packages/cli/src/commands/init.ts — if that
- * function's layout changes, this has to follow.
+ * The invariants:
+ *   - each preset and the headless shape type-check;
+ *   - no template imports `zod` directly;
+ *   - every table in a template states its `rls`;
+ *   - `frontend/**` imports `backend/**` as types only (`backend-type-imports.mjs`);
+ *   - a headless scaffold has no React, and no admin package, anywhere in what
+ *     it installs — directly or through a workspace package it depends on;
+ *   - Mode B has no config workspace and no collections plugin;
+ *   - a preset's App.tsx differs from the blog's only in its customizations;
+ *   - scripts per shape, tsconfig resolution, declared ambient types, install
+ *     allowlists, single-declared deps, the PGlite pins, `.env.example`
+ *     coverage, Node floors, quoted files and getting-started paths;
+ *   - the template-pins import half: a template imports only what the version
+ *     `rebase init` pins exports.
  *
- * Run: pnpm run check:templates
+ * Run: pnpm run check:templates [-- --released-as <version>]
  */
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
+import ts from "typescript";
 
+import { findValueImportsOfBackend, sourceFilesUnder } from "./backend-type-imports.mjs";
 import { checkTemplatePins } from "./check-template-pins.mjs";
 import { loadCliCommands } from "./docs-verify/cli-commands.mjs";
 import { checkResolutionMatchesShipped, stripJsonComments } from "./template-tsconfig.mjs";
 
 const repoRoot = path.resolve(import.meta.dirname, "..", "..");
-const templateRoot = path.join(repoRoot, "packages/cli/templates/template");
-const templateConfig = path.join(templateRoot, "config");
-const baasOverlay = path.join(repoRoot, "packages/cli/templates/overlays/baas");
+const templatesRoot = path.join(repoRoot, "packages/cli/templates");
+const templateRoot = path.join(templatesRoot, "template");
+const presetsRoot = path.join(templatesRoot, "presets");
+const baasOverlay = path.join(templatesRoot, "overlays/baas");
+const initSource = path.join(repoRoot, "packages/cli/src/commands/init.ts");
 const tsc = path.join(repoRoot, "node_modules/.bin/tsc");
 
 /** Presets offered by `rebase init`, from TemplatePreset. */
 const PRESETS = ["blog", "ecommerce", "blank"];
 
 /** The `--headless` scaffold, checked as its own variant. */
-const BAAS = "baas";
+const HEADLESS = "headless";
 
-/** Files the blog preset owns; other presets replace them. Mirrors applyPreset. */
-const BLOG_FILES = ["posts.ts", "authors.ts", "tags.ts", "index.ts"];
+/**
+ * `BLOG_PRESET_FILES` from commands/init.ts, read from its source rather than
+ * copied here: a second list is a list that drifts, and this gate would then
+ * check a layout `rebase init` does not produce.
+ */
+function blogPresetFiles() {
+    const source = fs.readFileSync(initSource, "utf8");
+    const block = /export const BLOG_PRESET_FILES[^=]*=\s*\[([\s\S]*?)\]/.exec(source);
+    if (!block) throw new Error("commands/init.ts no longer exports BLOG_PRESET_FILES — this gate cannot lay out a preset the way init does");
+    return [...block[1].matchAll(/"([^"]+)"/g)].map(m => m[1]);
+}
 
 /**
  * A template never imports `zod` directly.
@@ -97,98 +129,32 @@ function copyDir(from, to) {
     }
 }
 
-/** Lay out `collections/` the way applyPreset does for one preset. */
+/** Lay out one preset the way `rebase init` does: the template, then the preset over it. */
 function materialize(preset, into) {
-    copyDir(templateConfig, into);
-    const collections = path.join(into, "collections");
-    const presets = path.join(collections, "presets");
-
-    if (preset !== "blog") {
-        for (const file of BLOG_FILES) {
-            fs.rmSync(path.join(collections, file), { force: true });
-        }
-        const presetDir = path.join(presets, preset);
-        for (const file of fs.readdirSync(presetDir).filter((f) => f.endsWith(".ts"))) {
-            fs.copyFileSync(path.join(presetDir, file), path.join(collections, file));
-        }
-    }
-    // cleanupPresets: the directory never ships in a scaffolded project.
-    fs.rmSync(presets, { recursive: true, force: true });
+    copyDir(templateRoot, into);
+    if (preset === "blog") return;
+    for (const file of blogPresetFiles()) fs.rmSync(path.join(into, file), { force: true });
+    copyDir(path.join(presetsRoot, preset), into);
 }
 
 /**
- * Add the thing a user adds the moment they want a custom field: a component, an
- * image inside it, and a collection pointing at it with a lazy `import()` thunk.
+ * Lay out the headless scaffold the way `applyHeadless` does: drop `frontend/`,
+ * `backend/schema/` and the generated schema, then copy the overlay over the top.
  *
- * This is checked because it is not free. The thunk is *type-checked*, so every
- * program that compiles the collection resolves the component and then the
- * component's own imports — including `import icon from "./icon.png"`, which is
- * Vite's doing and means nothing to `tsc`. The frontend gets away with it through
- * `vite/client` types, but those belong to the frontend's program, not this one, so
- * the config build fails on an import the author never thought of as risky.
- *
- * `config/frontend-assets.d.ts` is what answers it, and this probe is what keeps it
- * from being deleted as an unexplained file.
- *
- * The component lives inside the materialized config directory rather than at
- * `../frontend/src`, because only `config/` is materialized here — where the file
- * sits changes nothing about the asset question.
- */
-function addCustomComponentProbe(into) {
-    fs.writeFileSync(path.join(into, "__probe_component.tsx"), `
-import icon from "./__probe_icon.png";
-
-export const iconPath: string = icon;
-
-export default function ProbeField() {
-    return null;
-}
-`.trimStart(), "utf8");
-
-    fs.writeFileSync(path.join(into, "__probe_collection.ts"), `
-import type { PostgresCollectionConfig } from "@rebasepro/types";
-
-const probe: PostgresCollectionConfig = {
-    slug: "probe",
-    name: "Probe",
-    table: "probe",
-    properties: {
-        logo: {
-            name: "Logo",
-            type: "string",
-            admin: { Field: () => import("./__probe_component") }
-        }
-    }
-};
-
-export default probe;
-`.trimStart(), "utf8");
-}
-
-/**
- * Lay out the headless scaffold the way `applyHeadless` does: drop `frontend/`, `config/`
- * and the generated schema, then copy the overlay over the top.
- *
- * This is the only template *backend* that can be typechecked standalone — the CMS
- * one imports `./schema.generated.js`, which does not exist until `db generate` runs.
- * It is also the flavour with no Docker coverage at all: `cli-init-baas-e2e.ts` boots
+ * It is the flavour with no Docker coverage at all: `cli-init-baas-e2e.ts` boots
  * the project directly and never runs `docker compose up`, so a boot-time config
  * mistake here would only ever be found by a user.
  */
-function materializeBaas(into) {
+function materializeHeadless(into) {
     copyDir(templateRoot, into);
-    // Mirrors `applyHeadless` in commands/init.ts. It deletes the collections, NOT
-    // the config package: storage is not under row-level security, so the
-    // headless flavour still needs somewhere to put `storageAuthorize`, and the
-    // overlay replaces config/index.ts with one that exports only that.
     fs.rmSync(path.join(into, "frontend"), { recursive: true, force: true });
-    fs.rmSync(path.join(into, "config/collections"), { recursive: true, force: true });
-    for (const stray of ["cms.d.ts", "frontend-assets.d.ts"]) {
-        fs.rmSync(path.join(into, "config", stray), { force: true });
-    }
+    fs.rmSync(path.join(into, "backend/schema"), { recursive: true, force: true });
     fs.rmSync(path.join(into, "backend/src/schema.generated.ts"), { force: true });
     copyDir(baasOverlay, into);
 }
+
+/** The workspace packages a scaffold's tsconfig `paths` maps to their sources. */
+const SOURCE_PACKAGES = ["types", "cms-types", "common", "utils", "client", "server", "server-postgres", "cms", "app", "ui", "studio", "forms", "inference"];
 
 const TSCONFIG = {
     compilerOptions: {
@@ -196,6 +162,7 @@ const TSCONFIG = {
         target: "ES2022",
         module: "ESNext",
         moduleResolution: "bundler",
+        lib: ["DOM", "DOM.Iterable", "ES2023"],
         allowSyntheticDefaultImports: true,
         esModuleInterop: true,
         allowJs: true,
@@ -204,18 +171,15 @@ const TSCONFIG = {
         skipLibCheck: true,
         forceConsistentCasingInFileNames: true,
         resolveJsonModule: true,
+        isolatedModules: true,
         ignoreDeprecations: "6.0",
         types: ["node"],
         baseUrl: ".",
         paths: {
-            "@rebasepro/types": [`${repoRoot}/packages/types/src`],
-            "@rebasepro/cms-types": [`${repoRoot}/packages/cms-types/src`],
-            "@rebasepro/common": [`${repoRoot}/packages/common/src`],
-            "@rebasepro/utils": [`${repoRoot}/packages/utils/src`],
-            "@rebasepro/client": [`${repoRoot}/packages/client/src`],
-            "@rebasepro/server": [`${repoRoot}/packages/server/src`],
-            "@rebasepro/server-postgres": [`${repoRoot}/packages/server-postgres/src`]
-            // Third-party deps (hono, zod, dotenv) resolve through a node_modules
+            // What a schema file imports: the builders, and nothing of the server.
+            "@rebasepro/server/schema": [`${repoRoot}/packages/server/src/schema/index.ts`],
+            ...Object.fromEntries(SOURCE_PACKAGES.map(name => [`@rebasepro/${name}`, [`${repoRoot}/packages/${name}/src`]]))
+            // Third-party deps (hono, react, vite) resolve through a node_modules
             // symlink rather than `paths`: `hono/cors` is an exports-map subpath, and
             // a path mapping would point at a file that does not exist on disk.
         },
@@ -223,80 +187,33 @@ const TSCONFIG = {
             `${repoRoot}/node_modules/.pnpm/node_modules/@types`,
             `${repoRoot}/node_modules/@types`
         ]
-    },
-    include: ["**/*.ts"]
+    }
 };
 
-/**
- * The `admin` block reaches a collection file only if the config package can resolve
- * `@rebasepro/cms-types` — the augmentation is what declares the field, and a
- * `/// <reference types>` needs the package to be a real dependency.
- *
- * The typecheck below maps `@rebasepro/*` through `paths`, so it would compile happily
- * even if the manifest never declared it. saas/config was in exactly that state: a
- * reference file, no dependency, 42 errors the moment anything checked it for real.
- */
-function checkAdminTypesDeclared() {
-    const manifest = path.join(templateConfig, "package.json");
-    const ref = path.join(templateConfig, "cms.d.ts");
-    const problems = [];
-
-    const hasRef = fs.existsSync(ref)
-        && /reference\s+types\s*=\s*["']@rebasepro\/cms-types["']/.test(fs.readFileSync(ref, "utf8"));
-    if (!hasRef) problems.push("config/cms.d.ts is missing its /// <reference types=\"@rebasepro/cms-types\" />");
-
-    const pkg = JSON.parse(fs.readFileSync(manifest, "utf8"));
-    const deps = { ...pkg.dependencies, ...pkg.devDependencies };
-    if (!deps["@rebasepro/cms-types"]) {
-        problems.push("config/package.json does not depend on @rebasepro/cms-types, so the reference cannot resolve");
-    }
-    return problems;
-}
-
-/**
- * The headless config package must declare `@rebasepro/common`.
- *
- * `rebase schema introspect` writes its collections against `defineCollection`, and
- * which one it imports is *detected* from the manifests above the output directory —
- * `@rebasepro/cms-types` for a CMS project, `@rebasepro/common` for this one. Drop
- * the dependency and the detection silently falls back to a plain
- * `PostgresCollectionConfig` annotation, which widens the property keys to `string`
- * and takes the checking on `propertiesOrder` and friends away again.
- *
- * The typecheck below cannot see this: `node_modules` is symlinked at the pnpm
- * store, so the import resolves whether or not the manifest declares it. Same reason
- * `checkAdminTypesDeclared` exists, one flavour over.
- */
-function checkHeadlessBuilderDeclared() {
-    const manifest = path.join(baasOverlay, "config", "package.json");
-    const pkg = JSON.parse(fs.readFileSync(manifest, "utf8"));
-    const deps = { ...pkg.dependencies, ...pkg.devDependencies };
-    return deps["@rebasepro/common"]
-        ? []
-        : ["overlays/baas/config/package.json does not depend on @rebasepro/common, "
-            + "so introspection has no defineCollection to generate against"];
-}
+/** What each shape compiles: the whole backend, and for Mode B the whole frontend app. */
+const INCLUDES = {
+    cms: ["backend/**/*.ts", "frontend/src/**/*", "scripts/**/*.ts"],
+    headless: ["backend/**/*.ts", "scripts/**/*.ts"]
+};
 
 /**
  * Every ambient type library a template tsconfig pins must be a declared
  * dependency of the workspace that pins it.
  *
- * This is `checkAdminTypesDeclared`'s sibling, and it exists for the same reason:
- * a reference to a package the manifest never declares. `config/tsconfig.json`
+ * A reference to a package the manifest never declares. A workspace tsconfig
  * pins `types: ["node"]` — deliberately, to stop tsc sweeping the pnpm virtual
- * store — but `config/package.json` never depended on `@types/node`. Under
- * pnpm's isolated layout there is no `@types/node` reachable from `config/`, so
- * the workspace could not compile itself:
+ * store — and the old config workspace never depended on `@types/node`. Under
+ * pnpm's isolated layout there was no `@types/node` reachable from it, so the
+ * workspace could not compile itself:
  *
  *     config build$ tsc
  *     error TS2688: Cannot find type definition file for 'node'
  *
- * That is `pnpm -r build` — and the config workspace's own `build` script —
- * failing in a project one minute after `rebase init`.
+ * That is `pnpm -r build` failing in a project one minute after `rebase init`.
  *
  * The compile step below cannot catch it and should not try. It writes its own
  * tsconfig with `typeRoots` pointed at the repo's `node_modules`, because it is
- * checking the *collection files*, not the project's dependency graph. Those
+ * checking the *project's files*, not the project's dependency graph. Those
  * synthetic typeRoots resolve `node` no matter what the template declares, which
  * is exactly why the omission survived: the only program that ever compiled
  * these files was one that had been handed the answer.
@@ -315,13 +232,12 @@ function checkPinnedTypesAreDeclared() {
 
     // Every flavour, as `rebase init` lays it out. The headless overlay replaces
     // some of the template's files and keeps the rest, so a workspace there pairs
-    // whichever tsconfig and package.json the project actually ends up with: the
-    // overlay's `config/package.json` replaced the template's — dropping
-    // `@types/node` — while `config/tsconfig.json`, which pins it, came from the
-    // template. Checking the template alone could not see that pair.
+    // whichever tsconfig and package.json the project actually ends up with — an
+    // overlay manifest beside a template tsconfig is exactly the pair that once
+    // dropped `@types/node`. Checking the template alone could not see it.
     const flavours = [
-        { label: "template", roots: [templateRoot], workspaces: [".", "config", "backend", "frontend"] },
-        { label: "baas overlay", roots: [baasOverlay, templateRoot], workspaces: [".", "config", "backend"] }
+        { label: "template", roots: [templateRoot], workspaces: [".", "backend", "frontend"] },
+        { label: "baas overlay", roots: [baasOverlay, templateRoot], workspaces: [".", "backend"] }
     ];
     /** The first root that ships `relative`: the overlay's copy wins over the template's. */
     const scaffolded = (roots, relative) =>
@@ -364,19 +280,6 @@ function checkPinnedTypesAreDeclared() {
     return problems;
 }
 
-/**
- * The other direction, which nothing asserted: the BaaS flavour must not carry the
- * admin layer at all.
- *
- * A typecheck cannot show this. `materializeBaas` symlinks `node_modules` at the pnpm
- * store, so `@rebasepro/cms-types` resolves there no matter what `paths` says —
- * dropping the mapping and importing the package anyway still compiled cleanly. And
- * one import is enough to matter: the package index side-effect-imports `augment.ts`,
- * which declares `admin` for the whole program, so a single stray import in the
- * backend would hand a BaaS project the admin surface it is defined by not having.
- *
- * So assert it on the files instead. Cheap, and it cannot be fooled by resolution.
- */
 /**
  * `.env.example` is the file the docs call "a reference for the available
  * variables". It must actually be one.
@@ -532,7 +435,7 @@ function checkPgliteStackIsPinned() {
 /**
  * The three manifests a bundle reads must not declare one name twice.
  *
- * `collectDeclaredDependencies` reads root → config → backend and lets the last
+ * `collectDeclaredDependencies` reads root → backend and lets the last
  * one win, so exactly one of two disagreeing ranges reaches `deps.declared` and
  * the managed runtime installs it. The stock scaffold shipped that
  * disagreement — `dotenv ^16.0.0` at the root, `^17.4.2` in `backend/` — so
@@ -548,7 +451,7 @@ function checkPgliteStackIsPinned() {
 function checkScaffoldDeclaresEachDepOnce() {
     const problems = [];
     // The manifests `collectDeclaredDependencies` reads, in its order.
-    const MANIFESTS = ["package.json", "config/package.json", "backend/package.json"];
+    const MANIFESTS = ["package.json", "backend/package.json"];
 
     for (const [label, root] of [["template", templateRoot], ["baas overlay", baasOverlay]]) {
         const seen = new Map();
@@ -587,7 +490,7 @@ function checkScaffoldDeclaresEachDepOnce() {
  * Every script a scaffold ships can succeed on the tree it is scaffolded into.
  *
  * The headless overlay shipped `"generate:sdk": "rebase generate-sdk"`, and a
- * headless project has no `config/collections` by design — its API is
+ * headless project has no `backend/schema` by design — its API is
  * introspected from the live database at boot. So the script could never
  * succeed, in 0.17.3 and on main, on the documented headless path. `rebase
  * doctor` was the same shape. Nothing noticed, because a `package.json` script
@@ -611,19 +514,19 @@ const SCAFFOLD_SCRIPTS = new Map([
     ["dev", "succeeds on a fresh scaffold — the documented first command"],
     ["build", "succeeds on a fresh scaffold"],
     ["start", "needs a build"],
-    ["db:generate", "needs collections declared in code"],
-    ["db:push", "needs collections declared in code, and a database"],
+    ["db:generate", "needs tables declared in backend/schema"],
+    ["db:push", "needs tables declared in backend/schema, and a database"],
     ["db:migrate", "needs a database"],
-    ["schema:generate", "needs collections declared in code"],
+    ["schema:generate", "needs tables declared in backend/schema"],
     ["schema:introspect", "needs a database"],
-    ["generate:sdk", "succeeds on a fresh scaffold — says what to run first when there are no collections"],
+    ["generate:sdk", "succeeds on a fresh scaffold — says what to run first when there are no tables"],
     ["skills:install", "succeeds on a fresh scaffold"],
     ["example", "needs a running server"],
     ["deploy", "needs a linked cloud project"]
 ]);
 
-/** Scripts a headless scaffold must not ship: it has no `config/collections`. */
-const NEEDS_COLLECTIONS = new Set(["db:generate", "db:push", "schema:generate"]);
+/** Scripts a headless scaffold must not ship: it has no `backend/schema`. */
+const NEEDS_TABLES = new Set(["db:generate", "db:push", "schema:generate"]);
 
 function checkScaffoldedScriptsCanSucceed() {
     const problems = [];
@@ -653,13 +556,13 @@ function checkScaffoldedScriptsCanSucceed() {
                 );
                 continue;
             }
-            if (headless && NEEDS_COLLECTIONS.has(name)) {
+            if (headless && NEEDS_TABLES.has(name)) {
                 problems.push(
                     `${label} ships "${name}", which ${SCAFFOLD_SCRIPTS.get(name)} — and a headless `
-                    + "scaffold has no config/collections."
+                    + "scaffold has no backend/schema."
                 );
             }
-            // `rebase db push --collections …` → command `db`, subcommand `push`.
+            // `rebase db push --schema-dir …` → command `db`, subcommand `push`.
             const invocation = /(?:^|&&\s*|\|\|\s*)rebase\s+([a-z][a-z0-9-]*)(?:\s+([a-z][a-z0-9-]*))?/.exec(command);
             if (!invocation) continue;
             const [, cmd, subcommand] = invocation;
@@ -683,23 +586,173 @@ function checkScaffoldedScriptsCanSucceed() {
     return problems;
 }
 
-function checkBaasHasNoAdminTypes() {
+/**
+ * Packages that put React, or the admin panel, into an install.
+ *
+ * A headless project is a server and nothing else: one of these in its install
+ * means a React tree in a deployment that renders nothing, and — through
+ * `@rebasepro/cms-types` — the admin vocabulary in a project that has no admin.
+ */
+const ADMIN_PACKAGES = new Set([
+    "react", "react-dom", "react-router", "@types/react", "@types/react-dom",
+    "@rebasepro/app", "@rebasepro/cms", "@rebasepro/cms-types", "@rebasepro/ui",
+    "@rebasepro/studio", "@rebasepro/forms", "@rebasepro/plugin-ai", "@rebasepro/plugin-insights"
+]);
+
+/** `@rebasepro/<name>` → its workspace manifest, for every package under packages/. */
+function workspaceManifests() {
+    const byName = new Map();
+    for (const dir of fs.readdirSync(path.join(repoRoot, "packages"))) {
+        const manifest = path.join(repoRoot, "packages", dir, "package.json");
+        if (!fs.existsSync(manifest)) continue;
+        const pkg = JSON.parse(fs.readFileSync(manifest, "utf8"));
+        if (pkg.name) byName.set(pkg.name, pkg);
+    }
+    return byName;
+}
+
+/**
+ * A headless scaffold installs no React and no admin package.
+ *
+ * Read from what `pnpm install` is handed: the scaffold's own manifests, and —
+ * because a dependency's dependencies install too — the closure through every
+ * workspace package it names (dependencies, and peers that are not optional,
+ * which a package manager installs as well). Third-party packages are not
+ * walked: their trees are not in this repository, and none of the server's
+ * declares React.
+ *
+ * The files are scanned too: an import of an admin package in a backend file
+ * compiles here (the pnpm store has it) and fails in the project.
+ */
+function checkHeadlessInstallsNoReact(dir) {
     const problems = [];
-    const walk = (dir) => {
-        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-            const full = path.join(dir, entry.name);
-            if (entry.isDirectory()) {
-                if (entry.name !== "node_modules") walk(full);
-                continue;
-            }
-            if (!/\.(ts|tsx|json|mjs|js)$/.test(entry.name)) continue;
-            const source = fs.readFileSync(full, "utf8");
-            if (source.includes("@rebasepro/cms-types")) {
-                problems.push(`${path.relative(repoRoot, full)} references @rebasepro/cms-types`);
-            }
+    const workspace = workspaceManifests();
+    const manifests = ["package.json", "backend/package.json"]
+        .map(relative => path.join(dir, relative))
+        .filter(file => fs.existsSync(file));
+    if (fs.existsSync(path.join(dir, "frontend"))) problems.push("the headless scaffold has a frontend/ directory");
+
+    const seen = new Set();
+    const pending = [];
+    for (const manifest of manifests) {
+        const pkg = JSON.parse(fs.readFileSync(manifest, "utf8"));
+        for (const name of Object.keys({ ...pkg.dependencies, ...pkg.devDependencies })) {
+            pending.push({ name, via: [path.relative(dir, manifest)] });
         }
-    };
-    walk(baasOverlay);
+    }
+    while (pending.length > 0) {
+        const { name, via } = pending.shift();
+        if (ADMIN_PACKAGES.has(name)) {
+            problems.push(`the headless scaffold installs ${name} (${[...via, name].join(" → ")})`);
+            continue;
+        }
+        if (seen.has(name)) continue;
+        seen.add(name);
+        const pkg = workspace.get(name);
+        if (!pkg) continue;
+        const optionalPeers = new Set(Object.entries(pkg.peerDependenciesMeta ?? {}).filter(([, meta]) => meta?.optional).map(([peer]) => peer));
+        const next = [
+            ...Object.keys(pkg.dependencies ?? {}),
+            ...Object.keys(pkg.peerDependencies ?? {}).filter(peer => !optionalPeers.has(peer))
+        ];
+        for (const dep of next) pending.push({ name: dep, via: [...via, name] });
+    }
+
+    for (const file of sourceFilesUnder(dir)) {
+        const text = fs.readFileSync(file, "utf8");
+        for (const match of text.matchAll(/(?:from|import)\s*\(?\s*["']([^"']+)["']/g)) {
+            const spec = match[1].startsWith("@") ? match[1].split("/").slice(0, 2).join("/") : match[1].split("/")[0];
+            if (ADMIN_PACKAGES.has(spec)) problems.push(`${path.relative(dir, file)} imports ${match[1]}`);
+        }
+    }
+    return problems;
+}
+
+/**
+ * `frontend/**` imports `backend/**` as types only, in every preset as it lands.
+ * See `backend-type-imports.mjs`, which is the rule (exported for a repo-wide gate).
+ */
+function checkFrontendTypeImports(dir) {
+    return findValueImportsOfBackend({
+        files: sourceFilesUnder(path.join(dir, "frontend")),
+        backendDir: path.join(dir, "backend")
+    }).map(f => `${path.relative(dir, f.file)}:${f.line} — ${f.form} of "${f.specifier}" loads backend code into the browser bundle. Write \`import type\`.`);
+}
+
+/**
+ * Every table in a template states its `rls`.
+ *
+ * `defineTable` requires the key and boot refuses a table without one, so this
+ * is the cheap, offline version of a guarantee the compile already makes — kept
+ * because a template is where an agent copies a table from, and a template
+ * table without a posture is one copied a hundred times.
+ */
+function checkTablesStateRls(dir) {
+    const problems = [];
+    const schemaDir = path.join(dir, "backend", "schema");
+    for (const file of sourceFilesUnder(schemaDir)) {
+        const source = ts.createSourceFile(file, fs.readFileSync(file, "utf8"), ts.ScriptTarget.Latest, true);
+        let tables = 0;
+        const visit = (node) => {
+            if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)
+                && ["defineTable", "defineAuthTable"].includes(node.expression.text)) {
+                tables++;
+                const config = node.arguments[1];
+                const name = node.arguments[0] && ts.isStringLiteral(node.arguments[0]) ? node.arguments[0].text : "?";
+                const hasRls = config && ts.isObjectLiteralExpression(config)
+                    && config.properties.some(p => p.name && ts.isIdentifier(p.name) && p.name.text === "rls");
+                if (!hasRls) problems.push(`${path.relative(dir, file)}: ${node.expression.text}("${name}") states no rls — write the rules, "admin-only" or "inherit"`);
+            }
+            ts.forEachChild(node, visit);
+        };
+        visit(source);
+        if (tables === 0 && path.basename(file) !== "index.ts") problems.push(`${path.relative(dir, file)} declares no table`);
+    }
+    return problems;
+}
+
+/**
+ * Mode B is two workspaces: no `config/`, no `cms.d.ts`, no collections plugin
+ * and no virtual module. Each was there only to share collection files between
+ * Node and Vite, and a scaffold that grows one back teaches the old layout.
+ */
+function checkNoLegacyLayout(dir) {
+    const problems = [];
+    for (const stray of ["config", "frontend/src/virtual.d.ts", "config/cms.d.ts", "config/frontend-assets.d.ts"]) {
+        if (fs.existsSync(path.join(dir, stray))) problems.push(`the scaffold has ${stray}`);
+    }
+    for (const file of sourceFilesUnder(dir)) {
+        const text = fs.readFileSync(file, "utf8");
+        for (const legacy of ["rebaseCollectionsPlugin", "virtual:rebase-collections", "defineCollection", "@rebasepro/cms-types"]) {
+            if (text.includes(legacy)) problems.push(`${path.relative(dir, file)} mentions ${legacy}`);
+        }
+    }
+    return problems;
+}
+
+/**
+ * A preset's `frontend/src/App.tsx` is the blog's with its own customizations:
+ * the `./cms/` imports and the `tableCustomizations` list may differ, nothing
+ * else. Three copies of the entry point are three chances to drift; this makes
+ * a change to one a change to all.
+ */
+function checkPresetAppsMatchBlog() {
+    const problems = [];
+    const strip = text => text.split("\n")
+        .filter(line => !/^import \{ \w+Cms \} from "\.\/cms\/[\w-]+";$/.test(line))
+        .map(line => line.replace(/tableCustomizations=\{\[[^\]]*\]\}/, "tableCustomizations={[…]}"))
+        .join("\n");
+    const blog = strip(fs.readFileSync(path.join(templateRoot, "frontend/src/App.tsx"), "utf8"));
+    for (const preset of PRESETS.filter(p => p !== "blog")) {
+        const file = path.join(presetsRoot, preset, "frontend/src/App.tsx");
+        if (!fs.existsSync(file)) {
+            problems.push(`templates/presets/${preset}/frontend/src/App.tsx is missing`);
+            continue;
+        }
+        if (strip(fs.readFileSync(file, "utf8")) !== blog) {
+            problems.push(`templates/presets/${preset}/frontend/src/App.tsx differs from the blog's beyond its ./cms imports and tableCustomizations — make the change in all three`);
+        }
+    }
     return problems;
 }
 
@@ -762,12 +815,12 @@ function checkGettingStartedPathsExist() {
                 checked++;
                 if (NOT_SHIPPED.has(token)) continue;
                 const candidate = ALIAS[token] || token.replace(/\/$/, "");
-                const found = [templateRoot, baasOverlay, repoRoot]
+                const found = [templateRoot, baasOverlay, ...PRESETS.filter(p => p !== "blog").map(p => path.join(presetsRoot, p)), repoRoot]
                     .some(base => fs.existsSync(path.join(base, candidate)));
                 if (found) continue;
                 problems.push(
                     `${rel}:${i + 1} names \`${token}\`, which is in neither ` +
-                    "packages/cli/templates/template, packages/cli/templates/overlays/baas, " +
+                    "packages/cli/templates/template, templates/presets, templates/overlays/baas, " +
                     "nor the repository. Fix the page, ship the file, or add it to NOT_SHIPPED " +
                     "with the reason it is correct."
                 );
@@ -824,7 +877,19 @@ if (zodImportProblems.length > 0) {
 // typecheck against the working tree has nothing useful to say about a template
 // that cannot resolve its own imports. The compose half belongs to the release
 // gate — see check-template-pins.mjs — and is not run here.
-if (checkTemplatePins({ axes: ["imports"] }) !== 0) process.exit(1);
+//
+// `--released-as <version>` measures against the version a release is about to
+// publish instead of the one the manifests still name — the same override, for
+// the same reason, as `check-template-pins.mjs --released-as` in the release
+// preflight: a branch carrying the API a template now imports is measured
+// against the release that will ship them together, not the one it replaces.
+const releasedAsIndex = process.argv.indexOf("--released-as");
+const releasedAs = releasedAsIndex === -1 ? null : process.argv[releasedAsIndex + 1] ?? null;
+if (releasedAsIndex !== -1 && !releasedAs) {
+    console.error("--released-as needs a version, e.g. --released-as 0.31.0");
+    process.exit(2);
+}
+if (checkTemplatePins({ axes: ["imports"], releasedAs }) !== 0) process.exit(1);
 
 const envProblems = checkEnvExampleCoversWhatWritesIt();
 if (envProblems.length > 0) {
@@ -862,13 +927,13 @@ if (pgliteProblems.length > 0) {
     console.log("  ok   the PGlite stack a scaffold installs is pinned exactly");
 }
 
-const baasProblems = checkBaasHasNoAdminTypes();
-if (baasProblems.length > 0) {
+const presetAppProblems = checkPresetAppsMatchBlog();
+if (presetAppProblems.length > 0) {
     failed++;
-    console.log("  FAIL baas has no admin layer");
-    for (const p of baasProblems) console.error(`    ${p}`);
+    console.log("  FAIL each preset's App.tsx is the blog's, with its own customizations");
+    for (const p of presetAppProblems) console.error(`    ${p}`);
 } else {
-    console.log("  ok   baas has no admin layer");
+    console.log("  ok   each preset's App.tsx is the blog's, with its own customizations");
 }
 
 const scriptProblems = checkScaffoldedScriptsCanSucceed();
@@ -885,8 +950,8 @@ if (scriptProblems.length > 0) {
 const resolutionProblems = checkResolutionMatchesShipped({
     expected: TSCONFIG.compilerOptions.moduleResolution,
     tsconfigs: [
-        ...["config", "backend", "frontend"].map(workspace => path.join(templateRoot, workspace, "tsconfig.json")),
-        ...["config", "backend"].map(workspace => path.join(baasOverlay, workspace, "tsconfig.json"))
+        ...["backend", "frontend"].map(workspace => path.join(templateRoot, workspace, "tsconfig.json")),
+        path.join(baasOverlay, "backend", "tsconfig.json")
     ],
     repoRoot
 });
@@ -907,72 +972,42 @@ if (pinnedTypeProblems.length > 0) {
     console.log("  ok   pinned ambient types are declared dependencies");
 }
 
-const declarationProblems = checkAdminTypesDeclared();
-if (declarationProblems.length > 0) {
-    failed++;
-    console.log("  FAIL cms-types wiring");
-    for (const p of declarationProblems) console.error(`    ${p}`);
-} else {
-    console.log("  ok   cms-types wiring");
-}
-
-const headlessBuilderProblems = checkHeadlessBuilderDeclared();
-if (headlessBuilderProblems.length > 0) {
-    failed++;
-    console.log("  FAIL headless builder wiring");
-    for (const p of headlessBuilderProblems) console.error(`    ${p}`);
-} else {
-    console.log("  ok   headless builder wiring");
-}
-
 const workRoot = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-template-check-"));
 
-/**
- * Make `@rebasepro/cms-types` resolvable the way a scaffolded project resolves
- * it — as a dependency in `node_modules`, found by walking up from the file.
- *
- * `config/cms.d.ts` opts the project in with
- * `/// <reference types="@rebasepro/cms-types" />`, and a triple-slash type
- * reference is resolved through `typeRoots` and `node_modules` — **not** through
- * tsconfig `paths`. The `paths` entry below therefore does nothing for it.
- *
- * This check happened to pass on a developer machine anyway, because pnpm's hoisted
- * store (`node_modules/.pnpm/node_modules`, which the per-preset symlink points at)
- * had an `@rebasepro/cms-types` entry left in it. A fresh `pnpm install
- * --frozen-lockfile` has no such entry, so CI failed with twelve `'admin' does not
- * exist` errors on files that compile locally. A gate that depends on a stray link
- * in someone's store is not a gate.
- *
- * The shim sits one directory above each materialized project, so resolution finds
- * the store symlink first (third-party packages) and this second (@rebasepro). It
- * points at `src` rather than the package directory on purpose: `check:templates`
- * runs before `pnpm build` in CI, so `dist` may not exist yet.
- */
-function linkCmsTypes(into) {
-    const shim = path.join(into, "node_modules", "@rebasepro", "cms-types");
-    fs.mkdirSync(shim, { recursive: true });
-    fs.writeFileSync(
-        path.join(shim, "package.json"),
-        JSON.stringify({ name: "@rebasepro/cms-types", version: "0.0.0", types: "index.d.ts" }, null, 2),
-        "utf8"
-    );
-    fs.writeFileSync(
-        path.join(shim, "index.d.ts"),
-        `export * from ${JSON.stringify(path.join(repoRoot, "packages/cms-types/src/index"))};\n`,
-        "utf8"
-    );
+/** Run one named check over a materialized scaffold, printing ok / FAIL. */
+function report(label, problems) {
+    if (problems.length > 0) {
+        failed++;
+        console.log(`  FAIL ${label}`);
+        for (const p of problems) console.error(`    ${p}`);
+    } else {
+        console.log(`  ok   ${label}`);
+    }
 }
 
-linkCmsTypes(workRoot);
+/** Where a materialized file came from, so a diagnostic names the file to edit. */
+function sourceOf(preset, relative) {
+    const candidates = preset === HEADLESS
+        ? [path.join(baasOverlay, relative), path.join(templateRoot, relative)]
+        : preset === "blog"
+            ? [path.join(templateRoot, relative)]
+            : [path.join(presetsRoot, preset, relative), path.join(templateRoot, relative)];
+    const found = candidates.find(candidate => fs.existsSync(candidate)) ?? candidates[candidates.length - 1];
+    return path.relative(repoRoot, found);
+}
 
 try {
-    for (const preset of [...PRESETS, BAAS]) {
+    for (const preset of [...PRESETS, HEADLESS]) {
         const dir = path.join(workRoot, preset);
-        if (preset === BAAS) materializeBaas(dir);
-        else {
-            materialize(preset, dir);
-            // BaaS has no config/ and no components, so this applies to CMS only.
-            addCustomComponentProbe(dir);
+        if (preset === HEADLESS) materializeHeadless(dir);
+        else materialize(preset, dir);
+
+        if (preset === HEADLESS) {
+            report(`${preset}: installs no React and no admin package`, checkHeadlessInstallsNoReact(dir));
+        } else {
+            report(`${preset}: frontend imports backend as types only`, checkFrontendTypeImports(dir));
+            report(`${preset}: every table states its rls`, checkTablesStateRls(dir));
+            report(`${preset}: no config workspace, no collections plugin`, checkNoLegacyLayout(dir));
         }
 
         // Real resolution for third-party specifiers, exports maps included.
@@ -983,60 +1018,29 @@ try {
         );
         fs.writeFileSync(
             path.join(dir, "tsconfig.check.json"),
-            JSON.stringify(
-                preset === BAAS
-                    // The BaaS flavour keeps a config package — holding
-                    // `storageAuthorize` and nothing else — so it is checked the
-                    // same way every other variant is. It used to be narrowed to
-                    // `backend/src/**/*.ts` on the premise that there was no
-                    // config/ at all; that premise stopped being true, and the
-                    // narrowed include then matched an EMPTY directory, which tsc
-                    // reports as TS18003 rather than as "nothing to do".
-                    //
-                    // Note this program can still *resolve* @rebasepro/cms-types,
-                    // and deliberately so — dropping the `paths` entry changes
-                    // nothing, because resolution falls through to the pnpm store
-                    // that `node_modules` is symlinked to. What keeps the admin layer
-                    // out of this flavour is `checkBaasHasNoAdminTypes` below, and
-                    // the guarantee that writing `admin` is an error is asserted by
-                    // its own program in `tests/e2e/baas-typecheck`.
-                    ? { ...TSCONFIG }
-                    : TSCONFIG,
-                null,
-                4
-            )
+            JSON.stringify({ ...TSCONFIG, include: INCLUDES[preset === HEADLESS ? "headless" : "cms"] }, null, 4)
         );
 
+        // cwd is the materialized dir so tsc prints paths relative to it
+        // (`backend/schema/posts.ts`), which map back onto the template file. A
+        // diagnostic in a package's own source prints as `../…` and is not this
+        // gate's to report.
+        let output = "";
         try {
-            // cwd is the materialized dir so tsc emits paths relative to it
-            // (`collections/posts.ts`), which can be prefixed back onto the real
-            // template path. Run from the repo root it emits a `../../../var/...`
-            // temp path instead, which is useless to the reader.
-            execFileSync(tsc, ["-p", "tsconfig.check.json"], {
-                cwd: dir,
-                stdio: "pipe",
-                encoding: "utf8"
-            });
-            console.log(`  ok   ${preset}`);
+            execFileSync(tsc, ["-p", "tsconfig.check.json"], { cwd: dir, stdio: "pipe", encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
         } catch (error) {
-            failed++;
-            console.log(`  FAIL ${preset}`);
-            // tsc writes diagnostics to stdout. Rewrite the temp path back to the
-            // template file the author has to edit.
-            const output = `${error.stdout ?? ""}${error.stderr ?? ""}`;
-            const templateRel = "packages/cli/templates/template/config";
-            console.error(
-                output
-                    .split("\n")
-                    .filter(Boolean)
-                    .map((line) => `    ${line
-                        .replace(/^(collections\/)/, `${templateRel}/$1`)
-                        .replace(/^(backend\/src\/)/, preset === BAAS
-                            ? "packages/cli/templates/overlays/baas/$1"
-                            : `packages/cli/templates/template/$1`)}`)
-                    .join("\n")
-            );
+            output = `${error.stdout ?? ""}${error.stderr ?? ""}`;
         }
+        const lines = output.split("\n");
+        const own = [];
+        for (let k = 0; k < lines.length; k++) {
+            const m = /^([^\s(][^(]*)\((\d+),(\d+)\): error/.exec(lines[k]);
+            if (!m || m[1].startsWith("..") || path.isAbsolute(m[1])) continue;
+            own.push(`${sourceOf(preset, m[1])}${lines[k].slice(m[1].length)}`);
+            for (let n = k + 1; n < lines.length && /^\s/.test(lines[n]); n++) own.push(lines[n]);
+        }
+        if (output && own.length === 0 && !/error TS/.test(output)) own.push(output.trim());
+        report(`${preset} type-checks`, own);
     }
 } finally {
     fs.rmSync(workRoot, { recursive: true, force: true });
@@ -1049,8 +1053,9 @@ if (failed > 0) {
     console.error(
         `\n${failed} FAIL(s) above. These are the files every new project starts from, ` +
             `so this fails the build.\n` +
-            `If a preset did not compile: presentation fields belong under \`admin\` — see ` +
-            `tooling/scripts/codemod/collections-admin-block.mjs.`
+            `If a preset did not compile: a table's columns, relations and rls belong in ` +
+            `backend/schema; labels, icons, enum colours and custom fields in frontend/src/cms ` +
+            `(customizeTable).`
     );
     process.exit(1);
 }
@@ -1185,6 +1190,6 @@ if (quoteFindings.length > 0) {
     process.exit(1);
 }
 
-console.log(`\nAll ${PRESETS.length} init presets compile, and the baas backend.`);
+console.log(`\nAll ${PRESETS.length} init presets compile, and the headless backend.`);
 console.log("Each scaffold's Node floor covers the packages it depends on.");
 console.log(`${QUOTED_FILES.length} documented template file(s) match the template.`);

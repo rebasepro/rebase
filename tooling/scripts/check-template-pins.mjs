@@ -310,7 +310,13 @@ export function exportsAtTag(tag, spec) {
         }
         : file => show(tag, file);
 
-    const dedicated = surfaceExports(read(`contracts/${pkg}.api.txt`));
+    // A per-package surface — unless the file named after the package is the
+    // multi-package baseline itself (`contracts/server.api.txt` is named after
+    // `server` and holds six `## @rebasepro/…` sections). Read whole, it answered
+    // for `@rebasepro/server/schema` with every name of every package in it; the
+    // section below is the only part of it that speaks for one entry point.
+    const own = read(`contracts/${pkg}.api.txt`);
+    const dedicated = own && !/^## @rebasepro\//m.test(own) ? surfaceExports(own) : null;
     if (dedicated) return { names: dedicated, unresolved: [], source: `contracts/${pkg}.api.txt@${at}` };
 
     const shared = surfaceExports(read("contracts/server.api.txt"), spec);
