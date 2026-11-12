@@ -6,13 +6,16 @@ description: "Build and customize the panel — Rebase CMS and Rebase Studio —
 
 ## Overview
 
-The Rebase frontend is a **React framework** that renders your admin panel. It reads your collection definitions and generates tables, forms, navigation, and routing automatically.
+The Rebase frontend is a **React framework** that renders your admin panel. It
+reads the tables the backend serves and generates the navigation, tables,
+forms and routes from them, with no configuration (see
+[Tables in the CMS](/docs/collections/)). What you add is what differs.
 
 In the default scaffold, the admin panel **is** the frontend: it's served at the root of your deployed URL. If you build your own product app instead, you can mount the admin under a prefix like `/admin` in the same deployment — see [Changing the Base URL](/docs/getting-started/deployment#changing-the-base-url).
 
-This is `frontend/src/App.tsx` as `rebase init` writes it, without its font
-imports, error boundary and Google client id — the whole admin panel, four
-declarations inside one provider:
+This is a `frontend/src/App.tsx` without its font imports, error boundary and
+Google client id — the whole admin panel, four declarations inside one
+provider:
 
 ```tsx
 import React from "react";
@@ -20,7 +23,7 @@ import { Rebase, RebaseAuth, useRebaseAuthController } from "@rebasepro/app";
 import { RebaseCMS, RebaseShell } from "@rebasepro/cms";
 import { RebaseStudio } from "@rebasepro/studio";
 import { createRebaseClient } from "@rebasepro/client";
-import { collections } from "virtual:rebase-collections";
+import { tableCustomizations } from "./cms";
 
 const client = createRebaseClient({
     baseUrl: import.meta.env.VITE_API_URL,
@@ -34,7 +37,8 @@ export function App() {
         <Rebase client={client} authController={authController}>
             {/* Sign-in screen. Pass `loginView` to replace it. */}
             <RebaseAuth/>
-            <RebaseCMS collections={collections}/>
+            {/* Every table the backend serves, plus your customizations. */}
+            <RebaseCMS tableCustomizations={tableCustomizations}/>
             <RebaseStudio/>
             <RebaseShell title="My App"/>
         </Rebase>
@@ -50,13 +54,71 @@ matter, and adding a feature means adding a component, not rewiring a tree.
 | Component | Package | Registers |
 |---|---|---|
 | `<RebaseAuth>` | `@rebasepro/app` | the sign-in screen (`loginView`) |
-| `<RebaseCMS>` | `@rebasepro/cms` | collections, custom views, the home page, the collection editor |
+| `<RebaseCMS>` | `@rebasepro/cms` | the served tables with their customizations, external collections, custom views, the home page, the collection editor |
 | `<RebaseStudio>` | `@rebasepro/studio` | the developer tools (SQL, RLS, logs, backups…) |
 | `<RebaseShell>` | `@rebasepro/cms` | nothing — it renders the admin from everything above |
 
 Drop `<RebaseStudio>` and you have a content-only CMS; drop `<RebaseCMS>` and
 you have the developer tools alone. To lay the shell out by hand instead, see
 [Advanced: manual layout](#advanced-manual-layout).
+
+## Where the CMS files live
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+```text
+frontend/src/
+├── App.tsx
+└── cms/
+    ├── index.ts      # export const tableCustomizations = [postsCms, …]
+    ├── posts.tsx     # customizeTable("posts", { … })
+    └── events.ts     # defineFirestoreCollection({ … })
+```
+
+`frontend/src/cms/` holds what the panel cannot derive: one
+[`customizeTable`](/docs/frontend/customize-table/) per table you want to
+present differently, and the [Firestore collections](/docs/frontend/firebase/)
+the browser reads directly. These files run only in the browser, so a custom
+field is a component you import by value.
+
+The frontend imports a table's **type** from `backend/schema`, never a value:
+`import type { posts } from "../../../backend/schema/posts"`. A type import is
+erased from the bundle, so the backend's hooks and server code never reach the
+browser. The backend imports nothing from the frontend.
+
+## `<RebaseCMS>` props
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+<!-- rebase-cms-props:start -->
+| Prop | Description |
+|------|-------------|
+| `tableCustomizations` | `customizeTable(...)` results, one per table at most. Two for the same table throw; one for a table the caller is not served is ignored, with a warning in development |
+| `externalCollections` | Collections whose rows live on another data source, such as `defineFirestoreCollection` results, shown beside the tables in the same navigation, search and reference pickers |
+| `collections` | Collections declared in code. One with the slug of a served table is shown instead of the table, with a warning in development |
+| `views` | Top-level pages in the navigation, or a builder of them — see [Custom Views](#custom-views) |
+| `homePage` | Replaces the content home page |
+| `entityViews` | Record tabs any table can name by `key` in its `entityViews` |
+| `collectionViews` | View modes any table can name by `key` in its `customViews` |
+| `entityActions` | Record actions any table can name by `key` in its `entityActions` |
+| `collectionEditor` | `true` or options for the visual schema editor |
+| `navigationGroupMappings` | Named groups and the collections and views in each, in order |
+| `basePath` | The URL prefix the admin is mounted under, when the router has no `basename` |
+<!-- rebase-cms-props:end -->
+
+The panel's collections are composed in this order, which is also the
+navigation's: the `collections` declared in code, then every served table none
+of them claims (with its customization applied), then the
+`externalCollections`. A slug names one collection only:
+
+| Collision | What happens |
+|---|---|
+| two `customizeTable` results for one slug | throws: merge them into one |
+| a declared collection and a served table | the declared collection is shown; development warns |
+| an external collection and a served table, a declared collection, or another external collection | the panel shows a loading error naming both; give one another slug |
+
+How the panel waits for the tables, and what it shows when they cannot be
+loaded, is on [Tables in the CMS](/docs/collections/#loading-and-errors).
 
 ## The Rebase Provider
 
@@ -83,10 +145,10 @@ were props the component never read:
 | `entityLinkBuilder` | `({ row, id, path }) => string`: the URL for the "open in your app" button on a record, from the record as the server sends the row |
 | `plugins` | Plugin instances — see [Plugins](/docs/plugins) |
 | `slots` | Slot contributions declared directly, without a plugin |
-| `propertyConfigs` | Custom field widgets, keyed by the name a property names in `propertyConfig` |
-| `entityViews` | Custom entity view tabs, available to any collection that names their `key` in `admin.entityViews` |
+| `propertyConfigs` | Custom field widgets, keyed by the name a field names in `propertyConfig` |
+| `entityViews` | Custom entity view tabs, available to any table that names their `key` in its `entityViews` |
 | `collectionViews` | Custom collection view modes, available to any collection by `key` |
-| `entityActions` | Entity actions, available to any collection that names their `key` in `admin.entityActions` |
+| `entityActions` | Entity actions, available to any table that names their `key` in its `entityActions` |
 | `effectiveRoleController` | Simulate a different role while dev mode is on |
 | `modeController` | Hand Rebase the host app's light/dark mode; Rebase then never touches `<html>`, `prefers-color-scheme` or localStorage — see [Styling](#styling) |
 | `translations` | Override or extend any UI string, keyed by locale — see [Translations](/docs/frontend/i18n) |
@@ -107,7 +169,7 @@ and only when the router has no `basename` of its own. See
 Your code gets rows as the server sends them, wherever it asks: `client.data`,
 `context.data` (in a backend callback and in the browser alike), `useRows`,
 `useRow` and `useRowWrites`, the collection and view builders' `data`, and what
-a collection's `browserCallbacks` are handed. A row is a flat object: `row.title`,
+a table's `browserCallbacks` are handed. A row is a flat object: `row.title`,
 a date as its ISO string, a belongsTo as its foreign-key column.
 
 ```tsx
@@ -151,7 +213,7 @@ replacing the layout, stop at [Custom Views](#custom-views).
 
 ```tsx
 <Rebase client={client} authController={authController}>
-    <RebaseCMS collections={collections}/>
+    <RebaseCMS tableCustomizations={tableCustomizations}/>
     <RebaseStudio/>
 
     {/* login screen until there is a user */}
@@ -330,11 +392,11 @@ const views: AppView[] = [
 ];
 ```
 
-Hand them to `<RebaseCMS>`, next to your collections — that is the component
-that registers navigation:
+Hand them to `<RebaseCMS>`, next to your customizations — that is the
+component that registers navigation:
 
 ```tsx
-<RebaseCMS collections={collections} views={views}/>
+<RebaseCMS tableCustomizations={tableCustomizations} views={views}/>
 ```
 
 | Field | |
@@ -419,6 +481,7 @@ Wrapping `<Rebase>` in a `ModeControllerProvider` does not do this:
 
 ## Next Steps
 
+- **[customizeTable](/docs/frontend/customize-table)** — Every option of a table's collection
 - **[Custom Fields](/docs/frontend/custom-fields)** — Build custom form fields
 - **[Entity Views](/docs/frontend/entity-views)** — Add tabs to entity editors
 - **[View Modes](/docs/frontend/view-modes)** — List, Table, Cards, Kanban
