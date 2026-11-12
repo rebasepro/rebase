@@ -49,8 +49,6 @@ import {
     getEffectiveSecurityRules,
     getEnumVarName,
     getInjectedSecurityRules,
-    getTenantConfig,
-    tenantBypassRoles,
     TENANT_INDEX_REASON,
     getJunctionCollectionConfig,
     getJunctionSecurityRules,
@@ -64,7 +62,9 @@ import {
     assertBeforeQueryIsPostgresOnly,
     resolveStringColumnLength,
     customSqlTypeProblem,
-    declaredSchemaOf
+    declaredSchemaOf,
+    columnByKey,
+    tenantOf
 } from "@rebasepro/common";
 import {
     generateForeignKeyName,
@@ -1464,8 +1464,8 @@ function planCollectionTable(
     // The policy is already above — `getEffectiveSecurityRules` injects it, so
     // it compiles, names and renders like every other rule. What is left is the
     // half a rule cannot express: the column is NOT NULL, and it is indexed.
-    const tenantIndexes = applyTenantColumnEffects(collection, columns, primaryKey, schema, table);
-    const keepTenant = planKeepTenantTrigger(collection, columns, schema, table);
+    const tenantIndexes = applyTenantColumnEffects(descriptor, columns, primaryKey);
+    const keepTenant = planKeepTenantTrigger(descriptor, columns);
     if (keepTenant) triggers.push(keepTenant);
 
     // Last among the columns, because it reads a nullability the two passes
@@ -1682,21 +1682,20 @@ function planPropertyColumn(
  * collection denies every row.
  */
 function applyTenantColumnEffects(
-    collection: CollectionConfig,
+    descriptor: TableDescriptor,
     columns: ColumnPlan[],
-    primaryKey: string[],
-    schema: string,
-    table: string
+    primaryKey: string[]
 ): CollectionIndexSpec[] {
-    const tenant = getTenantConfig(collection);
+    const tenant = tenantOf(descriptor);
     if (!tenant) return [];
+    const { schema, table } = descriptor;
 
-    const column = findTenantColumn(collection, columns, tenant.field);
+    const column = findTenantColumn(descriptor, columns, tenant.field);
     if (!column) {
         throw new Error(
-            `Collection "${describe(collection)}" declares \`tenant: { field: "${tenant.field}" }\`, and ` +
-            "no property of that name reaches a column. `tenant` says what a column means; it does not " +
-            "create one. Declare the property, or name the one that holds the tenant id."
+            `Table "${descriptor.slug}" declares \`tenant: { field: "${tenant.field}" }\`, and ` +
+            "no column of that key is created on it. `tenant` says what a column means; it does not " +
+            "create one. Declare the column, or name the one that holds the tenant id."
         );
     }
 
@@ -1727,22 +1726,21 @@ function applyTenantColumnEffects(
  * declares no `tenant`. See `tenant-keep-trigger.ts` for why a policy cannot.
  */
 function planKeepTenantTrigger(
-    collection: CollectionConfig,
-    columns: ColumnPlan[],
-    schema: string,
-    table: string
+    descriptor: TableDescriptor,
+    columns: ColumnPlan[]
 ): TriggerPlan | undefined {
-    const tenant = getTenantConfig(collection);
+    const tenant = tenantOf(descriptor);
     if (!tenant) return undefined;
-    const column = findTenantColumn(collection, columns, tenant.field);
+    const column = findTenantColumn(descriptor, columns, tenant.field);
     if (!column) return undefined;
+    const { schema, table } = descriptor;
     return {
         schema,
         table,
         column: column.column,
         name: toPostgresIdentifier(keepTenantTriggerName(table)),
         kind: "keep-tenant",
-        bypassRoles: [...tenantBypassRoles(tenant)]
+        bypassRoles: [...tenant.bypassRoles]
     };
 }
 
@@ -1791,38 +1789,23 @@ function planForeignKeyIndexes(
 /**
  * The planned column a `tenant.field` names.
  *
- * Not simply `columns.find(c => c.key === field)`: a `belongsTo` relation
- * property emits its column under the *foreign key's* field name, so
- * `tenant: { field: "org" }` beside `org: { type: "relation", … }` has to
- * resolve through the relation to `org_id`. Matching only on `key` found
- * nothing there and the declaration would have been refused as naming no
- * column — for the shape the documentation recommends.
+ * The descriptor's `tenant.field` is a column key — a `belongsTo` named as
+ * the tenant was resolved to its foreign-key column when the table compiled —
+ * so the planned column is the one with that column's SQL name.
+ *
+ * Only columns that are created count. A relation whose column a declared
+ * column owns keeps an entry for its constraint alone, under the same SQL
+ * name; when the relation was declared first, NOT NULL landed on that entry,
+ * nothing rendered it, and the tenant column stayed nullable.
  */
 function findTenantColumn(
-    collection: CollectionConfig,
+    descriptor: TableDescriptor,
     columns: ColumnPlan[],
     field: string
 ): ColumnPlan | undefined {
-    // Only columns that are created. A relation whose column a declared
-    // property owns keeps an entry for its constraint alone, under the same key
-    // and column; when the relation was declared first, NOT NULL landed on that
-    // entry, nothing rendered it, and the tenant column stayed nullable.
-    const created = columns.filter(c => !c.columnOwnedByProperty);
-    const direct = created.find(c => c.key === field);
-    if (direct) return direct;
-
-    const prop = collection.properties?.[field] as Property | undefined;
-    if (prop?.type === "relation") {
-        const relations = resolveCollectionRelations(collection);
-        const relation = findRelation(relations, (prop as RelationProperty).relation?.relationName ?? field);
-        if (relation?.kind === "belongsTo" && relation.localKey) {
-            return created.find(c => c.column === relation.localKey);
-        }
-        return undefined;
-    }
-    if (!prop) return undefined;
-    const columnName = resolveColumnName(field, prop);
-    return created.find(c => c.column === columnName);
+    const tenantColumn = columnByKey(descriptor, field);
+    if (!tenantColumn) return undefined;
+    return columns.find(c => !c.columnOwnedByProperty && c.column === tenantColumn.column);
 }
 
 /**
