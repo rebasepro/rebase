@@ -13,9 +13,11 @@
  *  - `isRebaseIndexName` cannot match any other producer's names, since it is
  *    what decides whether `db push` may drop an index.
  */
-import { CollectionConfig, type CollectionIndex, type PostgresCollectionConfig } from "@rebasepro/types";
+import { CollectionConfig, col, defineTable, rel, type CollectionIndex, type PostgresCollectionConfig } from "@rebasepro/types";
+import { compileSchema, lowerTables } from "@rebasepro/common";
 import {
     buildCollectionIndexSpecs,
+    buildTableIndexSpecs,
     buildCollectionIndexPlan,
     collectionIndexStatement,
     deriveIndexName,
@@ -235,7 +237,7 @@ describe("refusals", () => {
     it("refuses an unknown property", () => rejects([{ on: ["nope"], reason: "r" }], /not a property/));
     it("refuses a missing reason", () => rejects([{ on: ["status"] }], /`reason` is required/));
     it("refuses a blank reason", () => rejects([{ on: ["status"], reason: "   " }], /`reason` is required/));
-    it("refuses an empty key list", () => rejects([{ on: [], reason: "r" }], /at least one property/));
+    it("refuses an empty key list", () => rejects([{ on: [], reason: "r" }], /at least one column/));
 
     it(`refuses more than ${MAX_INDEX_KEYS} keys`, () =>
         rejects([{ on: ["id", "title", "status", "views", "email", "createdAt"], reason: "r" }], /the limit is 5/));
@@ -262,7 +264,7 @@ describe("refusals", () => {
         const collection = posts([{ on: ["email"], unique: true, reason: "r" }], {
             properties: { email: { type: "string", name: "Email", validation: { unique: true } } }
         });
-        expect(() => specs(collection)).toThrow(/already declares `validation.unique`/);
+        expect(() => specs(collection)).toThrow(/already declares a single-column UNIQUE/);
     });
 });
 
@@ -357,5 +359,39 @@ describe("the generated Drizzle schema", () => {
         const schema = await generated([]);
         expect(schema).not.toContain("index(");
         expect(schema).not.toMatch(/import \{[^}]*\bindex\b/);
+    });
+});
+
+describe("buildTableIndexSpecs", () => {
+    const authors = defineTable("authors", { columns: { id: col.serial().primaryKey() }, rls: "admin-only" });
+    const posts = defineTable("posts", {
+        columns: {
+            id: col.serial().primaryKey(),
+            title: col.text(),
+            status: col.text(),
+            tags: col.array(col.text()),
+            createdAt: col.timestamptz().column("created_at")
+        },
+        relations: { author: rel.belongsTo(() => authors) },
+        indexes: [
+            { columns: ["author", { column: "createdAt", direction: "desc" }], include: ["title"], reason: "an author's latest posts" },
+            { columns: ["tags"], using: "gin" },
+            { columns: ["title"], unique: true, where: { column: "status", op: "in", value: ["published", "pinned"] } }
+        ],
+        rls: "admin-only"
+    });
+    const descriptor = compileSchema([authors, posts])[1].descriptor;
+
+    it("resolves keys, a belongsTo and a predicate to the SQL columns, as the lowered collection does", () => {
+        const fromTable = buildTableIndexSpecs(descriptor);
+        const lowered = lowerTables([authors, posts])[1];
+        expect(fromTable).toEqual(buildCollectionIndexSpecs(lowered, resolveColumnName));
+        expect(fromTable[0].keys.map(key => [key.column, key.direction])).toEqual([["author_id", "asc"], ["created_at", "desc"]]);
+        expect(fromTable[1]).not.toHaveProperty("reason");
+        expect(fromTable[2].predicate).toEqual({ column: "status", op: "in", value: ["published", "pinned"] });
+    });
+
+    it("plans nothing for a table without indexes", () => {
+        expect(buildTableIndexSpecs(compileSchema([authors])[0].descriptor)).toEqual([]);
     });
 });

@@ -31,9 +31,19 @@
  * dropped, there is never a window with no index, and drift detection reduces
  * to a set difference over names.
  */
-import type { CollectionConfig, CollectionIndex, IndexPredicate, Property, ResolvedRelation } from "@rebasepro/types";
+import type {
+    CollectionConfig,
+    CollectionIndex,
+    IndexPredicate,
+    Property,
+    ResolvedRelation,
+    TableDescriptor,
+    TableIndex,
+    TableIndexKey,
+    TableIndexPredicate
+} from "@rebasepro/types";
 import { isPostgresCollectionConfig } from "@rebasepro/types";
-import { getTableName, resolveCollectionRelations } from "@rebasepro/common";
+import { columnByKey, columnNameOf, getTableName, resolveCollectionRelations } from "@rebasepro/common";
 import { sha1Hex, truncateToBytes } from "@rebasepro/utils";
 import { isTableIndex } from "./plan/table-input";
 
@@ -290,40 +300,70 @@ export const resolveIndexableColumn = (
     return resolveColumnName(propKey, property);
 };
 
-const resolvePredicate = (
-    collection: CollectionConfig,
-    predicate: IndexPredicate,
-    resolveColumnName: ResolveColumnName,
-    fail: (message: string) => never
-): ResolvedPredicate => {
-    if ("and" in predicate) {
-        return { and: predicate.and.map(p => resolvePredicate(collection, p, resolveColumnName, fail)) };
-    }
-    const column = resolveIndexableColumn(collection, predicate.prop, resolveColumnName, fail);
-    switch (predicate.op) {
-        case "is null":
-        case "is not null":
-            return { column, op: predicate.op };
-        case "in": {
-            const seen = new Set(predicate.value);
-            if (seen.size !== predicate.value.length) {
-                fail(`the \`in\` list for "${predicate.prop}" repeats a value, which changes nothing.`);
-            }
-            return { column, op: "in", value: [...predicate.value] };
-        }
-        default:
-            return { column, op: predicate.op, value: predicate.value };
-    }
-};
-
 /** The primary key columns of a collection, for the "you already have this" refusal. */
 const primaryKeyColumns = (collection: CollectionConfig, resolveColumnName: ResolveColumnName): string[] =>
     Object.entries(collection.properties ?? {})
         .filter(([, prop]) => prop && typeof prop === "object" && "isId" in prop && Boolean((prop as { isId?: unknown }).isId))
         .map(([key, prop]) => resolveColumnName(key, prop as Property));
 
+/** One index key, under the names both doors share. */
+interface IndexKeySource {
+    key: string;
+    direction?: "asc" | "desc";
+    nulls?: "first" | "last";
+}
+
+/** A predicate, under the names both doors share. */
+type IndexPredicateSource =
+    | { key: string; op: "=" | "!=" | "<" | "<=" | ">" | ">="; value: string | number | boolean }
+    | { key: string; op: "is null" | "is not null" }
+    | { key: string; op: "in"; value: readonly (string | number)[] }
+    | { and: readonly IndexPredicateSource[] };
+
+/** One declared index, under the names both doors share. */
+interface IndexSource {
+    on: readonly IndexKeySource[];
+    using?: IndexMethod;
+    unique?: boolean;
+    include?: readonly string[];
+    where?: IndexPredicateSource;
+    /** Absent or blank: no reason (a table's index may leave it out). */
+    reason?: string;
+    /** A legacy entry must state its `reason`. */
+    reasonRequired: boolean;
+}
+
+/** The table the indexes are declared on, read through one interface by both doors. */
+interface IndexTableSource {
+    slug: string;
+    schema: string;
+    table: string;
+    /** The primary-key columns. */
+    primaryKey: readonly string[];
+    indexes: readonly IndexSource[];
+    /** The SQL column a key names; calls `fail` for a key that names none. */
+    column(key: string, fail: (message: string) => never): string;
+    /** Whether the key's own column already carries a single-column UNIQUE. */
+    declaresUnique(key: string): boolean;
+}
+
+const legacyPredicate = (predicate: IndexPredicate): IndexPredicateSource => {
+    if ("and" in predicate) return { and: predicate.and.map(legacyPredicate) };
+    switch (predicate.op) {
+        case "is null":
+        case "is not null": return { key: predicate.prop, op: predicate.op };
+        case "in": return { key: predicate.prop, op: "in", value: predicate.value };
+        default: return { key: predicate.prop, op: predicate.op, value: predicate.value };
+    }
+};
+
 /**
  * Every index one collection declares, resolved and named.
+ *
+ * TRANSITIONAL (Postgres-first Stage B): the planner builds a table's indexes
+ * from its descriptor ({@link buildTableIndexSpecs}). This door stays for the
+ * readers outside the planner that still hold a collection, and builds
+ * through the same function, so the two cannot disagree.
  *
  * Throws {@link CollectionIndexConfigError} rather than dropping a bad entry:
  * an index that silently does not exist is the failure mode this whole feature
@@ -336,48 +376,172 @@ export const buildCollectionIndexSpecs = (
     if (!isPostgresCollectionConfig(collection)) return [];
     const declared = collection.indexes;
     if (!declared || declared.length === 0) return [];
+    return indexSpecsFrom({
+        slug: collection.slug ?? getTableName(collection),
+        schema: collection.schema ?? "public",
+        table: getTableName(collection),
+        primaryKey: primaryKeyColumns(collection, resolveColumnName),
+        indexes: declared.map((index: CollectionIndex): IndexSource => ({
+            on: Array.isArray(index.on)
+                ? index.on.map(key => typeof key === "string"
+                    ? { key }
+                    : {
+                        key: key.prop,
+                        ...((key as { direction?: "asc" | "desc" }).direction !== undefined ? { direction: (key as { direction?: "asc" | "desc" }).direction } : {}),
+                        ...((key as { nulls?: "first" | "last" }).nulls !== undefined ? { nulls: (key as { nulls?: "first" | "last" }).nulls } : {})
+                    })
+                : [],
+            ...(index.using !== undefined ? { using: index.using } : {}),
+            ...((index as { unique?: boolean }).unique !== undefined ? { unique: (index as { unique?: boolean }).unique } : {}),
+            ...((index as { include?: readonly string[] }).include !== undefined ? { include: (index as { include?: readonly string[] }).include } : {}),
+            ...(index.where ? { where: legacyPredicate(index.where) } : {}),
+            ...(typeof index.reason === "string" ? { reason: index.reason } : {}),
+            reasonRequired: !isTableIndex(index)
+        })),
+        column: (key, fail) => resolveIndexableColumn(collection, key, resolveColumnName, fail),
+        declaresUnique: key => {
+            const property = collection.properties?.[key] as { validation?: { unique?: boolean } } | undefined;
+            return property?.validation?.unique === true;
+        }
+    });
+};
 
-    const slug = collection.slug ?? getTableName(collection);
-    const schema = collection.schema ?? "public";
-    const table = getTableName(collection);
-    const pk = primaryKeyColumns(collection, resolveColumnName).sort().join(",");
+const tableIndexKey = (entry: string | TableIndexKey): IndexKeySource => typeof entry === "string"
+    ? { key: entry }
+    : {
+        key: entry.column,
+        ...(entry.direction !== undefined ? { direction: entry.direction } : {}),
+        ...(entry.nulls !== undefined ? { nulls: entry.nulls } : {})
+    };
+
+const tablePredicate = (predicate: TableIndexPredicate): IndexPredicateSource => {
+    if ("and" in predicate) return { and: predicate.and.map(tablePredicate) };
+    switch (predicate.op) {
+        case "is null":
+        case "is not null": return { key: predicate.column, op: predicate.op };
+        case "in": return { key: predicate.column, op: "in", value: predicate.value };
+        default: return { key: predicate.column, op: predicate.op, value: predicate.value };
+    }
+};
+
+const tableIndexSource = (index: TableIndex): IndexSource => ({
+    on: index.columns.map(tableIndexKey),
+    ...(index.using !== undefined ? { using: index.using } : {}),
+    ...(index.unique !== undefined ? { unique: index.unique } : {}),
+    ...(index.include !== undefined ? { include: index.include } : {}),
+    ...(index.where !== undefined ? { where: tablePredicate(index.where) } : {}),
+    ...(index.reason !== undefined ? { reason: index.reason } : {}),
+    reasonRequired: false
+});
+
+/**
+ * The SQL column an index key names on a table: a column key, or a
+ * `belongsTo` relation (its foreign-key column). Another relation kind has no
+ * column here — its foreign key is on the target, or in a junction.
+ */
+const tableIndexColumn = (table: TableDescriptor, key: string, fail: (message: string) => never): string => {
+    const column = columnByKey(table, key);
+    if (column) return column.column;
+    const relation = table.relations.find(candidate => candidate.name === key);
+    if (relation?.kind === "belongsTo") return relation.localKey;
+    if (relation) {
+        return fail(
+            `"${key}" is a ${relation.kind} relation, which has no column on this table — ` +
+            `the foreign key lives on "${relation.target}". Declare the index there.`
+        );
+    }
+    return fail(`"${key}" is no column key or \`belongsTo\` relation of this table.`);
+};
+
+/**
+ * Every index one table declares (`indexes`), resolved and named, read from
+ * its descriptor — what the planner calls, for a table and for a
+ * materialized view's stored rows alike.
+ *
+ * Throws {@link CollectionIndexConfigError} rather than dropping a bad entry.
+ */
+export const buildTableIndexSpecs = (table: TableDescriptor): CollectionIndexSpec[] => {
+    const declared = table.indexes;
+    if (!declared || declared.length === 0) return [];
+    return indexSpecsFrom({
+        slug: table.slug,
+        schema: table.schema,
+        table: table.table,
+        primaryKey: table.primaryKey.map(key => columnNameOf(table, key) ?? key),
+        indexes: declared.map(tableIndexSource),
+        column: (key, fail) => tableIndexColumn(table, key, fail),
+        declaresUnique: key => {
+            const column = columnByKey(table, key);
+            if (column) return column.unique === true;
+            const relation = table.relations.find(candidate => candidate.name === key);
+            if (relation?.kind !== "belongsTo") return false;
+            return table.columns.some(candidate => candidate.column === relation.localKey && candidate.unique === true);
+        }
+    });
+};
+
+const resolveSourcePredicate = (
+    source: IndexTableSource,
+    predicate: IndexPredicateSource,
+    fail: (message: string) => never
+): ResolvedPredicate => {
+    if ("and" in predicate) {
+        return { and: predicate.and.map(p => resolveSourcePredicate(source, p, fail)) };
+    }
+    const column = source.column(predicate.key, fail);
+    switch (predicate.op) {
+        case "is null":
+        case "is not null":
+            return { column, op: predicate.op };
+        case "in": {
+            const seen = new Set(predicate.value);
+            if (seen.size !== predicate.value.length) {
+                fail(`the \`in\` list for "${predicate.key}" repeats a value, which changes nothing.`);
+            }
+            return { column, op: "in", value: [...predicate.value] };
+        }
+        default:
+            return { column, op: predicate.op, value: predicate.value };
+    }
+};
+
+const indexSpecsFrom = (source: IndexTableSource): CollectionIndexSpec[] => {
+    const { slug, schema, table } = source;
+    const pk = [...source.primaryKey].sort().join(",");
 
     const specs: CollectionIndexSpec[] = [];
     const byName = new Map<string, number>();
 
-    declared.forEach((index: CollectionIndex, position: number) => {
+    source.indexes.forEach((index, position) => {
         const fail = (message: string): never => {
             throw new CollectionIndexConfigError(slug, position, message);
         };
 
         // A table's index may leave its reason out; a legacy entry may not.
-        const fromTable = isTableIndex(index);
-        if (!fromTable && (typeof index.reason !== "string" || index.reason.trim() === "")) {
+        if (index.reasonRequired && (typeof index.reason !== "string" || index.reason.trim() === "")) {
             fail("`reason` is required — see the doc comment. An index nobody can justify is one nobody can delete.");
         }
-        if (!Array.isArray(index.on) || index.on.length === 0) {
-            fail("`on` must name at least one property.");
+        if (index.on.length === 0) {
+            fail("`on` must name at least one column.");
         }
         if (index.on.length > MAX_INDEX_KEYS) {
             fail(`\`on\` has ${index.on.length} keys; the limit is ${MAX_INDEX_KEYS}. Payload columns belong in \`include\`.`);
         }
 
         const method: IndexMethod = index.using ?? "btree";
-        const unique = method === "btree" && Boolean((index as { unique?: boolean }).unique);
+        const unique = method === "btree" && Boolean(index.unique);
         if (!isOrderedMethod(method)) {
             for (const key of index.on) {
-                if (typeof key !== "string" && ("direction" in key || "nulls" in key)) {
+                if (key.direction !== undefined || key.nulls !== undefined) {
                     fail(`access method "${method}" does not support ASC/DESC or NULLS options.`);
                 }
             }
         }
 
         const keys: ResolvedIndexKey[] = index.on.map(key => {
-            const propKey = typeof key === "string" ? key : key.prop;
-            const column = resolveIndexableColumn(collection, propKey, resolveColumnName, fail);
-            const direction = (typeof key === "string" ? undefined : (key as { direction?: "asc" | "desc" }).direction) ?? "asc";
-            const nulls = (typeof key === "string" ? undefined : (key as { nulls?: "first" | "last" }).nulls)
-                ?? (direction === "desc" ? "first" : "last");
+            const column = source.column(key.key, fail);
+            const direction = key.direction ?? "asc";
+            const nulls = key.nulls ?? (direction === "desc" ? "first" : "last");
             return { column, direction, nulls };
         });
 
@@ -388,27 +552,23 @@ export const buildCollectionIndexSpecs = (
             fail(`this is the primary key — "${table}_pkey" already indexes exactly these columns.`);
         }
 
-        const include = ((index as { include?: readonly string[] }).include ?? [])
-            .map(propKey => resolveIndexableColumn(collection, propKey, resolveColumnName, fail));
+        const include = (index.include ?? []).map(key => source.column(key, fail));
         const overlap = include.find(c => keys.some(k => k.column === c));
         if (overlap) fail(`"${overlap}" is in both \`on\` and \`include\`; Postgres rejects the overlap.`);
 
         if (unique && keys.length === 1) {
-            const propKey = typeof index.on[0] === "string" ? index.on[0] as string : (index.on[0] as { prop: string }).prop;
-            const property = collection.properties?.[propKey] as { validation?: { unique?: boolean } } | undefined;
-            if (property?.validation?.unique) {
+            const key = index.on[0].key;
+            if (source.declaresUnique(key)) {
                 fail(
-                    `"${propKey}" already declares \`validation.unique\`, which compiles to an inline UNIQUE. ` +
-                    `Two declarations of one guarantee — remove one.`
+                    `"${key}" already declares a single-column UNIQUE (\`.unique()\`, legacy \`validation.unique\`). ` +
+                    "Two declarations of one guarantee — remove one."
                 );
             }
         }
 
-        const predicate = index.where
-            ? resolvePredicate(collection, index.where, resolveColumnName, fail)
-            : null;
+        const predicate = index.where ? resolveSourcePredicate(source, index.where, fail) : null;
 
-        const reason = fromTable && index.reason.trim() === "" ? {} : { reason: index.reason };
+        const reason = index.reason === undefined || index.reason.trim() === "" ? {} : { reason: index.reason };
         const withoutName = { schema, table, method, unique, keys, include, predicate, ...reason };
         const indexName = deriveIndexName(withoutName);
 

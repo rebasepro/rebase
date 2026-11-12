@@ -105,6 +105,7 @@ import {
 } from "../vector-index";
 import {
     buildCollectionIndexSpecs,
+    buildTableIndexSpecs,
     collectionIndexStatement,
     deriveIndexName,
     foreignKeyIndexSpec,
@@ -1471,7 +1472,7 @@ function planCollectionTable(
     // After every other index, because the foreign-key ones defer to them: a
     // declared index or the tenant index that already leads with the column
     // serves the same lookups, and a second one would only cost writes.
-    const indexes = [...buildCollectionIndexSpecs(collection, resolveColumnName), ...tenantIndexes];
+    const indexes = [...buildTableIndexSpecs(descriptor), ...tenantIndexes];
     indexes.push(...planForeignKeyIndexes(schema, table, columns, primaryKey, indexes, column => {
         // A `belongsTo` whose author opted out keeps its constraint and loses
         // only the index. Asked of the relation, not the column: the column a
