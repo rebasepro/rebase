@@ -5,7 +5,7 @@
  * So its plan, which was everything `db push --dry-run` showed, never named
  * one. After `schema introspect` on a database whose tables had policies of
  * their own and no admin baseline, the dry run said "No changes: the database
- * already matches these collections", and the push then created eight
+ * already matches these tables", and the push then created eight
  * `<table>_default_admin_*` policies that let an admin read and write every
  * row.
  *
@@ -47,7 +47,7 @@ export interface PolicyPushPlan {
     replace: { policy: PolicyRef; why: string[] }[];
     /** Policies an earlier push generated from a rule edited since: the push drops them. */
     drop: PolicyRef[];
-    /** Policies no collection describes, which the push leaves in force. */
+    /** Policies no table describes, which the push leaves in force. */
     keep: PolicyRef[];
     /** Declared policies the database has with no stamp of Rebase's: re-created from their rules, changed or not. */
     unstamped: PolicyRef[];

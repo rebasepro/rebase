@@ -4,23 +4,23 @@
  * Boot is additive (`ConstraintPolicy` in `plan/diff-plan.ts`). It creates
  * tables, columns, enum values and indexes, and it never relaxes a constraint
  * or drops a column, because an unattended boot runs against customer data
- * with nobody reading a diff. That leaves two states a collection change can
+ * with nobody reading a diff. That leaves two states a table change can
  * reach and nothing in the platform can leave:
  *
- * - **A property made optional.** The column stays NOT NULL. Boot reports the
+ * - **A column made nullable.** The column stays NOT NULL. Boot reports the
  *   drift on every start and applies nothing.
- * - **A property removed.** The column stays, with its data. If it was NOT NULL
+ * - **A column removed.** The column stays, with its data. If it was NOT NULL
  *   with no default, every insert through the API now fails on a field nobody
  *   can send (`orphanedRequiredColumns`).
  *
  * This plans both, for a person to read. It relaxes every column the
- * collections declare optional and the database still requires — the
+ * tables declare nullable and the database still requires — the
  * `drop-not-null` actions the live editor's `converge` policy already plans —
- * and it lists every column no collection declares. An undeclared column that
+ * and it lists every column no table declares. An undeclared column that
  * blocks inserts (NOT NULL, no default) is relaxed too, unless it is being
  * dropped: that keeps its data and makes the table writable again, which is
- * the one thing a removed property must not prevent. It drops only the columns
- * the caller names, one by one: removing a property is not consent to destroy
+ * the one thing a removed column must not prevent. It drops only the columns
+ * the caller names, one by one: removing a column is not consent to destroy
  * the column's data, so the drop is a separate, explicit act.
  *
  * Pure, given the database's catalogue. `readReconcileFacts` reads it and
@@ -37,14 +37,14 @@ import { readSchemaFactsFor, type Queryable } from "./ensure-collection-tables";
 import type { TablePlan } from "./plan/types";
 
 export interface ReconcileOptions {
-    /** Undeclared columns to drop, as `<collection slug>.<column>`. */
+    /** Undeclared columns to drop, as `<table slug>.<column>`. */
     drop?: string[];
 }
 
 /** The table, quoted for SQL. Names come from the catalogue and the plan, both already validated. */
 const relation = (table: TablePlan): string => `"${table.schema}"."${table.table}"`;
 
-/** Every column a collection's table carries that no property declares. */
+/** Every column a declared table carries that it does not declare. */
 function undeclaredColumns(
     tables: TablePlan[],
     existing: ExistingSchema
@@ -120,7 +120,7 @@ export function planSchemaReconcile(
             continue;
         }
         // Refused rather than ignored, and never dropped: a declared column is
-        // one the collection still reads and writes.
+        // one the table still reads and writes.
         problems.push(table.columns.some(c => c.column === column)
             ? `"${request}": the "${slug}" table still declares "${column}". Remove the column, deploy, then drop it.`
             : `"${request}": "${table.qualified}" has no column "${column}".`);
