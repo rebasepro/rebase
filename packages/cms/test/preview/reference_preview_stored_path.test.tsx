@@ -101,4 +101,15 @@ describe("ReferencePreview of a reference to a collection stored under a declare
         expect(screen.getByTestId("card").textContent).toBe("Diagnosis (Postgres)");
         expect(fetched.map(props => props.path)).toEqual(["diagnosis"]);
     });
+
+    it("previews a reference to a record of another data source there, whatever the scope", () => {
+        // A Firestore record's reference to a Postgres row carries the row's
+        // data source as its `driver`: in a Firestore scope it is still the
+        // Postgres row, not the Firestore collection stored at the same path.
+        scope = { dataSource: "firestore", engine: "firestore" };
+        render(<ReferencePreview reference={new EntityReference({ id: "abc", path: "diagnosis", driver: "(default)" })}/>);
+
+        expect(screen.getByTestId("card").textContent).toBe("Diagnosis (Postgres)");
+        expect(fetched.map(props => props.path)).toEqual(["diagnosis"]);
+    });
 });

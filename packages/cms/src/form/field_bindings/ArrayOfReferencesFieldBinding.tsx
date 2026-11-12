@@ -51,8 +51,8 @@ export function ArrayOfReferencesFieldBinding({
     const selectedEntityIds = value && Array.isArray(value) ? value.map((ref) => ref.id) : [];
 
     const collectionRegistryController = useCollectionRegistryController();
-    const { toCollectionPath, referenceTo } = useReferencePaths();
-    const collectionPath = ofProperty.path ? toCollectionPath(ofProperty.path) : undefined;
+    const { targetPath, referenceTo } = useReferencePaths();
+    const collectionPath = ofProperty.path ? targetPath(ofProperty.path) : undefined;
     const collection: AdminCollection | undefined = useMemo(() => {
         return collectionPath ? collectionRegistryController.getCollection(collectionPath) : undefined;
     }, [collectionPath]);

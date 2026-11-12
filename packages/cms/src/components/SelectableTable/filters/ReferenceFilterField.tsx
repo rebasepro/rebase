@@ -126,8 +126,8 @@ export function ReferenceFilterField({
     }
 
     const collectionRegistryController = useCollectionRegistryController();
-    const { toCollectionPath, referenceTo } = useReferencePaths();
-    const collectionPath = path ? toCollectionPath(path) : undefined;
+    const { targetPath, referenceTo } = useReferencePaths();
+    const collectionPath = path ? targetPath(path) : undefined;
     const collection: AdminCollection | undefined = useMemo(() => {
         return collectionPath ? collectionRegistryController.getCollection(collectionPath) : undefined;
     }, [collectionPath]);

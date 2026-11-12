@@ -45,10 +45,19 @@ const exercises: CollectionConfig = {
     properties: {}
 };
 
+const firestoreSymptoms: CollectionConfig = {
+    name: "Symptoms (Firestore)",
+    slug: "fs_symptoms",
+    path: "symptoms",
+    engine: "firestore",
+    dataSource: "firestore",
+    properties: {}
+};
+
 function renderReferencePaths(scope?: CollectionConfig) {
     const registry = renderHook(() => useBuildCollectionRegistryController({}));
     act(() => {
-        registry.result.current.collectionRegistryRef.current.registerMultiple([postgresDiagnosis, firestoreDiagnosis, exercises]);
+        registry.result.current.collectionRegistryRef.current.registerMultiple([postgresDiagnosis, firestoreDiagnosis, exercises, firestoreSymptoms]);
     });
     registry.rerender();
 
@@ -100,5 +109,38 @@ describe("useReferencePaths", () => {
         expect(controller.resolveDataPath("/exercises/")).toBe("/exercises/");
         expect(controller.resolveCollectionPath("/diagnosis/", "firestore")).toBe("fs_diagnosis");
         expect(controller.resolveCollectionPath("/diagnosis/")).toBe("/diagnosis/");
+    });
+
+    it("reads a reference property's path as the slug of its target, on any data source", () => {
+        // A Firestore field targeting `diagnosis` means the Postgres
+        // collection, even though a Firestore collection is stored there:
+        // a property names its target the way the admin addresses it.
+        const { paths } = renderReferencePaths(exercises);
+
+        expect(paths.targetPath("diagnosis")).toBe("diagnosis");
+        expect(paths.targetPath("fs_diagnosis")).toBe("fs_diagnosis");
+        // A store path no collection has as its slug still finds its collection.
+        expect(paths.targetPath("symptoms")).toBe("fs_symptoms");
+        // While the same string read back from a Firestore record is a Firestore path.
+        expect(paths.toCollectionPath("diagnosis")).toBe("fs_diagnosis");
+    });
+
+    it("marks a picked record of another data source with that source, so it routes there and is stored as its id", () => {
+        const { paths } = renderReferencePaths(exercises);
+
+        const toPostgres = paths.referenceTo({ id: "abc", path: "diagnosis", values: {} });
+        expect(toPostgres.driver).toBe("(default)");
+        expect(toPostgres.pathWithId).toBe("diagnosis/abc");
+        // Read back with that driver, it is the Postgres collection, not the
+        // Firestore one stored at the same path.
+        expect(paths.toCollectionPath(toPostgres.path, toPostgres.driver)).toBe("diagnosis");
+
+        // Within the scope's own source nothing changes.
+        expect(paths.referenceTo({ id: "abc", path: "fs_diagnosis", values: {} }).driver).toBeUndefined();
+
+        // From a Postgres form, a Firestore record is the other source.
+        const toFirestore = renderReferencePaths(postgresDiagnosis).paths.referenceTo({ id: "abc", path: "fs_diagnosis", values: {} });
+        expect(toFirestore.driver).toBe("firestore");
+        expect(toFirestore.pathWithId).toBe("diagnosis/abc");
     });
 });

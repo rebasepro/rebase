@@ -11,6 +11,7 @@ import { deserializeFilter } from "./filter-dialect";
 import { buildCompositeId, resolvePrimaryKeys, PrimaryKeyInfo } from "../util/identity";
 import { fieldKeyForColumn, resolveCollectionRelations } from "../util/relations";
 import { EntityReference, EntityRelation } from "@rebasepro/types";
+import { routeCrossSourceReferences, storeCrossSourceReferences } from "./cross-source-references";
 
 /**
  * What a client says when its data source cannot subscribe.
@@ -360,7 +361,9 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
      * Asked on every call, not once: the collections it is derived from
      * register after this accessor is built, and can change while it lives.
      */
-    storedPath: () => string = () => slug
+    storedPath: () => string = () => slug,
+    /** Values on their way to the driver — see `createStoredValuesConverter`. */
+    toStored: <V extends Record<string, unknown>>(values: V) => V = (values) => values
 ): CollectionAccessor<M> {
     /**
      * One page of the collection, and its count. `withDeleted: "only"` reads
@@ -603,7 +606,7 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
         async create(data: Partial<EntityValues<M>>, id?: string | number): Promise<Entity<M>> {
             const row = await driver.save<M>({
                 path: storedPath(),
-                values: data,
+                values: toStored(data),
                 id: id,
                 status: "new"
             });
@@ -617,7 +620,7 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
             ): Promise<Entity<M>[]> => {
                 const rows = await driver.saveMany!<M>({
                     path: storedPath(),
-                    rows: data,
+                    rows: data.map(row => toStored(row)),
                     upsert: options?.upsert,
                     // Dropped here, an `upsert` on a natural key silently
                     // became an upsert on the primary key — which for a serial
@@ -634,7 +637,7 @@ function createDriverAccessor<M extends Record<string, unknown> = Record<string,
         async update(id: string | number, data: Partial<EntityValues<M>>): Promise<Entity<M>> {
             const row = await driver.save<M>({
                 path: storedPath(),
-                values: data,
+                values: toStored(data),
                 id: id,
                 status: "existing"
             });
@@ -829,7 +832,30 @@ function createViewModelConverter(options?: EntityDataOptions) {
             // edited in the schema editor should not need a reload here.
             const collection = options.resolveCollection?.(slug);
             if (!collection) return values;
-            return toViewModelValues(values, collection.properties, collection, options.resolveCollection);
+            // A reference to a record of another data source is stored as
+            // its id; in the view model it is a reference routed to that
+            // source (see `routeCrossSourceReferences`).
+            return routeCrossSourceReferences(
+                toViewModelValues(values, collection.properties, collection, options.resolveCollection),
+                collection,
+                options.resolveCollection
+            );
+        };
+    };
+}
+
+/**
+ * The converter values pass through on their way to the store of one
+ * collection — the inverse half of {@link createViewModelConverter}: a
+ * reference to a record of another data source becomes that record's id
+ * (see `storeCrossSourceReferences`). Identity where no collection resolver
+ * is registered: the flat SDK writes what it is handed.
+ */
+function createStoredValuesConverter(options?: EntityDataOptions) {
+    return function storedValuesFor(slug: string) {
+        return <V extends Record<string, unknown>>(values: V): V => {
+            const collection = options?.resolveCollection?.(slug);
+            return collection ? storeCrossSourceReferences(values, collection) : values;
         };
     };
 }
@@ -852,7 +878,11 @@ export function rowToViewModel(
 ): Record<string, unknown> {
     const collection = resolveCollection(slug);
     if (!collection) return row;
-    return withReferences(toViewModelValues(row, collection.properties, collection, resolveCollection), collection.properties);
+    return routeCrossSourceReferences(
+        withReferences(toViewModelValues(row, collection.properties, collection, resolveCollection), collection.properties),
+        collection,
+        resolveCollection
+    );
 }
 
 /**
@@ -906,6 +936,7 @@ export function buildRebaseData(driver: DataDriver, options?: EntityDataOptions)
     const cache = new Map<string, CollectionAccessor>();
     const primaryKeysFor = createPrimaryKeyResolver(options);
     const viewModelFor = createViewModelConverter(options);
+    const storedValuesFor = createStoredValuesConverter(options);
 
     function getAccessor(slug: string): CollectionAccessor {
         let accessor = cache.get(slug);
@@ -915,7 +946,8 @@ export function buildRebaseData(driver: DataDriver, options?: EntityDataOptions)
                 slug,
                 () => primaryKeysFor(slug),
                 viewModelFor(slug),
-                () => options?.resolveDataPath?.(slug) ?? slug
+                () => options?.resolveDataPath?.(slug) ?? slug,
+                storedValuesFor(slug)
             );
             cache.set(slug, accessor);
         }
@@ -1424,7 +1456,9 @@ function toEntityAccessor<M extends Record<string, unknown>>(
      * live list keeps the entities it built for as long as this and the keys
      * stay the same object (see `listen`).
      */
-    viewModelSource: () => unknown = () => undefined
+    viewModelSource: () => unknown = () => undefined,
+    /** Values on their way to the client — see `createStoredValuesConverter`. */
+    toStored: <V extends Record<string, unknown>>(values: V) => V = (values) => values
 ): CollectionAccessor<M> {
     const accessor: CollectionAccessor<M> = {
         async find(params?: FindParams<M>): Promise<FindResponse<M>> {
@@ -1436,7 +1470,7 @@ function toEntityAccessor<M extends Record<string, unknown>>(
             return row ? rowToEntity<M>(row, slug, getPks(), toViewModel) : undefined;
         },
         async create(data: Partial<EntityValues<M>>, id?: string | number): Promise<Entity<M>> {
-            return rowToEntity<M>(await sdk.create(data as Partial<M>, id), slug, getPks(), toViewModel);
+            return rowToEntity<M>(await sdk.create(toStored(data) as Partial<M>, id), slug, getPks(), toViewModel);
         },
         // Declared on `CollectionAccessor` and, until now, never implemented on
         // this side of the boundary — so the admin's own import wrote one HTTP
@@ -1447,14 +1481,15 @@ function toEntityAccessor<M extends Record<string, unknown>>(
                 data: Partial<EntityValues<M>>[],
                 options?: { upsert?: boolean; onConflict?: readonly string[] }
             ): Promise<Entity<M>[]> => {
-                const rows = await sdk.createMany!(data as Partial<M>[], options);
+                const rows = await sdk.createMany!(data.map(row => toStored(row)) as Partial<M>[], options);
                 return rowsToEntities<M>(rows, slug, getPks(), toViewModel);
             }
             : undefined,
         async update(id: string | number, data: Partial<EntityValues<M>>, options?: { ifMatch?: string }): Promise<Entity<M>> {
+            const stored = toStored(data);
             const row = options?.ifMatch
-                ? await sdk.update(id, data as Partial<M>, { ifMatch: options.ifMatch })
-                : await sdk.update(id, data as Partial<M>);
+                ? await sdk.update(id, stored as Partial<M>, { ifMatch: options.ifMatch })
+                : await sdk.update(id, stored as Partial<M>);
             if (!row) throw new Error(`Update returned no data for id ${id}`);
             return rowToEntity<M>(row, slug, getPks(), toViewModel);
         },
@@ -1570,12 +1605,13 @@ export function wrapAsEntityData(sdkData: { collection(slug: string): SDKCollect
     const cache = new Map<string, CollectionAccessor>();
     const primaryKeysFor = createPrimaryKeyResolver(options);
     const viewModelFor = createViewModelConverter(options);
+    const storedValuesFor = createStoredValuesConverter(options);
 
     function getAccessor(slug: string): CollectionAccessor {
         let accessor = cache.get(slug);
         if (!accessor) {
             accessor = toEntityAccessor(sdkData.collection(slug), slug, () => primaryKeysFor(slug), viewModelFor(slug),
-                () => options?.resolveCollection?.(slug));
+                () => options?.resolveCollection?.(slug), storedValuesFor(slug));
             cache.set(slug, accessor);
         }
         return accessor;

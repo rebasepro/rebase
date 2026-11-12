@@ -53,8 +53,8 @@ function TableReferenceFieldResolver(props: TableReferenceFieldProps & { collect
 
 export function TableReferenceField(props: TableReferenceFieldProps) {
     const collectionRegistryController = useCollectionRegistryController();
-    const { toCollectionPath } = useReferencePaths();
-    const path = toCollectionPath(props.path);
+    const { targetPath } = useReferencePaths();
+    const path = targetPath(props.path);
     const collection = collectionRegistryController.getCollection(path);
 
     const content = (

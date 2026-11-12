@@ -58,8 +58,8 @@ export function ReferenceWidget<M extends Record<string, unknown>>({
 }: ReferenceWidgetProps<M>) {
 
     const collectionRegistryController = useCollectionRegistryController();
-    const { toCollectionPath, referenceTo } = useReferencePaths();
-    const collectionPath = toCollectionPath(path);
+    const { targetPath, referenceTo } = useReferencePaths();
+    const collectionPath = targetPath(path);
 
     const collection: AdminCollection | undefined = useMemo(() => {
         return collectionRegistryController.getCollection(collectionPath);

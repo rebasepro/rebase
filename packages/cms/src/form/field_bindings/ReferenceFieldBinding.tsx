@@ -61,8 +61,8 @@ function ReferenceFieldBindingInternal({
     const validValue = refValue && typeof refValue === "object" && "isEntityReference" in refValue && refValue.isEntityReference();
 
     const collectionRegistryController = useCollectionRegistryController();
-    const { toCollectionPath, referenceTo } = useReferencePaths();
-    const collectionPath = toCollectionPath(property.path);
+    const { targetPath, referenceTo } = useReferencePaths();
+    const collectionPath = targetPath(property.path);
     const collection: AdminCollection | undefined = useMemo(() => {
         return collectionRegistryController.getCollection(collectionPath);
     }, [collectionPath]);
