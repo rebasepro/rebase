@@ -468,6 +468,9 @@ describe("lowerTables — table keys", () => {
             indexes: [{ on: ["title"], reason: "by title" }]
         });
         expect(only([defineView("v", { query: "SELECT 1 AS n", columns: { n: col.integer() } })]).view).toEqual({ query: "SELECT 1 AS n" });
+        // A view named apart from its SQL view.
+        const renamed = only([defineView("titles", { table: "post_titles_v", query: "SELECT 1 AS n", columns: { n: col.integer().primaryKey() } })]);
+        expect(renamed).toMatchObject({ slug: "titles", table: "post_titles_v" });
     });
 });
 

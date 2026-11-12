@@ -367,6 +367,7 @@ describe("printTableSource / printTableModule", () => {
             "",
             "export const postStats = defineView(\"post_stats\", {",
             "    slug: \"post-stats\",",
+            "    table: \"post_stats_mv\",",
             "    schema: \"reports\",",
             "    query: `select",
             "    status,",

@@ -281,7 +281,7 @@ function prepareDef(def: unknown, index: number): PreparedDef | { problem: Schem
             relations.push([key, relation]);
         }
     }
-    const table = isTableDef(def) ? deriveTableName(name, def.config.table) : name;
+    const table = deriveTableName(name, def.config.table);
     return {
         def,
         kind: view ? "view" : "table",

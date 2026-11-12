@@ -72,7 +72,7 @@ export const TABLE_KEY_ORDER = [
  * @group Schema
  */
 export const VIEW_KEY_ORDER = [
-    "slug", "schema", "database", "description", "query", "materialized", "roles", "columns", "relations",
+    "slug", "table", "schema", "database", "description", "query", "materialized", "roles", "columns", "relations",
     "indexes", "hooks", "metadata"
 ] as const;
 
@@ -605,6 +605,7 @@ function definitionDoc(def: AnyTableDef | AnyViewDef, state: TableState, options
         checkKnownKeys(def.config, VIEW_CONFIG_KEYS, state.label, "defineView");
         const view = def.config;
         put("slug", view.slug);
+        put("table", view.table);
         put("schema", view.schema);
         put("database", database);
         put("description", view.description);
@@ -654,7 +655,7 @@ function descriptorDoc(descriptor: TableDescriptor, state: TableState, options: 
     };
     const view = descriptor.kind === "view";
     put("slug", descriptor.slug !== descriptor.name ? descriptor.slug : undefined);
-    if (!view) put("table", descriptor.table !== descriptor.name ? descriptor.table : undefined);
+    put("table", descriptor.table !== descriptor.name ? descriptor.table : undefined);
     put("schema", descriptor.schema !== "public" ? descriptor.schema : undefined);
     put("database", descriptor.database);
     put("description", descriptor.description);

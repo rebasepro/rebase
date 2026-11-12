@@ -277,6 +277,8 @@ export interface ViewConfig<
     columns: C;
     /** The name in the API. The view's name when omitted. Captured as a literal type, like a table's. */
     slug?: S;
+    /** The SQL view name, when it is not the name the view is defined under. A plain SQL identifier. */
+    table?: string;
     /** The Postgres schema. `public` when omitted. */
     schema?: string;
     /** A non-default Postgres database. */

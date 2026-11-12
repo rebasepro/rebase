@@ -92,6 +92,9 @@ describe("defineView", () => {
         expect(() => defineView("v", { query: "select 1", roles: ["admin"], columns: { id: id() } })).toThrow(/lists `roles` but is not materialized/);
         expect(() => defineView("v", { query: "select 1", materialized: true, roles: ["admin"], columns: { id: id() } })).not.toThrow();
         expect(() => defineView("v", { query: "select 1", columns: {} })).toThrow(/declares no columns/);
+        // `table` names the SQL view, and is checked like a table's.
+        expect(defineView("v", { table: "v_sql", query: "select 1", columns: { id: id() } }).config.table).toBe("v_sql");
+        expect(() => defineView("v", { table: "reports.v", query: "select 1", columns: { id: id() } })).toThrow("`table` of table \"v\" must be a plain SQL identifier, got \"reports.v\".");
     });
 });
 

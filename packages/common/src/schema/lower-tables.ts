@@ -301,7 +301,7 @@ const describeUnknown = (value: unknown): string => {
 };
 
 const slugOf = (def: AnyDef): string => def.config.slug ?? def.name;
-const tableNameOf = (def: AnyDef): string => (isTableDef(def) ? def.config.table : undefined) ?? def.name;
+const tableNameOf = (def: AnyDef): string => def.config.table ?? def.name;
 const sqlNameOf = (key: string, def: ColumnDef): string => def.column ?? toSnakeCase(key);
 
 interface LowerContext {

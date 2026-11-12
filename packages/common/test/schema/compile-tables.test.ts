@@ -641,6 +641,10 @@ describe("compileTables — views", () => {
         expect(s.indexes).toEqual([{ columns: ["id"] }]);
         expect(g.view?.roles).toEqual(["analyst"]);
         expect(g.slug).toBe("gated_stats");
+        expect(g.table).toBe("gated");
+        // A view's SQL name can differ from the name it is defined under, as a table's can.
+        const renamed = defineView("titles", { table: "post_titles_v", slug: "post-titles", query: "select 1 as id", columns: { id: col.integer().primaryKey() } });
+        expect(compileTables([renamed])[0]).toMatchObject({ name: "titles", slug: "post-titles", table: "post_titles_v" });
         // Materialized or not, a view's rls is its own posture: no rules, no baseline.
         expect(s.rls).toEqual({ posture: "view", rules: [], defaultPolicies: false });
         expect(g.rls).toEqual({ posture: "view", rules: [], defaultPolicies: false });

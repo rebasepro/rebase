@@ -254,6 +254,7 @@ export const publishedPosts = defineView("published_posts", {
 
 export const postStats = defineView("post_stats", {
     slug: "post-stats",
+    table: "post_stats_mv",
     schema: "reports",
     query: "select\n    status,\n    count(*) as total\nfrom posts\ngroup by status",
     materialized: true,
