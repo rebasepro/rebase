@@ -2,7 +2,7 @@ import path from "path";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
-import { rebaseManualChunks } from "@rebasepro/app/vitePlugin";
+import { rebaseBackendGuard, rebaseManualChunks } from "@rebasepro/app/vitePlugin";
 
 export default defineConfig({
     // The project's .env (VITE_FIREBASE_*, and VITE_API_URL from `rebase dev`).
@@ -15,5 +15,6 @@ export default defineConfig({
         chunkSizeWarningLimit: Infinity,
         rollupOptions: { output: { manualChunks: rebaseManualChunks } }
     },
-    plugins: [react({}), tailwindcss()]
+    // rebaseBackendGuard: nothing in the frontend may import a value from ../backend.
+    plugins: [react({}), tailwindcss(), rebaseBackendGuard()]
 });

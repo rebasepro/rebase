@@ -3,7 +3,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import svgr from "vite-plugin-svgr";
 import tailwindcss from "@tailwindcss/vite";
-import { rebaseManualChunks, rebaseMcpViewPlugin } from "@rebasepro/app/vitePlugin";
+import { rebaseBackendGuard, rebaseManualChunks, rebaseMcpViewPlugin } from "@rebasepro/app/vitePlugin";
 
 export default defineConfig({
     // `import.meta.dirname`, not `__dirname`: vite 8 warns that the latter is
@@ -60,6 +60,11 @@ export default defineConfig({
         svgr(),
         react({}),
         tailwindcss(),
+        // Fails the build (and the dev server's load) when anything in the
+        // frontend imports a VALUE from ../backend: tables there carry server
+        // hooks, and a value import would ship them to every visitor. Import
+        // tables as types: `import type { posts } from "../../../backend/schema/posts"`.
+        rebaseBackendGuard(),
         // The view Claude shows this project's data in over MCP, built from
         // this app so it draws your own fields, views and actions.
         rebaseMcpViewPlugin()

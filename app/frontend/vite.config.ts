@@ -4,7 +4,7 @@ import { defineConfig } from "vite"
 import react from "@vitejs/plugin-react"
 import svgr from "vite-plugin-svgr";
 import tailwindcss from "@tailwindcss/vite";
-import { rebaseMcpViewPlugin } from "@rebasepro/app/vitePlugin";
+import { rebaseBackendGuard, rebaseMcpViewPlugin } from "@rebasepro/app/vitePlugin";
 import { visualizer } from "rollup-plugin-visualizer";
 
 const PACKAGES_DIR = path.resolve(__dirname, "../../packages");
@@ -215,6 +215,9 @@ export default defineConfig({
         svgr(),
         react({}),
         tailwindcss(),
+        // Refuses any module that resolves into ../backend: the tables there
+        // carry server hooks, and the frontend imports them as types only.
+        rebaseBackendGuard(),
         // The view Claude shows this app's data in (show_table, show_record,
         // show_app), built from this app's `App` so its table customizations,
         // custom views and fields come along.
