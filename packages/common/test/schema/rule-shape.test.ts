@@ -228,6 +228,65 @@ describe("S-1: the migration lift refuses a legacy rule it would widen", () => {
     });
 });
 
+describe("the migration lift notes every legacy rule whose policy now grants something different", () => {
+    const legacy = (rules: SecurityRule[]): PostgresCollectionConfig => ({
+        slug: "notes",
+        name: "Notes",
+        table: "notes",
+        properties: { id: { type: "string", isId: "uuid" }, owner: { type: "string" }, status: { type: "string" } },
+        securityRules: rules
+    });
+    const meaningNotes = (rules: SecurityRule[]) =>
+        collectionsToTableDefs([legacy(rules)]).notCarried.filter(note => note.kind === "meaning");
+
+    it("bare `access: \"authenticated\"`: granted nothing, now every signed-in caller — carried as written", () => {
+        const rule: SecurityRule = { operation: "select", access: "authenticated" };
+        const { tables, notCarried } = collectionsToTableDefs([legacy([rule])]);
+        expect(tables[0].config.rls).toEqual([rule]);
+        const notes = notCarried.filter(note => note.kind === "meaning");
+        expect(notes).toHaveLength(1);
+        expect(notes[0]).toMatchObject({ collection: "notes", field: "securityRules[0]", value: rule });
+        expect(notes[0].reason).toContain("granted nothing");
+        expect(notes[0].reason).toContain("guests included");
+        expect(notes[0].reason).toContain('`access: "registered"`');
+        expect(notes[0].reason).toContain("remove the rule");
+    });
+
+    it("`access: \"authenticated\"` with a condition: the access was ignored, now it narrows", () => {
+        const [note] = meaningNotes([{ operation: "select", access: "authenticated", condition: { status: "published" } }]);
+        expect(note.reason).toContain("was ignored");
+        expect(note.reason).toContain('`access: "public"`');
+    });
+
+    it("`access` with only a `check`, on an operation that reads rows: no existing row before, every row now", () => {
+        expect(meaningNotes([{ operation: "update", access: "public", check: { status: "open" } }])[0].reason)
+            .toContain("granted no existing row");
+        expect(meaningNotes([{ operations: ["all"], access: "authenticated", check: { status: "open" } }])).toHaveLength(1);
+        // Inserting under `public` meant the same before and now.
+        expect(meaningNotes([{ operation: "insert", access: "public", check: { status: "open" } }])).toEqual([]);
+        expect(meaningNotes([{ operation: "insert", access: "authenticated", check: { status: "open" } }])[0].reason)
+            .toContain("any caller could insert");
+    });
+
+    it("says nothing for a shape that compiles as it did", () => {
+        expect(meaningNotes([
+            { operation: "select", access: "public" },
+            { operation: "select", access: "public", condition: { status: "published" } },
+            { operation: "select", ownerField: "owner" },
+            { operation: "select", condition: policy.true() },
+            { operation: "select", using: "true" },
+            { operation: "insert", withCheck: "true" },
+            { operation: "delete", roles: ["admin"] },
+            { operation: "select", access: "authenticated", roles: ["editor"] }
+        ])).toEqual([]);
+    });
+
+    it("notes a default rule too", () => {
+        const { notCarried } = collectionsToTableDefs([legacy([])], { defaultSecurityRules: [{ operation: "select", access: "authenticated" }] });
+        expect(notCarried.filter(note => note.kind === "meaning")).toMatchObject([{ collection: "defaultSecurityRules", field: "defaultSecurityRules[0]" }]);
+    });
+});
+
 describe("S-6: access: \"registered\"", () => {
     const registered: SecurityRule = { operation: "select", access: "registered" };
 

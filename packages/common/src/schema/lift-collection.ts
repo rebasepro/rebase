@@ -89,7 +89,7 @@ import { fieldKeyForColumn, findRelation, getTableName, resolveCollectionRelatio
 import { resolveRelation } from "../util/resolve-relation";
 import { SchemaDefinitionError, isSchemaDefinitionError } from "./errors";
 import { liftRuleSpelling, liftTenantSourceSpelling } from "./lift-rule-spelling";
-import { legacyRuleRefusal } from "./resolve-rls";
+import { legacyRuleMeaningChange, legacyRuleRefusal } from "./resolve-rls";
 
 // ── Notes ────────────────────────────────────────────────────────────────────
 
@@ -106,10 +106,15 @@ import { legacyRuleRefusal } from "./resolve-rls";
  * - `redundant` — states the default.
  * - `renamed` — a legacy name the table model cannot keep; the reason names
  *   the new one, and what reads it.
+ * - `meaning` — carried as written (a security rule: its policy keeps its
+ *   name), but it compiles to a policy that grants something different than
+ *   it did on the previous version; the reason says what it did, what it
+ *   does, and what to write instead (see `legacyRuleMeaningChange`). The
+ *   codemod lists these under "Review before deploying".
  *
  * @group Schema
  */
-export type LiftNoteKind = "ui" | "browser" | "metadata" | "unknown" | "inert" | "derived" | "redundant" | "renamed";
+export type LiftNoteKind = "ui" | "browser" | "metadata" | "unknown" | "inert" | "derived" | "redundant" | "renamed" | "meaning";
 
 /**
  * One legacy field the conversion did not carry, and where it was.
@@ -202,6 +207,10 @@ export function collectionsToTableDefs(
     });
     if (defaultProblems.length > 0) throw new SchemaDefinitionError(defaultProblems);
     const lifter = new Lifter(collections, options);
+    (options.defaultSecurityRules ?? []).forEach((rule, index) => {
+        const change = legacyRuleMeaningChange(rule);
+        if (change) lifter.note("defaultSecurityRules", undefined, `defaultSecurityRules[${index}]`, "meaning", rule, change);
+    });
     const tables = lifter.liftAll();
     const defaultRls = nonEmpty((options.defaultSecurityRules ?? []).map(liftRuleSpelling));
     return {
@@ -1346,6 +1355,12 @@ class CollectionLift {
                 return message ? [message] : [];
             });
             if (refusals.length > 0) this.refuse("securityRules", refusals.join("\n"));
+            // Carried as written (its policy keeps its name), but never in
+            // silence when it now compiles to a different policy.
+            (rules ?? []).forEach((rule, index) => {
+                const change = legacyRuleMeaningChange(rule);
+                if (change) this.note(undefined, `securityRules[${index}]`, "meaning", rule, change);
+            });
         }
         const declared = nonEmpty((rules ?? []).map(liftRuleSpelling));
         const posture: RlsPosture = inherits ? "inherit" : declared ?? "admin-only";

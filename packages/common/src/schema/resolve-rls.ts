@@ -257,3 +257,70 @@ export function legacyRuleRefusal(rule: object, label: string): string | undefin
     return `${shape.join(" ")} ${meant} Write that clause alone — \`{ ownerField }\` for owner-only rows, or ` +
         "`access` with a `condition` to grant those callers the rows that match it — and migrate again.";
 }
+
+/** The operations a legacy rule applies to — `operations` wins over `operation`, `"all"` by default. */
+function legacyOperations(rule: object): string[] {
+    const operations: unknown = Reflect.get(rule, "operations");
+    if (Array.isArray(operations) && operations.length > 0) return operations.filter((op): op is string => typeof op === "string");
+    const operation: unknown = Reflect.get(rule, "operation");
+    return [typeof operation === "string" ? operation : "all"];
+}
+
+/**
+ * How a legacy rule that is carried as written compiles to a different
+ * policy than it did on the previous version, or `undefined` when it does not.
+ * The previous compiler read `condition`, else `using`, else `access:
+ * "public"`, else `ownerField` for USING (`check`, else `withCheck`, else the
+ * same for WITH CHECK), and did not know any other `access` value. Where the
+ * current compiler disagrees for a rule {@link legacyRuleRefusal} accepts:
+ *
+ * - `access: "authenticated"` (or `"registered"`) alone, without `roles`:
+ *   granted nothing; now admits every signed-in caller (with an account) —
+ *   a widening;
+ * - `access: "authenticated"` / `"registered"` with a `condition`: the access
+ *   value was ignored, so the condition admitted anyone; now only signed-in
+ *   callers pass it — a narrowing;
+ * - `access` with a `check` and no `condition`, on an operation that reads
+ *   existing rows (`select`, `update`, `delete`, `all`): no USING clause, so
+ *   no existing row; now every row to the `access` callers — a widening.
+ *   On `insert` with `"authenticated"` / `"registered"`: anyone could write a
+ *   row matching `check`; now only signed-in callers — a narrowing.
+ *
+ * Every other legacy shape compiles to the same policy. Its name never moves
+ * with this: a policy's name is a hash of the rule as written.
+ *
+ * @group Schema
+ */
+export function legacyRuleMeaningChange(rule: object): string | undefined {
+    const access: unknown = Reflect.get(rule, "access");
+    if (access === undefined || (access === "public" && !carries(rule, "check"))) return undefined;
+    const roles: unknown = Reflect.get(rule, "roles");
+    const hasRoles = Array.isArray(roles) && roles.length > 0;
+    const signedIn = access === "registered"
+        ? "every signed-in caller with an account (guests excluded)"
+        : "every signed-in caller, guests included";
+    const who = access === "public" ? "every caller" : signedIn;
+    const hasCondition = carries(rule, "condition");
+    const hasCheck = carries(rule, "check");
+
+    if (!hasCondition && !hasCheck) {
+        if (hasRoles) return undefined;
+        return `\`access: ${JSON.stringify(access)}\` was not a value the previous version knew, so this rule granted ` +
+            `nothing. Carried as written it now admits ${signedIn}. To keep granting only callers with an account, ` +
+            "write `access: \"registered\"`; to keep granting nothing, remove the rule.";
+    }
+    if (hasCondition) {
+        return `\`access: ${JSON.stringify(access)}\` was ignored by the previous version, so this rule's \`condition\` ` +
+            `admitted any caller, signed in or not. It now admits only ${signedIn} to the rows it matches. To keep ` +
+            "the old meaning, write `access: \"public\"` with the same condition.";
+    }
+    const reads = legacyOperations(rule).some(op => op !== "insert");
+    if (reads) {
+        return `This rule has a \`check\` and no \`condition\`: on the previous version it had no USING clause and ` +
+            `granted no existing row for ${legacyOperations(rule).join("/")}. It now grants ${who} every existing ` +
+            "row. To keep granting no existing row, make the rule `operation: \"insert\"`; to grant some, add a `condition`.";
+    }
+    if (access === "public") return undefined;
+    return `\`access: ${JSON.stringify(access)}\` was ignored by the previous version, so any caller could insert a row ` +
+        `matching this rule's \`check\`. It now admits only ${signedIn}. To keep the old meaning, write \`access: "public"\`.`;
+}
