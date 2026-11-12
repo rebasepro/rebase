@@ -16,7 +16,7 @@ Scopes come in two planes, and a person holds them differently.
 
 **The data plane** is `data:*`, `storage:*` and `functions:invoke`. Every
 signed-in person holds all of it. What a person may do with a row is decided by
-the collection's [security rules](/docs/collections/security-rules/), row by row,
+the table's [row-level security](/docs/collections/security-rules/), row by row,
 and what they may do with a file by the [storage policies](/docs/backend/storage-authorization/).
 A scope never decides that for a person. On a key or a token, data-plane scopes
 narrow: a key that holds only `data:read:posts` reads `posts` and nothing else,
@@ -39,8 +39,8 @@ all of it. Any other role holds what the app declares for it.
 | `functions:invoke` | data | function | Call custom functions. A function can do anything its code does |
 | `users:read` | admin | — | List accounts and their roles |
 | `users:write` | admin | — | Create, edit and delete accounts, reset passwords and second factors, assign roles up to the holder's own |
-| `schema:read` | admin | — | Read the collection schema, plan schema changes, run the RLS audit, read the private API docs |
-| `schema:write` | admin | — | Apply schema changes: edits collection files and alters the database |
+| `schema:read` | admin | — | Read the schema, plan schema changes, run the RLS audit, read the private API docs |
+| `schema:write` | admin | — | Apply schema changes: edits the schema files and alters the database |
 | `database:read` | admin | — | List databases, tables, Postgres roles and branches |
 | `database:write` | admin | — | Run SQL as the database owner, outside row-level security, and create or delete branches |
 | `backups:read` | admin | — | List and download backups: every row, outside row-level security |
@@ -64,58 +64,49 @@ const { scopes, held } = await client.personalKeys.listScopes();
 
 A data-plane scope can be narrowed to one target, after a second colon:
 
-- `data:read:posts` reads the `posts` collection only. The target is a collection slug.
+- `data:read:posts` reads the `posts` table only. The target is a table's slug.
 - `storage:write:avatars` uploads to the `avatars` storage source only. The
   default source's id is `(default)`: `storage:read:(default)`.
 - `functions:invoke:export` calls the `export` function only.
 
 The plain scope covers every target. A narrowed scope covers its own target and
 nothing else. It never answers a question about all targets: a key holding
-`data:read:posts` cannot list every collection.
+`data:read:posts` cannot list every table.
 
 Admin-plane scopes take no target. An app scope takes one when it declares a
 `target`, as below.
 
 ## Declaring roles
 
-Roles are declared on the users collection, under `auth.roles`. A role is a name
-the database sees, which RLS policies can match, plus a list of admin-plane and
-app scopes.
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
-```typescript
-import { defineCollection } from "@rebasepro/cms-types";
+Roles are declared on the [users table](/docs/schema/auth-table/), under
+`auth.roles`. A role is a name the database sees, which row-level security
+policies can match, plus a list of admin-plane and app scopes.
 
-export const usersCollection = defineCollection({
-    slug: "users",
-    name: "Users",
-    table: "users",
+```ts
+import { defineAuthTable, col } from "@rebasepro/server/schema";
+
+export const users = defineAuthTable("users", {
+    columns: {
+        id:    col.uuid().primaryKey().defaultRandom(),
+        email: col.text().notNull().unique(),
+        roles: col.array(col.text().oneOf(["admin", "support", "developer", "editor"])),
+    },
+    rls: "admin-only",
     auth: {
-        enabled: true,
         roles: {
             support: {
                 name: "Support",
                 description: "Helps people back into their accounts.",
-                scopes: ["users:read", "users:write", "logs:read"]
+                scopes: ["users:read", "users:write", "logs:read"],
             },
             developer: {
                 name: "Developer",
-                scopes: ["schema:read", "database:read", "logs:read", "cron:read"]
-            }
-        }
+                scopes: ["schema:read", "database:read", "logs:read", "cron:read"],
+            },
+        },
     },
-    properties: {
-        email: { name: "Email", type: "string" },
-        roles: {
-            name: "Roles",
-            type: "array",
-            columnType: "text[]",
-            of: {
-                name: "Role",
-                type: "string",
-                enum: { admin: "Admin", support: "Support", developer: "Developer", editor: "Editor" }
-            }
-        }
-    }
 });
 ```
 
@@ -127,7 +118,7 @@ The boot refuses a declaration that would read as a grant it is not:
 - **`admin` cannot be declared.** It is built in and holds every scope.
 - **A role may not list a data-plane scope.** Every person already holds the data
   plane. `data:write` on a role would grant nothing and look like it granted
-  something. What a role may do with rows belongs in the collection's `securityRules`.
+  something. What a role may do with rows belongs in the table's [`rls`](/docs/collections/security-rules/).
 - **Every scope must exist.** An unknown name fails the boot and lists the valid ones.
 
 A role you do not declare is still a role. `editor` above has no entry, so it
@@ -155,28 +146,28 @@ const { roles } = await client.admin.listRoles();
 
 ## App scopes
 
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
 An app can name its own operations as scopes, under `auth.scopes`:
 
-```typescript
-import { defineCollection } from "@rebasepro/cms-types";
+```ts
+import { defineAuthTable, col } from "@rebasepro/server/schema";
 
-export const usersCollection = defineCollection({
-    slug: "users",
-    name: "Users",
-    table: "users",
+export const users = defineAuthTable("users", {
+    columns: {
+        id:    col.uuid().primaryKey().defaultRandom(),
+        email: col.text().notNull().unique(),
+    },
+    rls: "admin-only",
     auth: {
-        enabled: true,
         scopes: {
             "project:deploy": {
                 label: "Deploy projects",
                 description: "Starts a deploy of one project.",
-                target: "project"
-            }
-        }
+                target: "project",
+            },
+        },
     },
-    properties: {
-        email: { name: "Email", type: "string" }
-    }
 });
 ```
 
@@ -227,8 +218,8 @@ administrator too, `500 SCOPE_NOT_DECLARED`.
 
 - It holds every admin-plane scope, `keys:*` included.
 - It is a role the database sees. The default policies Rebase adds to each
-  collection admit it, so an admin reads and writes every row of a collection
-  that keeps them. A collection with `disableDefaultPolicies: true` drops them.
+  table admit it, so an admin reads and writes every row of a table that keeps
+  them. A table with `defaultPolicies: false` drops them.
 - Only an admin can grant `admin`. A role that lists every admin-plane scope is
   still not `admin`: it cannot hand `admin` out, and the default policies do not
   admit it.
@@ -263,7 +254,7 @@ For accounts, a holder of `users:write`:
 A role name may be anything except a name that would be read back as other
 roles: an empty name, or one containing `,` `{` `}` `"` `\` or a control
 character, is refused with `400 INVALID_ROLE` wherever a role is written (users,
-the users collection, service keys).
+the users table, service keys).
 
 ## How each credential holds scopes
 
@@ -299,6 +290,6 @@ that holds it.
 ## Next steps
 
 - [API keys](/docs/backend/api-keys/): service keys, personal keys, and the minting rules
-- [Security Rules (RLS)](/docs/collections/security-rules/): what a person may do with each row
+- [Row-level security](/docs/collections/security-rules/): what a person may do with each row
 - [Endpoint index](/docs/backend/endpoints/): the scope each route needs
 - [Error codes](/docs/backend/errors/#authentication-and-accounts): every refusal above

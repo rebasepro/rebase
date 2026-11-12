@@ -1,20 +1,58 @@
 ---
 title: Vector Search
 sidebar_label: Vector Search
-description: Nearest-neighbour search over a vector property through the REST API — the query parameters, thresholds, embeddings too long for a URL, and how filters behave on an HNSW index.
+description: Nearest-neighbour search over a col.vector() column through the REST API — the query parameters, thresholds, embeddings too long for a URL, and how filters behave on an HNSW index.
 ---
 
-If a collection defines a property with a type of `vector`, you can perform high-speed similarity searches using pgvector distance operations compiled directly in the database query.
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+A table with a `col.vector()` column can be searched by similarity: the nearest
+rows to a query vector, by a pgvector distance computed in the database query.
 
 ```bash
 GET /api/data/products?vector_search=embedding&vector=[0.15,0.22,-0.05]&vector_distance=cosine&vector_threshold=0.8
 ```
 
+## Declaring the column
+
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+```ts
+import { defineTable, col } from "@rebasepro/server/schema";
+
+export const products = defineTable("products", {
+    columns: {
+        id:        col.uuid().primaryKey().defaultRandom(),
+        name:      col.text().notNull(),
+        embedding: col.vector(1536, { index: { method: "hnsw", metric: ["cosine", "l2"] } }),
+    },
+    rls: [{ operation: "select", access: "authenticated" }],
+});
+```
+
+`col.vector(dimensions)` is a pgvector `vector(dimensions)` column, read and
+written as a `number[]`. It gets an approximate-nearest-neighbour index unless
+`index` says otherwise:
+
+| `index` option | Default | What it does |
+|---|---|---|
+| `method` | `"hnsw"` | `"hnsw"` or `"ivfflat"`. |
+| `metric` | `"cosine"` | `"cosine"`, `"l2"` or `"ip"` (inner product), or a list: one index is built per metric. |
+| `m` | pgvector's | HNSW: connections per layer. |
+| `efConstruction` | pgvector's | HNSW: size of the candidate list while building. |
+| `lists` | pgvector's | IVFFlat: number of lists. |
+
+`index: false` creates no index, so every vector search is an exact scan. A
+search by a distance that has no index of its own is an exact scan too, so
+index each metric you query with. The query parameter spells the inner product
+`inner_product`; the column option spells it `ip`.
+
+
 ## Query parameters
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `vector_search` | `string` | The name of the vector property to query against. |
+| `vector_search` | `string` | The key of the vector column to query against. |
 | `vector` | `string` | A JSON-serialized array of floats representing the query vector. |
 | `vector_distance` | `string` | The distance metric to evaluate. Supported values: `cosine` (default, `<=>`), `l2` (`<->`), `inner_product` (`<#>`). |
 | `vector_threshold` | `number` | Maximum distance threshold. Only records with distance less than this threshold are returned. |
@@ -94,4 +132,4 @@ vector search, and any count whose URL would pass 6 KB — and falls back to the
 ## Related
 
 - [REST API](/docs/backend/api/) — every other parameter a listing takes
-- [Aggregates & search](/docs/sdk/aggregates-and-search/#vector-search) — `.vectorSearch()` from the SDK, and the index a vector property gets
+- [Aggregates & search](/docs/sdk/aggregates-and-search/#vector-search) — `.vectorSearch()` from the SDK

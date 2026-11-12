@@ -1,43 +1,39 @@
 ---
 title: Indexes
 sidebar_label: Indexes
-description: Declare ordinary Postgres indexes on a collection — btree, GIN and BRIN, partial, composite, covering and unique — and why a hand-written one used to disappear.
+description: Declare ordinary Postgres indexes on a table — btree, GIN and BRIN, partial, composite, covering and unique — and why a hand-written one used to disappear.
 ---
 
-A collection declares the indexes its queries need, in the same file as the
-properties they cover:
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
-```typescript
-import type { PostgresCollectionConfig } from "@rebasepro/types";
+A table declares the indexes its queries need, beside the columns they cover:
 
-const posts: PostgresCollectionConfig = {
-    slug: "posts",
-    table: "posts",
-    name: "Blog posts",
-    properties: {
-        id: { name: "ID", type: "string", isId: "uuid" },
-        title: { name: "Title", type: "string" },
-        status: { name: "Status", type: "string", enum: { draft: "Draft", published: "Published" } },
-        publish_date: { name: "Publish date", type: "date" }
+```ts
+import { defineTable, col } from "@rebasepro/server/schema";
+
+export const posts = defineTable("posts", {
+    columns: {
+        id:          col.uuid().primaryKey().defaultRandom(),
+        title:       col.text().notNull(),
+        status:      col.enum(["draft", "published"]).notNull().default("draft"),
+        publishDate: col.timestamptz(),
     },
     indexes: [
         {
-            on: ["status", { prop: "publish_date", direction: "desc" }],
-            reason: "admin list: filter by status, newest first"
-        }
-    ]
-};
+            columns: ["status", { column: "publishDate", direction: "desc" }],
+            reason: "admin list: filter by status, newest first",
+        },
+    ],
+    rls: "admin-only",
+});
 ```
-
-Postgres only. On another engine the key is refused at boot rather than
-silently ignored.
 
 ## Why this exists
 
 The DDL generator has always emitted index statements for exactly two things,
 and both are structures a *feature* owns rather than queries you wrote: the GIN
 index behind a [`search` block](/docs/backend/search), and the ANN index behind
-a [`vector` property](/docs/sdk/aggregates-and-search#the-index). The plain case — the btree
+a [`col.vector()` column](/docs/sdk/aggregates-and-search#the-index). The plain case — the btree
 behind a `where` clause — had no declaration site at all.
 
 So the only way to have one was to write it by hand. And:
@@ -58,32 +54,38 @@ them in the meantime.
 
 ## The shape
 
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
 | Field | Type | Description |
 |-------|------|-------------|
-| `on` | `(string \| IndexKey)[]` | **Required.** The key columns, in order. 1–5 entries. |
+| `columns` | `(string \| { column, direction?, nulls? })[]` | **Required.** The key columns, in order. 1–5 entries. |
 | `reason` | `string` | **Required.** Why this index exists, in one line. |
 | `using` | `"btree" \| "gin" \| "brin"` | Access method. Defaults to `btree`. |
 | `where` | `IndexPredicate` | Makes the index partial — it covers only the rows matching this. |
 | `unique` | `boolean` | btree only. A composite uniqueness guarantee. |
 | `include` | `string[]` | btree only. Payload columns carried for index-only scans. |
 
-### `on` takes property keys, never column names
+### `columns` takes column keys, never SQL names
 
-This is the one that bites. A `belongsTo` relation compiles to its resolved
-`localKey`, so the property `author` is the column `author_id`:
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
-```typescript
-// Correct — `author` is the relation property.
-{ on: ["author"], reason: "an author's posts, and the ON DELETE cascade" }
+A `belongsTo` relation's name stands for its foreign-key column, so the relation
+`author` is the column `author_id`:
+
+```ts
+indexes: [
+    // `author` is the relation; its key is the column author_id.
+    { columns: ["author"], reason: "an author's posts, and the ON DELETE cascade" },
+]
 ```
 
-Writing `author_id` here is refused at build: it is a column, not a property of
-the collection, and `on` names properties. Postgres does not
+Writing `author_id` here is refused: it is a SQL column name, not a key of the
+table, and `columns` names keys. Postgres does not
 index a foreign key column for you — without this index, both "list this
 author's posts" and the `ON DELETE` cascade are sequential scans.
 
 A `hasMany` or many-to-many relation has no column on this table, and is
-refused with the collection that does own the foreign key.
+refused: declare the index on the table that owns the foreign key.
 
 ### Order matters, and only a leading subset is usable
 
@@ -96,8 +98,8 @@ directions. A lone `DESC` index is redundant with its `ASC` twin — Postgres
 scans a btree backwards just as fast — so one index serves the filter *and* the
 sort in the example at the top of this page.
 
-```typescript
-{ on: [{ prop: "createdAt", direction: "desc", nulls: "last" }], reason: "…" }
+```ts
+indexes: [{ columns: [{ column: "createdAt", direction: "desc", nulls: "last" }], reason: "…" }]
 ```
 
 Writing the Postgres default down explicitly is free: the derived name hashes
@@ -111,12 +113,12 @@ query gets faster by accretion. Payload columns that are not searched belong in
 
 ### `where` is structured, not SQL
 
-```typescript
-{
-    on: ["publish_date"],
-    where: { prop: "status", op: "=", value: "published" },
-    reason: "public feed: published posts by date"
-}
+```ts
+indexes: [{
+    columns: ["publishDate"],
+    where: { column: "status", op: "=", value: "published" },
+    reason: "public feed: published posts by date",
+}]
 ```
 
 The index then holds only published rows, and stays small as drafts accumulate.
@@ -124,53 +126,53 @@ The index then holds only published rows, and stays small as drafts accumulate.
 Operators are `=`, `!=`, `<`, `<=`, `>`, `>=`, `in`, `is null` and
 `is not null`, combined with `and`:
 
-```typescript
-{
-    on: ["assignee"],
+```ts
+indexes: [{
+    columns: ["assignee"],
     where: {
         and: [
-            { prop: "status", op: "in", value: ["open", "in_progress"] },
-            { prop: "archived_at", op: "is null" }
-        ]
+            { column: "status", op: "in", value: ["open", "in_progress"] },
+            { column: "archivedAt", op: "is null" },
+        ],
     },
-    reason: "the open-work queue, which is a fraction of the table"
-}
+    reason: "the open-work queue, which is a fraction of the table",
+}]
 ```
 
 There is deliberately no `or`. An OR predicate almost always means the index
 should not be partial at all; if you genuinely need one, declare two indexes.
 
 A predicate is structure rather than a string because a string could not be
-checked against the collection's properties, could not be fingerprinted without
+checked against the table's columns, could not be fingerprinted without
 putting its own text into the index name — so reformatting it would rename a
 live index — and would be the one place a caller reaches for an extension
 operator class that the planner cannot replay.
 
 ### `unique` is for composites only
 
-Single-column uniqueness is `validation.unique` on the property, and declaring
-it here as well is refused rather than accepted as a synonym.
-`validation.unique` compiles to an inline `UNIQUE` whose backing index
+Single-column uniqueness is `.unique()` on the column, and declaring it here as
+well is refused rather than accepted as a synonym. `.unique()` compiles to an
+inline `UNIQUE` whose backing index
 Postgres — not Rebase — names `<table>_<column>_key`.
 
-```typescript
-{ on: ["workspaceId", "slug"], unique: true, reason: "one slug per workspace" }
+```ts
+indexes: [{ columns: ["workspaceId", "slug"], unique: true, reason: "one slug per workspace" }]
 ```
 
 ### `include` buys an index-only scan
 
 Payload columns live in the leaf pages: not searchable, not ordered, and they
-save a heap fetch at the cost of a fatter index. They may not overlap `on`.
+save a heap fetch at the cost of a fatter index. They may not overlap `columns`.
 
-```typescript
-{ on: ["status"], include: ["title"], reason: "the status sidebar counts, without touching the heap" }
+```ts
+indexes: [{ columns: ["status"], include: ["title"], reason: "the status sidebar counts, without touching the heap" }]
 ```
 
 ### `using`
 
 `btree` (the default) answers equality, range, `ORDER BY` and uniqueness.
 
-`gin` is containment over an `array` property or a JSONB `map`. `brin` is for a
+`gin` is containment over an array column or a `jsonb` column. `brin` is for a
 naturally-ordered column on an append-only table — tiny, and useless the moment
 rows start arriving out of order. Neither has an ordering, so `direction` and
 `nulls` are unrepresentable on them rather than refused later by Postgres.
@@ -181,22 +183,25 @@ restriction is what keeps the whole model on the Atlas path — `rebase db push`
 materialises the desired state in a bare scratch database to plan against, and
 `CREATE EXTENSION` cannot go in that file. **Trigram search is
 [`search:`](/docs/backend/search); ANN is a
-[`vector` property](/docs/sdk/aggregates-and-search#the-index).** An index needing
+[`col.vector()` column](/docs/sdk/aggregates-and-search#the-index).** An index needing
 `gin_trgm_ops` or `vector_cosine_ops` is refused at build time rather than
 emitted to fail later against a database you have never seen.
 
 ### `reason` is required
 
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
 It is the only required field with no SQL behind it.
 
-An index is the only thing a Rebase config can declare that costs money forever
+An index is the only thing a schema can declare that costs money forever
 and whose benefit is invisible from the config. The reason is what gets printed
 beside "0 scans in 34 days, 412 MB", which is the one moment anybody is in a
 position to decide whether to delete it. Without it nobody can decide, so nobody
 does, and the table accretes indexes for the life of the product.
 
 It is deliberately **not** part of the index's identity — rewording a
-justification never rebuilds an index.
+justification never rebuilds an index. The types accept an index without one;
+the schema is refused when it is compiled.
 
 ## What a declaration is called
 
@@ -307,7 +312,7 @@ an index each of those reads every row of the child table.
 
 So Rebase derives a plain btree for:
 
-- the `localKey` of every [`belongsTo`](/docs/collections/relations#belongsto--the-key-is-on-this-table)
+- the `localKey` of every [`belongsTo`](/docs/collections/relations/#belongsto--the-key-is-on-this-table)
   — which is also the column the far side's `hasOne` / `hasMany` reads;
 - the target column of every `manyToMany` junction. The junction's primary key
   `(source, target)` already serves lookups by the source column; the reverse
@@ -324,34 +329,31 @@ Measured on Postgres 18 with a warm cache, 1M comments over 50k posts:
 | deleting one post (`ON DELETE SET NULL` check) | 129 ms | 1.7 ms |
 
 Nothing is indexed twice. The derived index is skipped when the column already
-leads the primary key, carries a `UNIQUE` (`validation.unique` on the relation
-or on the property that owns the column), or leads an index in `indexes:` —
+leads the primary key, carries a `UNIQUE` (`.unique()` on a bound column, or
+`unique: true` on the relation), or leads an index in `indexes:` —
 plain or composite, as long as it is a btree with no `where`. A partial index
 cannot serve a lookup that has to reach every row, and a GIN or BRIN index
 answers a different question, so neither counts.
 
 The name is the one [a declaration](#what-a-declaration-is-called) of a plain
 index on that column derives — `posts_author_id_ix_00ad191` — so the derived
-index and `indexes: [{ on: ["author"], … }]` are one object, not two. It is a
+index and `indexes: [{ columns: ["author"], … }]` are one object, not two. It is a
 [frozen derived name](/docs/architecture/schema-as-code) like every other.
 
 To keep the constraint and drop the index — a table so write-heavy that the
 index costs more than the lookups it serves, or one where you keep an index of
 your own outside `indexes:` — say so on the relation:
 
-```typescript
-author: {
-    name: "Author",
-    type: "relation",
-    relation: { kind: "belongsTo", target: () => authors, index: false }
+```ts
+relations: {
+    author: rel.belongsTo(() => authors, { index: false }),
 }
 ```
 
-`index` is accepted on a `belongsTo` only; on the other kinds the config
-validator refuses it, because their foreign key is a column on the target (set
-`index` on the target's `belongsTo`) or in a junction.
+`index` exists on `belongsTo` only: on the other kinds the foreign key is a
+column on the target (set `index` on the target's `belongsTo`) or in a junction.
 
-Rebase reads only your collections to decide this, never the database: `db
+Rebase reads only your tables to decide this, never the database: `db
 push` and the boot have to reach the same set of indexes with the same names, or
 the next push would drop what the boot built. An index you wrote by hand on the
 same column, outside `indexes:`, is therefore not seen — declare it in
@@ -390,16 +392,18 @@ build them differently:
 
 ## What is refused, and when
 
-All of these throw at build time, naming the collection and the position in the
-array — an index that silently does not exist is the failure this whole feature
-removes:
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
-- a property that is not on the collection, or a relation whose foreign key
-  lives on the other table
-- more than five keys in `on`, or the same column twice
+All of these are refused when the schema is compiled, naming the table and the
+position in the array — an index that silently does not exist is the failure
+this whole feature removes:
+
+- a key that is no column or `belongsTo` relation of the table, or a relation
+  whose foreign key lives on the other table
+- more than five keys in `columns`, or the same column twice
 - exactly the primary key columns — `<table>_pkey` already indexes those
-- a column in both `on` and `include`
-- `unique` on one column whose property already declares `validation.unique`
+- a column in both `columns` and `include`
+- `unique` on one column that already declares `.unique()`
 - `direction` or `nulls` under `gin` or `brin`
 - an `in` list that repeats a value
 - two declarations that derive the same name — they are the same index, twice
@@ -410,6 +414,7 @@ removes:
 - [Search](/docs/backend/search) — ranked full-text, which builds its own GIN
   index over a generated `tsvector`
 - [Vector search](/docs/sdk/aggregates-and-search#vector-search) — the ANN index over an
-  embedding column, configured on the property
+  embedding column, configured on `col.vector()`
 - [Schema as code](/docs/architecture/schema-as-code) — how declarations reach
   the database, and what a derived name is
+- [Tables](/docs/schema/) — every key of `defineTable`

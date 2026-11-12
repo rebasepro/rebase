@@ -1,18 +1,18 @@
 ---
 title: Search
 sidebar_label: Search
-description: How .search() behaves by default, and how to opt a Postgres collection in to ranked full-text search over the fields you name — including JSONB and array content.
+description: How .search() behaves by default, and how a table opts in to ranked full-text search over the columns you name — including JSONB and array content.
 ---
 
-`.search("term")` works on every collection without configuration. What it
-compiles to depends on whether the collection has asked for anything more.
+`.search("term")` works on every table without configuration. What it
+compiles to depends on whether the table has asked for anything more.
 
 ## The default
 
 With no configuration, `.search()` is a **case-insensitive substring match**,
-OR-ed across the collection's top-level `string` properties. The search string
+OR-ed across the table's text columns. The search string
 is split on whitespace and every term has to match — but they may match
-different properties, so a name kept in two columns is still found:
+different columns, so a name kept in two columns is still found:
 
 ```sql
 -- .search("ada lovelace")
@@ -23,17 +23,17 @@ WHERE (first_name ILIKE '%ada%'      OR last_name ILIKE '%ada%')
 Wrap a run in double quotes — `.search('"ada lovelace"')` — to search for the
 phrase instead, the same way the full-text path below reads them.
 
-This is enough for a small collection with its text in plain columns. It has
+This is enough for a small table with its text in plain columns. It has
 three limits that no setting inside it can fix:
 
-- **It cannot see inside `map` or `array` properties.** A collection that keeps
+- **It cannot see inside JSON or array columns.** A table that keeps
   its searchable content in JSONB — tags, certifications, a questionnaire — has
   a search box that silently matches nothing.
 - **It has no relevance.** Rows come back in `orderBy` order, so the best match
   can be on page seven.
 - **It cannot use an index.** A leading `%` defeats a B-tree, so every search is
   a sequential scan. Fine at a thousand rows; a cliff at a million.
-  `rebase doctor` names the collections where this has started to matter: no
+  `rebase doctor` names the tables where this has started to matter: no
   `search` block and more than about 10,000 rows.
 
 The term is matched **literally**: `%` and `_` are LIKE metacharacters, and they
@@ -46,40 +46,40 @@ A one-word search compiles to exactly the SQL it always did.
 
 ## Opting in
 
-Declare a `search` block on a Postgres collection, naming the fields you want
-indexed:
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
-```typescript
-import type { PostgresCollectionConfig } from "@rebasepro/types";
+Declare `search` on a table, naming the columns you want indexed:
 
-const talents: PostgresCollectionConfig = {
-    slug: "talents",
-    table: "talents",
-    name: "Candidates",
-    properties: {
-        id: { name: "ID", type: "string", isId: "uuid" },
-        full_name: { name: "Full name", type: "string" },
-        bio: { name: "Bio", type: "string" },
-        interests: { name: "Interests", type: "array", of: { name: "Interest", type: "string" } },
-        questionnaire: { name: "Questionnaire", type: "map", properties: {} }
+```ts
+import { defineTable, col, json } from "@rebasepro/server/schema";
+
+export const talents = defineTable("talents", {
+    columns: {
+        id:            col.uuid().primaryKey().defaultRandom(),
+        fullName:      col.text().notNull(),
+        bio:           col.text(),
+        interests:     col.array(col.text()),
+        questionnaire: col.jsonb(json.object({ certifications: json.array(json.string()) }, { additional: true })),
     },
     search: {
         language: "spanish",
         unaccent: true,
         fields: [
-            { path: "full_name", weight: "A" },
+            { path: "fullName", weight: "A" },
             { path: "bio", weight: "D" },
             "interests",
-            "questionnaire.certifications"
-        ]
-    }
-};
+            "questionnaire.certifications",
+        ],
+    },
+    rls: [{ operation: "select", access: "authenticated" }],
+});
 ```
 
 Nothing is inferred. A field is searched if and only if you name it, and a path
-that does not resolve fails at boot rather than being quietly skipped — a search
-field you believe is live and is not is exactly the failure this block exists to
-prevent.
+that does not resolve is refused when the schema is compiled rather than being
+quietly skipped — a search field you believe is live and is not is exactly the
+failure this block exists to prevent. So is a column that `.private()` or
+`.access({ read })` restricts: the index is shared by every caller.
 
 `.search()` then compiles to a ranked full-text match, and rows come back with a
 `_score`:
@@ -135,12 +135,16 @@ returns nothing for content plainly in the row.
 
 ## What you can name in `fields`
 
+<span class="since-badge" data-since="0.31">Since 0.31</span>
+
+A path starts with a column key.
+
 | Path | Resolves to | Example |
 |------|-------------|---------|
-| A `string` property | the column | `"full_name"` |
-| A `string[]` property | every element | `"interests"` |
-| A `map` property | every string value in the document | `"questionnaire"` |
-| A path inside a `map` | every string value at or below that point | `"questionnaire.certifications"` |
+| A text column | the column | `"fullName"` |
+| A `col.array(col.text())` column | every element | `"interests"` |
+| A `col.jsonb()` column | every string value in the document | `"questionnaire"` |
+| A path inside a `col.jsonb()` column | every string value at or below that point | `"questionnaire.certifications"` |
 
 A path into a map indexes **string values at any depth** below it — arrays of
 strings, nested objects, arrays of objects. JSON *keys* are never indexed, only
@@ -148,7 +152,7 @@ values, so a field name common to every row does not become a term that matches
 every row.
 
 Naming an enum, a UUID, a `json` (rather than `jsonb`) column, or an array of
-numbers is a boot-time error explaining why. Enums in particular are a fixed
+numbers is refused, with the reason. Enums in particular are a fixed
 vocabulary: filter on them with `where`, which is exact and uses an index.
 
 ## Options
@@ -176,7 +180,7 @@ How a search string is matched against the fields you named.
 search: {
     language: "spanish",
     mode: "hybrid",
-    fields: ["full_name", "questionnaire.certifications"]
+    fields: ["fullName", "questionnaire.certifications"]
 }
 ```
 
@@ -201,7 +205,7 @@ mode adds is a scan over the rows the index rejected. On a large table that is
 the difference between an index scan and a sequential one, which is why this is
 a mode and not the default.
 
-**Changing it on a live collection is safe** — the one option in this block
+**Changing it on a live table is safe** — the one option in this block
 that is. `mode` is query-side: it changes no generated column, no generation
 expression and no index, so it does not trip the refusal described in
 [Changing the block later](#changing-the-block-later). Turning it on takes a
@@ -209,7 +213,7 @@ deploy and nothing else.
 
 It folds accents on the substring half **whether or not `unaccent` is set**,
 because that folding is also query-side. That is deliberate: `unaccent` is the
-setting you cannot turn on later without rewriting the table, so a collection
+setting you cannot turn on later without rewriting the table, so a table
 stuck without it can still stop missing `Muñoz`. What `unaccent` still buys is
 folding on the `@@` half, where the lexemes are stored.
 
@@ -237,7 +241,7 @@ different lexemes.
 
 ```typescript
 search: {
-    fields: ["full_name", "questionnaire.certifications"],
+    fields: ["fullName", "questionnaire.certifications"],
     fuzzy: true,
     fuzzyThreshold: 0.3   // default
 }
@@ -261,7 +265,7 @@ renaming it later is a drop and recreate, which rewrites the table.
 ## Ranking
 
 `_score` is `ts_rank` against the same query the rows were matched with, and is
-present only when the collection opted in *and* the request carried a search
+present only when the table opted in *and* the request carried a search
 string.
 
 With `mode: "hybrid"`, a row found only by the substring half scores a small
@@ -304,7 +308,7 @@ data[0]._matches;
 `field` is the path exactly as declared in `fields`, so you can map it to a
 label for display. Fields come back in the order you declared them.
 
-Per-query, not per-collection, because the cost is per-query: one `ts_headline`
+Per-query, not per-table, because the cost is per-query: one `ts_headline`
 per declared field per returned row, and `ts_headline` re-parses the document
 rather than reading the index. Right for a page of results, wrong for an export.
 
@@ -324,7 +328,7 @@ unaccented query produced, so it would return the text with nothing marked at
 all; a readable snippet that highlights beats a prettier one that silently
 doesn't.
 
-## Adding the block to a live collection
+## Adding the block to a live table
 
 The generated column is added by the boot-time schema ensure, like any other
 column. Its index is built after the server is serving, in the background, with
@@ -333,12 +337,6 @@ column. Its index is built after the server is serving, in the background, with
 built, a search works but reads the whole table. Adding a *stored* generated
 column does rewrite the table, so on a large one, plan it like any other
 rewrite.
-
-## Which engines
-
-The `search` block is Postgres-only, and is rejected at boot on other engines
-rather than silently ignored. MongoDB collections keep their regex-based
-matching; Firestore collections use the external text-search controller.
 
 ## Related
 

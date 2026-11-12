@@ -1,7 +1,7 @@
 ---
 title: Authentication
 sidebar_label: Authentication
-description: Configure JWT authentication, OAuth providers, SMTP email, bot protection and the users collection on the Rebase backend.
+description: Configure JWT authentication, OAuth providers, SMTP email, bot protection and the users table on the Rebase backend.
 ---
 
 Authentication is three pages, because it is three jobs. This one is **configuration**: what goes in the `auth` block and in the environment.
@@ -24,7 +24,7 @@ Rebase includes a complete backend authentication system:
 ## Configuration
 
 :::note[Where this goes]
-**Managed runtime:** environment — `JWT_SECRET`, `AUTH_*`, `SMTP_*`, `CAPTCHA_*` and the provider `*_CLIENT_ID` / `*_CLIENT_SECRET` pairs, one for each of the twelve providers ([the spellings](#the-environment-spellings); Apple's is four keys, not a pair). The users collection is whichever one the bundle names (`collections/users` by convention).
+**Managed runtime:** environment — `JWT_SECRET`, `AUTH_*`, `SMTP_*`, `CAPTCHA_*` and the provider `*_CLIENT_ID` / `*_CLIENT_SECRET` pairs, one for each of the twelve providers ([the spellings](#the-environment-spellings); Apple's is four keys, not a pair). The users table is the [`defineAuthTable`](#the-users-table) exported from `backend/schema/index.ts`.
 **No managed route:** `auth.hooks`. They are functions; eject to pass them.
 **Ejected:** `initializeRebaseBackend({ auth })` in `backend/src/index.ts`.
 :::
@@ -81,7 +81,7 @@ const backend = await initializeRebaseBackend({
 
 | Key | Type | Default | What it does |
 |-----|------|---------|--------------|
-| `collection` | `CollectionConfig` | — | The users collection. See [Collection-Level Auth Configuration](#collection-level-auth-configuration) |
+| `collection` | `CollectionConfig` | — | The users collection. See [The users table](#the-users-table) |
 | `jwtSecret` | `string` | — | HS256 signing secret. Required in production |
 | `signingKeys` | `JwtSigningKeyConfig[]` | — | Asymmetric signing keys — see [Asymmetric Tokens and JWKS](/docs/backend/auth-endpoints/#asymmetric-tokens-and-jwks) |
 | `activeKid` | `string` | first key | Which of `signingKeys` mints new tokens |
@@ -141,11 +141,11 @@ it warns at boot. `http://localhost` does not need it.
 | `sameSite` | `Lax` | `None` is only for a genuinely cross-site frontend |
 | `secure` | `true` | Secure by default; `AUTH_COOKIE_SECURE=false` for plain http |
 
-:::caution[Collection callbacks do not fire for auth users]
+:::caution[Table hooks do not fire for auth users]
 User creation and updates through the auth system — registration, admin user
 management, and OAuth — write **directly** to the user store and bypass the
-collection save pipeline. A `beforeSave`/`afterSave`/`beforeDelete`/`afterDelete`
-callback on the auth (users) collection will **not** run for these paths. For
+table's save pipeline. A `beforeSave`/`afterSave`/`beforeDelete`/`afterDelete`
+hook on the users table will **not** run for these paths. For
 side effects like provisioning a personal team on signup, use the auth lifecycle
 hooks (`afterUserCreate`, `beforeUserCreate`, `afterUserDelete`, …), which
 receive the fully-populated user record.
@@ -491,7 +491,7 @@ also proves. `requireEmailVerification` makes registration confirm-first. See
 
 ## Auto-Created Tables
 
-On first startup, Rebase automatically provisions the `rebase` schema and the following tables in the database (bound to the schema defined in your collection, e.g., `rebase`):
+On first startup, Rebase automatically provisions the `rebase` schema and the following tables in the database:
 
 - **`rebase.users`** — User accounts with email, password hash, metadata, and a `roles` text[] column (roles are stored as inline text arrays to optimize queries and avoid joins).
 - **`rebase.user_identities`** — The OAuth identities linked to each account, one row per provider identity.
@@ -523,71 +523,36 @@ On a laptop this means you can always bootstrap a fresh database without seeding
 SELECT pg_advisory_xact_lock(hashtext('rebase_auth_functions_init'));
 ```
 
-## Collection-Level Auth Configuration
+## The users table
 
-Instead of relying solely on the default database auth rules, you can mark any Postgres collection (such as `users.ts` or a custom `members.ts` collection) as the authentication collection. This is configured via the `auth` property on the collection itself:
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
-```typescript
-import { randomBytes } from "node:crypto";
-import { defineCollection } from "@rebasepro/cms-types";
+Users are stored in the table declared with `defineAuthTable` in
+`backend/schema`. It is an ordinary table with the columns auth needs added,
+a policy that lets each user read their own row, and an admin-only gate on the
+`roles` column. Its `auth` block declares the roles, the app's scopes, personal
+API keys, and the hooks that run when an admin creates a user or resets a
+password:
 
-const membersCollection = defineCollection({
-  name: "Members",
-  slug: "members",
-  table: "members",
-  auth: {
-    enabled: true,
-    
-    // Customize what happens when an admin creates a user via the REST API
-    onCreateUser: async (values, ctx) => {
-      const hash = await ctx.hashPassword("welcome123");
-      return {
-        values: { ...values, passwordHash: hash, emailVerified: true },
-        temporaryPassword: "welcome123"
-      };
+```ts
+import { defineAuthTable, col } from "@rebasepro/server/schema";
+
+export const users = defineAuthTable("users", {
+    columns: {
+        id:    col.uuid().primaryKey().defaultRandom(),
+        email: col.text().notNull().unique(),
     },
-
-    // Customize what happens when an admin resets a user's password in the admin panel
-    onResetPassword: async (userId, ctx) => {
-      const tempPassword = randomBytes(12).toString("base64url");
-      return {
-        temporaryPassword: tempPassword, // saved as the new password, then shown to the admin
-        invitationSent: false
-      };
+    rls: "admin-only",
+    auth: {
+        roles: { support: { name: "Support", scopes: ["users:read", "users:write", "logs:read"] } },
+        personalKeys: true,
     },
-
-    // Inject/override auth-specific actions (e.g. show/hide the reset password button)
-    actions: {
-      resetPassword: true // Or false to disable, or a custom EntityAction
-    },
-
-    // What each role may do beyond its rows, the app's own scopes,
-    // and whether accounts may create personal API keys
-    roles: {
-      support: { name: "Support", scopes: ["users:read", "users:write", "logs:read"] }
-    },
-    scopes: {
-      "project:deploy": { label: "Deploy projects", target: "project" }
-    },
-    personalKeys: true
-  },
-  properties: { ... }
 });
 ```
 
-`roles`, `scopes` and `personalKeys` declare the access model: which admin-plane
-scopes each role holds, the scopes the app defines for its own operations, and
-whether each account may mint [personal API keys](/docs/backend/api-keys/#personal-keys).
-See [Roles and scopes](/docs/backend/roles-and-scopes/).
-
-A `temporaryPassword` returned from `onResetPassword` becomes the account's password. Rebase hashes it with the configured algorithm, saves it, signs the user out of every existing session, and shows it to the admin to pass on. The hook does not store it, and has no way to. Return no `temporaryPassword` when the hook emails its own reset link instead: the password then stays as it is until the user sets a new one, though their sessions still end.
-
-When custom hooks (`onCreateUser`, `onResetPassword`) are called, they receive an `AuthCollectionContext` facade containing:
-- `hashPassword(password: string): Promise<string>` — Hash password using the configured hashing algorithm (e.g. scrypt).
-- `sendEmail?: (options) => Promise<EmailSendResult>` — Send an email (only available when email service is configured). Resolves with what the provider reported — `messageId`, `accepted`, `rejected` — so a hook can store the id and later thread a reply back to it.
-- `emailConfigured: boolean` — Whether email service is configured.
-- `appName: string` — The app name from email config.
-- `resetPasswordUrl: string` — The password reset link base URL.
+[The users table](/docs/schema/auth-table/) covers the columns, the injected
+policies, `onCreateUser` and `onResetPassword`; [Roles and scopes](/docs/backend/roles-and-scopes/)
+covers what each role and scope grants.
 
 ## Next Steps
 
@@ -595,5 +560,5 @@ When custom hooks (`onCreateUser`, `onResetPassword`) are called, they receive a
 - **[Roles and scopes](/docs/backend/roles-and-scopes/)** — what each role may do, and how keys and tokens narrow it
 - **[Custom auth adapters](/docs/backend/auth-adapters/)** — bringing your own identity provider
 - **[Frontend Authentication](/docs/frontend/authentication/)** — login UI, auth controller, user management
-- **[Security Rules (RLS)](/docs/collections/security-rules/)** — row-level access control
+- **[Row-level security](/docs/collections/security-rules/)** — row-level access control
 - **[Typed SDK Authentication](/docs/sdk/authentication/)** — auth methods in the typed SDK

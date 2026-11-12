@@ -42,26 +42,33 @@ history: {
 }
 ```
 
-### Per Collection
+### Per table
 
-Mark which collections should track history:
+<span class="since-badge" data-since="0.31">Since 0.31</span>
 
-```typescript
-import { defineCollection } from "@rebasepro/cms-types";
-const ordersCollection = defineCollection({
-    slug: "orders",
-    name: "Orders",
-    table: "orders",
-    history: true,       // Enable for this collection
-    properties: { /* ... */ }
+Mark which tables track history with `history: true`:
+
+```ts
+import { defineTable, col } from "@rebasepro/server/schema";
+
+export const orders = defineTable("orders", {
+    columns: {
+        id:     col.uuid().primaryKey().defaultRandom(),
+        status: col.enum(["open", "paid", "shipped"]).notNull().default("open"),
+        total:  col.numeric(10, 2).notNull(),
+    },
+    history: true,
+    rls: "admin-only",
 });
 ```
+
+A view cannot track history: it is never written.
 
 ## How It Works
 
 1. The backend creates a `rebase.entity_history` table automatically.
 2. On every create, update, or delete, an entry is recorded with:
-   - Entity ID, and the collection slug (in `table_name`)
+   - Entity ID, and the table's slug (in `table_name`)
    - The entity's values after the change (`values`; for a delete, the entity
      that was deleted)
    - On an update, what the changed fields held before it (`previous_values`)
@@ -79,7 +86,7 @@ Entries that older versions recorded with the related row embedded (a delete
 used to store the admin panel's view of the row) are served the same way: the
 history endpoint drops the embedded values before it answers.
 
-On a collection with [soft delete](/docs/collections/soft-delete/), a delete is
+On a table with [soft delete](/docs/collections/soft-delete/), a delete is
 recorded as `delete` and a restore (the update setting the soft-delete field
 back to `null`) as `update`. A row's history stays readable while the row is in
 the trash, and reverting it to a version from before the delete restores it.
@@ -109,8 +116,8 @@ holds.
 ### Diff Tracking & Structural Deep Equality
 
 To avoid recording redundant logs where fields are saved but no values change, the `HistoryService` performs a structural deep equality comparison on the top-level keys of the old and new values:
-- It ignores system metadata properties starting with `__`.
-- If differences are found, the names of the modified properties are saved in the `changed_fields` (`text[]`) column.
+- It ignores system metadata fields starting with `__`.
+- If differences are found, the names of the modified fields are saved in the `changed_fields` (`text[]`) column.
 - If the deep equality check detects zero changes, the history insertion is entirely skipped.
 
 ### Pruning
@@ -213,5 +220,5 @@ The cap of 200 entries per entity is applied only after a write to that entity.
 
 ## Next Steps
 
-- **[Entity Callbacks](/docs/collections/callbacks)** — Lifecycle hooks
+- **[Table hooks](/docs/collections/callbacks/)** — Lifecycle hooks
 - **[Backend Overview](/docs/backend)** — Full backend configuration
