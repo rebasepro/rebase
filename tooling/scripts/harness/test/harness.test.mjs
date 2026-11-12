@@ -360,8 +360,34 @@ export const collections = [
 ];
 `;
 
+/**
+ * The same table in the 0.31 layout. The builders are imported by absolute
+ * path: the fixture has no `node_modules`, and what is under test is the
+ * harness's compile-and-compare, not package resolution.
+ */
+const TYPES_SRC = path.resolve(import.meta.dirname, "..", "..", "..", "..", "packages", "types", "src", "index.ts");
+const NOTES_TABLE = `import { defineTable, col } from ${JSON.stringify(TYPES_SRC)};
+
+const OWNER = "owner = auth.uid()";
+
+// The owner reads their own notes.
+export const notes = defineTable("notes", {
+    columns: { id: col.text().primaryKey(), owner: col.text() },
+    rls: [{ name: "notes_owner", mode: "permissive", operation: "select", using: OWNER }]
+});
+`;
+
+const LEGACY_BASE = {
+    "config/package.json": JSON.stringify({ type: "module" }),
+    "config/collections/index.ts": NOTES,
+};
+const TABLES_BASE = {
+    "backend/package.json": JSON.stringify({ type: "module" }),
+    "backend/schema/index.ts": NOTES_TABLE,
+};
+
 /** An outer repo ignoring saas/, and a saas/ repo whose `feature` branch carries `edits`. */
-function nestedSaasFixture(edits, { uncommitted = {} } = {}) {
+function nestedSaasFixture(edits, { uncommitted = {}, base = LEGACY_BASE } = {}) {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "rls-drift-"));
     const git = (args, cwd) =>
         execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
@@ -386,8 +412,7 @@ function nestedSaasFixture(edits, { uncommitted = {} } = {}) {
     git(["symbolic-ref", "HEAD", "refs/heads/main"], saas);
     write(saas, {
         "package.json": "{}",
-        "config/package.json": JSON.stringify({ type: "module" }),
-        "config/collections/index.ts": NOTES,
+        ...base,
         "backend/drizzle/0000_init.sql": "SELECT 1;\n",
     });
     git(["add", "-A"], saas);
@@ -476,7 +501,7 @@ test("rls-drift passes an edit that changes no compiled policy", () => {
     const [result] = rlsDrift.run(saasContext(root));
 
     assert.equal(result.level, PASS, JSON.stringify(result));
-    assert.match(result.message, /compile to exactly the policies/);
+    assert.match(result.message, /compiles to exactly the policies/);
 });
 
 test("rls-drift fails closed when the policies cannot be compiled", () => {
@@ -486,6 +511,44 @@ test("rls-drift fails closed when the policies cannot be compiled", () => {
 
     assert.equal(result.level, FAIL, JSON.stringify(result));
     assert.match(result.message, /could not be compiled/);
+});
+
+test("rls-drift reads backend/schema: a policy change through a constant fails without a migration", () => {
+    const root = nestedSaasFixture(
+        { "backend/schema/index.ts": NOTES_TABLE.replace(`"owner = auth.uid()"`, `"true"`) },
+        { base: TABLES_BASE },
+    );
+
+    const [result] = rlsDrift.run(saasContext(root));
+
+    assert.equal(result.level, FAIL, JSON.stringify(result));
+    assert.match(result.message, /public\.notes/);
+});
+
+test("rls-drift reads backend/schema: an edit that changes no compiled policy passes", () => {
+    const root = nestedSaasFixture(
+        { "backend/schema/index.ts": NOTES_TABLE.replace("auth.uid()", "rebase.uid()").replace("The owner reads", "Only the owner reads") },
+        { base: TABLES_BASE },
+    );
+
+    const [result] = rlsDrift.run(saasContext(root));
+
+    assert.equal(result.level, PASS, JSON.stringify(result));
+    assert.match(result.message, /compiles to exactly the policies/);
+});
+
+test("rls-drift compares across the migration: collections at the base, the same rule as a table now", () => {
+    // The commit that moves the cloud app to tables is compared against a base
+    // with collections. The same rule must compile to the same policies, or
+    // every migrated table would read as a policy change.
+    const root = nestedSaasFixture(
+        { ...TABLES_BASE, "config/collections/index.ts": "export const collections = [];\n" },
+    );
+    fs.rmSync(path.join(root, "saas", "config"), { recursive: true, force: true });
+
+    const [result] = rlsDrift.run(saasContext(root));
+
+    assert.equal(result.level, PASS, JSON.stringify(result));
 });
 
 test("a task's `source` names exactly what is reverted, and everything else is kept", () => {

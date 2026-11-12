@@ -1,8 +1,9 @@
 /**
  * A change to the cloud app's compiled RLS policies ships with a migration.
  *
- * The framework's boot compiles `securityRules` from saas/config/collections and
- * applies them to every table, so an edit does reach the database. What the boot
+ * The framework's boot compiles each table's `rls` from saas/backend/schema
+ * (saas/config/collections before the cloud app moved to tables) and applies
+ * the policies to every table, so an edit does reach the database. What the boot
  * cannot do is create anything a new rule needs — a helper function, a column, a
  * table. When a rule calls one that is not there, `CREATE POLICY` is refused, the
  * table is left RLS-enabled in a deny-leaning partial state, the boot logs a
@@ -13,7 +14,7 @@
  *
  * So this refuses a deploy whose compiled policies differ from the merge-base's
  * with no migration SQL beside them. "Compiled" is the point: it compares what
- * `planCollectionPolicies` produces at both revisions (lib/cloud-policies.mjs),
+ * the boot's compiler produces at both revisions (lib/cloud-policies.mjs),
  * not which lines changed, because a comment or a respelling the compiler undoes
  * changes no policy, and an edited constant far from its rule changes one on a
  * line that names none.
@@ -30,18 +31,19 @@ import { finding, pass, FAIL } from "../lib/report.mjs";
 export const id = "rls-drift";
 export const title = "Cloud RLS config/migration drift";
 
-const CONFIG_PREFIX = "saas/config/collections/";
+/** Where the schema lives: tables since 0.31, collections before. A change to either is a candidate. */
+const SCHEMA_PREFIXES = ["saas/backend/schema/", "saas/config/collections/"];
 const MIGRATION_PREFIX = "saas/backend/drizzle/";
 
 export function run(ctx = context()) {
     if (!ctx.hasSaas) return [pass(id, "No cloud workspace present — RLS drift check not applicable.")];
 
-    const touched = ctx.changed.filter((file) => file.startsWith(CONFIG_PREFIX));
-    if (!touched.length) return [pass(id, "No cloud collection config changed.")];
+    const touched = ctx.changed.filter((file) => SCHEMA_PREFIXES.some((prefix) => file.startsWith(prefix)));
+    if (!touched.length) return [pass(id, "No cloud schema changed.")];
 
     const migrations = ctx.changed.filter((file) => file.startsWith(MIGRATION_PREFIX) && file.endsWith(".sql"));
     if (migrations.length) {
-        return [pass(id, `Cloud collections changed (${touched.length} file(s)), with migration(s): ${migrations.join(", ")}.`)];
+        return [pass(id, `Cloud schema changed (${touched.length} file(s)), with migration(s): ${migrations.join(", ")}.`)];
     }
 
     const saasRoot = path.join(ctx.root, "saas");
@@ -64,7 +66,7 @@ export function run(ctx = context()) {
         return [
             pass(
                 id,
-                `Cloud collections changed (${touched.length} file(s)), but they compile to exactly the policies the ` +
+                `Cloud schema changed (${touched.length} file(s)), but it compiles to exactly the policies the ` +
                     "merge-base does — no migration needed.",
             ),
         ];
