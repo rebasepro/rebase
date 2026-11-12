@@ -35,7 +35,7 @@ jest.mock("@rebasepro/app", () => {
         useRebaseContext: () => ({}),
         useAuthController: () => ({ user: null }),
         useCustomizationController: () => ({ plugins: [], propertyConfigs: {}, locale: undefined }),
-        useData: () => ({ collection: () => ({}) }),
+        useData: () => ({ table: () => ({}) }),
         useTranslation: () => ({ t: (key: string) => key })
     };
     return new Proxy({}, {

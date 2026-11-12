@@ -106,7 +106,7 @@ const snackbar = { open: jest.fn() };
 const mode = { mode: "light", setMode: jest.fn() };
 const apiConfig = { apiUrl: "http://api.test", apiPath: "/api", getAuthToken: async () => "admin-token" };
 const posts = { data: ROWS.map((row, index) => ({ id: index + 1, ...row })), meta: { total: 30, limit: 30, offset: 0, hasMore: false } };
-const dataLayer = { collection: () => ({ find: async () => posts }) };
+const dataLayer = { table: () => ({ find: async () => posts }) };
 const appClient = { admin: { listUsersPaginated: async () => ({ users: [], total: 0, limit: 50, offset: 0 }) }, data: dataLayer };
 
 jest.mock("@rebasepro/app", () => ({
@@ -198,7 +198,7 @@ describe("typing in the JS console", () => {
     });
 
     it("does not draw the result table again", async () => {
-        const code = `return await client.data.collection("posts").find();`;
+        const code = `return await client.data.table("posts").find();`;
         const editor = await run(code);
         await screen.findByText("r29c9");
 

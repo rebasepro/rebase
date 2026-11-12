@@ -34,7 +34,7 @@ if (typeof globalThis.Request === "undefined") {
     Object.defineProperty(globalThis, "Request", { value: TestRequest, configurable: true });
 }
 
-const mockData = { collection: () => ({ find: () => new Promise(() => undefined) }) };
+const mockData = { table: () => ({ find: () => new Promise(() => undefined) }) };
 const mockContext = {};
 jest.mock("../../src/hooks", () => ({
     useRebaseContext: () => mockContext

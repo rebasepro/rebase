@@ -1,4 +1,4 @@
-import type { EntityStatus, RebaseSdkData, SDKCollectionClient, WriteOptions } from "@rebasepro/types";
+import type { EntityStatus, RebaseSdkData, SDKTableClient, WriteOptions } from "@rebasepro/types";
 import { RebaseApiError } from "@rebasepro/types";
 import type { AdminCollection, RebaseContext } from "@rebasepro/cms-types";
 import { buildCompositeId, resolvePrimaryKeys } from "@rebasepro/common";
@@ -112,7 +112,7 @@ export function createRowWriter(
     };
 
     const send = (slug: string, status: EntityStatus, values: Row, id: string | number | undefined, options: WriteOptions | undefined): Promise<Row> => {
-        const accessor = data.collection(slug);
+        const accessor = data.table(slug);
         // Options only where given: a write without them is the call it always was.
         return signalWrite(changes, slug, () => status === "existing" && id !== undefined
             ? options ? accessor.update(id, values, options) : accessor.update(id, values)
@@ -124,7 +124,7 @@ export function createRowWriter(
         const collection = callbacksOf(slug, "save");
         if (!collection) return send(slug, status, values, id, options);
         const previous = status === "existing" && id !== undefined
-            ? await data.collection(slug).findById(id)
+            ? await data.table(slug).findById(id)
             : undefined;
         const keys = resolvePrimaryKeys(collection);
         // A write asked not to return its row (`returning: false`) still hands
@@ -157,7 +157,7 @@ export function createRowWriter(
         update: (slug, id, values, options) => save(slug, "existing", values, id, options),
         remove: async (slug, id, options) => {
             if (depth > MAX_WRITE_DEPTH) throw recursionError(slug, "delete");
-            const accessor = data.collection(slug);
+            const accessor = data.table(slug);
             const removeRow = () => signalWrite(changes, slug, () => options ? accessor.delete(id, options) : accessor.delete(id));
             const collection = callbacksOf(slug, "delete");
             if (!collection) return removeRow();
@@ -191,11 +191,11 @@ const SIGNALLED_WRITES = ["createMany", "updateMany", "upsert", "deleteMany"] as
  */
 export function buildContextData(layer: SdkDataLayer, context: () => RebaseContext, depth = 1): RebaseSdkData {
     const writer = createRowWriter(layer, context, depth);
-    const accessors = new Map<string, SDKCollectionClient>();
+    const accessors = new Map<string, SDKTableClient>();
     return sdkDataOf((slug) => {
         let accessor = accessors.get(slug);
         if (!accessor) {
-            accessor = withRowWrites(layer.data.collection(slug), slug, writer, layer);
+            accessor = withRowWrites(layer.data.table(slug), slug, writer, layer);
             accessors.set(slug, accessor);
         }
         return accessor;
@@ -214,12 +214,12 @@ export function missingContextData(): RebaseSdkData {
     });
 }
 
-/** A `RebaseSdkData` over `accessorFor`: `data.collection(slug)`, and `data.products` named the way every data layer names it. */
-function sdkDataOf(accessorFor: (slug: string) => SDKCollectionClient): RebaseSdkData {
-    const target = { collection: accessorFor };
+/** A `RebaseSdkData` over `accessorFor`: `data.table(slug)`, and `data.products` named the way every data layer names it. */
+function sdkDataOf(accessorFor: (slug: string) => SDKTableClient): RebaseSdkData {
+    const target = { table: accessorFor };
     return new Proxy(target, {
         get(_target, prop: string | symbol) {
-            if (prop === "collection") return accessorFor;
+            if (prop === "table") return accessorFor;
             if (typeof prop === "symbol" || prop === "then" || prop === "toJSON" || prop === "$$typeof") return undefined;
             return accessorFor(toSnakeCase(prop));
         }
@@ -227,11 +227,11 @@ function sdkDataOf(accessorFor: (slug: string) => SDKCollectionClient): RebaseSd
 }
 
 function withRowWrites(
-    accessor: SDKCollectionClient,
+    accessor: SDKTableClient,
     slug: string,
     writer: RowWriter,
     { changes }: SdkDataLayer
-): SDKCollectionClient {
+): SDKTableClient {
     const after = <T, >(write: () => Promise<T>): Promise<T> => signalWrite(changes, slug, write);
     const own = new Map<PropertyKey, unknown>();
     own.set("create", (values: Row, id?: string | number, options?: WriteOptions) => writer.create(slug, values, id, options));
@@ -245,7 +245,7 @@ function withRowWrites(
             own.set(name, (...args: unknown[]) => after(() => Reflect.apply(write, accessor, args)));
         }
     }
-    let trash: SDKCollectionClient["trash"] | undefined;
+    let trash: SDKTableClient["trash"] | undefined;
     const bound = new Map<PropertyKey, unknown>();
     return new Proxy(accessor, {
         get(target, prop) {
@@ -269,9 +269,9 @@ function withRowWrites(
 }
 
 function signalTrash(
-    trash: SDKCollectionClient["trash"],
+    trash: SDKTableClient["trash"],
     after: <T>(write: () => Promise<T>) => Promise<T>
-): SDKCollectionClient["trash"] {
+): SDKTableClient["trash"] {
     return {
         find: (...args) => trash.find(...args),
         count: (...args) => trash.count(...args),

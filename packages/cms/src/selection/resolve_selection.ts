@@ -1,4 +1,4 @@
-import { CollectionConfig, Entity, FindParams, OrderByTuple, SDKCollectionClient } from "@rebasepro/types";
+import { CollectionConfig, Entity, FindParams, OrderByTuple, SDKTableClient } from "@rebasepro/types";
 import { EntitySelection, RowSelection, SelectionQuery } from "@rebasepro/cms-types";
 import { buildCompositeId, resolvePrimaryKeys } from "@rebasepro/common";
 import { getRelationIncludeParams } from "@rebasepro/app";
@@ -70,7 +70,7 @@ export function selectionQueryToFindParams<M extends Record<string, unknown>>(
  * nothing else.
  */
 export interface SelectionRowSource {
-    collection(slug: string): Pick<SDKCollectionClient, "find">;
+    table(slug: string): Pick<SDKTableClient, "find">;
 }
 
 export interface ResolveSelectionParams<M extends Record<string, unknown>> {
@@ -154,7 +154,7 @@ export async function resolveSelection<M extends Record<string, unknown>>({
     }
     const keys = resolvePrimaryKeys(collection);
     const path = selection.query.path;
-    const flat = data.collection(path);
+    const flat = data.table(path);
     // The relations the view reads its rows with, so a row read here is the
     // row a ticked one is.
     const include = getRelationIncludeParams(collection);

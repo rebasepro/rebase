@@ -100,12 +100,12 @@ const makeDefaultCode = (slug?: string) => `// Available: client (RebaseClient),
 //   const me = context.user; // who this script runs as ("Run as"), null under No Auth
 ${slug
         ? `
-const result = await client.data.collection(${JSON.stringify(slug)}).find({ limit: 10 });
+const result = await client.data.table(${JSON.stringify(slug)}).find({ limit: 10 });
 return result;
 `
         : `
 // Name one of your collections to query it:
-//   const result = await client.data.collection("posts").find({ limit: 10 });
+//   const result = await client.data.table("posts").find({ limit: 10 });
 //   return result;
 
 return context.user;
@@ -180,20 +180,20 @@ function detectCollectionsInResult(
     if (!resultValue || !collections?.length) return [];
     const code = withoutComments(executedCode);
 
-    // Extract collection slugs mentioned in the code
+    // Extract table slugs mentioned in the code
     const mentionedSlugs = new Set<string>();
 
-    // Match: collection("slug") or collection('slug')
-    const collectionCallRegex = /\.collection\(["']([^"']+)["']\)/g;
+    // Match: table("slug") or table('slug')
+    const tableCallRegex = /\.table\(["']([^"']+)["']\)/g;
     let m: RegExpExecArray | null;
-    while ((m = collectionCallRegex.exec(code)) !== null) {
+    while ((m = tableCallRegex.exec(code)) !== null) {
         mentionedSlugs.add(m[1]);
     }
 
     // Match: client.data.<slug>. (dot-access pattern)
     const dotAccessRegex = /client\.data\.([a-zA-Z_][a-zA-Z0-9_]*)\./g;
     while ((m = dotAccessRegex.exec(code)) !== null) {
-        if (!["collection", "find", "findById", "create", "update", "delete"].includes(m[1])) {
+        if (!["table", "find", "findById", "create", "update", "delete"].includes(m[1])) {
             mentionedSlugs.add(m[1]);
         }
     }

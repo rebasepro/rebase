@@ -39,7 +39,7 @@ const mockAccessor = {
 
 jest.mock("@rebasepro/app", () => {
     const overrides: Record<string, unknown> = {
-        useData: () => ({ collection: () => mockAccessor }),
+        useData: () => ({ table: () => mockAccessor }),
         useRebaseContext: () => ({}),
         useAuthController: () => ({ user: { uid: "u1", roles: ["admin"] } }),
         useCustomizationController: () => ({ plugins: [], propertyConfigs: {}, entityActions: [], entityViews: [], resolvedSlots: [] })

@@ -142,7 +142,7 @@ describe("one change signal per <Rebase>", () => {
         await waitFor(() => expect(captured.rows!.rows).toHaveLength(1));
 
         await act(async () => {
-            await captured.data!.collection("tasks").create({ title: "Second" });
+            await captured.data!.table("tasks").create({ title: "Second" });
         });
         await waitFor(() => expect(captured.rows!.rows).toHaveLength(2));
         await waitFor(() => expect(captured.count!.count).toBe(2));
@@ -259,7 +259,7 @@ describe("one change signal per <Rebase>", () => {
         const listened = listens.length;
 
         await act(async () => {
-            await captured.data!.collection("tasks").update(1, { title: "Renamed" });
+            await captured.data!.table("tasks").update(1, { title: "Renamed" });
             await captured.writes!.update("tasks", 1, { title: "Again" });
         });
         expect(listens.length).toBe(listened);
@@ -373,7 +373,7 @@ describe("useRowWrites runs the collection's browser callbacks, as the form's sa
         expect(failure).toEqual(new Error("Titles are frozen"));
         expect(errors).toEqual(["Titles are frozen"]);
         expect(captured.writes!.error).toBe("Titles are frozen");
-        const { data } = await captured.data!.collection("tasks").find();
+        const { data } = await captured.data!.table("tasks").find();
         expect(data[0].values.title).toBe("First");
     });
 
@@ -417,7 +417,7 @@ describe("useRowWrites runs the collection's browser callbacks, as the form's sa
             });
         });
         expect(failure).toEqual(new Error("Keep it"));
-        const { data } = await captured.data!.collection("tasks").find();
+        const { data } = await captured.data!.table("tasks").find();
         expect(data).toHaveLength(1);
     });
 });
@@ -428,7 +428,7 @@ describe("context.data in the browser", () => {
         const { captured } = setup();
         await waitFor(() => expect(captured.rows!.rows).toHaveLength(1));
 
-        const row = await captured.context!.data.collection("tasks").findById(1);
+        const row = await captured.context!.data.table("tasks").findById(1);
         expect(row).toEqual({ id: 1, title: "First", due: DUE });
         const { data } = await captured.context!.data.tasks.find();
         expect(data).toEqual([{ id: 1, title: "First", due: DUE }]);
@@ -439,7 +439,7 @@ describe("context.data in the browser", () => {
         await waitFor(() => expect(captured.rows!.rows).toHaveLength(1));
 
         await act(async () => {
-            await captured.context!.data.collection("tasks").create({ title: "Second" });
+            await captured.context!.data.table("tasks").create({ title: "Second" });
         });
         await waitFor(() => expect(captured.rows!.rows).toHaveLength(2));
         await waitFor(() => expect(captured.count!.count).toBe(2));
@@ -450,14 +450,14 @@ describe("context.data in the browser", () => {
         const { captured } = setup({
             callbacks: {
                 beforeSave: ({ values, previousValues, context }) => {
-                    calls.push({ callback: "beforeSave", values, previousValues, hasData: typeof context.data.collection === "function" });
+                    calls.push({ callback: "beforeSave", values, previousValues, hasData: typeof context.data.table === "function" });
                     return { ...values, title: `${String(values.title)}!` };
                 },
                 afterSave: ({ values, context }) => {
-                    calls.push({ callback: "afterSave", values, hasData: typeof context.data.collection === "function" });
+                    calls.push({ callback: "afterSave", values, hasData: typeof context.data.table === "function" });
                 },
                 beforeDelete: ({ row, context }) => {
-                    calls.push({ callback: "beforeDelete", row, hasData: typeof context.data.collection === "function" });
+                    calls.push({ callback: "beforeDelete", row, hasData: typeof context.data.table === "function" });
                 }
             }
         });
@@ -465,13 +465,13 @@ describe("context.data in the browser", () => {
 
         let saved: Row | undefined;
         await act(async () => {
-            saved = await captured.context!.data.collection("tasks").update(1, { title: "Renamed" });
+            saved = await captured.context!.data.table("tasks").update(1, { title: "Renamed" });
         });
         expect(saved).toEqual({ id: 1, title: "Renamed!", due: DUE });
         await waitFor(() => expect(captured.rows!.rows[0].title).toBe("Renamed!"));
 
         await act(async () => {
-            await captured.context!.data.collection("tasks").delete(1);
+            await captured.context!.data.table("tasks").delete(1);
         });
         await waitFor(() => expect(captured.rows!.rows).toHaveLength(0));
 
@@ -492,9 +492,9 @@ describe("context.data in the browser", () => {
         });
         await waitFor(() => expect(captured.rows!.rows).toHaveLength(1));
 
-        await expect(captured.context!.data.collection("tasks").update(1, { title: "Renamed" }))
+        await expect(captured.context!.data.table("tasks").update(1, { title: "Renamed" }))
             .rejects.toThrow("Titles are frozen");
-        const row = await captured.context!.data.collection("tasks").findById(1);
+        const row = await captured.context!.data.table("tasks").findById(1);
         expect(row?.title).toBe("First");
     });
 
@@ -506,7 +506,7 @@ describe("context.data in the browser", () => {
             callbacks: {
                 beforeSave: async ({ values, context }) => {
                     runs++;
-                    await context.data.collection("tasks").update(1, { title: `level ${runs}` });
+                    await context.data.table("tasks").update(1, { title: `level ${runs}` });
                     return values;
                 }
             }
@@ -515,7 +515,7 @@ describe("context.data in the browser", () => {
 
         let error: unknown;
         await act(async () => {
-            error = await captured.context!.data.collection("tasks").update(1, { title: "Renamed" }).catch((e: unknown) => e);
+            error = await captured.context!.data.table("tasks").update(1, { title: "Renamed" }).catch((e: unknown) => e);
         });
         expect(error).toBeInstanceOf(RebaseApiError);
         expect(error).toMatchObject({
@@ -524,7 +524,7 @@ describe("context.data in the browser", () => {
         });
         expect(runs).toBe(MAX_WRITE_DEPTH);
         // Refused before anything was written.
-        const row = await captured.context!.data.collection("tasks").findById(1);
+        const row = await captured.context!.data.table("tasks").findById(1);
         expect(row?.title).toBe("First");
     });
 
@@ -534,19 +534,19 @@ describe("context.data in the browser", () => {
         const { captured } = setup({
             callbacks: {
                 afterSave: async ({ values, context }) => {
-                    if (values.title === "parent") await context.data.collection("tasks").create({ title: "child" });
+                    if (values.title === "parent") await context.data.table("tasks").create({ title: "child" });
                 }
             }
         });
         await waitFor(() => expect(captured.rows!.rows).toHaveLength(1));
 
         await act(async () => {
-            await captured.context!.data.collection("tasks").create({ title: "parent" });
+            await captured.context!.data.table("tasks").create({ title: "parent" });
             for (let i = 0; i < MAX_WRITE_DEPTH + 4; i++) {
-                await captured.context!.data.collection("tasks").update(1, { title: `edit ${i}` });
+                await captured.context!.data.table("tasks").update(1, { title: `edit ${i}` });
             }
         });
-        const { data } = await captured.context!.data.collection("tasks").find();
+        const { data } = await captured.context!.data.table("tasks").find();
         expect(data.map(row => row.title).sort()).toEqual(["child", `edit ${MAX_WRITE_DEPTH + 3}`, "parent"]);
     });
 });

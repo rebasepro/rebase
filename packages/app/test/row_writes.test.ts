@@ -1,5 +1,5 @@
 import { describe, expect, it, jest } from "@jest/globals";
-import type { CollectionCallbacks, SDKCollectionClient } from "@rebasepro/types";
+import type { CollectionCallbacks, SDKTableClient } from "@rebasepro/types";
 import type { AdminCollection, RebaseContext } from "@rebasepro/cms-types";
 import { createDataChanges, type DataChanges } from "../src/hooks/data/dataChanges";
 import { buildContextData, createRowWriter, MAX_WRITE_DEPTH } from "../src/hooks/data/rowWrites";
@@ -52,12 +52,12 @@ function layerOver(accessor: object, callbacks?: CollectionCallbacks, changes: D
     };
     const layer: SdkDataLayer = {
         data: {
-            collection: (slug: string) => {
+            table: (slug: string) => {
                 slugs.push(slug);
                 // A stub answers per method, `undefined` included (as a `returning:
                 // false` write does), and a class instance whose methods read
-                // `this`; SDKCollectionClient's overloads type neither on an object.
-                return accessor as unknown as SDKCollectionClient;
+                // `this`; SDKTableClient's overloads type neither on an object.
+                return accessor as unknown as SDKTableClient;
             }
         } as SdkDataLayer["data"],
         changes,
@@ -159,8 +159,8 @@ describe("buildContextData", () => {
         const { layer } = layerOver(stubAccessor([]), undefined, changes);
         const data = buildContextData(layer, context);
 
-        await data.collection("tasks").upsert!({ id: 1, title: "A" });
-        await data.collection("tasks").trash.restore(1);
+        await data.table("tasks").upsert!({ id: 1, title: "A" });
+        await data.table("tasks").trash.restore(1);
         expect(signal.emit.mock.calls).toEqual([["tasks"], ["tasks"]]);
     });
 
@@ -180,7 +180,7 @@ describe("buildContextData", () => {
             }
         }
         const { layer } = layerOver(new Accessor());
-        const { count } = buildContextData(layer, context).collection("tasks");
+        const { count } = buildContextData(layer, context).table("tasks");
         await expect(count!()).resolves.toBe(1);
     });
 });

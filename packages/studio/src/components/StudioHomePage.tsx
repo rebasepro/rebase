@@ -280,7 +280,7 @@ export function StudioHomePage({
                     </div>
 
                     <Typography variant="body2" color="secondary" className="mb-4 max-w-2xl">
-                        Generate a fully-typed SDK from your collections with{" "}
+                        Generate a fully-typed SDK from your tables with{" "}
                         <code className="text-emerald-400 font-mono text-xs bg-emerald-400/10 px-1.5 py-0.5 rounded">
                             npx rebase generate-sdk
                         </code>
@@ -379,7 +379,7 @@ function SyntaxHighlightedSnippet({ baseUrl }: { baseUrl: string }) {
             {"\n"}
 
             <span className={kw}>import</span>
-            <span className={tx}>{" { collectionsDictionary, "}</span>
+            <span className={tx}>{" { tablesDictionary, "}</span>
             <span className={kw}>type</span>
             <span className={tx}> </span>
             <span className={typ}>Database</span>
@@ -406,10 +406,10 @@ function SyntaxHighlightedSnippet({ baseUrl }: { baseUrl: string }) {
             {"\n"}
             {/* Maps each accessor back to its slug: without it a hyphenated
                 slug is not reachable from the property name, and the copied
-                client 404s on that collection. */}
-            <span className={tx}>{"    collections"}</span>
+                client 404s on that table. */}
+            <span className={tx}>{"    tables"}</span>
             <span className={op}>: </span>
-            <span className={tx}>collectionsDictionary</span>
+            <span className={tx}>tablesDictionary</span>
             <span className={op}>,</span>
             {"\n"}
             <span className={tx}>{"}"}</span>

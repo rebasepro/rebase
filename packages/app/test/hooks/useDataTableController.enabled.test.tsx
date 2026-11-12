@@ -21,7 +21,7 @@ jest.mock("react-router", () => ({ useLocation: () => mockLocation }));
 const mockFind = jest.fn();
 const mockListen = jest.fn();
 const mockAccessor = { find: mockFind, listen: mockListen };
-const mockData = { collection: () => mockAccessor };
+const mockData = { table: () => mockAccessor };
 const mockContext = {};
 jest.mock("../../src/hooks", () => ({
     useRebaseContext: () => mockContext

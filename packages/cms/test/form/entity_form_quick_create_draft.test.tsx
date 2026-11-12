@@ -27,7 +27,7 @@ type Row = Record<string, unknown>;
 const create = jest.fn<(data: Row) => Promise<Entity<Row>>>();
 
 jest.mock("@rebasepro/app", () => {
-    const data = { collection: () => ({ create, update: create }) };
+    const data = { table: () => ({ create, update: create }) };
     const overrides: Record<string, unknown> = {
         useRebaseContext: () => ({}),
         useAuthController: () => ({ user: { uid: "u1", roles: ["admin"] } }),

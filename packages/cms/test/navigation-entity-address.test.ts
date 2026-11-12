@@ -40,7 +40,7 @@ isId: true },
     const contextServing = (collections: CollectionConfig[], row: Record<string, unknown> | undefined) => {
         const findById = jest.fn(async (_id: string | number) => row);
         const context: NavigationResolutionContext = {
-            data: { collection: () => ({ findById }) },
+            data: { table: () => ({ findById }) },
             navigationStateController: fakeNavigationState(),
             collectionRegistryController: fakeCollectionRegistry(collections)
         };

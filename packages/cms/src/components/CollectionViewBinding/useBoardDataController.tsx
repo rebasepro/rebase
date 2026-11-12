@@ -180,7 +180,7 @@ export function useBoardDataController<M extends Record<string, unknown> = any, 
 
     // Where the source cannot subscribe, the columns are one read each: they
     // are read again on every write to the collection in this `<Rebase>`.
-    const changeVersion = useDataChangeVersion(resolvedPath, !dataClient.collection(resolvedPath).listen);
+    const changeVersion = useDataChangeVersion(resolvedPath, !dataClient.table(resolvedPath).listen);
 
     // Trigger full re-subscription when key params change
     useEffect(() => {
@@ -434,7 +434,7 @@ values: { ...e.values,
             });
         };
 
-        const accessor = currentDataClient.collection(currentResolvedPath);
+        const accessor = currentDataClient.table(currentResolvedPath);
 
         // Eagerly include relations to avoid N+1 fetches.
         const includeParams = getRelationIncludeParams(currentCollection);
@@ -545,7 +545,7 @@ values: { ...e.values,
                 }
 
                 // Count query for column (for display in column header)
-                const accessor = currentDataClient.collection(currentResolvedPath);
+                const accessor = currentDataClient.table(currentResolvedPath);
                 if (accessor.count) {
 
                     const whereFilter: FilterValues<string> = {

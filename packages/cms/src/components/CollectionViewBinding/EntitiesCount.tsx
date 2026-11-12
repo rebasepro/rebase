@@ -45,7 +45,7 @@ export function EntitiesCount({
     const dataClient = useData();
     // A count is one read where the source cannot count live: it is read
     // again on every write to the collection in this `<Rebase>`.
-    const changeVersion = useDataChangeVersion(path, !dataClient.collection(path).listenCount);
+    const changeVersion = useDataChangeVersion(path, !dataClient.table(path).listenCount);
 
     // The whole sort as one string: it keys the dedup cache and drives the
     // effect, and a `sortBy` array is a new reference on every render.
@@ -61,7 +61,7 @@ export function EntitiesCount({
     const filterKey = React.useMemo(() => filter ? JSON.stringify(filter) : "", [filter]);
 
     useEffect(() => {
-        const accessor = dataClientRef.current.collection(path);
+        const accessor = dataClientRef.current.table(path);
         if (!accessor.count && !accessor.listenCount) {
             onCountChangeRef.current?.(undefined);
             return;

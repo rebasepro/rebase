@@ -75,7 +75,7 @@ Components you render anywhere under `<Rebase>` and a router.
 | `useRowCount` | `@rebasepro/app` | `useRowCount("orders", where)` → `{ count, loading, error }`, counted by the data source. |
 | `useAggregate` | `@rebasepro/app` | `useAggregate("orders", { select: [{ fn: "count" }], groupBy: ["status"], orderBy: ["count", "desc"] })` → `{ result, loading, error }`: one row per group, each aggregate under its alias (`count`, `sum_total`). Computed by the data source; `error` says so where it cannot. |
 | `useRowWrites` | `@rebasepro/app` | `{ create, update, remove, saving, error }`: `update("orders", id, { status: "shipped" })`. Each write is the record form's save: the collection's `browserCallbacks` run, then the server's callbacks and rules, and every view of the collection reads it again. |
-| `useRebaseContext` | `@rebasepro/app` | The context: `context.data.collection("orders").find / findById / create / update / delete`, outside React state. Rows as the hooks return them; a write runs the collection's `browserCallbacks` and refreshes its views, as `useRowWrites` does. |
+| `useRebaseContext` | `@rebasepro/app` | The context: `context.data.table("orders").find / findById / create / update / delete`, outside React state. Rows as the hooks return them; a write runs the collection's `browserCallbacks` and refreshes its views, as `useRowWrites` does. |
 | `usePermissions` | `@rebasepro/app` | `canCreate(collection, path)`, `canEdit(collection, path, row)`, `canDelete(collection, path, row)`: what the signed-in user may do, by the collection's rules. |
 | `useAuthController` | `@rebasepro/app` | The signed-in `user` (uid, roles), and sign-in / sign-out. |
 | `useSnackbarController` | `@rebasepro/app` | `open({ type, message })` for a toast. |

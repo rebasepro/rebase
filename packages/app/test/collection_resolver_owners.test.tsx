@@ -64,8 +64,8 @@ describe("collection resolvers registered by several owners", () => {
             </Rebase>
         );
 
-        const posts = await captured.data!.collection("posts").find();
-        const authors = await captured.data!.collection("authors").find();
+        const posts = await captured.data!.table("posts").find();
+        const authors = await captured.data!.table("authors").find();
 
         expect(posts.data.map(entity => entity.id)).toEqual(["hello"]);
         expect(authors.data.map(entity => entity.id)).toEqual(["ada"]);
@@ -88,7 +88,7 @@ describe("collection resolvers registered by several owners", () => {
                     <Probe/>
                 </Rebase>
             );
-            const posts = await captured.data!.collection("posts").find();
+            const posts = await captured.data!.table("posts").find();
             expect(posts.data.map(entity => entity.id)).not.toEqual(["hello"]);
         } finally {
             warn.mockRestore();

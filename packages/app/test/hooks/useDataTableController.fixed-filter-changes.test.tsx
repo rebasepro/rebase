@@ -14,7 +14,7 @@ const mockLocation = { pathname: "/my-page", search: "", hash: "", state: null, 
 jest.mock("react-router", () => ({ useLocation: () => mockLocation }));
 
 const mockFind = jest.fn();
-const mockData = { collection: () => ({ find: mockFind }) };
+const mockData = { table: () => ({ find: mockFind }) };
 jest.mock("../../src/hooks", () => ({ useRebaseContext: () => ({}) }));
 jest.mock("../../src/hooks/data/useData", () => ({ useData: () => mockData }));
 jest.mock("../../src/hooks/data/useFetch", () => ({ populateFetchCache: jest.fn() }));

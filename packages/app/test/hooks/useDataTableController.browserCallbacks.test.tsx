@@ -27,7 +27,7 @@ jest.mock("../../src/hooks", () => ({
     useRebaseContext: () => ({ someContextField: true })
 }));
 jest.mock("../../src/hooks/data/useData", () => ({
-    useData: () => ({ collection: () => ({ find: findMock }) })
+    useData: () => ({ table: () => ({ find: findMock }) })
 }));
 jest.mock("../../src/hooks/data/useFetch", () => ({ populateFetchCache: jest.fn() }));
 

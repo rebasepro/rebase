@@ -18,7 +18,7 @@ const toasts: { type: string; title?: string; message?: string }[] = [];
 
 jest.mock("@rebasepro/app", () => {
     const overrides: Record<string, unknown> = {
-        useData: () => ({ collection: () => ({}) }),
+        useData: () => ({ table: () => ({}) }),
         useSnackbarController: () => ({ open: (t: { type: string; title?: string; message?: string }) => toasts.push(t), close: () => undefined }),
         deleteEntityWithCallbacks: async ({ entity, onDeleteFailure }: {
             entity: Entity<Record<string, unknown>>;

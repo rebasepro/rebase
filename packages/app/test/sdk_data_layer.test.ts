@@ -61,7 +61,7 @@ describe("useBuildSdkDataLayer", () => {
             [{ key: "(default)", engine: "postgres", driver: driver("(default)", reads) }],
             (slug) => slug === "diagnosis" ? "fs_diagnosis" : undefined
         )));
-        await result.current!.data.collection("diagnosis").find();
+        await result.current!.data.table("diagnosis").find();
         expect(reads).toEqual(["fs_diagnosis"]);
     });
 });

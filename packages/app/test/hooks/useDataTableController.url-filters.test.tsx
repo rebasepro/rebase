@@ -33,7 +33,7 @@ key: "k" };
 jest.mock("react-router", () => ({ useLocation: () => mockLocation }));
 
 const mockFind = jest.fn();
-const mockData = { collection: () => ({ find: mockFind }) };
+const mockData = { table: () => ({ find: mockFind }) };
 jest.mock("../../src/hooks", () => ({
     useRebaseContext: () => ({})
 }));

@@ -17,7 +17,7 @@ jest.mock("react-router", () => ({ useLocation: () => mockLocation }));
 const stored = Array.from({ length: 500 }, (_, i) => ({ id: `c${i}`, path: "customers", values: {} }));
 const find = jest.fn((params: { limit: number; offset?: number }) =>
     Promise.resolve({ data: stored.slice(params.offset ?? 0, (params.offset ?? 0) + params.limit) }));
-const mockClient = { collection: () => ({ find }) };
+const mockClient = { table: () => ({ find }) };
 jest.mock("../../src/hooks", () => ({
     useRebaseContext: () => ({})
 }));

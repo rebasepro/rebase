@@ -35,7 +35,7 @@ jest.mock("@rebasepro/app", () => {
         useAuthController: () => ({ user: null }),
         useAnalyticsController: () => ({}),
         useCustomizationController: () => customization,
-        useData: () => ({ collection: () => ({}) }),
+        useData: () => ({ table: () => ({}) }),
         useTranslation: () => translation,
         useLargeLayout: () => true,
         // The one read a bare foreign key needs: the related row, by its id.

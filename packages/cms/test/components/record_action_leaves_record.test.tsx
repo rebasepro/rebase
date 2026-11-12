@@ -23,7 +23,7 @@ const entity = { id: "7", path: "posts", values: { title: "Hello" } };
 
 jest.mock("@rebasepro/app", () => {
     const context = {};
-    const data = { collection: () => ({}) };
+    const data = { table: () => ({}) };
     const overrides: Record<string, unknown> = {
         useFetch: () => ({ entity, dataLoading: false, dataLoadingError: undefined }),
         usePermissions: () => ({ canEdit: () => true, canCreate: () => false, canDelete: () => false }),

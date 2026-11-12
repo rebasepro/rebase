@@ -37,7 +37,7 @@ const accessor = {
     },
     findById: async () => { calls.findById++; return undefined; }
 };
-const mockClient = { collection: () => accessor };
+const mockClient = { table: () => accessor };
 jest.mock("../../src/hooks/data/useData", () => ({ useData: () => mockClient }));
 
 import { useBatchedFetch } from "../../src/hooks/data/useBatchedFetch";

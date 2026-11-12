@@ -20,7 +20,7 @@ import type { AdminCollection } from "@rebasepro/cms-types";
 const count = jest.fn();
 
 jest.mock("@rebasepro/app", () => ({
-    useData: () => ({ collection: () => ({ count }) }),
+    useData: () => ({ table: () => ({ count }) }),
     useDataChangeVersion: () => 0
 }));
 

@@ -25,7 +25,7 @@ jest.mock("react-router", () => ({ useLocation: () => mockLocation }));
 const find = jest.fn().mockResolvedValue({ data: [] });
 // One client for every render, as the real context provides: a new one per
 // render re-opens the read on every render.
-const mockClient = { collection: () => ({ find }) };
+const mockClient = { table: () => ({ find }) };
 jest.mock("../../src/hooks", () => ({
     useRebaseContext: () => ({})
 }));

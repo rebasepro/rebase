@@ -2,10 +2,10 @@ import React from "react";
 import { render, act } from "@testing-library/react";
 import { useRelationSelector } from "../../src/hooks/data/useRelationSelector";
 import type { AdminCollection } from "@rebasepro/cms-types";
-import { type DataCollections, fakeCollectionAccessor, findResponse } from "../helpers/fakes";
+import { type DataTables, fakeTableAccessor, findResponse } from "../helpers/fakes";
 
 /** What the mocked `useData()` hands the hook; each test installs its own. */
-let mockDataClient: DataCollections | undefined;
+let mockDataClient: DataTables | undefined;
 
 /**
  * A mounted picker is not an open picker.
@@ -31,7 +31,7 @@ function mockClient({ withSocket }: { withSocket: boolean }) {
     const listens: unknown[] = [];
     const unsubscribes: string[] = [];
     mockDataClient = {
-        collection: (slug) => fakeCollectionAccessor(slug, {
+        table: (slug) => fakeTableAccessor(slug, {
             find: async (params) => {
                 finds.push(params);
                 return findResponse([]);

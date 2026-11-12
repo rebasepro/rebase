@@ -13,7 +13,7 @@ import { startMcpView, type ViewBridge } from "@rebasepro/cms/mcp-view";
 import { CollectionTable } from "../collection-table/CollectionTable";
 import "../index.css";
 
-const NO_COLLECTIONS: never[] = [];
+const NO_TABLES: never[] = [];
 
 function root(): HTMLElement {
     return document.getElementById("root") ?? document.body.appendChild(document.createElement("div"));
@@ -28,7 +28,7 @@ export function startGenericView(bridge?: ViewBridge): ViewBridge {
         // the person, and the collections the server sent.
         mountApp: () => createRoot(root()).render(
             <Rebase>
-                <RebaseCMS collections={NO_COLLECTIONS}/>
+                <RebaseCMS collections={NO_TABLES}/>
                 <RebaseShell/>
             </Rebase>
         ),

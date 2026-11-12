@@ -19,7 +19,7 @@ const pending: PendingDelete[] = [];
 
 jest.mock("@rebasepro/app", () => {
     const overrides: Record<string, unknown> = {
-        useData: () => ({ collection: () => ({}) }),
+        useData: () => ({ table: () => ({}) }),
         useSnackbarController: () => ({ open: () => undefined, close: () => undefined }),
         deleteEntityWithCallbacks: ({ entity }: { entity: Entity<Record<string, unknown>> }) =>
             new Promise<boolean>(resolve => pending.push({ entity, resolve }))

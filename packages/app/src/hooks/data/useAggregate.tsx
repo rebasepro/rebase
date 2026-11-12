@@ -42,7 +42,7 @@ export function useAggregate<M extends Record<string, unknown> = Record<string, 
 ): UseAggregateResult {
     const { data, changes } = useSdkData("useAggregate");
     const query = useStableFilterValues(params);
-    const accessor = useMemo(() => data.collection<M>(collection), [data, collection]);
+    const accessor = useMemo(() => data.table<M>(collection), [data, collection]);
 
     const [version, recompute] = useReducer((n: number) => n + 1, 0);
     useEffect(() => changes.subscribe(collection, recompute), [changes, collection]);

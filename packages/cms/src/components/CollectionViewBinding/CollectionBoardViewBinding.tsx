@@ -273,7 +273,7 @@ parentEntityIds,
 
     useEffect(() => {
         const currentDataClient = dataClientRef.current;
-        const accessor = currentDataClient.collection(fullPath);
+        const accessor = currentDataClient.table(fullPath);
 
         if (!orderProperty || !accessor.count) {
             setMissingOrderCount(0);
@@ -399,7 +399,7 @@ parentEntityIds,
             // than quietly answered with the first thousand. A board past the
             // ceiling still gets only its first page backfilled — the same rows
             // as before this became explicit — and wants a paged walk.
-            const allDocsRes = await dataClient.collection(fullPath).find({
+            const allDocsRes = await dataClient.table(fullPath).find({
                 limit: MAX_LIST_LIMIT
             });
             const allDocs = allDocsRes.data as Entity<M>[];

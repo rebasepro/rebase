@@ -17,7 +17,7 @@ let listenCount: jest.Mock | undefined;
 const count = jest.fn();
 
 jest.mock("@rebasepro/app", () => ({
-    useData: () => ({ collection: () => ({ count, ...(listenCount ? { listenCount } : {}) }) }),
+    useData: () => ({ table: () => ({ count, ...(listenCount ? { listenCount } : {}) }) }),
     useDataChangeVersion: () => 0
 }));
 

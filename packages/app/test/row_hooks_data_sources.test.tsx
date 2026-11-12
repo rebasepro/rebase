@@ -7,7 +7,7 @@ import { CollectionResolverRegistrationContext } from "../src/contexts/Collectio
 import { useRebaseContext } from "../src/hooks/useRebaseContext";
 import { useRows, type UseRowsResult } from "../src/hooks/data/useRows";
 import { useRowWrites, type UseRowWritesResult } from "../src/hooks/data/useRowWrites";
-import { clientOver, fakeAuthController, fakeSdkCollection, fakeStorageSource, fakeUser } from "./helpers/fakes";
+import { clientOver, fakeAuthController, fakeSdkTable, fakeStorageSource, fakeUser } from "./helpers/fakes";
 
 /**
  * The row hooks and `context.data` read each collection from the data source
@@ -141,7 +141,7 @@ describe("row hooks over several data sources", () => {
         const { main, archive, captured } = setupDrivers();
         await waitFor(() => expect(captured.notes!.rows).toHaveLength(1));
 
-        expect(await captured.context!.data.collection("notes").findById(1)).toEqual({ id: 1, text: "Note" });
+        expect(await captured.context!.data.table("notes").findById(1)).toEqual({ id: 1, text: "Note" });
         await act(async () => {
             await captured.context!.data.notes.update(1, { text: "Edited" });
         });
@@ -156,7 +156,7 @@ describe("row hooks over several data sources", () => {
         const page = (rows: Row[]): FindResult => ({ data: rows, meta: { total: rows.length, limit: 50, offset: 0, hasMore: false } });
         const client = clientOver((slug: string) => {
             requested.push(slug);
-            return fakeSdkCollection(slug, { find: async () => page([{ id: 7, title: "From the client" }]) });
+            return fakeSdkTable(slug, { find: async () => page([{ id: 7, title: "From the client" }]) });
         });
         const captured: Captured = {};
         render(

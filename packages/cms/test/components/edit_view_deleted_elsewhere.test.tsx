@@ -40,7 +40,7 @@ function FormStub({ row, children }: { row?: { title?: unknown }, children?: Rea
 }
 
 jest.mock("@rebasepro/app", () => {
-    const data = { collection: () => ({}) };
+    const data = { table: () => ({}) };
     const rebaseContext = {};
     const customization = { plugins: [], propertyConfigs: {}, entityActions: [], entityViews: [], components: {}, resolvedSlots: [] };
     const noSlots: unknown[] = [];

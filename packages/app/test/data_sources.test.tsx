@@ -58,8 +58,8 @@ describe("<Rebase> data source wiring", () => {
     function expectWrapsClientData(data?: RebaseData) {
         expect(data).toBeDefined();
         expect(data).not.toBe(clientData);
-        const spy = jest.spyOn(clientData, "collection");
-        data!.collection("widgets");
+        const spy = jest.spyOn(clientData, "table");
+        data!.table("widgets");
         expect(spy).toHaveBeenCalledWith("widgets");
         spy.mockRestore();
     }
@@ -80,7 +80,7 @@ describe("<Rebase> data source wiring", () => {
         });
         // A built RebaseData is present for the direct source.
         expect(captured.sources!.sources["analytics"]).toBeDefined();
-        expect(typeof captured.sources!.sources["analytics"].collection).toBe("function");
+        expect(typeof captured.sources!.sources["analytics"].table).toBe("function");
     });
 
     it("infers transport when omitted: driver → direct, no driver → server", () => {
@@ -231,7 +231,7 @@ describe("<Rebase> data source wiring", () => {
             </Rebase>
         );
 
-        await captured.sources!.sources["firestore"].collection("fs_diagnosis").find();
+        await captured.sources!.sources["firestore"].table("fs_diagnosis").find();
 
         expect(fs.fetchCollection).toHaveBeenCalledWith(expect.objectContaining({ path: "diagnosis" }));
     });

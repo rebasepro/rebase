@@ -22,7 +22,7 @@ import type { AdminCollection } from "@rebasepro/cms-types";
 type Deliver = (entity: Entity | undefined) => void;
 let deliver: Deliver = () => undefined;
 const mockClient = {
-    collection: () => ({
+    table: () => ({
         listenById: (_id: string, onUpdate: Deliver) => {
             deliver = onUpdate;
             return () => undefined;

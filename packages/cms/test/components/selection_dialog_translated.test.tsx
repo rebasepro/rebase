@@ -39,7 +39,7 @@ jest.mock("../../src/components/CollectionTableBinding", () => ({
 
 jest.mock("@rebasepro/app", () => {
     const analytics = { onAnalyticsEvent: () => undefined };
-    const data = { collection: () => ({}) };
+    const data = { table: () => ({}) };
     const tableController = {};
     const columnIds: string[] = [];
     const permissions = { canCreate: () => false };

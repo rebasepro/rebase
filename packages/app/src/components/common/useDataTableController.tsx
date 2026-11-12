@@ -368,7 +368,7 @@ export function useDataTableController<M extends Record<string, any> = any, USER
     // form's save, `useRowWrites`, `useData()`, a change the driver heard of.
     // A re-read is the only way to show it. A live subscription already
     // delivers the change, so it is left alone.
-    const canListen = Boolean(dataClient.collection(path).listen);
+    const canListen = Boolean(dataClient.table(path).listen);
     const changeVersion = useDataChangeVersion(path, !canListen && enabled);
     const oneShotReadKey = canListen ? undefined : `${lastDeleteTimestamp ?? 0}:${changeVersion}`;
 
@@ -457,7 +457,7 @@ export function useDataTableController<M extends Record<string, any> = any, USER
         const seed = seedRef.current;
         seedRef.current = undefined;
         const collectionWindow = new CollectionWindow<M>({
-            accessor: dataClient.collection<M>(path),
+            accessor: dataClient.table<M>(path),
             query: toFindParams({ where: whereParams, orderBy: orderByParams, searchString, include: includeParams }),
             pageSize,
             target: targetRef.current,

@@ -121,7 +121,7 @@ export function ExportCollectionAction<M extends Record<string, unknown>, USER e
         setProgress({ loaded: 0 });
         try {
             const onProgress = (loaded: number, total: number | undefined) => setProgress({ loaded, total });
-            const accessor = dataClient.collection(path) as { find: (params?: any) => Promise<any> };
+            const accessor = dataClient.table(path) as { find: (params?: any) => Promise<any> };
 
             const additionalHeaders = [
                 ...exportConfig?.additionalFields?.map(column => column.key) ?? [],

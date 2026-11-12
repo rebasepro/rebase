@@ -21,7 +21,7 @@ import { useRowCount, type UseRowCountResult } from "../src/hooks/data/useRowCou
 import { useAggregate, type UseAggregateResult } from "../src/hooks/data/useAggregate";
 import { useRowWrites, type UseRowWritesResult } from "../src/hooks/data/useRowWrites";
 import { CHANGE_QUIET_MS } from "../src/hooks/data/dataChanges";
-import { clientOver, fakeAuthController, fakeSdkCollection, fakeStorageSource, fakeUser } from "./helpers/fakes";
+import { clientOver, fakeAuthController, fakeSdkTable, fakeStorageSource, fakeUser } from "./helpers/fakes";
 
 /**
  * The flat row hooks read the server's own rows — ISO date strings, a
@@ -119,7 +119,7 @@ function fakeClient(collections: Record<string, FakeCollection>) {
     const client = clientOver((slug: string) => {
         requested.push(slug);
         const fake = collections[slug];
-        return fakeSdkCollection(slug, {
+        return fakeSdkTable(slug, {
             find: fake.find,
             findById: fake.findById ?? notAvailable("findById"),
             count: fake.count ?? notAvailable("count"),
@@ -230,7 +230,7 @@ describe("row hooks over a driver (buildSdkData)", () => {
 
         // The admin's own layer, over the same driver, does convert: the flat
         // hooks are not built on it.
-        const viewModel = await captured.data!.collection("posts").find();
+        const viewModel = await captured.data!.table("posts").find();
         expect(viewModel.data[0].values.created_at).toBeInstanceOf(Date);
     });
 

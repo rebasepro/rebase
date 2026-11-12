@@ -24,7 +24,7 @@ const update = jest.fn<(id: string | number, data: Row, options?: { ifMatch?: st
 const snackbar = jest.fn();
 
 jest.mock("@rebasepro/app", () => {
-    const data = { collection: () => ({ update, create: update }) };
+    const data = { table: () => ({ update, create: update }) };
     const overrides: Record<string, unknown> = {
         useAuthController: () => ({ user: { uid: "u1", roles: ["admin"] } }),
         useCustomizationController: () => ({ plugins: [], propertyConfigs: {}, entityActions: [], entityViews: [], resolvedSlots: [] }),

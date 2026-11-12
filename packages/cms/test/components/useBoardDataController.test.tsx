@@ -14,7 +14,7 @@ const find = jest.fn();
 const count = jest.fn();
 
 jest.mock("@rebasepro/app", () => ({
-    useData: () => ({ collection: () => ({ listen,
+    useData: () => ({ table: () => ({ listen,
 find,
 count }) }),
     useRebaseContext: () => ({}),
@@ -373,7 +373,7 @@ done: 0 });
 find,
 count };
         find.mockResolvedValue({ data: [entity("1", { status: "todo" })] });
-        jest.spyOn(require("@rebasepro/app"), "useData").mockReturnValue({ collection: () => noListen });
+        jest.spyOn(require("@rebasepro/app"), "useData").mockReturnValue({ table: () => noListen });
 
         const { result } = renderBoard();
 
@@ -567,7 +567,7 @@ describe("useBoardDataController — superseded reads", () => {
 
     it("an older search's rows cannot overwrite a newer search's", async () => {
         const noListen = { listen: undefined, find, count };
-        const spy = jest.spyOn(require("@rebasepro/app"), "useData").mockReturnValue({ collection: () => noListen });
+        const spy = jest.spyOn(require("@rebasepro/app"), "useData").mockReturnValue({ table: () => noListen });
         const reads: Record<string, (value: { data: unknown[] }) => void> = {};
         find.mockImplementation((params: any) => new Promise(resolve => {
             reads[params.searchString ?? ""] = resolve;

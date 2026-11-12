@@ -14,7 +14,7 @@ import type { AdminCollection } from "@rebasepro/cms-types";
  */
 
 // A listener that never answers: what is on screen at first is the cache.
-const mockClient = { collection: () => ({ listenById: () => () => undefined }) };
+const mockClient = { table: () => ({ listenById: () => () => undefined }) };
 jest.mock("../../src/hooks/data/useData", () => ({ useData: () => mockClient }));
 jest.mock("../../src/hooks/useRebaseContext", () => ({ useRebaseContext: () => ({}) }));
 

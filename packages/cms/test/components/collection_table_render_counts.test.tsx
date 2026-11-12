@@ -72,7 +72,7 @@ jest.mock("react-use-measure", () => {
 jest.mock("@rebasepro/app", () => {
     const ReactActual = jest.requireActual("react") as typeof React;
     const translation = { t: (key: string) => key };
-    const data = { collection: () => ({ count: async () => ROWS, find: async () => ({ data: [] }) }) };
+    const data = { table: () => ({ count: async () => ROWS, find: async () => ({ data: [] }) }) };
     const auth = { user: { uid: "u1" } };
     const rebaseContext = { authController: auth };
     const permissions = { canCreate: () => true, canEdit: () => true, canDelete: () => true };

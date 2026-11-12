@@ -38,6 +38,6 @@ export async function updateRecord<T extends CustomizableTable | undefined = und
     message?: string
 ): Promise<void> {
     if (!context || !slug || id === undefined) return;
-    await context.data.collection(slug).update(id, patch);
+    await context.data.table(slug).update(id, patch);
     if (message) context.snackbarController?.open({ type: "success", message });
 }

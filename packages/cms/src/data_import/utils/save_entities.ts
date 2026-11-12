@@ -1,4 +1,4 @@
-import type { CollectionAccessor, CollectionConfig, Entity } from "@rebasepro/types";
+import type { TableAccessor, CollectionConfig, Entity } from "@rebasepro/types";
 import { findEntitiesByIds } from "../../util/find_entities_by_ids";
 
 /**
@@ -6,7 +6,7 @@ import { findEntitiesByIds } from "../../util/find_entities_by_ids";
  * `RebaseData` accessor is one, and so is any source that can find rows by id
  * and create and update them.
  */
-export type ImportAccessor = Pick<CollectionAccessor, "find" | "findById" | "create" | "update" | "createMany" | "updateMany">;
+export type ImportAccessor = Pick<TableAccessor, "find" | "findById" | "create" | "update" | "createMany" | "updateMany">;
 
 /**
  * Rows written per request, and per transaction where the data source has one.
@@ -182,7 +182,7 @@ function toUserCreationRow(entity: Partial<Entity<any>>): Record<string, unknown
 async function writeUpdatesAndCreates(accessor: ImportAccessor,
     batch: Partial<Entity<any>>[],
     collection: CollectionConfig,
-    createMany: NonNullable<CollectionAccessor["createMany"]>,
+    createMany: NonNullable<TableAccessor["createMany"]>,
     upsert: boolean): Promise<void> {
 
     const ids = batch.map(entity => entity.id).filter((id): id is string | number => id !== undefined && id !== null && id !== "");
@@ -292,7 +292,7 @@ async function writeBatch(accessor: ImportAccessor,
  *
  * @throws {ImportSaveError} naming the rows that were not written.
  */
-export async function saveImportedEntities(dataClient: { collection(slug: string): ImportAccessor },
+export async function saveImportedEntities(dataClient: { table(slug: string): ImportAccessor },
     path: string,
     data: Partial<Entity<any>>[],
     {
@@ -319,7 +319,7 @@ export async function saveImportedEntities(dataClient: { collection(slug: string
 
     console.debug("Saving imported data", offset, batchSize);
 
-    const accessor = dataClient.collection(path);
+    const accessor = dataClient.table(path);
 
     // Lowered for the rest of the import when a batch is refused for its
     // size — a server or proxy configured below the byte cap — so an import

@@ -21,7 +21,7 @@ export function useCollectionInlineEditor<M extends Record<string, unknown>>({
     // Unique field validator (ported from CollectionViewBinding)
     const uniqueFieldValidator: UniqueFieldValidator = useCallback(
         async ({ name, value, property, entityId }: Parameters<UniqueFieldValidator>[0]) => {
-            const accessor = dataClient.collection(path);
+            const accessor = dataClient.table(path);
             const res = await accessor.find({
                 where: { [name]: ["==", value] }
             });

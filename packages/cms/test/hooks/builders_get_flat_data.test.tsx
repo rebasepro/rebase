@@ -45,7 +45,7 @@ describe("the collection and view builders", () => {
         global.fetch = fakeFetch(async () => jsonResponse({}, { status: 404 }));
         const seen: { collections?: unknown[]; views?: unknown[] } = {};
         const collections = async ({ data }: { data: RebaseSdkData }) => {
-            seen.collections = (await data.collection("tasks").find()).data;
+            seen.collections = (await data.table("tasks").find()).data;
             return [tasks];
         };
         const views = async ({ data }: { data: RebaseSdkData }) => {

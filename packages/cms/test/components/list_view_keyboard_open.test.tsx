@@ -27,7 +27,7 @@ jest.mock("@rebasepro/app", () => {
         useAuthController: () => ({ user: null }),
         useAnalyticsController: () => ({}),
         useCustomizationController: () => customization,
-        useData: () => ({ collection: () => ({}) }),
+        useData: () => ({ table: () => ({}) }),
         useTranslation: () => translation,
         useLargeLayout: () => true
     };

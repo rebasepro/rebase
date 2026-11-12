@@ -93,7 +93,7 @@ export function useCollection<M extends Record<string, any>, USER extends User>(
     const { reportSchemaDrift } = useSchemaDriftContext();
     // A source that cannot subscribe is read again on every write to the
     // collection in this `<Rebase>`, and every change its driver announces.
-    const changeVersion = useDataChangeVersion(path, !dataClient.collection(path).listen);
+    const changeVersion = useDataChangeVersion(path, !dataClient.table(path).listen);
 
     const sortByProperty = sortBy ? sortBy[0] : undefined;
     const currentSort = sortBy ? sortBy[1] : undefined;
@@ -148,7 +148,7 @@ export function useCollection<M extends Record<string, any>, USER extends User>(
             }
         };
 
-        const accessor = dataClient.collection(path);
+        const accessor = dataClient.table(path);
 
         // Eagerly include relations to avoid N+1 fetches.
         const includeParams = getRelationIncludeParams(collection);

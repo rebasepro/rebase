@@ -43,7 +43,7 @@ jest.mock("@rebasepro/app", () => {
     };
     const overrides: Record<string, unknown> = {
         useTranslation: () => ({ t: (key: string) => key }),
-        useData: () => ({ collection: () => ({ count: async () => rows.length, find: async () => ({ data: [] }) }) }),
+        useData: () => ({ table: () => ({ count: async () => rows.length, find: async () => ({ data: [] }) }) }),
         useAuthController: () => ({ user: { uid: "u1" } }),
         useRebaseContext: () => ({ authController: { user: { uid: "u1" } } }),
         useUserConfigurationPersistence: () => undefined,

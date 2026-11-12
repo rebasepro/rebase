@@ -2,10 +2,10 @@ import React from "react";
 import { render, act } from "@testing-library/react";
 import { useCollection } from "../src/hooks/data/useCollection";
 import type { AdminCollection } from "@rebasepro/cms-types";
-import { type DataCollections, fakeCollectionAccessor, findResponse } from "./helpers/fakes";
+import { type DataTables, fakeTableAccessor, findResponse } from "./helpers/fakes";
 
 /** What the mocked `useData()` hands the hook; each test installs its own. */
-let mockDataClient: DataCollections | undefined;
+let mockDataClient: DataTables | undefined;
 
 /**
  * Without a websocket the client defines no `listen`, and `useCollection`
@@ -40,7 +40,7 @@ type Pending = {
 function mockClientWithoutListen() {
     const pending: Pending[] = [];
     mockDataClient = {
-        collection: (slug) => fakeCollectionAccessor(slug, {
+        table: (slug) => fakeTableAccessor(slug, {
             find: (params) => new Promise((resolve, reject) => {
                 pending.push({
                     searchString: params?.searchString,

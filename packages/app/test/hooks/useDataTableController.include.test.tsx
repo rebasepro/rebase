@@ -28,7 +28,7 @@ type Row = { id: string; path: string; values: Record<string, unknown> };
 const mockFind = jest.fn();
 const mockListen = jest.fn();
 const mockAccessor = { find: mockFind, listen: mockListen };
-const mockData = { collection: () => mockAccessor };
+const mockData = { table: () => mockAccessor };
 const mockContext = {};
 jest.mock("../../src/hooks", () => ({
     useRebaseContext: () => mockContext

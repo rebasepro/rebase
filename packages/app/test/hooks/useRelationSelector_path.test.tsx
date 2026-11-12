@@ -19,7 +19,7 @@ describe("useRelationSelector — the target path", () => {
 
     beforeEach(() => {
         (globalThis as { __mockDataClient?: unknown }).__mockDataClient = {
-            collection: (path: string) => ({
+            table: (path: string) => ({
                 find: async () => ({ data: [{ id: `${path}-1`, path, values: { name: `${path} one` } }], meta: { hasMore: false } })
             })
         };

@@ -247,7 +247,7 @@ function SelectionTableBindingInternal<M extends Record<string, unknown>>(
         const selectedEntityIds = selectedEntityIdsProp?.map(id => id?.toString()).filter(Boolean);
         if (selectedEntityIds && selectedEntityIds.length > 0 && collection) {
             // One request per 1,000 ids, not one per id (see findEntitiesByIds).
-            findEntitiesByIds(dataClient.collection<M>(path), collection, selectedEntityIds)
+            findEntitiesByIds(dataClient.table<M>(path), collection, selectedEntityIds)
                 .then((found) => {
                     if (!unmounted) {
                         // In the order given; an id with no row is dropped.

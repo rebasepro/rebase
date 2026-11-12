@@ -89,7 +89,7 @@ export async function saveEntityWithCallbacks<M extends Record<string, unknown>>
         throw new Error("Entity id must be specified when updating an existing entity");
     }
 
-    const accessor = data.collection(path);
+    const accessor = data.table(path);
     // The callbacks' rows. The form's values are what is written: a row
     // `beforeSave` hands back is converted onto them, key by key. It is
     // handed a copy, so an edit it makes in place is a change to `row`.

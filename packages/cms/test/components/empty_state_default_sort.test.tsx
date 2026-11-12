@@ -37,7 +37,7 @@ const mockState: {
 
 jest.mock("@rebasepro/app", () => {
     const translation = { t: (key: string) => key };
-    const data = { collection: () => ({ count: async () => 0, find: async () => ({ data: [] }) }) };
+    const data = { table: () => ({ count: async () => 0, find: async () => ({ data: [] }) }) };
     const auth = { user: { uid: "u1" } };
     const analytics = {};
     const customization = { plugins: [], propertyConfigs: {}, entityActions: [], components: {}, resolvedSlots: [] };

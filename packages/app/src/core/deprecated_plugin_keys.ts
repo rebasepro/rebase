@@ -24,7 +24,7 @@ export function warnDeprecatedPluginKeys(plugins: readonly RebasePlugin[]): void
                 `plugin:${plugin.key}:lifecycle.onCollectionChange`,
                 `Plugin "${plugin.key}" sets \`lifecycle.onCollectionChange\`, which is deprecated: ` +
                 "nothing has ever called it. Remove it and subscribe to the rows yourself instead — " +
-                "`context.data.collection(slug).listen(...)` from `lifecycle.onMount`, unsubscribing in " +
+                "`context.data.table(slug).listen(...)` from `lifecycle.onMount`, unsubscribing in " +
                 "`lifecycle.onUnmount`."
             );
         }

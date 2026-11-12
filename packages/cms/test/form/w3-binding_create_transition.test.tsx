@@ -35,7 +35,7 @@ jest.mock("@rebasepro/app", () => {
         useCustomizationController: () => ({ plugins: [], propertyConfigs: {}, entityActions: [], entityViews: [], resolvedSlots: [] }),
         useAuthController: () => ({ user: { uid: "u1" } }),
         useSnackbarController: () => ({ open: () => undefined }),
-        useData: () => ({ collection: () => ({ create, update, find: async () => ({ data: [] }) }) }),
+        useData: () => ({ table: () => ({ create, update, find: async () => ({ data: [] }) }) }),
         useAnalyticsController: () => ({}),
         useSlot: () => null
     };

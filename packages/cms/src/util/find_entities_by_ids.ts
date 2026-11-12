@@ -1,5 +1,5 @@
 import { MAX_LIST_LIMIT } from "@rebasepro/types";
-import type { CollectionAccessor, CollectionConfig, Entity, WhereFor } from "@rebasepro/types";
+import type { TableAccessor, CollectionConfig, Entity, WhereFor } from "@rebasepro/types";
 import { getPrimaryKeys } from "@rebasepro/common";
 
 /**
@@ -24,7 +24,7 @@ import { getPrimaryKeys } from "@rebasepro/common";
  *   per-id read that fails is absent too, and logged.
  */
 export async function findEntitiesByIds<M extends Record<string, unknown>>(
-    accessor: Pick<CollectionAccessor<M>, "find" | "findById">,
+    accessor: Pick<TableAccessor<M>, "find" | "findById">,
     collection: CollectionConfig<M>,
     ids: readonly (string | number)[]
 ): Promise<Map<string, Entity<M>>> {

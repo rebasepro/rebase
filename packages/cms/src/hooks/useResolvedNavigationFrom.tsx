@@ -1,6 +1,6 @@
 
 import type { EntityCustomView, AdminCollection } from "@rebasepro/cms-types";
-import { Entity, SDKCollectionClient, User } from "@rebasepro/types";
+import { Entity, SDKTableClient, User } from "@rebasepro/types";
 import { RebaseContext } from "@rebasepro/cms-types";
 import { useEffect, useState, useMemo } from "react";
 import { getNavigationEntriesFromPath } from "@rebasepro/app";
@@ -56,7 +56,7 @@ interface ResolvedNavigationEntityCustom<M extends Record<string, unknown>> {
  */
 export type NavigationResolutionContext<USER extends User = User> =
     Pick<RebaseContext<USER>, "navigationStateController" | "collectionRegistryController"> & {
-        data: { collection(slug: string): Pick<SDKCollectionClient, "findById"> };
+        data: { table(slug: string): Pick<SDKTableClient, "findById"> };
     };
 
 /**
@@ -103,7 +103,7 @@ export function resolveNavigationFrom<M extends Record<string, unknown>, USER ex
                 // Entity view-model the navigation entry expects. The address is
                 // the one we just fetched by — reading it back off the row would
                 // find nothing, since a row is only its columns.
-                return data.collection(entry.slug).findById(entry.entityId)
+                return data.table(entry.slug).findById(entry.entityId)
                     .then((row) => {
                         if (!row) return undefined;
                         const entity = { id: entry.entityId, path: entry.slug, values: row };

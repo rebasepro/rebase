@@ -19,7 +19,7 @@ import type { AdminCollection, EntitySelection } from "@rebasepro/cms-types";
 
 jest.mock("@rebasepro/app", () => {
     const overrides: Record<string, unknown> = {
-        useData: () => ({ collection: () => ({}) }),
+        useData: () => ({ table: () => ({}) }),
         useSnackbarController: () => ({ open: () => undefined, close: () => undefined })
     };
     return new Proxy({}, {

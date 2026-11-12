@@ -35,7 +35,7 @@ describe("useCollection keeps the rows a push did not change", () => {
     it("hands an unchanged row through as the same object", async () => {
         let push!: Update;
         (globalThis as { __mockDataClient?: unknown }).__mockDataClient = {
-            collection: () => ({
+            table: () => ({
                 listen: (_params: unknown, onUpdate: Update) => {
                     push = onUpdate;
                     return () => undefined;

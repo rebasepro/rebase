@@ -131,8 +131,8 @@ describe("StudioHomePage Component", () => {
         // and the copied client 404s on that collection at runtime.
         const { container } = render(<StudioHomePage />);
 
-        expect(container.textContent).toContain("import { collectionsDictionary, type Database } from './database.types';");
-        expect(container.textContent).toContain("collections: collectionsDictionary,");
+        expect(container.textContent).toContain("import { tablesDictionary, type Database } from './database.types';");
+        expect(container.textContent).toContain("tables: tablesDictionary,");
     });
 
     it("renders additional children when provided", () => {

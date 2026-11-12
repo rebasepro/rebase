@@ -509,7 +509,7 @@ export function EntityPreviewBindingWithId({
         const fetchOne = async () => {
             setDataLoading(true);
             try {
-                const fetchedEntity = await dataClient.collection(path).findById(entityId);
+                const fetchedEntity = await dataClient.table(path).findById(entityId);
                 if (isMounted) {
                     setEntity(fetchedEntity);
                 }

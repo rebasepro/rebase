@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useSyncExternalStore } from "react";
-import type { CollectionAccessor, Entity, FindParams, FindResponse, RebaseData } from "@rebasepro/types";
+import type { TableAccessor, Entity, FindParams, FindResponse, RebaseData } from "@rebasepro/types";
 import type { AdminCollection } from "@rebasepro/cms-types";
 import { resolvePrimaryKeys } from "@rebasepro/common";
 import { useData } from "./useData";
@@ -59,7 +59,7 @@ class RecordBatcher {
     private settleScheduled = false;
 
     constructor(
-        private readonly accessor: CollectionAccessor<any>,
+        private readonly accessor: TableAccessor<any>,
         /** The one key column, and its type — `undefined` for a composite key. */
         private readonly key: { fieldName: string; type: "string" | "number" } | undefined
     ) {}
@@ -205,7 +205,7 @@ function batcherFor(data: RebaseData, path: string, collection: AdminCollection<
     if (!batcher) {
         const keys = resolvePrimaryKeys(collection);
         batcher = new RecordBatcher(
-            data.collection(path),
+            data.table(path),
             keys.length === 1 ? { fieldName: keys[0].fieldName, type: keys[0].type } : undefined
         );
         byPath.set(path, batcher);

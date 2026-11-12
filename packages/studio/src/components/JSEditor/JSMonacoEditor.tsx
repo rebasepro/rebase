@@ -82,7 +82,7 @@ interface QueryBuilder<M extends Record<string, any> = any> {
     count(): Promise<number>;
 }
 
-interface CollectionClient<M extends Record<string, any> = any> {
+interface TableClient<M extends Record<string, any> = any> {
     find(params?: FindParams): Promise<FindResult<M>>;
     findById(id: string | number): Promise<M | undefined>;
     create(data: Partial<M>, id?: string | number): Promise<M>;
@@ -207,11 +207,11 @@ interface StorageSource {
 }
 
 type RebaseData = {
-    /** Look up a collection by slug. */
-    collection(slug: string): CollectionClient;
+    /** Look up a table by slug. */
+    table(slug: string): TableClient;
 } & {
-    /** Dynamic collection access — e.g. client.data.authors */
-    [collectionSlug: string]: CollectionClient;
+    /** Dynamic table access — e.g. client.data.authors */
+    [tableSlug: string]: TableClient;
 };
 
 /**
@@ -219,7 +219,7 @@ type RebaseData = {
  * \`client.storage\`, and \`client.call()\` to interact with your Rebase backend.
  *
  * @example
- * // Query a collection
+ * // Query a table
  * const result = await client.data.products.find({ limit: 10 });
  *
  * // Create a record
@@ -238,7 +238,7 @@ type RebaseData = {
  * const result = await client.call("/my-endpoint", { myData: 123 });
  */
 interface RebaseClient {
-    /** Data access — dynamic collection accessors */
+    /** Data access — dynamic table accessors */
     data: RebaseData;
     /** Authentication methods */
     auth: RebaseAuth;
@@ -248,8 +248,8 @@ interface RebaseClient {
     storage?: StorageSource;
     /** Call a custom server-side endpoint */
     call<T = unknown>(endpoint: string, payload?: unknown): Promise<T>;
-    /** Direct collection access (shorthand) */
-    [collectionSlug: string]: unknown;
+    /** Direct table access (shorthand) */
+    [tableSlug: string]: unknown;
 }
 
 /**
@@ -395,7 +395,7 @@ export const JSMonacoEditor = ({
                         : "Record<string, any>";
                     lines.push(`/** Collection: ${col.name} (${col.slug}) */`);
                     lines.push(`interface ${ifaceName}_Row ${propsType}`);
-                    lines.push(`declare namespace client.data { const ${col.slug}: CollectionClient<${ifaceName}_Row>; }`);
+                    lines.push(`declare namespace client.data { const ${col.slug}: TableClient<${ifaceName}_Row>; }`);
                 }
                 ts.typescriptDefaults.addExtraLib(
                     lines.join("\n"),
@@ -404,7 +404,7 @@ export const JSMonacoEditor = ({
             } else if (collectionSlugs.length > 0) {
                 // Fallback: just slug names without property info
                 const collectionHints = collectionSlugs.map(slug =>
-                    `/** Collection: ${slug} */\ndeclare namespace client.data { const ${slug}: CollectionClient; }`
+                    `/** Collection: ${slug} */\ndeclare namespace client.data { const ${slug}: TableClient; }`
                 ).join("\n");
                 ts.typescriptDefaults.addExtraLib(
                     collectionHints,

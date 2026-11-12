@@ -68,7 +68,7 @@ jest.mock("@rebasepro/app", () => {
         }),
         useAuthController: () => ({ user: { uid: "u1" } }),
         useCustomizationController: () => customization,
-        useData: () => ({ collection: () => ({ find: async () => ({ data: [] }) }) }),
+        useData: () => ({ table: () => ({ find: async () => ({ data: [] }) }) }),
         useSnackbarController: () => ({ open: () => undefined }),
         useAnalyticsController: () => ({}),
         useRebaseContext: () => ({})

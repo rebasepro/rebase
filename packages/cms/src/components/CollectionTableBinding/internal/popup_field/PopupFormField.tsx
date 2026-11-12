@@ -69,7 +69,7 @@ export function PopupFormFieldLoading<M extends Record<string, unknown>>({
     const [entity, setEntity] = useState<Entity<M> | undefined>(undefined);
     useEffect(() => {
         if (hasEntityId(entityId) && inputCollection) {
-            dataClient.collection(path).findById(entityId).then((result) => setEntity(result as Entity<M> | undefined));
+            dataClient.table(path).findById(entityId).then((result) => setEntity(result as Entity<M> | undefined));
         }
     }, [entityId, inputCollection, dataClient, path]);
 

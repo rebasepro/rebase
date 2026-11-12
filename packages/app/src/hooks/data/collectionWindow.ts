@@ -1,5 +1,5 @@
 import { MAX_LIST_LIMIT } from "@rebasepro/types";
-import type { CollectionAccessor, Entity, FindParams } from "@rebasepro/types";
+import type { TableAccessor, Entity, FindParams } from "@rebasepro/types";
 
 import { isConnectionLostError } from "../../util/realtime";
 
@@ -40,7 +40,7 @@ export interface CollectionWindowState<M extends Record<string, unknown> = Recor
 }
 
 export interface CollectionWindowOptions<M extends Record<string, unknown>> {
-    accessor: Pick<CollectionAccessor<M>, "find" | "listen">;
+    accessor: Pick<TableAccessor<M>, "find" | "listen">;
     query: CollectionWindowQuery<M>;
     /** Rows in the first page, which is the one kept live. */
     pageSize: number;

@@ -40,7 +40,7 @@ export function useRow<M extends Record<string, unknown> = Record<string, unknow
     id: string | number | undefined
 ): UseRowResult<M> {
     const { data, changes } = useSdkData("useRow");
-    const accessor = useMemo(() => data.collection<M>(collection), [data, collection]);
+    const accessor = useMemo(() => data.table<M>(collection), [data, collection]);
     const live = !isUnsupported(accessor.listenById);
     const absent = id === undefined || id === "";
     const key = absent ? "" : `${collection}\u0000${typeof id}:${String(id)}`;

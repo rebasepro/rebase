@@ -32,7 +32,7 @@ function read(options?: ByIdReadOptions): Entity {
 
 let live = true;
 const mockClient = {
-    collection: () => live
+    table: () => live
         ? {
             listenById: (_id: string, onUpdate: (entity: Entity | undefined) => void, _onError?: unknown, options?: ByIdReadOptions) => {
                 queueMicrotask(() => onUpdate(read(options)));

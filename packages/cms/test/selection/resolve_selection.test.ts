@@ -12,7 +12,7 @@ import {
 
 /** `context.data` reduced to what a selection reads: every slug finds through `find`. */
 function rowSource(find: (params?: FindParams) => Promise<FindResult>): SelectionRowSource {
-    return { collection: () => ({ find }) };
+    return { table: () => ({ find }) };
 }
 
 /** One page holding every row. */

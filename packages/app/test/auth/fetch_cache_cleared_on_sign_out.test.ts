@@ -21,7 +21,7 @@ import { useFetch } from "../../src/hooks/data/useFetch";
 // value under test is what `useFetch` seeds its first render with, which is
 // the cache and nothing else.
 jest.mock("../../src/hooks/data/useData", () => ({
-    useData: () => ({ collection: () => ({ findById: () => new Promise(() => undefined) }) })
+    useData: () => ({ table: () => ({ findById: () => new Promise(() => undefined) }) })
 }));
 
 // `useFetch` also reads the whole Rebase context, and this suite renders it with

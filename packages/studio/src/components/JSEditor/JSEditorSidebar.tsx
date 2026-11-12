@@ -39,32 +39,32 @@ interface JSEditorSidebarProps {
 const QUICK_REFERENCE: { label: string; code: string; description: string }[] = [
     {
         label: "Find all",
-        code: "const result = await client.data.collection(\"COLLECTION\").find({ limit: 20 });\nreturn result;",
+        code: "const result = await client.data.table(\"TABLE\").find({ limit: 20 });\nreturn result;",
         description: "Fetch records with pagination"
     },
     {
         label: "Find by ID",
-        code: "const item = await client.data.collection(\"COLLECTION\").findById(\"ID\");\nreturn item;",
+        code: "const item = await client.data.table(\"TABLE\").findById(\"ID\");\nreturn item;",
         description: "Fetch a single record"
     },
     {
         label: "Create",
-        code: "const created = await client.data.collection(\"COLLECTION\").create({\n  // your fields here\n});\nreturn created;",
+        code: "const created = await client.data.table(\"TABLE\").create({\n  // your fields here\n});\nreturn created;",
         description: "Insert a new record"
     },
     {
         label: "Update",
-        code: "const updated = await client.data.collection(\"COLLECTION\").update(\"ID\", {\n  // fields to update\n});\nreturn updated;",
+        code: "const updated = await client.data.table(\"TABLE\").update(\"ID\", {\n  // fields to update\n});\nreturn updated;",
         description: "Update an existing record"
     },
     {
         label: "Delete",
-        code: "await client.data.collection(\"COLLECTION\").delete(\"ID\");\nreturn { success: true };",
+        code: "await client.data.table(\"TABLE\").delete(\"ID\");\nreturn { success: true };",
         description: "Delete a record"
     },
     {
         label: "Fluent query",
-        code: "const result = await client.data.collection(\"COLLECTION\")\n  .where(\"field\", \">\", value)\n  .orderBy(\"field\", \"desc\")\n  .limit(10)\n  .find();\nreturn result;",
+        code: "const result = await client.data.table(\"TABLE\")\n  .where(\"field\", \">\", value)\n  .orderBy(\"field\", \"desc\")\n  .limit(10)\n  .find();\nreturn result;",
         description: "Chained query builder"
     },
     {

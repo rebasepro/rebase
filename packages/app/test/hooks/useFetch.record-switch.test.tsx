@@ -16,7 +16,7 @@ import type { AdminCollection } from "@rebasepro/cms-types";
 
 const listeners = new Map<string, (entity: Entity | undefined) => void>();
 const mockClient = {
-    collection: () => ({
+    table: () => ({
         listenById: (id: string, onUpdate: (entity: Entity | undefined) => void) => {
             listeners.set(id, onUpdate);
             return () => listeners.delete(id);

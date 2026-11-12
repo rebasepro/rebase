@@ -35,7 +35,7 @@ jest.mock("../../src/components/EntityPreviewBinding", () => ({
 
 jest.mock("@rebasepro/app", () => ({
     useData: () => ({
-        collection: () => ({
+        table: () => ({
             find: async () => ({ data: [], meta: { hasMore: false } })
         })
     }),

@@ -29,7 +29,7 @@ const listUsersPaginated = jest.fn(async () => ({
 }));
 
 /** Every collection hands back the same page: what is under test is the label put on it. */
-const dataLayer = { collection: () => ({ find: async () => ROWS }) };
+const dataLayer = { table: () => ({ find: async () => ROWS }) };
 
 /** Stable across renders, as the real contexts are. */
 const appContext = {
@@ -97,7 +97,7 @@ const offersRowActions = () => screen.queryByText("studio_sql_collections_label"
 describe("the JS editor's row actions", () => {
     it("are offered for rows read from the one collection the script names", async () => {
         render(<JSEditor/>);
-        await runToTable(`return await client.data.collection("posts").find({ limit: 10 });`);
+        await runToTable(`return await client.data.table("posts").find({ limit: 10 });`);
 
         expect(offersRowActions()).toBe(true);
         expect(screen.getByText("Posts")).toBeTruthy();
@@ -106,8 +106,8 @@ describe("the JS editor's row actions", () => {
     it("are not offered when the script names two collections, since the rows could be either's", async () => {
         render(<JSEditor/>);
         await runToTable(`
-const authors = await client.data.collection("authors").find();
-return await client.data.collection("posts").find({ limit: 10 });
+const authors = await client.data.table("authors").find();
+return await client.data.table("posts").find({ limit: 10 });
 `);
 
         expect(offersRowActions()).toBe(false);
@@ -116,7 +116,7 @@ return await client.data.collection("posts").find({ limit: 10 });
     it("do not take a collection named in a comment for the source of the rows", async () => {
         render(<JSEditor/>);
         await runToTable(`
-// The ids come from client.data.collection("authors"), fetched elsewhere.
+// The ids come from client.data.table("authors"), fetched elsewhere.
 return { data: [{ id: 7, title: "Hello" }] };
 `);
 
@@ -126,7 +126,7 @@ return { data: [{ id: 7, title: "Hello" }] };
     it("are not offered for rows read as another user, since the editor they open runs as you", async () => {
         render(<JSEditor/>);
         fireEvent.click(await screen.findByRole("button", { name: "Run as b@example.test" }));
-        await runToTable(`return await client.data.collection("posts").find({ limit: 10 });`);
+        await runToTable(`return await client.data.table("posts").find({ limit: 10 });`);
 
         expect(offersRowActions()).toBe(false);
     });

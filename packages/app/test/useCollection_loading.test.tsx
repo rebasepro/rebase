@@ -2,10 +2,10 @@ import React from "react";
 import { render, act } from "@testing-library/react";
 import { useCollection } from "../src/hooks/data/useCollection";
 import type { AdminCollection } from "@rebasepro/cms-types";
-import { type DataCollections, fakeCollectionAccessor } from "./helpers/fakes";
+import { type DataTables, fakeTableAccessor } from "./helpers/fakes";
 
 /** What the mocked `useData()` hands the hook; each test installs its own. */
-let mockDataClient: DataCollections | undefined;
+let mockDataClient: DataTables | undefined;
 
 /**
  * `useCollection` owns the flag the collection view renders its spinner from.
@@ -32,7 +32,7 @@ type ListenArgs = {
 function mockClientWithListen() {
     const captured: ListenArgs[] = [];
     mockDataClient = {
-        collection: (slug) => fakeCollectionAccessor(slug, {
+        table: (slug) => fakeTableAccessor(slug, {
             listen: (_params, onUpdate, onError) => {
                 captured.push({ onUpdate, onError: onError ?? (() => undefined) });
                 return () => {};

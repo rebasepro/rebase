@@ -94,7 +94,7 @@ export function useRows<M extends Record<string, unknown> = Record<string, unkno
 ): UseRowsResult<M> {
     const { data, changes } = useSdkData("useRows");
     const query = useStableFilterValues(options);
-    const accessor = useMemo(() => data.collection<M>(collection), [data, collection]);
+    const accessor = useMemo(() => data.table<M>(collection), [data, collection]);
     const live = !isUnsupported(accessor.listen);
 
     // How many pages `loadMore` has asked for, counted for this query only: a

@@ -27,7 +27,7 @@ jest.mock("../../src/components/EntityPreviewBinding", () => ({
 jest.mock("@rebasepro/app", () => {
     const overrides: Record<string, unknown> = {
         useData: () => ({
-            collection: () => ({ find: async () => ({ data: [], meta: { hasMore: false } }) })
+            table: () => ({ find: async () => ({ data: [], meta: { hasMore: false } }) })
         }),
         usePermissions: () => ({ canCreate: () => false }),
         useRelationSelector: () => ({

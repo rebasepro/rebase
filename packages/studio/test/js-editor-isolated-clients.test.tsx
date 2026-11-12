@@ -93,7 +93,7 @@ function runScript(code: string) {
 }
 
 const PROBE = `
-await client.data.collection("posts").find({ limit: 1 });
+await client.data.table("posts").find({ limit: 1 });
 const session = client.auth.getSession();
 // Joined at run time, so the marker is in the result and not in the script.
 return ["ran", "as"].join("-") + " " + (session ? "session:" + session.user.uid : "no session") + " / user:" + (context.user ? context.user.uid : "none");

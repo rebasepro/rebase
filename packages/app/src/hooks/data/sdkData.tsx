@@ -7,7 +7,7 @@ import type { DataChanges } from "./dataChanges";
  * The flat data the row hooks read: `collection(slug)` and nothing else, so a
  * typed client (`RebaseSdkData<Database>`) fits as well as an untyped one.
  */
-export type FlatData = Pick<RebaseSdkData, "collection">;
+export type FlatData = Pick<RebaseSdkData, "table">;
 
 /** The flat data of one `<Rebase>`, and what says its collections changed. */
 export interface SdkDataLayer {

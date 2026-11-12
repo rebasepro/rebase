@@ -7,8 +7,8 @@ import type { RebaseProps } from "../src/core/RebaseProps";
  * `RebaseProps` was generic over `USER` and not over the database, so its
  * `client` prop was pinned to `RebaseClient` — that is, `RebaseClient<unknown>`,
  * whose `data` is the untyped branch of `RebaseSdkData`: an index signature
- * `[slug: string]: SDKCollectionClient`. Reaching `data.products` through it
- * yields `SDKCollectionClient<Record<string, unknown>>`, so every row a project
+ * `[slug: string]: SDKTableClient`. Reaching `data.products` through it
+ * yields `SDKTableClient<Record<string, unknown>>`, so every row a project
  * generated types for came back untyped — and the saas console, which passes a
  * client built against a generated `Database`, could not compile at all.
  *

@@ -21,8 +21,8 @@ export function importAccessor(methods: Partial<ImportAccessor> = {}): ImportAcc
 }
 
 /** The data client `saveImportedEntities` takes, handing out `accessor` for every slug. */
-export function importClient(accessor: ImportAccessor): { collection(slug: string): ImportAccessor } {
-    return { collection: () => accessor };
+export function importClient(accessor: ImportAccessor): { table(slug: string): ImportAccessor } {
+    return { table: () => accessor };
 }
 
 /** A stored row, as the accessor hands it back. */

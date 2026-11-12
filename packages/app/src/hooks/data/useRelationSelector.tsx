@@ -186,7 +186,7 @@ export function useRelationSelector<M extends Record<string, any> = any>(
         // asked for them: an answer for "ab" that lands after the window for
         // "abc" opened is dropped, not painted.
         const collectionWindow = new CollectionWindow({
-            accessor: dataClient.collection(path),
+            accessor: dataClient.table(path),
             query: {
                 where: whereParams,
                 searchString: currentSearch || undefined,

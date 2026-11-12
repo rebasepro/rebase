@@ -31,7 +31,7 @@ jest.mock("@rebasepro/app", () => {
     const auth = { user: null };
     const analytics = {};
     const customization = { plugins: [], propertyConfigs: {}, locale: undefined, entityActions: [], resolvedSlots: [] };
-    const data = { collection: () => ({}) };
+    const data = { table: () => ({}) };
     const translation = { t: (key: string) => key };
     const wrapped = new Map<unknown, unknown>();
     const overrides: Record<string, unknown> = {

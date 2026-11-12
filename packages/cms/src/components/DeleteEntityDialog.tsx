@@ -164,7 +164,7 @@ export function DeleteEntityDialog<M extends Record<string, unknown>>({
             // not yet agreed to — the expensive part.
             entities = await resolveEntitySelection<M>({
                 selection,
-                accessor: dataClient.collection<M>(path),
+                accessor: dataClient.table<M>(path),
                 signal: cancelledRef.current,
                 onProgress: (loaded, total) => setProgress(
                     total === undefined

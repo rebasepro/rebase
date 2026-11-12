@@ -168,7 +168,7 @@ export function useFetch<M extends Record<string, any>, USER extends User = User
     // it the row changed: the `<Rebase>`'s change signal does — a save,
     // `useRowWrites`, a change the driver heard of — and it is read again.
     // A subscribed record already receives the change.
-    const canListen = Boolean(dataClient.collection(path).listenById);
+    const canListen = Boolean(dataClient.table(path).listenById);
     const changeVersion = useDataChangeVersion(path, entityId !== undefined && !canListen);
 
     const context: RebaseContext<USER> = useRebaseContext();
@@ -242,7 +242,7 @@ export function useFetch<M extends Record<string, any>, USER extends User = User
             return () => {
             };
         } else if (entityId && path && collection) {
-            const accessor = dataClient.collection(path);
+            const accessor = dataClient.table(path);
             // The relations the form edits, read with the record exactly as a
             // list read includes them. Without them a to-many relation was
             // absent from the record, and one opened by URL — nothing cached

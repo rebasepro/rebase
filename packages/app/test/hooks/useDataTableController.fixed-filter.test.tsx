@@ -17,7 +17,7 @@ const mockLocation = { pathname: "/c/customers", search: "", hash: "", state: nu
 jest.mock("react-router", () => ({ useLocation: () => mockLocation }));
 
 const mockFind = jest.fn();
-const mockClient = { collection: () => ({ find: mockFind }) };
+const mockClient = { table: () => ({ find: mockFind }) };
 jest.mock("../../src/hooks", () => ({
     useRebaseContext: () => ({})
 }));

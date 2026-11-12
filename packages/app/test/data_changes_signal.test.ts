@@ -1,6 +1,6 @@
 import type { Entity, RebaseData } from "@rebasepro/types";
 import React from "react";
-import { fakeCollectionAccessor, rebaseDataOver } from "./helpers/fakes";
+import { fakeTableAccessor, rebaseDataOver } from "./helpers/fakes";
 import { act, renderHook } from "@testing-library/react";
 import {
     CHANGE_MAX_WAIT_MS,
@@ -225,7 +225,7 @@ describe("createDataChanges", () => {
 
 describe("withDataChanges", () => {
     function fakeData(writes: string[]): RebaseData {
-        const accessor = fakeCollectionAccessor("posts", {
+        const accessor = fakeTableAccessor("posts", {
             find: async () => ({ data: [], meta: { total: 0, limit: 50, offset: 0, hasMore: false } }),
             create: async () => {
                 writes.push("create");
@@ -248,7 +248,7 @@ describe("withDataChanges", () => {
     /** Writes that each answer `ms` later, in a task of their own, as an HTTP response or an MCP reply does. */
     function slowData(ms: (index: number) => number): RebaseData {
         let sent = 0;
-        const accessor = fakeCollectionAccessor("posts", {
+        const accessor = fakeTableAccessor("posts", {
             update: (id) => {
                 const index = sent++;
                 return new Promise<Entity>((resolve) => setTimeout(() => resolve({ id, path: "posts", values: {} }), ms(index)));
@@ -265,15 +265,15 @@ describe("withDataChanges", () => {
         const writes: string[] = [];
         const data = withDataChanges(fakeData(writes), changes);
 
-        await data.collection("posts").find();
+        await data.table("posts").find();
         await heardOf();
         expect(emitted).toEqual([]);
 
-        await data.collection("posts").create({});
+        await data.table("posts").create({});
         await heardOf();
-        await data.collection("posts").update(1, {});
+        await data.table("posts").update(1, {});
         await heardOf();
-        await data.collection("posts").deleteMany!([1]);
+        await data.table("posts").deleteMany!([1]);
         await heardOf();
         await data.blogPosts.delete(1);
         await heardOf();
@@ -285,20 +285,20 @@ describe("withDataChanges", () => {
         const changes = createDataChanges();
         let emitted = 0;
         changes.subscribe("posts", () => emitted++);
-        const failing = rebaseDataOver((slug) => fakeCollectionAccessor(slug, { create: async () => Promise.reject(new Error("refused")) }));
+        const failing = rebaseDataOver((slug) => fakeTableAccessor(slug, { create: async () => Promise.reject(new Error("refused")) }));
         const data = withDataChanges(failing, changes);
 
-        await expect(data.collection("posts").create({})).rejects.toThrow("refused");
+        await expect(data.table("posts").create({})).rejects.toThrow("refused");
         await heardOf();
         expect(emitted).toBe(0);
-        expect(data.collection("posts").createMany).toBeUndefined();
+        expect(data.table("posts").createMany).toBeUndefined();
     });
 
     it("says so after a batch update and the trash's purges", async () => {
         const changes = createDataChanges();
         let emitted = 0;
         changes.subscribe("posts", () => emitted++);
-        const accessor = fakeCollectionAccessor("posts", {
+        const accessor = fakeTableAccessor("posts", {
             update: async () => ({ id: 1, path: "posts", values: {} }),
             updateMany: async () => [],
             trash: {
@@ -310,11 +310,11 @@ describe("withDataChanges", () => {
         });
         const data = withDataChanges(rebaseDataOver(() => accessor), changes);
 
-        await data.collection("posts").updateMany!([{ id: 1, data: {} }]);
+        await data.table("posts").updateMany!([{ id: 1, data: {} }]);
         await heardOf();
-        await data.collection("posts").trash!.purge(1);
+        await data.table("posts").trash!.purge(1);
         await heardOf();
-        await data.collection("posts").trash!.purgeMany!([1]);
+        await data.table("posts").trash!.purgeMany!([1]);
         await heardOf();
         expect(emitted).toBe(3);
     });
@@ -342,7 +342,7 @@ describe("withDataChanges", () => {
         const data = withDataChanges(slowData(() => 40), changes);
 
         const run = (async () => {
-            for (let i = 0; i < 20; i++) await data.collection("posts").update(i, { status: "done" });
+            for (let i = 0; i < 20; i++) await data.table("posts").update(i, { status: "done" });
         })();
         await jest.advanceTimersByTimeAsync(20 * 40);
         await run;
@@ -360,7 +360,7 @@ describe("withDataChanges", () => {
         const data = withDataChanges(slowData(() => 4 * CHANGE_QUIET_MS), changes);
 
         const run = (async () => {
-            for (let i = 0; i < 4; i++) await data.collection("posts").update(i, { status: "done" });
+            for (let i = 0; i < 4; i++) await data.table("posts").update(i, { status: "done" });
         })();
         await jest.advanceTimersByTimeAsync(4 * 4 * CHANGE_QUIET_MS);
         await run;
@@ -375,7 +375,7 @@ describe("withDataChanges", () => {
         changes.subscribe("posts", () => reads++);
         const data = withDataChanges(slowData((index) => 100 + index * 7), changes);
 
-        const all = Promise.all(Array.from({ length: 20 }, (_, i) => data.collection("posts").update(i, { status: "done" })));
+        const all = Promise.all(Array.from({ length: 20 }, (_, i) => data.table("posts").update(i, { status: "done" })));
         await jest.advanceTimersByTimeAsync(100 + 19 * 7);
         await all;
         expect(reads).toBe(0);
@@ -389,7 +389,7 @@ describe("withDataChanges", () => {
         changes.subscribe("posts", () => reads++);
         const data = withDataChanges(slowData(() => 30), changes);
 
-        const write = data.collection("posts").update(1, { status: "done" });
+        const write = data.table("posts").update(1, { status: "done" });
         await jest.advanceTimersByTimeAsync(30);
         await write;
         await jest.advanceTimersByTimeAsync(CHANGE_QUIET_MS - 1);

@@ -264,7 +264,7 @@ export interface PluginLifecycle {
 
     /**
      * @deprecated Never invoked — this hook never ran. Remove it; subscribe to
-     * the rows yourself instead: `context.data.collection(slug).listen(...)`
+     * the rows yourself instead: `context.data.table(slug).listen(...)`
      * from `onMount`, unsubscribing in `onUnmount`. Will be removed in a
      * future release.
      */

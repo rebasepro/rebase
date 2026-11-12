@@ -112,7 +112,7 @@ function client(): RebaseClient {
     return {
         baseUrl: "https://api.example.com",
         apiPath: "/api",
-        data: { collection: () => ({}) },
+        data: { table: () => ({}) },
         storage: {},
         resolveToken: async () => session.accessToken,
         auth: {

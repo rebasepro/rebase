@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useReducer } from "react";
-import type { CollectionAccessor, CollectionTrashAccessor, RebaseData } from "@rebasepro/types";
+import type { TableAccessor, TableTrashAccessor, RebaseData } from "@rebasepro/types";
 import { toSnakeCase } from "@rebasepro/utils";
 
 /**
@@ -184,18 +184,18 @@ export function useDataChangeVersion(path: string, enabled: boolean): number {
  * @internal
  */
 export function withDataChanges(data: RebaseData, changes: DataChanges): RebaseData {
-    const accessors = new Map<string, CollectionAccessor>();
-    const accessorFor = (path: string): CollectionAccessor => {
+    const accessors = new Map<string, TableAccessor>();
+    const accessorFor = (path: string): TableAccessor => {
         let accessor = accessors.get(path);
         if (!accessor) {
-            accessor = signalWrites(data.collection(path), changes, path);
+            accessor = signalWrites(data.table(path), changes, path);
             accessors.set(path, accessor);
         }
         return accessor;
     };
     return new Proxy(data, {
         get(target, prop, receiver) {
-            if (prop === "collection") return accessorFor;
+            if (prop === "table") return accessorFor;
             if (typeof prop === "symbol" || prop === "then" || prop === "toJSON" || prop === "$$typeof") {
                 return Reflect.get(target, prop, receiver);
             }
@@ -235,12 +235,12 @@ export function signalWrite<T>(changes: DataChanges, path: string, send: () => P
 type Signalled = <T>(send: () => Promise<T>) => Promise<T>;
 
 function signalWrites<M extends Record<string, unknown>>(
-    accessor: CollectionAccessor<M>,
+    accessor: TableAccessor<M>,
     changes: DataChanges,
     path: string
-): CollectionAccessor<M> {
+): TableAccessor<M> {
     const after: Signalled = <T>(send: () => Promise<T>): Promise<T> => signalWrite(changes, path, send);
-    type Accessor = CollectionAccessor<M>;
+    type Accessor = TableAccessor<M>;
     // Only the writes the accessor has: an absent batch method stays absent,
     // which is how a caller tells it is not supported.
     const writes = new Map<PropertyKey, unknown>();
@@ -265,9 +265,9 @@ function signalWrites<M extends Record<string, unknown>>(
 }
 
 function signalPurges<M extends Record<string, unknown>>(
-    trash: CollectionTrashAccessor<M>,
+    trash: TableTrashAccessor<M>,
     after: Signalled
-): CollectionTrashAccessor<M> {
+): TableTrashAccessor<M> {
     return {
         find: (...args) => trash.find(...args),
         count: (...args) => trash.count(...args),

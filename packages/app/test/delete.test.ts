@@ -2,7 +2,7 @@ import { deleteEntityWithCallbacks } from "../src/hooks/data/delete";
 import type { Entity, RebaseData } from "@rebasepro/types";
 import type { AdminCollection, RebaseContext } from "@rebasepro/cms-types";
 import type { CollectionCallbacks } from "@rebasepro/types";
-import { fakeCollectionAccessor, rebaseDataOver } from "./helpers/fakes";
+import { fakeTableAccessor, rebaseDataOver } from "./helpers/fakes";
 
 /**
  * `deleteEntityWithCallbacks` has been named that since it was written and ran
@@ -33,7 +33,7 @@ describe("deleteEntityWithCallbacks", () => {
     });
 
     function createMockData(deleteFn = jest.fn().mockResolvedValue(undefined)): RebaseData {
-        return rebaseDataOver((slug) => fakeCollectionAccessor(slug, { delete: deleteFn }));
+        return rebaseDataOver((slug) => fakeTableAccessor(slug, { delete: deleteFn }));
     }
 
     it("deletes and reports success", async () => {

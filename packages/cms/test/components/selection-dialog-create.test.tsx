@@ -73,7 +73,7 @@ jest.mock("@rebasepro/app", () => {
     const auth = {};
     const customization = {};
     const analytics = { onAnalyticsEvent: () => undefined };
-    const data = { collection: () => ({}) };
+    const data = { table: () => ({}) };
     const tableController = {};
     const columnIds: string[] = [];
     const permissions = { canCreate: () => canCreateResult };

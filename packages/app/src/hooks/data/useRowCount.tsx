@@ -30,7 +30,7 @@ export function useRowCount<M extends Record<string, unknown> = Record<string, u
 ): UseRowCountResult {
     const { data, changes } = useSdkData("useRowCount");
     const filter = useStableFilterValues(where);
-    const accessor = useMemo(() => data.collection<M>(collection), [data, collection]);
+    const accessor = useMemo(() => data.table<M>(collection), [data, collection]);
     const live = !isUnsupported(accessor.listenCount);
 
     const [version, recount] = useReducer((n: number) => n + 1, 0);

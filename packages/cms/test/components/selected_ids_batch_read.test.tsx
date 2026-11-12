@@ -60,7 +60,7 @@ jest.mock("../../src/components/EntityPreviewBinding", () => ({
 
 jest.mock("@rebasepro/app", () => {
     const analytics = { onAnalyticsEvent: () => undefined };
-    const data = { collection: () => accessor };
+    const data = { table: () => accessor };
     const columnIds: string[] = [];
     const permissions = { canCreate: () => false };
     const translation = { t: (key: string) => key };

@@ -37,7 +37,7 @@ const mockAccessor = {
         };
     }
 };
-const mockData = { collection: () => mockAccessor };
+const mockData = { table: () => mockAccessor };
 jest.mock("../../src/hooks", () => ({
     useRebaseContext: () => ({})
 }));

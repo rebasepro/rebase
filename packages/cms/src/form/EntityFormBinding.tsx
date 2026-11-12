@@ -322,7 +322,7 @@ export function EntityFormBinding<M extends Record<string, unknown>>({
         value
     }: { name: string; value: unknown }) => {
         try {
-            const accessor = dataClient.collection(path);
+            const accessor = dataClient.table(path);
             const { data } = await accessor.find({
                 where: { [name]: ["==", value] },
                 limit: 2

@@ -1,7 +1,7 @@
 import { saveEntityWithCallbacks } from "../src/hooks/data/save";
 import { EntityRelation } from "@rebasepro/types";
 import type { CollectionCallbacks, CollectionConfig, Entity, RebaseData } from "@rebasepro/types";
-import { fakeCollectionAccessor, rebaseDataOver } from "./helpers/fakes";
+import { fakeTableAccessor, rebaseDataOver } from "./helpers/fakes";
 import type { AdminCollection, RebaseContext } from "@rebasepro/cms-types";
 
 describe("saveEntityWithCallbacks", () => {
@@ -20,7 +20,7 @@ describe("saveEntityWithCallbacks", () => {
     function createMockData(overrides?: Partial<{ create: jest.Mock; update: jest.Mock }>): RebaseData {
         const createFn = overrides?.create ?? jest.fn().mockResolvedValue(mockEntity);
         const updateFn = overrides?.update ?? jest.fn().mockResolvedValue(mockEntity);
-        return rebaseDataOver((slug) => fakeCollectionAccessor(slug, {
+        return rebaseDataOver((slug) => fakeTableAccessor(slug, {
             create: createFn,
             update: updateFn
         }));

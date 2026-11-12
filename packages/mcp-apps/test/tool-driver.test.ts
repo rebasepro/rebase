@@ -153,12 +153,12 @@ describe("reading", () => {
 
         await driver.fetchCollection({ path: "customers", collection: customers });
         expect(await driver.fetchOne({ path: "customers", id: "c2" })).toEqual({ id: "c2", name: "Grace" });
-        expect(await flat.collection("customers").findById("c1")).toEqual({ id: "c1", name: "Ada" });
+        expect(await flat.table("customers").findById("c1")).toEqual({ id: "c1", name: "Ada" });
         expect(calls.map(call => call.name)).toEqual(["query_collection"]);
 
         // An app's own page fills it too.
-        await flat.collection("orders").find({ limit: 5 });
-        await flat.collection("orders").findById("c1");
+        await flat.table("orders").find({ limit: 5 });
+        await flat.table("orders").findById("c1");
         expect(calls.filter(call => call.name === "get_document")).toHaveLength(0);
     });
 
@@ -486,7 +486,7 @@ describe("a write the person's own click made", () => {
             });
 
             await driver.delete({ row: { id: "o1", path: "orders" } });
-            await flat.collection("orders").create({ status: "new" });
+            await flat.table("orders").create({ status: "new" });
 
             expect(asked).toEqual(["delete", "create"]);
         } finally {
@@ -503,7 +503,7 @@ describe("a write the person's own click made", () => {
             }
         });
 
-        await flat.collection("orders").update("o1", { status: "sent" });
+        await flat.table("orders").update("o1", { status: "sent" });
 
         expect(asked.map(plan => plan.write?.gesture)).toEqual([false]);
     });
@@ -539,13 +539,13 @@ describe("the row hooks' writes", () => {
             }
         });
 
-        await expect(flat.collection("orders").update("o1", { status: "sent" })).rejects.toBeInstanceOf(SaveCancelledError);
+        await expect(flat.table("orders").update("o1", { status: "sent" })).rejects.toBeInstanceOf(SaveCancelledError);
         expect(calls).toEqual([]);
         expect(changes).toEqual([]);
 
         answer = true;
-        await flat.collection("orders").create({ status: "new" });
-        await flat.collection("orders").delete("o2");
+        await flat.table("orders").create({ status: "new" });
+        await flat.table("orders").delete("o2");
         expect(asked.map(plan => plan.summary)).toEqual([
             "Change status on row o1 of orders.",
             "Create a row in orders.",
@@ -566,7 +566,7 @@ describe("the row hooks' writes", () => {
             }
         });
 
-        await flat.collection("orders").update("o1", { status: "sent" });
+        await flat.table("orders").update("o1", { status: "sent" });
         expect(asked.map(plan => plan.summary)).toEqual(["Change status on row o1 of orders in shop."]);
         expect(calls).toHaveLength(2);
     });
@@ -587,7 +587,7 @@ describe("the row hooks' writes", () => {
         });
         await driver.fetchCollection({ path: "orders", collection: orders });
 
-        await flat.collection("public.orders").update("o1", { status: "sent" });
+        await flat.table("public.orders").update("o1", { status: "sent" });
         expect(await driver.fetchOne({ path: "orders", id: "o1" })).toEqual({ id: "o1", status: "sent" });
         expect(calls.filter(call => call.name === "query_collection" && call.args.where)).toHaveLength(1);
     });
@@ -600,7 +600,7 @@ describe("aggregates", () => {
             meta: { limit: 10, offset: 0, hasMore: false }
         }));
 
-        const result = await flat.collection("orders").aggregate({
+        const result = await flat.table("orders").aggregate({
             select: [{ fn: "sum", field: "total" }, { fn: "count" }],
             groupBy: ["status"],
             where: { placed: [">=", "2026-11-01"] },
@@ -627,13 +627,13 @@ describe("aggregates", () => {
         const actions = actionsOf({ aggregate: { tool: "query", arguments: { project: "shop" } } });
         const { flat, calls } = driverWith(() => ok({ data: [{ count: 7 }] }), { actions });
 
-        expect([...await flat.collection("orders").aggregate({ select: [{ fn: "count" }] })]).toEqual([{ count: 7 }]);
+        expect([...await flat.table("orders").aggregate({ select: [{ fn: "count" }] })]).toEqual([{ count: 7 }]);
         expect(calls).toEqual([{ name: "query", args: { project: "shop", collection: "orders", select: ["count()"] } }]);
     });
 
     it("refuse an or()/and() group the tools cannot express, rather than aggregate wider", async () => {
         const { flat, calls } = driverWith(() => ok({ data: [] }));
-        await expect(flat.collection("orders").aggregate({
+        await expect(flat.table("orders").aggregate({
             select: [{ fn: "count" }],
             logical: {
                 type: "or",
@@ -907,7 +907,7 @@ describe("what the driver sends, and refuses to", () => {
 
     it("caps an aggregate's limit at the read tools' ceiling", async () => {
         const { flat, calls } = driverWith(() => ok({ data: [] }));
-        await flat.collection("orders").aggregate({ select: [{ fn: "count" }], groupBy: ["status"], limit: 5000 });
+        await flat.table("orders").aggregate({ select: [{ fn: "count" }], groupBy: ["status"], limit: 5000 });
         expect(calls[0].args.limit).toBe(1000);
     });
 
@@ -1029,7 +1029,7 @@ describe("a write through the row hooks", () => {
         const { driver, flat } = driverWith(name => name === "update_document" ? ok({ id: "o1" }) : ok({ data: [{ id: "o1", number: "ORD-41" }] }),
             { rowLabel, confirm: async plan => { plans.push(plan); return true; } });
         await driver.fetchCollection({ path: "orders", limit: 10 });
-        await flat.collection("orders").update("o1", { status: "sent" });
+        await flat.table("orders").update("o1", { status: "sent" });
         expect(plans[0].summary).toBe("Change status on ORD-41 of orders.");
     });
 
@@ -1039,14 +1039,14 @@ describe("a write through the row hooks", () => {
             ? { isError: true, content: [{ type: "text", text: "a row-level security policy rejected the write." }] }
             : ok({ data: [{ id: "o1", number: "ORD-41" }] }), { rowLabel, onWriteFailed: failure => failures.push(failure) });
         await driver.fetchCollection({ path: "orders", limit: 10 });
-        await expect(flat.collection("orders").update("o1", { status: "sent" })).rejects.toThrow(/row-level security/);
+        await expect(flat.table("orders").update("o1", { status: "sent" })).rejects.toThrow(/row-level security/);
         expect(failures).toEqual([{ action: "update", collection: "orders", id: "o1", title: "ORD-41", message: expect.stringContaining("row-level security") }]);
     });
 
     it("declined by the person, is not a failure", async () => {
         const failures: WriteFailure[] = [];
         const { flat, calls } = driverWith(() => ok({ id: "o1" }), { confirm: async () => false, onWriteFailed: failure => failures.push(failure) });
-        await expect(flat.collection("orders").update("o1", { status: "sent" })).rejects.toThrow();
+        await expect(flat.table("orders").update("o1", { status: "sent" })).rejects.toThrow();
         expect(failures).toEqual([]);
         expect(calls).toEqual([]);
     });
@@ -1080,7 +1080,7 @@ describe("a write through the row hooks", () => {
     it("names a row it has not read by its id", async () => {
         const plans: WritePlan[] = [];
         const { flat } = driverWith(() => ok({ id: "o9" }), { rowLabel, confirm: async plan => { plans.push(plan); return true; } });
-        await flat.collection("orders").update("o9", { status: "sent" });
+        await flat.table("orders").update("o9", { status: "sent" });
         expect(plans[0].summary).toBe("Change status on row o9 of orders.");
     });
 });

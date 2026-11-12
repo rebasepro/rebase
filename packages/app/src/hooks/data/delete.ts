@@ -63,7 +63,7 @@ export async function deleteEntityWithCallbacks<M extends Record<string, any>, U
         id: String(entity.id),
         row: toWireRow(entity.values, collection),
         context,
-        remove: () => data.collection(entity.path).delete(entity.id)
+        remove: () => data.table(entity.path).delete(entity.id)
     }).then(() => {
         if (onDeleteSuccess) onDeleteSuccess(entity);
         return true;

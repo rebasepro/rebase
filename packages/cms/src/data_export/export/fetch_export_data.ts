@@ -21,7 +21,7 @@ export const EXPORT_PAGE_SIZE = MAX_LIST_LIMIT;
 export const MAX_EXPORT_ROWS = 100_000;
 
 export interface FetchAllForExportParams<M extends Record<string, unknown>> {
-    /** The collection accessor to read through — `dataClient.collection(path)`. */
+    /** The collection accessor to read through — `dataClient.table(path)`. */
     accessor: EntityPageAccessor<M>;
     /** Query to export. The window (`limit` / `offset` / `page`) is owned by the walk. */
     params?: Omit<FindParams<M>, "limit" | "offset" | "page">;

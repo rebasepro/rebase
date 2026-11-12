@@ -28,7 +28,7 @@ type Update = (res: { data: { id: string; values: object }[]; meta: { hasMore: b
 function mockLiveClient() {
     const subscriptions: { where?: unknown }[] = [];
     (globalThis as { __mockDataClient?: unknown }).__mockDataClient = {
-        collection: () => ({
+        table: () => ({
             listen: (params: { where?: unknown }, onUpdate: Update) => {
                 subscriptions.push(params);
                 const timer = setTimeout(() => onUpdate({ data: [{ id: "p1", values: {} }], meta: { hasMore: false } }), 1);

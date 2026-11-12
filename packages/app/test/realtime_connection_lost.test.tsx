@@ -4,10 +4,10 @@ import { RebaseApiError } from "@rebasepro/types";
 import { useFetch } from "../src/hooks/data/useFetch";
 import { useCollection } from "../src/hooks/data/useCollection";
 import type { AdminCollection } from "@rebasepro/cms-types";
-import { type DataCollections, fakeCollectionAccessor, findResponse } from "./helpers/fakes";
+import { type DataTables, fakeTableAccessor, findResponse } from "./helpers/fakes";
 
 /** What the mocked `useData()` hands the hook; each test installs its own. */
-let mockDataClient: DataCollections | undefined;
+let mockDataClient: DataTables | undefined;
 
 /**
  * A realtime outage is not a broken record.
@@ -39,7 +39,7 @@ function mockLiveClient() {
     const live: { byId?: Handlers; list?: Handlers } = {};
     const noError = () => undefined;
     mockDataClient = {
-        collection: (slug) => fakeCollectionAccessor(slug, {
+        table: (slug) => fakeTableAccessor(slug, {
             find: () => Promise.resolve(findResponse([])),
             findById: () => Promise.resolve(undefined),
             listen: (_params, onUpdate, onError) => {

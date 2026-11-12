@@ -396,7 +396,7 @@ export const RelationSelector = React.forwardRef<
             Promise.all(
                 [...unresolved].map(async ([path, ids]): Promise<[string, Map<string, Entity>]> => {
                     try {
-                        return [path, await findEntitiesByIds(client.collection(path), target, ids)];
+                        return [path, await findEntitiesByIds(client.table(path), target, ids)];
                     } catch (e) {
                         console.warn("RelationSelector: could not fetch the entities for relations", path, ids, e);
                         return [path, new Map()];
