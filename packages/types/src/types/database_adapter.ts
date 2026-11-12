@@ -234,8 +234,21 @@ export interface DatabaseAdapter {
  * @group Backend
  */
 export interface DatabaseAdapterInitConfig {
-    /** Registered collection definitions. */
+    /**
+     * The collections the declared tables were lowered into: one per entry of
+     * {@link tables}, by slug. Read by the parts of a driver not yet moved onto
+     * {@link tables}; removed once none reads it.
+     */
     collections: CollectionConfig[];
+    /**
+     * The tables the backend declares, compiled (`compileSchema`): each
+     * descriptor with its hooks, field-level hooks and definition. The input
+     * that replaces {@link collections}: a driver builds its runtime model of
+     * each table from this, never from the lowered collection. Required beside
+     * a non-empty {@link collections}; absent (or empty) when the driver
+     * introspects the database, which describes its own tables.
+     */
+    tables?: import("../schema/compiled").CompiledTable[];
     /**
      * The data-source key this driver serves — `(default)`, or a declared
      * one such as `analytics`. A driver given every collection needs it to

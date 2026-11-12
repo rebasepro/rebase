@@ -73,7 +73,8 @@ pg.Client.prototype.query = function countedQuery(this: unknown, ...rest: unknow
 
 const { createPostgresBootstrapper, createPostgresDatabaseConnection, openRebase } =
     await import("../../packages/server-postgres/src/index.ts");
-const { logger } = await import("../../packages/server/src/index.ts");
+const { logger, compileSchemaDefs } = await import("../../packages/server/src/index.ts");
+const { collectionsToTableDefs } = await import("../../packages/common/src/index.ts");
 for (const level of ["info", "debug", "warn"] as const) (logger as unknown as Record<string, () => void>)[level] = () => undefined;
 
 // ── Collections ────────────────────────────────────────────────────────────
@@ -162,6 +163,9 @@ const dailyScores: CollectionConfig = {
 } as CollectionConfig;
 
 const collections = [songs, events, dailyScores];
+// The driver runs on compiled tables; these legacy literals are lifted and compiled for it.
+const lifted = collectionsToTableDefs(collections);
+const { tables } = compileSchemaDefs(lifted.tables, lifted.defaultRls);
 
 // ── Database ───────────────────────────────────────────────────────────────
 function urlFor(base: string, name: string, port?: number): string {
@@ -185,7 +189,7 @@ const benchUrl = urlFor(adminUrl, DB_NAME);
     const conn = createPostgresDatabaseConnection(benchUrl);
     try {
         const bootstrapper = createPostgresBootstrapper({ connectionString: benchUrl, connection: conn.db });
-        const driverResult = await bootstrapper.initializeDriver({ collections, realtime: { subscribe: false, provision: false } });
+        const driverResult = await bootstrapper.initializeDriver({ collections, tables, realtime: { subscribe: false, provision: false } });
         await bootstrapper.ensureCollectionSchema!(collections, driverResult);
         await bootstrapper.ensureRlsRuntime!(driverResult);
         await bootstrapper.ensureCollectionPolicies!(collections, driverResult);
@@ -216,7 +220,7 @@ if (DELAY_MS > 0) {
     port = listen;
 }
 
-const rb = await openRebase({ databaseUrl: urlFor(benchUrl, DB_NAME, port), collections, pool: { max: 4 } });
+const rb = await openRebase({ databaseUrl: urlFor(benchUrl, DB_NAME, port), collections, tables, pool: { max: 4 } });
 type Sql = (q: string, o?: { params?: unknown[] }) => Promise<Record<string, unknown>[]>;
 const sql = rb.sql as unknown as Sql;
 // The accessors are typed from a registered Database this script has none of.

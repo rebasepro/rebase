@@ -232,7 +232,7 @@ async function openAndRun(
     // subset of the tables.
     const { loadTableSchema } = await import("./schema/load-tables");
     const schemaDir = path.resolve(options.schemaDir || DEFAULT_SCHEMA_DIR);
-    const { collections, descriptors } = await loadTableSchema(schemaDir);
+    const { collections, descriptors, tables } = await loadTableSchema(schemaDir);
     // Writes from the console run the same hook tiers as a server write.
     const callbacks = await loadProjectHooks(schemaDir, descriptors);
 
@@ -242,6 +242,7 @@ async function openAndRun(
         rebase = await openRebase({
             databaseUrl,
             collections,
+            tables,
             ...(callbacks ? { callbacks } : {}),
             ...(ceiling !== null ? { pool: { max: ceiling } } : {})
         });

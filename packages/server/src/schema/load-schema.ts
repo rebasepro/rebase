@@ -7,11 +7,12 @@ import {
     isViewDef,
     type AnyTableDef,
     type AnyViewDef,
+    type CompiledTable,
     type DefaultRls,
     type PostgresCollectionConfig,
     type TableDescriptor
 } from "@rebasepro/types";
-import { SchemaDefinitionError, compileTables, lowerTables, type SchemaDefinitionProblem } from "@rebasepro/common";
+import { SchemaDefinitionError, compileSchema, compileTables, lowerTables, type SchemaDefinitionProblem } from "@rebasepro/common";
 
 /**
  * The one definition of "the tables".
@@ -310,7 +311,12 @@ export async function loadBackendSchema(dir: string, options: LoadBackendSchemaO
  * @group Schema
  */
 export interface CompiledSchema {
-    /** The descriptors, in definition order. */
+    /**
+     * The compiled tables, in definition order: each descriptor with its
+     * hooks, field-level hooks and definition. What the data driver runs on.
+     */
+    tables: CompiledTable[];
+    /** The descriptors, in definition order: `tables[i].descriptor`. */
     descriptors: TableDescriptor[];
     /**
      * The definitions lowered into the collection objects today's registry,
@@ -320,9 +326,10 @@ export interface CompiledSchema {
 }
 
 /**
- * Compile table and view definitions to descriptors, and lower them into the
- * collection objects the request-time code reads, with every hook wired to its
- * table's descriptor. The one way to lower: boot, the runtime and the CLI all
+ * Compile table and view definitions to {@link CompiledSchema.tables} (and their
+ * descriptors), and lower them into the collection objects the request-time
+ * code not yet moved onto tables reads, with every hook wired to its table's
+ * descriptor. The one way to lower: boot, the runtime and the CLI all
  * call this rather than `lowerTables` directly.
  *
  * @group Schema
@@ -332,10 +339,11 @@ export function compileSchemaDefs(
     defaultRls?: DefaultRls
 ): CompiledSchema {
     const options = defaultRls !== undefined ? { defaultRls } : {};
-    const descriptors = compileTables(defs, options);
+    const tables = compileSchema(defs, options);
+    const descriptors = tables.map(table => table.descriptor);
     const bySlug = new Map(descriptors.map(descriptor => [descriptor.slug, descriptor]));
     const collections = lowerTables(defs, { ...options, describe: slug => bySlug.get(slug) });
-    return { descriptors, collections };
+    return { tables, descriptors, collections };
 }
 
 /**

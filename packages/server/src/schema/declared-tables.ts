@@ -4,6 +4,7 @@ import {
     type AnyViewDef,
     type AuthTableOptions,
     type CollectionCallbacks,
+    type CompiledTable,
     type DefaultRls,
     type PostgresCollectionConfig,
     type TableDescriptor,
@@ -20,6 +21,8 @@ import { compileSchemaDefs, loadBackendSchema, type LoadBackendSchemaOptions } f
 export interface DeclaredTables {
     /** The definitions, as authored. Empty when nothing was declared. */
     defs: (AnyTableDef | AnyViewDef)[];
+    /** The compiled tables, in definition order: what the data drivers run on. */
+    tables: CompiledTable[];
     /** Their compiled descriptors, in definition order. */
     descriptors: TableDescriptor[];
     /** Their lowering: what the registry, the routes and the drivers read. */
@@ -64,15 +67,15 @@ export async function resolveDeclaredTables(options: {
         defaultRls = loaded.defaultRls;
         if (defs.length > 0) source = "schemaDir";
     }
-    if (defs.length === 0) return { defs: [], descriptors: [], collections: [], source: "none" };
+    if (defs.length === 0) return { defs: [], tables: [], descriptors: [], collections: [], source: "none" };
 
-    const { descriptors, collections } = compileSchemaDefs(defs, defaultRls);
+    const { tables, descriptors, collections } = compileSchemaDefs(defs, defaultRls);
     const authIndex = defs.findIndex(def => isAuthTableDef(def));
     const authDef = authIndex >= 0 ? defs[authIndex] : undefined;
     const authTable = authDef && isAuthTableDef(authDef)
         ? { descriptor: descriptors[authIndex], collection: collections[authIndex], options: authDef.auth }
         : undefined;
-    return { defs, descriptors, collections, source, ...(authTable ? { authTable } : {}) };
+    return { defs, tables, descriptors, collections, source, ...(authTable ? { authTable } : {}) };
 }
 
 /** The slug a legacy callback was called for: its collection's, or the path's first segment. */

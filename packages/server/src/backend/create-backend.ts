@@ -844,6 +844,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
 
         const driverResult = await bootstrapper.initializeDriver({
             collections: activeCollections,
+            tables: declaredTables.tables,
             collectionRegistry,
             introspectCollections,
             dataSourceKey: b.id || DEFAULT_DRIVER_ID,

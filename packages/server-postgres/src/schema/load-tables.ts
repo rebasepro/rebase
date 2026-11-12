@@ -17,7 +17,7 @@
  */
 import fs from "fs";
 import path from "path";
-import { computeSchemaVersion, DEFAULT_DATA_SOURCE_KEY, type PostgresCollectionConfig, type TableDescriptor } from "@rebasepro/types";
+import { computeSchemaVersion, DEFAULT_DATA_SOURCE_KEY, type CompiledTable, type PostgresCollectionConfig, type TableDescriptor } from "@rebasepro/types";
 import { compileLoadedSchema, loadBackendSchema } from "@rebasepro/server";
 import { outWarn } from "../cli-output";
 
@@ -60,6 +60,8 @@ export interface LoadedTables {
      * stamp is computed over, and what `GET /api/schema/tables` serves.
      */
     descriptors: TableDescriptor[];
+    /** The compiled tables, in the same slug order: what a driver opened from a script runs on. */
+    tables: CompiledTable[];
 }
 
 /**
@@ -88,7 +90,8 @@ export async function loadTableSchema(schemaDir: string): Promise<LoadedTables> 
     const bySlug = (a: { slug: string }, b: { slug: string }): number => a.slug.localeCompare(b.slug);
     return {
         collections: [...compiled.collections].sort(bySlug),
-        descriptors: [...compiled.descriptors].sort(bySlug)
+        descriptors: [...compiled.descriptors].sort(bySlug),
+        tables: [...compiled.tables].sort((a, b) => bySlug(a.descriptor, b.descriptor))
     };
 }
 

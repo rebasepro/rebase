@@ -17,6 +17,7 @@ import {
     type CallerSqlOptions,
     type CollectionCallbacks,
     type CollectionConfig,
+    type CompiledTable,
     type RebaseSdkData,
     type RebaseServerClient,
     type RegisteredDatabase,
@@ -58,6 +59,12 @@ export interface OpenRebaseOptions {
      * collection files does.
      */
     collections: CollectionConfig[];
+    /**
+     * The tables those collections were lowered from, compiled
+     * (`compileSchemaDefs(...).tables`): one per collection. What the driver
+     * builds its runtime model from; required beside non-empty `collections`.
+     */
+    tables?: CompiledTable[];
     /** Pool tuning, when `databaseUrl` is given. */
     pool?: PostgresPoolConfig;
     /** The data source these collections are served from. Defaults to `(default)`. */
@@ -185,6 +192,7 @@ export async function openRebase<DB = RegisteredDatabase>(options: OpenRebaseOpt
     try {
         opened = await openPostgresDriver({ connection: db, connectionString }, {
             collections: options.collections,
+            tables: options.tables,
             dataSourceKey: ownKey,
             introspectCollections: options.collections.length === 0,
             provision: false,
