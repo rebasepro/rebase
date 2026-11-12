@@ -13,7 +13,7 @@ function neutraliseMarkers(text: string): string {
  * A row is text somebody else wrote — a `body` column an anonymous visitor
  * filled in, a support-ticket title — and an MCP tool hands it to the model on
  * the same channel as the tool contract the model is following, in a session
- * that also holds `update_document` and `delete_document`. So an instruction
+ * that also holds `update_row` and `delete_row`. So an instruction
  * smuggled through a row is an instruction with reach. A fenced envelope does
  * not solve prompt injection; handing the row over with no marking at all is
  * below the floor.

@@ -138,7 +138,7 @@ export function restrictedFieldNames(
  * names, and the foreign key of an excluded to-one relation.
  *
  * Not the same set as {@link restrictedFieldNames}. A field restricted by role
- * is public by name: OpenAPI and `list_collections` describe it, and refusing a
+ * is public by name: OpenAPI and MCP's `describe_table` describe it, and refusing a
  * query on it with "not readable" tells the caller nothing they could not read
  * there. An `excludeFromApi` field is described nowhere, so a query naming one
  * has to be answered as a query naming a column that does not exist — anything

@@ -7,7 +7,7 @@ import { apiHiddenFieldNames } from "./field-access";
  * once, here, because two layers give them.
  *
  * The driver gives them for a typo. The REST check gives the same ones for a
- * field marked `excludeFromApi`: OpenAPI, `list_collections` and the generated
+ * field marked `excludeFromApi`: OpenAPI, MCP's `describe_table` and the generated
  * SDK all leave such a field out, so anything but the typo's answer — "not
  * readable", a different message, a list that names it — confirms it exists.
  * Both build the answer from these functions, so the two cannot drift apart by
