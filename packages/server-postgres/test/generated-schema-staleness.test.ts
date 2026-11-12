@@ -329,7 +329,7 @@ describe("the verdict schema stale prints", () => {
         const printed = verdict.lines.join("\n");
 
         expect(verdict.exitCode).toBe(1);
-        expect(printed).toContain("not what the current collections generate");
+        expect(printed).toContain("not what the current tables generate");
         expect(printed).toContain("projectsDatabaseMode");
         expect(printed).toContain("rebase schema generate");
     });
@@ -367,7 +367,7 @@ describe("the verdict schema stale prints", () => {
         });
 
         expect(printed).toContain("foreign key(s)");
-        expect(printed).toContain("not what the current collections generate");
+        expect(printed).toContain("not what the current tables generate");
     });
 
     it("stays quiet about differences it was never given", () => {

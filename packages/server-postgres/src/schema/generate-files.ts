@@ -2,8 +2,8 @@ import { promises as fsPromises } from "fs";
 import * as fs from "fs";
 import path from "path";
 import { pathToFileURL } from "url";
-import { CollectionConfig, declaredDatabaseExtensions } from "@rebasepro/types";
-import { loadCollectionsFromDirectory } from "@rebasepro/server";
+import { declaredDatabaseExtensions } from "@rebasepro/types";
+import { loadTables } from "./load-tables";
 import { generateSchema } from "./generate-drizzle-schema-logic";
 import {
     generatePostgresDdl,
@@ -22,12 +22,12 @@ import { nextStepAfterGenerate } from "./generate-next-step";
  * They used to exist only as scripts, each its own `tsx` process: the driver
  * (itself a `tsx` process) spawned one for the Drizzle schema and then one for
  * the DDL, and each paid a Node start, tsx's loader and an import of the whole
- * server package before reading a single collection — about 0.5 s apiece, a
+ * server package before reading a single table — about 0.5 s apiece, a
  * second per push. The driver process is one-shot, so a fresh module graph per
- * generation bought nothing: the collections cannot change under it.
+ * generation bought nothing: the tables cannot change under it.
  *
  * The scripts remain (`generate-drizzle-schema.ts`, `generate-postgres-ddl.ts`)
- * for `--watch`, which re-imports the collections on every save and does need a
+ * for `--watch`, which re-imports the tables on every save and does need a
  * process of its own — Node's module cache would serve it the first version
  * forever.
  *
@@ -45,8 +45,8 @@ export class GenerationFailed extends Error {
 }
 
 export interface GenerateFileOptions {
-    /** The collections directory (or single module), resolved against the cwd. */
-    collectionsPath: string;
+    /** The schema directory (`backend/schema`: its index exports the tables), resolved against the cwd. */
+    schemaDir: string;
     /** Where to write. Absent: print to stdout instead. */
     outputPath?: string;
     /**
@@ -57,22 +57,12 @@ export interface GenerateFileOptions {
     nextStep?: boolean;
 }
 
-/** The collections, in slug order so the output does not depend on the directory's. */
-async function loadSortedCollections(collectionsPath: string): Promise<CollectionConfig[]> {
-    // Shared with the runtime and the doctor: what gets generated here must
-    // be exactly what the server serves, including directory-level defaults.
-    const loaded = await loadCollectionsFromDirectory(path.resolve(collectionsPath));
-    // A copy: the loader's array is its caller's, and in-process the same
-    // collections are read again by the steps after this one.
-    const collections: CollectionConfig[] = Array.isArray(loaded) ? [...loaded] : [];
-    collections.sort((a, b) => a.slug.localeCompare(b.slug));
-    return collections;
-}
-
-/** `src/schema.generated.ts`, from the collections. */
+/** `src/schema.generated.ts`, from the tables. */
 export async function writeDrizzleSchema(options: GenerateFileOptions): Promise<void> {
     try {
-        const collections = await loadSortedCollections(options.collectionsPath);
+        // Shared with the runtime and the doctor (`loadTables`), in slug order so
+        // the output does not depend on the index's export order.
+        const collections = await loadTables(options.schemaDir);
         const schemaContent = generateSchema(collections);
 
         if (options.outputPath) {
@@ -93,14 +83,14 @@ export async function writeDrizzleSchema(options: GenerateFileOptions): Promise<
     }
 }
 
-/** Where a project declares its resources, relative to the config directory. */
+/** Where a project declares its resources, relative to `backend/` (the schema directory's parent). */
 const RESOURCE_ENTRIES = ["resources.ts", "resources.js", "resources/index.ts", "resources/index.js"];
 
 /**
  * Evaluate the project's `resources.ts`, so `declaredDatabaseExtensions()` can
  * answer.
  *
- * The DDL generator loads only the collections directory, so nothing else in it
+ * The DDL generator loads only the schema directory, so nothing else in it
  * would ever import the resources module — and a permission that reads as
  * absent because nobody loaded it is the worst shape this could take: the push
  * succeeds, `vector.sql` quietly omits the `CREATE EXTENSION`, and the failure
@@ -115,9 +105,9 @@ const RESOURCE_ENTRIES = ["resources.ts", "resources.js", "resources/index.ts", 
  * evaluate is a configuration error, and treating it as "declared nothing"
  * would turn it into a silently missing extension.
  */
-async function loadDeclaredResources(configDir: string): Promise<void> {
+async function loadDeclaredResources(backendDir: string): Promise<void> {
     const entry = RESOURCE_ENTRIES
-        .map(name => path.join(configDir, name))
+        .map(name => path.join(backendDir, name))
         .find(candidate => fs.existsSync(candidate));
     if (!entry) return;
     await import(pathToFileURL(entry).href);
@@ -130,14 +120,14 @@ async function loadDeclaredResources(configDir: string): Promise<void> {
  */
 export async function writePostgresDdl(options: GenerateFileOptions): Promise<void> {
     try {
-        const resolvedPath = path.resolve(options.collectionsPath);
+        const resolvedPath = path.resolve(options.schemaDir);
 
-        // `<config>/collections` is the path this is given, so the config
-        // directory is its parent — the same relationship `rebase resources`
-        // and the boot loader assume.
+        // `backend/schema` is the path this is given, so `backend/` — where
+        // `resources.ts` lives — is its parent: the same relationship
+        // `rebase resources` and the boot loader assume.
         await loadDeclaredResources(path.dirname(resolvedPath));
 
-        const collections = await loadSortedCollections(resolvedPath);
+        const collections = await loadTables(resolvedPath);
 
         // `schema.sql` is Atlas's desired state, and it carries neither the RLS
         // policies, nor the search apparatus, nor the vector columns: Atlas
@@ -169,7 +159,7 @@ export async function writePostgresDdl(options: GenerateFileOptions): Promise<vo
 
             // Removed when the last `search` block goes: the CLI applies this
             // file whenever it exists, and a stale one would keep re-creating
-            // functions for collections that no longer want them.
+            // functions for tables that no longer want them.
             const searchPath = path.join(outputDir, "search.sql");
             if (searchContent) {
                 await fsPromises.writeFile(searchPath, searchContent);
@@ -178,9 +168,9 @@ export async function writePostgresDdl(options: GenerateFileOptions): Promise<vo
                 await fsPromises.rm(searchPath);
             }
 
-            // Removed when the last `vector` property goes, for the same reason
+            // Removed when the last vector column goes, for the same reason
             // `search.sql` is: the CLI applies whichever of these files exists,
-            // and a stale one would keep re-adding a column the collections no
+            // and a stale one would keep re-adding a column the tables no
             // longer declare — which Atlas, no longer told to exclude it, would
             // then plan a DROP for on the very next push.
             const vectorPath = path.join(outputDir, "vector.sql");
@@ -191,7 +181,7 @@ export async function writePostgresDdl(options: GenerateFileOptions): Promise<vo
                 await fsPromises.rm(vectorPath);
             }
 
-            // `autoValue: "on_update"`, on the same terms as the two above: a
+            // `.onUpdateNow()` (`autoValue: "on_update"`), on the same terms as the two above: a
             // trigger is a function plus a binding, which Atlas's free tier
             // will not parse, and a stale file would keep re-installing a
             // trigger for a column nothing declares any more.
@@ -203,8 +193,8 @@ export async function writePostgresDdl(options: GenerateFileOptions): Promise<vo
                 await fsPromises.rm(triggersPath);
             }
 
-            // The collections' views, which Atlas's free tier does not manage.
-            // Removed with the last `view`, as the others are: the CLI applies
+            // The schema's views (`defineView`), which Atlas's free tier does not manage.
+            // Removed with the last view, as the others are: the CLI applies
             // the file whenever it exists.
             const viewsPath = path.join(outputDir, "views.sql");
             if (viewsContent) {

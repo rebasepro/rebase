@@ -20,7 +20,9 @@ describe("assertDbCommandLine", () => {
     });
 
     it.each([
-        [["db", "generate", "--colections", "x"], /`rebase db generate` has no option --colections — did you mean --collections\?/],
+        [["db", "generate", "--schema-di", "x"], /`rebase db generate` has no option --schema-di — did you mean --schema-dir\?/],
+        [["db", "push", "--collections", "../config/collections"], /--collections was removed: .*--schema-dir <dir>.*migrate-collections-to-tables/],
+        [["db", "generate", "add_tags", "-c", "x"], /-c was removed: .*--schema-dir/],
         [["db", "migrate", "--baselin", "1"], /`rebase db migrate` has no option --baselin — did you mean --baseline\?/],
         [["db", "branch", "create", "x", "--froce"], /`rebase db branch create` has no option --froce — did you mean --force\?/],
         [["db", "branch", "prune", "--older-then", "1d"], /`rebase db branch prune` has no option --older-then/],
@@ -39,9 +41,9 @@ describe("assertDbCommandLine", () => {
     });
 
     it.each([
-        [["db", "push", "--dry-run", "--collections", "../config/collections", "-y"]],
+        [["db", "push", "--dry-run", "--schema-dir", "/abs/backend/schema", "-y"]],
         [["db", "push", "--allow-destructive", "--database-url", "postgres://u:p@h/db", "--docker", "--debug"]],
-        [["db", "generate", "add_tags", "-c", "x"]],
+        [["db", "generate", "add_tags", "--schema-dir=/abs/backend/schema"]],
         [["db", "migrate", "--baseline", "20261014102032"]],
         [["db", "migrate", "--refuse-destructive"]],
         [["db", "branch", "create", "feature", "--from", "main", "--force"]],

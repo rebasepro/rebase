@@ -384,7 +384,7 @@ export function staleVerdict(input: {
     const differences = input.differences ?? [];
     if (differences.length > 0) {
         problems.push(
-            `  ⚠️  ${input.outputPath} is not what the current collections generate.`,
+            `  ⚠️  ${input.outputPath} is not what the current tables generate.`,
             `      Differs in: ${describeDeclarationDifferences(differences)}.`
         );
     }

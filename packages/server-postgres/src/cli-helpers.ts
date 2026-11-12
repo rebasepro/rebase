@@ -343,73 +343,22 @@ export async function getTableIncludesFromCollections(allCollections: Collection
     return Array.from(new Set(includes));
 }
 
-export async function getTableIncludes(collectionsPath: string): Promise<string[]> {
-    return getTableIncludesFromCollections(await loadCollectionsForCli(collectionsPath));
+export async function getTableIncludes(schemaDir: string): Promise<string[]> {
+    return getTableIncludesFromCollections(await tablesIn(schemaDir));
 }
 
 /**
- * Load a project's collections the way the Atlas-facing commands need them.
+ * The project's tables, for the Atlas-facing helpers below.
  *
- * Deliberately forgiving — a file that fails to import is skipped rather than
- * fatal — because the callers use this to *narrow* what Atlas may touch, and a
- * hard failure here would block a push over an unrelated broken file. Callers
- * that cannot tolerate a partial answer (the table excludes, which fail closed)
- * check the result themselves.
+ * Through the one loader every driver command uses (`loadTables`), and fatal
+ * like it: these helpers decide what Atlas may touch, and a table dropped from
+ * the answer because its module failed to import is a table Atlas is told to
+ * leave alone — or, for the includes, one it plans to drop. Imported on first
+ * use, so a command that never reaches here does not load the server package.
  */
-/** Paths this process has already complained about. See {@link loadCollectionsForCli}. */
-const warnedMissingCollectionsPaths = new Set<string>();
-
-export async function loadCollectionsForCli(collectionsPath: string): Promise<CollectionConfig[]> {
-    // Note: a relative --collections path resolves against the *current working
-    // directory*, not the backend package. When invoked via the generated npm
-    // script (cwd = backend/), the script uses "../config/collections" to
-    // compensate — so running the CLI directly from the repo root with a
-    // different relative path can silently point at the wrong place.
-    const resolvedPath = path.resolve(collectionsPath);
-    const collections: CollectionConfig[] = [];
-    if (!fs.existsSync(resolvedPath) && !warnedMissingCollectionsPaths.has(resolvedPath)) {
-        // Once per path per process. `db push` re-enters this from
-        // `schemaCommand`, `generatePostgresDdlCommand` and the Atlas argv
-        // assembly, so the same four lines were printed four times — sixteen
-        // lines of identical text ahead of the real output.
-        //
-        // An explicitly typed `--collections` never reaches here at all: it is
-        // refused at the entry point, before anything is generated. See
-        // `cli-collections-path.ts`. What is left is the default, which a
-        // headless project legitimately does not have.
-        warnedMissingCollectionsPaths.add(resolvedPath);
-        outWarn(chalk.yellow(
-            `  ⚠  Collections path not found: "${collectionsPath}"\n` +
-            `     Resolved to: ${resolvedPath}\n` +
-            `     (relative to cwd: ${process.cwd()})\n` +
-            `     Pass an absolute path, or a path relative to where you run the command.`
-        ));
-    }
-    if (fs.existsSync(resolvedPath)) {
-        const stats = fs.statSync(resolvedPath);
-        if (stats.isDirectory()) {
-            const files = fs.readdirSync(resolvedPath);
-            for (const file of files) {
-                if ((file.endsWith(".ts") || file.endsWith(".js")) &&
-                    !file.includes(".test.") &&
-                    !file.endsWith(".d.ts") &&
-                    file !== "index.ts" && file !== "index.js") {
-                    try {
-                        const filePath = path.join(resolvedPath, file);
-                        const fileUrl = pathToFileURL(filePath).href;
-                        const module = await import(fileUrl);
-                        if (module && module.default) {
-                            collections.push(module.default);
-                        }
-                    } catch {
-                        // ignore
-                    }
-                }
-            }
-        }
-    }
-
-    return collections;
+async function tablesIn(schemaDir: string): Promise<CollectionConfig[]> {
+    const { loadTables } = await import("./schema/load-tables");
+    return loadTables(schemaDir);
 }
 
 /**
@@ -702,9 +651,9 @@ export async function applySearchDdl(
  * Returns an empty list — and so changes nothing — for a project with no
  * `search` block, which is every project that has not opted in.
  */
-export async function getSearchExcludes(collectionsPath: string): Promise<string[]> {
+export async function getSearchExcludes(schemaDir: string): Promise<string[]> {
     const { searchExcludePatterns } = await import("./schema/generate-postgres-ddl-logic");
-    return searchExcludePatterns(await loadCollectionsForCli(collectionsPath));
+    return searchExcludePatterns(await tablesIn(schemaDir));
 }
 
 /**
@@ -830,9 +779,9 @@ export async function applyVectorDdl(
  * Returns an empty list — and so changes nothing — for a project with no
  * `vector` property, which is every project that has not opted in.
  */
-export async function getVectorExcludes(collectionsPath: string): Promise<string[]> {
+export async function getVectorExcludes(schemaDir: string): Promise<string[]> {
     const { vectorExcludePatterns } = await import("./schema/generate-postgres-ddl-logic");
-    return vectorExcludePatterns(await loadCollectionsForCli(collectionsPath));
+    return vectorExcludePatterns(await tablesIn(schemaDir));
 }
 
 /**
@@ -899,9 +848,9 @@ export async function applyViewsDdl(
 }
 
 /** @see getSearchExcludes */
-export async function getTriggerExcludes(collectionsPath: string): Promise<string[]> {
+export async function getTriggerExcludes(schemaDir: string): Promise<string[]> {
     const { triggerExcludePatterns } = await import("./schema/generate-postgres-ddl-logic");
-    return triggerExcludePatterns(await loadCollectionsForCli(collectionsPath));
+    return triggerExcludePatterns(await tablesIn(schemaDir));
 }
 
 /**
@@ -974,16 +923,16 @@ export async function queryExistingIndexes(databaseUrl: string): Promise<Existin
  */
 export async function getForeignIndexExcludes(
     databaseUrl: string,
-    collectionsPath: string,
+    schemaDir: string,
     deps: {
         queryExistingIndexes?: (databaseUrl: string) => Promise<ExistingIndex[]>;
-        getManagedIndexNames?: (collectionsPath: string) => Promise<Set<string>>;
+        getManagedIndexNames?: (schemaDir: string) => Promise<Set<string>>;
     } = {}
 ): Promise<string[]> {
     const queryIndexes = deps.queryExistingIndexes ?? queryExistingIndexes;
     const getManaged = deps.getManagedIndexNames ?? managedIndexNames;
 
-    const managed = await getManaged(collectionsPath);
+    const managed = await getManaged(schemaDir);
 
     let existing: ExistingIndex[];
     try {
@@ -1010,8 +959,8 @@ export async function getForeignIndexExcludes(
  * The index names the current collections would create — search, vector and
  * declared alike. Anything Atlas would emit is by definition not foreign.
  */
-async function managedIndexNames(collectionsPath: string): Promise<Set<string>> {
-    const collections = await loadCollectionsForCli(collectionsPath);
+async function managedIndexNames(schemaDir: string): Promise<Set<string>> {
+    const collections = await tablesIn(schemaDir);
     const { searchExcludePatterns, vectorExcludePatterns } =
         await import("./schema/generate-postgres-ddl-logic");
     const { resolveColumnName } = await import("./schema/column-plan-helpers");
@@ -1112,16 +1061,16 @@ export class ExcludeIntrospectionError extends Error {
  */
 export async function getTableExcludes(
     databaseUrl: string,
-    collectionsPath: string,
+    schemaDir: string,
     deps: {
         queryExistingTables?: (databaseUrl: string) => Promise<ExistingTable[]>;
-        getIncludes?: (collectionsPath: string) => Promise<string[]>;
+        getIncludes?: (schemaDir: string) => Promise<string[]>;
     } = {}
 ): Promise<string[]> {
     const getIncludes = deps.getIncludes ?? getTableIncludes;
     const queryTables = deps.queryExistingTables ?? queryExistingTables;
 
-    const includes = await getIncludes(collectionsPath);
+    const includes = await getIncludes(schemaDir);
     // Schemas the declarative apply must never touch. `rebase` holds the auth
     // tables (users, refresh_tokens, …), the RLS helper functions and Atlas's
     // own revision table. Excluding both the schema object AND its contents

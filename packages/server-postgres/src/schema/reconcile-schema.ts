@@ -106,12 +106,12 @@ export function planSchemaReconcile(
         const slug = dot > 0 ? request.slice(0, dot) : "";
         const column = dot > 0 ? request.slice(dot + 1) : "";
         if (!slug || !column) {
-            problems.push(`"${request}" is not <collection>.<column>.`);
+            problems.push(`"${request}" is not <table>.<column>.`);
             continue;
         }
         const table = tables.find(t => t.slug === slug);
         if (!table) {
-            problems.push(`"${request}": no collection "${slug}".`);
+            problems.push(`"${request}": no table "${slug}".`);
             continue;
         }
         const match = undeclared.find(u => u.collection === slug && u.column === column);
@@ -122,7 +122,7 @@ export function planSchemaReconcile(
         // Refused rather than ignored, and never dropped: a declared column is
         // one the collection still reads and writes.
         problems.push(table.columns.some(c => c.column === column)
-            ? `"${request}": the "${slug}" collection still declares "${column}". Remove the property, deploy, then drop it.`
+            ? `"${request}": the "${slug}" table still declares "${column}". Remove the column, deploy, then drop it.`
             : `"${request}": "${table.qualified}" has no column "${column}".`);
     }
 

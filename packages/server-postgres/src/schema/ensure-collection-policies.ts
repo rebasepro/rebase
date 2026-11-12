@@ -8,7 +8,7 @@
  * policies is not servable: authenticated requests run as the restricted
  * `rebase_user` role, so a read with no `SELECT` policy returns nothing (a
  * public collection answered 401) and a write with no `INSERT`/`UPDATE` policy
- * is denied. The policies live in the collections' `securityRules`; nothing at
+ * is denied. The policies live in the tables' `rls` (lowered to `securityRules`); nothing at
  * boot applied them. `rebase db push` does — but it drives Atlas against a
  * local `DATABASE_URL`, and a managed tenant's database is reachable only from
  * inside the cluster, by the runtime that is already connected to it. So the
@@ -132,18 +132,18 @@ export interface PolicyEnsureResult {
      */
     deferred: { table: string; error: string; rulesChanged: boolean }[];
     /**
-     * Tables whose collection declares no rule of its own and which still held
+     * Tables that declare no rule of their own (`rls: "admin-only"`, or
+     * `"inherit"` of an admin-only `defaultRls`) and which still held
      * generated rule policies, all of them dropped: the generated policies, by
      * name, the boot is to warn about.
      *
      * An edited rule supersedes its old policy, and that drop is the point of
-     * {@link PolicyEnsureResult.orphansDropped}. A collection with no rule at
-     * all is something else: what a collection looks like when the
-     * `defaultSecurityRules` its directory's index declares never reached it —
-     * an array handed to a backend without them. Dropping is still right (the
-     * declared state wins, and the table is left admin-only rather than open),
-     * but it changes who can read the table on every server sharing the
-     * database, so it is not done in silence.
+     * {@link PolicyEnsureResult.orphansDropped}. A table with no rule at all is
+     * something else: what a table looks like when the `defaultRls` it meant
+     * to inherit never reached it — a server handed another schema directory,
+     * say. Dropping is still right (the declared state wins, and the table is
+     * left admin-only rather than open), but it changes who can read the table
+     * on every server sharing the database, so it is not done in silence.
      */
     rulesDropped: { table: string; policies: string[] }[];
 }
@@ -823,11 +823,11 @@ async function applyAtomically(
  * each policy, what it means for the table, and the likely cause.
  */
 export function describeRulesDropped(dropped: { table: string; policies: string[] }): string {
-    return `🔐 [rls] "${dropped.table}" declares no securityRules, so the policies its rules had made were dropped: ` +
+    return `🔐 [rls] "${dropped.table}" is \`rls: "admin-only"\` now, so the policies its rules had made were dropped: ` +
         `${dropped.policies.join(", ")}. Only administrators reach its rows now, on every server sharing this database. ` +
-        "If its collection came in an array handed to createRebaseBackend, that array lacked the defaultSecurityRules " +
-        "its config/collections/index.ts declares: pass collectionsDir, or the array that index exports, which carries " +
-        "them. If the rules were removed on purpose, this is that change.";
+        "If the table says `rls: \"inherit\"`, the `defaultRls` it inherits is \"admin-only\": check what " +
+        "backend/schema/index.ts exports as `defaultRls`, and that this server was handed that schema directory. " +
+        "If the rules were removed on purpose, this is that change.";
 }
 
 /** The orphans just dropped, when they were every rule the table had. See {@link PolicyEnsureResult.rulesDropped}. */

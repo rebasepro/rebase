@@ -39,7 +39,7 @@ function runGenerator(script: string, fixture: string, outputPath: string) {
         tsxBin(),
         [
             path.join(packageRoot, "src", "schema", script),
-            `--collections=${path.join(fixtures, fixture, "collections")}`,
+            `--schema-dir=${path.join(fixtures, fixture, "schema")}`,
             `--output=${outputPath}`
         ],
         { cwd: packageRoot, encoding: "utf8", env: { ...process.env, DOTENV_CONFIG_QUIET: "true" } }
@@ -48,8 +48,8 @@ function runGenerator(script: string, fixture: string, outputPath: string) {
 
 // The DDL generator evaluates the project's `resources.ts` (for the declared
 // database extensions) and the Drizzle generator does not — it reads the
-// collections and nothing else. So each is handed the module that can fail
-// for it: a resources module that throws for the first, a collection module
+// schema and nothing else. So each is handed the module that can fail
+// for it: a resources module that throws for the first, a schema module
 // that throws for the second. The property under test is the same — step 1
 // of `rebase db push` raised, so the generator must not exit 0.
 describe.each([
@@ -86,18 +86,19 @@ describe("the fixture", () => {
     it("is only broken in `resources.ts`", () => {
         // Guards the DDL test above from passing for the wrong reason: if the
         // collection file itself stopped loading, the generator would fail
-        // whatever the resources module did. The collection must load — and
-        // load from a package server-postgres declares, or pnpm's isolated
-        // layout is what makes it fail.
+        // whatever the resources module did. The table must load — and load
+        // from a package server-postgres declares, or pnpm's isolated layout
+        // is what makes it fail.
         const fixture = path.join(fixtures, "broken-resources");
-        const collection = fs.readFileSync(path.join(fixture, "collections", "tags.ts"), "utf8");
-        expect(collection).toContain('from "@rebasepro/common"');
+        const table = fs.readFileSync(path.join(fixture, "schema", "tags.ts"), "utf8");
+        expect(table).toContain('from "@rebasepro/types"');
+        expect(fs.readFileSync(path.join(fixture, "schema", "index.ts"), "utf8")).toContain("export { tags }");
         expect(fs.readFileSync(path.join(fixture, "resources.ts"), "utf8")).toContain("throw new Error");
     });
 
-    it("is only broken in the collection, for the generator that reads nothing else", () => {
+    it("is only broken in the schema module, for the generator that reads nothing else", () => {
         const fixture = path.join(fixtures, "broken-collection");
-        expect(fs.readFileSync(path.join(fixture, "collections", "tags.ts"), "utf8")).toContain("throw new Error");
+        expect(fs.readFileSync(path.join(fixture, "schema", "tags.ts"), "utf8")).toContain("throw new Error");
         expect(fs.existsSync(path.join(fixture, "resources.ts"))).toBe(false);
     });
 

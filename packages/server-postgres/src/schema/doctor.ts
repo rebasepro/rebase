@@ -12,7 +12,7 @@ import * as fs from "fs";
 import path from "path";
 import { pathToFileURL } from "url";
 import chalk from "chalk";
-import { computeSchemaVersion, CollectionConfig, DEFAULT_DATA_SOURCE_KEY, isPostgresCollectionConfig, Property, NumberProperty, StringProperty, DateProperty, ArrayProperty, MapProperty, RelationProperty, type ResolvedManyToMany, type ResolvedBelongsTo, isManyToMany } from "@rebasepro/types";
+import { computeSchemaVersion, CollectionConfig, DEFAULT_DATA_SOURCE_KEY, type TableDescriptor, isPostgresCollectionConfig, Property, NumberProperty, StringProperty, DateProperty, ArrayProperty, MapProperty, RelationProperty, type ResolvedManyToMany, type ResolvedBelongsTo, isManyToMany } from "@rebasepro/types";
 import { generateSchema } from "./generate-drizzle-schema-logic";
 import { compareGeneratedDeclarations, describeDeclarationDifferences } from "./generated-schema-staleness";
 import { describeSchemaDifference, readGeneratedSchemaDrift, type SchemaDifference } from "./generated-schema-diff";
@@ -22,7 +22,7 @@ import type { PgType, SchemaPlan, TablePlan } from "./plan/types";
 import { generateTypedefs } from "@rebasepro/codegen";
 import { getTableName, resolveCollectionRelations, findRelation, relationalCollections, resolveJunctionSpecs } from "@rebasepro/common";
 import { toPostgresIdentifier, toSnakeCase } from "@rebasepro/utils";
-import { loadCollectionsFromDirectory } from "@rebasepro/server";
+import { loadTableSchema } from "./load-tables";
 // The report is CLI output, not application logging — see cli-output.ts.
 import { out, outError } from "../cli-output";
 import { deepestErrorMessage, diagnoseDbError, parseHostInfo } from "../cli-errors";
@@ -187,18 +187,6 @@ export function getExpectedColumnType(prop: Property): string | null {
     }
 }
 
-// ── Collection loading ───────────────────────────────────────────────────
-
-/**
- * Re-exported so callers keep importing it from here, but the implementation is
- * now shared with the runtime and the generators — a doctor that disagreed with
- * the policy generator about which files are collections would compare the
- * wrong thing.
- */
-export async function loadCollections(collectionsPath: string): Promise<CollectionConfig[]> {
-    return loadCollectionsFromDirectory(collectionsPath);
-}
-
 // ── Phase 1: Collections ↔ Generated Schema ─────────────────────────────
 
 export async function checkCollectionsVsSchema(
@@ -243,7 +231,7 @@ issues };
             issues.push({
                 severity: "warning",
                 category: "schema_stale",
-                message: "Generated schema is out of date — collection definitions have changed since last generation. "
+                message: "Generated schema is out of date — table definitions have changed since last generation. "
                     + `Differs in: ${describeDeclarationDifferences(differences)}.`,
                 fix: "Run `rebase schema generate`"
             });
@@ -263,7 +251,8 @@ issues };
 }
 
 export async function checkCollectionsVsSdk(
-    collections: CollectionConfig[],
+    /** The tables' compiled descriptors — what `rebase generate-sdk` generates from. */
+    descriptors: readonly TableDescriptor[],
     sdkFilePath: string
 ): Promise<DoctorPhase> {
     const issues: DoctorIssue[] = [];
@@ -277,7 +266,7 @@ export async function checkCollectionsVsSdk(
             severity: "info",
             category: "sdk_not_generated",
             message: "Typed SDK not generated (optional).",
-            fix: "Run `rebase generate-sdk` if you want typed collection access"
+            fix: "Run `rebase generate-sdk` if you want typed table access"
         });
         return { passed: true,
 issues,
@@ -285,7 +274,7 @@ notApplicable: "not generated (optional)" };
     }
 
     try {
-        const expectedSdk = generateTypedefs(collections);
+        const expectedSdk = generateTypedefs(descriptors);
         const actualSdk = await fsPromises.readFile(sdkFilePath, "utf-8");
 
         // Normalize whitespace for comparison
@@ -300,7 +289,7 @@ notApplicable: "not generated (optional)" };
             issues.push({
                 severity: "warning",
                 category: "sdk_stale",
-                message: "Generated SDK types are out of date — collection definitions have changed since last SDK generation.",
+                message: "Generated SDK types are out of date — table definitions have changed since last SDK generation.",
                 fix: "Run `rebase generate-sdk`"
             });
         }
@@ -316,8 +305,8 @@ notApplicable: "not generated (optional)" };
             issues.push({
                 severity: "error",
                 category: "sdk_ungeneratable",
-                message: `The typed SDK cannot be generated from these collections: ${message}`,
-                fix: "Fix the collection definitions named above, then run `rebase generate-sdk`"
+                message: `The typed SDK cannot be generated from these tables: ${message}`,
+                fix: "Fix the table definitions named above, then run `rebase generate-sdk`"
             });
         } else {
             issues.push({
@@ -375,17 +364,18 @@ export function missingExtensionIssues(
     return [{
         severity: "error",
         category: "missing_table",
-        message: 'A collection declares a `{ type: "vector" }` property and the pgvector extension is not installed on this database.',
+        message: 'A table declares a vector column (`col.vector(...)`) and the pgvector extension is not installed on this database.',
         fix: 'Declare it — `database({ extensions: ["vector"] })` in config/resources.ts — and use an image that ships the library '
             + "(the scaffold's pgvector/pgvector:pg18; a stock postgres:18 does not). Or install it once by hand: CREATE EXTENSION vector;"
     }];
 }
 
 /**
- * The stamp the runtime wrote, against the collections on disk.
+ * The stamp the runtime wrote, against the tables on disk (their compiled
+ * descriptors, which is what the stamp is computed over).
  *
  * A stamp that disagrees means this database was provisioned from a different
- * set of collections than the ones in this checkout — a colleague's branch, an
+ * set of tables than the ones in this checkout — a colleague's branch, an
  * older deploy, a tenant somebody else migrated. Everything else in this report
  * is then describing a schema somebody else created, which is worth knowing
  * before acting on any of it.
@@ -397,7 +387,7 @@ export function missingExtensionIssues(
  */
 export async function schemaStampIssues(
     pool: { query<T>(text: string): Promise<{ rows: T[] }> },
-    collections: CollectionConfig[]
+    descriptors: readonly TableDescriptor[]
 ): Promise<DoctorIssue[]> {
     let stamped: string | null = null;
     try {
@@ -419,14 +409,14 @@ export async function schemaStampIssues(
     }
 
     if (!stamped) return [];
-    const expected = computeSchemaVersion(collections);
+    const expected = computeSchemaVersion(descriptors);
     if (stamped === expected) return [];
 
     return [{
         severity: "warning",
         category: "schema_stale",
-        message: `This database was provisioned from a different set of collections (stamp ${stamped.slice(0, 12)}…, this checkout computes ${expected.slice(0, 12)}…).`,
-        fix: "A hash says the two disagree, never which is ahead. Check you are pointed at the database you think you are; then `rebase db push` to bring it to these collections."
+        message: `This database was provisioned from a different set of tables (stamp ${stamped.slice(0, 12)}…, this checkout computes ${expected.slice(0, 12)}…).`,
+        fix: "A hash says the two disagree, never which is ahead. Check you are pointed at the database you think you are; then `rebase db push` to bring it to these tables."
     }];
 }
 
@@ -475,7 +465,7 @@ export function primaryKeyIssues(tablePlan: TablePlan, dbPk: string[], displayNa
             table: displayName,
             expected: expected.join(", "),
             actual: "(none)",
-            message: `Table "${displayName}" has no primary key; the collection reads its rows by ${keyList}.`,
+            message: `Table "${displayName}" has no primary key; the table definition reads its rows by ${keyList}.`,
             fix: `ALTER TABLE ${table} ADD PRIMARY KEY (${keyList});`
         }];
     }
@@ -492,7 +482,7 @@ export function primaryKeyIssues(tablePlan: TablePlan, dbPk: string[], displayNa
         table: displayName,
         expected: expected.join(", "),
         actual: dbPk.join(", "),
-        message: `Table "${displayName}" is keyed on (${dbPk.join(", ")}), but the collection reads its rows by ${keyList}.`,
+        message: `Table "${displayName}" is keyed on (${dbPk.join(", ")}), but the table definition reads its rows by ${keyList}.`,
         fix
     }];
 }
@@ -559,7 +549,7 @@ const COVERING_CATEGORY: Record<SchemaDifference["kind"], DoctorIssue["category"
 
 /** What to do about one boot difference, said the way the boot warning says it. */
 function generatedDriftFix(difference: SchemaDifference): string {
-    const regenerate = " If the collections changed since schema.generated.ts was written, run `rebase schema generate` first.";
+    const regenerate = " If backend/schema changed since schema.generated.ts was written, run `rebase schema generate` first.";
     switch (difference.kind) {
         case "nullability":
             return difference.generated === "NOT NULL"
@@ -631,6 +621,12 @@ export async function checkCollectionsVsDatabase(
          * comparison. Without it the doctor compares the collections alone.
          */
         generated?: Record<string, unknown>;
+        /**
+         * The tables' compiled descriptors, to compare against the
+         * schema-version stamp the runtime wrote. Without them that one check
+         * is not made.
+         */
+        descriptors?: readonly TableDescriptor[];
     } = {}
 ): Promise<DoctorPhase> {
     const issues: DoctorIssue[] = [];
@@ -690,7 +686,7 @@ export async function checkCollectionsVsDatabase(
         // The runtime stamps what it applied; nothing compared it outside boot,
         // and a stamp that disagrees is exactly the state where the rest of
         // this report is describing a schema somebody else's deploy created.
-        issues.push(...await schemaStampIssues(pool, collections));
+        if (options.descriptors) issues.push(...await schemaStampIssues(pool, options.descriptors));
 
         // Fetch all columns in the defined schemas
         const columnsResult = await pool.query<DbColumn>(
@@ -903,7 +899,7 @@ export async function checkCollectionsVsDatabase(
                         category: "missing_column",
                         table: fullTableName,
                         column: colName,
-                        message: `Column "${colName}" is defined in collection "${collection.slug}" but missing from table "${fullTableName}".`,
+                        message: `Column "${colName}" is defined in table "${collection.slug}" (backend/schema) but missing from table "${fullTableName}".`,
                         fix: "Run `rebase db push` or `rebase db generate && rebase db migrate`"
                     });
                     continue;
@@ -970,7 +966,7 @@ export async function checkCollectionsVsDatabase(
                                 table: fullTableName,
                                 column: colName,
                                 expected: enumName,
-                                message: `Enum type "${schemaName}"."${enumName}" is defined in collection but not found in the database.`,
+                                message: `Enum type "${schemaName}"."${enumName}" is defined in backend/schema but not found in the database.`,
                                 fix: "Run `rebase db push` or `rebase db generate && rebase db migrate`"
                             });
                         } else {
@@ -1106,7 +1102,7 @@ export function orphanedJunctionIssues(
             severity: "info",
             category: "orphaned_junction",
             table,
-            message: `Table "${table}" links "${targets[0]}" and "${targets[1]}" like a many-to-many junction, but no collection declares it — left behind by a renamed or removed relation?`,
+            message: `Table "${table}" links "${targets[0]}" and "${targets[1]}" like a many-to-many junction, but no table declares it — left behind by a renamed or removed relation?`,
             fix: `DROP TABLE "public"."${table}";`
         });
     }
@@ -1122,13 +1118,13 @@ export function renderReport(report: DoctorReport): void {
     out();
 
     // Phase 1
-    renderPhase("Collections → Generated Schema", report.collectionsToSchema);
+    renderPhase("Tables → Generated Schema", report.collectionsToSchema);
 
     // Phase 2
-    renderPhase("Collections → Database", report.schemaToDatabase);
+    renderPhase("Tables → Database", report.schemaToDatabase);
 
     // Phase 3
-    renderPhase("Collections → SDK Types", report.collectionsToSdk);
+    renderPhase("Tables → SDK Types", report.collectionsToSdk);
 
     // Summary
     out(chalk.gray("  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"));
@@ -1268,32 +1264,35 @@ async function loadGeneratedTables(schemaPath: string): Promise<{ tables?: Recor
 }
 
 export async function runDoctor(options: {
-    collectionsPath: string;
+    schemaDir: string;
     schemaPath: string;
     sdkPath: string;
     databaseUrl?: string;
 }): Promise<DoctorReport> {
     out();
-    out(chalk.bold("  🩺 Loading collections..."));
-    const collections = await loadCollections(options.collectionsPath);
+    out(chalk.bold("  🩺 Loading tables..."));
+    // The loader every door uses (`loadTableSchema`): a doctor that disagreed with
+    // the policy generator about which tables exist would compare the wrong
+    // thing. A schema that does not compile is fatal here as everywhere.
+    const { collections, descriptors } = await loadTableSchema(options.schemaDir);
     if (collections.length === 0) {
-        outError(chalk.red("  ✗ No collections found."));
+        outError(chalk.red(`  ✗ No tables found in ${options.schemaDir} (its index.ts exports none).`));
         process.exit(1);
     }
-    out(chalk.gray(`  Found ${collections.length} collection(s)`));
+    out(chalk.gray(`  Found ${collections.length} table(s)`));
     out();
 
     // Phase 1: Collections ↔ Generated Schema
-    out(chalk.gray("  Checking Collections → Generated Schema..."));
+    out(chalk.gray("  Checking Tables → Generated Schema..."));
     const collectionsToSchema = await checkCollectionsVsSchema(collections, options.schemaPath);
 
     // Phase 2: Collections ↔ Database (only if we have a DATABASE_URL)
     let schemaToDatabase: DoctorPhase;
     if (options.databaseUrl) {
-        out(chalk.gray("  Checking Collections → Database..."));
+        out(chalk.gray("  Checking Tables → Database..."));
         try {
             const generated = await loadGeneratedTables(options.schemaPath);
-            schemaToDatabase = await checkCollectionsVsDatabase(collections, options.databaseUrl, { generated: generated.tables });
+            schemaToDatabase = await checkCollectionsVsDatabase(collections, options.databaseUrl, { generated: generated.tables, descriptors });
             if (generated.error) {
                 // Boot imports this module too, and would stop on it.
                 schemaToDatabase.issues.push({
@@ -1332,8 +1331,8 @@ skipped: "DATABASE_URL not set" };
     }
 
     // Phase 3: Collections ↔ SDK Types
-    out(chalk.gray("  Checking Collections → SDK Types..."));
-    const collectionsToSdk = await checkCollectionsVsSdk(collections, options.sdkPath);
+    out(chalk.gray("  Checking Tables → SDK Types..."));
+    const collectionsToSdk = await checkCollectionsVsSdk(descriptors, options.sdkPath);
 
     const phases = [collectionsToSchema, schemaToDatabase, collectionsToSdk];
     const allIssues = phases.flatMap((p) => p.issues);

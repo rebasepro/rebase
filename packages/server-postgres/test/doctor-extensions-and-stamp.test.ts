@@ -1,4 +1,5 @@
-import { computeSchemaVersion, type CollectionConfig } from "@rebasepro/types";
+import { computeSchemaVersion, type CollectionConfig, type TableDescriptor } from "@rebasepro/types";
+import { collectionsToTableDefs, compileTables } from "@rebasepro/common";
 import { missingExtensionIssues, schemaStampIssues } from "../src/schema/doctor";
 
 /**
@@ -11,7 +12,7 @@ import { missingExtensionIssues, schemaStampIssues } from "../src/schema/doctor"
  * `type "vector" does not exist` on a write to a table the report has just
  * called healthy.
  *
- * And the stamp: the runtime records which collections it provisioned from, and
+ * And the stamp: the runtime records which tables it provisioned from, and
  * nothing outside boot ever compared it. A database provisioned from a
  * different set — a colleague's branch, an older deploy — makes every other
  * line of this report a description of somebody else's schema.
@@ -32,6 +33,10 @@ const withoutVector: CollectionConfig[] = [{
     table: "posts",
     properties: { id: { name: "ID", type: "string", isId: "uuid" } }
 }];
+
+/** The tables as the stamp sees them: compiled descriptors, the way `loadTableSchema` returns them. */
+const descriptorsOf = (collections: CollectionConfig[]): TableDescriptor[] =>
+    compileTables(collectionsToTableDefs(collections).tables);
 
 describe("missing extensions", () => {
     it("reports pgvector when a collection needs it and the database has not got it", () => {
@@ -70,10 +75,10 @@ function scriptedPool(answers: Array<[RegExp, unknown[]]>) {
 const stampTablePresent: [RegExp, unknown[]] = [/to_regclass/, [{ present: true }]];
 
 describe("the schema stamp", () => {
-    it("reports a database provisioned from different collections", async () => {
+    it("reports a database provisioned from different tables", async () => {
         const issues = await schemaStampIssues(
             scriptedPool([stampTablePresent, [/collections_schema_version/, [{ value: "0000deadbeef1111" }]]]),
-            withoutVector
+            descriptorsOf(withoutVector)
         );
 
         expect(issues).toHaveLength(1);
@@ -84,13 +89,13 @@ describe("the schema stamp", () => {
         expect(issues[0].fix).toContain("never which is ahead");
     });
 
-    it("says nothing when the stamp agrees with the collections on disk", async () => {
+    it("says nothing when the stamp agrees with the tables on disk", async () => {
         const issues = await schemaStampIssues(
             scriptedPool([
                 stampTablePresent,
-                [/collections_schema_version/, [{ value: computeSchemaVersion(withoutVector) }]]
+                [/collections_schema_version/, [{ value: computeSchemaVersion(descriptorsOf(withoutVector)) }]]
             ]),
-            withoutVector
+            descriptorsOf(withoutVector)
         );
         expect(issues).toEqual([]);
     });
@@ -98,18 +103,18 @@ describe("the schema stamp", () => {
     it("treats a never-stamped database as no finding", async () => {
         // Every database provisioned before the stamp existed reads this way,
         // and so does every fresh one until its first provisioning boot.
-        expect(await schemaStampIssues(scriptedPool([]), withoutVector)).toEqual([]);
-        expect(await schemaStampIssues(scriptedPool([stampTablePresent]), withoutVector)).toEqual([]);
+        expect(await schemaStampIssues(scriptedPool([]), descriptorsOf(withoutVector))).toEqual([]);
+        expect(await schemaStampIssues(scriptedPool([stampTablePresent]), descriptorsOf(withoutVector))).toEqual([]);
     });
 
     it("stays quiet when the database will not answer the question", async () => {
         // The stamp is a diagnostic, not a gate. A database that cannot answer
         // has bigger problems, and the checks around this one report them.
         const throwing = { query: async () => { throw new Error("permission denied for schema rebase"); } };
-        expect(await schemaStampIssues(throwing, withoutVector)).toEqual([]);
+        expect(await schemaStampIssues(throwing, descriptorsOf(withoutVector))).toEqual([]);
     });
 
-    it("changes when the collections change", () => {
-        expect(computeSchemaVersion(withVector)).not.toBe(computeSchemaVersion(withoutVector));
+    it("changes when the tables change", () => {
+        expect(computeSchemaVersion(descriptorsOf(withVector))).not.toBe(computeSchemaVersion(descriptorsOf(withoutVector)));
     });
 });

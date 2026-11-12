@@ -49,7 +49,7 @@ export async function keptEnumLabels(client: Queryable, collections: CollectionC
 export function formatKeptEnumLabelsNotice(kept: KeptEnumLabels[]): string {
     const lines = kept.map(k => `       ${k.type}: ${k.labels.map(l => `"${l}"`).join(", ")}`);
     return [
-        `  ⚠️  ${kept.length === 1 ? "An enum keeps a label" : `${kept.length} enums keep labels`} your collections no longer declare:`,
+        `  ⚠️  ${kept.length === 1 ? "An enum keeps a label" : `${kept.length} enums keep labels`} your tables no longer declare:`,
         ...lines,
         "     PostgreSQL has no ALTER TYPE … DROP VALUE, so a push (like boot) adds labels",
         "     and never removes one: the database still accepts these values. To retire one,",

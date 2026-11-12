@@ -67,6 +67,19 @@ export { compareMigrationVersions, migrationVersionOf } from "./schema/migrate-b
 export { isGeneratedPolicyName } from "./security/policy-drift";
 
 /**
+ * Everything the schema pipeline emits for a collection set, as text — the
+ * plan-golden corpus's renderer, and how `rebase migrate collections-to-tables`
+ * proves a migration produces byte-identical SQL.
+ */
+export {
+    renderSchemaOutputs,
+    toStableJson,
+    withPinnedPlannerWorld,
+    PLANNER_ENV_VARIABLES,
+    type RenderSchemaOutputsOptions
+} from "./schema/render-outputs";
+
+/**
  * The app-role provisioning boot performs, for callers that restore a database
  * outside a boot.
  *

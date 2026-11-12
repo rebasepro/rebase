@@ -309,8 +309,8 @@ export function classifyCollectionChanges(
             kind: "invalid-collection",
             verdict: "needs-migration",
             collection: [...next.keys()].find(slug => !previous.has(slug)) ?? [...next.keys()][0] ?? "",
-            detail: `The proposed collections cannot be planned: ${afterPlan.message}`,
-            remedy: "Fix the collection so its schema can be generated, then try again."
+            detail: `The proposed tables cannot be planned: ${afterPlan.message}`,
+            remedy: "Fix the table definition so its schema can be generated, then try again."
         });
     }
     const plans: Plans | undefined = afterPlan instanceof Error
@@ -323,7 +323,7 @@ export function classifyCollectionChanges(
                 kind: "add-collection",
                 verdict: "safe",
                 collection: slug,
-                detail: `New collection "${slug}" — creates table "${getTableName(collection)}".`
+                detail: `New table "${slug}" — creates table "${getTableName(collection)}".`
             });
             continue;
         }
@@ -342,7 +342,7 @@ export function classifyCollectionChanges(
                     "which would create the new table empty and leave every row in the old one.",
                 remedy:
                     "The ensure path never renames or moves a table. Do it in a migration you have read " +
-                    "(ALTER TABLE … RENAME TO, or SET SCHEMA), then change the collection to match."
+                    "(ALTER TABLE … RENAME TO, or SET SCHEMA), then change the table definition to match."
             });
             continue;
         }
@@ -359,11 +359,11 @@ export function classifyCollectionChanges(
             verdict: "needs-migration",
             collection: slug,
             detail:
-                `Collection "${slug}" was removed, which would drop table ` +
+                `Table "${slug}" was removed from backend/schema, which would drop table ` +
                 `"${getTableName(collection)}" and everything in it.`,
             remedy:
                 "The ensure path never drops anything, so this cannot be applied here. Remove the " +
-                "collection in a migration you have read, or keep it and stop serving it."
+                "table in a migration you have read, or keep it and stop serving it."
         });
     }
 
@@ -403,7 +403,7 @@ function sourceOnlyOf(change: SchemaChange, was: CollectionConfig | undefined): 
             };
         case "rename-table":
             return {
-                sourceOnly: `The collection reads a new table, which the next start creates empty; every row stays in "${table}".`,
+                sourceOnly: `The definition reads a new table, which the next start creates empty; every row stays in "${table}".`,
                 kept: `rows stay in ${table}`
             };
         case "change-required":
@@ -538,7 +538,7 @@ function classifyAddedProperty(
     const adds = what
         ? `adds ${what}`
         : relation && hasForeignKeyOnTarget(relation)
-            ? `adds no column — its links are read from "${relation.foreignKeyOnTarget}" on the collection it points at`
+            ? `adds no column — its links are read from "${relation.foreignKeyOnTarget}" on the table it points at`
             : "adds nothing to the database";
     changes.push({
         kind: "add-property",
@@ -689,7 +689,7 @@ function classifyRemovedProperty(
             collection: slug,
             property: name,
             detail: footprint.columns.length + footprint.junctions.length > 0
-                ? `"${name}" was removed; ${describeFootprint(footprint)} stays, because the collections still use it.`
+                ? `"${name}" was removed; ${describeFootprint(footprint)} stays, because the tables still use it.`
                 : `"${name}" was removed — it had nothing in the database of its own, so nothing there changes.`
         });
         return;
@@ -1055,7 +1055,7 @@ function classifyTable(
                 kind: "change-constraint",
                 verdict: "needs-migration",
                 property: before.columns.find(c => c.column === trigger.column)?.source.propName,
-                detail: `The collection no longer declares a tenant, but trigger "${trigger.name}" stays and keeps refusing moves.`,
+                detail: `The table no longer declares a tenant, but trigger "${trigger.name}" stays and keeps refusing moves.`,
                 remedy: `Drop it in a migration: DROP TRIGGER "${trigger.name}" ON "${after.schema}"."${after.table}".`,
                 sourceOnly: `Trigger "${trigger.name}" stays and keeps "${trigger.column}" from changing.`,
                 kept: `trigger ${trigger.name} kept`

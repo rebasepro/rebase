@@ -1,8 +1,8 @@
 /**
  * `rebase console` — the driver's half.
  *
- * Loads the project's collections the way `rebase db push` does, and the
- * global callbacks its `config/index.ts` exports, opens the database with
+ * Loads the project's tables (`backend/schema`) the way `rebase db push` does,
+ * opens the database with
  * {@link openRebase}, and either evaluates one piece of code
  * (`--eval`) or starts a Node REPL with `rebase` and `collections` in scope.
  * The `rebase` CLI resolves the database first (the managed one included) and
@@ -19,11 +19,11 @@ import readline from "node:readline";
 import repl from "node:repl";
 import { PassThrough } from "node:stream";
 import tty from "node:tty";
-import { pathToFileURL } from "node:url";
 import { inspect } from "node:util";
 import { setLogOutput } from "@rebasepro/server";
-import type { CollectionCallbacks, CollectionConfig } from "@rebasepro/types";
+import type { CollectionConfig } from "@rebasepro/types";
 import { RELAYED_FLAGS } from "./cli-flags";
+import { DEFAULT_SCHEMA_DIR } from "./cli-schema-dir";
 import { diagnoseDbError } from "./cli-errors";
 import { out, outError, describeFailure } from "./cli-output";
 import { poolMaxCeiling } from "./connection";
@@ -34,8 +34,7 @@ import { openRebase, type OpenedRebase } from "./open-rebase";
  * keeps the REPL's history (`.rebase/console_history` in the project).
  */
 export const CONSOLE_FLAGS = {
-    "--collections": String,
-    "-c": "--collections",
+    "--schema-dir": String,
     "--eval": String,
     "-e": "--eval",
     "--history": String
@@ -94,7 +93,7 @@ export interface ConsoleStreams {
 }
 
 /**
- * `rebase console [--eval <code>] [--collections <dir>]`, from the driver
+ * `rebase console [--eval <code>] [--schema-dir <dir>]`, from the driver
  * line `["console", …flags]`. Resolves with the exit code.
  */
 export async function consoleCommand(args: string[], streams: ConsoleStreams = {}): Promise<number> {
@@ -122,7 +121,7 @@ export async function consoleCommand(args: string[], streams: ConsoleStreams = {
     try {
         return await openAndRun({
             databaseUrl,
-            collections: flags["--collections"],
+            schemaDir: flags["--schema-dir"],
             eval: flags["--eval"],
             history: flags["--history"]
         }, streams);
@@ -167,54 +166,17 @@ export function describeOpenFailure(error: unknown, databaseUrl: string, managed
     return diagnoseDbError(error, databaseUrl) ?? describeFailure(error);
 }
 
-/**
- * The project's global callbacks: the `callbacks` its `config/index.ts`
- * exports, which the server runs ahead of every collection's own hooks.
- *
- * The config package is the directory the collections live in
- * (`<config>/collections`), or `../config` beside the backend for a
- * collections directory named otherwise. No `index` there means no global
- * callbacks, as it does for the server.
- *
- * One that is there and cannot be imported — an import that needs an
- * environment variable the console was not given, say — does not stop the
- * console, which can still read and write. It says so, once, and runs without
- * them: writes from this session then skip the global tier, and the reader
- * knows it.
- */
-export async function loadProjectCallbacks(collectionsPath: string): Promise<CollectionCallbacks | undefined> {
-    const configDir = path.basename(collectionsPath) === "collections"
-        ? path.dirname(collectionsPath)
-        : path.resolve("..", "config");
-    // `.js` first, as the server's own loader reads it.
-    const indexPath = [".js", ".ts"]
-        .map(ext => path.join(configDir, `index${ext}`))
-        .find(candidate => fs.existsSync(candidate));
-    if (!indexPath) return undefined;
-
-    let mod: Record<string, unknown>;
-    try {
-        mod = await import(pathToFileURL(indexPath).href) as Record<string, unknown>;
-    } catch (error) {
-        const reason = (error instanceof Error ? error.message : String(error)).split("\n")[0];
-        outError(`⚠ Global callbacks are off in this session: ${indexPath} could not be loaded (${reason}). Collection callbacks still run.`);
-        return undefined;
-    }
-    const callbacks = mod.callbacks;
-    return callbacks && typeof callbacks === "object" ? callbacks as CollectionCallbacks : undefined;
-}
-
 /** Open the project, run `--eval` or the REPL, and close it again. Resolves with the exit code. */
 async function openAndRun(
-    options: { databaseUrl: string; collections?: string; eval?: string; history?: string },
+    options: { databaseUrl: string; schemaDir?: string; eval?: string; history?: string },
     streams: ConsoleStreams
 ): Promise<number> {
     const { databaseUrl } = options;
-    const collectionsPath = path.resolve(options.collections || path.join("..", "config", "collections"));
-    const { loadCollections } = await import("./schema/doctor");
-    const collections = fs.existsSync(collectionsPath) ? await loadCollections(collectionsPath) : [];
-    // Writes from the console run the same hook tiers as a server write.
-    const callbacks = await loadProjectCallbacks(collectionsPath);
+    // The tables the way every other driver command reads them: a schema that
+    // does not compile stops the console too, rather than opening it over a
+    // subset of the tables. Writes run each table's own hooks.
+    const { loadTables } = await import("./schema/load-tables");
+    const collections = await loadTables(path.resolve(options.schemaDir || DEFAULT_SCHEMA_DIR));
 
     const ceiling = poolMaxCeiling();
     let rebase: OpenedRebase;
@@ -222,7 +184,6 @@ async function openAndRun(
         rebase = await openRebase({
             databaseUrl,
             collections,
-            ...(callbacks ? { callbacks } : {}),
             ...(ceiling !== null ? { pool: { max: ceiling } } : {})
         });
     } catch (error) {
@@ -265,9 +226,9 @@ async function startRepl(scope: ConsoleScope, options: { history?: string; datab
     // rest of what the console says about itself.
     const say = typed ? out : outError;
     say("");
-    say(`  rebase console — ${options.database}, ${scope.collections.length} collection(s)`);
+    say(`  rebase console — ${options.database}, ${scope.collections.length} table(s)`);
     say("  In scope: rebase (dataAsAdmin, sql, withAuth, close) and collections. Top-level await works.");
-    say("  Try: await rebase.dataAsAdmin.<collection>.find({ limit: 5 })");
+    say("  Try: await rebase.dataAsAdmin.<table>.find({ limit: 5 })");
     say("");
 
     // Typed at a terminal, the REPL reads it as one. Anything else — a pipe, a

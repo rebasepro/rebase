@@ -349,7 +349,7 @@ export function warnOnGeneratedSchemaDrift(differences: SchemaDifference[]): voi
         "left for you. Run `rebase db push` to apply them (it shows the plan and asks before anything " +
         "destructive), or `rebase db generate` for a migration. A NOT NULL to relax or a column to drop " +
         "can also be applied through the running backend, Rebase Cloud included: `rebase schema reconcile`. " +
-        "If the collections changed since schema.generated.ts was written, run `rebase schema generate` first."
+        "If backend/schema changed since schema.generated.ts was written, run `rebase schema generate` first."
     );
 
     for (const difference of differences) {

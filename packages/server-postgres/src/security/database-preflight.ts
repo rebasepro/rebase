@@ -142,7 +142,7 @@ export async function preflightDatabase(
         findings.push({
             level: "warn",
             check: "Tables Rebase does not serve",
-            detail: `${unmanagedCount} table(s) in ${schemas.join(", ")} back no collection (${String(unmanaged?.sample ?? "").split(", ").slice(0, 5).join(", ")}${unmanagedCount > 5 ? ", …" : ""}). With grants: "schema" the request role gets DML on every one this connection may grant on.`,
+            detail: `${unmanagedCount} table(s) in ${schemas.join(", ")} back no declared table (${String(unmanaged?.sample ?? "").split(", ").slice(0, 5).join(", ")}${unmanagedCount > 5 ? ", …" : ""}). With grants: "schema" the request role gets DML on every one this connection may grant on.`,
             setting: "rls.grants = \"managed\""
         });
     }
@@ -217,7 +217,7 @@ export async function preflightDatabase(
             level: "warn",
             check: "Policies that never apply to requests",
             detail: `${unreachable.length} polic${unreachable.length === 1 ? "y" : "ies"} on Rebase's tables target ${roles.join(", ")}, whose privileges the request role does not have (e.g. ${unreachable[0].policy} on ${unreachable[0].name}).`,
-            setting: perGrant ? `rls.inheritRoles = [${roles.map((r) => `"${r}"`).join(", ")}]` : "move them into the collection's securityRules (PostgreSQL 15 cannot inherit per grant)"
+            setting: perGrant ? `rls.inheritRoles = [${roles.map((r) => `"${r}"`).join(", ")}]` : "move them into the table's `rls` rules (PostgreSQL 15 cannot inherit per grant)"
         });
     }
 
@@ -235,7 +235,7 @@ export async function preflightDatabase(
         findings.push({
             level: "warn",
             check: "Default privileges for other roles",
-            detail: `New tables in ${Array.from(new Set(defaults.map((d) => d.schema))).join(", ")} are granted to ${Array.from(new Set(defaults.map((d) => d.grantee))).join(", ")} as they are created — Rebase's collection tables included.`,
+            detail: `New tables in ${Array.from(new Set(defaults.map((d) => d.schema))).join(", ")} are granted to ${Array.from(new Set(defaults.map((d) => d.grantee))).join(", ")} as they are created — Rebase's declared tables included.`,
             setting: settings.policyTarget === "public" ? "rls.policyTarget = \"requestRole\"" : undefined
         });
     }

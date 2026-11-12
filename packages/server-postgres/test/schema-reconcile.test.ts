@@ -149,8 +149,8 @@ describe("planning and applying a schema reconcile", () => {
         expect(plan.problems).toEqual([
             expect.stringContaining(`still declares "wav"`),
             expect.stringContaining(`has no column "nope"`),
-            expect.stringContaining(`no collection "nobody"`),
-            expect.stringContaining("not <collection>.<column>")
+            expect.stringContaining(`no table "nobody"`),
+            expect.stringContaining("not <table>.<column>")
         ]);
     });
 

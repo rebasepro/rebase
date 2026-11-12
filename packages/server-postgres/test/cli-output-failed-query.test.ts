@@ -14,6 +14,7 @@
 import { DrizzleQueryError } from "drizzle-orm/errors";
 import pg from "pg";
 
+import { SchemaDefinitionError } from "@rebasepro/common";
 import { describeFailure } from "../src/cli-output";
 
 /** What node-postgres raises for `select * from nope_table`, fields as the wire carries them. */
@@ -84,5 +85,20 @@ describe("describeFailure, for a query Postgres refused", () => {
         expect(describeFailure(new Error("Collections directory not found"))).toBe(
             "Collections directory not found\n  Re-run with --debug for the stack trace."
         );
+    });
+});
+
+describe("describeFailure, for a schema the compiler refuses", () => {
+    it("prints every problem, one per line with its table and key, and no stack hint", () => {
+        const error = new SchemaDefinitionError([
+            { table: "posts", message: "uses `rls: \"inherit\"`, and backend/schema/index.ts exports no `defaultRls`." },
+            { table: "comments", key: "post", message: "points at a table the index does not export." }
+        ]);
+        const text = describeFailure(error);
+        expect(text.split("\n")).toEqual([
+            "The schema cannot be used (2 problems):",
+            "  - posts: uses `rls: \"inherit\"`, and backend/schema/index.ts exports no `defaultRls`.",
+            "  - comments.post: points at a table the index does not export."
+        ]);
     });
 });

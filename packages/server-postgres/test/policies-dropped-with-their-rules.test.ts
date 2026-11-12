@@ -93,10 +93,11 @@ describe("provisioning a collection that lost its rules", () => {
 describe("the warning", () => {
     it("names each policy, what it means for the table, and the likely cause", () => {
         const line = describeRulesDropped({ table: "public.posts", policies: ["posts_insert_3561e70_0", "posts_select_841c287"] });
-        expect(line).toContain('"public.posts" declares no securityRules');
+        expect(line).toContain('"public.posts" is `rls: "admin-only"` now');
         expect(line).toContain("posts_insert_3561e70_0, posts_select_841c287");
         expect(line).toContain("Only administrators reach its rows now");
-        expect(line).toContain("defaultSecurityRules");
-        expect(line).toContain("collectionsDir");
+        expect(line).toContain("defaultRls");
+        expect(line).toContain("backend/schema/index.ts");
+        expect(line).not.toMatch(/securityRules|collectionsDir|config\/collections/);
     });
 });

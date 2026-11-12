@@ -61,6 +61,11 @@ export const wantsStack = (): boolean => parseEnvBoolean(process.env.REBASE_DEBU
  */
 export const describeFailure = (error: unknown): string => {
     if (!(error instanceof Error)) return String(error);
+    // A definition the compiler refuses is fully described by its message —
+    // one problem per line, each naming the table and key. The stack is the
+    // compiler's, never the author's mistake. (A module that would not import
+    // keeps the hint: its stack points into the author's file.)
+    if (isSchemaDefinitionRefusal(error) && !wantsStack()) return error.message;
     const failedQuery = describeFailedQuery(error);
     const lead = failedQuery?.reason ? `${failedQuery.reason}\n  ` : "";
     if (wantsStack() && error.stack) {
@@ -73,6 +78,14 @@ export const describeFailure = (error: unknown): string => {
     if (failedQuery) return `${lead}${failedQuery.query}\n  Re-run with --debug for the stack trace.`;
     return `${error.message}\n  Re-run with --debug for the stack trace.`;
 };
+
+/**
+ * Whether an error is `SchemaDefinitionError` (`@rebasepro/common`), told by
+ * its code so this module does not import the package.
+ */
+function isSchemaDefinitionRefusal(error: Error): boolean {
+    return "code" in error && error.code === "SCHEMA_DEFINITION_INVALID";
+}
 
 /**
  * A failed query as a reader needs it: why it failed — Postgres' own reason

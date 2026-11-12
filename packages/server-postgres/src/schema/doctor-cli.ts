@@ -11,9 +11,10 @@ import { runSearchScaleCheck } from "./doctor-search-scale";
 import { runDatabasePreflight } from "./doctor-database";
 import { diagnoseDbError } from "../cli-errors";
 import { describeFailure } from "../cli-output";
+import { DEFAULT_SCHEMA_DIR } from "../cli-schema-dir";
 
 async function main() {
-    const collectionsArg = process.argv.find((a) => a.startsWith("--collections="));
+    const schemaDirArg = process.argv.find((a) => a.startsWith("--schema-dir="));
     const schemaArg = process.argv.find((a) => a.startsWith("--schema="));
     const sdkArg = process.argv.find((a) => a.startsWith("--sdk="));
     // --policies runs only the RLS checks: no schema diff, no SDK types. Useful
@@ -25,7 +26,7 @@ async function main() {
     // settings. Read-only, and a gate like --policies.
     const databaseOnly = process.argv.includes("--database");
 
-    const collectionsPath = collectionsArg?.split("=")[1] ?? path.join("..", "config", "collections");
+    const schemaDir = schemaDirArg?.split("=")[1] ?? DEFAULT_SCHEMA_DIR;
     const schemaPath = schemaArg?.split("=")[1] ?? path.join("src", "schema.generated.ts");
     const sdkPath = sdkArg?.split("=")[1] ?? path.join("..", "generated", "sdk", "database.types.ts");
 
@@ -48,23 +49,23 @@ async function main() {
         // Non-zero so this can gate CI — the whole point of the flags, and a
         // check that could not run has not passed. See exitCodeForPolicyGate.
         const statuses = [
-            ...(databaseOnly ? [await runDatabasePreflight(collectionsPath, databaseUrl)] : []),
-            ...(policiesOnly ? [await runPolicyChecks(collectionsPath, databaseUrl)] : [])
+            ...(databaseOnly ? [await runDatabasePreflight(schemaDir, databaseUrl)] : []),
+            ...(policiesOnly ? [await runPolicyChecks(schemaDir, databaseUrl)] : [])
         ];
         process.exit(statuses.some(status => exitCodeForPolicyGate(status) !== 0) ? 1 : 0);
     }
 
     const report = await runDoctor({
-        collectionsPath: path.resolve(process.cwd(), collectionsPath),
+        schemaDir: path.resolve(process.cwd(), schemaDir),
         schemaPath: path.resolve(process.cwd(), schemaPath),
         sdkPath: path.resolve(process.cwd(), sdkPath),
         databaseUrl: databaseUrl ?? undefined
     });
 
-    const policyStatus = await runPolicyChecks(collectionsPath, databaseUrl);
+    const policyStatus = await runPolicyChecks(schemaDir, databaseUrl);
 
     // A hint about speed, not drift: it never changes the exit code.
-    await runSearchScaleCheck(collectionsPath, databaseUrl);
+    await runSearchScaleCheck(schemaDir, databaseUrl);
 
     // Exit non-zero if there are errors. A policy run that could not happen is
     // reported loudly above but does not fail the interactive command — the

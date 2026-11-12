@@ -39,7 +39,7 @@ const command = (text: string): string => chalk.bold.bgBlue.black(text);
  */
 export const nextStepAfterGenerate = (): string => {
     if (process.env.REBASE_DEV_DATABASE_KIND === "managed") {
-        return `Start or restart ${command("rebase dev")} — boot applies your collections to the managed development database.`;
+        return `Start or restart ${command("rebase dev")} — boot applies your tables to the managed development database.`;
     }
 
     return `You can now run ${command("rebase db generate")} to generate the SQL migration files.`;

@@ -339,7 +339,7 @@ function formatDependencyDropBanner(manager: ProjectPackageManager = detectProje
         `  statements individually, so earlier changes in this push may\n` +
         `  already be committed while later ones failed.\n` +
         `\n` +
-        `  This commonly happens when a collection is removed but an enum\n` +
+        `  This commonly happens when a table is removed but an enum\n` +
         `  type it defined is still referenced. To recover:\n` +
         `\n` +
         `    1. Inspect the leftover object named in the error above.\n` +
@@ -902,7 +902,7 @@ export function formatGeneratedColumnRefusalBanner(
         `  STORED expression reads it, and Atlas applies a push as one\n` +
         `  transaction — ${chalk.yellow("nothing in this push was applied.")}\n` +
         `\n` +
-        `  A collection's ${chalk.bold("search")} column is dropped and rebuilt around the apply\n` +
+        `  A table's ${chalk.bold("search")} column is dropped and rebuilt around the apply\n` +
         `  by the push itself. If that is the column named above, run the push\n` +
         `  again, and please report it: it should not have got this far.\n` +
         `\n` +
@@ -940,7 +940,7 @@ export function formatUncastableRetypeBanner(refusal: { column: string; type: st
         `  ❌  ${table}.${quotedColumn} cannot be converted to ${type} automatically\n` +
         `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n` +
         `\n` +
-        `  The collection now declares this column as ${type}, and PostgreSQL has\n` +
+        `  The table now declares this column as ${type}, and PostgreSQL has\n` +
         `  no implicit conversion from what the column holds today. Atlas stops\n` +
         `  at the first such statement — ${chalk.yellow("nothing in this push was applied")}, and a\n` +
         `  --dry-run cannot show the rest of the plan until this one is settled.\n` +
@@ -1092,7 +1092,7 @@ export function formatForeignGeneratedColumnBanner(
         `  in the push with it.\n` +
         `\n` +
         `  ${chalk.yellow("Nothing was applied.")} Rebase rebuilds the generated columns it made\n` +
-        `  itself (a collection's ${chalk.bold("search")} block) around the apply. It has no\n` +
+        `  itself (a table's ${chalk.bold("search")} block) around the apply. It has no\n` +
         `  definition for this one, and a dropped generated expression is not\n` +
         `  recoverable from anywhere but your own migration.\n` +
         `\n` +

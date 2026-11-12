@@ -184,7 +184,7 @@ describe("writing a table's policies into its collection", () => {
     });
 });
 
-describe("the doctor's word for a policy no collection describes", () => {
+describe("the doctor's word for a policy no table describes", () => {
     const ref = (name: string): PolicyRef => ({
         schema: "public", table: "orders", name, roles: ["public"], command: "ALL", hasUsing: true, hasWithCheck: false
     });
@@ -194,7 +194,7 @@ describe("the doctor's word for a policy no collection describes", () => {
         const report = formatPolicyDrift(drift([ref("orders_owner")]));
         expect(report).not.toMatch(/left behind by an earlier push/i);
         expect(report).toContain("written by hand or by another tool");
-        expect(report).toContain("securityRules");
+        expect(report).toContain("`rls` in backend/schema");
     });
 
     it("says a superseded generated policy is what the next push drops", () => {

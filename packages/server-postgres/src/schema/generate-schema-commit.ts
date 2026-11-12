@@ -180,15 +180,15 @@ function subjectOf(classified: ClassifiedChanges): string {
     const { changes } = classified;
     const collections = [...new Set(changes.map(change => change.collection))].sort();
     const only = changes.length === 1 ? changes[0] : undefined;
-    if (only?.kind === "add-collection") return `add the ${only.collection} collection`;
-    if (only?.kind === "remove-collection") return `remove the ${only.collection} collection`;
+    if (only?.kind === "add-collection") return `add the ${only.collection} table`;
+    if (only?.kind === "remove-collection") return `remove the ${only.collection} table`;
     if (only?.kind === "add-property") return `add ${only.property} to ${only.collection}`;
     if (only?.kind === "remove-property") return `remove ${only.property} from ${only.collection}`;
     if (changes.length > 0 && changes.every(c => c.kind === "change-security-rules")) {
-        return `change the security rules of ${collections.join(", ")}`;
+        return `change the rls of ${collections.join(", ")}`;
     }
     if (collections.length === 1) return `${changes.length} change(s) to ${collections[0]}`;
-    return `${changes.length} change(s) across ${collections.length} collections`;
+    return `${changes.length} change(s) across ${collections.length} tables`;
 }
 
 /** A commit message that says what changed rather than that something did. */
@@ -222,7 +222,7 @@ export async function generateSchemaCommit(input: SchemaCommitInput): Promise<Sc
         const unoffered = classified.changes.filter(change => change.verdict !== "safe" && !change.sourceOnly);
         if (unoffered.length > 0) {
             throw new SchemaCommitError(
-                "This change cannot be written to the collection source alone:\n" +
+                "This change cannot be written to the table source alone:\n" +
                 unoffered.map(change => `  • ${change.detail}${change.remedy ? `\n    ${change.remedy}` : ""}`).join("\n"),
                 classified
             );

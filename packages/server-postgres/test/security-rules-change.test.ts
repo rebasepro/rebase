@@ -40,7 +40,7 @@ describe("a security-rules edit", () => {
     it("is committed under a subject that names it", async () => {
         const commit = await generateSchemaCommit({ before: [posts(PUBLIC)], after: [posts(ADMINS)] });
         expect(commit.message).not.toMatch(/no change/);
-        expect(commit.message.split("\n")[0]).toMatch(/security rules.*posts|posts.*security rules/);
+        expect(commit.message.split("\n")[0]).toMatch(/rls of posts/);
     });
 
     it("is not a change when the rules are only re-spelled into the same policies", () => {
@@ -53,6 +53,6 @@ describe("a security-rules edit", () => {
             changes: [{ kind: "change-security-rules", verdict: "safe", collection: "posts", detail: "x" }],
             verdict: "safe",
             applicable: true
-        })).toMatch(/^feat\(schema\): change the security rules of posts/);
+        })).toMatch(/^feat\(schema\): change the rls of posts/);
     });
 });

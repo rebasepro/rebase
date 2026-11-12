@@ -8,7 +8,7 @@
 import path from "path";
 import chalk from "chalk";
 import { CollectionConfig } from "@rebasepro/types";
-import { loadCollections } from "./doctor";
+import { loadTables } from "./load-tables";
 import { checkPolicyDrift, formatPolicyDrift, hasDrift } from "../security/policy-drift";
 import { validatePolicyPgRoles, warnOnAnonymousGrants } from "../security/rls-enforcement";
 
@@ -43,26 +43,26 @@ export function exitCodeForPolicyGate(status: PolicyCheckStatus): 0 | 1 {
  *
  * Never reports `ok` for work it did not do — see {@link PolicyCheckStatus}.
  */
-export async function runPolicyChecks(collectionsPath: string, databaseUrl?: string): Promise<PolicyCheckStatus> {
+export async function runPolicyChecks(schemaDir: string, databaseUrl?: string): Promise<PolicyCheckStatus> {
     if (!databaseUrl) {
         console.error(chalk.yellow("  ⚠ No DATABASE_URL — RLS policies were NOT checked"));
         return "unchecked";
     }
 
-    const resolvedPath = path.resolve(process.cwd(), collectionsPath);
+    const resolvedPath = path.resolve(process.cwd(), schemaDir);
     let problems = false;
     const { Pool } = await import("pg");
     const pool = new Pool({ connectionString: databaseUrl });
     try {
-        const collections: CollectionConfig[] = await loadCollections(resolvedPath);
+        const collections: CollectionConfig[] = await loadTables(resolvedPath);
 
-        // Zero collections is not "no drift", it is nothing to compare. The
-        // loader returns `[]` for a path that does not exist, so the commonest
-        // way to get here is a `--collections` path resolved against the wrong
-        // directory — which used to render as a green tick.
+        // Zero tables is not "no drift", it is nothing to compare. The loader
+        // returns `[]` for a directory that does not exist, so the commonest
+        // way to get here is the right directory from the wrong cwd — which
+        // used to render as a green tick.
         if (collections.length === 0) {
-            console.error(chalk.red(`  ✗ No collections found in ${resolvedPath}`));
-            console.error(chalk.gray("    RLS policies were NOT checked. Pass --collections=<dir> if your collections live elsewhere."));
+            console.error(chalk.red(`  ✗ No tables found in ${resolvedPath}`));
+            console.error(chalk.gray("    RLS policies were NOT checked. Pass --schema-dir=<dir> if your tables live elsewhere than backend/schema."));
             return "unchecked";
         }
 
@@ -105,10 +105,10 @@ export async function runPolicyChecks(collectionsPath: string, databaseUrl?: str
         console.log("");
         if (hasDrift(drift)) {
             problems = true;
-            console.log(chalk.yellow("  RLS policies: database does not match your collections"));
+            console.log(chalk.yellow("  RLS policies: database does not match your tables"));
             console.log(formatPolicyDrift(drift));
         } else {
-            console.log(chalk.green(`  ✓ RLS policies match your collections (${collections.length} collection(s) checked)`));
+            console.log(chalk.green(`  ✓ RLS policies match your tables (${collections.length} table(s) checked)`));
         }
     } catch (err) {
         // Fail closed. This catch covers every query and every collection import

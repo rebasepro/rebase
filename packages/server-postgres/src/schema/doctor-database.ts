@@ -6,7 +6,6 @@
  * Lives beside `doctor-cli.ts` rather than inside it because that file runs
  * `main()` on import; the rendering and the table list are tested here.
  */
-import path from "path";
 import chalk from "chalk";
 import type { CollectionConfig } from "@rebasepro/types";
 import { isPostgresCollectionConfig } from "@rebasepro/types";
@@ -114,13 +113,13 @@ async function everyTableIn(run: RawSqlRunner, schemas: readonly string[]): Prom
  * the server sees (`REBASE_RLS_*`, else the roles recorded in the database),
  * and print it. Never reports `ok` for a check it could not run.
  */
-export async function runDatabasePreflight(collectionsPath: string, databaseUrl?: string): Promise<PolicyCheckStatus> {
+export async function runDatabasePreflight(schemaDir: string, databaseUrl?: string): Promise<PolicyCheckStatus> {
     if (!databaseUrl) {
         console.error(chalk.yellow("  ⚠ No DATABASE_URL — the database preflight did NOT run"));
         return "unchecked";
     }
 
-    const { loadCollections } = await import("./doctor");
+    const { loadTables } = await import("./load-tables");
     const { preflightDatabase } = await import("../security/database-preflight");
     const { readRecordedRequestRoles } = await import("../security/rls-enforcement");
     const { cliRlsSettings } = await import("../security/rls-settings");
@@ -129,7 +128,7 @@ export async function runDatabasePreflight(collectionsPath: string, databaseUrl?
     const pool = new Pool({ connectionString: databaseUrl });
     try {
         const run: RawSqlRunner = async (text) => (await pool.query(text)).rows as Record<string, unknown>[];
-        const collections = await loadCollections(path.resolve(process.cwd(), collectionsPath));
+        const collections = await loadTables(schemaDir);
         // Only the schemas that exist: the SQL a finding carries grants on each
         // one, and a GRANT on a missing schema fails the whole script. A boot
         // grants on the ones it creates itself.
@@ -141,7 +140,7 @@ export async function runDatabasePreflight(collectionsPath: string, databaseUrl?
         console.log("");
         if (managedTables.length === 0) {
             managedTables = await everyTableIn(run, schemas);
-            console.log(chalk.gray("  No declared collections: every table in public is treated as served, as an introspected project serves them."));
+            console.log(chalk.gray("  No declared tables: every table in public is treated as served, as an introspected project serves them."));
         }
 
         const findings = await preflightDatabase(run, settings, { schemas, managedTables });

@@ -14,11 +14,10 @@
  * Lives beside `doctor-cli.ts` rather than inside it because that file runs
  * `main()` on import.
  */
-import path from "path";
 import chalk from "chalk";
 import { getTableName, relationalCollections } from "@rebasepro/common";
 import { isPostgresCollectionConfig, type CollectionConfig } from "@rebasepro/types";
-import { loadCollections } from "./doctor";
+import { loadTables } from "./load-tables";
 import { buildSearchColumnSpec } from "./search-column";
 
 /** Above this many rows an unindexed search is worth a word. */
@@ -98,7 +97,7 @@ export async function estimateRowCounts(
 /** The report, one warning per collection. */
 export function formatUnindexedSearches(findings: (IlikeSearchedCollection & { rows: number })[]): string[] {
     if (findings.length === 0) return [];
-    const lines = ["", chalk.yellow(`  ⚠ ${findings.length} collection(s) searched by reading the whole table:`)];
+    const lines = ["", chalk.yellow(`  ⚠ ${findings.length} table(s) searched by reading the whole table:`)];
     for (const finding of findings) {
         lines.push(chalk.yellow(
             `     • ${finding.slug} — about ${finding.rows.toLocaleString("en-US")} rows, no \`search\` block: a search is ` +
@@ -113,16 +112,16 @@ export function formatUnindexedSearches(findings: (IlikeSearchedCollection & { r
 }
 
 /**
- * Print the warning for the project at `collectionsPath`, against
+ * Print the warning for the project at `schemaDir`, against
  * `databaseUrl`. Never throws and never fails the run: it is a hint, and a
  * check that could not run says so in one grey line.
  */
-export async function runSearchScaleCheck(collectionsPath: string, databaseUrl?: string): Promise<void> {
+export async function runSearchScaleCheck(schemaDir: string, databaseUrl?: string): Promise<void> {
     if (!databaseUrl) return;
     const { Client } = await import("pg");
     const client = new Client({ connectionString: databaseUrl });
     try {
-        const collections = await loadCollections(path.resolve(process.cwd(), collectionsPath));
+        const collections = await loadTables(schemaDir);
         const candidates = ilikeSearchedCollections(collections);
         if (candidates.length === 0) return;
         await client.connect();

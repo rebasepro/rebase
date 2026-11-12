@@ -75,7 +75,7 @@ it("starts the watching generator as one Node with tsx's loader, not through the
     const driver = spawn(tsxBin(), [
         path.join(packageRoot, "src", "cli.ts"),
         "schema", "generate", "--watch",
-        `--collections=${path.join(fixtures, "broken-resources", "collections")}`,
+        `--schema-dir=${path.join(fixtures, "broken-resources", "schema")}`,
         `--output=${path.join(work, "schema.generated.ts")}`
     ], {
         cwd: work,

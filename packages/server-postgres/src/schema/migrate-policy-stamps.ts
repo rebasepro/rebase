@@ -20,7 +20,6 @@
  * definition is exactly what its rule makes is stamped. Any other keeps no
  * stamp, and the boot re-applies its table, as before.
  */
-import path from "path";
 import chalk from "chalk";
 import type { CollectionConfig } from "@rebasepro/types";
 import type { Queryable } from "../security/policy-drift";
@@ -30,7 +29,7 @@ import { pinSearchPath } from "../connection";
 import { planCollectionPolicies } from "./generate-postgres-ddl-logic";
 import { ensureCollectionPolicies, policyStampSql, probeRenderedPolicies, readPolicyStamps } from "./ensure-collection-policies";
 import { underSearchPath } from "./push-policy-plan";
-import { loadCollections } from "./doctor";
+import { loadTables } from "./load-tables";
 
 /**
  * `rebase db migrate`'s last step: stamp what the migration left as its rules
@@ -38,9 +37,9 @@ import { loadCollections } from "./doctor";
  * unstamped costs the next boot a re-apply of its table, which is what every
  * boot after a migrate did before this.
  */
-export async function stampMigratedPolicies(databaseUrl: string, collectionsPath: string, adminRoleAvailable = true): Promise<void> {
+export async function stampMigratedPolicies(databaseUrl: string, schemaDir: string, adminRoleAvailable = true): Promise<void> {
     try {
-        const collections = await loadCollections(path.resolve(process.cwd(), collectionsPath));
+        const collections = await loadTables(schemaDir);
         // The rule the boot's connections follow: `search_path=public` unless
         // the URL pins one of its own, in which case this connection has it too.
         const searchPath = pinSearchPath(databaseUrl) === databaseUrl ? undefined : "public";

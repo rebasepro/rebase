@@ -213,7 +213,7 @@ describe("commitMessage", () => {
         commitMessage(classifyCollectionChanges(before, after));
 
     it("names a single new collection", () => {
-        expect(message([], [collection("posts")])).toContain("add the posts collection");
+        expect(message([], [collection("posts")])).toContain("add the posts table");
     });
 
     it("names a single new property and where it went", () => {
@@ -231,7 +231,7 @@ describe("commitMessage", () => {
 
     it("counts collections when the change spans them", () => {
         expect(message([], [collection("posts"), collection("tags")]))
-            .toContain("across 2 collections");
+            .toContain("across 2 tables");
     });
 
     it("puts every change in the body, so the commit explains itself", () => {

@@ -1050,7 +1050,7 @@ export async function ensureInheritedRoles(run: RawSqlRunner, role: string, inhe
         throw new AppRoleSetupError(
             `rls.inheritRoles (${inheritRoles.join(", ")}) needs PostgreSQL 16 or newer: before 16 the request role ` +
             `"${role}" can only inherit by inheriting from every role it belongs to.`,
-            "Upgrade to PostgreSQL 16+, or drop rls.inheritRoles and express those policies as the collection's securityRules."
+            "Upgrade to PostgreSQL 16+, or drop rls.inheritRoles and express those policies as the table's `rls` rules (backend/schema)."
         );
     }
     const rows = await run(`
@@ -1874,9 +1874,9 @@ export async function validatePolicyPgRoles(
 
     if (problems.length > 0) {
         throw new Error(
-            `Security rules target PostgreSQL roles this server cannot use. Requests run as ` +
+            `RLS rules target PostgreSQL roles this server cannot use. Requests run as ` +
             `"${requestRole}", so these policies would never apply and every row would be ` +
-            `filtered out — the collections would look empty rather than error.\n\n` +
+            `filtered out — the tables would look empty rather than error.\n\n` +
             problems.join("\n\n") + "\n"
         );
     }

@@ -7,16 +7,16 @@ import { writeDrizzleSchema } from "./generate-files";
 
 /**
  * The generator as its own process — what `--watch` runs, because a watch has
- * to re-import the collections on every save and Node's module cache would
+ * to re-import the tables on every save and Node's module cache would
  * serve it the first version forever. One-shot generation runs in the driver's
  * own process instead; see `generate-files.ts`.
  */
-const runGeneration = async (collectionsFilePath?: string, outputPath?: string, nextStep = true) => {
-    if (!collectionsFilePath) {
-        throw new Error("No collections file path provided.");
+const runGeneration = async (schemaDir?: string, outputPath?: string, nextStep = true) => {
+    if (!schemaDir) {
+        throw new Error("No schema directory provided.");
     }
     try {
-        await writeDrizzleSchema({ collectionsPath: path.resolve(collectionsFilePath), outputPath, nextStep });
+        await writeDrizzleSchema({ schemaDir: path.resolve(schemaDir), outputPath, nextStep });
     } catch (error) {
         // The same contract its sibling `generate-postgres-ddl.ts` keeps, and
         // for the same reason: a caller that reads nothing but this process's
@@ -27,8 +27,8 @@ const runGeneration = async (collectionsFilePath?: string, outputPath?: string, 
 };
 
 export const main = async () => {
-    const collectionsFilePathArg = process.argv.find(arg => arg.startsWith("--collections="));
-    const collectionsFilePath = collectionsFilePathArg ? collectionsFilePathArg.split("=")[1] : process.argv[2];
+    const schemaDirArg = process.argv.find(arg => arg.startsWith("--schema-dir="));
+    const schemaDir = schemaDirArg ? schemaDirArg.split("=")[1] : process.argv[2];
 
     const outputPathArg = process.argv.find(arg => arg.startsWith("--output="));
     const outputPath = outputPathArg ? outputPathArg.split("=")[1] : undefined;
@@ -37,12 +37,12 @@ export const main = async () => {
     // Set when `db push` / `db generate` run this as their first step.
     const nextStep = !process.argv.includes("--no-next-step");
 
-    if (!collectionsFilePath) {
-        out("Usage: ts-node generate-drizzle-schema.ts <path-to-collections-file> [--output <path-to-output-file>] [--watch]");
+    if (!schemaDir) {
+        out("Usage: ts-node generate-drizzle-schema.ts --schema-dir=<backend/schema> [--output=<path-to-output-file>] [--watch]");
         return;
     }
 
-    const resolvedPath = path.resolve(process.cwd(), collectionsFilePath);
+    const resolvedPath = path.resolve(process.cwd(), schemaDir);
     const resolvedOutputPath = outputPath ? path.resolve(process.cwd(), outputPath) : undefined;
 
     if (watch) {

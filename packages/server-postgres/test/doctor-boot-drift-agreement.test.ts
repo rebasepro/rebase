@@ -20,8 +20,8 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { PGlite } from "@electric-sql/pglite";
-import type { CollectionConfig } from "@rebasepro/types";
-import { loadCollectionsFromDirectory } from "@rebasepro/server";
+import type { CollectionConfig, PostgresCollectionConfig } from "@rebasepro/types";
+import { loadTableSchema } from "../src/schema/load-tables";
 import { ensureCollectionTables } from "../src/schema/ensure-collection-tables";
 import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
 import { readCatalogueSchema } from "../src/schema/catalogue-schema";
@@ -41,11 +41,8 @@ jest.mock("pg", () => {
     return { Pool };
 });
 
-// `runDoctor` loads collections off disk through the server package.
-jest.mock("@rebasepro/server", () => {
-    const actual = jest.requireActual("@rebasepro/server");
-    return { ...actual, loadCollectionsFromDirectory: jest.fn() };
-});
+// `runDoctor` loads the tables off disk through `loadTableSchema`.
+jest.mock("../src/schema/load-tables", () => ({ loadTableSchema: jest.fn(), loadTables: jest.fn() }));
 
 const PACKAGE_ROOT = path.resolve(__dirname, "..");
 const URL = "postgres://doctor.test/db";
@@ -62,7 +59,7 @@ const authorsBefore: CollectionConfig = {
 };
 
 /** `email` renamed to `contactEmail`, and made required. */
-const authorsAfter: CollectionConfig = {
+const authorsAfter: PostgresCollectionConfig = {
     slug: "authors",
     table: "authors",
     name: "Authors",
@@ -183,13 +180,13 @@ describe("doctor and boot agree about schema drift", () => {
     });
 
     it("runDoctor reads schema.generated.ts from --schema and reports the same drift", async () => {
-        jest.mocked(loadCollectionsFromDirectory).mockResolvedValue([authorsAfter]);
+        jest.mocked(loadTableSchema).mockResolvedValue({ collections: [authorsAfter], descriptors: [] });
         const logSpy = jest.spyOn(console, "log").mockImplementation(() => undefined);
         const errSpy = jest.spyOn(console, "error").mockImplementation(() => undefined);
         const { dir, file } = writeGeneratedSchema(await generateSchema([authorsAfter]));
         try {
             const report = await runDoctor({
-                collectionsPath: dir,
+                schemaDir: dir,
                 schemaPath: file,
                 sdkPath: path.join(dir, "database.types.ts"),
                 databaseUrl: URL
@@ -198,7 +195,7 @@ describe("doctor and boot agree about schema drift", () => {
             expect(report.schemaToDatabase.issues.map(i => i.category).sort())
                 .toEqual(["extra_column", "nullability_mismatch"]);
             const printed = logSpy.mock.calls.map(c => String(c[0] ?? "")).join("\n");
-            expect(printed).not.toContain("Collections → Database: In sync");
+            expect(printed).not.toContain("Tables → Database: In sync");
             expect(printed).toContain("Nullability Mismatch");
             expect(printed).toContain("Extra Column");
         } finally {

@@ -137,7 +137,7 @@ export function formatPolicyPushPlan(plan: PolicyPushPlan): { changes: string[];
         for (const p of plan.unstamped) notes.push(`       ${describe(p)}`);
     }
     if (plan.keep.length > 0) {
-        notes.push("  Policies in the database that no collection describes, which the push leaves in force:");
+        notes.push("  Policies in the database that no table describes, which the push leaves in force:");
         for (const p of plan.keep) notes.push(`       ${describe(p)}`);
     }
     return { changes, notes };

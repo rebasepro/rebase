@@ -13,6 +13,7 @@
  * Each entry calls the parse its command runs itself, never a copy of it.
  */
 import { assertKnownFlags } from "./cli-flags";
+import { assertNoCollectionsFlag } from "./cli-schema-dir";
 import { assertKnownBranchFlags } from "./branch-argv";
 import { backupActionOf } from "./backup-argv";
 import { parseBackupLine, parseBackupsListLine, parseRestoreLine } from "./backup/backup-cli";
@@ -25,8 +26,16 @@ import { parseProvisionLine, parseRequestRoleLine } from "./request-role-cli";
  * how its line is judged.
  */
 const LINE_CHECKS: Record<DriverDbSubcommand, (args: string[]) => void> = {
-    push: args => assertKnownFlags("db", "push", args),
-    generate: args => assertKnownFlags("db", "generate", args),
+    // A removed `--collections` is named as removed, with its replacement,
+    // rather than refused as an unknown option.
+    push: (args) => {
+        assertNoCollectionsFlag(args);
+        assertKnownFlags("db", "push", args);
+    },
+    generate: (args) => {
+        assertNoCollectionsFlag(args);
+        assertKnownFlags("db", "generate", args);
+    },
     migrate: args => assertKnownFlags("db", "migrate", args),
     // The action's own table; an action the table does not list is the
     // dispatch's to answer, in its own words.

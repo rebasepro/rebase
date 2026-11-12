@@ -1,20 +1,18 @@
-import { CollectionConfig, StringProperty, NumberProperty, DateProperty, ArrayProperty, Property } from "@rebasepro/types";
+import { CollectionConfig, PostgresCollectionConfig, StringProperty, NumberProperty, DateProperty, ArrayProperty, Property } from "@rebasepro/types";
 import { generateSchema } from "../src/schema/generate-drizzle-schema-logic";
 import { checkCollectionsVsSchema, checkCollectionsVsSdk, getExpectedColumnType, renderReport, runDoctor } from "../src/schema/doctor";
 import { generateTypedefs } from "@rebasepro/codegen";
-import { loadCollectionsFromDirectory } from "@rebasepro/server";
+import { collectionsToTableDefs, compileTables } from "@rebasepro/common";
+import { loadTableSchema } from "../src/schema/load-tables";
 import * as fs from "fs";
 import * as path from "path";
 import { tmpdir } from "os";
 
-// `runDoctor` loads collections off disk via the server package. Stubbing only
-// that one export lets the summary be driven from in-memory collections while
-// the phase checks, the counting and the renderer all stay real.
-jest.mock("@rebasepro/server", () => {
-    const actual = jest.requireActual("@rebasepro/server");
-    return { ...actual,
-        loadCollectionsFromDirectory: jest.fn() };
-});
+// `runDoctor` loads the tables off disk through `loadTableSchema` (the loader
+// every driver command uses; its own tests read real backend/schema
+// directories). Stubbing only that lets the summary be driven from in-memory
+// tables while the phase checks, the counting and the renderer all stay real.
+jest.mock("../src/schema/load-tables", () => ({ loadTableSchema: jest.fn(), loadTables: jest.fn() }));
 
 // Re-export for testing — we need to access the internal helper
 // but since it's not exported, we test it indirectly via checkCollectionsVsSchema
@@ -201,7 +199,7 @@ inactive: "Inactive" }
     });
 
     describe("report generation", () => {
-        const collections: CollectionConfig[] = [{
+        const collections: PostgresCollectionConfig[] = [{
             slug: "products",
             table: "products",
             name: "Products",
@@ -214,7 +212,7 @@ inactive: "Inactive" }
         const printed = () => logSpy.mock.calls.map(c => String(c[0] ?? "")).join("\n");
 
         beforeEach(() => {
-            (loadCollectionsFromDirectory as jest.Mock).mockResolvedValue(collections);
+            (loadTableSchema as jest.Mock).mockResolvedValue({ collections, descriptors: compileTables(collectionsToTableDefs(collections).tables) });
             // The renderer writes the whole drift report to stdout; the counts
             // and the verdict are what is under test, not the noise. It writes
             // through `console.log` rather than `logger.info` deliberately —
@@ -239,7 +237,7 @@ inactive: "Inactive" }
 
             try {
                 const report = await runDoctor({
-                    collectionsPath: dir,
+                    schemaDir: dir,
                     // Missing schema file → one error from phase 1.
                     schemaPath: path.join(dir, "schema.generated.ts"),
                     sdkPath
@@ -277,7 +275,7 @@ errors: 1 });
 
             try {
                 const report = await runDoctor({
-                    collectionsPath: dir,
+                    schemaDir: dir,
                     schemaPath,
                     // An absent SDK is informational, so it must not count as a
                     // warning or the phase would never come back clean.
@@ -315,7 +313,7 @@ errors: 0 });
 
             try {
                 const report = await runDoctor({
-                    collectionsPath: dir,
+                    schemaDir: dir,
                     schemaPath,
                     sdkPath: path.join(dir, "rebase.d.ts"),
                     // Nothing is listening on port 1.
@@ -334,7 +332,7 @@ errors: 0 });
                 expect(report.schemaToDatabase.blocked).toBe(true);
 
                 const output = printed();
-                expect(output).toContain("Collections → Generated Schema");
+                expect(output).toContain("Tables → Generated Schema");
                 expect(output).not.toContain("All schemas are in sync");
             } finally {
                 fs.rmSync(dir, { recursive: true });
@@ -350,7 +348,7 @@ errors: 0 });
             fs.writeFileSync(schemaPath, await generateSchema(collections), "utf-8");
 
             try {
-                const report = await runDoctor({ collectionsPath: dir, schemaPath, sdkPath: path.join(dir, "rebase.d.ts") });
+                const report = await runDoctor({ schemaDir: dir, schemaPath, sdkPath: path.join(dir, "rebase.d.ts") });
                 expect(report.schemaToDatabase.skipped).toBe("DATABASE_URL not set");
                 expect(report.schemaToDatabase.blocked).toBeUndefined();
             } finally {
@@ -365,14 +363,14 @@ errors: 0 });
 
             try {
                 await runDoctor({
-                    collectionsPath: dir,
+                    schemaDir: dir,
                     schemaPath,
                     sdkPath: path.join(dir, "rebase.d.ts")
                 });
 
                 const output = printed();
-                expect(output).toContain("Collections → Database: skipped (DATABASE_URL not set)");
-                expect(output).not.toContain("Collections → Database: In sync");
+                expect(output).toContain("Tables → Database: skipped (DATABASE_URL not set)");
+                expect(output).not.toContain("Tables → Database: In sync");
                 expect(output).not.toContain("All schemas are in sync");
                 expect(output).toContain("1 skipped");
             } finally {
@@ -397,7 +395,7 @@ errors: 0 }
             });
 
             const output = printed();
-            expect(output).toContain("Collections → Database: In sync");
+            expect(output).toContain("Tables → Database: In sync");
             expect(output).toContain("All schemas are in sync!");
         });
 
@@ -412,7 +410,7 @@ errors: 0 }
 
             try {
                 const report = await runDoctor({
-                    collectionsPath: dir,
+                    schemaDir: dir,
                     schemaPath,
                     sdkPath: path.join(dir, "rebase.d.ts")
                 });
@@ -420,8 +418,8 @@ errors: 0 }
                 expect(report.collectionsToSdk.notApplicable).toBe("not generated (optional)");
 
                 const output = printed();
-                expect(output).toContain("Collections → SDK Types: not generated (optional)");
-                expect(output).not.toContain("Collections → SDK Types: In sync");
+                expect(output).toContain("Tables → SDK Types: not generated (optional)");
+                expect(output).not.toContain("Tables → SDK Types: In sync");
                 expect(output).toContain("1 not applicable");
                 // An optional artifact nobody asked for is not a reason to
                 // withhold a clean verdict from the checks that did run.
@@ -473,10 +471,11 @@ errors: 0 }
         it("does not report the SDK types as stale on a filename/slug inversion", async () => {
             const dir = fs.mkdtempSync(path.join(tmpdir(), "doctor-order-sdk-"));
             const sdkPath = path.join(dir, "database.types.ts");
-            fs.writeFileSync(sdkPath, generateTypedefs([articles, authors]), "utf-8");
+            const [articlesTable, authorsTable] = compileTables(collectionsToTableDefs([articles, authors]).tables);
+            fs.writeFileSync(sdkPath, generateTypedefs([articlesTable, authorsTable]), "utf-8");
 
             try {
-                const result = await checkCollectionsVsSdk([authors, articles], sdkPath);
+                const result = await checkCollectionsVsSdk([authorsTable, articlesTable], sdkPath);
                 expect(result.issues).toHaveLength(0);
                 expect(result.passed).toBe(true);
             } finally {

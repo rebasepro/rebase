@@ -39,7 +39,6 @@ import {
     queryGeneratedColumnDependencies,
     queryColumnTypes,
     dropGeneratedColumns,
-    loadCollectionsForCli,
     withAppClient,
     closeAppClients
 } from "./cli-helpers";
@@ -80,8 +79,8 @@ import { baselineVersionProblem, describeBaselinePlan, latestRecordedMigration, 
 import { promptConfirm } from "./cli-prompt";
 import { applyPoliciesFile, applyPushPlan, stampableTables, type PolicyStamping } from "./cli-push";
 import { branchNameIn, branchSourceIn, resolveBranchSwitches, unexpectedBranchArgs } from "./branch-argv";
-import { assertKnownFlags, collectionsPathIn, parseDriverLine, resolveDriverSwitches } from "./cli-flags";
-import { assertCollectionsPathExists } from "./cli-collections-path";
+import { assertKnownFlags, parseDriverLine, resolveDriverSwitches, schemaDirIn } from "./cli-flags";
+import { assertNoCollectionsFlag, assertSchemaDirExists, DEFAULT_SCHEMA_DIR } from "./cli-schema-dir";
 import { DESIRED_STATE_URL, GENERATED_SQL_DIR, generatedSqlDir, prepareGeneratedSqlDir } from "./generated-sql";
 import { backupActionOf } from "./backup-argv";
 import { DRIVER_DB_SUBCOMMANDS, isDriverDbSubcommand } from "./db-subcommands";
@@ -122,7 +121,7 @@ const __cliDirname = path.dirname(fileURLToPath(import.meta.url));
  * build, which is how the monorepo runs before `pnpm build`.
  *
  * **The interpreter is tsx either way, and that is not incidental.** These
- * scripts load the *project's* collection files, which are TypeScript and
+ * scripts load the *project's* table files (`backend/schema`), which are TypeScript and
  * import each other as `./authors.js` — the extension TypeScript tells you to
  * write. Node resolves that literally and fails on a file that does not exist;
  * tsx maps it back. Running the built `.js` under plain `node` therefore fails
@@ -154,7 +153,7 @@ function resolveChildScript(name: string):
 /** What to print when {@link resolveChildScript} cannot produce a command. */
 function childScriptError(what: string, reason: "script" | "tsx"): string {
     if (reason === "tsx") {
-        return `✗ Could not find the tsx binary, which ${what} needs to read your collection files. `
+        return `✗ Could not find the tsx binary, which ${what} needs to read your table files (backend/schema). `
             + "Install your project's dependencies and try again.";
     }
     return `✗ The driver's ${what} is missing. This copy of @rebasepro/server-postgres is `
@@ -163,7 +162,7 @@ function childScriptError(what: string, reason: "script" | "tsx"): string {
 
 /**
  * Whether this process can run the generators itself — that is, whether it
- * runs under tsx, the interpreter the project's collection files need (see
+ * runs under tsx, the interpreter the project's table files need (see
  * {@link resolveChildScript}). `rebase` always starts the driver that way when
  * tsx is installed, which a scaffold guarantees; a driver started with plain
  * `node` keeps the child process, which brings its own tsx.
@@ -247,6 +246,11 @@ export async function runPluginCommand(args: string[]) {
     const domain = args[0]; // "db" or "schema"
     const subcommand = args[1];
 
+    // First, a line written for the layout this driver no longer reads:
+    // `--collections` named a config/collections directory, and reading the
+    // default backend/schema in its place would generate a different schema
+    // than the one typed. One line naming `--schema-dir` and the codemod.
+    assertNoCollectionsFlag(args);
     // Before anything reads the line: every parser below runs `permissive`,
     // which turns an undeclared flag into a positional rather than an error, so
     // `db push --alow-destructive` pushed with the destructive gate still shut
@@ -257,19 +261,15 @@ export async function runPluginCommand(args: string[]) {
     // they run `permissive`, and `arg` reads `--allow-destructive=false` as on.
     args = resolveDriverSwitches(domain, subcommand, args);
 
-    // And before anything is generated: a `--collections` path that does not
+    // And before anything is generated: a schema directory that does not
     // resolve used to warn and carry on, four times over, and the generators
     // then wrote an *empty* schema over `drizzle/schema.sql` and
     // `src/schema.generated.ts` — both committed artifacts — after which the
     // push planned a DROP TABLE for every table in the database. Only the
-    // destructive gate stood between a typo and the whole schema.
-    //
-    // Checked here rather than in `loadCollectionsForCli`, which is
-    // deliberately forgiving: its callers use it to *narrow* what Atlas may
-    // touch, and a hard failure there would block a push over one broken file.
-    // This is a different question — "does the directory the user named
-    // exist" — and the answer was already known before the first write.
-    assertCollectionsPathExists(collectionsPathIn(args));
+    // destructive gate stood between a typo and the whole schema. The loader
+    // reads a missing *default* directory as "no tables" (the headless
+    // layout); a directory somebody typed is refused here, before any write.
+    assertSchemaDirExists(schemaDirIn(args));
 
     try {
         if (domain === "db") {
@@ -330,7 +330,7 @@ function latestMigrationVersion(): string | null {
  *
  * @returns true when a new migration survives and may be appended to.
  */
-async function stripCarvedOutFromNewestMigration(collectionsPath: string): Promise<boolean> {
+async function stripCarvedOutFromNewestMigration(schemaDir: string): Promise<boolean> {
     // Both carve-outs, for one reason: they are the same problem. Search is out
     // of Atlas's sight because its free tier will not parse a function; vector
     // is out because Atlas resolves the desired state in a dev database that
@@ -338,9 +338,9 @@ async function stripCarvedOutFromNewestMigration(collectionsPath: string): Promi
     // replays a migration directory holding objects `schema.sql` omits, and
     // plans a drop for every one.
     const patterns = [
-        ...await getSearchExcludes(collectionsPath),
-        ...await getVectorExcludes(collectionsPath),
-        ...await getTriggerExcludes(collectionsPath)
+        ...await getSearchExcludes(schemaDir),
+        ...await getVectorExcludes(schemaDir),
+        ...await getTriggerExcludes(schemaDir)
     ];
     if (patterns.length === 0) return true;
 
@@ -385,7 +385,7 @@ async function stripCarvedOutFromNewestMigration(collectionsPath: string): Promi
         out(chalk.gray(`  ✓ Kept Rebase's own columns out of ${newest} (${result.removed.length} statement(s))`));
     }
 
-    await runAtlas("migrate", ["hash", "--dir", "file://drizzle/migrations"], collectionsPath);
+    await runAtlas("migrate", ["hash", "--dir", "file://drizzle/migrations"], schemaDir);
     return !result.empty;
 }
 
@@ -395,14 +395,14 @@ async function stripCarvedOutFromNewestMigration(collectionsPath: string): Promi
  * name before applying it (`adoptIdenticalIndexes`) and the statement then
  * finds it there. Re-hashes the directory when it rewrote anything.
  */
-async function makeDeclaredIndexesAdoptable(collectionsPath: string): Promise<void> {
+async function makeDeclaredIndexesAdoptable(schemaDir: string): Promise<void> {
     const newest = listMigrationFiles().at(-1);
     if (!newest) return;
     const file = path.resolve(process.cwd(), "drizzle", "migrations", newest);
     const result = declaredIndexesIfNotExists(fs.readFileSync(file, "utf-8"));
     if (result.rewritten === 0) return;
     fs.writeFileSync(file, result.sql, "utf-8");
-    await runAtlas("migrate", ["hash", "--dir", "file://drizzle/migrations"], collectionsPath);
+    await runAtlas("migrate", ["hash", "--dir", "file://drizzle/migrations"], schemaDir);
 }
 
 /**
@@ -472,13 +472,12 @@ async function reportDestructiveMigration(migrationSql: string, migrationFile: s
  * this source, sees them.
  */
 const DB_FLAGS = {
-    "--collections": String,
+    "--schema-dir": String,
     "--allow-destructive": Boolean,
     "--refuse-destructive": Boolean,
     "--dry-run": Boolean,
     "--yes": Boolean,
     "--baseline": String,
-    "-c": "--collections",
     "-y": "--yes"
 } satisfies arg.Spec;
 
@@ -533,12 +532,12 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
     }
 
     const argsList = parseDriverLine(DB_FLAGS, rawArgs);
-    const collectionsPath = argsList["--collections"] || path.join("..", "config", "collections");
+    const schemaDir = argsList["--schema-dir"] || DEFAULT_SCHEMA_DIR;
 
     if (subcommand === "generate") {
         out("");
         out(chalk.bold("  📦 Rebase DB Generate"));
-        out(chalk.gray("  Step 1/2: Generating Drizzle schema & Postgres DDL from collections..."));
+        out(chalk.gray("  Step 1/2: Generating Drizzle schema & Postgres DDL from backend/schema..."));
         out("");
         await schemaCommand("generate", rawArgs, { nextStep: false });
         await generatePostgresDdlCommand(rawArgs);
@@ -547,15 +546,15 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
         out("");
         const migrationName = argsList._[0] || "migration";
         const migrationsBefore = listMigrationFiles();
-        await runAtlas("migrate", ["diff", migrationName, "--dir", "file://drizzle/migrations", "--to", DESIRED_STATE_URL], collectionsPath);
+        await runAtlas("migrate", ["diff", migrationName, "--dir", "file://drizzle/migrations", "--to", DESIRED_STATE_URL], schemaDir);
         // The diff cannot be told to ignore the carved-out objects the way the
         // apply can, so the drop it plans for them is taken back out of the
         // file it just wrote. A migration that was nothing else is deleted.
         let wroteNewMigration = listMigrationFiles().length > migrationsBefore.length;
         if (wroteNewMigration) {
-            wroteNewMigration = await stripCarvedOutFromNewestMigration(collectionsPath);
+            wroteNewMigration = await stripCarvedOutFromNewestMigration(schemaDir);
         }
-        if (wroteNewMigration) await makeDeclaredIndexesAdoptable(collectionsPath);
+        if (wroteNewMigration) await makeDeclaredIndexesAdoptable(schemaDir);
         const newestWritten = wroteNewMigration ? listMigrationFiles().at(-1) : undefined;
         if (newestWritten) {
             await reportDestructiveMigration(
@@ -622,13 +621,14 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                     // late to help — so the drop is prepended and the
                     // rebuild is the append that was already happening.
                     //
-                    // Derived from the collections rather than a catalogue:
+                    // Derived from the tables rather than a catalogue:
                     // `searchColumnDependencies` knows which columns each
                     // block reads, which is all the decision needs.
                     const { searchColumnDependencies } = await import("./schema/generate-postgres-ddl-logic");
+                    const { loadTables } = await import("./schema/load-tables");
                     const migrationConflicts = findGeneratedColumnConflicts(
                         parseColumnMutations(migrationContent),
-                        searchColumnDependencies(await loadCollectionsForCli(collectionsPath))
+                        searchColumnDependencies(await loadTables(schemaDir))
                     );
                     const preamble = migrationDropPreamble(migrationConflicts);
                     if (preamble) {
@@ -672,11 +672,11 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
 
                     // Re-hash the migration directory
                     out(chalk.gray("  Re-hashing migration files..."));
-                    await runAtlas("migrate", ["hash", "--dir", "file://drizzle/migrations"], collectionsPath, { throwOnFailure: true });
+                    await runAtlas("migrate", ["hash", "--dir", "file://drizzle/migrations"], schemaDir, { throwOnFailure: true });
                     out(chalk.gray("  ✓ Migration directory checksum updated successfully."));
                 }
             }, async () => {
-                await runAtlas("migrate", ["hash", "--dir", "file://drizzle/migrations"], collectionsPath, { throwOnFailure: true });
+                await runAtlas("migrate", ["hash", "--dir", "file://drizzle/migrations"], schemaDir, { throwOnFailure: true });
             });
             if (!finished.ok) {
                 outError(chalk.red(`\n  ✗ Could not finish ${newestSql}: ${finished.error}`));
@@ -728,8 +728,8 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
         if (subcommand === "push") {
             const dryRun = argsList["--dry-run"] === true;
             out(chalk.gray(dryRun
-                ? "  Step 1/3: Generating the Postgres DDL from collections (the plan's input)..."
-                : "  Step 1/3: Generating Drizzle schema & Postgres DDL from collections..."));
+                ? "  Step 1/3: Generating the Postgres DDL from backend/schema (the plan's input)..."
+                : "  Step 1/3: Generating Drizzle schema & Postgres DDL from backend/schema..."));
             out("");
             // `--dry-run` applies nothing, and that includes the project's
             // files: it used to rewrite the tracked `src/schema.generated.ts`
@@ -764,20 +764,20 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
             // way (`categorie_id`) are renamed — the lossless, metadata-only
             // statement boot runs — so Atlas does not plan them as a drop and
             // an add. See `schema/push-legacy-renames.ts`.
-            if (databaseUrl) await renameLegacyForeignKeys(databaseUrl, collectionsPath, dryRun);
+            if (databaseUrl) await renameLegacyForeignKeys(databaseUrl, schemaDir, dryRun);
 
             // An index made by hand that is identical to a declared one takes
             // the declared one's name, so Atlas finds it instead of building a
             // twin. See `schema/index-adoption.ts`.
-            if (databaseUrl) await adoptIdenticalIndexes(databaseUrl, collectionsPath, dryRun);
+            if (databaseUrl) await adoptIdenticalIndexes(databaseUrl, schemaDir, dryRun);
 
-            const prebuilt = databaseUrl ? await prebuildForeignKeyIndexes(databaseUrl, collectionsPath, dryRun) : [];
+            const prebuilt = databaseUrl ? await prebuildForeignKeyIndexes(databaseUrl, schemaDir, dryRun) : [];
 
             // A column declared `databaseDefault: true` keeps the DEFAULT the
             // database holds: read here and written into the desired state,
             // since Atlas cannot be told to leave one DEFAULT alone. See
             // `schema/push-kept-defaults.ts`.
-            if (databaseUrl) await keepDatabaseOwnedDefaults(databaseUrl, collectionsPath);
+            if (databaseUrl) await keepDatabaseOwnedDefaults(databaseUrl, schemaDir);
 
             // Preview the plan before touching data. `atlas schema apply` with
             // --auto-approve will silently DROP COLUMN on a field removal and
@@ -786,7 +786,7 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
             const plan = await runAtlas(
                 "schema",
                 ["apply", "--to", DESIRED_STATE_URL, "--dry-run"],
-                collectionsPath,
+                schemaDir,
                 { captureStdout: true }
             );
             // The columns' current types, because an `ALTER COLUMN … TYPE`
@@ -832,19 +832,19 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                 : [];
             const { managed: rebuildable, foreign: unowned } = partitionByOwnership(
                 generatedConflicts,
-                collectionsPath ? await getSearchExcludes(collectionsPath) : []
+                schemaDir ? await getSearchExcludes(schemaDir) : []
             );
 
             // A removed enum option plans nothing (no ALTER TYPE … DROP VALUE
             // exists), so the push would succeed and the database go on
             // accepting the value. Not a refusal — boot does the same — but said.
-            if (databaseUrl) await reportKeptEnumLabels(databaseUrl, collectionsPath);
+            if (databaseUrl) await reportKeptEnumLabels(databaseUrl, schemaDir);
 
             // What the push does to row-level security, which Atlas's plan
             // cannot show: it has no model for a policy. Read once, here, for
             // the dry run to list and the push to summarize — see
             // `schema/push-policy-plan.ts`.
-            const policyPlan = databaseUrl ? await readPolicyPushPlan(databaseUrl, collectionsPath) : undefined;
+            const policyPlan = databaseUrl ? await readPolicyPushPlan(databaseUrl, schemaDir) : undefined;
             const policyLines = policyPlan ?? { changes: [], notes: [] };
 
             // `--dry-run` stops here, having printed the SQL and nothing else.
@@ -873,8 +873,8 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                 }
                 if (!schemaChanges && !rlsHeading) {
                     out(chalk.green(policyPlan
-                        ? "  ✓ No changes: the database already matches these collections."
-                        : "  ✓ No schema changes: the tables already match these collections."));
+                        ? "  ✓ No changes: the database already matches these tables."
+                        : "  ✓ No schema changes: the tables already match backend/schema."));
                     out("");
                 }
                 if (databaseUrl && !policyPlan) {
@@ -983,7 +983,7 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                 // rebuild below entirely, so a failed apply left the search
                 // columns it had just dropped dropped.
                 atlasApply: async () => {
-                    await runAtlas("schema", ["apply", "--to", DESIRED_STATE_URL, "--auto-approve"], collectionsPath, { throwOnFailure: true, omitPlanEcho: true });
+                    await runAtlas("schema", ["apply", "--to", DESIRED_STATE_URL, "--auto-approve"], schemaDir, { throwOnFailure: true, omitPlanEcho: true });
                 },
                 reportSynced: () => out("Schema is synced, no changes to be made"),
                 rebuildAfterFailure: async () => {
@@ -1000,8 +1000,8 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                     // First, before anything below can fail. Atlas has just
                     // committed any new table with RLS off and the user role
                     // already holding DML on it; every later step may refuse.
-                    await lockManagedTables(databaseUrl, collectionsPath);
-                    await ensureAuthTables(databaseUrl, collectionsPath);
+                    await lockManagedTables(databaseUrl, schemaDir);
+                    await ensureAuthTables(databaseUrl, schemaDir);
                     // After the tables exist and before the policies: the vector and
                     // search columns are `ALTER TABLE ... ADD COLUMN`, and a policy
                     // may reference the table they are added to.
@@ -1016,8 +1016,8 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                     // them, a fresh database got them TO public and its first boot
                     // moved every one.
                     await ensureRlsUserRole(databaseUrl);
-                    await applyPolicies(databaseUrl, collectionsPath);
-                    await reconcilePolicies(databaseUrl, collectionsPath);
+                    await applyPolicies(databaseUrl, schemaDir);
+                    await reconcilePolicies(databaseUrl, schemaDir);
                     await retireLegacyAuthSchema(databaseUrl);
                 }
             });
@@ -1050,7 +1050,7 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                 const plan = await runAtlas(
                     "migrate",
                     [...migrateApplyArgs(argsList._, atlasBaseline), "--dry-run"],
-                    collectionsPath,
+                    schemaDir,
                     { captureStdout: true }
                 );
                 const destructive = detectDestructiveStatements(plan, await columnTypesOrNone(databaseUrl), await constraintsOrNone(databaseUrl));
@@ -1071,19 +1071,19 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                 // An index made by hand that is identical to a declared one
                 // takes the declared name first, and the migration's
                 // `CREATE INDEX IF NOT EXISTS` then finds it.
-                if (collectionsPath) await adoptIdenticalIndexes(databaseUrl, collectionsPath, false);
+                if (schemaDir) await adoptIdenticalIndexes(databaseUrl, schemaDir, false);
             }
             if (baseline && baselinePlan) {
                 out(chalk.gray(`  ${describeBaselinePlan(baseline, baselinePlan)}`));
                 out("");
                 if (baselinePlan.kind === "set") {
-                    await runAtlas("migrate", ["set", baseline, "--dir", "file://drizzle/migrations"], collectionsPath);
+                    await runAtlas("migrate", ["set", baseline, "--dir", "file://drizzle/migrations"], schemaDir);
                 }
             }
             await runAtlas(
                 "migrate",
                 migrateApplyArgs(argsList._, atlasBaseline),
-                collectionsPath
+                schemaDir
             );
             if (databaseUrl) {
                 await ensureRlsUserRole(databaseUrl);
@@ -1091,10 +1091,10 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                 // As push stamps what it applies, so the first boot after a
                 // migrate does not re-apply every policy once.
                 const adminRoleAvailable = await readAdminPoliciesLive(databaseUrl);
-                if (!adminRoleAvailable) await moveAdminPoliciesToPublic(databaseUrl, collectionsPath);
-                await dropStaleCompanions(databaseUrl, collectionsPath, adminRoleAvailable);
+                if (!adminRoleAvailable) await moveAdminPoliciesToPublic(databaseUrl, schemaDir);
+                await dropStaleCompanions(databaseUrl, schemaDir, adminRoleAvailable);
                 const { stampMigratedPolicies } = await import("./schema/migrate-policy-stamps");
-                await stampMigratedPolicies(databaseUrl, collectionsPath, adminRoleAvailable);
+                await stampMigratedPolicies(databaseUrl, schemaDir, adminRoleAvailable);
             }
         }
 
@@ -1122,10 +1122,10 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
  * says "no DEFAULT", and the push would drop each of them. A project declaring
  * no such column reads nothing.
  */
-async function keepDatabaseOwnedDefaults(databaseUrl: string, collectionsPath: string): Promise<void> {
-    const { loadCollections } = await import("./schema/doctor");
+async function keepDatabaseOwnedDefaults(databaseUrl: string, schemaDir: string): Promise<void> {
+    const { loadTables } = await import("./schema/load-tables");
     const { databaseOwnedDefaultColumns, readKeptDefaults, withKeptDefaults } = await import("./schema/push-kept-defaults");
-    const columns = databaseOwnedDefaultColumns(await loadCollections(path.resolve(process.cwd(), collectionsPath)));
+    const columns = databaseOwnedDefaultColumns(await loadTables(schemaDir));
     if (columns.length === 0) return;
 
     let kept: Awaited<ReturnType<typeof readKeptDefaults>>;
@@ -1154,12 +1154,12 @@ async function keepDatabaseOwnedDefaults(databaseUrl: string, collectionsPath: s
 }
 
 /** Renames relation columns that carry their pre-0.13 derived name, as boot does; a dry-run only names them. */
-async function renameLegacyForeignKeys(databaseUrl: string, collectionsPath: string, dryRun: boolean): Promise<void> {
+async function renameLegacyForeignKeys(databaseUrl: string, schemaDir: string, dryRun: boolean): Promise<void> {
     let renames: LegacyRename[];
     try {
-        const { loadCollections } = await import("./schema/doctor");
+        const { loadTables } = await import("./schema/load-tables");
         const { legacyForeignKeyRenames } = await import("./schema/push-legacy-renames");
-        const collections = await loadCollections(path.resolve(process.cwd(), collectionsPath));
+        const collections = await loadTables(schemaDir);
         renames = await withAppClient(databaseUrl, client => legacyForeignKeyRenames(
             { query: async (text) => ({ rows: (await client.query(text)).rows }) },
             collections
@@ -1188,12 +1188,12 @@ async function renameLegacyForeignKeys(databaseUrl: string, collectionsPath: str
 }
 
 /** Renames identical existing indexes to the declared ones' names, as boot does; a dry-run only names them. */
-async function adoptIdenticalIndexes(databaseUrl: string, collectionsPath: string, dryRun: boolean): Promise<void> {
+async function adoptIdenticalIndexes(databaseUrl: string, schemaDir: string, dryRun: boolean): Promise<void> {
     let adoptions: IndexAdoption[];
     try {
-        const { loadCollections } = await import("./schema/doctor");
+        const { loadTables } = await import("./schema/load-tables");
         const { pushIndexAdoptions } = await import("./schema/push-index-adoption");
-        const collections = await loadCollections(path.resolve(process.cwd(), collectionsPath));
+        const collections = await loadTables(schemaDir);
         adoptions = await withAppClient(databaseUrl, client => pushIndexAdoptions(
             { query: async (text) => ({ rows: (await client.query(text)).rows }) },
             collections
@@ -1218,12 +1218,12 @@ async function adoptIdenticalIndexes(databaseUrl: string, collectionsPath: strin
     out("");
 }
 
-/** Names the enum labels the database keeps after the collections dropped them. See `schema/enum-labels-kept.ts`. */
-async function reportKeptEnumLabels(databaseUrl: string, collectionsPath: string): Promise<void> {
+/** Names the enum labels the database keeps after the tables dropped them. See `schema/enum-labels-kept.ts`. */
+async function reportKeptEnumLabels(databaseUrl: string, schemaDir: string): Promise<void> {
     try {
-        const { loadCollections } = await import("./schema/doctor");
+        const { loadTables } = await import("./schema/load-tables");
         const { keptEnumLabels, formatKeptEnumLabelsNotice } = await import("./schema/enum-labels-kept");
-        const collections = await loadCollections(path.resolve(process.cwd(), collectionsPath));
+        const collections = await loadTables(schemaDir);
         const kept = await withAppClient(databaseUrl, client => keptEnumLabels(
             { query: async (text) => ({ rows: (await client.query(text)).rows }) },
             collections
@@ -1234,12 +1234,12 @@ async function reportKeptEnumLabels(databaseUrl: string, collectionsPath: string
     }
 }
 
-async function prebuildForeignKeyIndexes(databaseUrl: string, collectionsPath: string, dryRun: boolean): Promise<string[]> {
+async function prebuildForeignKeyIndexes(databaseUrl: string, schemaDir: string, dryRun: boolean): Promise<string[]> {
     let missing: DeferredIndexBuild[];
     try {
-        const { loadCollections } = await import("./schema/doctor");
+        const { loadTables } = await import("./schema/load-tables");
         const { missingForeignKeyIndexes } = await import("./schema/push-index-prebuild");
-        const collections = await loadCollections(path.resolve(process.cwd(), collectionsPath));
+        const collections = await loadTables(schemaDir);
         missing = await withAppClient(databaseUrl, client => missingForeignKeyIndexes(
             { query: async (text) => ({ rows: (await client.query(text)).rows }) },
             collections
@@ -1303,7 +1303,7 @@ async function ensureAuthSchemaAndFunctions(databaseUrl: string): Promise<void> 
 }
 
 /**
- * Switch row-level security on for every table the collections declare, right
+ * Switch row-level security on for every table backend/schema declares, right
  * after Atlas has applied the schema.
  *
  * Atlas cannot carry `ENABLE ROW LEVEL SECURITY` in `schema.sql`: its free tier
@@ -1320,15 +1320,15 @@ async function ensureAuthSchemaAndFunctions(databaseUrl: string): Promise<void> 
  * role provisioning at the end re-grants on every table in the schema, which
  * would undo the revoke that is the fallback here.
  */
-async function lockManagedTables(databaseUrl: string, collectionsPath: string): Promise<void> {
+async function lockManagedTables(databaseUrl: string, schemaDir: string): Promise<void> {
     let unsecured: TableLockResult["unsecured"];
     let userRole: string;
     try {
         const { lockCollectionTables } = await import("./schema/ensure-collection-policies");
-        const { loadCollections } = await import("./schema/doctor");
+        const { loadTables } = await import("./schema/load-tables");
         const { readRecordedRequestRoles } = await import("./security/rls-enforcement");
         const { cliRlsSettings } = await import("./security/rls-settings");
-        const collections = await loadCollections(path.resolve(process.cwd(), collectionsPath));
+        const collections = await loadTables(schemaDir);
         ({ unsecured, userRole } = await withAppClient(databaseUrl, async client => {
             const runSql = async (text: string) => (await client.query(text)).rows as Record<string, unknown>[];
             const roles = cliRlsSettings(await readRecordedRequestRoles(runSql)).roles;
@@ -1345,7 +1345,7 @@ async function lockManagedTables(databaseUrl: string, collectionsPath: string): 
         ));
         outError(chalk.gray(
             "    A table this push created may be readable and writable by every authenticated request\n" +
-            "    until it is. Re-run `rebase db push` — it locks every collection table before anything else."
+            "    until it is. Re-run `rebase db push` — it locks every declared table before anything else."
         ));
         process.exit(1);
     }
@@ -1378,14 +1378,14 @@ async function lockManagedTables(databaseUrl: string, collectionsPath: string): 
  * `ensureAuthTablesExist` is idempotent (CREATE TABLE IF NOT EXISTS), so it is
  * safe to run on every push and harmless once the server has also created them.
  */
-async function ensureAuthTables(databaseUrl: string, collectionsPath: string): Promise<void> {
+async function ensureAuthTables(databaseUrl: string, schemaDir: string): Promise<void> {
     try {
         const { drizzle } = await import("drizzle-orm/node-postgres");
         const { ensureAuthTablesExist } = await import("./auth/ensure-tables");
-        const { loadCollections } = await import("./schema/doctor");
+        const { loadTables } = await import("./schema/load-tables");
 
-        const collections = await loadCollections(path.resolve(process.cwd(), collectionsPath));
-        // The auth collection is flagged with `auth: true` or `auth: { enabled: true }`.
+        const collections = await loadTables(schemaDir);
+        // The auth table (`defineAuthTable`) is lowered with `auth: true`.
         const authCollection = collections.find((c) => {
             const a = c.auth;
             return a === true || (typeof a === "object" && a !== null && a.enabled === true);
@@ -1490,7 +1490,7 @@ async function retireLegacyAuthSchema(databaseUrl: string): Promise<void> {
     }
 }
 
-async function applyPolicies(databaseUrl: string, collectionsPath: string): Promise<void> {
+async function applyPolicies(databaseUrl: string, schemaDir: string): Promise<void> {
     try {
         const policiesPath = path.join(generatedSqlDir(), "policies.sql");
         if (!fs.existsSync(policiesPath)) return;
@@ -1513,9 +1513,9 @@ async function applyPolicies(databaseUrl: string, collectionsPath: string): Prom
                 `database (\`rebase doctor --database\` says what is missing). A server boot that sets them up moves them TO ${REBASE_ADMIN_ROLE}.`
             ));
             // Its own preamble would refuse the whole file where the role cannot be made.
-            policiesContent = (await policiesToPublic(collectionsPath, policiesContent)).split(`${ADMIN_POLICY_ROLE_SQL};`).join("");
+            policiesContent = (await policiesToPublic(schemaDir, policiesContent)).split(`${ADMIN_POLICY_ROLE_SQL};`).join("");
         }
-        const stamping = await policyStamping(databaseUrl, collectionsPath, policiesContent, adminRoleAvailable);
+        const stamping = await policyStamping(databaseUrl, schemaDir, policiesContent, adminRoleAvailable);
         const { stampError } = await withAppClient(databaseUrl, client => applyPoliciesFile(client, policiesContent, stamping));
         out(chalk.green("  ✓ RLS policies applied successfully."));
         if (stampError) {
@@ -1560,10 +1560,10 @@ async function readAdminPoliciesLive(databaseUrl: string): Promise<boolean> {
  * admits every admin to every row, and a boot without provisioning never
  * takes it back.
  */
-async function dropStaleCompanions(databaseUrl: string, collectionsPath: string, adminRoleAvailable: boolean): Promise<void> {
-    const { loadCollections } = await import("./schema/doctor");
+async function dropStaleCompanions(databaseUrl: string, schemaDir: string, adminRoleAvailable: boolean): Promise<void> {
+    const { loadTables } = await import("./schema/load-tables");
     const { dropStaleAdminRequestCompanions } = await import("./security/policy-drift");
-    const collections = await loadCollections(path.resolve(process.cwd(), collectionsPath));
+    const collections = await loadTables(schemaDir);
     try {
         const dropped = await withAppClient(databaseUrl, client => dropStaleAdminRequestCompanions(client, collections, { adminRoleAvailable }));
         for (const p of dropped) out(chalk.gray(`  ✓ Dropped stale admin-request policy "${p.name}" on ${p.schema}.${p.table}`));
@@ -1580,10 +1580,10 @@ async function dropStaleCompanions(databaseUrl: string, collectionsPath: string,
  * them on a push. Fatal when it fails — those policies refuse every admin
  * caller, and a boot without provisioning would leave them so.
  */
-async function moveAdminPoliciesToPublic(databaseUrl: string, collectionsPath: string): Promise<void> {
-    const { loadCollections } = await import("./schema/doctor");
+async function moveAdminPoliciesToPublic(databaseUrl: string, schemaDir: string): Promise<void> {
+    const { loadTables } = await import("./schema/load-tables");
     const { moveMigratedAdminPoliciesToPublic } = await import("./schema/migrate-policy-stamps");
-    const collections = await loadCollections(path.resolve(process.cwd(), collectionsPath));
+    const collections = await loadTables(schemaDir);
     try {
         const moved = await withAppClient(databaseUrl, client => moveMigratedAdminPoliciesToPublic(
             { query: async (text, values) => ({ rows: (await client.query(text, values)).rows }) },
@@ -1605,7 +1605,7 @@ async function moveAdminPoliciesToPublic(databaseUrl: string, collectionsPath: s
 
 /**
  * The stamps a boot looks for, for the policies `policies.sql` is about to
- * create — see `applyPoliciesFile`. None when the collections cannot be read
+ * create — see `applyPoliciesFile`. None when the tables cannot be read
  * here, which costs only the shortcut: the next boot re-applies, as before.
  */
 /**
@@ -1613,10 +1613,10 @@ async function moveAdminPoliciesToPublic(databaseUrl: string, collectionsPath: s
  * rewritten `TO public` — statement for statement, from the two plans, so a
  * rule that names `rebase_admin` itself is left exactly as written.
  */
-async function policiesToPublic(collectionsPath: string, policiesSql: string): Promise<string> {
-    const { loadCollections } = await import("./schema/doctor");
+async function policiesToPublic(schemaDir: string, policiesSql: string): Promise<string> {
+    const { loadTables } = await import("./schema/load-tables");
     const { planCollectionPolicies } = await import("./schema/generate-postgres-ddl-logic");
-    const collections = await loadCollections(path.resolve(process.cwd(), collectionsPath));
+    const collections = await loadTables(schemaDir);
     const fallback = new Map(planCollectionPolicies(collections, { adminRoleAvailable: false })
         .flatMap(plan => plan.policies.map(policy => [`${plan.qualified}.${policy.name}`, policy.statements] as const)));
     let sql = policiesSql;
@@ -1632,15 +1632,15 @@ async function policiesToPublic(collectionsPath: string, policiesSql: string): P
     return sql;
 }
 
-async function policyStamping(databaseUrl: string, collectionsPath: string, policiesSql: string, adminRoleAvailable = true): Promise<PolicyStamping> {
+async function policyStamping(databaseUrl: string, schemaDir: string, policiesSql: string, adminRoleAvailable = true): Promise<PolicyStamping> {
     try {
-        const { loadCollections } = await import("./schema/doctor");
+        const { loadTables } = await import("./schema/load-tables");
         const { planCollectionPolicies } = await import("./schema/generate-postgres-ddl-logic");
         const { policyStampSql } = await import("./schema/ensure-collection-policies");
         // The rule the boot's connections follow: `search_path=public` unless
         // the URL pins one of its own, in which case this connection has it too.
         const { pinSearchPath } = await import("./connection");
-        const collections = await loadCollections(path.resolve(process.cwd(), collectionsPath));
+        const collections = await loadTables(schemaDir);
         const statements = stampableTables(planCollectionPolicies(collections, { adminRoleAvailable }), policiesSql)
             .map(plan => policyStampSql(plan))
             .filter((statement): statement is string => statement !== undefined);
@@ -1656,16 +1656,16 @@ async function policyStamping(databaseUrl: string, collectionsPath: string, poli
  * prints and the one the push does; `undefined`, having said why, when it
  * cannot be read.
  */
-async function readPolicyPushPlan(databaseUrl: string, collectionsPath: string): Promise<{
+async function readPolicyPushPlan(databaseUrl: string, schemaDir: string): Promise<{
     changes: string[];
     notes: string[];
     summary: string | null;
 } | undefined> {
     try {
         const { formatPolicyPushPlan, planPolicyPush, summarizePolicyPushPlan } = await import("./schema/push-policy-plan");
-        const { loadCollections } = await import("./schema/doctor");
+        const { loadTables } = await import("./schema/load-tables");
         const { pinSearchPath } = await import("./connection");
-        const collections = await loadCollections(path.resolve(process.cwd(), collectionsPath));
+        const collections = await loadTables(schemaDir);
         const adminRoleAvailable = await readAdminPoliciesLive(databaseUrl);
         const plan = await withAppClient(databaseUrl, client => planPolicyPush(
             { query: async (text, values) => ({ rows: (await client.query(text, values)).rows }) },
@@ -1692,13 +1692,13 @@ async function readPolicyPushPlan(databaseUrl: string, collectionsPath: string):
  * drift check then sees exactly the set that should survive, and anything else
  * on a managed table is by definition left over.
  */
-async function reconcilePolicies(databaseUrl: string, collectionsPath: string): Promise<void> {
+async function reconcilePolicies(databaseUrl: string, schemaDir: string): Promise<void> {
     try {
         const { checkPolicyDrift, dropOrphanedPolicies, formatPolicyDrift, hasDrift } =
             await import("./security/policy-drift");
-        const { loadCollections } = await import("./schema/doctor");
+        const { loadTables } = await import("./schema/load-tables");
 
-        const collections = await loadCollections(path.resolve(process.cwd(), collectionsPath));
+        const collections = await loadTables(schemaDir);
         const adminRoleAvailable = await readAdminPoliciesLive(databaseUrl);
         await withAppClient(databaseUrl, async client => {
             const drift = await checkPolicyDrift(client, collections, { adminRoleAvailable });
@@ -1714,11 +1714,11 @@ async function reconcilePolicies(databaseUrl: string, collectionsPath: string): 
             // Custom-named orphans are indistinguishable from policies someone
             // wrote in SQL deliberately, so they are reported, never dropped.
             if (kept.length > 0) {
-                outWarn(chalk.yellow("  ⚠️  Policies in the database that no collection describes:"));
+                outWarn(chalk.yellow("  ⚠️  Policies in the database that no table describes:"));
                 for (const p of kept) {
                     outWarn(chalk.yellow(`       • ${p.schema}.${p.table} → "${p.name}" (${p.command} TO ${p.roles.join(", ")})`));
                 }
-                outWarn(chalk.yellow("       Each is still in force. To keep one, describe it in its collection's `securityRules`"));
+                outWarn(chalk.yellow("       Each is still in force. To keep one, describe it in its table's `rls` (backend/schema)"));
                 outWarn(chalk.yellow("       (Studio's RLS view imports it); if it is stale, drop it by hand."));
             }
 
@@ -1726,7 +1726,7 @@ async function reconcilePolicies(databaseUrl: string, collectionsPath: string): 
             // them is how a database ends up not matching its config.
             const remaining = { ...drift, orphaned: kept };
             if (hasDrift(remaining) && (remaining.missing.length > 0 || remaining.diverged.length > 0)) {
-                outWarn(chalk.yellow("  ⚠️  RLS policies do not match your collections:"));
+                outWarn(chalk.yellow("  ⚠️  RLS policies do not match your tables:"));
                 outWarn(formatPolicyDrift({ ...remaining, orphaned: [] }));
             }
         });
@@ -2182,7 +2182,7 @@ const scratchDatabase = new ScratchDatabase({ create: ensureDevDatabaseExists, d
 async function runAtlas(
     domain: "schema" | "migrate",
     args: string[],
-    collectionsPath?: string,
+    schemaDir?: string,
     opts: {
         captureStdout?: boolean;
         /**
@@ -2327,19 +2327,19 @@ async function runAtlas(
     // migration afterwards instead, with `stripCarvedOutStatements`. See
     // `acceptsExcludeFlag`.
     const excludes: string[] = [];
-    if (collectionsPath && acceptsExcludeFlag(domain, args)) {
+    if (schemaDir && acceptsExcludeFlag(domain, args)) {
         // Search and vector objects are Rebase's, not Atlas's: the desired state
         // does not carry them, so an apply left to itself would drop them.
-        excludes.push(...await getSearchExcludes(collectionsPath));
-        excludes.push(...await getVectorExcludes(collectionsPath));
-        excludes.push(...await getTriggerExcludes(collectionsPath));
+        excludes.push(...await getSearchExcludes(schemaDir));
+        excludes.push(...await getVectorExcludes(schemaDir));
+        excludes.push(...await getTriggerExcludes(schemaDir));
 
         // Fail CLOSED: the exclude list is the only thing shielding
         // non-collection tables from the auto-approved apply. If we can't
         // introspect the database to build it, abort rather than proceed with
         // a partial list that would let Atlas drop unmanaged tables.
         try {
-            excludes.push(...await getTableExcludes(databaseUrl, collectionsPath));
+            excludes.push(...await getTableExcludes(databaseUrl, schemaDir));
         } catch (err) {
             if (err instanceof ExcludeIntrospectionError) {
                 outError(chalk.red("\n✗ Aborting push: could not determine which tables to protect."));
@@ -2356,7 +2356,7 @@ async function runAtlas(
         // fail-closed contract as the table list above, for the same reason: a
         // partial answer here silently drops somebody's index.
         try {
-            excludes.push(...await getForeignIndexExcludes(databaseUrl, collectionsPath));
+            excludes.push(...await getForeignIndexExcludes(databaseUrl, schemaDir));
         } catch (err) {
             if (err instanceof ExcludeIntrospectionError) {
                 outError(chalk.red("\n✗ Aborting push: could not determine which indexes to protect."));
@@ -2483,9 +2483,8 @@ async function generatePostgresDdlCommand(
 ): Promise<void> {
     const argsList = arg(
         {
-            "--collections": String,
+            "--schema-dir": String,
             "--output": String,
-            "-c": "--collections",
             "-o": "--output"
         },
         {
@@ -2501,7 +2500,7 @@ async function generatePostgresDdlCommand(
         process.exit(1);
     }
 
-    const collectionsPath = argsList["--collections"] || path.join("..", "config", "collections");
+    const schemaDir = argsList["--schema-dir"] || DEFAULT_SCHEMA_DIR;
     const outputPath = argsList["--output"] || path.join(GENERATED_SQL_DIR, "schema.sql");
 
     // Only for the default location: an explicit `--output` is somebody's own
@@ -2525,7 +2524,7 @@ async function generatePostgresDdlCommand(
     if (!ddl) {
         await generateInProcess("Postgres DDL generator", "Postgres DDL", async ({ writePostgresDdl }) => {
             await writePostgresDdl({
-                collectionsPath: path.resolve(process.cwd(), collectionsPath),
+                schemaDir: path.resolve(process.cwd(), schemaDir),
                 outputPath: path.resolve(process.cwd(), outputPath)
             });
         });
@@ -2535,7 +2534,7 @@ async function generatePostgresDdlCommand(
     const cmdParts = [
         ddl.bin,
         ...ddl.args,
-        `--collections=${collectionsPath}`,
+        `--schema-dir=${schemaDir}`,
         `--output=${outputPath}`
     ];
 
@@ -2578,10 +2577,9 @@ async function generatePostgresDdlCommand(
 async function schemaStaleCommand(rawArgs: string[]): Promise<void> {
     const argsList = arg(
         {
-            "--collections": String,
+            "--schema-dir": String,
             "--output": String,
             "--fix": Boolean,
-            "-c": "--collections",
             "-o": "--output",
             // Both spellings, on every command that writes a file. See
             // `OUTPUT_FLAG_ALIASES` in cli-flags.ts.
@@ -2590,14 +2588,14 @@ async function schemaStaleCommand(rawArgs: string[]): Promise<void> {
         { argv: rawArgs.slice(2), permissive: true }
     );
 
-    const collectionsPath = argsList["--collections"] || path.join("..", "config", "collections");
+    const schemaDir = argsList["--schema-dir"] || DEFAULT_SCHEMA_DIR;
     const outputPath = argsList["--output"] || path.join("src", "schema.generated.ts");
     const schemaFile = path.resolve(process.cwd(), outputPath);
 
     const fix = Boolean(argsList["--fix"]);
     const generatedExists = fs.existsSync(schemaFile);
 
-    const { loadCollections } = await import("./schema/doctor");
+    const { loadTables } = await import("./schema/load-tables");
     const { findLegacyForeignKeyNames, compareGeneratedDeclarations, staleVerdict } =
         await import("./schema/generated-schema-staleness");
     const { generateSchema } = await import("./schema/generate-drizzle-schema-logic");
@@ -2608,11 +2606,11 @@ async function schemaStaleCommand(rawArgs: string[]): Promise<void> {
     let unreadable: string | undefined;
     if (generatedExists) {
         try {
-            const collections = await loadCollections(path.resolve(process.cwd(), collectionsPath));
+            const collections = await loadTables(schemaDir);
             const onDisk = fs.readFileSync(schemaFile, "utf8");
             stale = findLegacyForeignKeyNames(onDisk, collections);
             // The check the command's own summary promises, and the one it did
-            // not make: render what these collections generate and compare it,
+            // not make: render what these tables generate and compare it,
             // declaration by declaration, with the file on disk. Without this
             // the verdict rested entirely on `findLegacyForeignKeyNames`, which
             // looks for one historical naming defect — so a file the generator
@@ -2622,7 +2620,7 @@ async function schemaStaleCommand(rawArgs: string[]): Promise<void> {
                 differences = compareGeneratedDeclarations(generateSchema(postgresCollections), onDisk);
             }
         } catch (err) {
-            // Best-effort by design: a collections directory that will not load
+            // Best-effort by design: a schema directory that will not load
             // is a real error, but it is one the boot reports far better than
             // this does. Said out loud all the same — this command used to exit
             // 0 in silence here, which is indistinguishable from a clean run.
@@ -2652,7 +2650,7 @@ async function schemaStaleCommand(rawArgs: string[]): Promise<void> {
     if (verdict.exitCode !== 0) process.exit(verdict.exitCode);
     if (!verdict.regenerate) return;
 
-    await schemaCommand("generate", ["schema", "generate", `--collections=${collectionsPath}`, `--output=${outputPath}`]);
+    await schemaCommand("generate", ["schema", "generate", `--schema-dir=${schemaDir}`, `--output=${outputPath}`]);
 }
 
 async function schemaCommand(
@@ -2685,10 +2683,9 @@ async function schemaCommand(
     if (subcommand === "generate") {
         const argsList = arg(
             {
-                "--collections": String,
+                "--schema-dir": String,
                 "--output": String,
                 "--watch": Boolean,
-                "-c": "--collections",
                 "-o": "--output",
                 "--out": "--output",
                 "-w": "--watch"
@@ -2699,12 +2696,12 @@ async function schemaCommand(
             }
         );
 
-        const collectionsPath = argsList["--collections"] || path.join("..", "config", "collections");
+        const schemaDir = argsList["--schema-dir"] || DEFAULT_SCHEMA_DIR;
         const outputPath = argsList["--output"] || path.join("src", "schema.generated.ts");
         const watch = argsList["--watch"] || false;
 
         // One-shot generation runs here, in this process: see `generate-files.ts`.
-        // `--watch` keeps its own process, which re-imports the collections on
+        // `--watch` keeps its own process, which re-imports the tables on
         // every save — this process's module cache would not.
         if (!watch && generatesInProcess()) {
             out("");
@@ -2712,7 +2709,7 @@ async function schemaCommand(
             out("");
             await generateInProcess("schema generator", "Drizzle schema", async ({ writeDrizzleSchema }) => {
                 await writeDrizzleSchema({
-                    collectionsPath: path.resolve(process.cwd(), collectionsPath),
+                    schemaDir: path.resolve(process.cwd(), schemaDir),
                     outputPath: path.resolve(process.cwd(), outputPath),
                     nextStep: options.nextStep
                 });
@@ -2735,7 +2732,7 @@ async function schemaCommand(
         const cmdParts = [
             generator.bin,
             ...generator.args,
-            `--collections=${collectionsPath}`,
+            `--schema-dir=${schemaDir}`,
             `--output=${outputPath}`
         ];
         if (watch) {
@@ -2830,12 +2827,11 @@ async function schemaCommand(
 async function doctorPluginCommand(rawArgs: string[]): Promise<void> {
     const parsedArgs = arg(
         {
-            "--collections": String,
+            "--schema-dir": String,
             "--schema": String,
             "--sdk": String,
             "--policies": Boolean,
             "--database": Boolean,
-            "-c": "--collections",
             "-s": "--schema",
             "-k": "--sdk"
         },
@@ -2851,14 +2847,14 @@ async function doctorPluginCommand(rawArgs: string[]): Promise<void> {
         process.exit(1);
     }
 
-    const collectionsPath = parsedArgs["--collections"] || path.join("..", "config", "collections");
+    const schemaDir = parsedArgs["--schema-dir"] || DEFAULT_SCHEMA_DIR;
     const schemaPath = parsedArgs["--schema"] || path.join("src", "schema.generated.ts");
     const sdkPath = parsedArgs["--sdk"] || path.join("..", "generated", "sdk", "database.types.ts");
 
     const cmdParts = [
         doctor.bin,
         ...doctor.args,
-        `--collections=${collectionsPath}`,
+        `--schema-dir=${schemaDir}`,
         `--schema=${schemaPath}`,
         `--sdk=${sdkPath}`,
         // Only the RLS checks: skips the schema/SDK diff, so it can run against

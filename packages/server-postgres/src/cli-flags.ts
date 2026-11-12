@@ -65,16 +65,14 @@ export function parseDriverLine<S extends arg.Spec>(
 /** Keyed by `"<domain> <subcommand>"`, the way the user types it. */
 export const DRIVER_FLAG_SPECS: Record<string, arg.Spec> = {
     "db push": {
-        "--collections": String,
-        "-c": "--collections",
+        "--schema-dir": String,
         "--dry-run": Boolean,
         "--allow-destructive": Boolean,
         "--yes": Boolean,
         "-y": "--yes"
     },
     "db generate": {
-        "--collections": String,
-        "-c": "--collections"
+        "--schema-dir": String
     },
     // Bare positionals still pass through to `atlas migrate apply`, which takes
     // an optional amount; flags do not, apart from `--baseline`.
@@ -94,8 +92,7 @@ export const DRIVER_FLAG_SPECS: Record<string, arg.Spec> = {
         "--refuse-destructive": Boolean
     },
     "schema generate": {
-        "--collections": String,
-        "-c": "--collections",
+        "--schema-dir": String,
         "--output": String,
         "-o": "--output",
         "--out": "--output",
@@ -106,6 +103,8 @@ export const DRIVER_FLAG_SPECS: Record<string, arg.Spec> = {
         "--output": String,
         "-o": "--output",
         "--out": "--output",
+        // The introspector's output directory, still of collection files: the
+        // introspection slice moves it to backend/schema with the generator.
         "--collections": String,
         "-c": "--collections",
         "--force": Boolean,
@@ -117,8 +116,7 @@ export const DRIVER_FLAG_SPECS: Record<string, arg.Spec> = {
         "--no-data-inference": Boolean
     },
     "schema stale": {
-        "--collections": String,
-        "-c": "--collections",
+        "--schema-dir": String,
         "--output": String,
         "-o": "--output",
         "--out": "--output",
@@ -157,25 +155,24 @@ export function assertOutputAliasesPaired(specs: Record<string, arg.Spec>): stri
 }
 
 /**
- * The `--collections` path the user typed, or `null` if they typed none.
+ * The `--schema-dir` the user typed, or `null` if they typed none.
  *
  * Read once, at the entry point, because every command that takes it re-enters
- * the generators with the same line and each of them resolved it again — which
- * is how "Collections path not found" came to be printed four times before the
- * real output, and how a path that does not exist got as far as *writing* an
- * empty schema.
+ * the generators with the same line and each of them would resolve it again —
+ * which is how a missing directory came to be reported four times before the
+ * real output, and how one got as far as *writing* an empty schema.
  *
  * Permissive, and it has to be: {@link assertKnownFlags} has already judged the
- * line, and `db push` carries flags the `--collections` spec does not name.
+ * line, and `db push` carries flags this one-flag spec does not name.
  */
-export function collectionsPathIn(args: string[]): string | null {
+export function schemaDirIn(args: string[]): string | null {
     try {
         const parsed = arg(
-            { "--collections": String, "-c": "--collections" },
+            { "--schema-dir": String },
             { argv: args.slice(2), permissive: true }
         );
 
-        return parsed["--collections"] ?? null;
+        return parsed["--schema-dir"] ?? null;
     } catch {
         return null;
     }
@@ -184,7 +181,7 @@ export function collectionsPathIn(args: string[]): string | null {
 /**
  * The long flags a `--help` usage line documents.
  *
- * `"rebase db push [--collections <dir>] [--dry-run] …"` → `["--collections",
+ * `"rebase db push [--schema-dir <dir>] [--dry-run] …"` → `["--schema-dir",
  * "--dry-run"]`. Placeholders (`<dir>`) and the alternation inside a positional
  * (`<create|list|switch>`) are not flags and are not returned.
  */
@@ -210,7 +207,7 @@ export function flagsInUsage(usage: string): string[] {
  * help covers commands that parse their own lines (`db branch`, `db backup`),
  * and an absent spec entry means "not checked here".
  *
- * Aliases (`"-c": "--collections"`, `"--out": "--output"`) need no line of their
+ * Aliases (`"-y": "--yes"`, `"--out": "--output"`) need no line of their
  * own: they are spellings of a documented flag. Neither do {@link RELAYED_FLAGS},
  * which every driver command accepts because the CLI relays them.
  */

@@ -99,12 +99,17 @@ describe("assertKnownFlags", () => {
         // in step; this asserts the line a reader would actually type.
         const documented = flagsInUsage(usageStrings()["db push"]);
         expect(documented).toContain("--dry-run");
-        const typed = documented.flatMap(flag => (flag === "--collections" ? [flag, "./config/collections"] : [flag]));
+        const typed = documented.flatMap(flag => (flag === "--schema-dir" ? [flag, "./schema"] : [flag]));
         expect(() => assertKnownFlags("db", "push", line("db", "push", ...typed))).not.toThrow();
     });
 
     it("accepts the short forms", () => {
-        expect(() => assertKnownFlags("db", "push", line("db", "push", "-c", "./c", "-y"))).not.toThrow();
+        expect(() => assertKnownFlags("db", "push", line("db", "push", "--schema-dir", "./s", "-y"))).not.toThrow();
+    });
+
+    it("no longer takes --collections or -c on a command that reads the schema", () => {
+        expect(() => assertKnownFlags("db", "push", line("db", "push", "--collections", "./c"))).toThrow(/has no option --collections/);
+        expect(() => assertKnownFlags("schema", "generate", line("schema", "generate", "-c", "./c"))).toThrow();
     });
 
     /**
@@ -198,8 +203,8 @@ describe("the help page and the flag spec", () => {
 
     it("does not ask for a line per alias, or per flag the CLI relays", () => {
         const problems = assertSpecMatchesUsage(
-            { "db push": { "--collections": String, "-c": "--collections", "--docker": Boolean } },
-            { "db push": "rebase db push [--collections <dir>]" }
+            { "db push": { "--yes": Boolean, "-y": "--yes", "--docker": Boolean } },
+            { "db push": "rebase db push [--yes]" }
         );
         expect(problems).toEqual([]);
     });
@@ -257,8 +262,8 @@ describe("a switch given a value", () => {
         ["--docker=false", []]
     ])("is read on db push, before any parser sees it: %s", (typed, resolved) => {
         expect(() => assertKnownFlags("db", "push", line("db", "push", typed))).not.toThrow();
-        expect(resolveDriverSwitches("db", "push", line("db", "push", typed, "--collections=../config")))
-            .toEqual(["db", "push", ...resolved, "--collections=../config"]);
+        expect(resolveDriverSwitches("db", "push", line("db", "push", typed, "--schema-dir=../schema")))
+            .toEqual(["db", "push", ...resolved, "--schema-dir=../schema"]);
     });
 
     // The permissive parse `db push` runs reads the resolved line, so the gate
@@ -300,7 +305,7 @@ describe("a switch given a value", () => {
     });
 
     it("leaves a value on a flag that takes one, a switch alone, and what follows `--`, as they are", () => {
-        expect(() => assertKnownFlags("db", "push", line("db", "push", "--collections=../config", "--dry-run"))).not.toThrow();
+        expect(() => assertKnownFlags("db", "push", line("db", "push", "--schema-dir=../schema", "--dry-run"))).not.toThrow();
         expect(() => assertKnownFlags("db", "push", line("db", "push", "--database-url=postgres://u:p@h/db"))).not.toThrow();
         expect(resolveSwitchValues({ "--yes": Boolean }, ["--", "--yes=maybe"], "db push")).toEqual(["--", "--yes=maybe"]);
     });
@@ -321,10 +326,10 @@ describe("an argument holding a flag and its value", () => {
     const URL_WITH_PASSWORD = "postgres://app:hunter2@db.example.com/prod?sslmode=require";
 
     it("is refused by db push as that, masked", () => {
-        expect(() => assertKnownFlags("db", "push", line("db", "push", `--colections ${URL_WITH_PASSWORD}`))).toThrow(
-            "`rebase db push` has no option \"--colections postgres://app:***@db.example.com/prod?sslmode=require\": " +
+        expect(() => assertKnownFlags("db", "push", line("db", "push", `--schema-di ${URL_WITH_PASSWORD}`))).toThrow(
+            "`rebase db push` has no option \"--schema-di postgres://app:***@db.example.com/prod?sslmode=require\": " +
             "that is a flag and a value in one argument, quoted together. " +
-            "Write them as two arguments, --collections <value>, or as --collections=<value>. Nothing was run. See `rebase db --help`."
+            "Write them as two arguments, --schema-dir <value>, or as --schema-dir=<value>. Nothing was run. See `rebase db --help`."
         );
     });
 
