@@ -1,5 +1,5 @@
 import { col, defineAuthTable, defineTable, defineView, json, rel } from "../../src/schema";
-import type { ColumnKeyOf, InferInsert, InferRow, InferUpdate, JsonGeoPoint, RelationKeyOf, RelationTarget } from "../../src/schema";
+import type { ColumnKeyOf, InferInsert, InferRow, InferUpdate, JsonGeoPoint, RelationKeyOf } from "../../src/schema";
 
 /**
  * The type-level contract of the schema builders.
@@ -375,12 +375,12 @@ function relationOptions(): void {
     rel.belongsTo(users);
     // @ts-expect-error a via needs its steps
     rel.via(() => users);
-    // @ts-expect-error a relation points at a table or a view
-    rel.hasMany(() => ({ name: "x" }));
-    // One side of a two-way link annotates its thunk; the other infers.
+    // What a thunk returns is not typed (a `TableThunk` is `() => void`, so
+    // two-way links need no annotation); `compileTables` refuses a thunk that
+    // does not return a table or view. Neither side of this link annotates.
     const a = defineTable("a", {
         columns: { id: col.uuid().primaryKey() },
-        relations: { bs: rel.hasMany((): RelationTarget => b) },
+        relations: { bs: rel.hasMany(() => b) },
         rls: "admin-only"
     });
     const b = defineTable("b", {

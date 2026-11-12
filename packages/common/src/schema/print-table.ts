@@ -103,13 +103,6 @@ export interface PrintTarget {
     table?: string;
     /** Whether the target is a view. A view never gets a `FOREIGN KEY`, so `constraint: false` is not printed for it. */
     kind?: "table" | "view";
-    /**
-     * The target's module imports this one back (directly or through others),
-     * so the thunk needs a return type: TypeScript cannot infer two tables'
-     * types from each other (TS7022). Only a descriptor's target needs saying —
-     * a definition's cycles are found by following its thunks.
-     */
-    cyclic?: boolean;
 }
 
 /**
@@ -158,13 +151,6 @@ export interface PrintTableOptions {
     sources?: TableSources;
     /** Extra import lines, printed verbatim after the generated ones (what hook sources reference). */
     extraImports?: readonly string[];
-    /**
-     * When a relation thunk is annotated `(): RelationTarget => users`:
-     * `"cycles"` (the default) when the target leads back to this table —
-     * TypeScript cannot infer two definitions' types from each other —,
-     * `"always"`, or `"never"`.
-     */
-    annotateTargets?: "cycles" | "always" | "never";
 }
 
 /**
@@ -189,8 +175,6 @@ export interface PrintedImports {
     specifier: string;
     /** The builders used, in import order (`define*`, `col`, `rel`, `json`). */
     builders: SchemaBuilderName[];
-    /** Types imported from the builders' module (`RelationTarget`, for an annotated thunk). */
-    types: string[];
     /** The related tables, in the order their relations are declared, each once. */
     tables: PrintedTableImport[];
 }
@@ -274,32 +258,6 @@ interface TableState {
     resolve: PrintTargetResolver;
     /** Whether a relation target is the table being printed. */
     isSelf: (target: { def?: unknown; slug: string }) => boolean;
-    /** When a thunk is annotated. */
-    annotate: "cycles" | "always" | "never";
-    /** The definition being printed, to find the cycles its thunks close. */
-    self?: unknown;
-    /** Types the printed source uses. */
-    types: Set<string>;
-}
-
-/** Whether following relation thunks from `start` reaches `self`. */
-function leadsBack(start: unknown, self: unknown): boolean {
-    const seen = new Set<unknown>();
-    const stack: unknown[] = [start];
-    while (stack.length > 0) {
-        const current = stack.pop();
-        if (current === self) return true;
-        if (seen.has(current) || (!isTableDef(current) && !isViewDef(current))) continue;
-        seen.add(current);
-        for (const relation of Object.values(current.config.relations ?? {})) {
-            try {
-                stack.push(relation.target());
-            } catch {
-                // A thunk that cannot resolve yet closes no cycle we can see.
-            }
-        }
-    }
-    return false;
 }
 
 function columnContext(state: TableState, path: string, prefix: string): ColumnPrintContext {
@@ -385,7 +343,11 @@ const RELATION_KEYS: Readonly<Record<RelationDef["kind"], readonly string[]>> = 
     via: ["steps", "cardinality"]
 };
 
-/** The thunk `() => <identifier>`, recording the import it needs. */
+/**
+ * The thunk `() => <identifier>`, recording the import it needs. Never
+ * annotated: `rel.*` take a `TableThunk` (`() => void`), so tables that point
+ * at each other compile as written.
+ */
 function targetThunk(state: TableState, target: { name?: string; slug: string; def?: unknown }, path: string): { doc: Doc; printed: PrintTarget } {
     const self = state.isSelf(target);
     const printed: PrintTarget = self ? { identifier: state.identifier } : state.resolve({ name: target.name, slug: target.slug });
@@ -395,10 +357,7 @@ function targetThunk(state: TableState, target: { name?: string; slug: string; d
             state.imports.push({ identifier: printed.identifier, importPath: printed.importPath });
         }
     }
-    const cyclic = self || printed.cyclic === true || (target.def !== undefined && state.self !== undefined && leadsBack(target.def, state.self));
-    const annotate = state.annotate === "always" || (state.annotate === "cycles" && cyclic);
-    if (annotate) state.types.add("RelationTarget");
-    return { doc: text(`${annotate ? "(): RelationTarget" : "()"} => ${printed.identifier}`), printed };
+    return { doc: text(`() => ${printed.identifier}`), printed };
 }
 
 function relationOfDef(name: string, relation: RelationDef, state: TableState): Doc {
@@ -553,9 +512,7 @@ export function printRelation(name: string, relation: RelationDef | RelationDesc
         imports: [],
         transforms: context.transforms ?? {},
         resolve: context.resolveTarget ?? defaultResolver,
-        isSelf: target => context.owner !== undefined && target.def === undefined && target.slug === context.owner.slug,
-        annotate: "never",
-        types: new Set()
+        isSelf: target => context.owner !== undefined && target.def === undefined && target.slug === context.owner.slug
     };
     if ("brand" in relation) return render(relationOfDef(name, relation, state));
     if (!context.owner) {
@@ -595,7 +552,7 @@ function authDoc(auth: object, state: TableState, sources: TableSources["auth"])
     return entries.length > 0 ? object(entries) : undefined;
 }
 
-function newState(name: string, identifier: string, options: PrintTableOptions, isSelf: TableState["isSelf"], self?: unknown): TableState {
+function newState(name: string, identifier: string, options: PrintTableOptions, isSelf: TableState["isSelf"]): TableState {
     return {
         label: name,
         identifier,
@@ -603,10 +560,7 @@ function newState(name: string, identifier: string, options: PrintTableOptions, 
         imports: [],
         transforms: options.sources?.transforms ?? {},
         resolve: options.resolveTarget ?? defaultResolver,
-        isSelf,
-        annotate: options.annotateTargets ?? "cycles",
-        self,
-        types: new Set()
+        isSelf
     };
 }
 
@@ -761,7 +715,7 @@ export function printTableSource(input: PrintableTable, options: PrintTableOptio
     let state: TableState;
     let doc: Doc;
     if (isTableDef(input) || isViewDef(input)) {
-        state = newState(name, identifier, options, target => target.def === input, input);
+        state = newState(name, identifier, options, target => target.def === input);
         doc = definitionDoc(input, state, options);
     } else {
         state = newState(name, identifier, options, target => target.def === undefined && target.slug === input.slug);
@@ -774,7 +728,6 @@ export function printTableSource(input: PrintableTable, options: PrintTableOptio
         imports: {
             specifier: options.specifier ?? DEFAULT_SCHEMA_SPECIFIER,
             builders: BUILDER_ORDER.filter(builder => state.used.has(builder)),
-            types: [...state.types].sort(),
             tables: state.imports
         }
     };
@@ -782,8 +735,7 @@ export function printTableSource(input: PrintableTable, options: PrintTableOptio
 
 /** The import lines of a printed table: builders first, then related tables grouped by module. */
 export function printImportLines(imports: PrintedImports): string[] {
-    const names = [...imports.builders, ...imports.types.map(type => `type ${type}`)];
-    const lines = [`import { ${names.join(", ")} } from ${printString(imports.specifier)};`];
+    const lines = [`import { ${imports.builders.join(", ")} } from ${printString(imports.specifier)};`];
     const byPath = new Map<string, string[]>();
     for (const entry of imports.tables) {
         const list = byPath.get(entry.importPath) ?? [];

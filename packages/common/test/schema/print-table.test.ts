@@ -3,7 +3,7 @@ import path from "node:path";
 
 import { describe, expect, it } from "@jest/globals";
 import { col, defineAuthTable, defineTable, defineView, json, rel } from "@rebasepro/types";
-import type { AnyTableDef, AnyViewDef, ColumnDef, RelationTarget, TableDescriptor } from "@rebasepro/types";
+import type { AnyTableDef, AnyViewDef, ColumnDef, TableDescriptor } from "@rebasepro/types";
 
 import { compileTables } from "../../src/schema/compile-tables";
 import {
@@ -349,7 +349,6 @@ describe("printTableSource / printTableModule", () => {
         expect(printed.imports).toEqual({
             specifier: "@rebasepro/server/schema",
             builders: ["defineTable", "col", "rel"],
-            types: [],
             tables: [{ identifier: "users", importPath: "./users" }, { identifier: "tags", importPath: "./tags" }]
         });
     });
@@ -474,24 +473,22 @@ describe("printTableSource / printTableModule", () => {
         ]);
         const accountsModule = printTableModule(PRINT_FIXTURES[5]);
         expect(accountsModule.split("\n").slice(0, 3)).toEqual([
-            "import { defineTable, col, rel, type RelationTarget } from \"@rebasepro/server/schema\";",
+            "import { defineTable, col, rel } from \"@rebasepro/server/schema\";",
             "import { profiles } from \"./profiles\";",
             "import { tags } from \"./tags\";"
         ]);
     });
 
-    it("annotates the thunks that close a cycle, which TypeScript cannot infer (TS7022)", () => {
+    it("writes every thunk plainly, cycles included: a `TableThunk` needs no annotation", () => {
         const accountsModule = printTableModule(PRINT_FIXTURES[5]);
-        // Self-references and accounts ↔ profiles close a cycle; tags does not.
-        expect(accountsModule).toContain("profile: rel.hasOne((): RelationTarget => profiles, { foreignKey: \"account_id\" })");
-        expect(accountsModule).toContain("parent: rel.belongsTo((): RelationTarget => accounts)");
+        // Self-references and accounts ↔ profiles close a cycle; tags does not. All print alike.
+        expect(accountsModule).toContain("profile: rel.hasOne(() => profiles, { foreignKey: \"account_id\" })");
+        expect(accountsModule).toContain("parent: rel.belongsTo(() => accounts)");
         expect(accountsModule).toContain("tags: rel.manyToMany(() => tags)");
+        expect(accountsModule).not.toContain("RelationTarget");
         const postsCode = printTableSource(posts, optionsFor("posts")).code;
-        expect(postsCode).toContain("comments: rel.hasMany((): RelationTarget => comments, {");
+        expect(postsCode).toContain("comments: rel.hasMany(() => comments, {");
         expect(postsCode).toContain("author: rel.belongsTo(() => users, {");
-        expect(printTableSource(posts, { ...optionsFor("posts"), annotateTargets: "never" }).imports.types).toEqual([]);
-        expect(printTableSource(users, { annotateTargets: "always" }).imports.types).toEqual([]);
-        expect(printTableSource(posts, { ...optionsFor("posts"), annotateTargets: "always" }).code).toContain("author: rel.belongsTo((): RelationTarget => users, {");
     });
 
     it("takes the import specifier and extra import lines from the caller", () => {
@@ -597,8 +594,7 @@ describe("round trip: compile(evaluate(print(compile(defs)))) is compile(defs)",
         expect(module).toContain("tags: rel.manyToMany(() => tags, {\n            pivot: {");
         const accounts = printDescriptor(descriptors[5]);
         expect(accounts).toContain("tags: rel.manyToMany(() => tags)");
-        expect(accounts).toContain("parent: rel.belongsTo((): RelationTarget => accounts)");
-        // A descriptor's cycle through another table is the resolver's to say.
+        expect(accounts).toContain("parent: rel.belongsTo(() => accounts)");
         expect(accounts).toContain("profile: rel.hasOne(() => profiles)");
     });
 

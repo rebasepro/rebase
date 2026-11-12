@@ -2,8 +2,7 @@
  * Evaluating printed schema source without touching the filesystem.
  *
  * A printed module is `import` lines plus `export const x = defineTable(…);`.
- * The imports are dropped, `export const` becomes `const`, a thunk's
- * `(): RelationTarget` annotation is erased, and the statements
+ * The imports are dropped, `export const` becomes `const`, and the statements
  * of every module are run in one function body with the real builders passed
  * in — so relation thunks between modules resolve to each other, exactly as
  * they would across files.
@@ -29,8 +28,6 @@ export function evaluateModules(modules: readonly string[]): Record<string, unkn
         .split("\n")
         .filter(line => !line.startsWith("import "))
         .join("\n")
-        // The one piece of TypeScript a printed table holds: an annotated thunk.
-        .replace(/\(\): RelationTarget =>/g, "() =>")
         .replace(/^export const ([A-Za-z_$][\w$]*) = /gm, (_match, identifier: string) => {
             identifiers.push(identifier);
             return `const ${identifier} = `;

@@ -19,7 +19,7 @@
  */
 import { describe, expect, it } from "@jest/globals";
 import { col, defineAuthTable, defineTable, defineView, rel } from "@rebasepro/types";
-import type { AnyTableDef, AnyViewDef, ColumnDescriptor, DefaultRls, RelationTarget, TableDescriptor } from "@rebasepro/types";
+import type { AnyTableDef, AnyViewDef, ColumnDescriptor, DefaultRls, TableDescriptor } from "@rebasepro/types";
 import { collectionsToTableDefs, compileTables, isSchemaDefinitionError, lowerTables } from "@rebasepro/common";
 
 import { planSchema } from "../src/schema/plan/plan-schema";
@@ -171,7 +171,7 @@ const comments: AnyTableDef = defineTable("comments", {
         body: col.text().notNull(),
         postId: col.uuid().notNull()
     },
-    relations: { post: rel.belongsTo((): RelationTarget => posts) },
+    relations: { post: rel.belongsTo(() => posts) },
     rls: [{ operation: "select", access: "public" }]
 });
 

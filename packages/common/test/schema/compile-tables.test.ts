@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import { col, defineAuthTable, defineTable, defineView, json, rel } from "@rebasepro/types";
-import type { RelationTarget, TableDescriptor } from "@rebasepro/types";
+import type { TableDescriptor } from "@rebasepro/types";
 
 import { compileTable, compileTables, describeColumn } from "../../src/schema/compile-tables";
 
@@ -37,7 +37,7 @@ const comments = defineTable("comments", {
     },
     // One side of a two-way link annotates its thunk, or TypeScript cannot
     // infer either table's type (TS7022): each would depend on the other.
-    relations: { post: rel.belongsTo((): RelationTarget => posts) },
+    relations: { post: rel.belongsTo(() => posts) },
     rls: [{ operation: "select", access: "public" }]
 });
 
@@ -384,7 +384,7 @@ describe("compileTables — relations", () => {
 
     it("resolves a target handed back as a module namespace", () => {
         // What a cycle transpiled to CommonJS hands a thunk: `{ __esModule, default }`.
-        const holder: { namespace: RelationTarget } = { namespace: tags };
+        const holder: { namespace: unknown } = { namespace: tags };
         Object.assign(holder, { namespace: { __esModule: true, default: tags } });
         const linked = defineTable("linked", {
             columns: { id: col.uuid().primaryKey() },

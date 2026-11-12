@@ -3,21 +3,35 @@ import type { OrderByTuple } from "../types/filter-operators";
 import type { ColumnsShape } from "./columns";
 
 /**
- * What a relation may point at: a table or a view. Declared structurally so a
- * relation file does not have to import the table module it points back to.
+ * A relation's target, as written: `() => users`.
+ *
+ * Typed `() => void` on purpose. A thunk typed by what it returns (generic
+ * over the returned table, a structural table type, or `() => unknown`) makes
+ * TypeScript resolve the returned table's type while it is still inferring the
+ * table being defined, so two tables that point at each other — `posts.author`
+ * → `users`, `users.posts` → `posts` — failed with TS7022/TS7024 unless one
+ * thunk was annotated. A `void` return is the one form TypeScript never
+ * resolves, so mutual and self relations need no annotation, in one file or
+ * across files.
+ *
+ * What the thunk returns is checked when the schema is compiled instead: a
+ * thunk that does not return a `defineTable` / `defineView` result is refused
+ * by `compileTables`, naming the table and the relation.
+ *
+ * @group Schema
  */
-export interface RelationTarget {
-    readonly brand: "rebase.table" | "rebase.view";
-    readonly name: string;
-}
+export type TableThunk = () => void;
 
 /** The brand every relation builder result carries. */
 export const RELATION_BRAND = "rebase.relation";
 
-interface RelationDefBase<T extends RelationTarget> {
+interface RelationDefBase {
     readonly brand: typeof RELATION_BRAND;
-    /** The table it points at, behind a thunk so two tables can point at each other. */
-    readonly target: () => T;
+    /**
+     * The table it points at, behind a thunk so two tables can point at each
+     * other. Typed `() => unknown`: read it through `isTableDef` / `isViewDef`.
+     */
+    readonly target: () => unknown;
 }
 
 /**
@@ -98,28 +112,27 @@ export interface ViaOptions {
 }
 
 /** `rel.belongsTo(...)`. */
-export interface BelongsToDef<T extends RelationTarget = RelationTarget> extends RelationDefBase<T>, BelongsToOptions {
+export interface BelongsToDef extends RelationDefBase, BelongsToOptions {
     readonly kind: "belongsTo";
 }
 
 /** `rel.hasOne(...)`. */
-export interface HasOneDef<T extends RelationTarget = RelationTarget> extends RelationDefBase<T>, HasOptions {
+export interface HasOneDef extends RelationDefBase, HasOptions {
     readonly kind: "hasOne";
 }
 
 /** `rel.hasMany(...)`. */
-export interface HasManyDef<T extends RelationTarget = RelationTarget> extends RelationDefBase<T>, HasManyOptions {
+export interface HasManyDef extends RelationDefBase, HasManyOptions {
     readonly kind: "hasMany";
 }
 
 /** `rel.manyToMany(...)`. */
-export interface ManyToManyDef<T extends RelationTarget = RelationTarget, P extends ColumnsShape = ColumnsShape>
-    extends RelationDefBase<T>, ManyToManyOptions<P> {
+export interface ManyToManyDef<P extends ColumnsShape = ColumnsShape> extends RelationDefBase, ManyToManyOptions<P> {
     readonly kind: "manyToMany";
 }
 
 /** `rel.via(...)`. */
-export interface ViaDef<T extends RelationTarget = RelationTarget> extends RelationDefBase<T>, ViaOptions {
+export interface ViaDef extends RelationDefBase, ViaOptions {
     readonly kind: "via";
 }
 
@@ -128,12 +141,12 @@ export interface ViaDef<T extends RelationTarget = RelationTarget> extends Relat
  *
  * @group Schema
  */
-export type RelationDef<T extends RelationTarget = RelationTarget> =
-    | BelongsToDef<T>
-    | HasOneDef<T>
-    | HasManyDef<T>
-    | ManyToManyDef<T>
-    | ViaDef<T>;
+export type RelationDef =
+    | BelongsToDef
+    | HasOneDef
+    | HasManyDef
+    | ManyToManyDef
+    | ViaDef;
 
 /**
  * The `relations` of a table: `rel.*` results by relation name.
@@ -142,15 +155,16 @@ export type RelationDef<T extends RelationTarget = RelationTarget> =
  */
 export type RelationsShape = Record<string, RelationDef>;
 
-function belongsTo<T extends RelationTarget>(target: () => T): BelongsToDef<T>;
-function belongsTo<T extends RelationTarget, const O extends BelongsToOptions>(target: () => T, options: O): BelongsToDef<T> & O;
-function belongsTo(target: () => RelationTarget, options: BelongsToOptions = {}): BelongsToDef {
+function belongsTo(target: TableThunk): BelongsToDef;
+function belongsTo<const O extends BelongsToOptions>(target: TableThunk, options: O): BelongsToDef & O;
+function belongsTo(target: TableThunk, options: BelongsToOptions = {}): BelongsToDef {
     return { ...options, brand: RELATION_BRAND, kind: "belongsTo", target };
 }
 
 /**
  * The relation builders. All five kinds; the target is a thunk, so two tables
- * can point at each other whatever order their modules load in.
+ * can point at each other whatever order their modules load in — and, being a
+ * {@link TableThunk}, without a type annotation on either side.
  *
  * ```ts
  * relations: {
@@ -168,25 +182,25 @@ export const rel = {
      */
     belongsTo,
     /** The target holds a unique foreign key pointing here. */
-    hasOne<T extends RelationTarget>(target: () => T, options: HasOptions = {}): HasOneDef<T> {
+    hasOne(target: TableThunk, options: HasOptions = {}): HasOneDef {
         return { ...options, brand: RELATION_BRAND, kind: "hasOne", target };
     },
     /** The target holds a foreign key pointing here. */
-    hasMany<T extends RelationTarget>(target: () => T, options: HasManyOptions = {}): HasManyDef<T> {
+    hasMany(target: TableThunk, options: HasManyOptions = {}): HasManyDef {
         return { ...options, brand: RELATION_BRAND, kind: "hasMany", target };
     },
     /**
      * Linked through a junction table, which is created with its own row-level
      * security. `pivot` columns are read and written as `_pivot`.
      */
-    manyToMany<T extends RelationTarget, P extends ColumnsShape = Record<never, never>>(
-        target: () => T,
+    manyToMany<P extends ColumnsShape = Record<never, never>>(
+        target: TableThunk,
         options: ManyToManyOptions<P> = {}
-    ): ManyToManyDef<T, P> {
+    ): ManyToManyDef<P> {
         return { ...options, brand: RELATION_BRAND, kind: "manyToMany", target };
     },
     /** A read-only traversal across several joins. */
-    via<T extends RelationTarget>(target: () => T, options: ViaOptions): ViaDef<T> {
+    via(target: TableThunk, options: ViaOptions): ViaDef {
         if (!options.steps || options.steps.length === 0) {
             throw new Error("`rel.via(target, { steps })` needs at least one join step.");
         }

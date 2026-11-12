@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import { ColumnBuilder, TABLE_BRAND, VIEW_BRAND, col, defineAuthTable, defineTable, defineView, policy, rel } from "@rebasepro/types";
-import type { AnyTableDef, AnyViewDef, ColumnDef, DefaultRls, RelationTarget } from "@rebasepro/types";
+import type { AnyTableDef, AnyViewDef, ColumnDef, DefaultRls } from "@rebasepro/types";
 
 import { compileTables, type AnySchemaDef } from "../../src/schema/compile-tables";
 import { SchemaDefinitionError, isSchemaDefinitionError, type SchemaDefinitionProblem } from "../../src/schema/errors";
@@ -323,15 +323,18 @@ describe("compileTables — refusals", () => {
     describe("relations", () => {
         it("refuses a target outside the list, a thunk that throws, and one that returns nothing", () => {
             const elsewhere = table("elsewhere");
-            const holder: { target: RelationTarget } = { target: elsewhere };
+            const holder: { target: unknown } = { target: elsewhere };
             Object.assign(holder, { target: undefined });
             const t = rawTable("t", {
                 columns: { id: id() },
                 relations: {
                     gone: rel.belongsTo(() => elsewhere),
-                    cycle: rel.hasMany((): RelationTarget => { throw new ReferenceError("x is not defined"); }),
-                    broken: rel.hasMany((): RelationTarget => { throw new Error("boom"); }),
-                    empty: rel.hasOne(() => holder.target)
+                    cycle: rel.hasMany(() => { throw new ReferenceError("x is not defined"); }),
+                    broken: rel.hasMany(() => { throw new Error("boom"); }),
+                    empty: rel.hasOne(() => holder.target),
+                    // The type system does not check what a thunk returns (a
+                    // `TableThunk` is `() => void`); the compiler does.
+                    notATable: rel.hasOne(() => ({ name: "elsewhere" }))
                 },
                 rls: "admin-only"
             });
@@ -339,7 +342,8 @@ describe("compileTables — refusals", () => {
                 { table: "t", key: "gone", message: expect.stringContaining("its target \"elsewhere\" is not one of the tables being compiled. Export it from backend/schema/index.ts") },
                 { table: "t", key: "cycle", message: expect.stringContaining("its target is not initialized yet — almost always an import cycle") },
                 { table: "t", key: "broken", message: "the relation its target thunk threw: boom" },
-                { table: "t", key: "empty", message: expect.stringContaining("its target resolved to `undefined`") }
+                { table: "t", key: "empty", message: expect.stringContaining("its target resolved to `undefined`") },
+                { table: "t", key: "notATable", message: expect.stringContaining("its target resolved to something that is not a table. The thunk must return the `defineTable` / `defineView` result itself") }
             ]);
         });
 

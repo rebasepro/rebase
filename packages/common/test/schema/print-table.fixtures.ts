@@ -9,7 +9,7 @@
  * so the descriptor round trip runs over it too.
  */
 import { col, defineAuthTable, defineTable, defineView, json, rel } from "@rebasepro/types";
-import type { DefaultRls, RelationTarget } from "@rebasepro/types";
+import type { DefaultRls } from "@rebasepro/types";
 
 export const DEFAULT_RLS: DefaultRls = [{ operation: "select", access: "public" }];
 
@@ -54,7 +54,7 @@ export const comments = defineTable("comments", {
         createdAt: col.timestamptz().notNull().onCreateNow()
     },
     relations: {
-        post: rel.belongsTo((): RelationTarget => posts, { localKey: "post_id", onDelete: "cascade" }),
+        post: rel.belongsTo(() => posts, { localKey: "post_id", onDelete: "cascade" }),
         postAuthor: rel.via(() => users, {
             steps: [
                 { table: "posts", on: { from: "post_id", to: "id" } },
@@ -222,9 +222,9 @@ export const accounts = defineTable("accounts", {
         deletedAt: col.timestamptz()
     },
     relations: {
-        profile: rel.hasOne((): RelationTarget => profiles, { foreignKey: "account_id" }),
-        parent: rel.belongsTo((): RelationTarget => accounts),
-        friends: rel.manyToMany((): RelationTarget => accounts, { through: "account_friends", sourceKey: "account_id", targetKey: "friend_id", onDelete: "cascade" }),
+        profile: rel.hasOne(() => profiles, { foreignKey: "account_id" }),
+        parent: rel.belongsTo(() => accounts),
+        friends: rel.manyToMany(() => accounts, { through: "account_friends", sourceKey: "account_id", targetKey: "friend_id", onDelete: "cascade" }),
         tags: rel.manyToMany(() => tags)
     },
     rls: [{ operation: "select", ownerField: "id" }],
