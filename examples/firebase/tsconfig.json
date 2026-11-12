@@ -40,6 +40,9 @@
       ],
       "@rebasepro/cms": [
         "../../packages/cms/src"
+      ],
+      "@rebasepro/cms-types": [
+        "../../packages/cms-types/src"
       ]
     }
   },
