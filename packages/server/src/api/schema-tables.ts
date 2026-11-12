@@ -44,14 +44,14 @@ import { logger } from "../utils/logger";
  * | a column or relation the caller fails `access.read` for | dropped (`access` itself is kept on what remains) |
  * | a `belongsTo`'s foreign-key column | its own rules when declared in `columns`; withheld with the relation when derived from it |
  * | a relation whose target table the caller is not served | dropped |
- * | a table | a person: every one; a credential (API key, token): the tables its `data:*` scopes name, or all with `schema:read`; an anonymous caller (public opt-in): those with a public `select` rule |
- * | structured `rls.rules` | everyone served the table |
+ * | a table | administrators and `schema:read` holders: every one; any other person (`schemaTables.persons: "granted"`, the default): those some rule could grant their roles something on (see {@link tableReachable}), every one with `persons: "all"`; a credential (API key, token): the tables its `data:*` scopes name, or all with `schema:read`; an anonymous caller (public opt-in): those with a public `select` rule |
+ * | structured `rls.rules` | everyone served the table; a non-privileged person under `"granted"` only the rules that can apply to their roles (see {@link ruleAppliesTo}), the rest dropped |
  * | raw SQL in a rule (`using`, `withCheck`, a `policy.raw` node) | administrators and `schema:read` holders; everyone else gets a {@link RedactedSecurityRule} |
  * | `rls.policies`, `rls.junctions` (compiled policies) | administrators and `schema:read` holders |
  * | `view.query`, `indexes` | administrators and `schema:read` holders |
  * | `auth.roles`, `auth.scopes` (labels) | administrators, `schema:read` and `users:read` holders |
- * | `hooks` | everyone served the table (presence flags; code never leaves the server) |
- * | `metadata` | everyone served the table: it is public to authenticated callers by definition |
+ * | `hooks`, column `transforms`, `auth.hooks` | everyone served the table but a non-privileged person under `"granted"` and an anonymous caller (presence flags; code never leaves the server, and the panel reads none of them) |
+ * | `metadata`, `softDelete`, `tenant`, `history`, `search` | everyone served the table: the panel renders and gates from them (`metadata` is public to the callers served the table by definition) |
  *
  * @module
  */
@@ -62,7 +62,9 @@ import { logger } from "../utils/logger";
  * - `anonymous` — nobody signed in; served only when the backend opts in
  *   (`schemaTables: { public: true }`).
  * - `person` — a signed-in user, or the service key: holds what their roles
- *   hold, and sees every table (row-level security decides rows, not this).
+ *   hold. With `schema:read` (administrators) every table; otherwise the
+ *   tables some rule could grant their roles something on, or every table
+ *   when the backend says `schemaTables: { persons: "all" }`.
  * - `credential` — an API key, an MCP or platform token: holds exactly the
  *   scopes it was granted, and sees only the tables they name.
  *
@@ -89,8 +91,34 @@ export interface SchemaView {
     accountLabels: boolean;
     /** The roles columns and relations are judged against. */
     viewer: FieldViewer;
-    /** Which tables. */
-    tables: { kind: "all" } | { kind: "only"; slugs: readonly string[] } | { kind: "public" };
+    /**
+     * Which tables. `granted`: those some rule could grant the viewer's roles
+     * something on ({@link tableReachable}), with only the rules that can
+     * apply to them ({@link ruleAppliesTo}).
+     */
+    tables: { kind: "all" } | { kind: "only"; slugs: readonly string[] } | { kind: "public" } | { kind: "granted" };
+}
+
+/**
+ * What a signed-in person without `schema:read` is described:
+ *
+ * - `"granted"` (the default) — the tables some rule could grant their roles
+ *   something on, each with only the rules that can apply to them;
+ * - `"all"` — every table, with every rule (raw SQL still redacted): what
+ *   every signed-in caller was served before this option existed.
+ *
+ * @group Schema
+ */
+export type SchemaTablesPersons = "granted" | "all";
+
+/**
+ * Options of {@link schemaViewFor}.
+ *
+ * @group Schema
+ */
+export interface SchemaViewOptions {
+    /** `schemaTables.persons` — see {@link SchemaTablesPersons}. Default `"granted"`. */
+    persons?: SchemaTablesPersons;
 }
 
 /**
@@ -110,7 +138,7 @@ const DATA_SCOPES = ["data:read", "data:write", "data:delete"] as const;
  *
  * @group Schema
  */
-export function schemaViewFor(caller: SchemaCaller): SchemaView | SchemaRefusal {
+export function schemaViewFor(caller: SchemaCaller, options: SchemaViewOptions = {}): SchemaView | SchemaRefusal {
     if (caller.kind === "anonymous") {
         return { privileged: false, accountLabels: false, viewer: { roles: [] }, tables: { kind: "public" } };
     }
@@ -118,8 +146,9 @@ export function schemaViewFor(caller: SchemaCaller): SchemaView | SchemaRefusal 
     const privileged = scopeGrants(scopes, "schema:read");
     const accountLabels = privileged || scopeGrants(scopes, "users:read");
     const viewer: FieldViewer = { roles: [...caller.roles] };
-    if (caller.kind === "person" || privileged) {
-        return { privileged, accountLabels, viewer, tables: { kind: "all" } };
+    if (privileged) return { privileged, accountLabels, viewer, tables: { kind: "all" } };
+    if (caller.kind === "person") {
+        return { privileged, accountLabels, viewer, tables: { kind: options.persons === "all" ? "all" : "granted" } };
     }
     if (!DATA_SCOPES.some(scope => scopeGrantsAny(scopes, scope))) {
         return {
@@ -322,6 +351,58 @@ export function hasPublicSelectRule(table: TableDescriptor): boolean {
         && appliesTo(rule, "select"));
 }
 
+/**
+ * Whether a caller holding `roles` holds one of a rule's (or a view's)
+ * `roles`: always when it names none, and when it names `"public"`, which the
+ * policy compiler and the client evaluator both read as everyone.
+ */
+function holdsOneOf(named: readonly string[] | undefined, roles: readonly string[]): boolean {
+    if (!named || named.length === 0) return true;
+    return named.some(role => role === "public" || roles.includes(role));
+}
+
+/**
+ * Whether a rule can apply to a caller holding `roles`: a rule with no
+ * `roles` applies to everyone (public, authenticated, registered, owner,
+ * condition and raw SQL rules alike — what they admit is decided per row),
+ * one with `roles` to the holders of one of them. Restrictive rules count
+ * too: they narrow what the caller is granted, and the panel gates by them.
+ *
+ * @group Schema
+ */
+export function ruleAppliesTo(rule: SecurityRule, roles: readonly string[]): boolean {
+    return holdsOneOf(rule.roles, roles);
+}
+
+/**
+ * Whether some rule could grant a caller holding `roles` something on a
+ * table — what a person without `schema:read` is described under
+ * `schemaTables.persons: "granted"`:
+ *
+ * - a table with a permissive rule that applies to them ({@link ruleAppliesTo});
+ * - the auth table: every account reads its own row (the injected self-read);
+ * - a table under the admin baseline (`"admin-only"`, or rules with
+ *   `defaultPolicies`), for a caller holding `admin`;
+ * - a materialized view, for a holder of one of its `view.roles`
+ *   (`["admin"]` when it names none);
+ * - a plain view: never. It has no rules of its own — it runs as the caller
+ *   over the tables its SQL reads, which the descriptor does not list — so
+ *   the conservative answer is that it reaches nobody here; `persons: "all"`
+ *   or `schema:read` describes it.
+ *
+ * @group Schema
+ */
+export function tableReachable(table: TableDescriptor, roles: readonly string[]): boolean {
+    if (table.kind === "view" || table.rls.posture === "view") {
+        const viewRoles = table.view?.roles ?? ["admin"];
+        return table.view?.materialized === true && viewRoles.length > 0 && holdsOneOf(viewRoles, roles);
+    }
+    if (table.auth) return true;
+    if (roles.includes("admin") && (table.rls.posture === "admin-only" || table.rls.defaultPolicies)) return true;
+    if (table.rls.posture !== "rules") return false;
+    return table.rls.rules.some(rule => (rule.mode ?? "permissive") === "permissive" && ruleAppliesTo(rule, roles));
+}
+
 function tableServed(table: TableDescriptor, view: SchemaView): boolean {
     switch (view.tables.kind) {
         case "all":
@@ -330,7 +411,24 @@ function tableServed(table: TableDescriptor, view: SchemaView): boolean {
             return view.tables.slugs.includes(table.slug);
         case "public":
             return hasPublicSelectRule(table);
+        case "granted":
+            return tableReachable(table, view.viewer.roles ?? []);
     }
+}
+
+/**
+ * The slugs of the tables a view is served — what `/api/admin/ui-config`
+ * accepts a caller's preferences for.
+ *
+ * @group Schema
+ */
+export function servedTableSlugs(tables: readonly TableDescriptor[], view: SchemaView): Set<string> {
+    return new Set(tables.filter(table => tableServed(table, view)).map(table => table.slug));
+}
+
+/** Whether a view withholds hook presence flags: the least-privileged views, which the panel serves. */
+function withholdsHookFlags(view: SchemaView): boolean {
+    return !view.privileged && (view.tables.kind === "granted" || view.tables.kind === "public");
 }
 
 function columnServed(column: ColumnDescriptor, viewer: FieldViewer): boolean {
@@ -349,7 +447,11 @@ function servedRelation(relation: RelationDescriptor, view: SchemaView, served: 
 
 function servedRls(rls: RlsDescriptor, view: SchemaView, policies: TablePolicies | undefined): RlsDescriptor {
     const { policies: _policies, junctions: _junctions, ...base } = rls;
-    if (!view.privileged) return { ...base, rules: rls.rules.map(redactRule) };
+    if (!view.privileged) {
+        const roles = view.viewer.roles ?? [];
+        const rules = view.tables.kind === "granted" ? rls.rules.filter(rule => ruleAppliesTo(rule, roles)) : rls.rules;
+        return { ...base, rules: rules.map(redactRule) };
+    }
     return policies ? { ...base, policies: policies.policies, junctions: policies.junctions } : base;
 }
 
@@ -369,13 +471,19 @@ function serializeTable(
         .filter(relation => relation.kind === "belongsTo"
             && (relation.private === true || !canReadWithAccess(relation.access, view.viewer)))
         .map(relation => relation.kind === "belongsTo" ? relation.localField : ""));
+    const hookFlags = !withholdsHookFlags(view);
     const columns = table.columns
         .filter(column => columnServed(column, view.viewer))
         .filter(column => !(column.derived === true && withheldKeys.has(column.key)))
         .map(column => {
+            let served = column;
+            if (!hookFlags && served.transforms !== undefined) {
+                const { transforms: _transforms, ...rest } = served;
+                served = rest;
+            }
             // A dropped relation is not named by the column that held its key.
-            if (column.foreignKeyOf === undefined || relationNames.has(column.foreignKeyOf)) return column;
-            const { foreignKeyOf: _relation, ...rest } = column;
+            if (served.foreignKeyOf === undefined || relationNames.has(served.foreignKeyOf)) return served;
+            const { foreignKeyOf: _relation, ...rest } = served;
             return rest;
         });
     const columnKeys = new Set(columns.map(column => column.key));
@@ -388,6 +496,7 @@ function serializeTable(
         view: viewDefinition,
         auth,
         search,
+        hooks,
         ...rest
     } = table;
 
@@ -396,9 +505,13 @@ function serializeTable(
         return columnKeys.has(path.split(".")[0] ?? path);
     });
     let servedAuth = auth;
-    if (auth && !view.accountLabels) {
-        const { roles: _roles, scopes: _scopes, ...unlabelled } = auth;
+    if (servedAuth && !view.accountLabels) {
+        const { roles: _roles, scopes: _scopes, ...unlabelled } = servedAuth;
         servedAuth = unlabelled;
+    }
+    if (servedAuth && !hookFlags && servedAuth.hooks !== undefined) {
+        const { hooks: _authHooks, ...withoutHooks } = servedAuth;
+        servedAuth = withoutHooks;
     }
     let servedView = viewDefinition;
     if (viewDefinition && !view.privileged) {
@@ -414,7 +527,8 @@ function serializeTable(
         ...(search && searchFields && searchFields.length > 0 ? { search: { ...search, fields: searchFields } } : {}),
         ...(indexes && view.privileged ? { indexes } : {}),
         ...(servedView ? { view: servedView } : {}),
-        ...(servedAuth ? { auth: servedAuth } : {})
+        ...(servedAuth ? { auth: servedAuth } : {}),
+        ...(hooks && hookFlags ? { hooks } : {})
     };
 }
 

@@ -1,12 +1,12 @@
 import { describe, expect, it } from "@jest/globals";
 import { Hono, type MiddlewareHandler } from "hono";
-import { col, defineTable, policy, rel, type TableDescriptor } from "@rebasepro/types";
+import { col, defineTable, defineView, policy, rel, type TableDescriptor } from "@rebasepro/types";
 import { compileSchemaDefs } from "../src/schema/load-schema";
 import { TableRegistry } from "../src/schema/table-registry";
 import { errorHandler } from "../src/api/errors";
 import type { HonoEnv } from "../src/api/types";
 import { createSchemaTablesRoutes, createSchemaTablesService } from "../src/api/schema-tables-routes";
-import { redactRule, schemaViewFor, serializeTables } from "../src/api/schema-tables";
+import { redactRule, ruleAppliesTo, schemaViewFor, schemaViewKey, serializeTables, tableReachable } from "../src/api/schema-tables";
 
 /**
  * The serializer on its own — the MCP caller class, which reaches it in
@@ -48,6 +48,64 @@ describe("the MCP caller class (a credential holding scopes)", () => {
     it("with only storage or function scopes is refused", () => {
         expect(schemaViewFor({ kind: "credential", roles: [], scopes: ["storage:read", "functions:invoke"] }))
             .toMatchObject({ refused: "scope" });
+    });
+});
+
+describe("a person without schema:read (schemaTables.persons, security review S-3)", () => {
+    const id = () => col.uuid().primaryKey().defaultRandom();
+    const reach = (rls: Parameters<typeof defineTable>[1]["rls"], roles: string[]): boolean => {
+        const [table] = compileSchemaDefs([defineTable("t", { columns: { id: id(), owner: col.text() }, rls })]).descriptors;
+        return tableReachable(table, roles);
+    };
+
+    it("is reached by a permissive rule with no roles, whatever it tests per row", () => {
+        expect(reach([{ operation: "select", ownerField: "owner" }], [])).toBe(true);
+        expect(reach([{ operation: "insert", access: "registered" }], [])).toBe(true);
+        expect(reach([{ operation: "select", using: "false" }], [])).toBe(true);
+    });
+
+    it("is reached by a rule naming one of the caller's roles, or naming `public`", () => {
+        expect(reach([{ operation: "select", roles: ["editor"] }], ["editor"])).toBe(true);
+        expect(reach([{ operation: "select", roles: ["editor"] }], ["viewer"])).toBe(false);
+        expect(reach([{ operation: "select", roles: ["public"] }], [])).toBe(true);
+    });
+
+    it("is not reached by a restrictive rule alone, nor by \"admin-only\" for a non-admin", () => {
+        expect(reach([{ operation: "select", mode: "restrictive", ownerField: "owner" }], [])).toBe(false);
+        expect(reach("admin-only", ["editor"])).toBe(false);
+        expect(reach("admin-only", ["admin"])).toBe(true);
+    });
+
+    it("withholds a plain view (no rules of its own) and gates a materialized one by its roles", () => {
+        const plain = defineView("plain", { query: "SELECT 1 AS id", columns: { id: col.integer().primaryKey() } });
+        const mat = defineView("mat", { query: "SELECT 1 AS id", materialized: true, roles: ["analyst"], columns: { id: col.integer().primaryKey() } });
+        const [plainTable, matTable] = compileSchemaDefs([plain, mat]).descriptors;
+        expect(tableReachable(plainTable, ["analyst"])).toBe(false);
+        expect(tableReachable(matTable, ["analyst"])).toBe(true);
+        expect(tableReachable(matTable, ["editor"])).toBe(false);
+    });
+
+    it("keeps a rule for everyone and a rule for one of the caller's roles, restrictive ones included", () => {
+        expect(ruleAppliesTo({ operation: "select", mode: "restrictive", roles: ["editor"], condition: policy.true() }, ["editor"])).toBe(true);
+        expect(ruleAppliesTo({ operation: "select", roles: ["editor"] }, [])).toBe(false);
+        expect(ruleAppliesTo({ operation: "select", access: "public" }, [])).toBe(true);
+    });
+
+    it("is a granted view keyed on the caller's roles, so the cache never serves one role another's body", () => {
+        const viewer = schemaViewFor({ kind: "person", roles: ["viewer"], scopes: [] });
+        const editor = schemaViewFor({ kind: "person", roles: ["editor"], scopes: [] });
+        if ("refused" in viewer || "refused" in editor) throw new Error("refused");
+        expect(viewer.tables).toEqual({ kind: "granted" });
+        expect(schemaViewKey(viewer)).not.toBe(schemaViewKey(editor));
+        const all = schemaViewFor({ kind: "person", roles: ["viewer"], scopes: [] }, { persons: "all" });
+        if ("refused" in all) throw new Error("refused");
+        expect(all.tables).toEqual({ kind: "all" });
+        expect(schemaViewKey(all)).not.toBe(schemaViewKey(viewer));
+    });
+
+    it("leaves a credential's view as it was", () => {
+        expect(schemaViewFor({ kind: "credential", roles: [], scopes: ["data:read"] }, { persons: "granted" }))
+            .toMatchObject({ tables: { kind: "all" } });
     });
 });
 

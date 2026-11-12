@@ -15,6 +15,7 @@ import {
     schemaViewKey,
     serializeTables,
     type SchemaCaller,
+    type SchemaTablesPersons,
     type SchemaView,
     type TablePolicies
 } from "./schema-tables";
@@ -29,7 +30,10 @@ import {
  *
  * - `200` — a JSON array of `TableDescriptor` (one descriptor for `/:slug`),
  *   with `ETag: W/"<schemaVersion>-<view key>"`, `Cache-Control: private,
- *   no-cache` and the schema-version header.
+ *   no-cache` and the schema-version header. A signed-in person without
+ *   `schema:read` is described only the tables their roles can reach, with
+ *   only the rules that can apply to them, unless the backend says
+ *   `schemaTables: { persons: "all" }`; the view key carries their roles.
  * - `304` — `If-None-Match` named the current tag.
  * - `401` — nobody is signed in (and the backend did not opt into
  *   `schemaTables: { public: true }`), or the credential sent is invalid.
@@ -149,6 +153,12 @@ export interface SchemaTablesRoutesConfig {
     authenticate: MiddlewareHandler<HonoEnv>[];
     /** `schemaTables.public`: serve anonymous callers the tables with a public `select` rule. */
     publicTables?: boolean;
+    /**
+     * `schemaTables.persons`: what a signed-in person without `schema:read` is
+     * described — the tables their roles can reach (`"granted"`, the default)
+     * or every table (`"all"`). See {@link SchemaTablesPersons}.
+     */
+    persons?: SchemaTablesPersons;
 }
 
 /** The roles on the request's caller. */
@@ -205,7 +215,7 @@ export function createSchemaTablesRoutes(config: SchemaTablesRoutesConfig): Hono
         if (caller.kind === "anonymous" && !config.publicTables) {
             throw ApiError.unauthenticated("Authentication required: the tables are described to signed-in callers and credentials only.");
         }
-        const view = schemaViewFor(caller);
+        const view = schemaViewFor(caller, { persons: config.persons ?? "granted" });
         if ("refused" in view) throw new ApiError(403, "SCOPE_MISSING", view.message, { requiredScope: "schema:read" });
         return view;
     };

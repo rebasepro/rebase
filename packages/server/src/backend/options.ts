@@ -379,6 +379,25 @@ export interface SchemaTablesOptions {
      * anyone signs in. Off by default; logged at boot when on.
      */
     public?: boolean;
+    /**
+     * What a signed-in person without `schema:read` (anyone but an
+     * administrator, guests included) is described:
+     *
+     * - `"granted"` (default) — the tables some rule could grant their roles
+     *   something on: a permissive rule with no `roles` (public,
+     *   authenticated, registered, owner, condition or raw SQL — rows are
+     *   decided per row) or naming one of theirs; the auth table (every
+     *   account reads its own row); a materialized view whose `roles` they
+     *   hold. Within a table, only the rules that can apply to their roles;
+     *   relations to tables they are not described are dropped; hook presence
+     *   flags are withheld. A plain view is not described (it has no rules of
+     *   its own to decide by).
+     * - `"all"` — every table with every rule (raw SQL still redacted), as
+     *   every signed-in caller was described before this option existed.
+     *
+     * Administrators, `schema:read` holders and credentials are unaffected.
+     */
+    persons?: "granted" | "all";
 }
 
 /**

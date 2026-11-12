@@ -21,7 +21,9 @@ const authors = defineTable("authors", {
         email: col.text().notNull().unique(),
         salary: col.integer().access({ read: ["hr"] })
     },
-    rls: "admin-only"
+    // Readable by any signed-in caller, so the editor below is described it
+    // (a table no rule grants a person's roles is not described to them).
+    rls: [{ operation: "select", access: "authenticated" }]
 });
 const tags = defineTable("tags", {
     columns: { id: col.serial().primaryKey(), label: col.varchar(40).notNull() },

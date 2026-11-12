@@ -3899,6 +3899,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             service: schemaTables,
             available: adminSurfacesGated,
             publicTables,
+            persons: config.schemaTables?.persons ?? "granted",
             authenticate: [
                 provideServices,
                 ...(apiKeyPreAuth ? [apiKeyPreAuth] : []),

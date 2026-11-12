@@ -256,10 +256,27 @@ describe("who may ask", () => {
 // ── What each caller class is served ─────────────────────────────────────────
 
 describe("a signed-in user with no role", () => {
-    it("sees every table, row-level security deciding rows", async () => {
+    /**
+     * Security review S-3: every signed-in caller, guests included, used to be
+     * described every table — admin-only ones, their rules and role names.
+     * Now only what a rule could grant their roles: `authors` (a select rule
+     * for any signed-in caller), `posts` (a public select rule) and the auth
+     * table (every account reads its own row). Not `tags` ("admin-only") nor
+     * `post_stats` (a materialized view for editors).
+     */
+    it("sees only the tables some rule could grant their roles something on", async () => {
         const app = await boot();
         const tables = await tablesFor(app, bearer(await person([])));
+        expect(tables.map(table => table.slug)).toEqual(["users", "authors", "posts"]);
+        expect((await app.request("/api/schema/tables/tags", bearer(await person([])))).status).toBe(404);
+        expect((await app.request("/api/schema/tables/post_stats", bearer(await person([])))).status).toBe(404);
+    });
+
+    it("sees every table with `schemaTables: { persons: \"all\" }`", async () => {
+        const app = await boot({ schemaTables: { persons: "all" } });
+        const tables = await tablesFor(app, bearer(await person([])));
         expect(tables.map(table => table.slug)).toEqual(["users", "authors", "tags", "posts", "post_stats"]);
+        expect(bySlug(tables, "posts").rls.rules).toHaveLength(4);
     });
 
     it("is not served private columns, nor columns or relations whose access.read it fails", async () => {
@@ -268,7 +285,8 @@ describe("a signed-in user with no role", () => {
         expect(keys(bySlug(tables, "authors"))).toEqual(["id", "name"]);
         const postsTable = bySlug(tables, "posts");
         expect(keys(postsTable)).not.toContain("internalNote");
-        expect(relationNames(postsTable)).toEqual(["author", "tags"]);
+        // `tags` is not described to this caller, so neither is the relation into it.
+        expect(relationNames(postsTable)).toEqual(["author"]);
         // A belongsTo's key column follows its own rules; it no longer names
         // the relation it is withheld with.
         const reviewerId = postsTable.columns.find(column => column.key === "reviewerId");
@@ -277,25 +295,24 @@ describe("a signed-in user with no role", () => {
         expect(JSON.stringify(postsTable)).not.toContain("ghostwriter");
     });
 
-    it("keeps structured rules, and gets the redacted marker for every rule carrying SQL", async () => {
+    it("keeps the structured rules that can apply to them, drops the others, and redacts SQL", async () => {
         const app = await boot();
         const postsTable = bySlug(await tablesFor(app, bearer(await person([]))), "posts");
+        // The two rules for `editor` cannot apply to this caller: dropped, not redacted in place.
         expect(postsTable.rls.rules).toEqual([
             { operation: "select", access: "public", condition: { status: "published" } },
-            { operations: ["select", "insert", "update"], roles: ["editor"] },
-            { operation: "delete", roles: ["editor"], redacted: true },
             { operation: "update", redacted: true }
         ]);
+        expect(JSON.stringify(postsTable.rls)).not.toContain("editor");
         expect(postsTable.rls.policies).toBeUndefined();
         expect(postsTable.rls.junctions).toBeUndefined();
         expect(JSON.stringify(postsTable)).not.toContain("rebase.uid()");
     });
 
-    it("is served hooks as flags, no view query, no indexes, and no auth labels", async () => {
+    it("is served no hook flags, no indexes, and no auth labels", async () => {
         const app = await boot();
         const tables = await tablesFor(app, bearer(await person([])));
-        expect(bySlug(tables, "posts").hooks).toEqual({ beforeSave: true });
-        expect(bySlug(tables, "post_stats").view).toEqual({ materialized: true, roles: ["editor"] });
+        expect(bySlug(tables, "posts").hooks).toBeUndefined();
         const usersTable = bySlug(tables, "users");
         expect(usersTable.auth).toBeDefined();
         expect(usersTable.auth?.roles).toBeUndefined();
@@ -304,11 +321,24 @@ describe("a signed-in user with no role", () => {
 });
 
 describe("a signed-in user holding the role access.read names", () => {
+    it("is described what the editor role reaches: its materialized view and its rules, not the admin-only table", async () => {
+        const app = await boot();
+        const tables = await tablesFor(app, bearer(await person(["editor"])));
+        expect(tables.map(table => table.slug)).toEqual(["users", "authors", "posts", "post_stats"]);
+        expect(bySlug(tables, "post_stats").view).toEqual({ materialized: true, roles: ["editor"] });
+        expect(bySlug(tables, "posts").rls.rules).toEqual([
+            { operation: "select", access: "public", condition: { status: "published" } },
+            { operations: ["select", "insert", "update"], roles: ["editor"] },
+            { operation: "delete", roles: ["editor"], redacted: true },
+            { operation: "update", redacted: true }
+        ]);
+    });
+
     it("is served the column and the relation", async () => {
         const app = await boot();
         const postsTable = bySlug(await tablesFor(app, bearer(await person(["editor"]))), "posts");
         expect(keys(postsTable)).toContain("internalNote");
-        expect(relationNames(postsTable)).toEqual(["author", "reviewer", "tags"]);
+        expect(relationNames(postsTable)).toEqual(["author", "reviewer"]);
         expect(postsTable.columns.find(column => column.key === "reviewerId")?.foreignKeyOf).toBe("reviewer");
         // Access is kept on what is served: the panel disables inputs from `write`.
         expect(postsTable.columns.find(column => column.key === "internalNote")?.access)
@@ -422,7 +452,7 @@ describe("schemaTables: { public: true }", () => {
 
     it("leaves signed-in callers exactly as they were", async () => {
         const app = await boot({ schemaTables: { public: true } });
-        expect(await tablesFor(app, bearer(await person([])))).toHaveLength(5);
+        expect(await tablesFor(app, bearer(await person([])))).toHaveLength(3);
     });
 });
 
@@ -572,7 +602,7 @@ describe("client.schema.tables() against the real route", () => {
         const client = createRebaseClient({ baseUrl: "http://backend.test", token: await person(["editor"]), fetch: fetchThroughApp });
 
         const first = await client.schema.tables();
-        expect(first.map(table => table.slug)).toEqual(["users", "authors", "tags", "posts", "post_stats"]);
+        expect(first.map(table => table.slug)).toEqual(["users", "authors", "posts", "post_stats"]);
         const second = await client.schema.tables();
         expect(second).toEqual(first);
         expect(requests.map(response => response.status)).toEqual([200, 304]);
