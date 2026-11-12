@@ -177,7 +177,7 @@ function RebaseRouteContent() {
             ? resolveCollectionOpenMode({
                 collection,
                 search: location.search,
-                savedViewMode: userConfigPersistence?.getCollectionConfig(collection.slug)?.defaultViewMode as ViewMode | undefined,
+                savedViewMode: userConfigPersistence?.getTablePreferences(collection.slug).defaultViewMode,
                 registeredViews: customizationController.collectionViews
             })
             : undefined;
@@ -382,7 +382,7 @@ function EntityFullScreenRoute({
         resolveCollectionOpenMode({
             collection,
             search: location.search,
-            savedViewMode: userConfigPersistence?.getCollectionConfig(collection.slug)?.defaultViewMode as ViewMode | undefined,
+            savedViewMode: userConfigPersistence?.getTablePreferences(collection.slug).defaultViewMode,
             registeredViews: customizationController.collectionViews
         }) === "split";
 

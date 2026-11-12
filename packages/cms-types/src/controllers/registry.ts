@@ -49,6 +49,24 @@ export interface RebaseCMSConfig {
     tableCustomizations?: readonly TableCustomization[];
 
     /**
+     * The workspace's UI preferences as the collection editor wrote them in
+     * development: the contents of `frontend/src/cms/ui-config.json`, as
+     * `{ tables: { <slug>: <preferences> } }`. Folded in after
+     * `tableCustomizations` and before the preferences stored on the server
+     * (the workspace's, then the signed-in user's).
+     *
+     * Read as data and validated: an entry that is not a table preference
+     * (`UiTablePreferences`) is skipped with a warning in development.
+     *
+     * @example
+     * ```tsx
+     * import uiConfig from "./cms/ui-config.json";
+     * <RebaseCMS tableCustomizations={customizations} uiConfig={uiConfig}/>
+     * ```
+     */
+    uiConfig?: { tables?: { [slug: string]: object } };
+
+    /**
      * Collections whose rows live outside the Rebase backend — Firestore's,
      * from `defineFirestoreCollection` — shown beside the tables in the same
      * navigation, search and reference picker. Each is read through the data

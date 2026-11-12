@@ -31,6 +31,7 @@ import type { RebaseCMSConfig } from "@rebasepro/cms-types";
  */
 export function RebaseCMS({
     tableCustomizations,
+    uiConfig,
     externalCollections,
     tables,
     views,
@@ -52,6 +53,7 @@ export function RebaseCMS({
     useLayoutEffect(() => {
         dispatch.registerAdmin({
             tableCustomizations,
+            uiConfig,
             externalCollections,
             tables,
             views,
@@ -64,7 +66,7 @@ export function RebaseCMS({
             basePath
         });
         return () => dispatch.unregisterAdmin();
-    }, [dispatch, tableCustomizations, externalCollections, tables, views, homePage, entityViews, collectionViews, entityActions, collectionEditor, navigationGroupMappings, basePath]);
+    }, [dispatch, tableCustomizations, uiConfig, externalCollections, tables, views, homePage, entityViews, collectionViews, entityActions, collectionEditor, navigationGroupMappings, basePath]);
 
     return null;
 }

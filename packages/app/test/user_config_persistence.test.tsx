@@ -6,7 +6,7 @@
  *
  * `<Rebase>` published whatever `userConfigPersistence` prop it was handed, and
  * the apps the CLI scaffolds hand it none — so the context was `undefined`, the
- * views' `onCollectionModified` calls were guarded away, and every preference
+ * views' preference writes were guarded away, and every preference
  * was written nowhere. Dragging a column wider worked until the next render, at
  * which point the table rebuilt its columns from the unchanged collection and
  * the column snapped back.
@@ -20,7 +20,8 @@ import React from "react";
 import { act, render } from "@testing-library/react";
 import { Rebase } from "../src/core/Rebase";
 import { useUserConfigurationPersistence } from "../src/hooks/useUserConfigurationPersistence";
-import type { PartialCollectionConfig, UserConfigurationPersistence } from "@rebasepro/cms-types";
+import type { UserConfigurationPersistence } from "@rebasepro/cms-types";
+import type { UiTablePreferences } from "@rebasepro/types";
 import { fakeAuthController, fakeClient, fakeStorageSource, fakeUser } from "./helpers/fakes";
 
 const storageSource = fakeStorageSource();
@@ -37,15 +38,9 @@ const client = fakeClient({
     fetchStorageSources: () => new Promise<never>(() => undefined)
 });
 
-/**
- * A column-width override, as the table stores one: only the property's admin
- * block, under its key.
- */
-function columnWidth(key: string, width: number): PartialCollectionConfig {
-    // `PartialCollectionConfig` is `Partial<AdminCollection>`, whose `properties`
-    // must be whole properties, so the override the panel really stores has no
-    // typed form (its own `buildPropertyWidthOverwrite` asserts the same way).
-    return { properties: { [key]: { admin: { columnWidth: width } } } } as unknown as PartialCollectionConfig;
+/** A column-width preference, as the table stores one: the field's width, under its key. */
+function columnWidth(key: string, width: number): UiTablePreferences {
+    return { fields: { [key]: { columnWidth: width } } };
 }
 
 /** Collects the controller as the views below `<Rebase>` see it, render by render. */
@@ -79,16 +74,16 @@ describe("user configuration persistence", () => {
         const persistence = seen.at(-1);
         expect(persistence).toBeDefined();
 
-        act(() => persistence!.onCollectionModified("products", columnWidth("name", 337)));
+        act(() => persistence!.saveTablePreferences("products", columnWidth("name", 337)));
 
-        expect(JSON.parse(localStorage.getItem("collection_config::products")!))
-            .toEqual({ properties: { name: { admin: { columnWidth: 337 } } } });
+        expect(JSON.parse(localStorage.getItem("table_preferences::products")!))
+            .toEqual({ fields: { name: { columnWidth: 337 } } });
     });
 
     it("lets an app supply its own store instead", () => {
         const own: UserConfigurationPersistence = {
-            getCollectionConfig: () => ({}),
-            onCollectionModified: jest.fn(),
+            getTablePreferences: () => ({}),
+            saveTablePreferences: jest.fn(),
             recentlyVisitedPaths: [],
             setRecentlyVisitedPaths: jest.fn(),
             favouritePaths: [],
@@ -107,19 +102,20 @@ describe("user configuration persistence", () => {
         renderUnderRebase(seen);
         const persistence = seen.at(-1)!;
 
-        act(() => persistence.onCollectionModified("products", { defaultViewMode: "table" }));
+        act(() => persistence.saveTablePreferences("products", { defaultViewMode: "table" }));
         // A partial, as the type says. The view mode is nobody's business here
         // and must survive: writing the partial and merging afterwards read
         // back the value it had just overwritten, and lost it.
-        act(() => persistence.onCollectionModified("products", columnWidth("name", 337)));
+        act(() => persistence.saveTablePreferences("products", columnWidth("name", 337)));
+        act(() => persistence.saveTablePreferences("products", columnWidth("price", 120)));
 
-        expect(JSON.parse(localStorage.getItem("collection_config::products")!)).toEqual({
+        expect(JSON.parse(localStorage.getItem("table_preferences::products")!)).toEqual({
             defaultViewMode: "table",
-            properties: { name: { admin: { columnWidth: 337 } } }
+            fields: { name: { columnWidth: 337 }, price: { columnWidth: 120 } }
         });
-        expect(persistence.getCollectionConfig("products")).toEqual({
+        expect(persistence.getTablePreferences("products")).toEqual({
             defaultViewMode: "table",
-            properties: { name: { admin: { columnWidth: 337 } } }
+            fields: { name: { columnWidth: 337 }, price: { columnWidth: 120 } }
         });
     });
 
@@ -129,10 +125,17 @@ describe("user configuration persistence", () => {
 
         // After mount, so the store's own start-up reads are not what moves it.
         const before = seen.at(-1)!;
-        act(() => before.onCollectionModified("products", columnWidth("name", 337)));
+        act(() => before.saveTablePreferences("products", columnWidth("name", 337)));
 
         // The stored configs live in a ref, so identity is the only signal a
         // view merging them during render can act on.
         expect(seen.at(-1)).not.toBe(before);
+    });
+
+    it("ignores what an older panel stored, or anything that is not a preference", () => {
+        localStorage.setItem("table_preferences::products", JSON.stringify({ properties: { name: { admin: { columnWidth: 1 } } } }));
+        const seen: (UserConfigurationPersistence | undefined)[] = [];
+        renderUnderRebase(seen);
+        expect(seen.at(-1)!.getTablePreferences("products")).toEqual({});
     });
 });

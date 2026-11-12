@@ -1,47 +1,49 @@
 import { useCallback, useEffect, useRef, useState, useMemo } from "react";
-import { PartialCollectionConfig, UserConfigurationPersistence } from "@rebasepro/cms-types";
+import type { UserConfigurationPersistence } from "@rebasepro/cms-types";
+import type { UiTablePreferences } from "@rebasepro/types";
+import { isUiTablePreferences, mergeUiTablePreferences } from "@rebasepro/types";
 import { stripCollectionPath } from "@rebasepro/common";
-import { isArrayValue, isRecordValue, mergeDeep, readStoredJson, writeStoredJson } from "@rebasepro/utils";
+import { isArrayValue, readStoredJson, writeStoredJson } from "@rebasepro/utils";
 
+/** The key a table's preferences are stored under in this browser. */
+const storageKeyOf = (slug: string): string => `table_preferences::${stripCollectionPath(slug)}`;
+
+/**
+ * The user's table preferences, kept in this browser.
+ *
+ * What the panel uses when nobody is signed in, or when the server stores no
+ * preferences (its driver cannot run SQL): the views' column widths, order,
+ * view mode and board column, as {@link UiTablePreferences} deltas. A stored
+ * value that is not a valid preference — written by an older panel — is
+ * ignored, so no view renders from it.
+ *
+ * @group Hooks and utilities
+ */
 export function useBuildLocalConfigurationPersistence(): UserConfigurationPersistence {
 
-    const configCache = useRef<Record<string, PartialCollectionConfig>>({});
+    const cache = useRef<Record<string, UiTablePreferences>>({});
 
-    // Read during render by every collection view, so an unreadable value here
-    // used to throw the view away rather than fall back to an unconfigured one.
-    const getCollectionFromStorage = useCallback(<M extends Record<string, any>>(storageKey: string): PartialCollectionConfig<M> => {
-        return readStoredJson<PartialCollectionConfig<M>>(storageKey, { fallback: {}, accept: isRecordValue });
-    }, []);
-
-    const getCollectionConfig = useCallback(<M extends Record<string, any>>(path: string): PartialCollectionConfig<M> => {
-        const storageKey = `collection_config::${stripCollectionPath(path)}`;
-        if (configCache.current[storageKey]) {
-            return configCache.current[storageKey] as PartialCollectionConfig<M>;
-        }
-        return getCollectionFromStorage(storageKey);
-    }, [getCollectionFromStorage]);
-
-    // Bumped on every write. The collection views merge this store into their
+    // Bumped on every write. The views fold these preferences into their
     // collection while rendering, so a write that is only a ref mutation is
     // invisible to them: the new column width reaches storage, the table keeps
-    // rendering the old one, and the next re-render — a row arriving, a
-    // selection, a filter — rebuilds the columns from the stale config and
-    // snaps the column back. Making a write a state change is what lets the
-    // views re-read it.
-    const [configVersion, setConfigVersion] = useState(0);
+    // rendering the old one, and the next re-render snaps the column back.
+    // Making a write a state change is what lets the views re-read it.
+    const [version, setVersion] = useState(0);
 
-    const onCollectionModified = useCallback(<M extends Record<string, any>>(path: string, data: PartialCollectionConfig<M>) => {
-        const storageKey = `collection_config::${stripCollectionPath(path)}`;
-        // Read before writing. `data` is a partial by type and by this
-        // interface's contract, so what is already stored is the other half of
-        // the result — writing `data` first and merging afterwards read back
-        // the value that had just been overwritten, and every key the caller
-        // left out was dropped.
-        const merged = mergeDeep(configCache.current[storageKey] ?? getCollectionFromStorage(storageKey), data);
-        configCache.current[storageKey] = merged;
-        writeStoredJson(storageKey, merged);
-        setConfigVersion(version => version + 1);
-    }, [getCollectionFromStorage]);
+    const getTablePreferences = useCallback((slug: string): UiTablePreferences => {
+        const key = storageKeyOf(slug);
+        const cached = cache.current[key];
+        if (cached) return cached;
+        return readStoredJson<UiTablePreferences>(key, { fallback: {}, accept: isUiTablePreferences });
+    }, []);
+
+    const saveTablePreferences = useCallback((slug: string, delta: UiTablePreferences) => {
+        const key = storageKeyOf(slug);
+        const merged = mergeUiTablePreferences(getTablePreferences(slug), delta);
+        cache.current[key] = merged;
+        writeStoredJson(key, merged);
+        setVersion(v => v + 1);
+    }, [getTablePreferences]);
 
     const [recentlyVisitedPaths, _setRecentlyVisitedPaths] = useState<string[]>([]);
     const [favouritePaths, _setFavouritePaths] = useState<string[]>([]);
@@ -70,24 +72,22 @@ export function useBuildLocalConfigurationPersistence(): UserConfigurationPersis
     }, []);
 
     return useMemo(() => ({
-        onCollectionModified,
-        getCollectionConfig,
+        getTablePreferences,
+        saveTablePreferences,
         recentlyVisitedPaths,
         setRecentlyVisitedPaths,
         favouritePaths,
         setFavouritePaths,
         collapsedGroups,
         setCollapsedGroups
-        // eslint-disable-next-line react-hooks/exhaustive-deps -- `configVersion`
-        // is deliberate and the rule cannot see why: it contributes nothing to
-        // the value and everything to its IDENTITY. The stored configs live in a
-        // ref, so nothing else in this array changes when they do, and this is
-        // the only thing telling the views that read them during render that
-        // they have. Removing it as "unnecessary" is what would break it.
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- `version`
+        // contributes nothing to the value and everything to its IDENTITY: the
+        // stored preferences live in a ref, and this is the only thing telling
+        // the views that read them during render that they changed.
     }), [
-        configVersion,
-        onCollectionModified,
-        getCollectionConfig,
+        version,
+        getTablePreferences,
+        saveTablePreferences,
         recentlyVisitedPaths,
         setRecentlyVisitedPaths,
         favouritePaths,

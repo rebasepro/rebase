@@ -5,11 +5,12 @@ import {
     CollectionSize,
     EntitySelection,
     TableController,
-    PartialCollectionConfig,
     SelectionQuery,
     ViewMode
 } from "@rebasepro/cms-types";
 import { serializeSelectionQuery } from "../../selection";
+import type { UiFieldPreferences, UiTablePreferences } from "@rebasepro/types";
+import { userPreferencesOverlay } from "../../hooks/navigation/user_preferences_overlay";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
 
@@ -162,7 +163,10 @@ export function useCollectionViewState<M extends Record<string, unknown>>({
 
     const collection = useMemo(() => {
         const registryCollection = collectionRegistry.getCollection(path) || stableCollectionProp;
-        const userOverride = userConfigPersistence?.getCollectionConfig<M>(path);
+        // The user's own preferences, the composition's last layer.
+        const userOverride = userConfigPersistence
+            ? userPreferencesOverlay(userConfigPersistence.getTablePreferences(path), new Set(Object.keys(registryCollection.properties ?? {})))
+            : undefined;
         const drawn = (userOverride ? mergeDeep(registryCollection, userOverride) : registryCollection) as AdminCollection<M>;
         return stableOverrides ? { ...drawn, ...stableOverrides } as AdminCollection<M> : drawn;
     }, [stableCollectionProp, path, userConfigPersistence, collectionRegistry, stableOverrides]);
@@ -262,7 +266,7 @@ export function useCollectionViewState<M extends Record<string, unknown>>({
     // toolbar above it. An unrecognised value reads as "nothing saved",
     // which falls through to the collection default.
     const getSavedView = useCallback((): ViewMode | null => {
-        const saved = userConfigPersistence?.getCollectionConfig<M>(path)?.defaultViewMode;
+        const saved = userConfigPersistence?.getTablePreferences(path).defaultViewMode;
         return isViewMode(saved, customViewKeys) ? saved : null;
     }, [userConfigPersistence, path, customViewKeys]);
 
@@ -578,12 +582,10 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
         collection
     });
 
-    const onCollectionModifiedForUser = useCallback((path: string, partialCollection: PartialCollectionConfig<M>) => {
-        if (userConfigPersistence) {
-            const currentStoredConfig = userConfigPersistence.getCollectionConfig(path);
-            const updatedConfig = mergeDeep(currentStoredConfig, partialCollection);
-            userConfigPersistence.onCollectionModified(path, updatedConfig);
-        }
+    // The user's preferences for this view, as a delta in `customizeTable`'s
+    // names: on the server for a signed-in user, in the browser otherwise.
+    const onCollectionModifiedForUser = useCallback((path: string, delta: UiTablePreferences) => {
+        userConfigPersistence?.saveTablePreferences(path, delta);
     }, [userConfigPersistence]);
 
     const onColumnResize = useCallback(({
@@ -594,8 +596,7 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
         const collection = collectionRef.current;
         // Only for property columns
         if (!getPropertyInPath(collection.properties, key)) return;
-        const localCollection = buildPropertyWidthOverwrite(key, width) as PartialCollectionConfig<M>;
-        onCollectionModifiedForUser(path, localCollection);
+        onCollectionModifiedForUser(path, { fields: columnWidthPreference(key, width) });
     }, [onCollectionModifiedForUser, path]);
 
     const onListSizeChanged = useCallback((size: CollectionSize) => {
@@ -621,7 +622,7 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
         setViewMode(mode);
         // Save to local persistence for next visit
         if (userConfigPersistence) {
-            onCollectionModifiedForUser(path, { defaultViewMode: mode } as PartialCollectionConfig<M>);
+            onCollectionModifiedForUser(path, { defaultViewMode: mode });
         }
     }, [setViewMode, userConfigPersistence, onCollectionModifiedForUser, path, analyticsController, viewMode]);
 
@@ -679,8 +680,7 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
 
     // Get saved kanban property from user config
     const getSavedKanbanProperty = useCallback((): string | undefined => {
-        const saved = userConfigPersistence?.getCollectionConfig<M>(path);
-        return (saved as Record<string, unknown>)?.kanbanColumnProperty as string | undefined;
+        return userConfigPersistence?.getTablePreferences(path).kanban?.columnField;
     }, [userConfigPersistence, path]);
 
     // Selected kanban property state - priority: saved config > collection default > first available
@@ -714,7 +714,7 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
         setSelectedKanbanProperty(property);
         // Save to local persistence
         if (userConfigPersistence) {
-            onCollectionModifiedForUser(path, { kanbanColumnProperty: property } as PartialCollectionConfig<M>);
+            onCollectionModifiedForUser(path, { kanban: { columnField: property } });
         }
     }, [userConfigPersistence, onCollectionModifiedForUser, path, analyticsController]);
 
@@ -1047,7 +1047,7 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
 
         // Save to user configuration persistence (local storage)
         if (userConfigPersistence) {
-            onCollectionModifiedForUser(path, { propertiesOrder: newPropertiesOrder } as PartialCollectionConfig<M>);
+            onCollectionModifiedForUser(path, { fieldOrder: [...newPropertiesOrder] });
         }
     }, [collection, setLocalPropertiesOrder, customizationController, path, parentCollectionSlugs, parentEntityIds, userConfigPersistence, onCollectionModifiedForUser]);
 
@@ -1183,10 +1183,8 @@ parentEntityIds,
 export type CollectionViewState<M extends Record<string, unknown> = Record<string, unknown>> =
     ReturnType<typeof useCollectionViewState<M>>;
 
-function buildPropertyWidthOverwrite(key: string, width: number): PartialCollectionConfig {
-    if (key.includes(".")) {
-        const [parentKey, ...childKey] = key.split(".");
-        return { properties: { [parentKey]: buildPropertyWidthOverwrite(childKey.join("."), width) } } as PartialCollectionConfig;
-    }
-    return { properties: { [key]: { admin: { columnWidth: width } } } } as PartialCollectionConfig;
+/** A column's width as a field preference; a nested column (`address.city`) nests under its document's `fields`. */
+function columnWidthPreference(key: string, width: number): Record<string, UiFieldPreferences> {
+    const [head, ...rest] = key.split(".");
+    return { [head]: rest.length > 0 ? { fields: columnWidthPreference(rest.join("."), width) } : { columnWidth: width } };
 }

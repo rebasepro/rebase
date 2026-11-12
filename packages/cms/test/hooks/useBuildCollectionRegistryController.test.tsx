@@ -199,7 +199,7 @@ describe("useBuildCollectionRegistryController", () => {
 
     it("applies a user override only when it is asked for", () => {
         const userConfigPersistence = fakeUserConfigPersistence({
-            getCollectionConfig: () => ({ name: "My Jobs" })
+            getTablePreferences: () => ({ name: "My Jobs" })
         });
 
         const { result } = renderWithCollections({ userConfigPersistence });

@@ -14,8 +14,10 @@ import {
     useBridgeRegistration,
     CustomizationControllerContext,
     RebaseDataContext,
+    UserConfigurationPersistenceContext,
     useRebaseEmbedHost,
-    useTranslation
+    useTranslation,
+    useUiPreferences
 } from "@rebasepro/app";
 import { buildRoutedRebaseData, resolveDataSource } from "@rebasepro/common";
 import { CircularProgressCenter, lazyChunk } from "@rebasepro/ui";
@@ -89,7 +91,7 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
     // The store the rest of the panel reads. Built one level up, by
     // `<Rebase>`, so the registry here and the collection views below merge
     // from the same cache — a second instance built here would keep its own.
-    const userConfigPersistence = useUserConfigurationPersistence();
+    const browserUserConfigPersistence = useUserConfigurationPersistence();
 
     // ── Collection Editor resolution ──────────────────────────────────
     // The collection editor is ALWAYS enabled when Studio is registered.
@@ -112,6 +114,25 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
     const externalCollections = registry.cmsConfig?.externalCollections ?? NO_EXTERNAL_COLLECTIONS;
     const descriptors = usePanelTables(registry.cmsConfig?.tables, registry.cmsConfig !== null);
     const servedTables = descriptors.tables;
+    const uiConfig = registry.cmsConfig?.uiConfig;
+
+    // ── UI preferences: the workspace's, and the signed-in user's own ──
+    // How each table is presented, as the collection editor saved it for
+    // everybody and as the views remember it for this user. The user's live
+    // on the server when it keeps them, in the browser otherwise; everything
+    // below reads them through the persistence provided here.
+    const preferencesClient = useRebaseClient();
+    const preferencesAuth = useAuthController();
+    const inEmbedding = useRebaseEmbedHost() !== undefined;
+    const uiPreferences = useUiPreferences({
+        transport: preferencesClient,
+        getAuthToken: preferencesAuth?.getAuthToken,
+        authKey: preferencesAuth?.user?.uid ?? null,
+        enabled: registry.cmsConfig !== null && Boolean(preferencesAuth?.user) && !inEmbedding,
+        local: browserUserConfigPersistence
+    });
+    const userConfigPersistence = uiPreferences.userPersistence;
+    const workspacePreferences = uiPreferences.controller.workspace;
 
     // What the composition last produced, for the collection editor, which
     // lists and edits the collections the panel shows.
@@ -127,14 +148,16 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
         const composed = composeCollectionsInput({
             tables: servedTables,
             tableCustomizations,
-            externalCollections
+            externalCollections,
+            uiConfig,
+            workspacePreferences
         });
         return async (params: Parameters<typeof composed>[0]) => {
             const collections = await composed(params);
             setComposedCollections(collections);
             return narrow ? narrow(collections) : collections;
         };
-    }, [servedTables, tableCustomizations, externalCollections, narrow]);
+    }, [servedTables, tableCustomizations, externalCollections, uiConfig, workspacePreferences, narrow]);
 
     const dataSources = useDataSources();
     const collectionRegistryController = useBuildCollectionRegistryController({ userConfigPersistence, dataSources: dataSources.registry });
@@ -240,7 +263,8 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
             mayReadSchema: reportsScopes(authController)
                 ? callerHoldsScope(authController, "schema:read")
                 : undefined,
-            tables: servedTables
+            tables: servedTables,
+            presentation: { save: uiPreferences.controller.saveWorkspace }
         } : { readOnly: true }
     );
 
@@ -383,6 +407,7 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
     // consumer (list/entity views, references, board, import/export, and
     // `context.data`) is routed to the correct driver by collection path.
     const navigationContent = (
+        <UserConfigurationPersistenceContext.Provider value={userConfigPersistence}>
         <CollectionsScopeContext.Provider value={true}>
         <RebaseDataContext.Provider value={routedData}>
         <CustomizationControllerContext.Provider value={enrichedCustomizationController}>
@@ -406,6 +431,7 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
         </CustomizationControllerContext.Provider>
         </RebaseDataContext.Provider>
         </CollectionsScopeContext.Provider>
+        </UserConfigurationPersistenceContext.Provider>
     );
 
     // ── Wrap with ConfigControllerProvider when collection editor is enabled ──

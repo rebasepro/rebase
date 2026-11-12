@@ -28,6 +28,7 @@ export * from "./useSlot";
 export * from "./useCustomizationController";
 
 export * from "./useBuildLocalConfigurationPersistence";
+export * from "./useUiPreferences";
 export * from "./useBuildModeController";
 
 export * from "./useRebaseRegistry";

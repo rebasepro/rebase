@@ -5,6 +5,7 @@ import { getParentReferencesFromPath as commonGetParentReferencesFromPath, remov
 import { EntityReference, CollectionRegistryController } from "@rebasepro/types";
 import { UserConfigurationPersistence, resolveAdminCollection, AdminCollection } from "@rebasepro/cms-types";
 import { mergeDeep } from "@rebasepro/utils";
+import { userPreferencesOverlay } from "./user_preferences_overlay";
 
 export function useBuildCollectionRegistryController(props: {
     userConfigPersistence?: UserConfigurationPersistence,
@@ -58,7 +59,11 @@ export function useBuildCollectionRegistryController(props: {
             return undefined;
         }
 
-        const userOverride = includeUserOverride ? userConfigPersistence?.getCollectionConfig(slugOrPath) : undefined;
+        // The last layer of the composition (`compose_collections.ts`): the
+        // signed-in user's own preferences — column widths, order, view mode.
+        const userOverride = includeUserOverride && collection
+            ? userPreferencesOverlay(userConfigPersistence?.getTablePreferences(slugOrPath), new Set(Object.keys(collection.properties ?? {})))
+            : undefined;
         const overriddenCollection = collection ? mergeDeep(collection, userOverride ?? {}) : undefined;
 
         if (!overriddenCollection) return undefined;

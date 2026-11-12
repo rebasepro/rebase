@@ -334,8 +334,8 @@ export function fakeCollectionsConfigController(
 /** Per-user collection overrides, kept nowhere: nothing recently visited, nothing favourite. */
 export function fakeUserConfigPersistence(rest: Partial<UserConfigurationPersistence> = {}): UserConfigurationPersistence {
     return {
-        onCollectionModified: () => undefined,
-        getCollectionConfig: () => ({}),
+        saveTablePreferences: () => undefined,
+        getTablePreferences: () => ({}),
         recentlyVisitedPaths: [],
         setRecentlyVisitedPaths: () => undefined,
         favouritePaths: [],

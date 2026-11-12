@@ -1,11 +1,32 @@
 /**
  * What `<RebaseCMS>` registers: the tables the server serves, projected and
  * customized, beside the collections whose rows live elsewhere (Firestore).
+ *
+ * ## The composition order
+ *
+ * A served table's collection is built in layers, each over the one before:
+ *
+ * 1. **the projected table** — `GET /api/schema/tables`, through the
+ *    projector: every column, relation and rule, with zero configuration;
+ * 2. **code customizations** — `<RebaseCMS tableCustomizations>`, the
+ *    `customizeTable(...)` results written in the frontend (components,
+ *    actions, callbacks: everything that is code);
+ * 3. **workspace preferences** — what the collection editor saved for
+ *    everybody: `<RebaseCMS uiConfig>` (`frontend/src/cms/ui-config.json`,
+ *    shipped with the frontend), then the preferences the server stores for
+ *    the workspace;
+ * 4. **user preferences** — what the views remember for the signed-in user
+ *    (column widths, order, view mode), folded in by the collection registry
+ *    when a view resolves its collection (`useBuildCollectionRegistryController`).
+ *
+ * Layers 3 and 4 are data (`UiTablePreferences`): never a schema fact, never
+ * code.
  */
 import type { AdminCollection, TableCustomization } from "@rebasepro/cms-types";
-import type { TableDescriptor } from "@rebasepro/types";
+import type { TableDescriptor, UiPreferences } from "@rebasepro/types";
 import { collectionsFromTables } from "../../tables/project_table";
 import { applyTableCustomizations, type TableCollection } from "../../tables/apply_customization";
+import { applyUiPreferences, uiConfigPreferences } from "./ui_preferences";
 
 /** What the composition produces: a served table's collection, or an external one. */
 export type PanelCollection = TableCollection | AdminCollection;
@@ -18,6 +39,10 @@ export interface CollectionSources {
     tableCustomizations: readonly TableCustomization[];
     /** `<RebaseCMS externalCollections>`. */
     externalCollections: readonly AdminCollection[];
+    /** `<RebaseCMS uiConfig>`: the workspace's preferences shipped with the frontend, as imported (validated here). */
+    uiConfig?: { tables?: { [slug: string]: object } };
+    /** The workspace's preferences the server stores. */
+    workspacePreferences?: UiPreferences;
 }
 
 function describe(collection: PanelCollection): string {
@@ -30,15 +55,20 @@ function describe(collection: PanelCollection): string {
  * then the external ones.
  *
  * - **Tables**: every served table projected (`collectionsFromTables`), with
- *   its `customizeTable` folded in (`applyTableCustomizations`).
+ *   its `customizeTable` folded in (`applyTableCustomizations`), then the
+ *   workspace's preferences (see "The composition order" above).
  * - **External collections never share a slug.** One with the slug of a
  *   served table or of another external collection throws, naming both: a
  *   slug is a URL, a saved layout and a reference target, and two collections
  *   cannot answer to one.
  */
-export function composeCollections({ tables, tableCustomizations, externalCollections }: CollectionSources): PanelCollection[] {
+export function composeCollections({ tables, tableCustomizations, externalCollections, uiConfig, workspacePreferences }: CollectionSources): PanelCollection[] {
+    const shipped = uiConfigPreferences(uiConfig);
     const projected = tables.length > 0 || tableCustomizations.length > 0
-        ? applyTableCustomizations(collectionsFromTables(tables), tableCustomizations).map((collection, index) =>
+        ? applyTableCustomizations(collectionsFromTables(tables), tableCustomizations)
+            .map(collection => applyUiPreferences(collection, shipped.tables[collection.slug]))
+            .map(collection => applyUiPreferences(collection, workspacePreferences?.tables[collection.slug]))
+            .map((collection, index) =>
             // The projected rules are already the effective ones. A table that
             // switches the admin baseline off says so here too, so the editors
             // that list what Postgres holds (`getEffectiveSecurityRulesOnce`)

@@ -11,7 +11,7 @@ import React from "react";
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { BrowserRouter } from "react-router";
-import type { DataDriver } from "@rebasepro/types";
+import type { DataDriver, UiTablePreferences } from "@rebasepro/types";
 import type { AdminCollection, AnySlotContribution, EntityAction, UserConfigurationPersistence } from "@rebasepro/cms-types";
 import { Rebase } from "@rebasepro/app";
 import { resetDeprecationWarningsForTests } from "@rebasepro/common";
@@ -104,14 +104,14 @@ const authController = {
 };
 
 /** A user config store holding what the collection's own page saved. */
-function savedConfig(saved: Record<string, Row>): UserConfigurationPersistence & { modified: [string, Row][] } {
-    const modified: [string, Row][] = [];
+function savedConfig(saved: Record<string, UiTablePreferences>): UserConfigurationPersistence & { modified: [string, UiTablePreferences][] } {
+    const modified: [string, UiTablePreferences][] = [];
     return {
         modified,
-        getCollectionConfig: (path: string) => (saved[path] ?? {}),
-        onCollectionModified: (path: string, config: unknown) => {
-            modified.push([path, config as Row]);
-            saved[path] = config as Row;
+        getTablePreferences: (path: string) => (saved[path] ?? {}),
+        saveTablePreferences: (path: string, delta: UiTablePreferences) => {
+            modified.push([path, delta]);
+            saved[path] = { ...saved[path], ...delta };
         },
         recentlyVisitedPaths: [],
         setRecentlyVisitedPaths: () => undefined,
@@ -225,11 +225,11 @@ describe("a panel's fields", () => {
     });
 
     it("leave the column order the user saved alone", async () => {
-        const persistence = savedConfig({ tasks: { propertiesOrder: ["notes", "title", "status", "priority"] } });
+        const persistence = savedConfig({ tasks: { fieldOrder: ["notes", "title", "status", "priority"] } });
         render(<Page persistence={persistence}><CollectionPanel collection={tasks} viewMode={"table"} fields={["title", "status"]}/></Page>);
         expect(await screen.findByText("Write the plan")).toBeTruthy();
         expect(tableHeaders().filter(name => name !== "Id")).toEqual(["Title", "Status"]);
-        expect(persistence.modified.filter(([, config]) => "propertiesOrder" in config)).toEqual([]);
+        expect(persistence.modified.filter(([, config]) => "fieldOrder" in config)).toEqual([]);
     });
 });
 
@@ -585,8 +585,8 @@ describe("a panel's view mode", () => {
         const persistence = savedConfig({
             tasks: {
                 defaultViewMode: "table",
-                propertiesOrder: ["priority", "title"],
-                properties: { title: { admin: { columnWidth: 320 } } }
+                fieldOrder: ["priority", "title"],
+                fields: { title: { columnWidth: 320 } }
             }
         });
         render(<Page persistence={persistence}><CollectionPanel collection={tasks}/></Page>);
