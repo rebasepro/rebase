@@ -17,7 +17,7 @@ import { readExistingSchema, type Queryable } from "./ensure-collection-tables";
 export interface KeptEnumLabels {
     /** `schema.type`, as the catalogue names it. */
     type: string;
-    /** Labels in the database that no collection declares, in the type's order. */
+    /** Labels in the database that no table declares, in the type's order. */
     labels: string[];
 }
 

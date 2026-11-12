@@ -1,13 +1,13 @@
 /**
- * Do the migration files still describe the collections?
+ * Do the migration files still describe the declared tables?
  *
  * `rebase db generate` asks Atlas, which needs a dev database to replay the
  * migrations into — seconds of Docker, or the managed PGlite, before it can say
- * a word. `rebase verify` runs after every edit an agent makes to a collection
+ * a word. `rebase verify` runs after every edit an agent makes to a table
  * file and in CI, where neither is acceptable, so this answers the narrower
  * question offline: replay the `CREATE TABLE` / `ALTER TABLE` / `DROP TABLE`
  * statements the migrations contain, and compare the tables and columns that
- * leaves with the ones the schema plan derives from the collections.
+ * leaves with the ones the schema plan derives from the tables.
  *
  * Deliberately tables and columns only. A changed type or default is a real
  * drift too, but reading it back out of Atlas's SQL means parsing every type
@@ -16,25 +16,25 @@
  * that breaks a deploy — the runtime queries a column the migrated database
  * does not have — and it is unambiguous in the text.
  *
- * Policies are not compared: the runtime applies a collection's policies at
+ * Policies are not compared: the runtime applies a table's policies at
  * boot whether or not a migration carries them.
  */
 import type { CompiledTable } from "@rebasepro/types";
 import { planSchema } from "./plan/plan-schema";
 
-/** One difference between the collections and what the migrations build. */
+/** One difference between the declared tables and what the migrations build. */
 export interface UnmigratedChange {
     /**
-     * - `missing-table` / `missing-column` — the collections declare it and no
+     * - `missing-table` / `missing-column` — the tables declare it and no
      *   migration creates it.
-     * - `removed-column` — a migration creates it, the collection no longer
+     * - `removed-column` — a migration creates it, the table no longer
      *   declares it, and no later migration drops it.
      */
     kind: "missing-table" | "missing-column" | "removed-column";
     /** `schema.table`. */
     table: string;
     column?: string;
-    /** The collection that declares the table, when one does (a junction has none). */
+    /** The slug of the declared table, when one declares it (a junction has none). */
     slug?: string;
 }
 
@@ -47,7 +47,7 @@ interface MigratedTable {
      * `IF NOT EXISTS`. The search, vector and trigger DDL `db generate` appends
      * after Atlas's half always says `IF NOT EXISTS`, and the planner keeps
      * those columns out of `TablePlan.columns` — so only these are candidates
-     * for "removed from the collection".
+     * for "removed from the table".
      */
     managed: Set<string>;
 }
@@ -264,7 +264,7 @@ export function findUnmigratedSchema(
             continue;
         }
         // The users table is shared with the auth tables boot provisions
-        // (`auth-users-columns`), which add columns no collection declares and
+        // (`auth-users-columns`), which add columns no table declares and
         // no migration has to carry. The table's existence is the fact here.
         if (table.auth) continue;
 
