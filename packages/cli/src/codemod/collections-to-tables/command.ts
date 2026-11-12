@@ -34,12 +34,25 @@ ${chalk.bold("What it writes")}
   backend/resources.ts, backend/storage.ts, backend/generated/register.ts   from their config/ counterparts
   rebase.json, package.json, pnpm-workspace.yaml, backend/tsconfig.json     without the config package
 
+${chalk.bold("When to use it")}
+  Once, on a project every other command refuses with "still on the collections layout".
+  Commit first: the run refuses a dirty git tree, so what it changes is one reviewable diff.
+
 ${chalk.bold("Options")}
-  --dry-run   Print the plan; write nothing
-  --check     Verify an already migrated project: the tables must render the same SQL as config/collections
+  --dry-run   Print the plan (files, refusals, manual steps) and write nothing. Start here.
+  --check     On a project already migrated, before deleting config/: prove backend/schema still
+              renders the same SQL as config/collections. Writes nothing; exits 1 with the diff if not.
   --json      One JSON document on stdout: files, refusals, notes, manual steps, the SQL check
-  --force     Run on a dirty git tree, and replace output files that differ
-  --skip-sdk-calls  Leave the project's SDK calls as they are (see rebase migrate sdk-calls)
+  --force     Run on a dirty git tree, and replace output files that hold something else
+              (an earlier run's output you edited). Without it, both are refused and nothing is written.
+  --skip-sdk-calls  Leave the project's own code as it is; run rebase migrate sdk-calls later
+
+${chalk.bold("Manual steps")}
+  What the codemod cannot carry exactly is not guessed at: it is printed at the end as a numbered
+  list of manual steps, each with the file it is about and, where there is one, the code to paste —
+  mounting the customizations in <RebaseCMS tableCustomizations>, a module of config/ it did not
+  read, an import of config/ to repoint, regenerating the SDK, refreshing the agent skills.
+  The migration is done when the list is done and config/ is removed (the run prints the git rm line).
 
 ${chalk.bold("Safety")}
   Every run evaluates config/collections as the server did, converts it, writes the result
@@ -180,14 +193,23 @@ ${chalk.bold("Usage")}
   Part of ${chalk.cyan("rebase migrate collections-to-tables")}; run it alone on a project already migrated.
   data.collection("x") → data.table("x") on the SDK data surface, createRebaseClient options,
   generated type names, batch operations, error codes, offline options, typed accessors,
-  setCollectionCallbacks → setTableHooks (hook props adapted), storageAuthorize data.
+  setCollectionCallbacks → setTableHooks (hook props adapted), storageAuthorize data, and the
+  rule keys: existsIn({ collection: X }) and membership: { collection: X } → table: X.
   A .collection( call whose receiver is not the SDK is left as written and listed.
   Generated SDK files are not rewritten: run rebase generate-sdk.
+
+${chalk.bold("When to use it")}
+  On a project already migrated (or migrated with --skip-sdk-calls), and again after pulling in
+  code written against the old names. A second run on rewritten code changes nothing.
 
 ${chalk.bold("Options")}
   --dry-run   Print what would change; write nothing
   --json      One JSON document on stdout
-  --force     Run on a dirty (or absent) git tree
+  --force     Run on a dirty (or absent) git tree. Without it the run refuses, so its edits stay one diff.
+
+${chalk.bold("Manual steps")}
+  What it cannot rewrite safely — a boot option it cannot prove, a generated SDK file — is printed
+  after the counts, each with the file and what to do.
 `);
 }
 

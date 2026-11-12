@@ -4,6 +4,9 @@
  *
  * - `collections-to-tables [dir]` — `config/collections` → `backend/schema`
  *   (+ `frontend/src/cms`), proven by byte-identical generated SQL.
+ * - `sdk-calls [dir]` — the project's own code for the renames that came with
+ *   tables (`data.collection(…)` → `data.table(…)`, rule keys, hooks); part of
+ *   the first, and on its own for a project already migrated.
  *
  * The work lives in `../codemod/collections-to-tables`, loaded only when the
  * command runs (it brings ts-morph), so `rebase --help` and every other command
@@ -12,7 +15,7 @@
 import chalk from "chalk";
 
 import { parseCommandArgs, wantsHelp } from "../utils/args";
-import { unknownCommand } from "../utils/unknown-command";
+import { unknownCommandMessage } from "../utils/unknown-command";
 
 /** The subcommands `rebase migrate` dispatches. The CLI's vocabulary and the docs verifier read this. */
 export const MIGRATE_SUBCOMMANDS = ["collections-to-tables", "sdk-calls"] as const;
@@ -38,13 +41,31 @@ function printHelp(): void {
 ${chalk.bold("rebase migrate")} — move a project from a layout this release no longer reads
 
 ${chalk.bold("Usage")}
-  rebase migrate <subcommand> [options]
+  rebase migrate <subcommand> [dir] [options]
 
 ${chalk.bold("Subcommands")}
-  ${chalk.blue.bold("collections-to-tables")} ${chalk.gray("[dir]")}   config/collections → backend/schema + frontend/src/cms, SQL-checked
-  ${chalk.blue.bold("sdk-calls")} ${chalk.gray("[dir]")}               data.collection("x") → data.table("x") and the other SDK renames, in your own code
+  ${chalk.blue.bold("collections-to-tables")} ${chalk.gray("[dir]")}   config/collections → backend/schema + frontend/src/cms, SQL-checked.
+                                Run it once, on a project the CLI refuses with "still on the collections layout".
+                                It runs sdk-calls too, unless --skip-sdk-calls.
+  ${chalk.blue.bold("sdk-calls")} ${chalk.gray("[dir]")}               data.collection("x") → data.table("x"), the rule keys (existsIn / membership:
+                                collection → table) and the other renames, in your own code. Run it alone on a
+                                project already migrated, or after a migration run with --skip-sdk-calls.
 
-Run ${chalk.cyan("rebase migrate <subcommand> --help")} for its options.
+${chalk.bold("Options")} ${chalk.gray("(each subcommand's --help lists its own)")}
+  --dry-run   Print the plan and write nothing. Start here.
+  --check     ${chalk.gray("(collections-to-tables)")} On a project already migrated: prove backend/schema still renders
+              the same SQL as config/collections, before you delete config/. Writes nothing.
+  --force     Run on a git tree with uncommitted changes (the run refuses one, so every change it
+              makes is a reviewable diff), and replace output files that hold something else.
+  --json      One JSON document on stdout, for a script or an agent.
+
+${chalk.bold("Manual steps")}
+  What the codemod cannot do safely for you is printed at the end of a run as a numbered list,
+  each with the file it is about and the code to paste: mount the customizations, move a module
+  it did not read, repoint an import of config/, regenerate the SDK, refresh the agent skills.
+  The migration is finished when the list is done and config/ is removed.
+
+Run ${chalk.cyan("rebase migrate <subcommand> --help")} for the rest.
 `);
 }
 
@@ -98,7 +119,13 @@ export async function migrateCommand(subcommand: string | undefined, rawArgs: st
             }, positionals[1]);
             return;
         }
+        // Bare `rebase migrate`: the CLI hands a group with no subcommand
+        // `"--help"` as its subcommand, and that printed "Unknown migrate
+        // command" for the one line most likely to be typed first.
         case undefined:
+        case "--help":
+        case "-h":
+        case "help":
             printHelp();
             return;
         default:
@@ -106,6 +133,9 @@ export async function migrateCommand(subcommand: string | undefined, rawArgs: st
                 printHelp();
                 return;
             }
-            unknownCommand(subcommand, MIGRATE_SUBCOMMANDS, "migrate");
+            // Two subcommands: name both, whatever was typed.
+            console.error(chalk.red(`✗ ${unknownCommandMessage(subcommand, MIGRATE_SUBCOMMANDS, "migrate")} ` +
+                `The subcommands are ${MIGRATE_SUBCOMMANDS.join(" and ")}.`));
+            process.exit(1);
     }
 }

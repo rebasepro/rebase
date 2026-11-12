@@ -505,6 +505,7 @@ ${chalk.green.bold("Commands")}
   ${chalk.blue.bold("start")}                   Run the built bundle, as a deployment does ${chalk.gray("(in the NODE_ENV you set)")}
   ${chalk.blue.bold("upgrade")}                 Move every @rebasepro package to one release, then install
   ${chalk.blue.bold("migrate collections-to-tables")} config/collections → backend/schema, SQL-checked
+  ${chalk.blue.bold("migrate sdk-calls")}       Rewrite your own code for the table renames (data.table, rule keys)
   ${chalk.blue.bold("apps list")}               Show the apps this repository declares
 
 ${chalk.green.bold("Schema")}
