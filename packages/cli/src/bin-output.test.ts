@@ -93,24 +93,22 @@ describe("bin/rebase.js writes plain text to a pipe", () => {
     });
 
     it("still offers one for a failure inside a command", async () => {
-        // A real project whose collection files throw when imported: the command
+        // A real project whose schema module throws when imported: the command
         // line is fine, so what failed is not usage and the stack is worth
         // offering. This is the case the hint was written for, and the fix must
         // not take it away.
         //
         // Not "the directory is missing" any more: that is the headless project,
-        // where `generate-sdk` says what to run first and exits 0 rather than
-        // failing at all.
+        // where `generate-sdk` says there is nothing to generate and exits 0
+        // rather than failing at all.
         const project = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-bin-"));
         fs.writeFileSync(path.join(project, "rebase.json"), "{}\n");
-        const collections = path.join(project, "config", "collections");
-        fs.mkdirSync(collections, { recursive: true });
-        // A collection file, not the `index.ts` barrel: generate-sdk loads the
-        // directory the way boot does, and boot skips the barrel.
-        fs.writeFileSync(path.join(collections, "posts.ts"), "throw new Error(\"collection file is broken\");\n");
+        const schema = path.join(project, "backend", "schema");
+        fs.mkdirSync(schema, { recursive: true });
+        fs.writeFileSync(path.join(schema, "index.ts"), "throw new Error(\"schema module is broken\");\n");
         try {
             const { stderr } = await runCli(["generate-sdk"], {}, project);
-            expect(stderr).toContain("collection file is broken");
+            expect(stderr).toContain("schema module is broken");
             expect(stderr).toContain("--debug");
         } finally {
             fs.rmSync(project, { recursive: true, force: true });
