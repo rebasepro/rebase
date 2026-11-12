@@ -144,6 +144,22 @@ describe("col.* — modifiers", () => {
         expect(() => col.uuid().onCreateUser().onUpdateUser()).toThrow(/already has `\.onCreateUser\(\)`/);
     });
 
+    it("`.userId()` marks a text or uuid column as holding a user's id", () => {
+        for (const builder of [col.text(), col.varchar(64), col.char(36), col.uuid()]) {
+            expect(builder.userId().def.semantic).toBe("user");
+        }
+        // It is a meaning, not a stamp: both may be said.
+        expect(col.uuid().onCreateUser().userId().def).toMatchObject({ semantic: "user", stamp: { on: "create", value: "user" } });
+        expect(col.array(col.text().userId()).def.element?.semantic).toBe("user");
+    });
+
+    it("refuses `.userId()` at runtime on a column that cannot hold an id", () => {
+        // @ts-expect-error userId is a text or uuid modifier
+        expect(() => col.integer().userId()).toThrow("`.userId()` on a `integer` column: a user's id is held by `col.text()`, `col.varchar()`, `col.char()` or `col.uuid()`.");
+        // @ts-expect-error a stored file's path is not a user's id
+        expect(() => col.storage({ path: "x/" }).userId()).toThrow("`.userId()` on `col.storage()`");
+    });
+
     it("records `.oneOf()` for text and numbers, and refuses anything else at runtime", () => {
         expect(col.text().oneOf(["a", "b"]).def.oneOf).toEqual(["a", "b"]);
         expect(col.integer().oneOf([1, 2]).def.oneOf).toEqual([1, 2]);

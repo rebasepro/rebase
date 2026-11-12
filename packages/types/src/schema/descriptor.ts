@@ -110,8 +110,13 @@ export interface ColumnDescriptor {
     description?: string;
     /** The column holds the path of a stored file (or several). */
     storage?: ColumnStorage;
-    /** A `jsonb` column with a meaning the type does not state. */
-    semantic?: "geopoint";
+    /**
+     * A meaning the type does not state: `"geopoint"` on a `jsonb` point
+     * (`col.geopoint()`), `"user"` on a text or uuid column that holds a
+     * user's id (`.userId()`) — the panel offers a user picker for it, and a
+     * caller who may write the table may look users up to fill it.
+     */
+    semantic?: "geopoint" | "user";
     /** The vector index, or `false` when the column has none. */
     vectorIndex?: VectorIndexOptions | false;
     /** The shape of a `json`/`jsonb` document. */
@@ -135,6 +140,8 @@ export interface ColumnElementDescriptor {
     validate?: ColumnValidation;
     oneOf?: readonly (string | number)[];
     storage?: ColumnStorage;
+    /** `"user"`: each item is a user's id (`col.array(col.text().userId())`). */
+    semantic?: "user";
 }
 
 /** What every relation descriptor carries. */

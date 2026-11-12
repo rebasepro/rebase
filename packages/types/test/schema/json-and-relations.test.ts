@@ -40,9 +40,17 @@ describe("json.* — shapes", () => {
         // A string field stamps the caller's id instead.
         expect(json.string().onCreateUser().shape).toEqual({ kind: "string", stamp: "createUser" });
         expect(json.string().required().onUpdateUser().shape).toEqual({ kind: "string", required: true, stamp: "updateUser" });
+        // A string field may hold a user's id.
+        expect(json.string().required().userId().shape).toEqual({ kind: "string", required: true, semantic: "user" });
         expect(json.array(json.string()).validate({ minItems: 1 }).shape).toMatchObject({ validate: { minItems: 1 } });
         const beforeSave = ({ value }: { value: string | undefined }) => value;
         expect(json.string().transform({ beforeSave }).shape.transform?.beforeSave).toBe(beforeSave);
+    });
+
+    it("refuses `.userId()` at runtime on a field that cannot hold an id", () => {
+        // @ts-expect-error userId is a JSON string modifier
+        expect(() => json.number().userId()).toThrow("`.userId()` on a `json.number()` field: a user's id is held by `json.string()`.");
+        expect(() => json.storage({ path: "x/" }).userId()).toThrow("`.userId()` on `json.storage()`");
     });
 
     it("is immutable", () => {

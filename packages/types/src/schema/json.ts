@@ -34,6 +34,8 @@ type JsonNode<Extra> = Extra & JsonNodeBase & (
          * (`"updateUser"`, `.onUpdateUser()`).
          */
         stamp?: "createUser" | "updateUser";
+        /** `"user"`: the field holds a user's id (`.userId()`). */
+        semantic?: "user";
     }
     | { kind: "number"; validate?: ColumnValidation; oneOf?: readonly number[] }
     | { kind: "boolean" }
@@ -181,6 +183,19 @@ export class JsonField<TData, TKind extends JsonKind = JsonKind, TRequired exten
     /** The server writes the caller's user id into the field on every write. */
     onUpdateUser(this: JsonField<string, "string", TRequired>): JsonField<string, "string", TRequired> {
         return this.with<string, "string", TRequired>({ stamp: "updateUser" });
+    }
+
+    /**
+     * The field holds the id of a user. The panel offers a user picker for it,
+     * and callers who may write the table may look users up to fill it.
+     * Only on `json.string()`; anything else throws.
+     */
+    userId(this: JsonField<string, "string", TRequired>): JsonField<string, "string", TRequired> {
+        if (this.shape.kind !== "string" || this.shape.storage !== undefined) {
+            const what = this.shape.kind === "string" ? "`json.storage()`" : `a \`json.${this.shape.kind}()\` field`;
+            throw new Error(`\`.userId()\` on ${what}: a user's id is held by \`json.string()\`.`);
+        }
+        return this.with<string, "string", TRequired>({ semantic: "user" });
     }
 
     /**

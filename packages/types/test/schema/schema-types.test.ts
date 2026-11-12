@@ -371,6 +371,17 @@ function kindRestrictedModifiers(): void {
     col.integer().onCreateUser();
     // @ts-expect-error onUpdateUser stores an id: text or uuid
     col.timestamptz().onUpdateUser();
+    // @ts-expect-error userId holds an id: text or uuid
+    col.integer().userId();
+    // @ts-expect-error userId holds an id, not a document
+    col.jsonb().userId();
+    // @ts-expect-error userId holds an id, not a file path
+    col.storage({ path: "avatars/" }).userId();
+    col.varchar(36).notNull().userId();
+    col.uuid().userId().onCreateUser();
+    // @ts-expect-error a JSON number field holds no user id
+    json.number().userId();
+    json.string().required().userId();
     // @ts-expect-error multiple is a storage modifier
     col.text().multiple();
     // @ts-expect-error oneOf takes text or numbers

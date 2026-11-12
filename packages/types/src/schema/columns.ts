@@ -45,7 +45,12 @@ export interface ColumnDef {
     oneOf?: readonly (string | number)[];
     description?: string;
     storage?: ColumnStorage;
-    semantic?: "geopoint";
+    /**
+     * A meaning the Postgres type does not state: `"geopoint"` (`col.geopoint()`,
+     * a `jsonb` point) or `"user"` (`.userId()`, a text or uuid column holding a
+     * user's id).
+     */
+    semantic?: "geopoint" | "user";
     vectorIndex?: VectorIndexOptions | false;
     /** The shape of a `json`/`jsonb` document. */
     json?: JsonShapeDef;
@@ -370,6 +375,29 @@ export class ColumnBuilder<TData, TKind extends BuilderKind = BuilderKind, F ext
         this: ColumnBuilder<string, K, F>
     ): ColumnBuilder<string, K, WithDefault<F>> {
         return this.with<string, K, WithDefault<F>>(this.stamped({ on: "update", value: "user" }, "onUpdateUser"));
+    }
+
+    /**
+     * The column holds the id of a user. The panel offers a user picker for it,
+     * and callers who may write the table may look users up to fill it (the
+     * user picker's read answers them even though row-level security hides
+     * other users' rows).
+     *
+     * Only on `col.text()`, `col.varchar()`, `col.char()` and `col.uuid()`;
+     * anything else throws. It declares no foreign key: use
+     * `rel.belongsTo(() => users)` when the database should enforce one.
+     */
+    userId<K extends TextColumnKind | "uuid">(
+        this: ColumnBuilder<string, K, F>
+    ): ColumnBuilder<string, K, F> {
+        const kind = this.def.type.kind;
+        if ((kind !== "text" && kind !== "varchar" && kind !== "char" && kind !== "uuid") || this.def.storage !== undefined) {
+            const what = this.def.storage !== undefined ? "`col.storage()`" : `a \`${kind}\` column`;
+            throw new Error(
+                `\`.userId()\` on ${what}: a user's id is held by \`col.text()\`, \`col.varchar()\`, \`col.char()\` or \`col.uuid()\`.`
+            );
+        }
+        return this.with<string, K, F>({ semantic: "user" });
     }
 
     // ── Storage ──────────────────────────────────────────────────────────
