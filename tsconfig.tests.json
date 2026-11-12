@@ -125,6 +125,11 @@
     "packages/cms/test/data_import/csv.test.ts",
     "packages/cms/test/data_import/prototype_pollution.test.ts",
     "packages/cms/test/data_import/save_entities.test.ts",
+    // `customizeTable`: the slug and loose-form assertions are `@ts-expect-error`
+    // lines, and the merge and render tests hand typed tables to the runtime.
+    "packages/cms/test/tables/customize_table.test.tsx",
+    "packages/cms/test/tables/customize_apply.test.tsx",
+    "packages/cms/test/tables/customize_render.test.tsx",
     // Files, not directories, and each one for the same reason: it carries a
     // `@ts-expect-error`, which is a test written in the type system and inert
     // in a file no program reads. `pnpm check:ts-expect-error-coverage` is what

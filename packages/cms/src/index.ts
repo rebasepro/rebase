@@ -8,6 +8,20 @@ export { EditorAIControllerProvider, useProvidedEditorAIController } from "./con
 export * from "./form";
 export * from "./preview";
 export * from "./routes";
+// `customizeTable`: a frontend file's deltas over a Postgres table's default
+// collection, folded in by `applyTableCustomization`; `updateRecord` is the
+// write an entity action most often makes.
+export { customizeTable } from "./tables/customize_table";
+export { applyTableCustomization, applyTableCustomizations } from "./tables/apply_customization";
+export type { TableCollection } from "./tables/apply_customization";
+export { updateRecord } from "./tables/update_record";
+export type {
+    AnyFieldCustomization,
+    CustomizableTable,
+    FieldCustomization,
+    TableCustomization,
+    TableCustomizationOptions
+} from "@rebasepro/cms-types";
 
 // Components — explicitly listed to avoid conflicts with ./types re-exports
 export {
