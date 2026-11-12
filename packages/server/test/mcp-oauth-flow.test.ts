@@ -88,11 +88,11 @@ describe("the full flow", () => {
 
         const list = await rpc(app, token, { jsonrpc: "2.0", id: 2, method: "tools/list" });
         const listed = (await list.json() as { result: { tools: { name: string }[] } }).result.tools;
-        expect(listed.map(t => t.name)).toEqual(["list_collections", "describe_collection", "query_collection", "count_documents", "aggregate_documents", "get_document"]);
+        expect(listed.map(t => t.name)).toEqual(["list_tables", "describe_table", "query_table", "count_rows", "aggregate_rows", "get_row"]);
 
         const call = await rpc(app, token, {
             jsonrpc: "2.0", id: 3, method: "tools/call",
-            params: { name: "query_collection", arguments: { collection: "candidates" } }
+            params: { name: "query_table", arguments: { table: "candidates" } }
         });
         const result = (await call.json() as { result: { structuredContent: { data: unknown[] } } }).result;
         expect(result.structuredContent.data).toHaveLength(1);
@@ -386,7 +386,7 @@ describe("token endpoint refusals", () => {
 
         await rpc(app, refreshedToken, {
             jsonrpc: "2.0", id: 1, method: "tools/call",
-            params: { name: "query_collection", arguments: { collection: "candidates" } }
+            params: { name: "query_table", arguments: { table: "candidates" } }
         });
 
         expect(scopedAs.at(-1)).toEqual({ uid: "user-1", roles: ["recruiter"], isAnonymous: false });
@@ -426,8 +426,8 @@ describe("resource-server refusals", () => {
 
         const list = await rpc(app, String(body.access_token), { jsonrpc: "2.0", id: 1, method: "tools/list" });
         const names = (await list.json() as { result: { tools: { name: string }[] } }).result.tools.map(t => t.name);
-        expect(names).not.toContain("create_document");
-        expect(names).not.toContain("delete_document");
+        expect(names).not.toContain("create_row");
+        expect(names).not.toContain("delete_row");
     });
 
     it("refuses a write call from a read-only token, and says which scope is missing", async () => {
@@ -438,7 +438,7 @@ describe("resource-server refusals", () => {
 
         const res = await rpc(app, String(body.access_token), {
             jsonrpc: "2.0", id: 1, method: "tools/call",
-            params: { name: "delete_document", arguments: { collection: "candidates", id: "c1" } }
+            params: { name: "delete_row", arguments: { table: "candidates", id: "c1" } }
         });
         const payload = await res.json() as { error?: { message: string } };
         expect(payload.error?.message).toContain("data:delete");
@@ -453,7 +453,7 @@ describe("resource-server refusals", () => {
 
         const list = await rpc(app, String(body.access_token), { jsonrpc: "2.0", id: 1, method: "tools/list" });
         const names = (await list.json() as { result: { tools: { name: string }[] } }).result.tools.map(t => t.name);
-        expect(names).toContain("create_document");
+        expect(names).toContain("create_row");
     });
 
     it("refuses a collection the project does not declare", async () => {
@@ -466,11 +466,11 @@ describe("resource-server refusals", () => {
 
         const res = await rpc(app, String(body.access_token), {
             jsonrpc: "2.0", id: 1, method: "tools/call",
-            params: { name: "query_collection", arguments: { collection: "rebase.oauth_clients" } }
+            params: { name: "query_table", arguments: { table: "rebase.oauth_clients" } }
         });
         const payload = await res.json() as { result: { isError: boolean; content: { text: string }[] } };
         expect(payload.result.isError).toBe(true);
-        expect(payload.result.content[0].text).toContain("Unknown collection");
+        expect(payload.result.content[0].text).toContain("Unknown table");
     });
 
     it("refuses an argument the tool does not declare", async () => {
@@ -485,12 +485,12 @@ describe("resource-server refusals", () => {
         const res = await rpc(app, String(body.access_token), {
             jsonrpc: "2.0", id: 1, method: "tools/call",
             params: {
-                name: "query_collection",
-                arguments: { collection: "candidates", filter: { salary: ["==", 1] } }
+                name: "query_table",
+                arguments: { table: "candidates", filter: { salary: ["==", 1] } }
             }
         });
         const payload = await res.json() as { result: { isError: boolean; content: { text: string }[] } };
         expect(payload.result.isError).toBe(true);
-        expect(payload.result.content[0].text).toContain("\"filter\" is not an argument of query_collection");
+        expect(payload.result.content[0].text).toContain("\"filter\" is not an argument of query_table");
     });
 });

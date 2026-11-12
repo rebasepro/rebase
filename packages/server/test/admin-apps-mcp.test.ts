@@ -65,7 +65,7 @@ describe("the admin panel's MCP endpoint", () => {
         const { status, body } = await call(app(users), "good", "tools/list");
         expect(status).toBe(200);
         const names = body?.result?.tools?.map(tool => tool.name) ?? [];
-        expect(names).toEqual(expect.arrayContaining(["query_collection", "create_document", "delete_document"]));
+        expect(names).toEqual(expect.arrayContaining(["query_table", "create_row", "delete_row"]));
         // Offered only where the view is served; this test serves none.
         expect(names).not.toContain("open_app");
     });

@@ -146,7 +146,7 @@ describe("/mcp", () => {
     };
     const callQuery = (app: Parameters<typeof rpc>[0], bearer: string) => rpc(app, bearer, {
         jsonrpc: "2.0", id: 1, method: "tools/call",
-        params: { name: "query_collection", arguments: { collection: "candidates" } }
+        params: { name: "query_table", arguments: { table: "candidates" } }
     });
 
     it("scopes a tool call made with an API key with the key named", async () => {

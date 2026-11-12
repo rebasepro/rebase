@@ -112,7 +112,7 @@ describe("show_app's artifact guide", () => {
 
     it("names, for a project's own connector, only tools this server has", () => {
         const names = new Set(MCP_TOOLS.map(tool => tool.name));
-        for (const tool of ["show_app", "query_collection", "get_document", "count_documents", "aggregate_documents", "create_document", "update_document", "delete_document"]) {
+        for (const tool of ["show_app", "query_table", "get_row", "count_rows", "aggregate_rows", "create_row", "update_row", "delete_row"]) {
             expect(guide).toContain(`"${tool}"`);
             expect(names.has(tool)).toBe(true);
         }
@@ -129,10 +129,10 @@ describe("show_app's artifact guide", () => {
 describe("the read tools' output schemas", () => {
     it("describe a page, a count and a row, and only on tools that send a structured result", () => {
         const schemaOf = (name: string) => MCP_TOOLS.find(tool => tool.name === name)?.outputSchema;
-        expect(schemaOf("query_collection")).toMatchObject({ required: ["data"] });
-        expect(schemaOf("aggregate_documents")).toMatchObject({ required: ["data"] });
-        expect(schemaOf("count_documents")).toMatchObject({ required: ["count"] });
-        expect(schemaOf("get_document")).toMatchObject({ type: "object" });
+        expect(schemaOf("query_table")).toMatchObject({ required: ["data"] });
+        expect(schemaOf("aggregate_rows")).toMatchObject({ required: ["data"] });
+        expect(schemaOf("count_rows")).toMatchObject({ required: ["count"] });
+        expect(schemaOf("get_row")).toMatchObject({ type: "object" });
         for (const tool of MCP_TOOLS) {
             if (tool.outputSchema) expect(tool.structuredContent).not.toBe(false);
         }

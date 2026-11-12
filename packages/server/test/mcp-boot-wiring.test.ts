@@ -236,7 +236,7 @@ describe("when it does mount", () => {
     it("hands a write to the users collection to the auth adapter", async () => {
         // The write tools answer to the adapter's user administration only if
         // the boot hands them the adapter. Without it, deleting the last
-        // administrator through `delete_document` succeeded.
+        // administrator through `delete_row` succeeded.
         const deleted: unknown[] = [];
         const driver = capableDriver();
         driver.withAuth = async () => driver;
@@ -269,7 +269,7 @@ describe("when it does mount", () => {
             headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
             body: JSON.stringify({
                 jsonrpc: "2.0", id: 1, method: "tools/call",
-                params: { name: "delete_document", arguments: { collection: "users", id: "admin-1" } }
+                params: { name: "delete_row", arguments: { table: "users", id: "admin-1" } }
             })
         });
         const body = await res.json() as { result: { isError?: boolean; content: { text: string }[] } };

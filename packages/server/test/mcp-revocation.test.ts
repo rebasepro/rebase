@@ -506,7 +506,7 @@ describe("a grant follows the account it was made for", () => {
         // request; `/mcp` now does too.
         const query = {
             jsonrpc: "2.0", id: 1, method: "tools/call",
-            params: { name: "query_collection", arguments: { collection: "candidates" } }
+            params: { name: "query_table", arguments: { table: "candidates" } }
         };
 
         it("stops working the moment the account is deleted or disabled", async () => {

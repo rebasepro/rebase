@@ -16,7 +16,8 @@
  */
 import type { McpAppCompilerSource as McpRouteConfigAppCompiler } from "../../src/mcp/mcp-apps";
 import { Hono } from "hono";
-import type { AuthAdapter, CollectionConfig, DataDriver } from "@rebasepro/types";
+import type { AuthAdapter, CollectionConfig, DataDriver, TableDescriptor } from "@rebasepro/types";
+import { collectionsToTableDefs, compileTables, lowerTables, type AnySchemaDef } from "@rebasepro/common";
 import { generateAccessToken } from "../../src/auth/jwt";
 import { createOAuthRoutes } from "../../src/mcp/oauth-routes";
 import { createMcpRoutes, createMcpWellKnownRoutes, type McpRoutesConfig } from "../../src/mcp/mcp-routes";
@@ -151,6 +152,27 @@ export function memoryStore(): OAuthStore {
     };
 }
 
+/**
+ * The descriptors of legacy collection fixtures, as the backend's registry
+ * holds them for the same tables: lifted to definitions (the temporary
+ * bridge for fixtures) and compiled. What the MCP tools describe and show.
+ */
+export function tablesOf(collections: readonly CollectionConfig[]): TableDescriptor[] {
+    const { tables, defaultRls } = collectionsToTableDefs(collections);
+    return compileTables(tables, defaultRls ? { defaultRls } : {});
+}
+
+/**
+ * A schema as a backend boots it from `defineTable`s: the descriptors the
+ * registry holds and the tables lowered for the data path, from one compile.
+ * Spread into {@link buildApp}'s options.
+ */
+export function schemaOf(defs: readonly AnySchemaDef[]): { tables: TableDescriptor[]; collections: CollectionConfig[] } {
+    const tables = compileTables(defs);
+    const collections = lowerTables(defs, { describe: slug => tables.find(table => table.slug === slug) });
+    return { tables, collections };
+}
+
 export const COLLECTIONS: CollectionConfig[] = [{
     slug: "candidates",
     name: "Candidates",
@@ -209,6 +231,8 @@ export interface HarnessOptions {
     allowDynamicRegistration?: boolean;
     driver?: DataDriver;
     collections?: CollectionConfig[];
+    /** The descriptors the tools read. Those of `collections` when absent. */
+    tables?: TableDescriptor[];
     identity?: McpGrantIdentity;
     maxBodySize?: number;
     rateLimit?: DataRateLimitConfig;
@@ -229,13 +253,16 @@ export interface HarnessOptions {
 export function buildApp(options: HarnessOptions = {}) {
     const store = memoryStore();
     const driver = options.driver ?? stubDriver().driver;
+    const collections = options.collections ?? COLLECTIONS;
+    const tables = options.tables ?? tablesOf(collections);
     const app = new Hono();
     const mcpConfig = {
         publicUrl: PUBLIC_URL,
         mcpPath: "/mcp",
         oauthBasePath: "/api/oauth",
         getDriver: () => driver,
-        getCollections: () => options.collections ?? COLLECTIONS,
+        getTables: () => tables,
+        getCollections: () => collections,
         getAuthAdapter: () => options.authAdapter,
         serverInfo: { name: "rebase", version: "test" },
         maxBodySize: options.maxBodySize,

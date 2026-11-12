@@ -76,10 +76,10 @@ describe("the data tools", () => {
         const { result } = await call(app, await token("data:read data:write data:delete"), "tools/list");
         const tools = result?.tools as { name: string; title?: string; annotations?: Record<string, unknown> }[];
         const byName = Object.fromEntries(tools.map(tool => [tool.name, tool]));
-        expect(byName.query_collection).toMatchObject({ title: "Query rows", annotations: { readOnlyHint: true } });
-        expect(byName.create_document.annotations).toEqual(
+        expect(byName.query_table).toMatchObject({ title: "Query rows", annotations: { readOnlyHint: true } });
+        expect(byName.create_row.annotations).toEqual(
             { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false });
-        expect(byName.delete_document.annotations).toEqual(
+        expect(byName.delete_row.annotations).toEqual(
             { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false });
         // Every one of them says what it is.
         for (const tool of tools) expect(tool.annotations).toBeDefined();
@@ -94,7 +94,7 @@ describe("an app's own tools", () => {
         const names = (result?.tools as { name: string }[]).map(tool => tool.name);
         expect(names).toEqual(["projects", "deploy"]);
 
-        const data = await call(app, bearer, "tools/call", { name: "query_collection", arguments: { collection: "candidates" } });
+        const data = await call(app, bearer, "tools/call", { name: "query_table", arguments: { table: "candidates" } });
         expect(data.error?.message).toContain("Unknown tool");
     });
 

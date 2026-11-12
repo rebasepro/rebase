@@ -360,16 +360,16 @@ describe("the platform MCP endpoint", () => {
 
         expect(status).toBe(200);
         const names = (body.result?.tools as { name: string }[]).map(tool => tool.name);
-        expect(names).toEqual(expect.arrayContaining(["list_collections", "query_collection", "get_document"]));
-        expect(names).not.toContain("create_document");
-        expect(names).not.toContain("delete_document");
+        expect(names).toEqual(expect.arrayContaining(["list_tables", "query_table", "get_row"]));
+        expect(names).not.toContain("create_row");
+        expect(names).not.toContain("delete_row");
     });
 
     it("runs each call as platform:<sub> with the admin role, under RLS", async () => {
         const app = await boot();
         scopedAs.length = 0;
         const { body } = await mcp(app, await platformToken({ scope: "data:read" }), "tools/call",
-            { name: "query_collection", arguments: { collection: "jobs" } });
+            { name: "query_table", arguments: { table: "jobs" } });
 
         expect(body.result?.isError).toBeUndefined();
         expect(scopedAs).toContainEqual({ uid: "platform:cloud-user-1", roles: ["admin"] });

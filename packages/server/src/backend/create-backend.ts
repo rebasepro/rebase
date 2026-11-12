@@ -1789,10 +1789,11 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             mcpPath,
             oauthBasePath,
             getDriver: () => defaultDriver,
-            // The RESOLVED set, not `config.collections` — a project that
-            // declares its collections in a directory has an empty
-            // `config.collections`, and the MCP client would be told this
-            // project has no data at all.
+            // What the tools describe and show, redacted per caller by the
+            // serializer `GET /schema/tables` serves; the registry, so a
+            // schema change after boot reaches the next call.
+            getTables: () => tableRegistry.list(),
+            // The RESOLVED set the data path reads, not `config.collections`.
             getCollections: () => activeCollections,
             // The write tools' door into the users table answers to the
             // adapter, as the REST routes and the socket do.
@@ -1875,6 +1876,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             mcpPath,
             oauthBasePath: `${basePath}/oauth`,
             getDriver: () => defaultDriver,
+            getTables: () => tableRegistry.list(),
             getCollections: () => activeCollections,
             getAuthAdapter: () => authAdapter,
             serverInfo: {
@@ -1883,7 +1885,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             },
             maxBodySize: config.maxBodySize,
             rateLimit: rateLimitConfig,
-            // show_collection is offered where its view is served; the
+            // show_table is offered where its view is served; the
             // control plane serves the view itself and relays this result.
             apps: loadMcpApps,
             appCompiler: loadAppCompiler
@@ -1907,6 +1909,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             mcpPath,
             oauthBasePath: `${basePath}/oauth`,
             getDriver: () => defaultDriver,
+            getTables: () => tableRegistry.list(),
             getCollections: () => activeCollections,
             getAuthAdapter: () => authAdapter,
             serverInfo: {
