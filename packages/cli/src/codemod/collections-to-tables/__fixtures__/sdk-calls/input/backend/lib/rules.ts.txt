@@ -1,0 +1,22 @@
+import { policy } from "@rebasepro/server/schema";
+import type { SecurityRule } from "@rebasepro/server/schema";
+
+/** Shared rule helpers, outside any table file: the codemod leaves them in place. */
+export const memberOfTeam = policy.existsIn({ collection: "team_members", where: policy.authUid() });
+
+const collection = "org_members";
+export const memberOfOrg = { kind: "existsIn", collection, where: policy.authUid() } as const;
+
+export const teamRules: SecurityRule[] = [
+    { operation: "select", condition: { kind: "existsIn", collection: "team_members", where: policy.authUid() } }
+];
+
+export const tenant = {
+    field: "orgId",
+    from: { membership: { collection: "memberships", userField: "userId", tenantField: "orgId" } }
+};
+
+// Not rule sources: left as written.
+export const unrelated = { collection: "posts", kind: "other" };
+export const audit = record({ collection: "posts" });
+function record(entry: { collection: string }) { return entry; }

@@ -110,6 +110,16 @@ describe("rebase migrate sdk-calls", () => {
         // The provable boot option is rewritten; the rest is a manual step.
         expect(fs.readFileSync(path.join(dir, "backend/src/index.ts"), "utf8")).toContain(`schemaDir: path.join(__dirname, "../schema")`);
         expect(report.manualSteps.map(step => step.title)).toContain("Update the backend options in backend/src/index.ts");
+        // Rule sources name their table with `table`: existsIn (call and literal) and a membership source.
+        const rules = fs.readFileSync(path.join(dir, "backend/lib/rules.ts"), "utf8");
+        expect(rules).toContain(`policy.existsIn({ table: "team_members"`);
+        expect(rules).toContain(`{ kind: "existsIn", table: collection, where`);
+        expect(rules).toContain(`condition: { kind: "existsIn", table: "team_members"`);
+        expect(rules).toContain(`membership: { table: "memberships", userField`);
+        // An object that is not a rule source keeps its `collection`.
+        expect(rules).toContain(`{ collection: "posts", kind: "other" }`);
+        expect(rules).toContain(`record({ collection: "posts" })`);
+        expect(report.counts["rule-vocabulary"]).toBe(4);
         // Generated SDK files are regenerated, not rewritten.
         expect(report.generated).toEqual(["frontend/src/generated/sdk/database.types.ts"]);
         expect(fs.readFileSync(path.join(dir, "frontend/src/generated/sdk/database.types.ts"), "utf8")).toContain("CollectionName");

@@ -14,7 +14,11 @@
  * - every legacy `admin` key (`ADMIN_COLLECTION_KEYS` / `ADMIN_PROPERTY_KEYS`)
  *   has an entry: a destination, or `{ dropped: "why" }`;
  * - where `customizeTable` refuses a legacy name with a hint naming its new
- *   key (`propertiesOrder` → `fieldOrder`), the codemod sends it there.
+ *   key (`propertiesOrder` → `fieldOrder`), the codemod sends it there;
+ * - every rule key the codemod renames in project code (`RULE_KEY_RENAMES`:
+ *   `existsIn({ collection` → `table`, `membership: { collection` → `table`)
+ *   lands on a member of the rule type in `@rebasepro/types`, and the old key
+ *   is no longer one.
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -48,6 +52,37 @@ function stringArray(file, name) {
         assert.ok(ts.isStringLiteral(element), `${file}: ${name} has a non-string element`);
         return element.text;
     });
+}
+
+/** The member names of an interface (or of the object type at a member path inside it), read as source. */
+function interfaceMembers(file, name, segments = []) {
+    const text = readFileSync(path.join(ROOT, file), "utf8");
+    const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
+    const declaration = source.statements.find(statement => ts.isInterfaceDeclaration(statement) && statement.name.text === name);
+    assert.ok(declaration, `${file} has no interface ${name}`);
+    let members = declaration.members;
+    for (const segment of segments) {
+        const member = members.find(m => ts.isPropertySignature(m) && m.name.getText(source) === segment);
+        assert.ok(member && member.type && ts.isTypeLiteralNode(member.type), `${file}: ${name}.${segments.join(".")} is not an object type`);
+        members = member.type.members;
+    }
+    return new Set(members.filter(ts.isPropertySignature).map(member => member.name.getText(source)));
+}
+
+/** A record of records of strings, as data: `{ existsIn: { collection: "table" } }`. */
+function nestedRecord(file, name) {
+    const node = constInitializer(file, name);
+    assert.ok(ts.isObjectLiteralExpression(node), `${file}: ${name} is not an object literal`);
+    const out = {};
+    for (const property of node.properties) {
+        assert.ok(ts.isPropertyAssignment(property) && ts.isObjectLiteralExpression(property.initializer), `${file}: ${name} has a member that is not \`key: { … }\``);
+        out[keyOf(property)] = {};
+        for (const inner of property.initializer.properties) {
+            assert.ok(ts.isPropertyAssignment(inner) && ts.isStringLiteral(inner.initializer), `${file}: ${name}.${keyOf(property)} has a value that is not a string`);
+            out[keyOf(property)][keyOf(inner)] = inner.initializer.text;
+        }
+    }
+    return out;
 }
 
 function keyOf(property) {
@@ -180,4 +215,20 @@ test("every key customization.ts writes by name is a real option, not only the t
     assert.ok(written.target.size > 0 && written.options.size > 0, "found no keys written by name: the planner's shape changed?");
     for (const key of written.target) assert.ok(FIELD_KEYS.has(key), `customization.ts writes field option "${key}", which FIELD_CUSTOMIZATION_KEYS does not list`);
     for (const key of written.options) assert.ok(TABLE_KEYS.has(key), `customization.ts writes table option "${key}", which TABLE_CUSTOMIZATION_KEYS does not list`);
+});
+
+test("every rule key the codemod renames lands on a member of the rule type, and leaves an old key that is gone", () => {
+    const renames = nestedRecord(VOCABULARY, "RULE_KEY_RENAMES");
+    const types = {
+        existsIn: interfaceMembers("packages/types/src/types/policy.ts", "ExistsInPolicyExpression"),
+        membership: interfaceMembers("packages/types/src/types/tenancy.ts", "TenantMembershipSource", ["membership"])
+    };
+    assert.deepEqual(Object.keys(renames).sort(), Object.keys(types).sort(), "RULE_KEY_RENAMES names a rule source this test does not know: add its type here");
+    for (const [source, map] of Object.entries(renames)) {
+        assert.ok(Object.keys(map).length > 0, `RULE_KEY_RENAMES.${source} renames nothing`);
+        for (const [from, to] of Object.entries(map)) {
+            assert.ok(types[source].has(to), `RULE_KEY_RENAMES.${source}: "${from}" → "${to}", which the rule type does not declare`);
+            assert.ok(!types[source].has(from), `RULE_KEY_RENAMES.${source}: "${from}" is still a member of the rule type; renaming it would break a correct rule`);
+        }
+    }
 });

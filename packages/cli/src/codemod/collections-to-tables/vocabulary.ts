@@ -138,3 +138,16 @@ export const PROPERTY_FIELD_DESTINATIONS: Readonly<Record<string, Destination>> 
     isId: { dropped: "`\"manual\"` and `true` are the same key to the server; the difference had no other reader." },
     type: { dropped: "a reference inside a JSON array is a document value; there is nothing to customize." }
 };
+
+/**
+ * Keys of a rule source renamed with the move to tables, by where they are
+ * written: the argument of `policy.existsIn(…)` / a literal
+ * `{ kind: "existsIn", … }` (`ExistsInPolicyExpression` in `@rebasepro/types`),
+ * and a tenant's `membership: { … }` source (`TenantMembershipSource`). The
+ * SDK-call pass (`sdk-calls.ts`, rule 11) applies them to the project's own
+ * code; the gate test holds each new key to the type's members.
+ */
+export const RULE_KEY_RENAMES: Readonly<Record<"existsIn" | "membership", Readonly<Record<string, string>>>> = {
+    existsIn: { collection: "table" },
+    membership: { collection: "table" }
+};

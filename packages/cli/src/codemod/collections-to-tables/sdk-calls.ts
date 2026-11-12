@@ -27,6 +27,12 @@
  *    callbacks' props adapted as table hooks are (`collection` → `table`,
  *    `row` → `values`), `CollectionCallbacks` → `TableHooks`.
  * 10. `storageAuthorize`'s data: `.collection` → `.table`.
+ * 11. The rule vocabulary: an `existsIn` policy names its table with `table`
+ *    (`policy.existsIn({ collection: X …` → `table: X`, a literal
+ *    `{ kind: "existsIn", collection: X }` the same), and a tenant
+ *    membership source too (`membership: { collection: X …` →
+ *    `membership: { table: X …`). Wherever the rule is written: a table's
+ *    `rls`, a shared rule helper, a `tenant` option.
  *
  * The receiver of a `.collection(` call decides. Where a TypeScript program
  * can be built for the file (its nearest tsconfig, the workspace's sources
@@ -53,11 +59,12 @@ import { carryHook } from "./hooks";
 import { own } from "./own";
 import { reindent } from "./print-js";
 import type { ManualStep, Note } from "./types";
+import { RULE_KEY_RENAMES } from "./vocabulary";
 
 /** The rules, by the name the report counts them under. */
 export type SdkRule =
     | "collection-call" | "client-options" | "generated-types" | "batch-op" | "type-names" | "error-codes"
-    | "offline-options" | "typed-accessor" | "table-hooks" | "storage-authorize" | "boot-options";
+    | "offline-options" | "typed-accessor" | "table-hooks" | "storage-authorize" | "boot-options" | "rule-vocabulary";
 
 /** One `.collection(` left alone, and why. */
 export interface LeftUnchanged {
@@ -284,6 +291,30 @@ function functionMembers(ctx: AstContext, object: ObjectLiteralExpression): { na
     return out;
 }
 
+/**
+ * Which rule source an object literal is (rule 11), and so which of
+ * {@link RULE_KEY_RENAMES} apply: the argument of an `existsIn(…)` call
+ * (`policy.existsIn`, or the function imported bare) or a literal
+ * `{ kind: "existsIn", … }`; or the value of a `membership:` property (a
+ * tenant's membership source). Anything else is not a rule source.
+ */
+function ruleSourceOf(ctx: AstContext, object: ObjectLiteralExpression): keyof typeof RULE_KEY_RENAMES | undefined {
+    const { Node: N } = ctx.tsm;
+    const parent = object.getParent();
+    if (parent && N.isCallExpression(parent) && parent.getArguments()[0] === object) {
+        const callee = parent.getExpression();
+        if ((N.isIdentifier(callee) && callee.getText() === "existsIn") ||
+            (N.isPropertyAccessExpression(callee) && callee.getName() === "existsIn")) return "existsIn";
+    }
+    if (parent && N.isPropertyAssignment(parent) && parent.getInitializer() === object && parent.getName() === "membership") return "membership";
+    const isExistsIn = object.getProperties().some(property => {
+        if (!N.isPropertyAssignment(property) || property.getName() !== "kind") return false;
+        const value = property.getInitializer();
+        return value !== undefined && (N.isStringLiteral(value) || N.isNoSubstitutionTemplateLiteral(value)) && value.getLiteralValue() === "existsIn";
+    });
+    return isExistsIn ? "existsIn" : undefined;
+}
+
 /** Options of {@link rewriteSdkCalls}. */
 export interface RewriteSdkOptions {
     /** Files to read instead of the ones on disk (what the migration is about to write). */
@@ -426,11 +457,13 @@ function rewriteFile(
         if (next) add(identifier, next, "offline-options");
     }
 
-    // Object literals: createRebaseClient options (2), batch operations (4).
+    // Object literals: createRebaseClient options (2), batch operations (4), rule sources (11).
     for (const object of sf.getDescendantsOfKind(SyntaxKind.ObjectLiteralExpression)) {
         const parent = object.getParent();
         const isClientOptions = parent !== undefined && N.isCallExpression(parent) && parent.getExpression().getText() === CLIENT_FACTORY && parent.getArguments()[0] === object;
         const hasOp = object.getProperties().some(property => (N.isPropertyAssignment(property) || N.isShorthandPropertyAssignment(property)) && property.getName() === "op");
+        const ruleSource = ruleSourceOf(ctx, object);
+        const ruleRenames = ruleSource ? RULE_KEY_RENAMES[ruleSource] : undefined;
         for (const property of object.getProperties()) {
             if (!N.isPropertyAssignment(property) && !N.isShorthandPropertyAssignment(property)) continue;
             const name = property.getName();
@@ -441,6 +474,9 @@ function rewriteFile(
             else if (hasOp && name === "collection") {
                 next = "table";
                 rule = "batch-op";
+            } else if (ruleRenames && own(ruleRenames, name)) {
+                next = own(ruleRenames, name);
+                rule = "rule-vocabulary";
             }
             if (!next) continue;
             if (N.isShorthandPropertyAssignment(property)) add(property, `${next}: ${name}`, rule);

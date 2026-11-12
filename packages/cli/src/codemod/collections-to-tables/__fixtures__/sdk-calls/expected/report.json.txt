@@ -5,6 +5,10 @@
       "edits": 6
     },
     {
+      "path": "backend/lib/rules.ts",
+      "edits": 4
+    },
+    {
       "path": "backend/src/index.ts",
       "edits": 1
     },
@@ -24,6 +28,7 @@
   "counts": {
     "table-hooks": 5,
     "collection-call": 6,
+    "rule-vocabulary": 4,
     "boot-options": 1,
     "storage-authorize": 1,
     "generated-types": 4,
