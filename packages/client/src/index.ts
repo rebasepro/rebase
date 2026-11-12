@@ -4,6 +4,7 @@ import { createAuth, CreateAuthOptions, createMemoryStorage, resolveAuthFlowMode
 import { createAdmin, CreateAdminOptions } from "./admin";
 import { createCron, CreateCronOptions } from "./cron";
 import { createBackups } from "./backups";
+import { createSchema } from "./schema";
 import { createApiKeys, CreateApiKeysOptions, createPersonalKeys, CreatePersonalKeysOptions } from "./api-keys";
 import { CollectionClient, createCollectionClient, invalidBulkBody } from "./collection";
 import { createFunctionsClient } from "./functions";
@@ -102,6 +103,9 @@ export type { AdminUser } from "./admin";
 export type { CreateCronOptions } from "./cron";
 // `client.backups` answers these; the factory behind it is internal.
 export type { BackupStream } from "./backups";
+// `client.schema` answers with these; the factory behind it is internal.
+export { SCHEMA_UNAVAILABLE, isSchemaUnavailable } from "./schema";
+export type { SchemaAPI, SchemaTablesOptions, TableDescriptor } from "@rebasepro/types";
 export type {
     ApiKeyKind,
     ApiKeyMasked,
@@ -335,6 +339,8 @@ export type CreateRebaseClientResult<DB = Record<string, unknown>> = Omit<Rebase
     admin: ReturnType<typeof createAdmin>;
     cron: ReturnType<typeof createCron>;
     backups: ReturnType<typeof createBackups>;
+    /** The backend's tables, as `GET /api/schema/tables` serves them to the caller. */
+    schema: ReturnType<typeof createSchema>;
     apiKeys: ReturnType<typeof createApiKeys>;
     personalKeys: ReturnType<typeof createPersonalKeys>;
     functions: ReturnType<typeof createFunctionsClient>;
@@ -511,6 +517,7 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
     const admin = createAdmin(transport, options.admin);
     const cron = createCron(transport, options.cron);
     const backups = createBackups(transport);
+    const schema = createSchema(transport);
     const apiKeys = createApiKeys(transport, options.apiKeys);
     const personalKeys = createPersonalKeys(transport, options.personalKeys);
     const storage = createStorage(transport);
@@ -940,6 +947,7 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
         admin,
         cron,
         backups,
+        schema,
         apiKeys,
         personalKeys,
         functions,

@@ -11,6 +11,7 @@ import type { RoleSummary } from "../types/scopes";
 import type { StorageSourceDefinition } from "../types/storage_source";
 import type { RegisteredDatabase } from "../types/register";
 import type { AccessSimulation } from "../types/auth_adapter";
+import type { TableDescriptor } from "../schema/descriptor";
 
 
 /**
@@ -275,6 +276,36 @@ export interface CronAPI {
     toggleJob(jobId: string, enabled: boolean): Promise<{ job: CronJobStatus }>;
 }
 
+// ─── Schema API ──────────────────────────────────────────────────────────────
+
+/**
+ * Options of {@link SchemaAPI.tables}.
+ * @group Schema
+ */
+export interface SchemaTablesOptions {
+    /** Abandons the request. */
+    signal?: AbortSignal;
+}
+
+/**
+ * The backend's tables, as `GET /api/schema/tables` serves them to the caller.
+ * @group Schema
+ */
+export interface SchemaAPI {
+    /**
+     * Every table the signed-in caller may see, redacted for them: what the
+     * admin panel renders with no frontend configuration.
+     *
+     * Asked again, the request carries the `ETag` of the last answer in
+     * `If-None-Match`, and a `304` hands back the tables that answer held.
+     *
+     * Rejects with a `RebaseApiError`: status `401` when nobody is signed in;
+     * code `SCHEMA_UNAVAILABLE` (status `404`) when the backend serves no
+     * tables — auth is not configured there, or it predates the route.
+     */
+    tables(options?: SchemaTablesOptions): Promise<TableDescriptor[]>;
+}
+
 // ─── Backups API ─────────────────────────────────────────────────────────────
 
 /**
@@ -508,6 +539,9 @@ export interface RebaseClient<DB = unknown> {
 
     /** Database backup management API */
     backups?: BackupsAPI;
+
+    /** The backend's tables, as served to the caller (`GET /api/schema/tables`). */
+    schema?: SchemaAPI;
 
     /** Custom backend functions API */
     functions?: FunctionsAPI;
