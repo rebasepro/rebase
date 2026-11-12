@@ -214,12 +214,12 @@ export interface ServerContextPolicyExpression {
 
 /**
  * Membership / relational access: true when at least one row exists in another
- * collection (a join/membership table) matching `where`. This is what lets you
+ * table (a join/membership table) matching `where`. This is what lets you
  * scope reads to "rows whose team the caller belongs to" without an N+1
  * per-row lookup — it compiles to a single correlated `EXISTS` subquery.
  *
  * Inside `where`, {@link FieldPolicyOperand} (`policy.field`) references a column
- * of the joined collection, while {@link OuterFieldPolicyOperand}
+ * of the joined table, while {@link OuterFieldPolicyOperand}
  * (`policy.outerField`) references a column of the row being checked (the outer
  * table under RLS). Combine with {@link AuthUidPolicyOperand} to correlate to
  * the caller.
@@ -228,7 +228,7 @@ export interface ServerContextPolicyExpression {
  * ```ts
  * // documents visible only to members of the document's team:
  * policy.existsIn({
- *   collection: "team_members",
+ *   table: "team_members",
  *   where: policy.and(
  *     policy.compare(policy.field("team_id"), "eq", policy.outerField("team_id")),
  *     policy.compare(policy.field("user_id"), "eq", policy.authUid()),
@@ -245,9 +245,15 @@ export interface ServerContextPolicyExpression {
  */
 export interface ExistsInPolicyExpression {
     kind: "existsIn";
-    /** Slug of the collection to search (the join / membership table). */
-    collection: string;
-    /** Condition evaluated against the joined collection's rows. */
+    /**
+     * The table to search (the join / membership table), by its slug.
+     *
+     * Spelled `collection` before tables replaced collections in the backend
+     * vocabulary. A policy's name hashes the rule as written, so the name
+     * hash still reads this field as `collection` (see `getPolicyNameHash`).
+     */
+    table: string;
+    /** Condition evaluated against the joined table's rows. */
     where: PolicyExpression;
 }
 
@@ -291,7 +297,7 @@ export interface FieldPolicyOperand {
  */
 export interface OuterFieldPolicyOperand {
     kind: "outerField";
-    /** The property/column name on the outer collection. */
+    /** The property/column name on the outer table. */
     name: string;
 }
 
@@ -469,9 +475,9 @@ roles: roles as string[] }),
     authenticated: (): AuthenticatedPolicyExpression => ({ kind: "authenticated" }),
     registered: (): RegisteredPolicyExpression => ({ kind: "registered" }),
     serverContext: (): ServerContextPolicyExpression => ({ kind: "serverContext" }),
-    existsIn: (args: { collection: string; where: PolicyExpression }): ExistsInPolicyExpression =>
+    existsIn: (args: { table: string; where: PolicyExpression }): ExistsInPolicyExpression =>
         ({ kind: "existsIn",
-collection: args.collection,
+table: args.table,
 where: args.where }),
     raw: (sql: string): RawPolicyExpression => ({ kind: "raw",
 sql }),

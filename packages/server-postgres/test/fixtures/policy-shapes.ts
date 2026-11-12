@@ -111,7 +111,7 @@ export const POLICY_SHAPE_COLLECTIONS: CollectionConfig[] = [
         name: "Tasks", slug: "tasks", table: "tasks",
         tenant: {
             field: "orgId",
-            from: { membership: { collection: "memberships", userField: "userId", tenantField: "orgId" } },
+            from: { membership: { table: "memberships", userField: "userId", tenantField: "orgId" } },
             bypassRoles: ["admin", "support"]
         },
         properties: {
@@ -136,7 +136,7 @@ export const POLICY_SHAPE_COLLECTIONS: CollectionConfig[] = [
             {
                 operation: "select",
                 condition: policy.existsIn({
-                    collection: "memberships",
+                    table: "memberships",
                     where: policy.and(
                         policy.compare(policy.field("orgId"), "eq", policy.outerField("orgId")),
                         policy.compare(policy.field("userId"), "eq", policy.authUid())
@@ -150,7 +150,7 @@ export const POLICY_SHAPE_COLLECTIONS: CollectionConfig[] = [
                     policy.and(
                         policy.not(policy.rolesOverlap(["banned"])),
                         policy.existsIn({
-                            collection: "memberships",
+                            table: "memberships",
                             where: policy.and(
                                 policy.compare(policy.field("orgId"), "eq", policy.outerField("orgId")),
                                 policy.compare(policy.field("userId"), "eq", policy.authUid())

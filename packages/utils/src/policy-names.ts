@@ -45,8 +45,8 @@ export function getPolicyNameHash(rule: SecurityRule): string {
         pg: rule.pgRoles?.slice().sort(),
         u: rule.using,
         w: rule.withCheck,
-        c: rule.condition,
-        ch: rule.check
+        c: frozenHashSpelling(rule.condition),
+        ch: frozenHashSpelling(rule.check)
     });
     return sha1Hex(data).substring(0, 7);
 }
@@ -85,9 +85,29 @@ export function newShapeHashInput(rule: SecurityRule): string {
         pg: rule.pgRoles?.slice().sort(),
         u: rule.using,
         w: rule.withCheck,
-        c: conditionHashValue(rule.condition),
-        ch: conditionHashValue(rule.check)
+        c: conditionHashValue(frozenHashSpelling(rule.condition)),
+        ch: conditionHashValue(frozenHashSpelling(rule.check))
     })}`;
+}
+
+/**
+ * The frozen spelling of the hash input: a condition as it was spelled when
+ * the names in deployed databases were derived from it.
+ *
+ * An `existsIn` node names its join table in `table`, which was spelled
+ * `collection` before tables replaced collections in the backend vocabulary.
+ * Hashed as written, every unnamed policy with a membership subquery would be
+ * renamed by the rename alone. So the hash reads each `existsIn` node with
+ * `table` put back as `collection`, in the same key position, and nothing
+ * else changes: this is the input, byte for byte, the old spelling produced.
+ * Never extend it to a new field — it exists only to keep old names.
+ */
+function frozenHashSpelling(condition: unknown): unknown {
+    if (Array.isArray(condition)) return condition.map(frozenHashSpelling);
+    if (typeof condition !== "object" || condition === null) return condition;
+    const existsIn = "kind" in condition && condition.kind === "existsIn";
+    return Object.fromEntries(Object.entries(condition).map(([key, value]) =>
+        [existsIn && key === "table" ? "collection" : key, frozenHashSpelling(value)]));
 }
 
 function conditionHashValue(condition: unknown): unknown {

@@ -49,7 +49,7 @@ export interface TenantClaimSource {
 }
 
 /**
- * The caller's tenants come from rows of a membership collection.
+ * The caller's tenants come from rows of a membership table.
  *
  * The many-tenants-per-user shape — a `memberships` table with a user column
  * and a tenant column, which is how a person belongs to three organizations at
@@ -64,8 +64,8 @@ export interface TenantClaimSource {
  */
 export interface TenantMembershipSource {
     membership: {
-        /** Slug of the collection holding the memberships. */
-        collection: string;
+        /** Slug of the table holding the memberships. */
+        table: string;
         /** The property on it that holds the user id (compared to `rebase.uid()`). */
         userField: string;
         /** The property on it that holds the tenant id. */

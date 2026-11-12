@@ -170,7 +170,7 @@ describe("a tenancy membership read", () => {
             },
             {
                 name: "Notes", slug: "notes", table: "notes",
-                tenant: { field: "orgId", from: { membership: { collection: "members", userField: "userId", tenantField: "orgId" } } },
+                tenant: { field: "orgId", from: { membership: { table: "members", userField: "userId", tenantField: "orgId" } } },
                 properties: {
                     id: { name: "ID", type: "number", isId: "increment" },
                     orgId: { name: "Org", type: "string", columnName: "org_id" },

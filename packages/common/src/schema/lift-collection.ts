@@ -88,6 +88,7 @@ import { generateForeignKeyName, toSnakeCase } from "@rebasepro/utils";
 import { fieldKeyForColumn, findRelation, getTableName, resolveCollectionRelations } from "../util/relations";
 import { resolveRelation } from "../util/resolve-relation";
 import { SchemaDefinitionError, isSchemaDefinitionError } from "./errors";
+import { liftRuleSpelling, liftTenantSourceSpelling } from "./lift-rule-spelling";
 
 // ── Notes ────────────────────────────────────────────────────────────────────
 
@@ -194,7 +195,7 @@ export function collectionsToTableDefs(
 ): LiftResult {
     const lifter = new Lifter(collections, options);
     const tables = lifter.liftAll();
-    const defaultRls = nonEmpty(options.defaultSecurityRules ?? []);
+    const defaultRls = nonEmpty((options.defaultSecurityRules ?? []).map(liftRuleSpelling));
     return {
         tables,
         ...(defaultRls ? { defaultRls } : {}),
@@ -1309,7 +1310,7 @@ class CollectionLift {
         const rules = c.securityRules;
         const defaults = this.lifter.defaultRules();
         const inherits = defaults.length > 0 && (rules === defaults || !rules || rules.length === 0);
-        const declared = nonEmpty(rules ?? []);
+        const declared = nonEmpty((rules ?? []).map(liftRuleSpelling));
         const posture: RlsPosture = inherits ? "inherit" : declared ?? "admin-only";
         if (c.disableDefaultPolicies) {
             if (posture === "admin-only") {
@@ -1347,7 +1348,7 @@ class CollectionLift {
         if (c.tenant !== undefined) {
             config.tenant = {
                 field: this.columnKeyOf(c.tenant.field),
-                from: c.tenant.from,
+                from: liftTenantSourceSpelling(c.tenant.from),
                 ...(c.tenant.bypassRoles !== undefined ? { bypassRoles: c.tenant.bypassRoles } : {})
             };
         }

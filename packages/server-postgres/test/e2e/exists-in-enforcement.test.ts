@@ -72,7 +72,7 @@ const resolveCollection = (slug: string): CollectionConfig | undefined =>
 
 /** "Documents on a team the caller belongs to." */
 const MEMBERSHIP_POLICY: PolicyExpression = policy.existsIn({
-    collection: "teamMembers",
+    table: "teamMembers",
     where: policy.and(
         policy.compare(policy.field("team_id"), "eq", policy.outerField("team_id")),
         policy.compare(policy.field("user_id"), "eq", policy.authUid())
@@ -195,7 +195,7 @@ describe("existsIn enforcement", () => {
      */
     it("is distinguishable from the collapsed correlation it must not be", async () => {
         const collapsed = policy.existsIn({
-            collection: "teamMembers",
+            table: "teamMembers",
             where: policy.compare(policy.field("user_id"), "eq", policy.authUid())
         });
         await installPolicy("docs_membership", collapsed);
@@ -218,7 +218,7 @@ describe("existsIn enforcement", () => {
         const twoHops = policy.and(
             MEMBERSHIP_POLICY,
             policy.existsIn({
-                collection: "teamMembers",
+                table: "teamMembers",
                 where: policy.compare(policy.field("user_id"), "eq", policy.authUid())
             })
         );

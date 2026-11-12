@@ -113,7 +113,7 @@ const posts: PostgresCollectionConfig<Post> = {
         {
             operation: "select",
             condition: policy.existsIn({
-                collection: "memberships",
+                table: "memberships",
                 where: policy.compare(policy.field("user_id"), "eq", policy.authUid())
             })
         },

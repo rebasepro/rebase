@@ -80,7 +80,7 @@ export function tenantScopeExpression(tenant: CollectionTenantConfig): PolicyExp
     const match: PolicyExpression = isTenantClaimSource(tenant.from)
         ? policy.compare(policy.field(tenant.field), "eq", policy.authClaim(tenant.from.claim))
         : policy.existsIn({
-            collection: tenant.from.membership.collection,
+            table: tenant.from.membership.table,
             where: policy.and(
                 policy.compare(
                     policy.field(tenant.from.membership.tenantField),
@@ -323,6 +323,6 @@ function sourceHint(tenant: CollectionTenantConfig): string {
     return isTenantClaimSource(tenant.from)
         ? `The tenant comes from the '${tenant.from.claim}' claim on the caller's token; this one has no ` +
           "such claim. Sign in, or add the claim in the custom-claims hook."
-        : `The tenant comes from rows of '${tenant.from.membership.collection}' whose ` +
+        : `The tenant comes from rows of '${tenant.from.membership.table}' whose ` +
           `'${tenant.from.membership.userField}' is the caller; this caller has none.`;
 }

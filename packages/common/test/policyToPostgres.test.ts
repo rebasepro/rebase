@@ -24,7 +24,7 @@ const resolveCollection = (slug: string) => [documents, teamMembers].find(c => c
 describe("policyToPostgres — existsIn (membership)", () => {
     it("compiles a correlated EXISTS subquery scoping reads to the caller's teams", () => {
         const expr = policy.existsIn({
-            collection: "team_members",
+            table: "team_members",
             where: policy.and(
                 policy.compare(policy.field("team_id"), "eq", policy.outerField("team_id")),
                 policy.compare(policy.field("user_id"), "eq", policy.authUid())
@@ -44,7 +44,7 @@ describe("policyToPostgres — existsIn (membership)", () => {
 
     it("falls back to a snake_cased table name when the collection can't be resolved", () => {
         const expr = policy.existsIn({
-            collection: "teamMembers",
+            table: "teamMembers",
             where: policy.compare(policy.field("userId"), "eq", policy.authUid())
         });
         const sql = policyToPostgres(expr, documents);
@@ -59,7 +59,7 @@ describe("policyToPostgres — existsIn (membership)", () => {
 
     it("is treated as server-authoritative (unknown) by the JS evaluator", () => {
         const expr = policy.existsIn({
-            collection: "team_members",
+            table: "team_members",
             where: policy.compare(policy.field("user_id"), "eq", policy.authUid())
         });
         expect(evaluatePolicy(expr, { uid: "u1",
@@ -363,7 +363,7 @@ describe("policyToPostgres — row-independent parts become initPlans", () => {
 
     it("hoists inside a correlated EXISTS, without hoisting the EXISTS", () => {
         const sql = policyToPostgres(policy.existsIn({
-            collection: "team_members",
+            table: "team_members",
             where: policy.compare(policy.field("user_id"), "eq", policy.authUid())
         }), documents, { resolveCollection });
         expect(sql).toBe(`EXISTS (SELECT 1 FROM "public"."team_members" "_ex0" WHERE ("_ex0".user_id)::text = (SELECT rebase.uid()))`);

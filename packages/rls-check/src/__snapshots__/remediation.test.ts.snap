@@ -670,7 +670,7 @@ exports[`remediation per check id > 'unqualified-column-in-subquery: a col…' 1
     "placeholders": [],
     "rebase": {
       "applicable": true,
-      "note": "A raw rule keeps the expression as SQL; Rebase writes it into the policy as is, with \`{column}\` standing for the row being checked. Rebase rewrites \`auth.uid()\` to \`rebase.uid()\`, which returns text: compare a uuid column with it as \`{column}::text = rebase.uid()\`. The structured form, \`policy.existsIn({ collection, where })\` with \`policy.outerField("…")\` for the outer row, makes the binding explicit and is checked by the type system. https://rebase.pro/docs/collections/security-rules",
+      "note": "A raw rule keeps the expression as SQL; Rebase writes it into the policy as is, with \`{column}\` standing for the row being checked. Rebase rewrites \`auth.uid()\` to \`rebase.uid()\`, which returns text: compare a uuid column with it as \`{column}::text = rebase.uid()\`. The structured form, \`policy.existsIn({ table, where })\` with \`policy.outerField("…")\` for the outer row, makes the binding explicit and is checked by the type system. https://rebase.pro/docs/collections/security-rules",
       "securityRules": "[
     { name: "documents_select", operation: "select", using: "(EXISTS ( SELECT 1 FROM memberships WHERE ((memberships.user_id = auth.uid()) AND (memberships.org_id = {org_id}))))" }
 ]",

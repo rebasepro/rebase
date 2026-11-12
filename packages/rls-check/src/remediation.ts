@@ -939,7 +939,7 @@ function unqualifiedColumnInSubquery(snapshot: DbSnapshot, finding: Finding): Re
             ruleClauses.USING ?? policy.using,
             ruleClauses["WITH CHECK"] ?? policy.withCheck
         )], `${rawRuleNote(snapshot, policy.using, policy.withCheck)} The structured form, ` +
-            "`policy.existsIn({ collection, where })` with `policy.outerField(\"…\")` for the outer row, makes " +
+            "`policy.existsIn({ table, where })` with `policy.outerField(\"…\")` for the outer row, makes " +
             "the binding explicit and is checked by the type system.")
         : noRebaseRule("The comparison could not be located in the expression exactly once, so no rule was derived.");
 

@@ -249,11 +249,11 @@ describe("policy SQL — existsIn scoping", () => {
         const twoSubqueries = fc.tuple(snakeIdentifier, snakeIdentifier, snakeIdentifier)
             .map(([a, b, col]) => policy.and(
                 policy.existsIn({
-                    collection: a,
+                    table: a,
                     where: policy.compare(policy.field(col), "eq", policy.outerField(col))
                 }),
                 policy.existsIn({
-                    collection: b,
+                    table: b,
                     where: policy.compare(policy.field(col), "eq", policy.outerField(col))
                 })
             ));

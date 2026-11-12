@@ -297,7 +297,7 @@ function existsEndpoint(endpoint: JunctionEndpoint, extra?: PolicyExpression): P
         policy.outerField(endpoint.junctionColumn)
     );
     return policy.existsIn({
-        collection: endpoint.collection.slug,
+        table: endpoint.collection.slug,
         where: extra ? policy.and(correlation, extra) : correlation
     });
 }
@@ -332,7 +332,7 @@ export function embedParentExpression(expr: PolicyExpression, depth = 0): Policy
         }
         case "existsIn": {
             const where = embedParentExpression(expr.where, depth + 1);
-            return where ? policy.existsIn({ collection: expr.collection, where }) : null;
+            return where ? policy.existsIn({ table: expr.table, where }) : null;
         }
         case "compare": {
             const left = embedOperand(expr.left, depth);

@@ -224,7 +224,7 @@ describe("getJunctionSecurityRules — write inheritance", () => {
                     // A nested existsIn correlating via outerField cannot be
                     // re-scoped into the junction's EXISTS.
                     condition: policy.existsIn({
-                        collection: "team_members",
+                        table: "team_members",
                         where: policy.compare(policy.field("team_id"), "eq", policy.outerField("team_id"))
                     })
                 }
@@ -294,7 +294,7 @@ describe("embedParentExpression", () => {
 
     it("rejects an outerField inside a nested existsIn (no operand can express the middle scope)", () => {
         const expr = policy.existsIn({
-            collection: "team_members",
+            table: "team_members",
             where: policy.compare(policy.field("team_id"), "eq", policy.outerField("team_id"))
         });
         expect(embedParentExpression(expr)).toBeNull();
@@ -302,7 +302,7 @@ describe("embedParentExpression", () => {
 
     it("keeps a nested existsIn that does not reach outward", () => {
         const expr = policy.existsIn({
-            collection: "team_members",
+            table: "team_members",
             where: policy.compare(policy.field("user_id"), "eq", policy.authUid())
         });
         expect(embedParentExpression(expr)).toEqual(expr);

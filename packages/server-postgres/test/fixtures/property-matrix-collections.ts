@@ -480,7 +480,7 @@ export const membershipTenanted = C({
     ],
     tenant: {
         field: "org",
-        from: { membership: { collection: "memberships", userField: "userId", tenantField: "org" } }
+        from: { membership: { table: "memberships", userField: "userId", tenantField: "org" } }
     }
 });
 

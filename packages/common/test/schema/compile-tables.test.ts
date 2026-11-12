@@ -523,7 +523,7 @@ describe("compileTables — table options", () => {
             columns: { id: col.uuid().primaryKey() },
             relations: { org: rel.belongsTo(() => orgs) },
             rls: "admin-only",
-            tenant: { field: "id", from: { membership: { collection: "members", userField: "user_id", tenantField: "org_id" } } }
+            tenant: { field: "id", from: { membership: { table: "members", userField: "user_id", tenantField: "org_id" } } }
         });
         const viaRelation = { ...projects, config: { ...projects.config, tenant: { field: "org", from: { claim: "org_id" } } } };
         const [, p] = compileTables([orgs, viaRelation]);

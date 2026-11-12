@@ -142,7 +142,7 @@ export const policyExpression: fc.Arbitrary<PolicyExpression> = fc.letrec<{
         fc.array(tie("expr"), { minLength: 0, maxLength: 3 }).map(ops => policy.or(...ops)),
         tie("expr").map(op => policy.not(op)),
         fc.tuple(snakeIdentifier, tie("inner"))
-            .map(([collection, where]) => policy.existsIn({ collection, where }))
+            .map(([table, where]) => policy.existsIn({ table, where }))
     ),
     // Inside a subquery `outerField` becomes meaningful, so the inner grammar
     // is the outer one plus that operand.

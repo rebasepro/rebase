@@ -21,7 +21,7 @@ const authors = defineTable("authors", {
 const posts = defineTable("posts", {
     columns: { id: col.uuid().primaryKey().defaultRandom(), title: col.text(), note: col.text().access({ read: ["editor"] }) },
     relations: { author: rel.belongsTo(() => authors) },
-    rls: [{ operation: "select", condition: policy.existsIn({ collection: "authors", where: policy.raw("{id} IS NOT NULL") }) }]
+    rls: [{ operation: "select", condition: policy.existsIn({ table: "authors", where: policy.raw("{id} IS NOT NULL") }) }]
 });
 const descriptors = (): TableDescriptor[] => compileSchemaDefs([authors, posts]).descriptors;
 
@@ -53,7 +53,7 @@ describe("the MCP caller class (a credential holding scopes)", () => {
 
 describe("rule redaction", () => {
     it("finds a raw node anywhere inside a structured condition", () => {
-        expect(redactRule({ operation: "select", condition: policy.existsIn({ collection: "a", where: policy.raw("true") }) }))
+        expect(redactRule({ operation: "select", condition: policy.existsIn({ table: "a", where: policy.raw("true") }) }))
             .toEqual({ operation: "select", redacted: true });
     });
 

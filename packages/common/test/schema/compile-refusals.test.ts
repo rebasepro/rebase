@@ -211,7 +211,7 @@ describe("compileTables — refusals", () => {
                     {
                         operation: "update",
                         condition: policy.true(),
-                        check: policy.existsIn({ collection: "orgs", where: policy.compare(policy.field("anything"), "eq", policy.outerField("orgId")) })
+                        check: policy.existsIn({ table: "orgs", where: policy.compare(policy.field("anything"), "eq", policy.outerField("orgId")) })
                     }
                 ]
             });

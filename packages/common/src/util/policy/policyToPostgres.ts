@@ -372,8 +372,8 @@ function dollarQuoteTagAt(sql: string, at: number): string | undefined {
  * `outerField` operands bind to the (table-qualified) outer RLS row.
  */
 function compileExistsIn(expr: ExistsInPolicyExpression, scope: CompileScope): string {
-    const join = scope.resolveCollection?.(expr.collection);
-    const joinTable = join ? getTableName(join) : toSnakeCase(expr.collection);
+    const join = scope.resolveCollection?.(expr.table);
+    const joinTable = join ? getTableName(join) : toSnakeCase(expr.table);
     const joinSchema = schemaOf(join) ?? schemaOf(scope.outerCollection) ?? "public";
     const alias = `_ex${scope.alias.n++}`;
 

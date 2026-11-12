@@ -82,7 +82,7 @@ describe("isPolicyShorthand", () => {
             policy.true(), policy.false(), policy.and(), policy.or(), policy.not(policy.true()),
             policy.compare(policy.field("a"), "eq", policy.literal(1)), policy.rolesOverlap(["x"]),
             policy.rolesContain(["x"]), policy.authenticated(), policy.registered(), policy.serverContext(),
-            policy.existsIn({ collection: "m", where: policy.true() }), policy.raw("true")
+            policy.existsIn({ table: "m", where: policy.true() }), policy.raw("true")
         ];
         expect(nodes.map(n => n.kind).sort()).toEqual([...POLICY_EXPRESSION_KINDS].sort());
         for (const node of nodes) expect(isPolicyShorthand(node)).toBe(false);

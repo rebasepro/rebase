@@ -47,7 +47,7 @@ describe("findAnonymousGrants", () => {
         // produced, so this pins the exact shape that regressed.
         const expr: PolicyExpression = {
             kind: "existsIn",
-            collection: "a",
+            table: "a",
             where: policy.compare(policy.authUid(), "eq", policy.literal("anon"))
         };
 

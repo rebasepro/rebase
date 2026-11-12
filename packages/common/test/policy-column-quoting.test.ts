@@ -90,7 +90,7 @@ describe("policyToPostgres — column identifiers", () => {
 
         const sql = policyToPostgres(
             policy.existsIn({
-                collection: "members",
+                table: "members",
                 where: policy.compare(policy.field("docId"), "eq", policy.outerField("createdAt"))
             }),
             legacyDocs,

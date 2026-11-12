@@ -1283,7 +1283,7 @@ export class PostgresBackendDriver implements DataDriver {
         const uid = this.user?.uid;
         if (!uid) return { tenants: [], complete: true };
 
-        const { collection: slug, userField, tenantField } = tenant.from.membership;
+        const { table: slug, userField, tenantField } = tenant.from.membership;
         const cap = PostgresBackendDriver.TENANT_MEMBERSHIP_CAP;
         try {
             // Read on the trusted plane for its fields — the database still
