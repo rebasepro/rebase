@@ -99,19 +99,28 @@ workspaces: ["backend"] });
         expect(findProjectRoot(inner)).toBe(inner);
     });
 
-    it("finds root by backend/ + config/ sibling directories", () => {
+    it("finds root by a package.json beside backend/, with no config/", () => {
+        // The config package is gone: a project is a backend/ (with
+        // backend/schema for declared tables), and nothing else is required.
         const projectDir = createDir("my-app");
-        createDir("my-app", "backend");
-        createDir("my-app", "config");
+        createDir("my-app", "backend", "schema");
         writeJSON(path.join(projectDir, "package.json"), { name: "my-app" });
 
         expect(findProjectRoot(projectDir)).toBe(projectDir);
     });
 
+    it("finds root from inside backend/schema", () => {
+        const projectDir = createDir("my-app");
+        const schemaDir = createDir("my-app", "backend", "schema");
+        writeJSON(path.join(projectDir, "package.json"), { name: "my-app" });
+        writeJSON(path.join(projectDir, "backend", "package.json"), { name: "my-app-backend" });
+
+        expect(findProjectRoot(schemaDir)).toBe(projectDir);
+    });
+
     it("finds root from a nested subdirectory", () => {
         const projectDir = createDir("my-app");
         createDir("my-app", "backend", "src");
-        createDir("my-app", "config");
         writeJSON(path.join(projectDir, "package.json"), { name: "my-app" });
 
         const nestedDir = path.join(projectDir, "backend", "src");
@@ -122,7 +131,7 @@ workspaces: ["backend"] });
         const projectDir = createDir("workspace-app");
         writeJSON(path.join(projectDir, "package.json"), {
             name: "workspace-app",
-            workspaces: ["backend", "frontend", "config"]
+            workspaces: ["backend", "frontend"]
         });
 
         expect(findProjectRoot(projectDir)).toBe(projectDir);
@@ -138,10 +147,18 @@ workspaces: ["backend"] });
         expect(findProjectRoot(projectDir)).toBe(projectDir);
     });
 
-    it("does NOT match a directory with only backend/ (no config/)", () => {
+    it("does NOT match a backend/ with no package.json beside it", () => {
+        // A stray backend/ folder deep in some unrelated tree is not a project.
         const projectDir = createDir("partial-app");
         createDir("partial-app", "backend");
-        writeJSON(path.join(projectDir, "package.json"), { name: "partial" });
+
+        expect(findProjectRoot(projectDir)).toBeNull();
+    });
+
+    it("does NOT match a package.json beside config/ alone", () => {
+        const projectDir = createDir("legacy-app");
+        createDir("legacy-app", "config", "collections");
+        writeJSON(path.join(projectDir, "package.json"), { name: "legacy" });
 
         expect(findProjectRoot(projectDir)).toBeNull();
     });
@@ -149,7 +166,6 @@ workspaces: ["backend"] });
     it("ignores malformed package.json gracefully", () => {
         const projectDir = createDir("broken-app");
         createDir("broken-app", "backend");
-        createDir("broken-app", "config");
         writeFile(path.join(projectDir, "package.json"), "{ not valid json }}}");
 
         // Should still match via sibling directory check (which doesn't require valid JSON)

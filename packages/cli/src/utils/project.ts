@@ -21,8 +21,14 @@ export const MANIFEST_FILENAME = "rebase.json";
  * Walk up from `startDir` to find the Rebase project root.
  *
  * A directory is the root when it holds a `rebase.json`, or when it holds a
- * `package.json` that either lists `backend` as a workspace or sits beside both
- * `backend/` and `config/`.
+ * `package.json` that either lists `backend` as a workspace or sits beside a
+ * `backend/` directory.
+ *
+ * There is no `config/` requirement any more: the config package is gone (its
+ * collections became `backend/schema`, the rest moved into `backend/`), and a
+ * BaaS project is a `backend/` and nothing else. The `package.json` is still
+ * required beside it, so a stray `backend/` folder deep inside some unrelated
+ * tree does not make its parent a project.
  *
  * `rebase.json` is checked first and needs no `package.json` beside it, because
  * the conventions below all describe a repository that *contains the backend*.
@@ -55,8 +61,8 @@ export function findProjectRoot(startDir: string = process.cwd()): string | null
                 // ignore parse errors
             }
 
-            // Check for sibling backend directory
-            if (fs.existsSync(path.join(dir, "backend")) && fs.existsSync(path.join(dir, "config"))) {
+            // A package beside a backend directory.
+            if (fs.existsSync(path.join(dir, "backend"))) {
                 return dir;
             }
         }
@@ -430,7 +436,7 @@ export function requireProjectRoot(): string {
                 "Could not find a Rebase project root.",
                 "no_project_root",
                 `Looked in this directory and every parent for a ${MANIFEST_FILENAME}, `
-                + "a package.json with a \"backend\" workspace, or a backend/ next to a config/."
+                + "a package.json with a \"backend\" workspace, or a package.json next to a backend/."
             );
         }
         // Name what is actually looked for, in the order `findProjectRoot`
@@ -441,7 +447,7 @@ export function requireProjectRoot(): string {
         // place" while standing in the right one.
         console.error(chalk.red("✗ Could not find a Rebase project root."));
         console.error(chalk.gray(`  Looked in this directory and every parent for a ${MANIFEST_FILENAME},`));
-        console.error(chalk.gray("  a package.json with a \"backend\" workspace, or a backend/ next to a config/."));
+        console.error(chalk.gray("  a package.json with a \"backend\" workspace, or a package.json next to a backend/."));
         console.error(chalk.gray("  Run this from inside a project, or create one with `rebase init`."));
         process.exit(1);
     }
