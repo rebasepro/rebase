@@ -493,6 +493,10 @@ export type { ShutdownHandlerOptions } from "./init/shutdown";
 // used to hand-write in `backend/src/index.ts`.
 // =============================================================================
 export { bootFromBundle, runFromBundle } from "./boot/boot";
+// The words a schema-version mismatch is described in — a `v1:` stamp from a
+// runtime before 0.31 included — shared with the driver's doctor, so the two
+// never explain the same stamp differently.
+export { describeMismatch } from "./boot/schema-stamp";
 export type { BootedRuntime, BootOptions, SchemaProvisioningOptions } from "./boot/boot";
 
 // Concurrent-DDL classification, exported for the drivers.

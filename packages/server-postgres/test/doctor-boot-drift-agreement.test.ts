@@ -42,7 +42,11 @@ jest.mock("pg", () => {
 });
 
 // `runDoctor` loads the tables off disk through `loadTableSchema`.
-jest.mock("../src/schema/load-tables", () => ({ loadTableSchema: jest.fn(), loadTables: jest.fn() }));
+jest.mock("../src/schema/load-tables", () => ({
+    ...jest.requireActual<typeof import("../src/schema/load-tables")>("../src/schema/load-tables"),
+    loadTableSchema: jest.fn(),
+    loadTables: jest.fn()
+}));
 
 const PACKAGE_ROOT = path.resolve(__dirname, "..");
 const URL = "postgres://doctor.test/db";

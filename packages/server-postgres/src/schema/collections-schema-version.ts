@@ -31,6 +31,13 @@ import { sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { revokeInternalTableSql } from "@rebasepro/common";
 
+/**
+ * The schema the meta table lives in: the runtime's own, `rebase`, whatever
+ * schema the tables are in. Shared by the boot (through the bootstrapper),
+ * `rebase db push` and the doctor, so all three read and write one row.
+ */
+export const SCHEMA_META_SCHEMA = "rebase";
+
 /** Key under which the version is stored in the meta table. */
 const VERSION_KEY = "collections_schema_version";
 

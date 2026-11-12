@@ -17,7 +17,7 @@
  */
 import fs from "fs";
 import path from "path";
-import type { PostgresCollectionConfig, TableDescriptor } from "@rebasepro/types";
+import { computeSchemaVersion, DEFAULT_DATA_SOURCE_KEY, type PostgresCollectionConfig, type TableDescriptor } from "@rebasepro/types";
 import { compileLoadedSchema, loadBackendSchema } from "@rebasepro/server";
 import { outWarn } from "../cli-output";
 
@@ -90,4 +90,23 @@ export async function loadTableSchema(schemaDir: string): Promise<LoadedTables> 
         collections: [...compiled.collections].sort(bySlug),
         descriptors: [...compiled.descriptors].sort(bySlug)
     };
+}
+
+/**
+ * The schema version of what `rebase db push` provisions: the descriptors of
+ * the tables the default database holds.
+ *
+ * Exactly the set, and the function, the server stamps at boot
+ * (`enforceSchemaStamp` over the descriptors of the tables it provisions in
+ * the default database, hashed by `computeSchemaVersion`), so a database
+ * stamped by a push and the server that boots against it compute the same
+ * version — and the doctor, reading it, compares like with like.
+ *
+ * @group Schema
+ */
+export function defaultDatabaseSchemaVersion(loaded: LoadedTables): string {
+    const provisioned = new Set(loaded.collections
+        .filter(collection => !collection.dataSource || collection.dataSource === DEFAULT_DATA_SOURCE_KEY)
+        .map(collection => collection.slug));
+    return computeSchemaVersion(loaded.descriptors.filter(descriptor => provisioned.has(descriptor.slug)));
 }

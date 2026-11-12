@@ -12,7 +12,7 @@ import * as fs from "fs";
 import path from "path";
 import { pathToFileURL } from "url";
 import chalk from "chalk";
-import { computeSchemaVersion, CollectionConfig, DEFAULT_DATA_SOURCE_KEY, type TableDescriptor, isPostgresCollectionConfig, Property, NumberProperty, StringProperty, DateProperty, ArrayProperty, MapProperty, RelationProperty, type ResolvedManyToMany, type ResolvedBelongsTo, isManyToMany } from "@rebasepro/types";
+import { CollectionConfig, DEFAULT_DATA_SOURCE_KEY, LEGACY_SCHEMA_VERSION_PREFIX, type TableDescriptor, isPostgresCollectionConfig, Property, NumberProperty, StringProperty, DateProperty, ArrayProperty, MapProperty, RelationProperty, type ResolvedManyToMany, type ResolvedBelongsTo, isManyToMany } from "@rebasepro/types";
 import { generateSchema } from "./generate-drizzle-schema-logic";
 import { compareGeneratedDeclarations, describeDeclarationDifferences } from "./generated-schema-staleness";
 import { describeSchemaDifference, readGeneratedSchemaDrift, type SchemaDifference } from "./generated-schema-diff";
@@ -22,7 +22,8 @@ import type { PgType, SchemaPlan, TablePlan } from "./plan/types";
 import { generateTypedefs } from "@rebasepro/codegen";
 import { getTableName, resolveCollectionRelations, findRelation, relationalCollections, resolveJunctionSpecs } from "@rebasepro/common";
 import { toPostgresIdentifier, toSnakeCase } from "@rebasepro/utils";
-import { loadTableSchema } from "./load-tables";
+import { defaultDatabaseSchemaVersion, loadTableSchema } from "./load-tables";
+import { describeMismatch } from "@rebasepro/server";
 // The report is CLI output, not application logging — see cli-output.ts.
 import { out, outError } from "../cli-output";
 import { deepestErrorMessage, diagnoseDbError, parseHostInfo } from "../cli-errors";
@@ -387,7 +388,8 @@ export function missingExtensionIssues(
  */
 export async function schemaStampIssues(
     pool: { query<T>(text: string): Promise<{ rows: T[] }> },
-    descriptors: readonly TableDescriptor[]
+    /** The version this checkout computes — `defaultDatabaseSchemaVersion`, what a boot and a push stamp. */
+    expected: string
 ): Promise<DoctorIssue[]> {
     let stamped: string | null = null;
     try {
@@ -409,13 +411,24 @@ export async function schemaStampIssues(
     }
 
     if (!stamped) return [];
-    const expected = computeSchemaVersion(descriptors);
     if (stamped === expected) return [];
+
+    // A stamp from a runtime before 0.31 hashed collections, never tables: it
+    // differs from every version this release computes and says nothing about
+    // drift. Explained in the server's own words, once, with the restamp.
+    if (stamped.startsWith(LEGACY_SCHEMA_VERSION_PREFIX)) {
+        return [{
+            severity: "warning",
+            category: "schema_stale",
+            message: describeMismatch(stamped, expected),
+            fix: "Run `rebase db push` (or boot the process that owns the schema) once to restamp it."
+        }];
+    }
 
     return [{
         severity: "warning",
         category: "schema_stale",
-        message: `This database was provisioned from a different set of tables (stamp ${stamped.slice(0, 12)}…, this checkout computes ${expected.slice(0, 12)}…).`,
+        message: `This database was provisioned from a different set of tables (stamp ${stamped}, this checkout computes ${expected}).`,
         fix: "A hash says the two disagree, never which is ahead. Check you are pointed at the database you think you are; then `rebase db push` to bring it to these tables."
     }];
 }
@@ -622,11 +635,11 @@ export async function checkCollectionsVsDatabase(
          */
         generated?: Record<string, unknown>;
         /**
-         * The tables' compiled descriptors, to compare against the
-         * schema-version stamp the runtime wrote. Without them that one check
-         * is not made.
+         * The schema version this checkout computes
+         * (`defaultDatabaseSchemaVersion`), to compare against the stamp the
+         * runtime or a push wrote. Without it that one check is not made.
          */
-        descriptors?: readonly TableDescriptor[];
+        schemaVersion?: string;
     } = {}
 ): Promise<DoctorPhase> {
     const issues: DoctorIssue[] = [];
@@ -686,7 +699,7 @@ export async function checkCollectionsVsDatabase(
         // The runtime stamps what it applied; nothing compared it outside boot,
         // and a stamp that disagrees is exactly the state where the rest of
         // this report is describing a schema somebody else's deploy created.
-        if (options.descriptors) issues.push(...await schemaStampIssues(pool, options.descriptors));
+        if (options.schemaVersion !== undefined) issues.push(...await schemaStampIssues(pool, options.schemaVersion));
 
         // Fetch all columns in the defined schemas
         const columnsResult = await pool.query<DbColumn>(
@@ -1274,7 +1287,8 @@ export async function runDoctor(options: {
     // The loader every door uses (`loadTableSchema`): a doctor that disagreed with
     // the policy generator about which tables exist would compare the wrong
     // thing. A schema that does not compile is fatal here as everywhere.
-    const { collections, descriptors } = await loadTableSchema(options.schemaDir);
+    const loaded = await loadTableSchema(options.schemaDir);
+    const { collections, descriptors } = loaded;
     if (collections.length === 0) {
         outError(chalk.red(`  ✗ No tables found in ${options.schemaDir} (its index.ts exports none).`));
         process.exit(1);
@@ -1292,7 +1306,10 @@ export async function runDoctor(options: {
         out(chalk.gray("  Checking Tables → Database..."));
         try {
             const generated = await loadGeneratedTables(options.schemaPath);
-            schemaToDatabase = await checkCollectionsVsDatabase(collections, options.databaseUrl, { generated: generated.tables, descriptors });
+            schemaToDatabase = await checkCollectionsVsDatabase(collections, options.databaseUrl, {
+                generated: generated.tables,
+                schemaVersion: defaultDatabaseSchemaVersion(loaded)
+            });
             if (generated.error) {
                 // Boot imports this module too, and would stop on it.
                 schemaToDatabase.issues.push({

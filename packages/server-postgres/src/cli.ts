@@ -1019,6 +1019,9 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                     await applyPolicies(databaseUrl, schemaDir);
                     await reconcilePolicies(databaseUrl, schemaDir);
                     await retireLegacyAuthSchema(databaseUrl);
+                    // Last: the push has applied the whole schema, tables and
+                    // policies, so it records the version a boot would.
+                    await stampSchemaVersion(databaseUrl, schemaDir);
                 }
             });
         } else if (subcommand === "migrate") {
@@ -1378,6 +1381,28 @@ async function lockManagedTables(databaseUrl: string, schemaDir: string): Promis
  * `ensureAuthTablesExist` is idempotent (CREATE TABLE IF NOT EXISTS), so it is
  * safe to run on every push and harmless once the server has also created them.
  */
+/**
+ * Record the schema version this push applied, as a provisioning boot does
+ * (`rebase.schema_meta`, key `collections_schema_version`), computed the way
+ * the server computes it (`defaultDatabaseSchemaVersion`). Without it a
+ * database a push provisioned read as unstamped to every process, and one a
+ * pre-0.31 runtime stamped kept its `v1:` version, which every boot reports
+ * as a mismatch — the restamp the server's message tells the operator to do
+ * with `rebase db push`. Never fatal: the stamp is a diagnostic.
+ */
+async function stampSchemaVersion(databaseUrl: string, schemaDir: string): Promise<void> {
+    try {
+        const { drizzle } = await import("drizzle-orm/node-postgres");
+        const { defaultDatabaseSchemaVersion, loadTableSchema } = await import("./schema/load-tables");
+        const { stampCollectionsSchemaVersion, SCHEMA_META_SCHEMA } = await import("./schema/collections-schema-version");
+        const version = defaultDatabaseSchemaVersion(await loadTableSchema(schemaDir));
+        await withAppClient(databaseUrl, client => stampCollectionsSchemaVersion(drizzle(client), SCHEMA_META_SCHEMA, version));
+        out(chalk.gray(`  ✓ Stamped the schema version (${version}), so every process can check itself against this database.`));
+    } catch (err) {
+        outWarn(chalk.yellow(`  ⚠️  Could not record the schema version: ${err instanceof Error ? err.message : String(err)}`));
+    }
+}
+
 async function ensureAuthTables(databaseUrl: string, schemaDir: string): Promise<void> {
     try {
         const { drizzle } = await import("drizzle-orm/node-postgres");

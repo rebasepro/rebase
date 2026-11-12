@@ -1,4 +1,4 @@
-import { computeSchemaVersion, type CollectionConfig, type TableDescriptor } from "@rebasepro/types";
+import { computeSchemaVersion, LEGACY_SCHEMA_VERSION_PREFIX, type CollectionConfig, type TableDescriptor } from "@rebasepro/types";
 import { collectionsToTableDefs, compileTables } from "@rebasepro/common";
 import { missingExtensionIssues, schemaStampIssues } from "../src/schema/doctor";
 
@@ -77,8 +77,8 @@ const stampTablePresent: [RegExp, unknown[]] = [/to_regclass/, [{ present: true 
 describe("the schema stamp", () => {
     it("reports a database provisioned from different tables", async () => {
         const issues = await schemaStampIssues(
-            scriptedPool([stampTablePresent, [/collections_schema_version/, [{ value: "0000deadbeef1111" }]]]),
-            descriptorsOf(withoutVector)
+            scriptedPool([stampTablePresent, [/collections_schema_version/, [{ value: "v2:0000deadbeef1111" }]]]),
+            computeSchemaVersion(descriptorsOf(withoutVector))
         );
 
         expect(issues).toHaveLength(1);
@@ -95,7 +95,7 @@ describe("the schema stamp", () => {
                 stampTablePresent,
                 [/collections_schema_version/, [{ value: computeSchemaVersion(descriptorsOf(withoutVector)) }]]
             ]),
-            descriptorsOf(withoutVector)
+            computeSchemaVersion(descriptorsOf(withoutVector))
         );
         expect(issues).toEqual([]);
     });
@@ -103,15 +103,27 @@ describe("the schema stamp", () => {
     it("treats a never-stamped database as no finding", async () => {
         // Every database provisioned before the stamp existed reads this way,
         // and so does every fresh one until its first provisioning boot.
-        expect(await schemaStampIssues(scriptedPool([]), descriptorsOf(withoutVector))).toEqual([]);
-        expect(await schemaStampIssues(scriptedPool([stampTablePresent]), descriptorsOf(withoutVector))).toEqual([]);
+        expect(await schemaStampIssues(scriptedPool([]), computeSchemaVersion(descriptorsOf(withoutVector)))).toEqual([]);
+        expect(await schemaStampIssues(scriptedPool([stampTablePresent]), computeSchemaVersion(descriptorsOf(withoutVector)))).toEqual([]);
     });
 
     it("stays quiet when the database will not answer the question", async () => {
         // The stamp is a diagnostic, not a gate. A database that cannot answer
         // has bigger problems, and the checks around this one report them.
         const throwing = { query: async () => { throw new Error("permission denied for schema rebase"); } };
-        expect(await schemaStampIssues(throwing, descriptorsOf(withoutVector))).toEqual([]);
+        expect(await schemaStampIssues(throwing, computeSchemaVersion(descriptorsOf(withoutVector)))).toEqual([]);
+    });
+
+    it("explains a stamp from before 0.31 as the model change it is, in the server's words, with the restamp", async () => {
+        const legacy = `${LEGACY_SCHEMA_VERSION_PREFIX}0123456789abcdef`;
+        const issues = await schemaStampIssues(
+            scriptedPool([stampTablePresent, [/collections_schema_version/, [{ value: legacy }]]]),
+            computeSchemaVersion(descriptorsOf(withoutVector))
+        );
+        expect(issues).toHaveLength(1);
+        expect(issues[0].message).toContain("before 0.31");
+        expect(issues[0].message).toContain("says nothing about drift");
+        expect(issues[0].fix).toContain("rebase db push");
     });
 
     it("changes when the tables change", () => {

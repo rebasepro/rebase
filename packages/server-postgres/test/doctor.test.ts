@@ -12,7 +12,11 @@ import { tmpdir } from "os";
 // every driver command uses; its own tests read real backend/schema
 // directories). Stubbing only that lets the summary be driven from in-memory
 // tables while the phase checks, the counting and the renderer all stay real.
-jest.mock("../src/schema/load-tables", () => ({ loadTableSchema: jest.fn(), loadTables: jest.fn() }));
+jest.mock("../src/schema/load-tables", () => ({
+    ...jest.requireActual<typeof import("../src/schema/load-tables")>("../src/schema/load-tables"),
+    loadTableSchema: jest.fn(),
+    loadTables: jest.fn()
+}));
 
 // Re-export for testing — we need to access the internal helper
 // but since it's not exported, we test it indirectly via checkCollectionsVsSchema
