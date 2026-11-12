@@ -571,12 +571,12 @@ describe("compileTables — table options", () => {
         const members = defineAuthTable("members", {
             columns: { id: col.uuid().primaryKey() },
             rls: "admin-only",
-            auth: { onCreateUser: async () => ({}) }
+            auth: { onCreateUser: async values => ({ values }) }
         });
         const both = defineAuthTable("people", {
             columns: { id: col.uuid().primaryKey() },
             rls: "admin-only",
-            auth: { onCreateUser: async () => ({}), onResetPassword: async () => ({}) }
+            auth: { onCreateUser: async values => ({ values }), onResetPassword: async () => ({}) }
         });
         expect(compileTables([members])[0].auth).toEqual({ hooks: { onCreateUser: true } });
         expect(compileTables([both])[0].auth).toEqual({ hooks: { onCreateUser: true, onResetPassword: true } });

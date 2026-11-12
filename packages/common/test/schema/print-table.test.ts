@@ -447,7 +447,7 @@ describe("printTableSource / printTableModule", () => {
         const table = defineAuthTable("members", {
             columns: { id: col.uuid().primaryKey() },
             rls: "admin-only",
-            auth: { personalKeys: true, onCreateUser: async () => ({}), onResetPassword: async () => ({}) }
+            auth: { personalKeys: true, onCreateUser: async values => ({ values }), onResetPassword: async () => ({}) }
         });
         const [descriptor] = compileTables([table]);
         expect(() => printTableSource(descriptor)).toThrow(/members\.auth\.onCreateUser/);
