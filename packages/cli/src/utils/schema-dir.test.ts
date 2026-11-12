@@ -67,7 +67,7 @@ describe("schemaDirArgs: the driver is told where they are", () => {
     it("names the declared directory, absolute, to every driver command that reads the schema", () => {
         manifest({ tables: "db/tables" });
         const dir = path.join(root, "db", "tables");
-        for (const line of [["db", "push"], ["db", "generate"], ["db", "migrate"], ["schema", "generate"], ["schema", "stale", "--fix"], ["doctor"], ["console", "-e", "1"]]) {
+        for (const line of [["db", "push"], ["db", "generate"], ["db", "migrate"], ["schema", "generate"], ["schema", "introspect"], ["schema", "stale", "--fix"], ["doctor"], ["console", "-e", "1"]]) {
             expect(schemaDirArgs(root, line), line.join(" ")).toEqual(["--schema-dir", dir]);
         }
     });
@@ -75,7 +75,6 @@ describe("schemaDirArgs: the driver is told where they are", () => {
     it("adds nothing to a command that does not read it, or a line that names its own", () => {
         manifest({ tables: "db/tables" });
         expect(schemaDirArgs(root, ["db", "url"])).toEqual([]);
-        expect(schemaDirArgs(root, ["schema", "introspect"])).toEqual([]);
         expect(schemaDirArgs(root, ["db", "push", "--schema-dir", "/x"])).toEqual([]);
         expect(schemaDirArgs(root, ["schema", "generate", "--schema-dir=/x"])).toEqual([]);
     });

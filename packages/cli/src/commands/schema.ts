@@ -27,12 +27,10 @@ import { RECONCILE_USAGE } from "./schema-reconcile";
 /**
  * The line handed to the driver, its paths resolved from where the command was
  * run (the driver runs in `backend/`). `--schema` is left alone: on
- * `introspect` it names a Postgres schema, not a file. `--collections` / `-c`
- * survive only on `introspect`, where the driver still names its output
- * directory that way until introspection writes tables.
+ * `introspect` it names a Postgres schema, not a file.
  */
 export function schemaDriverArgs(rawArgs: string[], cwd: string): string[] {
-    return absolutizeLocalPathArgs(argsFromCommand(rawArgs, "schema"), cwd, ["--schema-dir", "--collections", "-c", "--output", "-o", "--out"]);
+    return absolutizeLocalPathArgs(argsFromCommand(rawArgs, "schema"), cwd, ["--schema-dir", "--output", "-o", "--out"]);
 }
 
 export async function schemaCommand(subcommand: string | undefined, rawArgs: string[]): Promise<void> {
@@ -64,9 +62,8 @@ export async function schemaCommand(subcommand: string | undefined, rawArgs: str
         unknownCommand(subcommand, Object.keys(SCHEMA_ACTION_HELP), "schema");
     }
 
-    // `introspect` still takes `--collections` (its output directory); the
-    // commands that read the schema do not. Before anything else runs.
-    if (subcommand !== "introspect") refuseRemovedCollectionsFlag(rawArgs.slice(2), `schema ${subcommand}`);
+    // Before anything else runs.
+    refuseRemovedCollectionsFlag(rawArgs.slice(2), `schema ${subcommand}`);
 
     const projectRoot = requireProjectRoot();
 
@@ -162,12 +159,11 @@ const SCHEMA_ACTION_HELP: Record<string, { usage: string; summary: string; notes
         notes: ["--watch regenerates on every change to a schema file.", `--schema-dir <dir>: ${SCHEMA_DIR_FLAG_HELP}.`]
     },
     introspect: {
-        usage: "rebase schema introspect [--collections <dir>] [--output <dir>] [--schema <name>] [--force] [--data-inference | --no-data-inference]",
-        summary: "Read an existing database and write Rebase collection definitions from it.",
+        usage: "rebase schema introspect [--schema-dir <dir>] [--schema <name>] [--force] [--data-inference | --no-data-inference]",
+        summary: "Read an existing database and write its tables as defineTable modules into backend/schema.",
         notes: [
-            "--force overwrites collection files that are already there.",
-            "Introspection still writes collection files (config/collections, or --collections <dir>); it moves to "
-                + "backend/schema tables in a later release — until then, run `rebase migrate collections-to-tables` on its output.",
+            "--force overwrites table modules that are already there.",
+            `--schema-dir <dir>: where the tables are written — ${SCHEMA_DIR_FLAG_HELP}.`,
             "--data-inference samples up to 100 rows per table to detect formats, constraints and UI settings; "
                 + "--no-data-inference reads the structure only. Without either it asks, and without a terminal "
                 + "it reads the structure only.",
@@ -219,7 +215,7 @@ ${chalk.green.bold("Usage")}
 ${chalk.green.bold("Commands")}
   ${chalk.gray("(Commands are provided by your active database driver plugin)")}
   ${chalk.blue.bold("generate")}    Generate the Drizzle schema from the tables in backend/schema
-  ${chalk.blue.bold("introspect")}  Introspect an existing database to generate collection definitions
+  ${chalk.blue.bold("introspect")}  Introspect an existing database into defineTable modules in backend/schema
   ${chalk.blue.bold("stale")}       Report generated schema files that no longer match the tables
   ${chalk.blue.bold("reconcile")}   Relax NOT NULL and drop columns the tables no longer declare, after review
 
@@ -229,10 +225,9 @@ ${chalk.green.bold("generate / stale Options")}
   ${chalk.blue("--watch, -w")}        Watch for changes and regenerate automatically
 
 ${chalk.green.bold("introspect Options")}
-  ${chalk.blue("--output, -o")}       Output directory for generated collection files
-  ${chalk.blue("--collections, -c")}  The same, under its older name ${chalk.gray("(introspect only)")}
+  ${chalk.blue("--schema-dir")}       Where the tables are written ${chalk.gray("(default: backend/schema)")}
   ${chalk.blue("--schema")}           Postgres schema to read (default: public)
-  ${chalk.blue("--force, -f")}        Overwrite collection files that already exist
+  ${chalk.blue("--force, -f")}        Overwrite table modules that already exist
   ${chalk.blue("--database-url")}     Read this database instead of the project's own
   ${chalk.blue("--docker")}           Read the compose database, starting it if needed
   ${chalk.blue("--data-inference")}   Sample rows to detect formats and constraints ${chalk.gray("(asked when omitted)")}

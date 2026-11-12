@@ -54,8 +54,8 @@ describe("a relative --schema-dir reaches the driver resolved from the cwd", () 
     });
 
     it("schema introspect leaves --schema alone: there it names a Postgres schema, not a file", () => {
-        const args = schemaDriverArgs(["node", "rebase", "schema", "introspect", "--schema", "analytics", "-o", "config/collections"], ROOT);
-        expect(args).toEqual(["schema", "introspect", "--schema", "analytics", "-o", path.join(ROOT, "config/collections")]);
+        const args = schemaDriverArgs(["node", "rebase", "schema", "introspect", "--schema", "analytics", "--schema-dir", "backend/schema"], ROOT);
+        expect(args).toEqual(["schema", "introspect", "--schema", "analytics", "--schema-dir", path.join(ROOT, "backend/schema")]);
     });
 
     it("doctor resolves every path it takes: --schema-dir, --schema and --sdk", () => {
@@ -198,7 +198,7 @@ describe("every help page states the rule in the same words", () => {
         // The default is the project's backend/schema, never a path relative
         // to a directory the reader is not standing in.
         expect(text).toContain("backend/schema");
-        expect(linesNaming("--collections").filter(line => !line.includes("introspect"))).toEqual([]);
+        expect(linesNaming("--collections")).toEqual([]);
     });
 });
 

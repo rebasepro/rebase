@@ -509,7 +509,7 @@ ${chalk.green.bold("Commands")}
 
 ${chalk.green.bold("Schema")}
   ${chalk.blue.bold("schema generate")}         Generate the Drizzle schema from backend/schema
-  ${chalk.blue.bold("schema introspect")}       Introspect database → Rebase collections ${chalk.gray("(then migrate collections-to-tables)")}
+  ${chalk.blue.bold("schema introspect")}       Introspect database → defineTable modules in backend/schema
   ${chalk.blue.bold("schema stale")}            Report generated schema files the tables have moved past
   ${chalk.blue.bold("schema")} ${chalk.gray("--help")}           Show schema command help
 

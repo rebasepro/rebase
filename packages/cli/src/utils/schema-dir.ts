@@ -70,6 +70,8 @@ const DRIVER_COMMANDS_READING_SCHEMA = new Set([
     // It stamps the policies the migration created as the tables' rules make them.
     "db migrate",
     "schema generate",
+    // It writes the introspected tables there.
+    "schema introspect",
     "schema stale",
     "doctor",
     "console"

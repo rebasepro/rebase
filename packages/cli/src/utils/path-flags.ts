@@ -122,6 +122,7 @@ const COMMANDS_THAT_TOOK_COLLECTIONS = new Set([
     "db push",
     "db generate",
     "schema generate",
+    "schema introspect",
     "schema stale"
 ]);
 
