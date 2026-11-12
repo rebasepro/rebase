@@ -3,7 +3,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { RealtimeService } from "../src/services/realtimeService";
 import { DataService } from "../src/services/dataService";
-import type { CollectionCallbacks, CollectionConfig } from "@rebasepro/types";
+import type { CollectionCallbacks, CollectionConfig, TableHooks } from "@rebasepro/types";
 import { registryOf } from "./helpers/spg-c-registry";
 
 /**
@@ -14,7 +14,8 @@ import { registryOf } from "./helpers/spg-c-registry";
  * (`restFetchService`) is guarded by the "restFetchService runs afterRead" suite
  * in `postgresDataDriver.test.ts`; this file covers the other one — the
  * `rebase.data` server path, i.e. `fetchCollection`/`fetchOne` on the driver
- * itself — plus the order the three callback tiers run in.
+ * itself — plus the order the hook tiers run in (global hooks, then the
+ * table's own).
  *
  * These are separate code blocks in PostgresBackendDriver, not one shared
  * helper, so a redaction that works over REST can still leak here. This suite
@@ -73,10 +74,10 @@ function dataServiceOf(driver: PostgresBackendDriver): DataService {
 function buildDriver(
     collection: CollectionConfig | undefined,
     rows: Record<string, unknown>[],
-    globalCallbacks?: CollectionCallbacks<Record<string, unknown>>
+    globalHooks?: TableHooks
 ) {
     const registry = collection ? registryOf(collection) : registryOf();
-    if (globalCallbacks) registry.setGlobalCallbacks(globalCallbacks);
+    if (globalHooks) registry.setGlobalHooks(globalHooks);
     const driver = new PostgresBackendDriver(mockDb, new RealtimeService(mockDb, registry), registry);
     const dataService = dataServiceOf(driver);
     jest.spyOn(dataService, "fetchCollection").mockResolvedValue(rows);
@@ -141,15 +142,15 @@ describe("CollectionCallbacks.afterRead PII redaction on the rebase.data path", 
         expect(rows[0].email).toBe("jane.doe@acme.com");
     });
 
-    it("runs the global callback before the collection one", async () => {
+    it("runs the global hook before the table's own", async () => {
         // The tiers compose, so order is observable: each appends its own tag.
         // Reversed, a global redactor would run on already-collection-mangled
         // data — and both tiers still "ran", which is all a spy would see.
         const order: string[] = [];
-        const globalCallbacks: CollectionCallbacks<Record<string, unknown>> = {
-            afterRead: ({ row }) => {
+        const globalHooks: TableHooks = {
+            afterRead: ({ values }) => {
                 order.push("global");
-                return { ...row, trail: "global" };
+                return { ...values, trail: "global" };
             }
         };
         const collection: CollectionConfig = {
@@ -165,7 +166,7 @@ describe("CollectionCallbacks.afterRead PII redaction on the rebase.data path", 
             }
         };
 
-        const driver = buildDriver(collection, [RAW_CUSTOMER], globalCallbacks);
+        const driver = buildDriver(collection, [RAW_CUSTOMER], globalHooks);
         const rows = await driver.fetchCollection({ path: "customers" });
 
         expect(order).toEqual(["global", "collection"]);
@@ -197,12 +198,17 @@ describe("an afterRead that returns nothing", () => {
 
     // Deliberately invalid: `afterRead` is typed to return the row, and a hook
     // that returns nothing is exactly what this block shows the driver survives.
-    const voidGlobal = {
-        afterRead: ({ row }: { row: Record<string, unknown> }) => {
-            row.seen = true;
-            // no return
+    // What a JavaScript hook may well be: it mutates `values` and returns
+    // nothing. Typed hooks must return the row, so the object is taken as
+    // hooks through a guard — the shape a `.js` hooks module hands the server.
+    const written = {
+        afterRead: ({ values }: { values: Record<string, unknown> }): void => {
+            values.seen = true;
         }
-    } as unknown as CollectionCallbacks<Record<string, unknown>>;
+    };
+    const isHooks = (value: unknown): value is TableHooks => typeof value === "object" && value !== null;
+    if (!isHooks(written)) throw new Error("unreachable");
+    const voidGlobal = written;
 
     it("still returns the rows from fetchCollection", async () => {
         const driver = buildDriver(plain, [{ ...RAW_CUSTOMER }], voidGlobal);
@@ -264,24 +270,24 @@ describe("an afterRead that returns nothing", () => {
  * the data services already do with such a path a few lines later — see
  * `getCollectionByPath` in `services/collection-helpers.ts`.
  */
-describe("a path the registry does not resolve, with a global callback registered", () => {
+describe("a path the registry does not resolve, with a global hook registered", () => {
     beforeEach(() => {
         jest.clearAllMocks();
     });
 
     /** A registry that knows nothing, so `getCollectionByPath` answers undefined. */
-    const buildUnknownPathDriver = (globalCallbacks: CollectionCallbacks<Record<string, unknown>>) =>
-        buildDriver(undefined, [RAW_CUSTOMER], globalCallbacks);
+    const buildUnknownPathDriver = (globalHooks: TableHooks) =>
+        buildDriver(undefined, [RAW_CUSTOMER], globalHooks);
 
     type ApiError = { message: string; status?: number; statusCode?: number; code?: string };
     const rejection = (p: Promise<unknown>) => p.then(() => undefined, (e: ApiError) => e);
 
-    it("refuses the read rather than running afterRead without a collection", async () => {
+    it("refuses the read rather than running afterRead without a table", async () => {
         const seen: unknown[] = [];
         const driver = buildUnknownPathDriver({
-            afterRead: ({ collection, row }) => {
-                seen.push(collection);
-                return row;
+            afterRead: ({ table, values }) => {
+                seen.push(table);
+                return values;
             }
         });
 
@@ -297,7 +303,7 @@ describe("a path the registry does not resolve, with a global callback registere
 
     it("refuses fetchOne on the same terms", async () => {
         const driver = buildUnknownPathDriver({
-            afterRead: ({ row }) => row
+            afterRead: ({ values }) => values
         });
 
         const error = await rejection(driver.fetchOne({ path: "ghost", id: "c1" }));
@@ -311,7 +317,7 @@ describe("a path the registry does not resolve, with a global callback registere
         // registered, a path it cannot be applied to, and the raw row returned
         // anyway because the tier was skipped.
         const driver = buildUnknownPathDriver({
-            afterRead: ({ row }) => ({ ...row, email: "***" })
+            afterRead: ({ values }) => ({ ...values, email: "***" })
         });
 
         await expect(driver.fetchCollection({ path: "ghost" })).rejects.toBeDefined();
@@ -324,8 +330,8 @@ describe("a path the registry does not resolve, with a global callback registere
         // rule the author never wrote, refusing a write for a reason that was
         // not theirs.
         const driver = buildUnknownPathDriver({
-            beforeSave: ({ collection, values }) => {
-                if (collection.slug === "orders") return values;
+            beforeSave: ({ table, values }) => {
+                if (table.slug === "orders") return values;
                 return values;
             }
         });
@@ -345,14 +351,14 @@ describe("a path the registry does not resolve, with a global callback registere
         expect(saveSpy).not.toHaveBeenCalled();
     });
 
-    it("still runs the tier, with a real collection, on a path that does resolve", async () => {
+    it("still runs the tier, with a real table, on a path that does resolve", async () => {
         // The other direction: the refusal must come from the missing
         // collection, not from the driver having stopped calling global hooks.
         const slugs: unknown[] = [];
         const driver = buildDriver(customersCollection, [RAW_CUSTOMER], {
-            afterRead: ({ collection, row }) => {
-                slugs.push(collection.slug);
-                return row;
+            afterRead: ({ table, values }) => {
+                slugs.push(table.slug);
+                return values;
             }
         });
 

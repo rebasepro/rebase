@@ -55,7 +55,7 @@ import {
 import { sql as drizzleSql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Client, DatabaseError, Pool, type PoolClient } from "pg";
-import { sqlRows, anonymousWriteRefusedBy, applyCreateDefaults, applyStamps, buildPropertyCallbacks, createStampKeys, hasFieldAccessRules, buildSdkData, callbackRefusal, createAccessorSlugResolver, classifyTable, getTableName, detectJunctionTables, requireCallbackClient, requireCallbackCollection, resolveCollectionRelations, resolveTenantWrite, restoresSoftDeletedRow, stampModifier, tenantOf, toCallbackError, updateStampKeys } from "@rebasepro/common";
+import { sqlRows, anonymousWriteRefusedBy, applyCreateDefaults, applyStamps, createStampKeys, hasFieldAccessRules, buildSdkData, callbackRefusal, createAccessorSlugResolver, classifyTable, getTableName, detectJunctionTables, requireCallbackClient, resolveCollectionRelations, resolveTenantWrite, restoresSoftDeletedRow, stampModifier, tenantOf, toCallbackError, updateStampKeys } from "@rebasepro/common";
 import { PostgresTableRegistry } from "./model/PostgresTableRegistry";
 import { deriveRowAddress, getPrimaryKeys, parseIdValues, tableKeys } from "./services/collection-helpers";
 import { isJunctionBackedRelation, isNestedPath, resolveNestedPath, splitPathSegments } from "./services/nested-path";
@@ -63,6 +63,7 @@ import { resolveSoftDelete, rowInTrashError } from "./services/soft-delete";
 import type { RuntimeTable } from "./model/runtime-table";
 import { currentWriteScope, runInWriteScope, WriteTransactionScope } from "./services/write-transaction-scope";
 import { currentWriteDepth, inWriteFrame, type WriteFrame } from "./services/write-depth";
+import { afterDelete, afterReadOnRow, afterReadOnRows, afterSave, afterSaveError, beforeDeleteVetoes, beforeSave, declaresAnyHook, hasAfterRead, hasBeforeQueryHook, hasBeforeSave, hasRowHook, resolveTableHooks, type TableHookSet } from "./services/table-hooks";
 import { HistoryService } from "./history/HistoryService";
 import { ApiError, logger, resolveBatchRefs } from "@rebasepro/server";
 import { extractPgError, isRoleSwitchingPermissionError, reachedDatabase } from "./utils/pg-error-utils";
@@ -370,15 +371,6 @@ function authContextOf(user: User | undefined): SubscriptionAuthContext {
         // carrying none produces no key at all.
         ...(user?.claims ? { claims: user.claims } : {})
     };
-}
-
-/**
- * Whether any tier declares a hook — application code that runs inside the
- * write, and so may catch a failed statement (see
- * `WriteTransactionScope.noteApplicationCode`).
- */
-function declaresAnyHook(...tiers: (object | undefined)[]): boolean {
-    return tiers.some(tier => tier !== undefined && Object.values(tier).some(value => typeof value === "function"));
 }
 
 /** The `(table, column)` pairs {@link warnReplacedStamps} has spoken about, once each. */
@@ -706,8 +698,8 @@ export class PostgresBackendDriver implements DataDriver {
     /**
      * REST-optimised fetch service (include-aware eager-loading).
      * Delegates to the underlying FetchService (include-aware eager loading),
-     * then runs the afterRead pipeline on the results. The raw FetchService does
-     * NOT run callbacks, so masking must be applied here — otherwise every
+     * then runs the afterRead pipeline on the results. The raw FetchService
+     * runs no hooks, so masking must be applied here — otherwise every
      * REST/SDK read leaks unmasked data (see {@link applyAfterReadForRest}).
      */
     get restFetchService(): RestFetchService {
@@ -730,9 +722,9 @@ export class PostgresBackendDriver implements DataDriver {
             // including the Postgres one whose absence the 501's own comment
             // says it is describing.
             //
-            // No afterRead pass: the callbacks shape rows, and an aggregate
-            // returns sums and counts rather than rows — so on a collection
-            // whose rows a callback rewrites, everything but a plain count is
+            // No afterRead pass: the hooks shape rows, and an aggregate
+            // returns sums and counts rather than rows — so on a table
+            // whose rows a hook rewrites, everything but a plain count is
             // refused (see `assertAggregateUnmasked`). Row-level authorization
             // is applied one layer down, by the request-scoped handle this
             // service reads through.
@@ -807,87 +799,39 @@ export class PostgresBackendDriver implements DataDriver {
         };
     }
 
-    private resolveCollectionCallbacks<M extends Record<string, unknown>>(collection: CollectionConfig<M> | undefined, path: string) {
-        if (!collection && !path) return {
-            collection: undefined,
-            callbacks: undefined,
-            globalCallbacks: undefined,
-            propertyCallbacks: undefined
-        };
+    /**
+     * The collection a path addresses: the registry's copy, over the one the
+     * caller handed in (which a socket frame deserialized), for the call sites
+     * that still read a collection.
+     */
+    private resolvedCollectionAt<M extends Record<string, unknown>>(collection: CollectionConfig<M> | undefined, path: string): CollectionConfig<M> | undefined {
+        if (!collection && !path) return undefined;
         const registryCollection = this.registry?.getCollectionByPath(path);
-        const resolvedCollection = registryCollection
-            ? {
-                ...collection,
-                ...registryCollection
-            } as CollectionConfig<M>
-            : collection as CollectionConfig<M>;
-
-        const callbacks = resolvedCollection?.callbacks;
-        const globalCallbacks = this.registry?.getGlobalCallbacks();
-        const properties = resolvedCollection?.properties;
-        let propertyCallbacks;
-        if (properties) {
-            propertyCallbacks = buildPropertyCallbacks(properties);
-        }
-        return {
-            collection: resolvedCollection,
-            callbacks,
-            globalCallbacks,
-            propertyCallbacks
-        };
+        return registryCollection
+            ? { ...collection, ...registryCollection } as CollectionConfig<M>
+            : collection;
     }
 
     /**
-     * Run the three-tier afterRead pipeline (global → collection → property) on a
-     * single row for a collection whose callbacks have already been resolved.
+     * The hooks that run for the table a path addresses — global, the table's
+     * own, its columns' transforms — read off the compiled table in the
+     * registry, never off a collection (a socket frame's included).
      */
-    private async applyAfterReadToRow(
-        row: Record<string, unknown>,
-        path: string,
-        resolved: ReturnType<PostgresBackendDriver["resolveCollectionCallbacks"]>,
-        contextForCallback: RebaseCallContext
-    ): Promise<Record<string, unknown>> {
-        const { collection: resolvedCollection, callbacks, globalCallbacks, propertyCallbacks } = resolved;
-        let out = row;
-        if (!PostgresBackendDriver.hasAfterRead(resolved)) return out;
-        // Resolved once for all three tiers — see `requireCallbackCollection`.
-        const callbackCollection = requireCallbackCollection(resolvedCollection, path);
-        if (globalCallbacks?.afterRead) {
-            out = await globalCallbacks.afterRead({
-                collection: callbackCollection,
-                path, row: out, context: contextForCallback
-            }) ?? out;
-        }
-        if (callbacks?.afterRead) {
-            out = await callbacks.afterRead({
-                collection: callbackCollection,
-                path, row: out, context: contextForCallback
-            }) ?? out;
-        }
-        if (propertyCallbacks?.afterRead) {
-            out = await propertyCallbacks.afterRead({
-                collection: callbackCollection,
-                path, row: out, context: contextForCallback
-            }) ?? out;
-        }
-        return out;
-    }
-
-    private static hasAfterRead(resolved: ReturnType<PostgresBackendDriver["resolveCollectionCallbacks"]>): boolean {
-        return !!(resolved.globalCallbacks?.afterRead || resolved.callbacks?.afterRead || resolved.propertyCallbacks?.afterRead);
+    private hooksAt(collection: { slug: string } | undefined, path: string): TableHookSet {
+        return resolveTableHooks(this.registry, path, collection?.slug);
     }
 
     /**
      * Refuse an aggregate that would read what `afterRead` hides.
      *
      * An aggregate reads the stored columns and never passes through the
-     * callbacks, so on a collection whose rows one rewrites, `max(email)` or
+     * hooks, so on a table whose rows one rewrites, `max(email)` or
      * `groupBy=salary` hands back the value the mask exists to withhold, one
-     * bucket at a time. What a callback does to a row cannot be known from
-     * here, so the rule is closed: on such a collection only `count()` with no
+     * bucket at a time. What a hook does to a row cannot be known from
+     * here, so the rule is closed: on such a table only `count()` with no
      * `groupBy` is served — the number `GET /count` already gives — and any
-     * other aggregate is refused, whichever tier (global, collection or
-     * property) the callback sits on.
+     * other aggregate is refused, whichever tier (global, the table's, or a
+     * column's `.transform()`) the hook sits on.
      */
     private assertAggregateUnmasked(
         path: string,
@@ -898,29 +842,16 @@ export class PostgresBackendDriver implements DataDriver {
         const plainCount = (options.groupBy?.length ?? 0) === 0
             && options.aggregates.every(aggregate => (aggregate.fn === "count" || aggregate.fn === "fingerprint") && !aggregate.field);
         if (plainCount) return;
-        if (!PostgresBackendDriver.hasAfterRead(this.resolveCollectionCallbacks(undefined, path))) return;
+        if (!hasAfterRead(this.hooksAt(undefined, path))) return;
         throw ApiError.badRequest(
-            `Aggregates other than count are refused on a collection whose rows an afterRead callback rewrites ("${path}"): ` +
-            "a sum, average, minimum, maximum, field count or group would read the stored values the callback hides. " +
+            `Aggregates other than count are refused on a table whose rows an afterRead hook rewrites ("${path}"): ` +
+            "a sum, average, minimum, maximum, field count or group would read the stored values the hook hides. " +
             "Use `count()` or `fingerprint()` without `groupBy`, or read the rows.",
             "AGGREGATE_MASKED_BY_AFTER_READ",
             { collection: path }
         );
     }
 
-    /**
-     * Apply afterRead to REST/SDK read results.
-     *
-     * The REST / `include` path fetches rows through the raw fetch service, which
-     * does NOT run callbacks — so without this, `afterRead` transforms (e.g. PII
-     * masking) are silently skipped on every SDK/REST read, leaking raw data.
-     * This choke point guarantees afterRead runs there too, matching the driver's
-     * fetchCollection/fetchOne paths.
-     *
-     * It also masks embedded relation data one level deep by running the TARGET
-     * collection's afterRead (so `post.author.email` is masked by the authors
-     * collection, not left raw).
-     */
     /**
      * One stored row as `restFetchService.fetchOneForRest` serves it: through
      * `afterRead`, on a copy, so the row the write itself goes on with (its
@@ -936,71 +867,44 @@ export class PostgresBackendDriver implements DataDriver {
         return served;
     }
 
+    /**
+     * Apply `afterRead` to REST/SDK read results.
+     *
+     * The REST / `include` path fetches rows through the raw fetch service, which
+     * runs no hooks — so without this, `afterRead` (PII masking among them) is
+     * silently skipped on every SDK/REST read, leaking raw data. This choke
+     * point guarantees it runs there too, as on `fetchCollection`/`fetchOne`.
+     *
+     * It also masks embedded relation data one level deep by running the TARGET
+     * table's `afterRead` (so `post.author.email` is masked by the authors
+     * table, not left raw).
+     */
     async applyAfterReadForRest(
         rows: Record<string, unknown>[],
         path: string
     ): Promise<Record<string, unknown>[]> {
-        if (!rows || rows.length === 0) return rows;
+        return this.applyAfterRead(rows, path);
+    }
 
-        const resolved = this.resolveCollectionCallbacks(undefined, path);
-        const hasOwn = PostgresBackendDriver.hasAfterRead(resolved);
-
-        // Resolve embedded relation targets (relationKey -> { path, resolved callbacks })
-        // once, keeping only those whose target collection actually has an afterRead.
-        const relationTargets: Record<string, { path: string; resolved: ReturnType<PostgresBackendDriver["resolveCollectionCallbacks"]> }> = {};
-        if (resolved.collection) {
-            try {
-                const rels = resolveCollectionRelations(resolved.collection as CollectionConfig);
-                for (const [key, rel] of Object.entries(rels)) {
-                    const target = typeof (rel as { target?: unknown }).target === "function"
-                        ? (rel as { target: () => CollectionConfig }).target()
-                        : undefined;
-                    const targetPath = target?.slug;
-                    if (!targetPath) continue;
-                    // The relation's own target, not just its slug: the target
-                    // config is in hand here, so a relation pointing at a
-                    // collection the registry cannot resolve by slug still
-                    // masks through the config it declared, instead of handing
-                    // the tiers a collection that is not there.
-                    const targetResolved = this.resolveCollectionCallbacks(target, targetPath);
-                    if (PostgresBackendDriver.hasAfterRead(targetResolved)) {
-                        relationTargets[key] = { path: targetPath, resolved: targetResolved };
-                    }
-                }
-            } catch {
-                // Ignore relation resolution errors (e.g. incomplete config during setup)
-            }
-        }
-        const relKeys = Object.keys(relationTargets);
-
-        if (!hasOwn && relKeys.length === 0) return rows;
-        // `afterRead` is application code; see `noteApplicationCode`.
-        currentWriteScope()?.noteApplicationCode();
-        const contextForCallback = this.buildCallContext();
-
-        const maskEmbedded = async (value: unknown, target: { path: string; resolved: ReturnType<PostgresBackendDriver["resolveCollectionCallbacks"]> }): Promise<unknown> => {
-            if (Array.isArray(value)) {
-                return Promise.all(value.map((v) => maskEmbedded(v, target)));
-            }
-            if (!value || typeof value !== "object") return value;
-            const obj = value as Record<string, unknown>;
-            // A pre-fetched relation payload may nest the row under `.data`.
-            if (obj.__type === "relation" && obj.data && typeof obj.data === "object") {
-                return { ...obj, data: await this.applyAfterReadToRow(obj.data as Record<string, unknown>, target.path, target.resolved, contextForCallback) };
-            }
-            // A bare reference pointer carries no row data to mask.
-            if (obj.__type === "reference") return obj;
-            return this.applyAfterReadToRow(obj, target.path, target.resolved, contextForCallback);
-        };
-
-        return Promise.all(rows.map(async (row) => {
-            let out = hasOwn ? await this.applyAfterReadToRow(row, path, resolved, contextForCallback) : row;
-            for (const key of relKeys) {
-                if (out[key] === undefined || out[key] === null) continue;
-                out = { ...out, [key]: await maskEmbedded(out[key], relationTargets[key]) };
-            }
-            return out;
-        }));
+    /**
+     * The driver's one `afterRead` chain (see `afterReadOnRows`): global, the
+     * table's, its columns' transforms, then each embedded relation masked
+     * with the TARGET table's. Every read this driver serves goes through it.
+     */
+    private applyAfterRead(
+        rows: Record<string, unknown>[],
+        path: string,
+        collection?: { slug: string }
+    ): Promise<Record<string, unknown>[]> {
+        return afterReadOnRows(
+            this.registry,
+            this.hooksAt(collection, path),
+            rows,
+            path,
+            () => this.buildCallContext(),
+            // `afterRead` is application code; see `noteApplicationCode`.
+            () => currentWriteScope()?.noteApplicationCode()
+        );
     }
 
     async fetchCollection<M extends Record<string, unknown>>(
@@ -1018,57 +922,9 @@ export class PostgresBackendDriver implements DataDriver {
             databaseId: collection?.databaseId
         });
 
-        const {
-            collection: resolvedCollection,
-            callbacks,
-            globalCallbacks,
-            propertyCallbacks
-        } = this.resolveCollectionCallbacks(collection, path);
-
-        if (globalCallbacks?.afterRead || callbacks?.afterRead || propertyCallbacks?.afterRead) {
-            const contextForCallback = this.buildCallContext();
-            const callbackCollection = requireCallbackCollection(resolvedCollection, path);
-            return Promise.all(rows.map(async (row) => {
-                let fetched = row;
-                // `?? fetched` on every tier. An `afterRead` that mutates the row
-                // and returns nothing is a reasonable thing to write — the guide's
-                // own signature says the return is a transform, not a requirement
-                // — and on the tiers that lacked the fallback it replaced the row
-                // with `undefined`. The collection tier tolerated it, so the same
-                // callback worked or emptied the response depending on which
-                // block it was registered in.
-                // 1. Global callbacks first
-                if (globalCallbacks?.afterRead) {
-                    fetched = await globalCallbacks.afterRead({
-                        collection: callbackCollection,
-                        path,
-                        row: fetched,
-                        context: contextForCallback
-                    }) ?? fetched;
-                }
-                // 2. Collection callbacks second
-                if (callbacks?.afterRead) {
-                    fetched = await callbacks.afterRead({
-                        collection: callbackCollection,
-                        path,
-                        row: fetched,
-                        context: contextForCallback
-                    }) ?? fetched;
-                }
-                // 3. Property callbacks third
-                if (propertyCallbacks?.afterRead) {
-                    fetched = await propertyCallbacks.afterRead({
-                        collection: callbackCollection,
-                        path,
-                        row: fetched,
-                        context: contextForCallback
-                    }) ?? fetched;
-                }
-                return fetched;
-            }));
-        }
-
-        return rows;
+        // The one chain: every tier, embedded relations included. A hook that
+        // mutates the row and returns nothing leaves the row it mutated.
+        return this.applyAfterRead(rows, path, collection);
     }
 
     /**
@@ -1125,54 +981,15 @@ export class PostgresBackendDriver implements DataDriver {
                                                              collection,
                                                              withDeleted
                                                          }: FetchOneProps<M>): Promise<Record<string, unknown> | undefined> {
-        let row = await this.dataService.fetchOne<M>(
+        const row = await this.dataService.fetchOne<M>(
             path,
             id,
             databaseId || collection?.databaseId,
             withDeleted
         );
-
-        const {
-            collection: resolvedCollection,
-            callbacks,
-            globalCallbacks,
-            propertyCallbacks
-        } = this.resolveCollectionCallbacks(collection, path);
-
-        if (row && (globalCallbacks?.afterRead || callbacks?.afterRead || propertyCallbacks?.afterRead)) {
-            const contextForCallback = this.buildCallContext();
-            const callbackCollection = requireCallbackCollection(resolvedCollection, path);
-            // `?? row` on every tier — see the note in `fetchCollection`.
-            // 1. Global callbacks first
-            if (globalCallbacks?.afterRead) {
-                row = await globalCallbacks.afterRead({
-                    collection: callbackCollection,
-                    path,
-                    row,
-                    context: contextForCallback
-                }) ?? row;
-            }
-            // 2. Collection callbacks second
-            if (callbacks?.afterRead) {
-                row = await callbacks.afterRead({
-                    collection: callbackCollection,
-                    path,
-                    row,
-                    context: contextForCallback
-                }) ?? row;
-            }
-            // 3. Property callbacks third
-            if (propertyCallbacks?.afterRead) {
-                row = await propertyCallbacks.afterRead({
-                    collection: callbackCollection,
-                    path,
-                    row,
-                    context: contextForCallback
-                }) ?? row;
-            }
-        }
-
-        return row;
+        if (!row) return row;
+        const [served] = await this.applyAfterRead([row], path, collection);
+        return served;
     }
 
     /**
@@ -1460,7 +1277,7 @@ export class PostgresBackendDriver implements DataDriver {
         let resolved: CollectionConfig | undefined = collection;
         if (!resolved) {
             try {
-                resolved = this.resolveCollectionCallbacks(undefined, path).collection as CollectionConfig | undefined;
+                resolved = this.resolvedCollectionAt(undefined, path);
             } catch {
                 return;
             }
@@ -1513,30 +1330,14 @@ export class PostgresBackendDriver implements DataDriver {
      */
     private async viewOfSavedRow(
         storedRow: Record<string, unknown>,
-        collection: CollectionConfig | undefined,
         path: string,
-        hooks: Pick<ReturnType<PostgresBackendDriver["resolveCollectionCallbacks"]>, "callbacks" | "globalCallbacks" | "propertyCallbacks">,
+        hooks: TableHookSet,
         context: RebaseCallContext
     ): Promise<Record<string, unknown>> {
-        const { callbacks, globalCallbacks, propertyCallbacks } = hooks;
-        if (!storedRow || !(globalCallbacks?.afterRead || callbacks?.afterRead || propertyCallbacks?.afterRead)) return storedRow;
-        const callbackCollection = requireCallbackCollection(collection, path);
-        let savedRow = { ...storedRow };
-        // `?? savedRow` on every tier — see the note in `fetchCollection`.
-        // Here it decided what the write's own response body contained.
-        // 1. Global callbacks first
-        if (globalCallbacks?.afterRead) {
-            savedRow = await globalCallbacks.afterRead({ collection: callbackCollection, path, row: savedRow, context }) ?? savedRow;
-        }
-        // 2. Collection callbacks second
-        if (callbacks?.afterRead) {
-            savedRow = await callbacks.afterRead({ collection: callbackCollection, path, row: savedRow, context }) ?? savedRow;
-        }
-        // 3. Property callbacks third
-        if (propertyCallbacks?.afterRead) {
-            savedRow = await propertyCallbacks.afterRead({ collection: callbackCollection, path, row: savedRow, context }) ?? savedRow;
-        }
-        return savedRow;
+        if (!storedRow || !hasAfterRead(hooks)) return storedRow;
+        // A tier that returns nothing leaves the row: here it decided what the
+        // write's own response body contained.
+        return afterReadOnRow(hooks, { ...storedRow }, path, context);
     }
 
     /**
@@ -1551,15 +1352,14 @@ export class PostgresBackendDriver implements DataDriver {
     private writeReadsStoredRow(
         collection: CollectionConfig | undefined,
         path: string,
-        hooks: Pick<ReturnType<PostgresBackendDriver["resolveCollectionCallbacks"]>, "callbacks" | "globalCallbacks" | "propertyCallbacks">
+        hooks: TableHookSet
     ): boolean {
         if (!collection) return true;
-        const { callbacks, globalCallbacks, propertyCallbacks } = hooks;
         return Boolean(
-            callbacks?.beforeSave || globalCallbacks?.beforeSave || propertyCallbacks?.beforeSave
-            || callbacks?.afterSave || globalCallbacks?.afterSave || propertyCallbacks?.afterSave
-            || callbacks?.afterSaveError || globalCallbacks?.afterSaveError || propertyCallbacks?.afterSaveError
-            || callbacks?.beforeQuery || globalCallbacks?.beforeQuery
+            hasBeforeSave(hooks)
+            || hasRowHook(hooks, "afterSave")
+            || hasRowHook(hooks, "afterSaveError")
+            || hasBeforeQueryHook(hooks)
             || collection.history
             || tenantOf(this.registry.requireTable(collection.slug).descriptor)
             || hasFieldAccessRules(collection)
@@ -1598,10 +1398,10 @@ export class PostgresBackendDriver implements DataDriver {
      */
     private lastWriteCommits(
         collection: CollectionConfig | undefined,
-        ...hooks: (object | undefined)[]
+        hooks?: TableHookSet
     ): boolean {
         return this._commitsWithLastWrite && currentWriteDepth() <= 1
-            && !declaresAnyHook(...hooks) && !collection?.history;
+            && !(hooks && declaresAnyHook(hooks)) && !collection?.history;
     }
 
     private async saveInFrame<M extends Record<string, unknown>>({
@@ -1622,13 +1422,9 @@ export class PostgresBackendDriver implements DataDriver {
                                                         /** An upsert's conflict rule: see {@link saveRowUnlessKept}. */
                                                         rule?: ConflictRule): Promise<Record<string, unknown> | undefined> {
 
-        const {
-            collection: resolvedCollection,
-            callbacks,
-            globalCallbacks,
-            propertyCallbacks
-        } = this.resolveCollectionCallbacks(collection, path);
-        if (declaresAnyHook(callbacks, globalCallbacks, propertyCallbacks)) currentWriteScope()?.noteApplicationCode();
+        const resolvedCollection = this.resolvedCollectionAt(collection, path);
+        const hooks = this.hooksAt(collection, path);
+        if (declaresAnyHook(hooks)) currentWriteScope()?.noteApplicationCode();
         // Before anything runs, hooks included: a write whose audit entry
         // cannot be recorded is refused, not made and rolled back.
         if (resolvedCollection?.history) this.historyService?.assertRecordable(resolvedCollection.slug);
@@ -1658,7 +1454,6 @@ export class PostgresBackendDriver implements DataDriver {
         if (!preconditionFirst) assertUpdateShape();
 
         const upserting = upsert === true && status !== "existing";
-        const hooks = { callbacks, globalCallbacks, propertyCallbacks };
         // Read first only for what needs the stored row; otherwise the
         // INSERT's conflict branch below is the update, in one statement.
         const readsStoredRow = this.writeReadsStoredRow(resolvedCollection as CollectionConfig | undefined, path, hooks);
@@ -1679,7 +1474,7 @@ export class PostgresBackendDriver implements DataDriver {
                 // narrow the "list" that found it differently from a "get", the
                 // find ran on the trusted plane for per-field read access, and a
                 // nested path reads the row from elsewhere.
-                const reusable = !callbacks?.beforeQuery && !globalCallbacks?.beforeQuery
+                const reusable = !hasBeforeQueryHook(hooks)
                     && !hasFieldAccessRules(resolvedCollection as CollectionConfig) && !isNestedPath(path);
                 return this.saveInFrame<M>(
                     { path, id: stored.id, values: stored.values, collection, status: "existing" },
@@ -1797,51 +1592,15 @@ export class PostgresBackendDriver implements DataDriver {
         // answers 400 with the author's message rather than a masked 500.
         try {
             frame.stage = "beforeSave";
-            if (globalCallbacks?.beforeSave || callbacks?.beforeSave || propertyCallbacks?.beforeSave) {
-                const callbackCollection = requireCallbackCollection(resolvedCollection, path);
-                // 1. Global callbacks first
-                if (globalCallbacks?.beforeSave) {
-                    const result = await globalCallbacks.beforeSave({
-                        collection: callbackCollection,
-                        path,
-                        id,
-                        values: updatedValues,
-                        previousValues: previousValuesForHistory,
-                        status,
-                        context: contextForCallback
-                    });
-                    if (result) updatedValues = applyBeforeSaveResult(updatedValues, result);
-                }
-
-                // 2. Collection callbacks second
-                if (callbacks?.beforeSave) {
-                    const result = await callbacks.beforeSave({
-                        collection: callbackCollection,
-                        path,
-                        id,
-                        values: updatedValues,
-                        previousValues: previousValuesForHistory,
-                        status,
-                        context: contextForCallback
-                    });
-                    if (result) updatedValues = applyBeforeSaveResult(updatedValues, result);
-                }
-
-                // 3. Property callbacks third
-                if (propertyCallbacks?.beforeSave) {
-                    const result = await propertyCallbacks.beforeSave({
-                        collection: callbackCollection,
-                        path,
-                        id,
-                        values: updatedValues,
-                        previousValues: previousValuesForHistory,
-                        status,
-                        context: contextForCallback
-                    });
-                    if (result) updatedValues = applyBeforeSaveResult(updatedValues, result);
-                }
-
-            }
+            // Global, then the table's, then its columns' transforms; each
+            // tier's returned values are merged over the ones before.
+            updatedValues = await beforeSave(hooks, updatedValues as Record<string, unknown>, {
+                path,
+                id,
+                previousValues: previousValuesForHistory as Record<string, unknown> | undefined,
+                status,
+                context: contextForCallback
+            }) as Partial<EntityValues<M>>;
         } catch (callbackError) {
             throw toCallbackError(callbackError, "beforeSave", path);
         }
@@ -1909,7 +1668,7 @@ export class PostgresBackendDriver implements DataDriver {
                 onConflict,
                 insertOnlyKeys,
                 unreadRow,
-                commitsTransaction: this.lastWriteCommits(resolvedCollection as CollectionConfig | undefined, callbacks, globalCallbacks, propertyCallbacks)
+                commitsTransaction: this.lastWriteCommits(resolvedCollection as CollectionConfig | undefined, hooks)
             };
             const storedRow = upserting && rule
                 ? await this.dataService.saveUnlessKept<M>(path, updatedValues, writeId, resolvedCollection?.databaseId, { ...persistOptions, ...rule })
@@ -1926,9 +1685,7 @@ export class PostgresBackendDriver implements DataDriver {
             // what a revert then wrote into the column, and a computed field it
             // added made every version un-revertable. A copy goes in, so an
             // `afterRead` that edits its argument in place edits only the view.
-            const savedRow = await this.viewOfSavedRow(
-                storedRow, resolvedCollection, path, { callbacks, globalCallbacks, propertyCallbacks }, contextForCallback
-            );
+            const savedRow = await this.viewOfSavedRow(storedRow, path, hooks, contextForCallback);
 
             // The row is exactly its columns, so its address is derived, not read
             // off it: `storedRow.id` is undefined for every table whose key is not
@@ -1956,45 +1713,14 @@ export class PostgresBackendDriver implements DataDriver {
             // enqueued in a transaction that rolls back was never enqueued.
             try {
                 frame.stage = "afterSave";
-                if (globalCallbacks?.afterSave || callbacks?.afterSave || propertyCallbacks?.afterSave) {
-                    const callbackCollection = requireCallbackCollection(resolvedCollection, path);
-                    // 1. Global callbacks first
-                    if (globalCallbacks?.afterSave) {
-                        await globalCallbacks.afterSave({
-                            collection: callbackCollection,
-                            path,
-                            id: savedId,
-                            values: savedValues,
-                            previousValues: previousValuesForHistory,
-                            status,
-                            context: contextForCallback
-                        });
-                    }
-                    // 2. Collection callbacks second
-                    if (callbacks?.afterSave) {
-                        await callbacks.afterSave({
-                            collection: callbackCollection,
-                            path,
-                            id: savedId,
-                            values: savedValues as Partial<M>,
-                            previousValues: previousValuesForHistory,
-                            status,
-                            context: contextForCallback
-                        });
-                    }
-                    // 3. Property callbacks third
-                    if (propertyCallbacks?.afterSave) {
-                        await propertyCallbacks.afterSave({
-                            collection: callbackCollection,
-                            path,
-                            id: savedId,
-                            values: savedValues,
-                            previousValues: previousValuesForHistory,
-                            status,
-                            context: contextForCallback
-                        });
-                    }
-                }
+                // Global, then the table's.
+                await afterSave(hooks, savedId, savedValues, {
+                    path,
+                    id,
+                    previousValues: previousValuesForHistory as Record<string, unknown> | undefined,
+                    status,
+                    context: contextForCallback
+                });
             } catch (callbackError) {
                 throw toCallbackError(callbackError, "afterSave", path);
             }
@@ -2041,40 +1767,25 @@ export class PostgresBackendDriver implements DataDriver {
 
             return savedRow;
         } catch (error) {
-            if (globalCallbacks?.afterSaveError || callbacks?.afterSaveError || propertyCallbacks?.afterSaveError) {
-                const callbackCollection = requireCallbackCollection(resolvedCollection, path);
-                // Global, then collection, then property — each on its own,
-                // and guarded: a hook that throws cannot replace the failure
-                // the caller is owed with its own.
-                const runHooks = async (context: RebaseCallContext) => {
-                    // What the hook exists to see. It was documented from the
-                    // start and never passed, so `props.error` was `undefined`
-                    // in every handler ever written against the guide. `id` is
-                    // the caller's when there is one, and `previousValues` is
-                    // whatever the pre-write read managed to fetch.
-                    const errorProps = {
-                        collection: callbackCollection,
+            if (hasRowHook(hooks, "afterSaveError")) {
+                // Global, then the table's — each on its own, and guarded: a
+                // hook that throws cannot replace the failure the caller is
+                // owed with its own. `error` is what the hook exists to see;
+                // `id` is the caller's when there is one, and `previousValues`
+                // whatever the pre-write read managed to fetch.
+                const runHooks = (context: RebaseCallContext) => afterSaveError(
+                    hooks,
+                    updatedValues as Record<string, unknown>,
+                    error,
+                    {
                         path,
                         id,
-                        values: updatedValues,
-                        previousValues: previousValuesForHistory,
+                        previousValues: previousValuesForHistory as Record<string, unknown> | undefined,
                         status,
-                        error,
                         context
-                    };
-                    for (const [tier, hook] of [
-                        ["global", globalCallbacks?.afterSaveError],
-                        ["collection", callbacks?.afterSaveError],
-                        ["property", propertyCallbacks?.afterSaveError]
-                    ] as const) {
-                        if (!hook) continue;
-                        try {
-                            await hook(errorProps);
-                        } catch (hookError) {
-                            logger.error(`[save] The ${tier} afterSaveError hook for "${path}" threw; answering with the save's own failure`, { error: hookError });
-                        }
-                    }
-                };
+                    },
+                    (tier, hookError) => logger.error(`[save] The ${tier} afterSaveError hook for "${path}" threw; answering with the save's own failure`, { error: hookError })
+                );
                 // The hook is for alerting, and the documented way to alert is
                 // a job. Inside a request's write it waits for that write's
                 // transaction to end: it used to run inside it, so what it
@@ -2280,9 +1991,10 @@ export class PostgresBackendDriver implements DataDriver {
      * tenancy read per row, so those batches keep the row-by-row pipeline.
      */
     private writesRowsTogether(collection: CollectionConfig | undefined, path: string): boolean {
-        const { collection: resolved, callbacks, globalCallbacks, propertyCallbacks } = this.resolveCollectionCallbacks(collection, path);
+        const resolved = this.resolvedCollectionAt(collection, path);
         if (!resolved || isNestedPath(path) || resolved.history || tenantOf(this.registry.requireTable(resolved.slug).descriptor)) return false;
-        return [callbacks, globalCallbacks, propertyCallbacks].every(tier => !tier?.beforeSave && !tier?.afterSave && !tier?.afterSaveError);
+        const hooks = this.hooksAt(collection, path);
+        return !hasBeforeSave(hooks) && !hasRowHook(hooks, "afterSave") && !hasRowHook(hooks, "afterSaveError");
     }
 
     /**
@@ -2303,10 +2015,9 @@ export class PostgresBackendDriver implements DataDriver {
         onConflict: readonly string[] | undefined,
         rule?: ConflictRule
     ): Promise<Record<string, unknown>[] | undefined> {
-        const { collection: resolvedCollection, callbacks, globalCallbacks, propertyCallbacks } = this.resolveCollectionCallbacks(collection, path);
-        const resolved = resolvedCollection as CollectionConfig | undefined;
+        const resolved = this.resolvedCollectionAt(collection, path);
         if (!resolved) return undefined;
-        const hooks = { callbacks, globalCallbacks, propertyCallbacks };
+        const hooks = this.hooksAt(collection, path);
 
         // What `saveInFrame` does to a new row with no hooks to run: the
         // declared defaults, then the stamps, and for an upsert the keys its
@@ -2331,7 +2042,7 @@ export class PostgresBackendDriver implements DataDriver {
             upsert,
             onConflict,
             ...rule,
-            commitsTransaction: this.lastWriteCommits(resolved, callbacks, globalCallbacks, propertyCallbacks)
+            commitsTransaction: this.lastWriteCommits(resolved, hooks)
         });
         if (!stored) return undefined;
         // The rows a conflict rule kept were not written, and are not answered.
@@ -2351,8 +2062,7 @@ export class PostgresBackendDriver implements DataDriver {
         updates: UpdateManyProps<M>["updates"],
         collection: CollectionConfig | undefined
     ): Promise<Record<string, unknown>[] | undefined> {
-        const { collection: resolvedCollection, callbacks, globalCallbacks, propertyCallbacks } = this.resolveCollectionCallbacks(collection, path);
-        const resolved = resolvedCollection as CollectionConfig | undefined;
+        const resolved = this.resolvedCollectionAt(collection, path);
         if (!resolved) return undefined;
         const prepared = updates.map(({ id, values }) => {
             assertUpdateDoesNotSoftDelete(this.tableOf(resolved), values as Record<string, unknown>, path);
@@ -2361,7 +2071,7 @@ export class PostgresBackendDriver implements DataDriver {
         });
         const stored = await this.dataService.getPersistService().updateRows(path, prepared);
         if (!stored) return undefined;
-        return this.answerRowsWritten(stored, prepared.map(row => row.values), resolved, path, { callbacks, globalCallbacks, propertyCallbacks });
+        return this.answerRowsWritten(stored, prepared.map(row => row.values), resolved, path, this.hooksAt(collection, path));
     }
 
     /**
@@ -2374,7 +2084,7 @@ export class PostgresBackendDriver implements DataDriver {
         written: Record<string, unknown>[],
         collection: CollectionConfig,
         path: string,
-        hooks: Pick<ReturnType<PostgresBackendDriver["resolveCollectionCallbacks"]>, "callbacks" | "globalCallbacks" | "propertyCallbacks">
+        hooks: TableHookSet
     ): Promise<Record<string, unknown>[]> {
         const context = this.buildCallContext();
         const primaryKeys = getPrimaryKeys(collection, this.registry);
@@ -2382,7 +2092,7 @@ export class PostgresBackendDriver implements DataDriver {
         const notifications: PostgresBackendDriver["_pendingNotifications"] = [];
         for (let i = 0; i < stored.length; i++) {
             const storedRow = stored[i];
-            const savedRow = await this.viewOfSavedRow(storedRow, collection, path, hooks, context);
+            const savedRow = await this.viewOfSavedRow(storedRow, path, hooks, context);
             const savedId = deriveRowAddress(storedRow, collection, this.registry, primaryKeys);
             notifications.push(
                 { path, id: savedId, row: savedRow, databaseId: collection.databaseId },
@@ -2539,8 +2249,7 @@ export class PostgresBackendDriver implements DataDriver {
         collection
     }: UpdateWhereProps<M>): Promise<Record<string, unknown>[]> {
         this.assertWritable(collection, path);
-        const { collection: resolvedCollection, callbacks, globalCallbacks, propertyCallbacks } = this.resolveCollectionCallbacks(collection, path);
-        const resolved = this.assertFilteredWrite(resolvedCollection as CollectionConfig | undefined, path, filter, logical);
+        const resolved = this.assertFilteredWrite(this.resolvedCollectionAt(collection, path), path, filter, logical);
         const written = values as Record<string, unknown>;
         assertUpdateDoesNotSoftDelete(this.tableOf(resolved), written, path);
         const keys = keysOfTable(this.registry.requireTable(resolved.slug), this.registry).map(key => key.fieldName).filter(field => written[field] !== undefined);
@@ -2552,11 +2261,11 @@ export class PostgresBackendDriver implements DataDriver {
                 { collection: resolved.slug, violations: keys.map(field => ({ field, code: "key_immutable" })) }
             );
         }
-        const hooks = { callbacks, globalCallbacks, propertyCallbacks };
+        const hooks = this.hooksAt(collection, path);
         if (!this.writeReadsStoredRow(resolved, path, hooks)) {
             const stamped = this.stampWrite(resolved, values, "existing", path) as Record<string, unknown>;
             const stored = await this.dataService.getPersistService().updateWhere(path, filter, logical, stamped, {
-                commitsTransaction: this.lastWriteCommits(resolved, callbacks, globalCallbacks, propertyCallbacks)
+                commitsTransaction: this.lastWriteCommits(resolved, hooks)
             });
             if (stored) return this.answerRowsWritten(stored, stored.map(() => stamped), resolved, path, hooks);
         }
@@ -2579,10 +2288,9 @@ export class PostgresBackendDriver implements DataDriver {
         hard
     }: DeleteWhereProps<M>): Promise<number> {
         this.assertWritable(collection, path);
-        const { collection: resolvedCollection, callbacks, globalCallbacks, propertyCallbacks } = this.resolveCollectionCallbacks(collection, path);
-        const resolved = this.assertFilteredWrite(resolvedCollection as CollectionConfig | undefined, path, filter, logical);
+        const resolved = this.assertFilteredWrite(this.resolvedCollectionAt(collection, path), path, filter, logical);
         const softDeleting = !hard && resolveSoftDelete(this.tableOf(resolved)) !== undefined;
-        if (!softDeleting && !resolved.history && !declaresAnyHook(callbacks, globalCallbacks, propertyCallbacks)) {
+        if (!softDeleting && !resolved.history && !declaresAnyHook(this.hooksAt(collection, path))) {
             const deleted = await this.dataService.getPersistService().deleteWhere(path, filter, logical, {
                 commitsTransaction: this.lastWriteCommits(resolved)
             });
@@ -2794,14 +2502,11 @@ export class PostgresBackendDriver implements DataDriver {
 
         const targetPath = row.path;
 
-        // Resolve from backend registry to restore callbacks lost during WebSocket serialization
-        const {
-            collection: resolvedCollection,
-            callbacks,
-            globalCallbacks,
-            propertyCallbacks
-        } = this.resolveCollectionCallbacks(collection, targetPath);
-        if (declaresAnyHook(callbacks, globalCallbacks, propertyCallbacks)) currentWriteScope()?.noteApplicationCode();
+        // The hooks come from the compiled table in the registry, never from
+        // the collection a caller (a socket frame) handed in.
+        const resolvedCollection = this.resolvedCollectionAt(collection, targetPath);
+        const hooks = this.hooksAt(collection, targetPath);
+        if (declaresAnyHook(hooks)) currentWriteScope()?.noteApplicationCode();
 
         // Through a many-to-many path the target row is not what is deleted —
         // see `unlinking` below — and an unlink is no entry in its history.
@@ -2842,7 +2547,7 @@ export class PostgresBackendDriver implements DataDriver {
         // the row's address comes back from the statement.
         const softDeleting = !hard && !unlinking && resolveSoftDelete(this.tableOf(resolvedCollection as CollectionConfig | undefined)) !== undefined;
         if (!precondition && !hop && !softDeleting && !resolvedCollection?.history
-            && !declaresAnyHook(callbacks, globalCallbacks, propertyCallbacks)) {
+            && !declaresAnyHook(hooks)) {
             await this.dataService.delete(targetPath, row.id, resolvedCollection?.databaseId, {
                 commitsTransaction: this.lastWriteCommits(resolvedCollection as CollectionConfig | undefined)
             });
@@ -2868,9 +2573,9 @@ export class PostgresBackendDriver implements DataDriver {
         if (!stored) {
             throw ApiError.notFound(`No row "${row.id}" in "${targetPath}" to delete.`);
         }
-        // The callbacks' `row` is the row: its columns, nothing else. The address
+        // The hooks' `values` is the row: its columns, nothing else. The address
         // travels beside it as `id`, so merging it in here only ever invented an
-        // `id` field for tables that have no such column. A copy, so a callback
+        // `id` field for tables that have no such column. A copy, so a hook
         // that edits it does not edit what history records.
         const targetRow: Record<string, unknown> = { ...stored };
         // The row's address, derived from the row as a save's is — what its
@@ -2888,56 +2593,14 @@ export class PostgresBackendDriver implements DataDriver {
         // answers 400 with the author's message rather than a masked 500.
         try {
             frame.stage = "beforeDelete";
-            if (globalCallbacks?.beforeDelete || callbacks?.beforeDelete || propertyCallbacks?.beforeDelete) {
-                const callbackCollection = requireCallbackCollection(resolvedCollection, targetPath);
-                let preventDefault = false;
-                // 1. Global callbacks first
-                if (globalCallbacks?.beforeDelete) {
-                    const result = await globalCallbacks.beforeDelete({
-                        collection: callbackCollection,
-                        path: targetPath,
-                        id: row.id,
-                        row: targetRow,
-                        context: contextForCallback
-                    });
-                    if (result === false) {
-                        preventDefault = true;
-                    }
-                }
-                // 2. Collection callbacks second
-                if (callbacks?.beforeDelete) {
-                    const result = await callbacks.beforeDelete({
-                        collection: callbackCollection,
-                        path: targetPath,
-                        id: row.id,
-                        row: targetRow,
-                        context: contextForCallback
-                    });
-                    if (result === false) {
-                        preventDefault = true;
-                    }
-                }
-                // 3. Property callbacks third
-                if (propertyCallbacks?.beforeDelete) {
-                    const result = await propertyCallbacks.beforeDelete({
-                        collection: callbackCollection,
-                        path: targetPath,
-                        id: row.id,
-                        row: targetRow,
-                        context: contextForCallback
-                    });
-                    if (result === false) {
-                        preventDefault = true;
-                    }
-                }
-                if (preventDefault) {
-                    // A veto, not a silent no-op. Returning early left the route
-                    // answering `204 No Content` — "the row is gone" — for a row
-                    // that is still there, so the panel dropped it from the list
-                    // and the next reload brought it back. Same code a throw
-                    // produces, so one branch handles both.
-                    throw callbackRefusal("beforeDelete", targetPath);
-                }
+            // Global, then the table's; every tier runs, and any `false` vetoes.
+            if (await beforeDeleteVetoes(hooks, { path: targetPath, id: row.id, values: targetRow, context: contextForCallback })) {
+                // A veto, not a silent no-op. Returning early left the route
+                // answering `204 No Content` — "the row is gone" — for a row
+                // that is still there, so the panel dropped it from the list
+                // and the next reload brought it back. Same code a throw
+                // produces, so one branch handles both.
+                throw callbackRefusal("beforeDelete", targetPath);
             }
         } catch (callbackError) {
             throw toCallbackError(callbackError, "beforeDelete", targetPath);
@@ -2978,39 +2641,8 @@ export class PostgresBackendDriver implements DataDriver {
         // cleanup half-done. See the comment on the `afterSave` block.
         try {
             frame.stage = "afterDelete";
-            if (globalCallbacks?.afterDelete || callbacks?.afterDelete || propertyCallbacks?.afterDelete) {
-                const callbackCollection = requireCallbackCollection(resolvedCollection, targetPath);
-                // 1. Global callbacks first
-                if (globalCallbacks?.afterDelete) {
-                    await globalCallbacks.afterDelete({
-                        collection: callbackCollection,
-                        path: targetPath,
-                        id: row.id,
-                        row: targetRow,
-                        context: contextForCallback
-                    });
-                }
-                // 2. Collection callbacks second
-                if (callbacks?.afterDelete) {
-                    await callbacks.afterDelete({
-                        collection: callbackCollection,
-                        path: targetPath,
-                        id: row.id,
-                        row: targetRow,
-                        context: contextForCallback
-                    });
-                }
-                // 3. Property callbacks third
-                if (propertyCallbacks?.afterDelete) {
-                    await propertyCallbacks.afterDelete({
-                        collection: callbackCollection,
-                        path: targetPath,
-                        id: row.id,
-                        row: targetRow,
-                        context: contextForCallback
-                    });
-                }
-            }
+            // Global, then the table's.
+            await afterDelete(hooks, { path: targetPath, id: row.id, values: targetRow, context: contextForCallback });
         } catch (callbackError) {
             throw toCallbackError(callbackError, "afterDelete", targetPath);
         }
@@ -3087,7 +2719,7 @@ export class PostgresBackendDriver implements DataDriver {
      * refresh needs: Postgres lets only a view's owner refresh it.
      */
     async refreshView(path: string, options?: { concurrently?: boolean }): Promise<void> {
-        const collection = this.resolveCollectionCallbacks(undefined, path).collection as CollectionConfig | undefined;
+        const collection = this.resolvedCollectionAt(undefined, path);
         if (!collection || !isPostgresCollectionConfig(collection) || !collection.view?.materialized) {
             throw ApiError.badRequest(
                 `"${collection?.slug ?? path}" is not a materialized view, so there is nothing to refresh.`,

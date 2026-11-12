@@ -195,6 +195,8 @@ describe("PostgresBackendDriver.delete — soft delete", () => {
 
     beforeEach(() => {
         jest.restoreAllMocks();
+        // Hooks are the table's, read from the registry; none unless a test attaches them.
+        registry.setTableHooks("posts", {});
     });
 
     it("stamps the field instead of issuing a DELETE", async () => {
@@ -222,9 +224,10 @@ describe("PostgresBackendDriver.delete — soft delete", () => {
 
     it("still runs beforeDelete, and a veto still blocks it", async () => {
         const beforeDelete = jest.fn().mockResolvedValue(false);
+        registry.setTableHooks("posts", { beforeDelete });
         await expect(stand().delete({
             row: { id: "7", path: "posts" },
-            collection: { ...posts, callbacks: { beforeDelete } } as CollectionConfig
+            collection: posts
         })).rejects.toThrow();
         expect(beforeDelete).toHaveBeenCalled();
         expect(saveSpy).not.toHaveBeenCalled();
@@ -232,9 +235,10 @@ describe("PostgresBackendDriver.delete — soft delete", () => {
 
     it("still runs afterDelete", async () => {
         const afterDelete = jest.fn().mockResolvedValue(undefined);
+        registry.setTableHooks("posts", { afterDelete });
         await stand().delete({
             row: { id: "7", path: "posts" },
-            collection: { ...posts, callbacks: { afterDelete } } as CollectionConfig
+            collection: posts
         });
         expect(afterDelete).toHaveBeenCalled();
     });

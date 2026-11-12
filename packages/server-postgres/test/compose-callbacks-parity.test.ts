@@ -1,8 +1,8 @@
 /**
- * `composeCallbacks(a, b)` in a collection's slot behaves exactly as `a` in
- * the global slot and `b` in the collection's.
+ * `composeTableHooks(a, b)` in a table's `hooks` behaves exactly as `a` in
+ * the global slot and `b` in the table's.
  *
- * `composeCallbacks` promises to combine sets the way this driver combines its
+ * `composeTableHooks` promises to combine sets the way this driver combines its
  * tiers. A second implementation of the same rules drifts from the first the
  * day one of them changes, so nothing here restates the rules: a real driver
  * over PGlite runs one scenario — saves, a failed save, reads, a count,
@@ -14,12 +14,11 @@ import { describe, it, expect } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
 import { pgTable, serial, varchar } from "drizzle-orm/pg-core";
-import type { CollectionCallbacks, CollectionConfig } from "@rebasepro/types";
-import { composeCallbacks } from "@rebasepro/common";
+import { col, defineTable, type TableHooks } from "@rebasepro/types";
+import { compileSchema, composeTableHooks, lowerTables } from "@rebasepro/common";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
-import { PostgresTableRegistry } from "../src/model/PostgresTableRegistry";
-import { FixtureTableRegistry } from "./helpers/tables";
+import { buildTableRegistry } from "../src/model/build-registry";
 import { RealtimeService } from "../src/services/realtimeService";
 
 const notesTable = pgTable("notes", {
@@ -49,33 +48,31 @@ const SCHEMA = `
         ('nope',   't1', 'published');
 `;
 
-function notes(callbacks: CollectionCallbacks | undefined): CollectionConfig {
-    return {
-        name: "Notes",
-        slug: "notes",
-        table: "notes",
-        properties: {
-            id: { name: "ID", type: "number", isId: "increment" },
-            title: { name: "Title", type: "string" },
-            slug: { name: "Slug", type: "string" },
-            tenant: { name: "Tenant", type: "string" },
-            status: { name: "Status", type: "string" },
-            code: { name: "Code", type: "string" }
+function notes(hooks: TableHooks | undefined) {
+    return defineTable("notes", {
+        columns: {
+            id: col.serial().primaryKey(),
+            title: col.varchar(),
+            slug: col.varchar(),
+            tenant: col.varchar(),
+            status: col.varchar(),
+            code: col.varchar({ length: 3 })
         },
-        ...(callbacks ? { callbacks } : {})
-    };
+        rls: "admin-only",
+        ...(hooks ? { hooks } : {})
+    });
 }
 
 /** Two independent sets, each with every hook, each writing what it saw to `log`. */
-function sets(log: unknown[]): [CollectionCallbacks, CollectionCallbacks] {
-    const a: CollectionCallbacks = {
+function sets(log: unknown[]): [TableHooks, TableHooks] {
+    const a: TableHooks = {
         beforeSave: ({ values, status }) => {
             log.push(["a.beforeSave", status, values]);
             return { slug: String(values.title).toLowerCase() };
         },
-        afterRead: ({ row }) => {
-            log.push(["a.afterRead", row.id]);
-            return { ...row, readBy: "a" };
+        afterRead: ({ values }) => {
+            log.push(["a.afterRead", values.id]);
+            return { ...values, readBy: "a" };
         },
         beforeQuery: ({ operation, query }) => {
             log.push(["a.beforeQuery", operation, query.limit]);
@@ -88,22 +85,22 @@ function sets(log: unknown[]): [CollectionCallbacks, CollectionCallbacks] {
             log.push(["a.afterSaveError", values.title]);
             throw new Error("a's alert failed");
         },
-        beforeDelete: ({ row }) => {
-            log.push(["a.beforeDelete", row.title]);
-            return row.title === "keep-a" ? false : undefined;
+        beforeDelete: ({ values }) => {
+            log.push(["a.beforeDelete", values.title]);
+            return values.title === "keep-a" ? false : undefined;
         },
-        afterDelete: ({ row }) => {
-            log.push(["a.afterDelete", row.title]);
+        afterDelete: ({ values }) => {
+            log.push(["a.afterDelete", values.title]);
         }
     };
-    const b: CollectionCallbacks = {
+    const b: TableHooks = {
         beforeSave: ({ values }) => {
             log.push(["b.beforeSave", values]);
             return { ...values, title: `${String(values.title)}!` };
         },
-        afterRead: ({ row }) => {
-            log.push(["b.afterRead", row.readBy]);
-            return { ...row, readBy: `${String(row.readBy)}+b` };
+        afterRead: ({ values }) => {
+            log.push(["b.afterRead", values.readBy]);
+            return { ...values, readBy: `${String(values.readBy)}+b` };
         },
         beforeQuery: () => {
             log.push(["b.beforeQuery"]);
@@ -118,12 +115,12 @@ function sets(log: unknown[]): [CollectionCallbacks, CollectionCallbacks] {
         afterSaveError: ({ values }) => {
             log.push(["b.afterSaveError", values.title]);
         },
-        beforeDelete: ({ row }) => {
-            log.push(["b.beforeDelete", row.title]);
-            return row.title === "keep-b" ? false : true;
+        beforeDelete: ({ values }) => {
+            log.push(["b.beforeDelete", values.title]);
+            return values.title === "keep-b" ? false : true;
         },
-        afterDelete: ({ row }) => {
-            log.push(["b.afterDelete", row.title]);
+        afterDelete: ({ values }) => {
+            log.push(["b.afterDelete", values.title]);
         }
     };
     return [a, b];
@@ -140,17 +137,21 @@ async function outcome<T>(work: () => Promise<T>): Promise<{ ok: T } | { error: 
 }
 
 /** The whole scenario, against sets placed by `place`. Returns everything observable. */
-async function scenario(place: (registry: PostgresTableRegistry, a: CollectionCallbacks, b: CollectionCallbacks) => CollectionConfig) {
+async function scenario(place: (a: TableHooks, b: TableHooks) => { table: ReturnType<typeof notes>; global?: TableHooks }) {
     const db = new PGlite();
     try {
         await db.waitReady;
         await db.exec(SCHEMA);
         const log: unknown[] = [];
         const [a, b] = sets(log);
-        const registry = new FixtureTableRegistry();
-        const collection = place(registry, a, b);
-        registry.registerMultiple([collection]);
-        registry.registerPgTable(notesTable, "notes");
+        const { table, global } = place(a, b);
+        const registry = buildTableRegistry({
+            compiledTables: compileSchema([table]),
+            collections: lowerTables([table]),
+            tables: { notes: notesTable }
+        });
+        if (global) registry.setGlobalHooks(global);
+        const collection = registry.getCollectionByPath("notes");
         const orm = drizzle(db, { schema: { notes: notesTable } });
         const driver = new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry);
 
@@ -178,20 +179,17 @@ async function scenario(place: (registry: PostgresTableRegistry, a: CollectionCa
             vetoedByB: await outcome(async () => driver.delete({ row: { id: await ids("keep-b"), path: "notes" }, collection })),
             deleted: await outcome(async () => driver.delete({ row: { id: await ids("goes!"), path: "notes" }, collection }))
         };
-        const table = (await db.query("SELECT id, title, slug, tenant, status, code FROM notes ORDER BY id")).rows;
-        return { results, log, table };
+        const stored = (await db.query("SELECT id, title, slug, tenant, status, code FROM notes ORDER BY id")).rows;
+        return { results, log, table: stored };
     } finally {
         await db.close();
     }
 }
 
-describe("composeCallbacks matches the driver's tiers", () => {
-    it("composed into the collection's slot, as the global set followed by the collection's", async () => {
-        const tiers = await scenario((registry, a, b) => {
-            registry.setGlobalCallbacks(a);
-            return notes(b);
-        });
-        const composed = await scenario((_registry, a, b) => notes(composeCallbacks(a, b)));
+describe("composeTableHooks matches the driver's tiers", () => {
+    it("composed into the table's hooks, as the global set followed by the table's", async () => {
+        const tiers = await scenario((a, b) => ({ table: notes(b), global: a }));
+        const composed = await scenario((a, b) => ({ table: notes(composeTableHooks(a, b)) }));
 
         // The scenario exercised what it claims to — so equality below is
         // not two empty runs agreeing.

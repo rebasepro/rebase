@@ -8,7 +8,7 @@ import { Pool } from "pg";
 import { sql as drizzleSql } from "drizzle-orm";
 import { RealtimeProvider, CollectionSubscriptionConfig, SingleSubscriptionConfig, DrizzleClient, type PgSqlDatabase } from "../interfaces";
 import { PostgresTableRegistry } from "../model/PostgresTableRegistry";
-import { buildPropertyCallbacks, deserializeFilter, getTableName, normalizeDriverOrderBy, OrderBySpecError, parseOrderBySpecStrict, requireCallbackCollection, UnknownFilterOperatorError } from "@rebasepro/common";
+import { deserializeFilter, getTableName, normalizeDriverOrderBy, OrderBySpecError, parseOrderBySpecStrict, UnknownFilterOperatorError } from "@rebasepro/common";
 import { applyAuthContext } from "../security/rls-enforcement";
 import type { RequestIdentity } from "../security/rls-settings";
 import { withFieldViewer } from "./field-viewer";
@@ -25,6 +25,7 @@ import { PgNotifyListener } from "./pg-notify-listener";
 import { terminateIfBacklogged } from "./socket-liveness";
 import { deriveRowAddress, getPrimaryKeys, type PrimaryKeyInfo } from "./collection-helpers";
 import { isNestedPath } from "./nested-path";
+import { afterReadApplies, afterReadOnRows, resolveTableHooks } from "./table-hooks";
 import { ChannelHistoryStore, type ResolvedRetention } from "./channel-history";
 import { ChannelPresenceStore } from "./channel-presence";
 import { CHANNEL_BUS_NOTIFY_CHANNEL, ChannelBus, ChannelBusFrame, MemoryChannelBus, PostgresChannelBus, frameByteLength } from "./channel-bus";
@@ -2146,59 +2147,18 @@ roles: ["anon"] };
                         distinct: collectionRequest.distinct
                     }, collectionRequest.include);
 
-                    // Re-apply `afterRead` lifecycle hooks to ensure consistent data structures
-                    // between the initial driver fetch and this RLS-bound refetch.
-                    const registryCollection = this.registry.getCollectionByPath(notifyPath);
-                    // `| undefined`, and now it says so: the registry answers
-                    // nothing for a path it does not know. The cast used to
-                    // erase that one line above the `?.` that admits it.
-                    const resolvedCollection: CollectionConfig | undefined = collection
-                        ? { ...collection, ...registryCollection } as CollectionConfig
-                        : registryCollection;
-
-                    const callbacks = resolvedCollection?.callbacks;
-                    const globalCallbacks = this.registry?.getGlobalCallbacks();
-                    const propertyCallbacks = resolvedCollection?.properties ? buildPropertyCallbacks(resolvedCollection.properties) : undefined;
-
-                    let rows = fetchedEntities;
-                    if (globalCallbacks?.afterRead || callbacks?.afterRead || propertyCallbacks?.afterRead) {
-                        // Bound to THIS transaction — the subscriber's — see
-                        // callbackContextWithin below for what this used to be.
-                        const contextForCallback = callbackContextWithin(this.driver, tx, activeAuth);
-
-                        const callbackCollection = requireCallbackCollection(resolvedCollection, notifyPath);
-                        rows = await Promise.all(fetchedEntities.map(async (fetchedRow) => {
-                            let processedEntity = fetchedRow;
-                            // 1. Global callbacks first
-                            if (globalCallbacks?.afterRead) {
-                                processedEntity = await globalCallbacks.afterRead({
-                                    collection: callbackCollection,
-                                    path: notifyPath,
-                                    row: processedEntity,
-                                    context: contextForCallback
-                                }) ?? processedEntity;
-                            }
-                            // 2. Collection callbacks second
-                            if (callbacks?.afterRead) {
-                                processedEntity = await callbacks.afterRead({
-                                    collection: callbackCollection,
-                                    path: notifyPath,
-                                    row: processedEntity,
-                                    context: contextForCallback
-                                }) ?? processedEntity;
-                            }
-                            // 3. Property callbacks third
-                            if (propertyCallbacks?.afterRead) {
-                                processedEntity = await propertyCallbacks.afterRead({
-                                    collection: callbackCollection,
-                                    path: notifyPath,
-                                    row: processedEntity,
-                                    context: contextForCallback
-                                }) ?? processedEntity;
-                            }
-                            return processedEntity;
-                        }));
-                    }
+                    // `afterRead`, through the driver's one chain: global, the
+                    // table's, its columns', and the TARGET table's on every
+                    // included row — what the initial fetch of the same rows ran.
+                    // Bound to THIS transaction — the subscriber's — see
+                    // callbackContextWithin for what this used to be.
+                    const rows = await afterReadOnRows(
+                        this.registry,
+                        resolveTableHooks(this.registry, notifyPath, collection?.slug),
+                        fetchedEntities,
+                        notifyPath,
+                        () => callbackContextWithin(this.driver, tx, activeAuth)
+                    );
 
                     // Last, after every hook has had the transaction: a count
                     // that fails leaves it aborted, and its rows are already read.
@@ -2221,6 +2181,7 @@ roles: ["anon"] };
         // served to everybody — a fallback that hands out *more* than the path
         // it stands in for, which is the defect the paragraph above describes
         // one clause at a time.
+        this.refuseReadHooksWithoutDriver(notifyPath);
         return await withFieldViewer({ roles: authContext?.roles ?? [] }, async () => {
             const rows = collectionRequest.countOnly ? [] : await this.dataService.fetchCollectionForRest(notifyPath, {
                 filter: collectionRequest.filter as FilterValues<string>,
@@ -2366,6 +2327,23 @@ roles: ["anon"] };
     }
 
     /**
+     * Refuse a frame the fallback (no driver) would serve past `afterRead`.
+     *
+     * The hooks run with a context only the driver can build, so without one
+     * they cannot run — and a frame that skips a masking `afterRead` hands out
+     * what every other read of the same rows withholds. Refused, naming the
+     * table, rather than served raw.
+     */
+    private refuseReadHooksWithoutDriver(path: string): void {
+        if (!afterReadApplies(this.registry, resolveTableHooks(this.registry, path))) return;
+        throw new Error(
+            `The rows of "${path}" pass through \`afterRead\` hooks, and this realtime service was built without a ` +
+            "driver to run them with, so the frame is refused rather than served unmasked. Construct it through the " +
+            "Postgres driver (or hand it one with `setDataDriver`)."
+        );
+    }
+
+    /**
      * Fetch a single row with optional RLS auth context.
      */
     private async fetchEntityWithAuth(
@@ -2418,48 +2396,14 @@ roles: ["anon"] };
                     ) ?? undefined;
 
                     if (processedEntity) {
-                        const registryCollection = this.registry.getCollectionByPath(notifyPath);
-                        // See the note on the collection refetch above.
-                        const resolvedCollection: CollectionConfig | undefined = collection
-                            ? { ...collection, ...registryCollection } as CollectionConfig
-                            : registryCollection;
-
-                        const callbacks = resolvedCollection?.callbacks;
-                        const globalCallbacks = this.registry?.getGlobalCallbacks();
-                        const propertyCallbacks = resolvedCollection?.properties ? buildPropertyCallbacks(resolvedCollection.properties) : undefined;
-
-                        if (globalCallbacks?.afterRead || callbacks?.afterRead || propertyCallbacks?.afterRead) {
-                            const contextForCallback = callbackContextWithin(this.driver, tx, activeAuth);
-                            const callbackCollection = requireCallbackCollection(resolvedCollection, notifyPath);
-
-                            // 1. Global callbacks first
-                            if (globalCallbacks?.afterRead) {
-                                processedEntity = await globalCallbacks.afterRead({
-                                    collection: callbackCollection,
-                                    path: notifyPath,
-                                    row: processedEntity,
-                                    context: contextForCallback
-                                }) ?? processedEntity;
-                            }
-                            // 2. Collection callbacks second
-                            if (callbacks?.afterRead) {
-                                processedEntity = await callbacks.afterRead({
-                                    collection: callbackCollection,
-                                    path: notifyPath,
-                                    row: processedEntity,
-                                    context: contextForCallback
-                                }) ?? processedEntity;
-                            }
-                            // 3. Property callbacks third
-                            if (propertyCallbacks?.afterRead) {
-                                processedEntity = await propertyCallbacks.afterRead({
-                                    collection: callbackCollection,
-                                    path: notifyPath,
-                                    row: processedEntity,
-                                    context: contextForCallback
-                                }) ?? processedEntity;
-                            }
-                        }
+                        // The same chain as the collection refetch above.
+                        [processedEntity] = await afterReadOnRows(
+                            this.registry,
+                            resolveTableHooks(this.registry, notifyPath, collection?.slug),
+                            [processedEntity],
+                            notifyPath,
+                            () => callbackContextWithin(this.driver, tx, activeAuth)
+                        );
                     }
 
                     return processedEntity;
@@ -2469,6 +2413,7 @@ roles: ["anon"] };
 
         // Same reasoning as the collection fallback above: no database auth
         // context is available here, but the subscriber's roles are.
+        this.refuseReadHooksWithoutDriver(notifyPath);
         return await withFieldViewer(
             { roles: authContext?.roles ?? [] },
             async () => (await this.dataService.fetchOneForRest(notifyPath, id)) ?? undefined

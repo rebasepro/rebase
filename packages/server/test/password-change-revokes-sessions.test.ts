@@ -2,7 +2,9 @@ import { describe, it, expect, beforeAll, jest } from "@jest/globals";
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { Hono } from "hono";
-import type { AuthAdapter, CompiledAuthHooks } from "@rebasepro/types";
+import { col, defineAuthTable, type AuthAdapter, type CompiledAuthHooks } from "@rebasepro/types";
+import { compileSchema } from "@rebasepro/common";
+import { TableRegistry } from "../src/schema/table-registry";
 import type { HonoEnv } from "../src/api/types";
 import { ApiError, errorHandler } from "../src/api/errors";
 import { createBuiltinAuthAdapter, type BuiltinAuthAdapterConfig } from "../src/auth/builtin-auth-adapter";
@@ -307,6 +309,9 @@ async function expectOk(res: Response): Promise<Record<string, unknown>> {
     return body;
 }
 
+/** The uids `defineAuthTable`'s `onResetPassword` was called for. */
+const resetHookCalls: string[] = [];
+
 const adminReset = (body?: unknown) => async (world: World) => {
     const res = await world.asAdmin("POST", `/admin/users/${VICTIM}/reset-password`, body);
     return (await expectOk(res)).temporaryPassword as string | undefined;
@@ -371,6 +376,33 @@ const CASES: Case[] = [
         }),
         act: async (world) => {
             expect(await adminReset()(world)).toBe(HOOK_PASSWORD);
+            return HOOK_PASSWORD;
+        }
+    },
+    {
+        // The same hook as declared: `defineAuthTable({ auth: { onResetPassword } })`,
+        // compiled, and read off the table registry by the expression the
+        // boot hands the adapter (`tableRegistry.authTable()?.auth`).
+        name: "admin reset, defineAuthTable's onResetPassword, compiled and read as the boot reads it",
+        config: () => {
+            const users = defineAuthTable("users", {
+                columns: { id: col.uuid().primaryKey().defaultRandom(), email: col.text() },
+                rls: "admin-only",
+                auth: {
+                    onResetPassword: async (uid) => {
+                        resetHookCalls.push(uid);
+                        return { temporaryPassword: HOOK_PASSWORD, invitationSent: false };
+                    }
+                }
+            });
+            const registry = new TableRegistry();
+            registry.replaceAll(compileSchema([users]));
+            return { authTableHooks: registry.authTable()?.auth };
+        },
+        act: async (world) => {
+            resetHookCalls.length = 0;
+            expect(await adminReset()(world)).toBe(HOOK_PASSWORD);
+            expect(resetHookCalls).toEqual([VICTIM]);
             return HOOK_PASSWORD;
         }
     },

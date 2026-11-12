@@ -89,7 +89,7 @@ export {
 // The descriptors' registry and the boot-time resolution of what a backend
 // serves, for code that builds a backend's parts by hand.
 export { TableRegistry } from "./schema/table-registry";
-export { resolveDeclaredTables, globalHooksAsCallbacks, type DeclaredTables } from "./schema/declared-tables";
+export { resolveDeclaredTables, type DeclaredTables } from "./schema/declared-tables";
 
 // =============================================================================
 // DB Abstractions (for database driver implementations)

@@ -308,14 +308,14 @@ describe("openRebase (E2E)", () => {
                 .toEqual([{ n: 0 }]);
         });
 
-        it("runs the project's global callbacks when given them, as a server write does", async () => {
+        it("runs the project's global hooks when given them, as a server write does", async () => {
             // A global `beforeSave` that stamps every write ran on every server
-            // write and on no script write, while the collection's own
+            // write and on no script write, while the table's own
             // `beforeSave` ran on both.
             const withGlobal = await openRebase({
                 databaseUrl: urlFor(container, "app", APP_NAME),
                 collections: [notesCollection, ledgerCollection], tables: tablesFromCollections([notesCollection, ledgerCollection]).tables,
-                callbacks: { beforeSave: ({ values }) => ({ ...values, title: `[stamped] ${String(values.title)}` }) }
+                hooks: { beforeSave: ({ values }) => ({ ...values, title: `[stamped] ${String(values.title)}` }) }
             });
             try {
                 const note = await withGlobal.dataAsAdmin.notes.create({ ownerId: "cy", title: "cy's" });
@@ -497,8 +497,8 @@ describe("openRebase (E2E)", () => {
                 expect(JSON.parse(result.stdout)).toEqual(["ada's"]);
             });
 
-            it("has the project's tables (as `collections`) and sql in scope", async () => {
-                expect(JSON.parse((await evalInConsole("collections.map(c => c.slug)")).stdout)).toEqual(["notes"]);
+            it("has the project's tables (as `tables`, their descriptors) and sql in scope", async () => {
+                expect(JSON.parse((await evalInConsole("tables.map(t => t.slug)")).stdout)).toEqual(["notes"]);
                 const counted = await evalInConsole("rebase.sql('SELECT count(*)::int AS n FROM public.notes WHERE owner_id = $1', { params: ['ada'] })");
                 expect(JSON.parse(counted.stdout)).toEqual([{ n: 1 }]);
             });

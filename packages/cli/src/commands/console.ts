@@ -3,7 +3,7 @@
  *
  * A Node REPL with the project open — `rebase` (what `openRebase` from
  * `@rebasepro/server-postgres` returns: `dataAsAdmin`, `sql`, `withAuth`) and
- * `collections` in scope — or, with `--eval`, one piece of code run and its
+ * `tables` in scope — or, with `--eval`, one piece of code run and its
  * result printed as JSON.
  *
  * Resolved like `rebase db push`: the same project and `.env`, the same
@@ -63,7 +63,7 @@ ${Object.keys(CONSOLE_FLAG_HELP)
 
 In scope:
   rebase        dataAsAdmin, sql(query, { params }), withAuth(user) → { data }, close()
-  collections   the project's tables (the driver's scope name for them)
+  tables        the project's tables, as their descriptors
 
 Top-level await works. Opening the database changes nothing in it: no table,
 role or trigger is created. withAuth runs as the user under row-level security.

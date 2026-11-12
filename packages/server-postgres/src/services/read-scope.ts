@@ -1,6 +1,6 @@
 /**
- * `beforeQuery`: the one place a collection callback can change *which* rows a
- * read asks for.
+ * `beforeQuery`: the one place a table hook can change *which* rows a read
+ * asks for.
  *
  * `afterRead` runs over rows that have already been fetched, so until this
  * existed an application developer who needed the read itself narrowed — a
@@ -50,13 +50,13 @@
 import { and, SQL } from "drizzle-orm";
 import { PgTable } from "drizzle-orm/pg-core";
 import type {
-    BeforeQueryProps,
     CollectionConfig,
-    CollectionCallbacks,
     QueryNarrowing,
     ReadOperation,
     ReadQuery,
-    RebaseCallContext
+    RebaseCallContext,
+    TableDescriptor,
+    TableHooks
 } from "@rebasepro/types";
 import type { PostgresTableRegistry } from "../model/PostgresTableRegistry";
 import { assertViewReadable } from "./view-access";
@@ -76,35 +76,44 @@ import {
  */
 export type ReadCallContextProvider = () => RebaseCallContext;
 
+/** The `beforeQuery` hooks of one table, in the order they run, and the table they run for. */
+interface ResolvedBeforeQuery {
+    hooks: NonNullable<TableHooks["beforeQuery"]>[];
+    /** The table the hooks are told about; `undefined` when the collection has no table here. */
+    table: TableDescriptor | undefined;
+}
+
 /**
- * The `beforeQuery` hooks that apply to one collection, in the order they run.
+ * The `beforeQuery` hooks that apply to one table, in the order they run.
  *
- * Global first, then the collection's own — the same order `afterRead` and
- * `beforeSave` use. The order changes nothing about the outcome here (both are
- * AND-ed in, so neither can relax the other) and is kept because a hook that
- * logs or measures should see the same sequence everywhere.
+ * Global first, then the table's own (`defineTable({ hooks })`, or attached
+ * with `setTableHooks`) — the same order `afterRead` and `beforeSave` use. The
+ * order changes nothing about the outcome here (both are AND-ed in, so neither
+ * can relax the other) and is kept because a hook that logs or measures
+ * should see the same sequence everywhere.
  *
- * There is no property tier: a property callback shapes one value on a row, and
- * a row filter is not a value.
+ * There is no column tier: a column's `.transform()` shapes one value on a
+ * row, and a row filter is not a value.
  */
 function resolveBeforeQuery(
     registry: PostgresTableRegistry | undefined,
     collection: CollectionConfig | undefined
-): NonNullable<CollectionCallbacks["beforeQuery"]>[] {
-    const hooks: NonNullable<CollectionCallbacks["beforeQuery"]>[] = [];
-    const global = registry?.getGlobalCallbacks();
+): ResolvedBeforeQuery {
+    const table = collection ? registry?.getTable(collection.slug) : undefined;
+    const hooks: NonNullable<TableHooks["beforeQuery"]>[] = [];
+    const global = registry?.globalHooks();
     if (global?.beforeQuery) hooks.push(global.beforeQuery);
-    const own = collection?.callbacks;
+    const own = table?.compiled.hooks;
     if (own?.beforeQuery) hooks.push(own.beforeQuery);
-    return hooks;
+    return { hooks, table: table?.descriptor };
 }
 
-/** Whether anything at all would run for this collection. */
+/** Whether anything at all would run for this table. */
 export function hasBeforeQuery(
     registry: PostgresTableRegistry | undefined,
     collection: CollectionConfig | undefined
 ): boolean {
-    return resolveBeforeQuery(registry, collection).length > 0;
+    return resolveBeforeQuery(registry, collection).hooks.length > 0;
 }
 
 /**
@@ -149,22 +158,22 @@ export async function beforeQueryConditions(
     // Every read of a collection comes through here, so a materialized view's
     // roles are judged here too (see `view-access.ts`).
     assertViewReadable(collection);
-    const hooks = resolveBeforeQuery(env.registry, collection);
+    const { hooks, table: hookTable } = resolveBeforeQuery(env.registry, collection);
     if (hooks.length === 0) return [];
 
-    if (!collection) {
-        // A hook reaching here with no collection can only be a global one, and
-        // a global hook has no properties to compile its filter against. It
-        // cannot be honoured — so it is refused, not skipped.
+    if (!collection || !hookTable) {
+        // A hook reaching here with no table can only be a global one, and a
+        // global hook has no columns to compile its filter against. It cannot
+        // be honoured — so it is refused, not skipped.
         throw new Error(
-            `[beforeQuery] "${path}" resolves to no registered collection, so a global \`beforeQuery\` cannot ` +
-            "be compiled against it. Register the collection, or narrow the hook to the collections it applies to."
+            `[beforeQuery] "${path}" resolves to no table this driver serves, so a global \`beforeQuery\` cannot ` +
+            "be compiled against it. Serve the table from backend/schema, or narrow the hook to the tables it applies to."
         );
     }
 
     if (!env.callContext) {
         throw new Error(
-            `[beforeQuery] "${collection.slug}" declares a \`beforeQuery\` hook, and this read was compiled by a ` +
+            `[beforeQuery] The table "${collection.slug}" has a \`beforeQuery\` hook, and this read was compiled by a ` +
             "service that was built without a call-context provider, so the hook could not run. Serving the read " +
             "unnarrowed is not an option — a hook that does not run widens the result set. Construct the " +
             "service through the driver (which passes one), or pass a provider explicitly."
@@ -182,14 +191,13 @@ export async function beforeQueryConditions(
 
     const conditions: SQL[] = [];
     for (const hook of hooks) {
-        const props: BeforeQueryProps = {
-            collection,
+        const narrowing: QueryNarrowing | void = await hook({
+            table: hookTable,
             path,
             operation: description.operation,
             query: description.query,
             context
-        };
-        const narrowing: QueryNarrowing | void = await hook(props);
+        });
 
         if (!narrowing) continue;
 
@@ -200,7 +208,7 @@ export async function beforeQueryConditions(
         // hook rather than about an empty condition list.
         if (!narrowing.filter && !narrowing.logical) {
             throw new Error(
-                `[beforeQuery] "${collection.slug}" returned an object with neither \`filter\` nor \`logical\`. ` +
+                `[beforeQuery] The \`beforeQuery\` hook of "${collection.slug}" returned an object with neither \`filter\` nor \`logical\`. ` +
                 "Return nothing (or `undefined`) to add no conditions; an empty object reads as a scope that was " +
                 "meant to be built and was not."
             );

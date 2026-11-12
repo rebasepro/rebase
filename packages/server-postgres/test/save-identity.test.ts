@@ -80,6 +80,8 @@ isId: true },
 
     beforeEach(() => {
         jest.restoreAllMocks();
+        // Hooks are the table's, read from the registry; none unless a test attaches them.
+        for (const slug of ["products", "sku_items", "memberships"]) registry.setTableHooks(slug, {});
 
         jest.spyOn(registry, "getCollectionByPath").mockImplementation(path => {
             if (path.startsWith("products")) return productsCollection;
@@ -93,7 +95,6 @@ isId: true },
             if (name === "memberships") return textTable("memberships", ["tenant_id", "user_id", "role"]);
             return undefined;
         });
-        jest.spyOn(registry, "getGlobalCallbacks").mockReturnValue(undefined);
     });
 
     it("notifies subscribers with a `sku` key's address instead of throwing", async () => {
@@ -137,11 +138,11 @@ role: "admin" });
         setup({ sku: "ABC-1",
 label: "Widget" });
 
+        registry.setTableHooks("sku_items", { afterSave });
         await driver.save({
             path: "sku_items",
             values: { label: "Widget" },
-            collection: { ...skuItemsCollection,
-callbacks: { afterSave } } as CollectionConfig,
+            collection: skuItemsCollection,
             status: "new"
         });
 
@@ -153,19 +154,19 @@ label: "Widget" },
         }));
     });
 
-    it("keeps the `id` column in the values it hands callbacks", async () => {
+    it("keeps the `id` column in the values it hands hooks", async () => {
         // `id` was destructured out of `values` back when it was the synthesized
         // address. It is a column now, and stripping it hid real data from every
-        // callback and from row history.
+        // hook and from row history.
         const afterSave = jest.fn();
         setup({ id: 42,
 name: "Camera" });
 
+        registry.setTableHooks("products", { afterSave });
         await driver.save({
             path: "products",
             values: { name: "Camera" },
-            collection: { ...productsCollection,
-callbacks: { afterSave } } as CollectionConfig,
+            collection: productsCollection,
             status: "new"
         });
 
@@ -213,7 +214,7 @@ label: "Widget" });
         expect(pending[0].id).toBe("ABC-1");
     });
 
-    it("hands delete callbacks the row's columns, without inventing an `id`", async () => {
+    it("hands delete hooks the row's columns, without inventing an `id`", async () => {
         // The address arrives beside the row as `id`; merging it into the row
         // fabricated an `id` field for tables that have no such column.
         const beforeDelete = jest.fn();
@@ -222,15 +223,15 @@ label: "Widget" });
         jest.spyOn(driver.dataService, "fetchOneForRest").mockResolvedValue({ sku: "ABC-1", label: "Widget" });
         jest.spyOn(driver.dataService, "delete").mockResolvedValue(undefined);
 
+        registry.setTableHooks("sku_items", { beforeDelete });
         await driver.delete({
             row: { id: "ABC-1", path: "sku_items" },
-            collection: { ...skuItemsCollection,
-callbacks: { beforeDelete } } as CollectionConfig
+            collection: skuItemsCollection
         });
 
         expect(beforeDelete).toHaveBeenCalledWith(expect.objectContaining({
             id: "ABC-1",
-            row: { sku: "ABC-1",
+            values: { sku: "ABC-1",
 label: "Widget" }
         }));
         expect(realtimeService.notifyUpdate).toHaveBeenCalledWith(

@@ -3,8 +3,8 @@
  *
  * `afterRead` is where PII masking lives, and an aggregate reads the stored
  * columns: `max(email)` or `groupBy=salary` on a masked collection is the
- * masked value, one bucket at a time. So on a collection any `afterRead` tier
- * (global, collection or property) applies to, only a plain `count()` is
+ * masked value, one bucket at a time. So on a table any `afterRead` tier
+ * (global, the table's, or a column's `.transform()`) applies to, only a plain `count()` is
  * served. The rule sits on the driver's `restFetchService.aggregate`, which
  * the REST route, the in-process SDK and the MCP tool all read through — each
  * door is driven here to prove it reaches the refusal.
@@ -51,7 +51,7 @@ function registry(globalAfterRead = false): PostgresTableRegistry {
     const registry = new FixtureTableRegistry();
     jest.spyOn(registry, "getCollectionByPath").mockImplementation((path) => collections.find(c => c.slug === path));
     jest.spyOn(registry, "getCollections").mockReturnValue(collections);
-    jest.spyOn(registry, "getGlobalCallbacks").mockReturnValue(globalAfterRead ? { afterRead: mask } : undefined);
+    if (globalAfterRead) registry.setGlobalHooks({ afterRead: ({ values }) => ({ ...values, email: "***" }) });
     return registry;
 }
 
@@ -73,7 +73,7 @@ describe("aggregates on a collection an afterRead callback rewrites", () => {
 
     const refusal = expect.objectContaining({
         code: "AGGREGATE_MASKED_BY_AFTER_READ",
-        message: expect.stringContaining("Aggregates other than count are refused on a collection whose rows an afterRead callback rewrites")
+        message: expect.stringContaining("Aggregates other than count are refused on a table whose rows an afterRead hook rewrites")
     });
 
     it("refuses sum, min/max, a field count and groupBy on a collection-level afterRead", async () => {

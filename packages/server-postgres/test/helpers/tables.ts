@@ -17,7 +17,8 @@ import type {
     DefaultRls,
     PostgresCollectionConfig,
     SecurityRule,
-    TableDescriptor
+    TableDescriptor,
+    TableHooks
 } from "@rebasepro/types";
 import { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry";
 import type { RuntimeTable } from "../../src/model/runtime-table";
@@ -230,5 +231,12 @@ export class FixtureTableRegistry extends PostgresTableRegistry {
 
     requireTable(slug: string): RuntimeTable {
         return this.getTable(slug) ?? super.requireTable(slug);
+    }
+
+    /** Attach hooks to a table, the one compiled on first ask included (it is registered first). */
+    setTableHooks(slug: string, hooks: TableHooks): boolean {
+        const table = this.getTable(slug);
+        if (table && !super.getTable(slug)) this.registerTables([table.compiled]);
+        return super.setTableHooks(slug, hooks);
     }
 }

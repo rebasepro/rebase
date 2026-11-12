@@ -15,12 +15,13 @@ import {
     isSQLAdmin,
     resourceKeyOf,
     type CallerSqlOptions,
-    type CollectionCallbacks,
     type CollectionConfig,
     type CompiledTable,
     type RebaseSdkData,
     type RebaseServerClient,
     type RegisteredDatabase,
+    type TableDescriptor,
+    type TableHooks,
     type User
 } from "@rebasepro/types";
 import { buildSdkData, createAccessorSlugResolver, warnOnTableDdl } from "@rebasepro/common";
@@ -70,13 +71,13 @@ export interface OpenRebaseOptions {
     /** The data source these collections are served from. Defaults to `(default)`. */
     dataSourceKey?: string;
     /**
-     * The project's global callbacks — `callbacks` exported from
-     * `config/index.ts`, what the server runs ahead of every collection's own.
-     * Without them a script write skips them: a global `beforeSave` that
-     * stamps a tenant or writes an audit row ran on every server write and on
-     * no script write, while the collection's own `beforeSave` ran on both.
+     * The project's global table hooks — the `hooks` `backend/hooks.ts`
+     * exports, what the server runs ahead of every table's own. Without them a
+     * script write skips them: a global `beforeSave` that stamps a tenant or
+     * writes an audit row ran on every server write and on no script write,
+     * while the table's own `beforeSave` ran on both.
      */
-    callbacks?: CollectionCallbacks;
+    hooks?: TableHooks;
 }
 
 /**
@@ -104,6 +105,8 @@ export interface OpenedRebase<DB = RegisteredDatabase> extends Pick<RebaseServer
     }>;
     /** The collections this was opened with, or the ones the database described. */
     readonly collections: CollectionConfig[];
+    /** The descriptors of the tables this serves: the declared ones, or the ones the database described. */
+    readonly tables: TableDescriptor[];
     /** End the pool `openRebase` created. Safe to call twice; a `connection` you passed stays open. */
     close(): Promise<void>;
 }
@@ -209,9 +212,9 @@ export async function openRebase<DB = RegisteredDatabase>(options: OpenRebaseOpt
 
     const driver = opened.internals.driver;
     const registry = opened.internals.registry;
-    // Where the server's `handGlobalCallbacksTo` puts them: on the driver's own
-    // registry, which is the one its writes resolve hooks from.
-    if (options.callbacks) registry.setGlobalCallbacks(options.callbacks);
+    // Where the server's `handGlobalHooksTo` puts them: on the driver's own
+    // registry, which is the one every read and write runs hooks from.
+    if (options.hooks) registry.setGlobalHooks(options.hooks);
     // The server boot announces this at info. A script's stdout is its own
     // output — `tsx script.ts > out.json` — so here it is there only for a
     // reader who asked for debug.
@@ -254,6 +257,7 @@ export async function openRebase<DB = RegisteredDatabase>(options: OpenRebaseOpt
     return {
         dataAsAdmin,
         collections,
+        tables: registry.tables().map(table => table.descriptor),
         async sqlAsAdmin(query, sqlOptions) {
             if (!service.scoped.sql) throw new Error("This driver cannot run SQL under row-level security.");
             return service.scoped.sql(query, sqlOptions);

@@ -153,16 +153,17 @@ describe("PostgresBackendDriver.save — defaults and autoValues", () => {
             // A hook reading `values.currency` to pick a tax rate was reading
             // `undefined` on exactly the writes the default exists to cover.
             let seen: unknown;
-            const withHook: CollectionConfig = {
-                ...posts,
-                callbacks: {
-                    beforeSave: async ({ values }) => {
-                        seen = (values as Record<string, unknown>).currency;
-                        return undefined;
-                    }
+            registry.setTableHooks("posts", {
+                beforeSave: async ({ values }) => {
+                    seen = values.currency;
+                    return values;
                 }
-            } as CollectionConfig;
-            await setup().save({ path: "posts", values: { title: "Hi" }, collection: withHook, status: "new" });
+            });
+            try {
+                await setup().save({ path: "posts", values: { title: "Hi" }, collection: posts, status: "new" });
+            } finally {
+                registry.setTableHooks("posts", {});
+            }
             expect(seen).toBe("EUR");
         });
     });

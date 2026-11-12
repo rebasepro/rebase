@@ -702,7 +702,7 @@ table_name: "users" }])
         });
     });
 
-    describe("storageSource in Callbacks", () => {
+    describe("storageSource in hooks", () => {
         const mockStorage = { key: "mockStorage" };
         // A `RebaseServerClient` needs auth, email, sql, buckets and an admin
         // SDK; these tests read `client.storage` alone, and server-postgres has
@@ -714,8 +714,9 @@ table_name: "users" }])
         });
 
         it("should inject storageSource: client.storage into contextForCallback in fetchCollection", async () => {
-            const afterReadSpy = jest.fn().mockImplementation(async ({ entity }) => entity);
-            const mockCollectionWithCallback = collection("test_coll", { callbacks: { afterRead: afterReadSpy } });
+            const afterReadSpy = jest.fn().mockImplementation(async ({ values }) => values);
+            registry.setTableHooks("test_coll", { afterRead: afterReadSpy });
+            const mockCollectionWithCallback = collection("test_coll");
 
             jest.spyOn(delegate.dataService, "fetchCollection").mockResolvedValueOnce([
                 { id: "e1", path: "test_coll", values: {} }
@@ -733,8 +734,9 @@ table_name: "users" }])
         });
 
         it("should inject storageSource in fetchOne", async () => {
-            const afterReadSpy = jest.fn().mockImplementation(async ({ entity }) => entity);
-            const mockCollectionWithCallback = collection("test_coll", { callbacks: { afterRead: afterReadSpy } });
+            const afterReadSpy = jest.fn().mockImplementation(async ({ values }) => values);
+            registry.setTableHooks("test_coll", { afterRead: afterReadSpy });
+            const mockCollectionWithCallback = collection("test_coll");
 
             jest.spyOn(delegate.dataService, "fetchOne").mockResolvedValueOnce(
                 { id: "e1", path: "test_coll", values: {} }
@@ -754,9 +756,8 @@ table_name: "users" }])
         it("should inject storageSource in save beforeSave and afterSave", async () => {
             const beforeSaveSpy = jest.fn().mockImplementation(async ({ values }) => values);
             const afterSaveSpy = jest.fn();
-            const mockCollectionWithCallback = collection("test_coll", {
-                callbacks: { beforeSave: beforeSaveSpy, afterSave: afterSaveSpy }
-            });
+            registry.setTableHooks("test_coll", { beforeSave: beforeSaveSpy, afterSave: afterSaveSpy });
+            const mockCollectionWithCallback = collection("test_coll");
 
             jest.spyOn(delegate.dataService, "fetchOne").mockResolvedValue(undefined);
             jest.spyOn(delegate.dataService, "save").mockResolvedValueOnce(
@@ -780,9 +781,8 @@ table_name: "users" }])
         it("should inject storageSource in delete beforeDelete and afterDelete", async () => {
             const beforeDeleteSpy = jest.fn().mockImplementation(async () => true);
             const afterDeleteSpy = jest.fn();
-            const mockCollectionWithCallback = collection("test_coll", {
-                callbacks: { beforeDelete: beforeDeleteSpy, afterDelete: afterDeleteSpy }
-            });
+            registry.setTableHooks("test_coll", { beforeDelete: beforeDeleteSpy, afterDelete: afterDeleteSpy });
+            const mockCollectionWithCallback = collection("test_coll");
 
             jest.spyOn(delegate.dataService, "fetchOneForRest").mockResolvedValueOnce({ id: "e1" });
             jest.spyOn(delegate.dataService, "delete").mockResolvedValueOnce();

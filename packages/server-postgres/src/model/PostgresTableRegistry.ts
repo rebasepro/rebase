@@ -1,5 +1,5 @@
 import { CollectionRegistry, resolveCollectionRelations, getTableName } from "@rebasepro/common";
-import { type CollectionConfig, type CompiledTable } from "@rebasepro/types";
+import { type CollectionConfig, type CompiledTable, type TableHooks } from "@rebasepro/types";
 import { PgEnum, PgTable } from "drizzle-orm/pg-core";
 import { Relations } from "drizzle-orm";
 import { CollectionRegistryInterface } from "../interfaces";
@@ -28,6 +28,7 @@ export class PostgresTableRegistry extends CollectionRegistry implements Collect
     private readonly pgTables = new Map<string, PgTable>();
     private readonly enums = new Map<string, PgEnum<[string, ...string[]]>>();
     private readonly relations = new Map<string, Relations>();
+    private globalTableHooks?: TableHooks;
 
     // ── Runtime tables ──────────────────────────────────────────────────────
 
@@ -75,6 +76,37 @@ export class PostgresTableRegistry extends CollectionRegistry implements Collect
             if (table.descriptor.table === name) return table;
         }
         return undefined;
+    }
+
+    // ── Hooks ───────────────────────────────────────────────────────────────
+
+    /**
+     * Take the global hooks — the ones that run for every table this driver
+     * serves, before each table's own (`initializeRebaseBackend({ hooks })`,
+     * `openRebase({ hooks })`). Replaces any set before; `undefined` clears.
+     */
+    setGlobalHooks(hooks: TableHooks | undefined): void {
+        this.globalTableHooks = hooks;
+    }
+
+    /** The global hooks, when any were set. */
+    globalHooks(): TableHooks | undefined {
+        return this.globalTableHooks;
+    }
+
+    /**
+     * Replace one table's own hooks after boot (`backend.setTableHooks`).
+     * Assignment, not a merge: the hooks the table was compiled with stop
+     * running. The descriptor and the column transforms stay as compiled.
+     *
+     * @returns whether this driver serves the table.
+     */
+    setTableHooks(slug: string, hooks: TableHooks): boolean {
+        const table = this.runtimeTables.get(slug);
+        if (!table) return false;
+        const compiled: CompiledTable = { ...table.compiled, hooks };
+        this.runtimeTables.set(slug, { ...table, compiled });
+        return true;
     }
 
     /** Every runtime table, in registration order. */

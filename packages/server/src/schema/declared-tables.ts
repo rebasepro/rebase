@@ -1,14 +1,11 @@
 import {
     type AnyTableDef,
     type AnyViewDef,
-    type CollectionCallbacks,
     type CompiledTable,
     type DefaultRls,
     type PostgresCollectionConfig,
-    type TableDescriptor,
-    type TableHooks
+    type TableDescriptor
 } from "@rebasepro/types";
-import { lowerHooks } from "@rebasepro/common";
 import { compileSchemaDefs, loadBackendSchema, type LoadBackendSchemaOptions } from "./load-schema";
 
 /**
@@ -63,44 +60,4 @@ export async function resolveDeclaredTables(options: {
 
     const { tables, descriptors, collections } = compileSchemaDefs(defs, defaultRls);
     return { defs, tables, descriptors, collections, source };
-}
-
-/** The slug a legacy callback was called for: its collection's, or the path's first segment. */
-function slugOfCall(props: { collection?: { slug?: string }; path: string }): string {
-    return props.collection?.slug ?? props.path.replace(/^\/+/, "").split("/")[0] ?? "";
-}
-
-/**
- * Global table hooks as the legacy global `callbacks` the registries and
- * drivers run for every collection.
- *
- * Each call is dispatched to {@link lowerHooks} for the slug it runs on — the
- * one adapter from table hooks to callbacks — so a global hook receives the
- * descriptor of the table it is running for, exactly as a table's own hook does.
- *
- * @group Schema
- */
-export function globalHooksAsCallbacks(
-    hooks: TableHooks,
-    describe: (slug: string) => TableDescriptor | undefined
-): CollectionCallbacks {
-    const cache = new Map<string, CollectionCallbacks>();
-    const forCall = (props: { collection?: { slug?: string }; path: string }): CollectionCallbacks => {
-        const slug = slugOfCall(props);
-        let callbacks = cache.get(slug);
-        if (!callbacks) {
-            callbacks = lowerHooks(hooks, slug, describe) ?? {};
-            cache.set(slug, callbacks);
-        }
-        return callbacks;
-    };
-    const out: CollectionCallbacks = {};
-    if (hooks.beforeQuery) out.beforeQuery = props => forCall(props).beforeQuery?.(props);
-    if (hooks.afterRead) out.afterRead = props => forCall(props).afterRead?.(props) ?? props.row;
-    if (hooks.beforeSave) out.beforeSave = props => forCall(props).beforeSave?.(props) ?? props.values;
-    if (hooks.afterSave) out.afterSave = props => forCall(props).afterSave?.(props);
-    if (hooks.afterSaveError) out.afterSaveError = props => forCall(props).afterSaveError?.(props);
-    if (hooks.beforeDelete) out.beforeDelete = props => forCall(props).beforeDelete?.(props);
-    if (hooks.afterDelete) out.afterDelete = props => forCall(props).afterDelete?.(props);
-    return out;
 }

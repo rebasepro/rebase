@@ -14,13 +14,22 @@ import { fakeDataDriver } from "./helpers/server-a-fakes";
  *
  * Global hooks were once set on the backend's own `collectionRegistry`, and no
  * driver reads that one: each builds a registry in `initializeDriver` and
- * resolves callbacks from it. So every global hook — an `afterRead` masking PII
+ * runs hooks from it. So every global hook — an `afterRead` masking PII
  * across tables, an audit `afterSave`, a tenant-scoping `beforeQuery` — was
  * declared, documented and never called.
  *
  * These drive the entrypoint, with a registry of the class the drivers extend,
- * and check that a hook receives the descriptor of the table it runs for.
+ * and check that the hooks reach it as declared — native `TableHooks`, which
+ * the driver calls with the descriptor of the table each runs for.
  */
+
+/** A driver registry that takes global hooks, as the Postgres driver's does. */
+class HookRegistry extends CollectionRegistry {
+    globalHooks?: TableHooks;
+    setGlobalHooks(hooks: TableHooks): void {
+        this.globalHooks = hooks;
+    }
+}
 
 const leads = (hooks?: TableHooks) => defineTable("leads", {
     columns: { id: col.uuid().primaryKey().defaultRandom(), name: col.text() },
@@ -28,14 +37,23 @@ const leads = (hooks?: TableHooks) => defineTable("leads", {
     ...(hooks ? { hooks } : {})
 });
 /** A Postgres-typed adapter whose driver keeps its own registry, as both real drivers do. */
-function adapter(options: { type?: string; registry?: CollectionRegistry | null; introspected?: PostgresCollectionConfig[]; tables?: TableDescriptor[] } = {}): DatabaseAdapter {
-    const registry = options.registry === undefined ? new CollectionRegistry() : options.registry;
+/** The hooks a driver's registry was handed after boot (`setTableHooks`), by slug. */
+class DriverTableHooks {
+    readonly attached = new Map<string, TableHooks>();
+    setTableHooks(slug: string, hooks: TableHooks): boolean {
+        this.attached.set(slug, hooks);
+        return true;
+    }
+}
+
+function adapter(options: { type?: string; registry?: CollectionRegistry | null; introspected?: PostgresCollectionConfig[]; tables?: TableDescriptor[]; driverRegistry?: DriverTableHooks } = {}): DatabaseAdapter {
+    const registry = options.registry === undefined ? new HookRegistry() : options.registry;
     return {
         type: options.type ?? "postgres",
         async initializeDriver() {
             return {
                 internals: {},
-                driver: fakeDataDriver(),
+                driver: options.driverRegistry ? Object.assign(fakeDataDriver(), { registry: options.driverRegistry }) : fakeDataDriver(),
                 ...(options.introspected ? { collections: options.introspected, tables: options.tables } : {}),
                 ...(registry ? { collectionRegistry: registry } : {})
             };
@@ -69,34 +87,42 @@ afterEach(() => {
     process.env.NODE_ENV = originalNodeEnv;
 });
 
-/** The legacy callback props the drivers call a global hook with. */
-const readProps = (row: Record<string, unknown>) => ({
-    collection: { slug: "leads", name: "leads", properties: {} },
-    path: "leads",
-    row,
+/** The props a driver calls a hook with, for a table it serves. */
+const readProps = (table: TableDescriptor, values: Record<string, unknown>) => ({
+    table,
+    path: table.slug,
+    values,
     context: createCallContext()
 });
 
+const leadsDescriptor: TableDescriptor = {
+    name: "leads", slug: "leads", table: "leads", schema: "public", kind: "table",
+    columns: [{ key: "id", column: "id", type: { kind: "uuid" }, nullable: false, primaryKey: true, default: { kind: "random-uuid" } }],
+    primaryKey: ["id"],
+    relations: [],
+    rls: { posture: "rules", rules: [{ name: "leads_read", operation: "select", using: "true" }], defaultPolicies: false }
+};
+
 describe("global hooks", () => {
-    it("are handed to the registry the driver resolves them from, with the table's descriptor", async () => {
-        const registry = new CollectionRegistry();
+    it("are handed to the registry the driver runs them from, as declared", async () => {
+        const registry = new HookRegistry();
         const seen: TableDescriptor[] = [];
         const hooks: TableHooks = { afterRead: ({ table, values }) => { seen.push(table); return { ...values, masked: true }; } };
 
         await boot(adapter({ registry }), { hooks });
 
-        const afterRead = registry.getGlobalCallbacks()?.afterRead;
-        expect(afterRead).toBeDefined();
-        expect(await afterRead?.(readProps({ id: "1" }))).toEqual({ id: "1", masked: true });
-        expect(seen.map(table => table.slug)).toEqual(["leads"]);
+        // The very object: nothing between the declaration and the driver.
+        expect(registry.globalHooks).toBe(hooks);
+        expect(await registry.globalHooks?.afterRead?.(readProps(leadsDescriptor, { id: "1" }))).toEqual({ id: "1", masked: true });
+        expect(seen).toEqual([leadsDescriptor]);
     });
 
     it("include a global `beforeQuery` on a Postgres driver", async () => {
-        const registry = new CollectionRegistry();
+        const registry = new HookRegistry();
 
         await boot(adapter({ registry }), { hooks: { beforeQuery: () => undefined } });
 
-        expect(typeof registry.getGlobalCallbacks()?.beforeQuery).toBe("function");
+        expect(typeof registry.globalHooks?.beforeQuery).toBe("function");
     });
 
     it("refuse to boot over a driver that returns no registry to hand them to", async () => {
@@ -107,15 +133,7 @@ describe("global hooks", () => {
             .rejects.toThrow(/returned no registry that accepts global hooks/);
     });
 
-    it("hand an introspected table's descriptor to a hook — the one the driver read from the catalogue", async () => {
-        // What the Postgres driver's runtime introspection hands back for one table.
-        const leadsDescriptor: TableDescriptor = {
-            name: "leads", slug: "leads", table: "leads", schema: "public", kind: "table",
-            columns: [{ key: "id", column: "id", type: { kind: "uuid" }, nullable: false, primaryKey: true, default: { kind: "random-uuid" } }],
-            primaryKey: ["id"],
-            relations: [],
-            rls: { posture: "rules", rules: [{ name: "leads_read", operation: "select", using: "true" }], defaultPolicies: false }
-        };
+    it("reach a driver that serves introspected tables — whose own descriptors the driver hands them", async () => {
         const introspectedLeads: PostgresCollectionConfig = {
             name: "leads",
             slug: "leads",
@@ -123,13 +141,11 @@ describe("global hooks", () => {
             schema: "public",
             properties: { id: { type: "string", isId: "uuid", columnType: "uuid" } }
         };
-        const registry = new CollectionRegistry();
-        const seen: TableDescriptor[] = [];
-        const hooks: TableHooks = { afterRead: ({ table, values }) => { seen.push(table); return values; } };
+        const registry = new HookRegistry();
+        const hooks: TableHooks = { afterRead: ({ values }) => values };
         await boot(adapter({ registry, introspected: [introspectedLeads], tables: [leadsDescriptor] }), { tables: [], hooks });
 
-        await registry.getGlobalCallbacks()?.afterRead?.(readProps({ id: "1" }));
-        expect(seen).toEqual([leadsDescriptor]);
+        expect(registry.globalHooks).toBe(hooks);
     });
 
     it("refuse to boot when a driver serves an introspected table without its descriptor — a hook would have none to receive", async () => {
@@ -156,24 +172,20 @@ describe("setTableHooks", () => {
         expect(() => backend.setTableHooks("leads", { beforeQuery: () => undefined })).not.toThrow();
     });
 
-    it("replaces what the table declared, says so, and adapts the new hooks to the descriptor", async () => {
-        const backend = await boot(adapter(), { tables: [leads({ beforeSave: ({ values }) => values })] });
+    it("replaces what the table declared, says so, and hands the new hooks to the driver as written", async () => {
+        const driverRegistry = new DriverTableHooks();
+        const backend = await boot(adapter({ driverRegistry }), { tables: [leads({ beforeSave: ({ values }) => values })] });
         const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
-        const seen: string[] = [];
+        const hooks: TableHooks = { afterSave: () => undefined };
 
-        backend.setTableHooks("leads", { afterSave: ({ table }) => { seen.push(table.slug); } });
+        backend.setTableHooks("leads", hooks);
         const warned = warn.mock.calls.map(call => String(call[0])).join("\n");
         expect(warned).toMatch(/replaced 'beforeSave'/);
         expect(warned).toMatch(/assigned, not merged/);
 
         // Replacement is the contract — the cloud relies on it — so the
-        // table now carries exactly what was attached.
-        const callbacks = backend.collectionRegistry.get("leads")?.callbacks;
-        expect(Object.keys(callbacks ?? {})).toEqual(["afterSave"]);
-        await callbacks?.afterSave?.({
-            collection: { slug: "leads", name: "leads", properties: {} }, path: "leads", id: "1", values: {}, status: "new", context: createCallContext()
-        });
-        expect(seen).toEqual(["leads"]);
+        // driver runs exactly what was attached: the very object, native.
+        expect(driverRegistry.attached.get("leads")).toBe(hooks);
         warn.mockRestore();
     });
 

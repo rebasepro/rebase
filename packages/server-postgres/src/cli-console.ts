@@ -4,7 +4,7 @@
  * Loads the project's tables (`backend/schema`) the way `rebase db push` does,
  * and the global table hooks `backend/hooks.ts` exports, opens the database with
  * {@link openRebase}, and either evaluates one piece of code
- * (`--eval`) or starts a Node REPL with `rebase` and `collections` in scope.
+ * (`--eval`) or starts a Node REPL with `rebase` and `tables` in scope.
  * The `rebase` CLI resolves the database first (the managed one included) and
  * hands this process `DATABASE_URL`, exactly as it does for `db` commands.
  *
@@ -21,8 +21,8 @@ import { PassThrough } from "node:stream";
 import tty from "node:tty";
 import { pathToFileURL } from "node:url";
 import { inspect } from "node:util";
-import { globalHooksAsCallbacks, setLogOutput } from "@rebasepro/server";
-import type { CollectionCallbacks, CollectionConfig, TableDescriptor, TableHooks } from "@rebasepro/types";
+import { setLogOutput } from "@rebasepro/server";
+import type { TableDescriptor, TableHooks } from "@rebasepro/types";
 import { RELAYED_FLAGS } from "./cli-flags";
 import { DEFAULT_SCHEMA_DIR } from "./cli-schema-dir";
 import { diagnoseDbError } from "./cli-errors";
@@ -44,17 +44,18 @@ export const CONSOLE_FLAGS = {
 /** What the code the console runs can name. */
 export interface ConsoleScope {
     rebase: OpenedRebase;
-    collections: CollectionConfig[];
+    /** The descriptors of the tables the project serves. */
+    tables: TableDescriptor[];
 }
 
-type ScopedFunction = (rebase: OpenedRebase, collections: CollectionConfig[]) => Promise<unknown>;
+type ScopedFunction = (rebase: OpenedRebase, tables: TableDescriptor[]) => Promise<unknown>;
 type AsyncFunctionConstructor = new (...parameters: string[]) => ScopedFunction;
 
 /** The constructor of `async function` — what `new Function` is for a body that awaits. */
 const AsyncFunction: AsyncFunctionConstructor = Object.getPrototypeOf(async () => undefined).constructor;
 
 /**
- * Run `code` with `rebase` and `collections` in scope and resolve with its
+ * Run `code` with `rebase` and `tables` in scope and resolve with its
  * value.
  *
  * Read as an expression first, so `rebase.dataAsAdmin.posts.find()` is its own
@@ -64,12 +65,12 @@ const AsyncFunction: AsyncFunctionConstructor = Object.getPrototypeOf(async () =
 export async function evaluateInConsole(code: string, scope: ConsoleScope): Promise<unknown> {
     let run: ScopedFunction;
     try {
-        run = new AsyncFunction("rebase", "collections", `return (${code}\n);`);
+        run = new AsyncFunction("rebase", "tables", `return (${code}\n);`);
     } catch (error) {
         if (!(error instanceof SyntaxError)) throw error;
-        run = new AsyncFunction("rebase", "collections", code);
+        run = new AsyncFunction("rebase", "tables", code);
     }
-    return run(scope.rebase, scope.collections);
+    return run(scope.rebase, scope.tables);
 }
 
 /** A result as JSON, the way `--eval` prints it: dates as ISO strings, bigints as strings. */
@@ -190,13 +191,12 @@ function isTableHooks(value: unknown): value is TableHooks {
  * them: writes from this session then skip the global tier, and the reader
  * knows it.
  *
+ * They are handed on as declared: the driver calls each with the descriptor
+ * of the table it runs for.
+ *
  * @param schemaDir the schema directory, absolute.
- * @param descriptors the tables' descriptors: what a hook receives as `table`.
  */
-export async function loadProjectHooks(
-    schemaDir: string,
-    descriptors: readonly TableDescriptor[]
-): Promise<CollectionCallbacks | undefined> {
+export async function loadProjectHooks(schemaDir: string): Promise<TableHooks | undefined> {
     const backendDir = path.dirname(schemaDir);
     // `.js` first, as the server's own loader reads a built module.
     const modulePath = [".js", ".mjs", ".ts", ".mts"]
@@ -217,8 +217,7 @@ export async function loadProjectHooks(
         outError(`⚠ Global hooks are off in this session: the \`hooks\` ${modulePath} exports is not an object of table hooks (${TABLE_HOOK_NAMES.join(", ")}).`);
         return undefined;
     }
-    const bySlug = new Map(descriptors.map(descriptor => [descriptor.slug, descriptor]));
-    return globalHooksAsCallbacks(mod.hooks, slug => bySlug.get(slug));
+    return mod.hooks;
 }
 
 /** Open the project, run `--eval` or the REPL, and close it again. Resolves with the exit code. */
@@ -232,9 +231,9 @@ async function openAndRun(
     // subset of the tables.
     const { loadTableSchema } = await import("./schema/load-tables");
     const schemaDir = path.resolve(options.schemaDir || DEFAULT_SCHEMA_DIR);
-    const { collections, descriptors, tables } = await loadTableSchema(schemaDir);
+    const { collections, tables } = await loadTableSchema(schemaDir);
     // Writes from the console run the same hook tiers as a server write.
-    const callbacks = await loadProjectHooks(schemaDir, descriptors);
+    const hooks = await loadProjectHooks(schemaDir);
 
     const ceiling = poolMaxCeiling();
     let rebase: OpenedRebase;
@@ -243,7 +242,7 @@ async function openAndRun(
             databaseUrl,
             collections,
             tables,
-            ...(callbacks ? { callbacks } : {}),
+            ...(hooks ? { hooks } : {}),
             ...(ceiling !== null ? { pool: { max: ceiling } } : {})
         });
     } catch (error) {
@@ -255,7 +254,7 @@ async function openAndRun(
         const code = options.eval;
         if (code !== undefined) {
             try {
-                const result = await evaluateInConsole(code, { rebase, collections: rebase.collections });
+                const result = await evaluateInConsole(code, { rebase, tables: rebase.tables });
                 if (result !== undefined) out(consoleJson(result));
                 return 0;
             } catch (error) {
@@ -264,7 +263,7 @@ async function openAndRun(
             }
         }
 
-        await startRepl({ rebase, collections: rebase.collections }, {
+        await startRepl({ rebase, tables: rebase.tables }, {
             history: options.history,
             database: describeDatabase(databaseUrl),
             ...streams
@@ -286,8 +285,8 @@ async function startRepl(scope: ConsoleScope, options: { history?: string; datab
     // rest of what the console says about itself.
     const say = typed ? out : outError;
     say("");
-    say(`  rebase console — ${options.database}, ${scope.collections.length} table(s)`);
-    say("  In scope: rebase (dataAsAdmin, sql, withAuth, close) and collections. Top-level await works.");
+    say(`  rebase console — ${options.database}, ${scope.tables.length} table(s)`);
+    say("  In scope: rebase (dataAsAdmin, sql, withAuth, close) and tables. Top-level await works.");
     say("  Try: await rebase.dataAsAdmin.<table>.find({ limit: 5 })");
     say("");
 
@@ -307,7 +306,7 @@ async function startRepl(scope: ConsoleScope, options: { history?: string; datab
         writer: (value: unknown) => inspect(value, { colors, depth: 6 })
     });
     server.context.rebase = scope.rebase;
-    server.context.collections = scope.collections;
+    server.context.tables = scope.tables;
     server.setPrompt("rebase> ");
 
     const history = options.history;

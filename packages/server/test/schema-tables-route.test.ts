@@ -14,7 +14,8 @@ import {
     type DataDriver,
     type InitializedDriver,
     type PostgresCollectionConfig,
-    type TableDescriptor
+    type TableDescriptor,
+    type TableHooks
 } from "@rebasepro/types";
 import { createRebaseClient } from "@rebasepro/client";
 import { lowerTables, tableDefsFromDescriptors } from "@rebasepro/common";
@@ -562,7 +563,14 @@ describe("introspection mode (no backend/schema)", () => {
     });
 
     it("lets global hooks boot, every introspected table having its descriptor", async () => {
-        const registry = new BackendCollectionRegistry();
+        // A driver registry takes the hooks as declared (`setGlobalHooks`).
+        class HookRegistry extends BackendCollectionRegistry {
+            globalHooks?: TableHooks;
+            setGlobalHooks(hooks: TableHooks): void {
+                this.globalHooks = hooks;
+            }
+        }
+        const registry = new HookRegistry();
         const fixture = introspected();
         const withRegistry: BackendBootstrapper = {
             ...bootstrapper(fixture),
@@ -578,7 +586,7 @@ describe("introspection mode (no backend/schema)", () => {
             auth: { jwtSecret: JWT_SECRET },
             hooks: { beforeSave: ({ values }) => values }
         });
-        expect(registry.getGlobalCallbacks()?.beforeSave).toBeDefined();
+        expect(registry.globalHooks?.beforeSave).toBeDefined();
     });
 
     it("refuses to boot when a driver serves a table it did not describe", async () => {

@@ -41,12 +41,11 @@ import {
     MCP_APP_MODULES,
     type AdminScope,
     type AuthConfigDocument,
-    type CollectionCallbacks,
     type RebaseServerClient,
     type TableDescriptor,
     type TableHooks
 } from "@rebasepro/types";
-import { lowerHooks, createDataSourceRegistry, resolveDataSource, buildSdkData, buildRoutedRebaseData, createAccessorSlugResolver, getEffectiveSecurityRules, assertBeforeQueryIsPostgresOnly, warnOnTableDdl } from "@rebasepro/common";
+import { createDataSourceRegistry, resolveDataSource, buildSdkData, buildRoutedRebaseData, createAccessorSlugResolver, getEffectiveSecurityRules, warnOnTableDdl } from "@rebasepro/common";
 import { randomBytes } from "node:crypto";
 import type { Server } from "node:http";
 import nodePath from "node:path";
@@ -59,7 +58,7 @@ import { createRebaseClient } from "@rebasepro/client";
 
 import { BackendCollectionRegistry } from "../collections/BackendCollectionRegistry";
 import { TableRegistry } from "../schema/table-registry";
-import { globalHooksAsCallbacks, resolveDeclaredTables } from "../schema/declared-tables";
+import { resolveDeclaredTables } from "../schema/declared-tables";
 import { introspectedDescriptors, type IntrospectedDriverResult } from "../schema/introspected-tables";
 import type { DriverCollectionOf } from "../schema/driver-seam";
 import {
@@ -697,16 +696,13 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     tableRegistry.replaceAll(declaredTables.tables);
     /** The lowered tables whose compiled policies are served; replaced by a live schema apply. */
     let servedPolicyCollections: PostgresCollectionConfig[] = declaredTables.collections;
-    const describeTable = (slug: string): TableDescriptor | undefined => tableRegistry.get(slug);
     if (declaredTables.source === "schemaDir") {
         logger.info("Loaded the declared tables", { count: declaredTables.defs.length, dir: config.schemaDir });
     }
 
-    // Global table hooks — applied to every table, on all data paths.
-    const globalCallbacks = config.hooks ? globalHooksAsCallbacks(config.hooks, describeTable) : undefined;
-    if (globalCallbacks) {
-        collectionRegistry.setGlobalCallbacks(globalCallbacks);
-    }
+    // Global table hooks — applied to every table, on all data paths: each
+    // driver is handed them below (`handGlobalHooksTo`), as declared.
+    const globalHooks = config.hooks;
     let activeCollections: CollectionConfig[] = [...declaredTables.collections];
     // The B-R7 seam (see `schema/driver-seam.ts`): table-model code decides
     // from descriptors and names a table to a driver call by its lowered
@@ -879,10 +875,9 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             // only when this backend provisions nothing at all.
             provision: provision.database
         });
-        // Global hooks were set on `collectionRegistry` above, and no driver
-        // reads that one — see `handGlobalHooksTo`.
-        if (globalCallbacks) {
-            handGlobalHooksTo(b.id || bootstrapper.type, driverResult, globalCallbacks);
+        // Each driver runs global hooks from its own registry — see `handGlobalHooksTo`.
+        if (globalHooks) {
+            handGlobalHooksTo(b.id || bootstrapper.type, driverResult, globalHooks);
         }
         delegates[b.id || bootstrapper.type] = driverResult.driver;
         // Kept because a later step has to hand each bootstrapper back its own
@@ -3973,14 +3968,13 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     );
 
     /**
-     * Every registry a driver might resolve callbacks from, plus the backend's
-     * own. Each holds its own normalized copy of a collection, so callbacks have
-     * to be written to all of them.
+     * Every driver registry that runs table hooks. Each driver runs hooks from
+     * its own registry, so hooks attached at runtime are handed to all of them.
      */
-    const callbackTargets = (): Array<{ get(slug: string): unknown }> => {
-        const targets: Array<{ get(slug: string): unknown }> = [collectionRegistry];
+    const hookTargets = (): Array<{ setTableHooks(slug: string, hooks: TableHooks): boolean }> => {
+        const targets: Array<{ setTableHooks(slug: string, hooks: TableHooks): boolean }> = [];
         for (const key of [DEFAULT_DRIVER_ID, ...driverRegistry.list()]) {
-            const registry = collectionRegistryOf(driverRegistry.get(key));
+            const registry = hookRegistryOf(driverRegistry.get(key));
             if (registry && !targets.includes(registry)) {
                 targets.push(registry);
             }
@@ -3989,45 +3983,28 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     };
 
     const setTableHooks = (slug: string, hooks: TableHooks): void => {
-        // The one adapter from table hooks to the callbacks the registries
-        // and drivers run — the same lowering the declared hooks went through.
-        const callbacks: CollectionCallbacks = lowerHooks(hooks, slug, describeTable) ?? {};
-        // The boot-time check on `beforeQuery` saw the collection's declared
-        // callbacks, not these, so it is repeated here before anything is
-        // assigned: a hook attached to a collection its engine cannot narrow is
-        // the same inert row filter it refuses at boot.
-        const declared = collectionRegistry.get(slug);
-        if (declared) assertBeforeQueryIsPostgresOnly([{ ...declared, callbacks }]);
-        let attached = 0;
-        // Assignment, not a merge — attaching callbacks REPLACES whatever the
-        // collection declared. That is the right semantics (the caller is
-        // taking ownership, and the cloud relies on it) and a silent one: a
-        // `beforeSave` on the collection config simply stops running, and a
+        // Assignment, not a merge — attaching hooks REPLACES whatever the
+        // table declared. That is the right semantics (the caller is taking
+        // ownership, and the cloud relies on it) and a silent one: a
+        // `beforeSave` on the table definition simply stops running, and a
         // guard that is gone looks exactly like a guard that passed. It has
         // already cost a duplicate-membership check in the control plane. So
         // the replacement is said out loud, naming what is being dropped and
         // the one call that keeps it.
-        const replaced = new Set<string>();
-        for (const registry of callbackTargets()) {
-            // The driver registries' copies, in the shape the driver runs (the
-            // B-R7 seam: `lowerHooks` above).
-            const collection = registry.get(slug);
-            if (typeof collection === "object" && collection !== null) {
-                const previous: unknown = Reflect.get(collection, "callbacks");
-                if (typeof previous === "object" && previous !== null) {
-                    for (const [name, value] of Object.entries(previous)) {
-                        if (typeof value === "function" && typeof Reflect.get(callbacks, name) !== "function") {
-                            replaced.add(name);
-                        }
-                    }
-                }
-                Reflect.set(collection, "callbacks", callbacks);
-                attached++;
-            }
+        const previous = tableRegistry.table(slug)?.hooks;
+        const replaced = previous
+            ? Object.entries(previous)
+                .filter(([name, value]) => typeof value === "function" && typeof Reflect.get(hooks, name) !== "function")
+                .map(([name]) => name)
+            : [];
+        let attached = 0;
+        // The drivers' copies: the hooks they run, native, on every door.
+        for (const registry of hookTargets()) {
+            if (registry.setTableHooks(slug, hooks)) attached++;
         }
-        if (replaced.size > 0) {
+        if (replaced.length > 0) {
             logger.warn(
-                `[hooks] Attaching hooks to "${slug}" replaced ${[...replaced].map(n => `'${n}'`).join(", ")} ` +
+                `[hooks] Attaching hooks to "${slug}" replaced ${replaced.map(n => `'${n}'`).join(", ")} ` +
                 "declared on the table itself, which will no longer run. Hooks are assigned, not merged. " +
                 "To keep the table's own, attach a hooks object that also calls them (`definition.config.hooks`)."
             );
@@ -4641,12 +4618,12 @@ async function loadAppCompiler(): Promise<McpAppCompiler> {
 }
 
 /** The collection registry a driver carries, if it has one: not part of `DataDriver`, so found by looking. */
-function collectionRegistryOf(driver: unknown): { get(slug: string): unknown } | undefined {
+function hookRegistryOf(driver: unknown): { setTableHooks(slug: string, hooks: TableHooks): boolean } | undefined {
     if (typeof driver !== "object" || driver === null || !("registry" in driver)) return undefined;
     const registry = driver.registry;
-    return typeof registry === "object" && registry !== null && hasSlugGetter(registry) ? registry : undefined;
+    return typeof registry === "object" && registry !== null && takesTableHooks(registry) ? registry : undefined;
 }
 
-function hasSlugGetter(value: object): value is { get(slug: string): unknown } {
-    return "get" in value && typeof value.get === "function";
+function takesTableHooks(value: object): value is { setTableHooks(slug: string, hooks: TableHooks): boolean } {
+    return "setTableHooks" in value && typeof value.setTableHooks === "function";
 }
