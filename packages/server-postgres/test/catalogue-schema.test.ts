@@ -27,6 +27,7 @@ import { assertWritableColumns, tableKeys } from "../src/services/collection-hel
 import { buildRuntimeTable } from "../src/model/runtime-table";
 import { compileDescribedTables } from "@rebasepro/common";
 import { relationalQuery } from "./helpers/spg-a-db";
+import { tablesFromCollections } from "./helpers/tables";
 import { namedCollection } from "./helpers/spg-a-fixtures";
 
 // ── The project, as its author wrote it ──────────────────────────────────────
@@ -157,7 +158,7 @@ describe("tables built from the live catalogue", () => {
         await pg.exec(DDL);
         catalogue = await readCatalogueSchema({
             client: pg,
-            collections,
+            tables: tablesFromCollections(collections).descriptors,
             defaultSchema: "public"
         });
         // Exactly what the bootstrapper does with them.
@@ -169,7 +170,7 @@ describe("tables built from the live catalogue", () => {
         await pg?.close();
     });
 
-    it("reads every table the collections declare, and their junction", () => {
+    it("reads every table declared for the source, and their junction", () => {
         expect(Object.keys(catalogue.tables).sort()).toEqual(["authors", "posts", "posts_tags", "tags"]);
         expect(catalogue.missing).toEqual([]);
     });
@@ -318,8 +319,9 @@ describe("BaaS mode, where the database is the whole specification", () => {
 
     it("serves every column under the same key the derived collection advertises", async () => {
         const schema = await introspectSchema(pg, "public");
-        const derived = lowerIntrospectedTables((await introspectTables(pg, "public", { unprotectedTables: "serve" })).tables).collections;
-        const { tables } = buildBaasSchema(schema.tablesMap, "public", derived);
+        const lowered = lowerIntrospectedTables((await introspectTables(pg, "public", { unprotectedTables: "serve" })).tables);
+        const derived = lowered.collections;
+        const { tables } = buildBaasSchema(schema.tablesMap, "public", lowered.tables);
 
         const properties = Object.keys(derived[0].properties ?? {});
         const columns = Object.keys(getTableColumns(tables.customers));
@@ -371,7 +373,7 @@ describe("a write against the catalogue, with a stale schema.generated.ts", () =
     it("accepts a column the database has and the generated module does not", async () => {
         const catalogue = await readCatalogueSchema({
             client: pg,
-            collections: [notes],
+            tables: tablesFromCollections([notes]).descriptors,
             defaultSchema: "public"
         });
 
@@ -403,7 +405,7 @@ describe("a write against the catalogue, with a stale schema.generated.ts", () =
         await pg.exec("ALTER TABLE notes ADD COLUMN IF NOT EXISTS subtitle_text text");
         const catalogue = await readCatalogueSchema({
             client: pg,
-            collections: [withColumn],
+            tables: tablesFromCollections([withColumn]).descriptors,
             defaultSchema: "public"
         });
 
@@ -422,7 +424,7 @@ describe("a write against the catalogue, with a stale schema.generated.ts", () =
     it("refuses a column the database does not have, and says the schema is unapplied", async () => {
         const catalogue = await readCatalogueSchema({
             client: pg,
-            collections: [notes],
+            tables: tablesFromCollections([notes]).descriptors,
             defaultSchema: "public"
         });
 

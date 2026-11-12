@@ -9,7 +9,8 @@
  */
 import { describe, expect, it } from "@jest/globals";
 import { boolean, integer, numeric, pgTable, text, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
-import type { CollectionConfig } from "@rebasepro/types";
+import { col, defineAuthTable, defineTable } from "@rebasepro/types";
+import { compileTables } from "@rebasepro/common";
 
 import { jest } from "@jest/globals";
 import { logger } from "@rebasepro/server";
@@ -37,16 +38,14 @@ function catalogueOf(columns: TableColumn[]) {
     return buildTablesMap(tables, columns, [], []);
 }
 
-const posts: CollectionConfig = {
-    slug: "posts",
-    table: "posts",
-    name: "Posts",
-    properties: {
-        id: { name: "ID", type: "string", isId: "uuid" },
-        title: { name: "Title", type: "string" },
-        authorId: { name: "Author", type: "string", columnName: "author_id" }
-    }
-};
+const [posts] = compileTables([defineTable("posts", {
+    columns: {
+        id: col.uuid().primaryKey(),
+        title: col.text(),
+        authorId: col.uuid("author_id")
+    },
+    rls: "admin-only"
+})]);
 
 const generated = {
     posts: pgTable("posts", {
@@ -67,7 +66,7 @@ describe("diffGeneratedSchemaAgainstCatalogue", () => {
         expect(diffGeneratedSchemaAgainstCatalogue({
             generated,
             catalogue,
-            collections: [posts]
+            tables: [posts]
         })).toEqual([]);
     });
 
@@ -75,11 +74,11 @@ describe("diffGeneratedSchemaAgainstCatalogue", () => {
         expect(diffGeneratedSchemaAgainstCatalogue({
             generated: undefined,
             catalogue,
-            collections: [posts]
+            tables: [posts]
         })).toEqual([]);
     });
 
-    it("names the collection, the property and the column of a missing column", () => {
+    it("names the table's slug, the column key and the column of a missing column", () => {
         const [difference, ...rest] = diffGeneratedSchemaAgainstCatalogue({
             generated: {
                 posts: pgTable("posts", {
@@ -90,14 +89,14 @@ describe("diffGeneratedSchemaAgainstCatalogue", () => {
                 })
             },
             catalogue,
-            collections: [posts]
+            tables: [posts]
         });
 
         expect(rest).toEqual([]);
         expect(difference).toMatchObject({
             kind: "missing-column",
             table: "posts",
-            collection: "posts",
+            slug: "posts",
             column: "subtitle"
         });
         expect(describeSchemaDifference(difference)).toContain("posts");
@@ -111,12 +110,12 @@ describe("diffGeneratedSchemaAgainstCatalogue", () => {
             column({ table_name: "posts", column_name: "published_at", data_type: "timestamp with time zone", udt_name: "timestamptz" })
         ]);
 
-        const differences = diffGeneratedSchemaAgainstCatalogue({ generated, catalogue: withExtra, collections: [posts] });
+        const differences = diffGeneratedSchemaAgainstCatalogue({ generated, catalogue: withExtra, tables: [posts] });
 
         expect(differences).toEqual([expect.objectContaining({
             kind: "extra-column",
             column: "published_at",
-            property: "publishedAt",
+            key: "publishedAt",
             live: "timestamptz"
         })]);
     });
@@ -128,11 +127,11 @@ describe("diffGeneratedSchemaAgainstCatalogue", () => {
             column({ table_name: "posts", column_name: "author_id", data_type: "text", udt_name: "text" })
         ]);
 
-        expect(diffGeneratedSchemaAgainstCatalogue({ generated, catalogue: asText, collections: [posts] }))
+        expect(diffGeneratedSchemaAgainstCatalogue({ generated, catalogue: asText, tables: [posts] }))
             .toEqual([expect.objectContaining({
                 kind: "type",
                 column: "author_id",
-                property: "authorId",
+                key: "authorId",
                 generated: "uuid",
                 live: "text"
             })]);
@@ -145,7 +144,7 @@ describe("diffGeneratedSchemaAgainstCatalogue", () => {
             column({ table_name: "posts", column_name: "author_id", data_type: "uuid", udt_name: "uuid" })
         ]);
 
-        expect(diffGeneratedSchemaAgainstCatalogue({ generated, catalogue: nullableTitle, collections: [posts] }))
+        expect(diffGeneratedSchemaAgainstCatalogue({ generated, catalogue: nullableTitle, tables: [posts] }))
             .toEqual([expect.objectContaining({
                 kind: "nullability",
                 column: "title",
@@ -158,8 +157,8 @@ describe("diffGeneratedSchemaAgainstCatalogue", () => {
         expect(diffGeneratedSchemaAgainstCatalogue({
             generated,
             catalogue: new Map(),
-            collections: [posts]
-        })).toEqual([expect.objectContaining({ kind: "missing-table", table: "posts", collection: "posts" })]);
+            tables: [posts]
+        })).toEqual([expect.objectContaining({ kind: "missing-table", table: "posts", slug: "posts" })]);
     });
 
     it("stays quiet about a table that belongs to another data source", () => {
@@ -168,26 +167,23 @@ describe("diffGeneratedSchemaAgainstCatalogue", () => {
         expect(diffGeneratedSchemaAgainstCatalogue({
             generated: { events: pgTable("events", { id: text("id").primaryKey() }) },
             catalogue,
-            collections: [posts]
+            tables: [posts]
         })).toEqual([]);
     });
 
     it("stays quiet about the auth columns the generator deliberately omits", () => {
         // A brand-new scaffold booted with seven differences on `users`, all of
-        // them by design: `render-drizzle` drops the columns a users collection
+        // them by design: `render-drizzle` drops the columns an auth table
         // does not declare (drizzle-kit creates no auth table), and the
-        // collection's properties say nothing about the `NOT NULL DEFAULT`
+        // table's columns say nothing about the `NOT NULL DEFAULT`
         // `ensureAuthTablesExist` applies. The remedy the warning printed —
-        // `rebase schema generate` — regenerates from the same collection and
+        // `rebase schema generate` — regenerates from the same table and
         // changes none of them, so the warning survived its own fix on every
         // boot forever.
-        const users: CollectionConfig = {
-            slug: "users",
-            table: "users",
-            name: "Users",
-            auth: true,
-            properties: { id: { type: "string", isId: "uuid" }, roles: { type: "array", of: { type: "string" } } }
-        };
+        const [users] = compileTables([defineAuthTable("users", {
+            columns: { id: col.uuid().primaryKey(), roles: col.array(col.text()) },
+            rls: "admin-only"
+        })]);
 
         const differences = diffGeneratedSchemaAgainstCatalogue({
             generated: {
@@ -204,18 +200,18 @@ describe("diffGeneratedSchemaAgainstCatalogue", () => {
                 column({ table_name: "users", column_name: "is_anonymous", data_type: "boolean", udt_name: "bool", is_nullable: "NO" }),
                 column({ table_name: "users", column_name: "tokens_valid_after", data_type: "timestamp with time zone", udt_name: "timestamptz" })
             ]),
-            collections: [users]
+            tables: [users]
         });
         expect(differences).toEqual([]);
     });
 
-    it("still reports a column the developer added to the users collection", () => {
+    it("still reports a column the developer added to the auth table", () => {
         // The carve-out is auth's own columns, not the whole table: a field the
         // developer declared and then dropped from the database is still drift.
-        const users: CollectionConfig = {
-            slug: "users", table: "users", name: "Users", auth: true,
-            properties: { id: { type: "string", isId: "uuid" }, bio: { type: "string" } }
-        };
+        const [users] = compileTables([defineAuthTable("users", {
+            columns: { id: col.uuid().primaryKey(), bio: col.text() },
+            rls: "admin-only"
+        })]);
 
         const differences = diffGeneratedSchemaAgainstCatalogue({
             generated: { users: pgTable("users", { id: uuid("id").primaryKey(), bio: text("bio") }) },
@@ -223,7 +219,7 @@ describe("diffGeneratedSchemaAgainstCatalogue", () => {
                 column({ table_name: "users", column_name: "id", data_type: "uuid", udt_name: "uuid", is_nullable: "NO" }),
                 column({ table_name: "users", column_name: "stripe_customer_id", data_type: "text", udt_name: "text" })
             ]),
-            collections: [users]
+            tables: [users]
         });
         expect(differences).toEqual([
             expect.objectContaining({ kind: "missing-column", column: "bio" }),
@@ -252,7 +248,7 @@ describe("diffGeneratedSchemaAgainstCatalogue", () => {
                 })
             },
             catalogue: widths,
-            collections: []
+            tables: []
         })).toEqual([]);
     });
 });
@@ -284,7 +280,7 @@ describe("typeFamily", () => {
  * What the warning tells somebody to run.
  *
  * It said `rebase schema generate`, which rewrites the file from the
- * collections and leaves the database as it is. `rebase dev` already rewrites
+ * declared tables and leaves the database as it is. `rebase dev` already rewrites
  * that file on every change and boot applies only additive changes, so the
  * drift still there at boot is the database behind the file, and regenerating
  * changed nothing: the same warning came back on the next boot.
@@ -297,7 +293,7 @@ describe("warnOnGeneratedSchemaDrift", () => {
         });
         try {
             warnOnGeneratedSchemaDrift([
-                { kind: "missing-column", table: "tags", collection: "tags", column: "color", property: "color" }
+                { kind: "missing-column", table: "tags", slug: "tags", column: "color", key: "color" }
             ]);
         } finally {
             spy.mockRestore();
@@ -314,9 +310,9 @@ describe("warnOnGeneratedSchemaDrift", () => {
 
     /**
      * The two differences a deployed backend can apply on its own, after
-     * review: a NOT NULL the collection relaxed, and a column it stopped
+     * review: a NOT NULL the table relaxed, and a column it stopped
      * declaring. SongBuzz's `voice_cache.wav` was the first: optional in the
-     * collection, NOT NULL in the database, reported on every boot with a fix
+     * table, NOT NULL in the database, reported on every boot with a fix
      * (`db push`) that cannot reach a Cloud database.
      */
     it("names `rebase schema reconcile` for what it can apply, and `db push` for the rest", () => {
@@ -326,10 +322,10 @@ describe("warnOnGeneratedSchemaDrift", () => {
         });
         try {
             warnOnGeneratedSchemaDrift([
-                { kind: "nullability", table: "songbuzz_voice_cache", collection: "voice_cache", column: "wav", property: "wav", generated: "nullable", live: "NOT NULL" },
-                { kind: "extra-column", table: "songbuzz_voice_cache", collection: "voice_cache", column: "legacy", live: "text" },
-                { kind: "nullability", table: "tags", collection: "tags", column: "color", property: "color", generated: "NOT NULL", live: "nullable" },
-                { kind: "type", table: "tags", collection: "tags", column: "day", property: "day", generated: "text", live: "date" }
+                { kind: "nullability", table: "songbuzz_voice_cache", slug: "voice_cache", column: "wav", key: "wav", generated: "nullable", live: "NOT NULL" },
+                { kind: "extra-column", table: "songbuzz_voice_cache", slug: "voice_cache", column: "legacy", live: "text" },
+                { kind: "nullability", table: "tags", slug: "tags", column: "color", key: "color", generated: "NOT NULL", live: "nullable" },
+                { kind: "type", table: "tags", slug: "tags", column: "day", key: "day", generated: "text", live: "date" }
             ]);
         } finally {
             spy.mockRestore();

@@ -364,7 +364,7 @@ export interface TablePlan {
  * One entry in a generated `relations(...)` block.
  *
  * Both sides of a link must carry the same `relationName` or Drizzle cannot
- * pair them; the rule that derives it is `sharedRelationName`, which both sides
+ * pair them; the rule that derives it is `tableRelationName`, which both sides
  * compute independently from the table that owns the column.
  */
 export type RelationPlan = OneRelationPlan | ManyRelationPlan;

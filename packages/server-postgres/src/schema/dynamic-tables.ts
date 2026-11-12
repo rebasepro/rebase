@@ -16,9 +16,9 @@
  * Two things a caller has to supply for the tables to match what the generated
  * module used to produce, both about *names*: the Drizzle object is keyed by the
  * wire name of a column and not by the column (`authorId`, not `author_id`), and
- * a relation is keyed by the collection's own relation key rather than by a
- * guess made from the foreign key. Both come from the collections — see
- * `columnKeysFromCollections` and `buildDrizzleRelationsFromCollections`.
+ * a relation is keyed by the table's own relation name rather than by a
+ * guess made from the foreign key. Both come from the table descriptors — see
+ * `columnKeysFromTables` and `buildDrizzleRelationsFromTables`.
  */
 import {
     bigint,

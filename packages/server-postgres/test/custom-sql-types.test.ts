@@ -16,7 +16,7 @@ import ts from "typescript";
 import { afterEach, beforeEach, describe, expect, it } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
-import { lowerTables } from "@rebasepro/common";
+import { compileSchema } from "@rebasepro/common";
 import { col, defineTable, type AnyTableDef, type AnyViewDef } from "@rebasepro/types";
 
 import { planSchema } from "../src/schema/plan/plan-schema";
@@ -54,7 +54,7 @@ const queryable = (db: PGlite) => ({
 });
 
 const ddlOf = (defs: readonly (AnyTableDef | AnyViewDef)[]): string =>
-    renderPostgresDdl(planSchema(lowerTables(defs), { databaseExtensions: [] }), { includePolicies: false, includeSearch: false, includeVector: false });
+    renderPostgresDdl(planSchema(compileSchema(defs), { databaseExtensions: [] }), { includePolicies: false, includeSearch: false, includeVector: false });
 
 function compileDiagnostics(source: string): string[] {
     const dir = fs.mkdtempSync(path.join(PACKAGE_ROOT, ".schema-compile-"));
@@ -106,7 +106,7 @@ describe("col.custom(): generated from a database, pushed, booted and served", (
     });
 
     it("plans and renders each type verbatim, in the DDL and the Drizzle file (which compiles)", () => {
-        const plan = planSchema(lowerTables(defs), { databaseExtensions: [] });
+        const plan = planSchema(compileSchema(defs), { databaseExtensions: [] });
         const columns = Object.fromEntries(plan.tables[0].columns.map(column => [column.column, column]));
         expect(columns.address).toMatchObject({ type: { kind: "custom", sqlType: "inet" }, nullable: false });
         expect(columns.hops.type).toEqual({ kind: "custom", sqlType: "inet[]" });
@@ -123,11 +123,11 @@ describe("col.custom(): generated from a database, pushed, booted and served", (
 
     it("is pushed, then a boot finds nothing to do, twice; and a database whose type differs is reported", async () => {
         await target.exec(ddlOf(defs));
-        const first = await ensureCollectionTables(queryable(target), lowerTables(defs), undefined, { databaseExtensions: [] });
+        const first = await ensureCollectionTables(queryable(target), compileSchema(defs), undefined, { databaseExtensions: [] });
         expect(first.failures).toEqual([]);
         expect(first.actions.map(action => `${action.kind} ${action.target}`)).toEqual([]);
         expect(first.columnTypeDrift).toEqual([]);
-        const second = await ensureCollectionTables(queryable(target), lowerTables(defs), undefined, { databaseExtensions: [] });
+        const second = await ensureCollectionTables(queryable(target), compileSchema(defs), undefined, { databaseExtensions: [] });
         expect(second.actions).toEqual([]);
 
         // The same table, declared with another range type: reported, never altered.
@@ -137,13 +137,13 @@ describe("col.custom(): generated from a database, pushed, booted and served", (
             rls: "admin-only"
         });
         const existing = await readExistingSchema(queryable(target), ["public"]);
-        const plan = diffPlanAgainstCatalogue(planSchema(lowerTables([changed]), { databaseExtensions: [] }), existing);
+        const plan = diffPlanAgainstCatalogue(planSchema(compileSchema([changed]), { databaseExtensions: [] }), existing);
         expect(plan.columnTypeDrift).toEqual([{ table: "public.sessions", column: "seats", declared: "int8range", actual: "int4range" }]);
     });
 
     it("is created by a boot from nothing, as ADD COLUMN on an existing table", async () => {
         await target.exec("CREATE TABLE public.sessions (id uuid PRIMARY KEY DEFAULT gen_random_uuid());");
-        const booted = await ensureCollectionTables(queryable(target), lowerTables(defs), undefined, { databaseExtensions: [] });
+        const booted = await ensureCollectionTables(queryable(target), compileSchema(defs), undefined, { databaseExtensions: [] });
         expect(booted.failures).toEqual([]);
         const { rows } = await target.query<{ column_name: string; formatted: string }>(
             "SELECT a.attname AS column_name, format_type(a.atttypid, a.atttypmod) AS formatted FROM pg_attribute a " +
@@ -152,14 +152,13 @@ describe("col.custom(): generated from a database, pushed, booted and served", (
             ["id", "uuid"], ["address", "inet"], ["lasted", "interval"], ["started", "timestamp(3) without time zone"],
             ["seats", "int4range"], ["hops", "inet[]"]
         ]);
-        const again = await ensureCollectionTables(queryable(target), lowerTables(defs), undefined, { databaseExtensions: [] });
+        const again = await ensureCollectionTables(queryable(target), compileSchema(defs), undefined, { databaseExtensions: [] });
         expect(again.actions).toEqual([]);
     });
 
     it("round-trips values through the codec and the catalogue-built table, as the driver returns them", async () => {
         await target.exec(ddlOf(defs));
-        const [collection] = lowerTables(defs);
-        const catalogue = await readCatalogueSchema({ client: queryable(target), collections: [collection], defaultSchema: "public" });
+        const catalogue = await readCatalogueSchema({ client: queryable(target), tables: compileSchema(defs).map(t => t.descriptor), defaultSchema: "public" });
         const orm = drizzle(target, { schema: catalogue.tables });
         const written: Record<string, unknown> = {
             address: "10.0.0.1",

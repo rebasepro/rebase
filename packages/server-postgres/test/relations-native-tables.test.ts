@@ -106,7 +106,7 @@ beforeAll(async () => {
     // The lowered collections are what the subsystems not yet moved still read
     // (registry, driver entry points); the relation services read the compiled tables.
     const collections = lowerTables(defs);
-    const catalogue = await readCatalogueSchema({ client: queryable(db), collections, defaultSchema: "public" });
+    const catalogue = await readCatalogueSchema({ client: queryable(db), tables: compiled.map(t => t.descriptor), defaultSchema: "public" });
     const registry = new FixtureTableRegistry();
     registry.registerMultiple(collections);
     registry.registerTables(compiled);

@@ -704,6 +704,22 @@ export const searchColumnNames = (collection: CollectionConfig): string[] => {
 };
 
 /**
+ * {@link searchColumnNames}, read from a table's descriptor: the generated
+ * search columns (`search_vector`, and the fuzzy column when there is one).
+ */
+export const tableSearchColumnNames = (table: TableDescriptor): string[] => {
+    let spec: SearchColumnSpec | undefined;
+    try {
+        spec = buildTableSearchColumnSpec(table);
+    } catch {
+        // As above: a malformed block is boot's to report.
+        return [];
+    }
+    if (!spec) return [];
+    return spec.fuzzy ? [spec.column, spec.fuzzy.column] : [spec.column];
+};
+
+/**
  * True for a column whose type only ever holds a search index.
  *
  * Independent of any collection config on purpose: an introspected database

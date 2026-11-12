@@ -1,64 +1,58 @@
 /**
- * Build drizzle `relations()` for declared collections, from the collections.
+ * Build drizzle `relations()` for declared tables, from their descriptors.
  *
  * The heuristic builder in `dynamic-tables.ts` names a relation after the
  * foreign-key column (`author_id` → `author`), which is the only evidence a
  * database offers and is right for BaaS mode. It is wrong for a project that
- * declares its collections: there the relation's name is whatever the author
+ * declares its tables: there the relation's name is whatever the author
  * called it, `include=writer` addresses that name, and a relation whose key was
  * guessed from the column simply does not answer to it — the read returns the
  * bare foreign key and no target, silently, which is how a demo lost every
  * relation in its list view while the detail view (a different code path) kept
  * working.
  *
- * So when there are collections, they are the authority for *which* relations
+ * So when there are declared tables, they are the authority for *which* relations
  * exist and what they are called; the live catalogue is the authority for the
  * columns underneath. This is the same pairing `generate-drizzle-schema-logic`
  * emits into `schema.generated.ts` — kind for kind, key for key, and paired by
- * the same {@link sharedRelationName} — only built against tables read back from
+ * the same {@link tableRelationName} — only built against tables read back from
  * `information_schema` rather than against a file.
  */
 import { getTableColumns, relations, type AnyColumn, type Relation, type Relations } from "drizzle-orm";
 import type { PgTable } from "drizzle-orm/pg-core";
-import { CollectionConfig, ResolvedRelation, type ResolvedForeignKeyOnTarget } from "@rebasepro/types";
-import { fieldKeyForColumn, getTableName, resolveCollectionRelations } from "@rebasepro/common";
-import { logger } from "@rebasepro/server";
+import type { RelationDescriptor, TableDescriptor } from "@rebasepro/types";
 
-import { sharedRelationName } from "./relation-names";
+import { servedKeyOf, tableRelationName } from "./relation-names";
 
-/** A collection's table, with any schema prefix stripped — as the DDL creates it. */
+/** A table's name with any schema prefix stripped — as the DDL creates it. */
 export function bareTableName(name: string): string {
     return name.includes(".") ? name.split(".").pop()! : name;
 }
 
 /**
- * The field key a collection's rows are addressed by, as the generated module
- * spells it: the property marked `isId`, else `id`.
+ * The key a table's rows are addressed by, as the generated module spells it:
+ * the first primary-key column's key, else `id`.
  *
- * Deliberately the config's answer rather than the catalogue's primary key —
- * `references: [users.id]` in the generated file is keyed the same way, and the
- * two have to name the same Drizzle key for a relation to compile at all.
+ * Deliberately the declaration's answer rather than the catalogue's primary
+ * key — `references: [users.id]` in the generated file is keyed the same way,
+ * and the two have to name the same Drizzle key for a relation to compile at
+ * all.
  */
-function primaryKeyFieldKey(collection: CollectionConfig): string {
-    for (const [key, prop] of Object.entries(collection.properties ?? {})) {
-        if (prop && typeof prop === "object" && "isId" in prop && Boolean((prop as { isId?: unknown }).isId)) {
-            return key;
-        }
-    }
-    return "id";
+function primaryKeyFieldKey(table: TableDescriptor): string {
+    return table.primaryKey[0] ?? "id";
 }
 
 /**
- * The field key on the source table that a `hasOne`/`hasMany` foreign key
- * holds: its `sourceKey` when the link names one, else the primary key.
+ * The key on the source table that a `hasOne`/`hasMany` foreign key holds:
+ * its `sourceKey` when the link names one, else the primary key.
  */
 function sourceKeyFieldKey(
-    relation: ResolvedForeignKeyOnTarget,
-    collection: CollectionConfig
+    relation: Extract<RelationDescriptor, { kind: "hasOne" | "hasMany" }>,
+    source: TableDescriptor
 ): string {
     return relation.sourceKey
-        ? fieldKeyForColumn(collection, relation.sourceKey)
-        : primaryKeyFieldKey(collection);
+        ? servedKeyOf(source, relation.sourceKey)
+        : primaryKeyFieldKey(source);
 }
 
 /**
@@ -67,15 +61,15 @@ function sourceKeyFieldKey(
  * The key is the answer in the ordinary case, and the name is the fallback for
  * the one place a caller holds a column and not a field: a junction table's two
  * foreign keys, which are keyed by column *unless* the project also declares a
- * collection over that table, in which case they are keyed by its property
- * names. Looking both up costs a scan of one table and removes the difference.
+ * table over that junction, in which case they are keyed by its column keys.
+ * Looking both up costs a scan of one table and removes the difference.
  */
 function columnOf(table: PgTable | undefined, key: string): AnyColumn | undefined {
     if (!table) return undefined;
     // Drizzle's column map is keyed by the JS property name, which is exactly
-    // the "keyed by its property names" case this function's docblock
-    // describes — so `getTableColumns` answers it, and indexing the table
-    // object (which also reaches its methods and symbols) was never needed.
+    // the "keyed by its column keys" case this function's docblock describes
+    // — so `getTableColumns` answers it, and indexing the table object (which
+    // also reaches its methods and symbols) was never needed.
     const direct = getTableColumns(table)[key];
     if (direct) return direct;
     for (const column of Object.values(getTableColumns(table))) {
@@ -99,13 +93,14 @@ interface ManySpec {
 }
 
 /**
- * Drizzle relations for every declared collection, keyed `<table>Relations`.
+ * Drizzle relations for every declared table, keyed `<table>Relations`.
  *
- * @param collections every collection backed by a table in `tables`
+ * @param descriptors every declared table backed by a table in `tables`, and
+ *                    the targets of their relations
  * @param tables      catalogue-built tables, keyed by bare table name
  */
-export function buildDrizzleRelationsFromCollections(
-    collections: CollectionConfig[],
+export function buildDrizzleRelationsFromTables(
+    descriptors: readonly TableDescriptor[],
     tables: Record<string, PgTable>
 ): Record<string, Relations> {
     const ones = new Map<string, OneSpec[]>();
@@ -125,45 +120,48 @@ export function buildDrizzleRelationsFromCollections(
     const addOne = (table: string, spec: OneSpec) => ones.set(table, [...(ones.get(table) ?? []), spec]);
     const addMany = (table: string, spec: ManySpec) => manys.set(table, [...(manys.get(table) ?? []), spec]);
 
-    const byTable = new Map<string, CollectionConfig>();
-    for (const collection of collections) {
-        const table = bareTableName(getTableName(collection));
-        if (table && tables[table]) byTable.set(table, collection);
+    const bySlug = new Map(descriptors.map(descriptor => [descriptor.slug, descriptor]));
+    // Only reached for a target that is among `descriptors`: every caller
+    // looks the target up in `bySlug` first.
+    const targetOf = (slug: string): TableDescriptor => {
+        const target = bySlug.get(slug);
+        if (!target) throw new Error(`Relation target "${slug}" is not a declared table`);
+        return target;
+    };
+
+    const byTable = new Map<string, TableDescriptor>();
+    for (const descriptor of descriptors) {
+        const table = bareTableName(descriptor.table);
+        if (tables[table]) byTable.set(table, descriptor);
     }
 
-    for (const [tableName, collection] of byTable) {
+    for (const [tableName, source] of byTable) {
         const table = tables[tableName];
 
-        for (const [relationKey, relation] of Object.entries(resolveCollectionRelations(collection))) {
-            let target: CollectionConfig;
-            try {
-                target = relation.target();
-            } catch (err) {
-                // Nothing to build against, and nothing to fail over: the boot
-                // relation check reports an unresolvable target by name.
-                logger.debug(`[schema] Relation ${collection.slug}.${relationKey} has no resolvable target`, { error: err });
-                continue;
-            }
-            const targetTableName = bareTableName(getTableName(target));
+        for (const relation of source.relations) {
+            // A target outside this set has nothing to build against, and
+            // nothing to fail over: the boot relation check reports an
+            // unresolvable target by name.
+            const target = bySlug.get(relation.target);
+            if (!target) continue;
+            const targetTableName = bareTableName(target.table);
             const targetTable = tables[targetTableName];
-            const name = sharedRelationName(relation, collection);
+            const name = tableRelationName(relation, source, targetOf);
 
             switch (relation.kind) {
                 case "belongsTo": {
                     if (!targetTable) continue;
                     if (!claim(tableName, name, relation.kind)) continue;
-                    const localKey = fieldKeyForColumn(collection, relation.localKey);
-                    const referenced = primaryKeyFieldKey(target);
-                    const field = columnOf(table, localKey);
-                    const reference = columnOf(targetTable, referenced);
+                    const field = columnOf(table, servedKeyOf(source, relation.localKey));
+                    const reference = columnOf(targetTable, primaryKeyFieldKey(target));
                     // A column the catalogue does not have would make drizzle
                     // throw `Cannot read properties of undefined` from inside
                     // `normalizeRelation`, three frames from anything nameable.
                     // The boot relation check reports the same defect in terms
-                    // of the collection; this only declines to build it.
+                    // of the table; this only declines to build it.
                     if (!field || !reference) continue;
                     addOne(tableName, {
-                        key: relationKey,
+                        key: relation.name,
                         target: targetTable,
                         fields: [field],
                         references: [reference],
@@ -185,11 +183,11 @@ export function buildDrizzleRelationsFromCollections(
                     // has two links back here or the link is to its own table.
                     // These are the columns drizzle would infer from the owning
                     // side, given outright.
-                    const field = columnOf(table, sourceKeyFieldKey(relation, collection));
-                    const reference = columnOf(targetTable, fieldKeyForColumn(target, relation.foreignKeyOnTarget));
+                    const field = columnOf(table, sourceKeyFieldKey(relation, source));
+                    const reference = columnOf(targetTable, servedKeyOf(target, relation.foreignKey));
                     if (!field || !reference) continue;
                     addOne(tableName, {
-                        key: relationKey,
+                        key: relation.name,
                         target: targetTable,
                         fields: [field],
                         references: [reference],
@@ -201,7 +199,7 @@ export function buildDrizzleRelationsFromCollections(
                 case "hasMany": {
                     if (!targetTable) continue;
                     if (!claim(tableName, name, relation.kind)) continue;
-                    addMany(tableName, { key: relationKey, target: targetTable, relationName: name });
+                    addMany(tableName, { key: relation.name, target: targetTable, relationName: name });
                     break;
                 }
 
@@ -210,8 +208,8 @@ export function buildDrizzleRelationsFromCollections(
                     const junction = tables[junctionName];
                     if (!junction) continue;
                     if (!claim(tableName, name, relation.kind)) continue;
-                    addMany(tableName, { key: relationKey, target: junction, relationName: name });
-                    addJunctionSides(relation, collection, target, junctionName, tables, addOne, claim);
+                    addMany(tableName, { key: relation.name, target: junction, relationName: name });
+                    addJunctionSides(relation, source, target, junctionName, tables, targetOf, addOne, claim);
                     break;
                 }
 
@@ -225,30 +223,26 @@ export function buildDrizzleRelationsFromCollections(
 
     // The reciprocal a `many()` needs. A `hasMany` gives drizzle no columns to
     // join on; it finds them on the owning side, which exists only if the other
-    // collection happens to declare a `belongsTo` back. Where it does not, the
+    // table happens to declare a `belongsTo` back. Where it does not, the
     // generated file synthesizes one under a `_synth_` key, and so does this.
     // A `hasOne` names its own columns, and gets the same owning side so the
     // target's table carries the link back under the same `relationName`.
-    for (const [tableName, collection] of byTable) {
+    for (const [tableName, source] of byTable) {
         const table = tables[tableName];
-        for (const [, relation] of Object.entries(resolveCollectionRelations(collection))) {
+        for (const relation of source.relations) {
             if (relation.kind !== "hasMany" && relation.kind !== "hasOne") continue;
-            let target: CollectionConfig;
-            try {
-                target = relation.target();
-            } catch {
-                continue;
-            }
-            const targetTableName = bareTableName(getTableName(target));
+            const target = bySlug.get(relation.target);
+            if (!target) continue;
+            const targetTableName = bareTableName(target.table);
             const targetTable = tables[targetTableName];
             if (!targetTable) continue;
 
-            const name = sharedRelationName(relation, collection);
+            const name = tableRelationName(relation, source, targetOf);
             if (!claim(targetTableName, name, "belongsTo")) continue;
 
-            const fkKey = fieldKeyForColumn(target, relation.foreignKeyOnTarget);
+            const fkKey = servedKeyOf(target, relation.foreignKey);
             const field = columnOf(targetTable, fkKey);
-            const reference = columnOf(table, sourceKeyFieldKey(relation, collection));
+            const reference = columnOf(table, sourceKeyFieldKey(relation, source));
             if (!field || !reference) continue;
 
             addOne(targetTableName, {
@@ -298,40 +292,40 @@ export function buildDrizzleRelationsFromCollections(
  * generated file keys them too.
  */
 function addJunctionSides(
-    relation: Extract<ResolvedRelation, { kind: "manyToMany" }>,
-    sourceCollection: CollectionConfig,
-    targetCollection: CollectionConfig,
+    relation: Extract<RelationDescriptor, { kind: "manyToMany" }>,
+    source: TableDescriptor,
+    target: TableDescriptor,
     junctionName: string,
     tables: Record<string, PgTable>,
+    targetOf: (slug: string) => TableDescriptor,
     addOne: (table: string, spec: OneSpec) => void,
     claim: (table: string, name: string, kind: string) => boolean
 ): void {
     const junction = tables[junctionName];
-    const sourceTable = tables[bareTableName(getTableName(sourceCollection))];
-    const targetTable = tables[bareTableName(getTableName(targetCollection))];
+    const sourceTable = tables[bareTableName(source.table)];
+    const targetTable = tables[bareTableName(target.table)];
     if (!junction || !sourceTable || !targetTable) return;
 
-    const sourceName = sharedRelationName(relation, sourceCollection);
+    const sourceName = tableRelationName(relation, source, targetOf);
     // The far endpoint pairs with whatever *it* calls this junction, so the two
     // sides are looked up rather than assumed: an inverse declared on the target
     // owns the name, and only a junction nothing points back through needs a
     // synthesized one.
-    const inverse = Object.values(resolveCollectionRelations(targetCollection))
-        .find(r => r.kind === "manyToMany"
-            && bareTableName(r.through.table) === junctionName);
+    const inverse = target.relations
+        .find(r => r.kind === "manyToMany" && bareTableName(r.through.table) === junctionName);
     const targetName = inverse
-        ? sharedRelationName(inverse, targetCollection)
-        : `${junctionName}_${relation.through.targetColumn}`;
+        ? tableRelationName(inverse, target, targetOf)
+        : `${junctionName}_${relation.through.targetKey}`;
 
-    const pairs: [string, PgTable, string, CollectionConfig, string][] = [
-        [relation.through.sourceColumn, sourceTable, sourceName, sourceCollection, "source"],
-        [relation.through.targetColumn, targetTable, targetName, targetCollection, "target"]
+    const pairs: [string, PgTable, string, TableDescriptor][] = [
+        [relation.through.sourceKey, sourceTable, sourceName, source],
+        [relation.through.targetKey, targetTable, targetName, target]
     ];
 
-    for (const [column, endpointTable, relationName, endpointCollection] of pairs) {
+    for (const [column, endpointTable, relationName, endpoint] of pairs) {
         if (!claim(junctionName, relationName, "junction")) continue;
         const field = columnOf(junction, column);
-        const reference = columnOf(endpointTable, primaryKeyFieldKey(endpointCollection));
+        const reference = columnOf(endpointTable, primaryKeyFieldKey(endpoint));
         if (!field || !reference) continue;
         addOne(junctionName, {
             key: column,

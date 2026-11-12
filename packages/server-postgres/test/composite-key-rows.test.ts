@@ -140,14 +140,15 @@ describe("a composite primary key, read and written by its whole address", () =>
         await pg.exec(DDL);
         // What boot does: tables from `information_schema`, keyed by wire name,
         // handed to drizzle as its schema so `db.query` exists.
+        const fixture = tablesFromCollections([companies, translations, notes]);
         const catalogue = await readCatalogueSchema({
             client: pg,
-            collections: [companies, translations, notes],
+            tables: fixture.descriptors,
             defaultSchema: "public"
         });
         db = drizzle(pg, { schema: { ...catalogue.tables, ...catalogue.relations } });
         registry = buildTableRegistry({
-            compiledTables: tablesFromCollections([companies, translations, notes]).tables,
+            compiledTables: fixture.tables,
             collections: [companies, translations, notes],
             tables: catalogue.tables,
             relations: catalogue.relations

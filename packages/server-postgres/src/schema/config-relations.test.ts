@@ -1,12 +1,12 @@
 /**
- * `buildDrizzleRelationsFromCollections`, judged by drizzle itself.
+ * `buildDrizzleRelationsFromTables`, judged by drizzle itself.
  *
  * The bootstrapper hands these relations to `drizzle({ schema })`, and drizzle
  * evaluates every `relations()` block right there, in
  * `extractTablesRelationalConfig`. A `one()` drizzle does not accept is not a
  * failed query later: it is a backend that does not start. So each case builds
  * the tables the way boot does (catalogue rows → `buildDrizzleTablesFromSchema`
- * keyed by `columnKeysFromCollections`), builds the relations, then runs
+ * keyed by `columnKeysFromTables`), builds the relations, then runs
  * drizzle's own normalisation — `extractTablesRelationalConfig`, and
  * `normalizeRelation` for every relation, which is what the query builder calls
  * for each `with` — and compiles a relational query from each end.
@@ -25,10 +25,11 @@ import {
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { PgTable } from "drizzle-orm/pg-core";
 import { RelationalQueryBuilder } from "drizzle-orm/pg-core/query-builders/query";
-import type { CollectionConfig } from "@rebasepro/types";
+import { col, defineTable, rel, type AnyTableDef } from "@rebasepro/types";
+import { compileSchema } from "@rebasepro/common";
 
-import { columnKeysFromCollections } from "./catalogue-schema";
-import { buildDrizzleRelationsFromCollections } from "./config-relations";
+import { columnKeysFromTables } from "./catalogue-schema";
+import { buildDrizzleRelationsFromTables } from "./config-relations";
 import { buildDrizzleTablesFromSchema } from "./dynamic-tables";
 import { buildTablesMap, type TableColumn } from "./introspect-db-logic";
 
@@ -44,7 +45,8 @@ interface Built {
     schema: Record<string, PgTable | Relations>;
 }
 
-function build(collections: CollectionConfig[], shapes: TableShape[]): Built {
+function build(defs: AnyTableDef[], shapes: TableShape[]): Built {
+    const descriptors = compileSchema(defs).map(table => table.descriptor);
     const columns: TableColumn[] = shapes.flatMap(shape => ["id", ...shape.columns].map(column_name => ({
         table_name: shape.name,
         column_name,
@@ -60,8 +62,8 @@ function build(collections: CollectionConfig[], shapes: TableShape[]): Built {
         shapes.map(shape => ({ table_name: shape.name, column_name: "id" })),
         []
     );
-    const tables = buildDrizzleTablesFromSchema(tablesMap, "public", columnKeysFromCollections(collections));
-    const relations = buildDrizzleRelationsFromCollections(collections, tables);
+    const tables = buildDrizzleTablesFromSchema(tablesMap, "public", columnKeysFromTables(descriptors));
+    const relations = buildDrizzleRelationsFromTables(descriptors, tables);
     return { tables, relations, schema: { ...tables, ...relations } };
 }
 
@@ -108,30 +110,17 @@ function relationalQuery(schema: Built["schema"], table: string): RelationalQuer
 const withSql = (schema: Built["schema"], table: string, relation: string): string =>
     relationalQuery(schema, table).findMany({ with: { [relation]: true } }).toSQL().sql;
 
-describe("buildDrizzleRelationsFromCollections — hasOne", () => {
+describe("buildDrizzleRelationsFromTables — hasOne", () => {
     it("builds a hasOne whose target declares nothing back, and drizzle accepts it", () => {
-        const billing: CollectionConfig = {
-            slug: "company_billing_config",
-            table: "company_billing_config",
-            name: "Billing configs",
-            properties: {
-                id: { name: "ID", type: "string", isId: "uuid" },
-                company_id: { name: "Company", type: "string" }
-            }
-        };
-        const company: CollectionConfig = {
-            slug: "company",
-            table: "company",
-            name: "Companies",
-            properties: {
-                id: { name: "ID", type: "string", isId: "uuid" },
-                billingConfig: {
-                    name: "Billing config",
-                    type: "relation",
-                    relation: { kind: "hasOne", target: () => billing, foreignKeyOnTarget: "company_id" }
-                }
-            }
-        };
+        const billing: AnyTableDef = defineTable("company_billing_config", {
+            columns: { id: col.uuid().primaryKey(), company_id: col.uuid() },
+            rls: "admin-only"
+        });
+        const company: AnyTableDef = defineTable("company", {
+            columns: { id: col.uuid().primaryKey() },
+            relations: { billingConfig: rel.hasOne(() => billing, { foreignKey: "company_id" }) },
+            rls: "admin-only"
+        });
         const { schema, relations } = build([company, billing], [
             { name: "company", columns: [] },
             { name: "company_billing_config", columns: ["company_id"] }
@@ -156,32 +145,16 @@ describe("buildDrizzleRelationsFromCollections — hasOne", () => {
     });
 
     it("pairs a hasOne with the belongsTo its target declares, under one relationName", () => {
-        const billing: CollectionConfig = {
-            slug: "company_billing_config",
-            table: "company_billing_config",
-            name: "Billing configs",
-            properties: {
-                id: { name: "ID", type: "string", isId: "uuid" },
-                company: {
-                    name: "Company",
-                    type: "relation",
-                    relation: { kind: "belongsTo", target: () => company, localKey: "company_id" }
-                }
-            }
-        };
-        const company: CollectionConfig = {
-            slug: "company",
-            table: "company",
-            name: "Companies",
-            properties: {
-                id: { name: "ID", type: "string", isId: "uuid" },
-                billingConfig: {
-                    name: "Billing config",
-                    type: "relation",
-                    relation: { kind: "hasOne", target: () => billing, foreignKeyOnTarget: "company_id" }
-                }
-            }
-        };
+        const billing: AnyTableDef = defineTable("company_billing_config", {
+            columns: { id: col.uuid().primaryKey() },
+            relations: { company: rel.belongsTo(() => company, { localKey: "company_id" }) },
+            rls: "admin-only"
+        });
+        const company: AnyTableDef = defineTable("company", {
+            columns: { id: col.uuid().primaryKey() },
+            relations: { billingConfig: rel.hasOne(() => billing, { foreignKey: "company_id" }) },
+            rls: "admin-only"
+        });
         const { schema } = build([company, billing], [
             { name: "company", columns: [] },
             { name: "company_billing_config", columns: ["company_id"] }
@@ -204,42 +177,22 @@ describe("buildDrizzleRelationsFromCollections — hasOne", () => {
     });
 
     it("keeps two hasOne relations to the same target apart", () => {
-        const billing: CollectionConfig = {
-            slug: "company_billing_config",
-            table: "company_billing_config",
-            name: "Billing configs",
-            properties: {
-                id: { name: "ID", type: "string", isId: "uuid" },
-                company: {
-                    name: "Company",
-                    type: "relation",
-                    relation: { kind: "belongsTo", target: () => company, localKey: "company_id" }
-                },
-                backupCompany: {
-                    name: "Backup company",
-                    type: "relation",
-                    relation: { kind: "belongsTo", target: () => company, localKey: "backup_company_id" }
-                }
-            }
-        };
-        const company: CollectionConfig = {
-            slug: "company",
-            table: "company",
-            name: "Companies",
-            properties: {
-                id: { name: "ID", type: "string", isId: "uuid" },
-                billingConfig: {
-                    name: "Billing config",
-                    type: "relation",
-                    relation: { kind: "hasOne", target: () => billing, foreignKeyOnTarget: "company_id" }
-                },
-                backupBillingConfig: {
-                    name: "Backup billing config",
-                    type: "relation",
-                    relation: { kind: "hasOne", target: () => billing, foreignKeyOnTarget: "backup_company_id" }
-                }
-            }
-        };
+        const billing: AnyTableDef = defineTable("company_billing_config", {
+            columns: { id: col.uuid().primaryKey() },
+            relations: {
+                company: rel.belongsTo(() => company, { localKey: "company_id" }),
+                backupCompany: rel.belongsTo(() => company, { localKey: "backup_company_id" })
+            },
+            rls: "admin-only"
+        });
+        const company: AnyTableDef = defineTable("company", {
+            columns: { id: col.uuid().primaryKey() },
+            relations: {
+                billingConfig: rel.hasOne(() => billing, { foreignKey: "company_id" }),
+                backupBillingConfig: rel.hasOne(() => billing, { foreignKey: "backup_company_id" })
+            },
+            rls: "admin-only"
+        });
         const { schema } = build([company, billing], [
             { name: "company", columns: [] },
             { name: "company_billing_config", columns: ["company_id", "backup_company_id"] }
@@ -263,24 +216,14 @@ describe("buildDrizzleRelationsFromCollections — hasOne", () => {
     });
 
     it("builds a self-referencing hasOne, with and without the belongsTo beside it", () => {
-        const withMentor: CollectionConfig = {
-            slug: "employees",
-            table: "employees",
-            name: "Employees",
-            properties: {
-                id: { name: "ID", type: "string", isId: "uuid" },
-                mentor: {
-                    name: "Mentor",
-                    type: "relation",
-                    relation: { kind: "belongsTo", target: () => withMentor, localKey: "mentor_id" }
-                },
-                mentee: {
-                    name: "Mentee",
-                    type: "relation",
-                    relation: { kind: "hasOne", target: () => withMentor, foreignKeyOnTarget: "mentor_id" }
-                }
-            }
-        };
+        const withMentor: AnyTableDef = defineTable("employees", {
+            columns: { id: col.uuid().primaryKey() },
+            relations: {
+                mentor: rel.belongsTo(() => withMentor, { localKey: "mentor_id" }),
+                mentee: rel.hasOne(() => withMentor, { foreignKey: "mentor_id" })
+            },
+            rls: "admin-only"
+        });
         const paired = build([withMentor], [{ name: "employees", columns: ["mentor_id"] }]);
 
         expect(resolvedJoins(paired.schema)).toEqual({
@@ -292,19 +235,11 @@ describe("buildDrizzleRelationsFromCollections — hasOne", () => {
         expect(withSql(paired.schema, "employees", "mentor"))
             .toContain("\"employees_mentor\".\"id\" = \"employees\".\"mentor_id\"");
 
-        const menteeOnly: CollectionConfig = {
-            slug: "employees",
-            table: "employees",
-            name: "Employees",
-            properties: {
-                id: { name: "ID", type: "string", isId: "uuid" },
-                mentee: {
-                    name: "Mentee",
-                    type: "relation",
-                    relation: { kind: "hasOne", target: () => menteeOnly, foreignKeyOnTarget: "mentor_id" }
-                }
-            }
-        };
+        const menteeOnly: AnyTableDef = defineTable("employees", {
+            columns: { id: col.uuid().primaryKey(), mentorId: col.uuid("mentor_id") },
+            relations: { mentee: rel.hasOne(() => menteeOnly, { foreignKey: "mentor_id" }) },
+            rls: "admin-only"
+        });
         const alone = build([menteeOnly], [{ name: "employees", columns: ["mentor_id"] }]);
 
         expect(resolvedJoins(alone.schema)).toEqual({
@@ -314,34 +249,17 @@ describe("buildDrizzleRelationsFromCollections — hasOne", () => {
     });
 
     it("joins a hasOne on its sourceKey rather than the primary key", () => {
-        const billing: CollectionConfig = {
-            slug: "company_billing_config",
-            table: "company_billing_config",
-            name: "Billing configs",
-            properties: {
-                id: { name: "ID", type: "string", isId: "uuid" },
-                company_ref: { name: "Company ref", type: "string" }
-            }
-        };
-        const company: CollectionConfig = {
-            slug: "company",
-            table: "company",
-            name: "Companies",
-            properties: {
-                id: { name: "ID", type: "string", isId: "uuid" },
-                external_ref: { name: "External ref", type: "string" },
-                billingConfig: {
-                    name: "Billing config",
-                    type: "relation",
-                    relation: {
-                        kind: "hasOne",
-                        target: () => billing,
-                        foreignKeyOnTarget: "company_ref",
-                        sourceKey: "external_ref"
-                    }
-                }
-            }
-        };
+        const billing: AnyTableDef = defineTable("company_billing_config", {
+            columns: { id: col.uuid().primaryKey(), company_ref: col.text() },
+            rls: "admin-only"
+        });
+        const company: AnyTableDef = defineTable("company", {
+            columns: { id: col.uuid().primaryKey(), external_ref: col.text().unique() },
+            relations: {
+                billingConfig: rel.hasOne(() => billing, { foreignKey: "company_ref", sourceKey: "external_ref" })
+            },
+            rls: "admin-only"
+        });
         const { schema } = build([company, billing], [
             { name: "company", columns: ["external_ref"] },
             { name: "company_billing_config", columns: ["company_ref"] }

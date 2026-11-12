@@ -819,7 +819,7 @@ export async function openPostgresDriver(
             if (!keep.has(table)) schema.tablesMap.delete(table);
         }
         ({ tables: introspectedTables, relations: introspectedRelations } =
-            buildBaasSchema(schema.tablesMap, pgSchemaName, introspectedCollections));
+            buildBaasSchema(schema.tablesMap, pgSchemaName, introspectedDescriptors));
         logger.info(
             `🔍 [PostgresRegistry] BaaS mode: derived ${introspectedCollections.length} tables from schema "${pgSchemaName}" [${introspectedCollections.map(c => c.slug).join(", ")}]`
         );
@@ -848,13 +848,13 @@ export async function openPostgresDriver(
     let ownTables: Record<string, PgTable> | undefined;
     let ownRelations: Record<string, Relations> | undefined;
     let ownCatalogue: Map<string, TableMeta> | undefined;
-    let ownCollections: CollectionConfig[] = [];
+    let ownDescriptors: TableDescriptor[] = [];
     const sourceKey = config.dataSourceKey ?? DEFAULT_DATA_SOURCE_KEY;
-    if (!introspectedCollections && collections && collections.length > 0) {
-        ownCollections = collections.filter(c =>
-            c.dataSource === sourceKey || (!c.dataSource && sourceKey === DEFAULT_DATA_SOURCE_KEY)
-        );
-        if (ownCollections.length > 0) {
+    if (!introspectedCollections && declaredTables && declaredTables.length > 0) {
+        ownDescriptors = declaredTables
+            .map(t => t.descriptor)
+            .filter(d => (d.database ?? DEFAULT_DATA_SOURCE_KEY) === sourceKey);
+        if (ownDescriptors.length > 0) {
             // Reading the catalogue is the first query this driver
             // issues, so it is the one that meets an unreachable
             // database — and the diagnosis that names the host, the
@@ -870,7 +870,7 @@ export async function openPostgresDriver(
             }
             const catalogue = await readCatalogueSchema({
                 client: rawClient,
-                collections: ownCollections,
+                tables: ownDescriptors,
                 defaultSchema: pgConfig.introspectionSchema ?? "public"
             });
             ownTables = catalogue.tables;
@@ -897,7 +897,7 @@ export async function openPostgresDriver(
             warnOnGeneratedSchemaDrift(diffGeneratedSchemaAgainstCatalogue({
                 generated: pgConfig.schema?.tables,
                 catalogue: ownCatalogue,
-                collections: ownCollections
+                tables: ownDescriptors
             }));
         } catch (err) {
             logger.debug("[schema] Could not compare schema.generated.ts against the database", { error: err });

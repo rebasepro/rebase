@@ -23,7 +23,6 @@ import { generateTypedefs } from "@rebasepro/codegen";
 import { relationsOfKind, resolveTableJunctions, sortTablesBySlug } from "@rebasepro/common";
 import { toPostgresIdentifier } from "@rebasepro/utils";
 import { defaultDatabaseSchemaVersion, loadTableSchema } from "./load-tables";
-import { lowerCompiledTables } from "./lowered-tables";
 import { describeMismatch } from "@rebasepro/server";
 // The report is CLI output, not application logging — see cli-output.ts.
 import { out, outError } from "../cli-output";
@@ -558,7 +557,7 @@ export function junctionKeyIssues(
 
 /** A table as the other issues name it: bare in `public`, `schema.table` elsewhere. */
 function displayTableOf(difference: SchemaDifference, tables: readonly TableDescriptor[]): string {
-    const schema = difference.collection ? tables.find(t => t.slug === difference.collection)?.schema : undefined;
+    const schema = difference.slug ? tables.find(t => t.slug === difference.slug)?.schema : undefined;
     return schema && schema !== "public" ? `${schema}.${difference.table}` : difference.table;
 }
 
@@ -1032,8 +1031,7 @@ export async function checkCollectionsVsDatabase(
             const differences = await readGeneratedSchemaDrift({
                 client: pool,
                 generated: options.generated,
-                // TRANSITIONAL until generated-schema-diff reads tables (B-PLAN-5 step 2).
-                collections: lowerCompiledTables(defaultDatabaseTables(tables)),
+                tables: defaultDatabaseTables(tables).map(t => t.descriptor),
                 defaultSchema: "public"
             });
             issues.push(...generatedSchemaDriftIssues(differences, issues, descriptors));

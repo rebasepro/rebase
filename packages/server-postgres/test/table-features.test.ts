@@ -330,8 +330,7 @@ describe("table features: `col.array(inner)` of every scalar element type", () =
         try {
             await db.waitReady;
             await db.exec(ddlOf([lists]));
-            const [collection] = lowered([lists]);
-            const catalogue = await readCatalogueSchema({ client: queryable(db), collections: [collection], defaultSchema: "public" });
+            const catalogue = await readCatalogueSchema({ client: queryable(db), tables: compileSchema([lists]).map(t => t.descriptor), defaultSchema: "public" });
             const table = catalogue.tables.lists;
             const orm = drizzle(db, { schema: catalogue.tables });
 

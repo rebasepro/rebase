@@ -15,20 +15,20 @@
  * is exactly what was removed.
  *
  * `generated-schema-staleness.ts` answers a narrower question (does the file
- * name every table the collections do) from the file's *source text*. This one
+ * name every declared table) from the file's *source text*. This one
  * compares the loaded module against the database, column by column.
  */
 import { getTableColumns, getTableName as drizzleTableName, isTable } from "drizzle-orm";
 import type { PgTable } from "drizzle-orm/pg-core";
-import { CollectionConfig } from "@rebasepro/types";
-import { fieldKeyForColumn, getTableName } from "@rebasepro/common";
+import type { TableDescriptor } from "@rebasepro/types";
 import { logger } from "@rebasepro/server";
 
-import { AUTH_USERS_COLUMNS, isAuthCollection } from "./auth-users-columns";
+import { AUTH_USERS_COLUMNS } from "./auth-users-columns";
 import type { TableMeta } from "./introspect-db-logic";
 import { bareTableName } from "./config-relations";
 import { readCatalogueSchema } from "./catalogue-schema";
 import type { Queryable } from "./introspect-runtime";
+import { servedKeyOf } from "./relation-names";
 
 export type SchemaDifferenceKind =
     | "missing-table"
@@ -41,12 +41,12 @@ export interface SchemaDifference {
     kind: SchemaDifferenceKind;
     /** Bare table name, as both sides spell it. */
     table: string;
-    /** The collection backed by that table, when one is. */
-    collection?: string;
+    /** The slug of the declared table backed by that table, when one is. */
+    slug?: string;
     /** The column, in database terms. */
     column?: string;
-    /** The field it is served under — the property key, where there is one. */
-    property?: string;
+    /** The key it is served under, where the table declares it. */
+    key?: string;
     /** What `schema.generated.ts` says. */
     generated?: string;
     /** What the database says. */
@@ -155,39 +155,36 @@ function catalogueColumns(meta: TableMeta): Map<string, CatalogueColumn> {
  * One-directional in one respect only: a table the module has and the database
  * does not is reported (that is the stale-file case), while a table the database
  * has and the module does not is left alone — a database may hold anything, and
- * the collections-vs-file question is `generated-schema-staleness`'s.
+ * the declared-tables-vs-file question is `generated-schema-staleness`'s.
  */
 export function diffGeneratedSchemaAgainstCatalogue(options: {
     /** The `tables` export of the bundle's schema module. */
     generated: Record<string, unknown> | undefined;
     /** What was introspected for this data source, keyed by bare table name. */
     catalogue: Map<string, TableMeta>;
-    /** Collections of this source, so a column can be named as a property. */
-    collections: CollectionConfig[];
+    /** The declared tables of this source, so a column can be named by its key. */
+    tables: readonly TableDescriptor[];
 }): SchemaDifference[] {
-    const { generated, catalogue, collections } = options;
+    const { generated, catalogue, tables } = options;
     if (!generated) return [];
 
-    const collectionByTable = new Map<string, CollectionConfig>();
-    for (const collection of collections) {
-        const table = getTableName(collection);
-        if (table) collectionByTable.set(bareTableName(table), collection);
-    }
+    const declaredByTable = new Map<string, TableDescriptor>();
+    for (const descriptor of tables) declaredByTable.set(bareTableName(descriptor.table), descriptor);
 
     const differences: SchemaDifference[] = [];
 
     for (const value of Object.values(generated)) {
         if (!isTable(value)) continue;
         const table = drizzleTableName(value as PgTable);
-        const collection = collectionByTable.get(table);
-        const at = { table, collection: collection?.slug };
+        const declared = declaredByTable.get(table);
+        const at = { table, slug: declared?.slug };
 
         const meta = catalogue.get(table);
         if (!meta) {
-            // Only for a table a collection of this source claims: the module
+            // Only for a table this source declares: the module
             // carries every table of the project, including the ones another
             // data source holds, and those are legitimately absent here.
-            if (collection) differences.push({ ...at, kind: "missing-table" });
+            if (declared) differences.push({ ...at, kind: "missing-table" });
             continue;
         }
 
@@ -196,32 +193,32 @@ export function diffGeneratedSchemaAgainstCatalogue(options: {
 
         // On the auth table, auth owns its own columns' contract and the
         // generated file deliberately does not carry it: `render-drizzle` drops
-        // the columns a users collection does not declare (`is_anonymous`,
+        // the columns an auth table does not declare (`is_anonymous`,
         // `tokens_valid_after`) because drizzle-kit creates no auth table, and
-        // the collection's own property definitions say nothing about the
+        // the table's own column definitions say nothing about the
         // `NOT NULL DEFAULT` that `ensureAuthTablesExist` applies.
         //
         // Comparing them anyway reported seven differences on a project nobody
         // had touched yet, and prescribed `rebase schema generate` — which
-        // regenerates the file from the same collection and cannot change any
+        // regenerates the file from the same table and cannot change any
         // of them. A warning that survives its own remedy teaches the reader to
         // ignore the next one, so these are not differences. A *type* mismatch
         // still is: that is the file and the database disagreeing about
         // something neither side intends.
-        const authOwned = isAuthCollection(collection)
+        const authOwned = declared?.auth
             ? new Set(AUTH_USERS_COLUMNS.map(c => c.column))
             : undefined;
 
         for (const [key, column] of Object.entries(getTableColumns(value as PgTable))) {
             const name = (column as { name?: string }).name ?? key;
             seen.add(name);
-            const property = collection ? fieldKeyForColumn(collection, name) : key;
+            const columnKey = declared ? servedKeyOf(declared, name) : key;
             const generatedFamily = typeFamily((column as { getSQLType?: () => string }).getSQLType?.());
             const generatedNotNull = Boolean((column as { notNull?: boolean }).notNull);
 
             const found = live.get(name);
             if (!found) {
-                differences.push({ ...at, kind: "missing-column", column: name, property, generated: generatedFamily });
+                differences.push({ ...at, kind: "missing-column", column: name, key: columnKey, generated: generatedFamily });
                 continue;
             }
             if (found.family !== generatedFamily) {
@@ -229,7 +226,7 @@ export function diffGeneratedSchemaAgainstCatalogue(options: {
                     ...at,
                     kind: "type",
                     column: name,
-                    property,
+                    key: columnKey,
                     generated: generatedFamily,
                     live: found.family
                 });
@@ -239,7 +236,7 @@ export function diffGeneratedSchemaAgainstCatalogue(options: {
                     ...at,
                     kind: "nullability",
                     column: name,
-                    property,
+                    key: columnKey,
                     generated: generatedNotNull ? "NOT NULL" : "nullable",
                     live: found.notNull ? "NOT NULL" : "nullable"
                 });
@@ -253,7 +250,7 @@ export function diffGeneratedSchemaAgainstCatalogue(options: {
                 ...at,
                 kind: "extra-column",
                 column: name,
-                property: collection ? fieldKeyForColumn(collection, name) : name,
+                key: declared ? servedKeyOf(declared, name) : name,
                 live: column.family
             });
         }
@@ -273,29 +270,29 @@ export function diffGeneratedSchemaAgainstCatalogue(options: {
  * doctor compared on its own terms, it answered "In sync" over a NOT NULL and a
  * left-behind column that boot had just warned about.
  *
- * `collections` are the data source's own, as boot filters them.
+ * `tables` are the data source's own, as boot filters them.
  */
 export async function readGeneratedSchemaDrift(options: {
     client: Queryable;
     /** The `tables` export of `schema.generated.ts`. */
     generated: Record<string, unknown> | undefined;
-    collections: CollectionConfig[];
+    tables: readonly TableDescriptor[];
     defaultSchema: string;
 }): Promise<SchemaDifference[]> {
-    const { client, generated, collections, defaultSchema } = options;
-    if (!generated || collections.length === 0) return [];
-    const catalogue = await readCatalogueSchema({ client, collections, defaultSchema });
-    return diffGeneratedSchemaAgainstCatalogue({ generated, catalogue: catalogue.meta, collections });
+    const { client, generated, tables, defaultSchema } = options;
+    if (!generated || tables.length === 0) return [];
+    const catalogue = await readCatalogueSchema({ client, tables, defaultSchema });
+    return diffGeneratedSchemaAgainstCatalogue({ generated, catalogue: catalogue.meta, tables });
 }
 
-/** One line, in the terms the reader has: collection, property, column. */
+/** One line, in the terms the reader has: table slug, column key, column. */
 export function describeSchemaDifference(difference: SchemaDifference): string {
-    const where = difference.collection
-        ? `${difference.collection} (table "${difference.table}")`
+    const where = difference.slug
+        ? `${difference.slug} (table "${difference.table}")`
         : `table "${difference.table}"`;
     const field = difference.column
-        ? `${difference.property && difference.property !== difference.column
-            ? `${difference.property} → "${difference.column}"`
+        ? `${difference.key && difference.key !== difference.column
+            ? `${difference.key} → "${difference.column}"`
             : `"${difference.column}"`}`
         : undefined;
 
@@ -315,13 +312,13 @@ export function describeSchemaDifference(difference: SchemaDifference): string {
 
 /**
  * The `rebase schema reconcile` line for a difference it can apply: a column
- * the database requires and the collection made optional, or one the
- * collection no longer declares. Undefined for the rest.
+ * the database requires and the table made nullable, or one the table no
+ * longer declares. Undefined for the rest.
  */
 export function reconcileFix(difference: SchemaDifference): string | undefined {
     if (difference.kind === "nullability" && difference.live === "NOT NULL") return "rebase schema reconcile";
-    if (difference.kind === "extra-column" && difference.collection) {
-        return `rebase schema reconcile --drop ${difference.collection}.${difference.column}`;
+    if (difference.kind === "extra-column" && difference.slug) {
+        return `rebase schema reconcile --drop ${difference.slug}.${difference.column}`;
     }
     return undefined;
 }
@@ -331,14 +328,14 @@ export function reconcileFix(difference: SchemaDifference): string | undefined {
  *
  * Per difference rather than one summary block on purpose: these are read out of
  * a log aggregator as often as a terminal, and a single multi-line message
- * cannot be filtered down to the one collection somebody is looking at.
+ * cannot be filtered down to the one table somebody is looking at.
  *
  * The fix it names is `rebase db push`. `rebase dev` rewrites
- * schema.generated.ts from the collections on every change, and boot applies
+ * schema.generated.ts from the tables on every change, and boot applies
  * only additive changes, so what is still different at boot is the database
  * behind the file: a rename, a dropped column, a narrowed type, a NOT NULL.
  * `rebase schema generate` rewrites the file and leaves the database as it is,
- * so it is named only for collections that changed since the file was written.
+ * so it is named only for tables that changed since the file was written.
  */
 export function warnOnGeneratedSchemaDrift(differences: SchemaDifference[]): void {
     if (differences.length === 0) return;
@@ -357,9 +354,9 @@ export function warnOnGeneratedSchemaDrift(differences: SchemaDifference[]): voi
             schemaDrift: {
                 kind: difference.kind,
                 table: difference.table,
-                collection: difference.collection,
+                slug: difference.slug,
                 column: difference.column,
-                property: difference.property,
+                key: difference.key,
                 generated: difference.generated,
                 live: difference.live
             },

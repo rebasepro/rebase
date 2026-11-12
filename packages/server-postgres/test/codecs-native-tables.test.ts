@@ -63,7 +63,7 @@ beforeAll(async () => {
     // The lowered collection is what the subsystems not yet moved still read
     // (registry, driver entry points); the codecs read the compiled table.
     const [collection] = lowerTables([shelves]);
-    const catalogue = await readCatalogueSchema({ client: queryable(db), collections: [collection], defaultSchema: "public" });
+    const catalogue = await readCatalogueSchema({ client: queryable(db), tables: compiled.map(t => t.descriptor), defaultSchema: "public" });
     const registry = new FixtureTableRegistry();
     registry.registerMultiple([collection]);
     registry.registerTables(compiled);

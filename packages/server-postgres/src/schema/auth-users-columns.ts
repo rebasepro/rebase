@@ -121,18 +121,3 @@ export function authUsersColumnDefinition(column: string): string | undefined {
     const spec = BY_COLUMN.get(column);
     return spec ? authUsersColumnSql(spec) : undefined;
 }
-
-/**
- * Whether a collection is an auth collection, i.e. whether the definitions in
- * this module apply to its table at all.
- *
- * Duplicated in shape from `@rebasepro/common`'s policy defaults on purpose:
- * that one takes a `CollectionConfig`, this one is called from DDL code paths
- * that hold looser objects, and both spellings must accept `auth: true` as well
- * as `auth: { enabled: true }`.
- */
-export function isAuthCollection(collection: unknown): boolean {
-    const auth = (collection as { auth?: unknown } | undefined)?.auth;
-    if (auth === true) return true;
-    return typeof auth === "object" && auth !== null && (auth as { enabled?: unknown }).enabled === true;
-}

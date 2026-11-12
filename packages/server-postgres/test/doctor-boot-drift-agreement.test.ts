@@ -102,8 +102,9 @@ async function generatedTables(collections: CollectionConfig[]): Promise<Record<
 
 /** What boot computes before it warns: its own two calls, with its own arguments. */
 async function bootDifferences(collections: CollectionConfig[], generated: Record<string, unknown>) {
-    const catalogue = await readCatalogueSchema({ client: mockDb!, collections, defaultSchema: "public" });
-    return diffGeneratedSchemaAgainstCatalogue({ generated, catalogue: catalogue.meta, collections });
+    const tables = compileSet(collections).map(table => table.descriptor);
+    const catalogue = await readCatalogueSchema({ client: mockDb!, tables, defaultSchema: "public" });
+    return diffGeneratedSchemaAgainstCatalogue({ generated, catalogue: catalogue.meta, tables });
 }
 
 describe("doctor and boot agree about schema drift", () => {
@@ -177,9 +178,9 @@ describe("doctor and boot agree about schema drift", () => {
             fix: "…"
         }];
         const issues = generatedSchemaDriftIssues([
-            { kind: "type", table: "authors", collection: "authors", column: "name", property: "name", generated: "text", live: "integer" },
-            { kind: "nullability", table: "authors", collection: "authors", column: "name", property: "name", generated: "NOT NULL", live: "nullable" },
-            { kind: "type", table: "authors", collection: "authors", column: "bio", property: "bio", generated: "text", live: "integer" }
+            { kind: "type", table: "authors", slug: "authors", column: "name", key: "name", generated: "text", live: "integer" },
+            { kind: "nullability", table: "authors", slug: "authors", column: "name", key: "name", generated: "NOT NULL", live: "nullable" },
+            { kind: "type", table: "authors", slug: "authors", column: "bio", key: "bio", generated: "text", live: "integer" }
         ], already, compileSet([authorsAfter]).map(table => table.descriptor));
         expect(issues.map(i => `${i.category} ${i.column}`)).toEqual(["nullability_mismatch name", "type_mismatch bio"]);
     });
