@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it } from "@jest/globals";
 import { RebaseApiError } from "@rebasepro/types";
-import type { CollectionClient } from "../src/collection";
+import type { TableClient } from "../src/table";
 import { OfflineManager } from "../src/offline";
 import { MemoryOfflineStore, type PendingMutation } from "../src/offline-store";
 import { restoreNavigator, setNavigatorOnLine } from "./support/offline-fake-server";
-import { fakeCollectionClient } from "./support/fake-collection";
+import { fakeTableClient } from "./support/fake-table";
 
 /**
  * `offline.replayBatchSize`: a run of creates queued offline drains as one
@@ -38,8 +38,8 @@ function fakeServer() {
         const row = { ...data };
         return row;
     };
-    function client(slug: string): CollectionClient<Row> {
-        const fake = fakeCollectionClient<Row>({
+    function client(slug: string): TableClient<Row> {
+        const fake = fakeTableClient<Row>({
             async find() {
                 if (!state.online) throw networkError();
                 const data = [...table(slug).values()];
@@ -106,7 +106,7 @@ function goOnline(server: ReturnType<typeof fakeServer>) {
     server.calls.length = 0;
 }
 
-async function createOffline(posts: CollectionClient<Row>, server: ReturnType<typeof fakeServer>, titles: string[]) {
+async function createOffline(posts: TableClient<Row>, server: ReturnType<typeof fakeServer>, titles: string[]) {
     goOffline(server);
     const rows: Row[] = [];
     for (const title of titles) rows.push(await posts.create({ title }));

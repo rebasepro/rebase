@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, jest } from "@jest/globals";
 import { RebaseApiError } from "@rebasepro/types";
-import { fakeCollectionClient } from "./support/fake-collection";
+import { fakeTableClient } from "./support/fake-table";
 import { OfflineManager, type ConflictResolution } from "../src/offline";
 import { MemoryOfflineStore, type PendingMutation } from "../src/offline-store";
 import { restoreNavigator, setNavigatorOnLine } from "./support/offline-fake-server";
@@ -35,7 +35,7 @@ function fakeServer() {
         const stored = rows.get(String(id));
         return stored ? tagged(stored.row, etag(stored.version)) : undefined;
     };
-    const client = fakeCollectionClient<Row>({
+    const client = fakeTableClient<Row>({
         async find() {
             if (!state.online) throw networkError();
             // A list carries no row versions.

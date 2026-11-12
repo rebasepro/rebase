@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 // constant is what makes the assertion about the server's page size instead of
 // about the line above it.
 import { DEFAULT_LIST_LIMIT, isUnsupported } from "@rebasepro/types";
-import { createCollectionClient, type CollectionClient, type CollectionRealtime } from "../src/collection";
+import { createTableClient, type TableClient, type TableRealtime } from "../src/table";
 import { Transport } from "../src/transport";
 import { createMockTransport as createSharedMockTransport, type RequestAnswer } from "./support/fake-transport";
 
@@ -19,18 +19,18 @@ type PostModel = {
 const createMockTransport = () => createSharedMockTransport({ apiPath: "/api/v1" });
 
 /** What a collection listener and a row listener are handed. */
-type RowsListener = Parameters<CollectionRealtime["listenCollection"]>[1];
-type RowListener = Parameters<CollectionRealtime["listenOne"]>[1];
+type RowsListener = Parameters<TableRealtime["listenCollection"]>[1];
+type RowListener = Parameters<TableRealtime["listenOne"]>[1];
 
 /** A realtime stand-in whose listeners answer with `unsubscribe`. */
 function mockRealtime(unsubscribe: () => void = () => {}) {
     return {
-        listenCollection: jest.fn<CollectionRealtime["listenCollection"]>(() => unsubscribe),
-        listenOne: jest.fn<CollectionRealtime["listenOne"]>(() => unsubscribe)
+        listenCollection: jest.fn<TableRealtime["listenCollection"]>(() => unsubscribe),
+        listenOne: jest.fn<TableRealtime["listenOne"]>(() => unsubscribe)
     };
 }
 
-describe("createCollectionClient", () => {
+describe("createTableClient", () => {
     let transport: Transport;
     let mockRequest: jest.Mock<RequestAnswer>;
 
@@ -39,7 +39,7 @@ describe("createCollectionClient", () => {
     });
 
     it("exposes all CRUD methods", () => {
-        const client = createCollectionClient<PostModel>(transport, "posts");
+        const client = createTableClient<PostModel>(transport, "posts");
         expect(typeof client.find).toBe("function");
         expect(typeof client.findById).toBe("function");
         expect(typeof client.create).toBe("function");
@@ -48,7 +48,7 @@ describe("createCollectionClient", () => {
     });
 
     it("exposes fluent query builder methods", () => {
-        const client = createCollectionClient<PostModel>(transport, "posts");
+        const client = createTableClient<PostModel>(transport, "posts");
         expect(typeof client.where).toBe("function");
         expect(typeof client.orderBy).toBe("function");
         expect(typeof client.limit).toBe("function");
@@ -62,7 +62,7 @@ describe("createCollectionClient", () => {
     // -----------------------------------------------------------------------
     describe("find", () => {
         it("calls GET /data/slug with correct query parameters and returns flat rows", async () => {
-            const client = createCollectionClient<PostModel>(transport, "posts");
+            const client = createTableClient<PostModel>(transport, "posts");
             mockRequest.mockResolvedValueOnce({ data: [{ id: 1,
 title: "Hello" }],
 meta: { total: 1,
@@ -85,7 +85,7 @@ hasMore: false }
         });
 
         it("calls GET /data/slug without query string if no params are passed", async () => {
-            const client = createCollectionClient<PostModel>(transport, "posts");
+            const client = createTableClient<PostModel>(transport, "posts");
             mockRequest.mockResolvedValueOnce({ data: [],
 meta: { total: 0,
 limit: 20,
@@ -98,7 +98,7 @@ hasMore: false } });
         });
 
         it("refuses a page without a data list rather than reading it as no rows", async () => {
-            const client = createCollectionClient<PostModel>(transport, "posts");
+            const client = createTableClient<PostModel>(transport, "posts");
             mockRequest.mockResolvedValueOnce({ data: undefined,
 meta: {} });
 
@@ -106,7 +106,7 @@ meta: {} });
         });
 
         it("returns multiple rows as flat objects", async () => {
-            const client = createCollectionClient<PostModel>(transport, "posts");
+            const client = createTableClient<PostModel>(transport, "posts");
             mockRequest.mockResolvedValueOnce({
                 data: [
                     { id: "a",
@@ -130,7 +130,7 @@ status: "draft" });
         });
 
         it("passes where filter parameters correctly", async () => {
-            const client = createCollectionClient<PostModel>(transport, "posts");
+            const client = createTableClient<PostModel>(transport, "posts");
             mockRequest.mockResolvedValueOnce({ data: [],
 meta: {} });
 
@@ -139,7 +139,7 @@ meta: {} });
         });
 
         it("uses orderBy together with other params", async () => {
-            const client = createCollectionClient<PostModel>(transport, "posts");
+            const client = createTableClient<PostModel>(transport, "posts");
             mockRequest.mockResolvedValueOnce({ data: [],
 meta: {} });
 
@@ -154,7 +154,7 @@ orderBy: ["title", "asc"] });
     // -----------------------------------------------------------------------
     describe("findById", () => {
         it("calls GET /data/slug/id and returns flat row", async () => {
-            const client = createCollectionClient<PostModel>(transport, "posts");
+            const client = createTableClient<PostModel>(transport, "posts");
             mockRequest.mockResolvedValueOnce({ id: "123",
 title: "Test" });
 
@@ -167,7 +167,7 @@ title: "Test" });
         });
 
         it("returns undefined when backend returns falsy", async () => {
-            const client = createCollectionClient<PostModel>(transport, "posts");
+            const client = createTableClient<PostModel>(transport, "posts");
             mockRequest.mockResolvedValueOnce(null);
 
             const result = await client.findById("999");
@@ -175,7 +175,7 @@ title: "Test" });
         });
 
         it("URI encodes the ID", async () => {
-            const client = createCollectionClient<PostModel>(transport, "posts");
+            const client = createTableClient<PostModel>(transport, "posts");
             mockRequest.mockResolvedValueOnce({ id: "a/b",
 title: "Encoded" });
 
@@ -184,7 +184,7 @@ title: "Encoded" });
         });
 
         it("handles numeric IDs by converting to string", async () => {
-            const client = createCollectionClient<PostModel>(transport, "posts");
+            const client = createTableClient<PostModel>(transport, "posts");
             mockRequest.mockResolvedValueOnce({ id: 42,
 title: "Numeric" });
 
@@ -198,7 +198,7 @@ title: "Numeric" });
     // -----------------------------------------------------------------------
     describe("create", () => {
         it("calls POST /data/slug with JSON body and returns flat row", async () => {
-            const client = createCollectionClient<PostModel>(transport, "posts");
+            const client = createTableClient<PostModel>(transport, "posts");
             mockRequest.mockResolvedValueOnce({ id: 1,
 title: "New" });
 
@@ -212,7 +212,7 @@ body: JSON.stringify(input) });
         });
 
         it("includes id in POST body when provided", async () => {
-            const client = createCollectionClient<PostModel>(transport, "posts");
+            const client = createTableClient<PostModel>(transport, "posts");
             mockRequest.mockResolvedValueOnce({ id: "custom-id",
 title: "Custom" });
 
@@ -229,7 +229,7 @@ id: "custom-id" })
         });
 
         it("includes numeric id in POST body", async () => {
-            const client = createCollectionClient<PostModel>(transport, "posts");
+            const client = createTableClient<PostModel>(transport, "posts");
             mockRequest.mockResolvedValueOnce({ id: 7,
 title: "T" });
 
@@ -244,7 +244,7 @@ title: "T" });
     // -----------------------------------------------------------------------
     describe("update", () => {
         it("calls PUT /data/slug/id with JSON body and returns flat row", async () => {
-            const client = createCollectionClient<PostModel>(transport, "posts");
+            const client = createTableClient<PostModel>(transport, "posts");
             mockRequest.mockResolvedValueOnce({ id: 1,
 title: "Updated" });
 
@@ -259,7 +259,7 @@ body: JSON.stringify(patch) }, expect.any(Object));
         });
 
         it("encodes special characters in update ID", async () => {
-            const client = createCollectionClient<PostModel>(transport, "posts");
+            const client = createTableClient<PostModel>(transport, "posts");
             mockRequest.mockResolvedValueOnce({ id: "x/y",
 title: "Updated" });
 
@@ -273,7 +273,7 @@ title: "Updated" });
     // -----------------------------------------------------------------------
     describe("delete", () => {
         it("calls DELETE /data/slug/id", async () => {
-            const client = createCollectionClient<PostModel>(transport, "posts");
+            const client = createTableClient<PostModel>(transport, "posts");
             mockRequest.mockResolvedValueOnce(undefined);
 
             await client.delete(42);
@@ -281,7 +281,7 @@ title: "Updated" });
         });
 
         it("encodes special characters in delete ID", async () => {
-            const client = createCollectionClient<PostModel>(transport, "posts");
+            const client = createTableClient<PostModel>(transport, "posts");
             mockRequest.mockResolvedValueOnce(undefined);
 
             await client.delete("a/b");
@@ -311,7 +311,7 @@ title: "Updated" });
      */
     describe("update takes WriteOptions like every other write", () => {
         it("sends the idempotency key", async () => {
-            const client = createCollectionClient<PostModel>(transport, "posts");
+            const client = createTableClient<PostModel>(transport, "posts");
             mockRequest.mockResolvedValue({ id: 1 });
 
             await client.update(1, { title: "x" }, { idempotencyKey: "attempt-1" });
@@ -323,7 +323,7 @@ title: "Updated" });
         });
 
         it("sends no header when no key was given", async () => {
-            const client = createCollectionClient<PostModel>(transport, "posts");
+            const client = createTableClient<PostModel>(transport, "posts");
             mockRequest.mockResolvedValue({ id: 1 });
 
             await client.update(1, { title: "x" });
@@ -334,7 +334,7 @@ title: "Updated" });
 
     describe("count request de-duplication", () => {
         it("issues one request for concurrent identical counts", async () => {
-            const client = createCollectionClient<PostModel>(transport, "posts");
+            const client = createTableClient<PostModel>(transport, "posts");
             let resolveCount: (v: { count: number }) => void = () => {};
             mockRequest.mockReturnValue(new Promise<{ count: number }>(r => { resolveCount = r; }));
 
@@ -346,7 +346,7 @@ title: "Updated" });
         });
 
         it("keeps different queries apart", async () => {
-            const client = createCollectionClient<PostModel>(transport, "posts");
+            const client = createTableClient<PostModel>(transport, "posts");
             mockRequest.mockResolvedValue({ count: 1 });
 
             await Promise.all([
@@ -360,7 +360,7 @@ title: "Updated" });
         // Merging concurrent callers must not turn into a cache: a later count
         // is a fresh question about a collection that may have changed.
         it("does not serve a settled count to a later caller", async () => {
-            const client = createCollectionClient<PostModel>(transport, "posts");
+            const client = createTableClient<PostModel>(transport, "posts");
             mockRequest.mockResolvedValue({ count: 3 });
 
             await client.count();
@@ -386,8 +386,8 @@ title: "Updated" });
             let resolveB: (v: { count: number }) => void = () => {};
             b.mockRequest.mockReturnValue(new Promise<{ count: number }>(r => { resolveB = r; }));
 
-            const clientA = createCollectionClient<PostModel>(a.transport, "posts");
-            const clientB = createCollectionClient<PostModel>(b.transport, "posts");
+            const clientA = createTableClient<PostModel>(a.transport, "posts");
+            const clientB = createTableClient<PostModel>(b.transport, "posts");
 
             const both = Promise.all([clientA.count(), clientB.count()]);
             resolveA({ count: 7 });
@@ -400,7 +400,7 @@ title: "Updated" });
         });
 
         it("propagates a failure to every sharing caller and clears the entry", async () => {
-            const client = createCollectionClient<PostModel>(transport, "posts");
+            const client = createTableClient<PostModel>(transport, "posts");
             mockRequest.mockRejectedValueOnce(new Error("boom"));
 
             const both = Promise.allSettled([client.count(), client.count()]);
@@ -418,7 +418,7 @@ title: "Updated" });
             // They used to be absent, so the failure a caller saw depended on
             // how deep they were: the query builder said "realtime: false" and
             // `client.listen(...)` said `undefined is not a function`.
-            const client = createCollectionClient<PostModel>(transport, "posts");
+            const client = createTableClient<PostModel>(transport, "posts");
             expect(() => client.listen(undefined, jest.fn())).toThrow(/realtime: false/);
             expect(() => client.listenById("p1", jest.fn())).toThrow(/realtime: false/);
             expect(isUnsupported(client.listen)).toBe(true);
@@ -428,7 +428,7 @@ title: "Updated" });
         it("exposes listen/listenById when websocket is provided", () => {
             const mockWs = mockRealtime();
 
-            const client = createCollectionClient<PostModel>(transport, "posts", mockWs);
+            const client = createTableClient<PostModel>(transport, "posts", mockWs);
             expect(typeof client.listen).toBe("function");
             expect(typeof client.listenById).toBe("function");
         });
@@ -436,9 +436,9 @@ title: "Updated" });
         it("listen passes correct parameters to ws.listenCollection", () => {
             const unsubFn = jest.fn();
             const mockWs = { ...mockRealtime(),
-                listenCollection: jest.fn<CollectionRealtime["listenCollection"]>(() => unsubFn) };
+                listenCollection: jest.fn<TableRealtime["listenCollection"]>(() => unsubFn) };
 
-            const client = createCollectionClient<PostModel>(transport, "posts", mockWs);
+            const client = createTableClient<PostModel>(transport, "posts", mockWs);
             const onUpdate = jest.fn();
             const onError = jest.fn();
 
@@ -463,12 +463,12 @@ orderBy: ["title", "desc"] }, onUpdate, onError);
         it("listen callback waits for count and fires once with authoritative meta", async () => {
             let capturedCallback: RowsListener | undefined;
             const mockWs = { ...mockRealtime(),
-                listenCollection: jest.fn<CollectionRealtime["listenCollection"]>((_props, cb) => {
+                listenCollection: jest.fn<TableRealtime["listenCollection"]>((_props, cb) => {
                     capturedCallback = cb;
                     return () => {};
                 }) };
 
-            const client = createCollectionClient<PostModel>(transport, "posts", mockWs);
+            const client = createTableClient<PostModel>(transport, "posts", mockWs);
             // Hold the count open so the *waiting* is observable. With a count
             // that resolves immediately this body is indistinguishable from
             // "listen fires once even when count matches heuristic" below, and
@@ -476,7 +476,7 @@ orderBy: ["title", "desc"] }, onUpdate, onError);
             // and corrected it afterwards — the flicker this behaviour exists
             // to prevent.
             let resolveCount!: (n: number) => void;
-            client.count = jest.fn<CollectionClient<PostModel>["count"]>().mockReturnValue(new Promise<number>(r => { resolveCount = r; }));
+            client.count = jest.fn<TableClient<PostModel>["count"]>().mockReturnValue(new Promise<number>(r => { resolveCount = r; }));
             const onUpdate = jest.fn();
             client.listen(undefined, onUpdate);
 
@@ -508,13 +508,13 @@ orderBy: ["title", "desc"] }, onUpdate, onError);
         it("listen callback fires once with authoritative count when available", async () => {
             let capturedCallback: RowsListener | undefined;
             const mockWs = { ...mockRealtime(),
-                listenCollection: jest.fn<CollectionRealtime["listenCollection"]>((_props, cb) => {
+                listenCollection: jest.fn<TableRealtime["listenCollection"]>((_props, cb) => {
                     capturedCallback = cb;
                     return () => {};
                 }) };
 
-            const client = createCollectionClient<PostModel>(transport, "posts", mockWs);
-            client.count = jest.fn<CollectionClient<PostModel>["count"]>().mockResolvedValue(100);
+            const client = createTableClient<PostModel>(transport, "posts", mockWs);
+            client.count = jest.fn<TableClient<PostModel>["count"]>().mockResolvedValue(100);
 
             const onUpdate = jest.fn();
             client.listen({ limit: 10, offset: 5 }, onUpdate);
@@ -546,13 +546,13 @@ orderBy: ["title", "desc"] }, onUpdate, onError);
         it("listen fires once even when count matches heuristic", async () => {
             let capturedCallback: RowsListener | undefined;
             const mockWs = { ...mockRealtime(),
-                listenCollection: jest.fn<CollectionRealtime["listenCollection"]>((_props, cb) => {
+                listenCollection: jest.fn<TableRealtime["listenCollection"]>((_props, cb) => {
                     capturedCallback = cb;
                     return () => {};
                 }) };
 
-            const client = createCollectionClient<PostModel>(transport, "posts", mockWs);
-            client.count = jest.fn<CollectionClient<PostModel>["count"]>().mockResolvedValue(2);
+            const client = createTableClient<PostModel>(transport, "posts", mockWs);
+            client.count = jest.fn<TableClient<PostModel>["count"]>().mockResolvedValue(2);
 
             const onUpdate = jest.fn();
             client.listen(undefined, onUpdate);
@@ -583,13 +583,13 @@ orderBy: ["title", "desc"] }, onUpdate, onError);
         it("listen falls back to heuristic meta when count rejects", async () => {
             let capturedCallback: RowsListener | undefined;
             const mockWs = { ...mockRealtime(),
-                listenCollection: jest.fn<CollectionRealtime["listenCollection"]>((_props, cb) => {
+                listenCollection: jest.fn<TableRealtime["listenCollection"]>((_props, cb) => {
                     capturedCallback = cb;
                     return () => {};
                 }) };
 
-            const client = createCollectionClient<PostModel>(transport, "posts", mockWs);
-            client.count = jest.fn<CollectionClient<PostModel>["count"]>().mockRejectedValue(new Error("Network error"));
+            const client = createTableClient<PostModel>(transport, "posts", mockWs);
+            client.count = jest.fn<TableClient<PostModel>["count"]>().mockRejectedValue(new Error("Network error"));
 
             const onUpdate = jest.fn();
             client.listen(undefined, onUpdate);
@@ -619,9 +619,9 @@ orderBy: ["title", "desc"] }, onUpdate, onError);
         it("listenById passes correct parameters to ws.listenOne", () => {
             const unsubFn = jest.fn();
             const mockWs = { ...mockRealtime(),
-                listenOne: jest.fn<CollectionRealtime["listenOne"]>(() => unsubFn) };
+                listenOne: jest.fn<TableRealtime["listenOne"]>(() => unsubFn) };
 
-            const client = createCollectionClient<PostModel>(transport, "posts", mockWs);
+            const client = createTableClient<PostModel>(transport, "posts", mockWs);
             const onUpdate = jest.fn();
 
             client.listenById("abc", onUpdate);
@@ -637,12 +637,12 @@ id: "abc" },
         it("listenById callback passes entity or undefined", () => {
             let capturedCallback: RowListener | undefined;
             const mockWs = { ...mockRealtime(),
-                listenOne: jest.fn<CollectionRealtime["listenOne"]>((_props, cb) => {
+                listenOne: jest.fn<TableRealtime["listenOne"]>((_props, cb) => {
                     capturedCallback = cb;
                     return () => {};
                 }) };
 
-            const client = createCollectionClient<PostModel>(transport, "posts", mockWs);
+            const client = createTableClient<PostModel>(transport, "posts", mockWs);
             const onUpdate = jest.fn();
             client.listenById("abc", onUpdate);
 
@@ -660,7 +660,7 @@ id: "abc" },
         it("listen parses where filter parameters", () => {
             const mockWs = mockRealtime();
 
-            const client = createCollectionClient<PostModel>(transport, "posts", mockWs);
+            const client = createTableClient<PostModel>(transport, "posts", mockWs);
             client.listen(
                 { where: { status: ["==", "published"] },
 searchString: "test" },
@@ -686,7 +686,7 @@ searchString: "test" },
     // -----------------------------------------------------------------------
     describe("Fluent QueryBuilder integration", () => {
         it("where() returns a QueryBuilder that can call find()", async () => {
-            const client = createCollectionClient<PostModel>(transport, "posts");
+            const client = createTableClient<PostModel>(transport, "posts");
             mockRequest.mockResolvedValueOnce({ data: [],
 meta: {} });
 
@@ -702,37 +702,37 @@ meta: {} });
         });
 
         it("orderBy() returns a QueryBuilder", () => {
-            const client = createCollectionClient<PostModel>(transport, "posts");
+            const client = createTableClient<PostModel>(transport, "posts");
             const qb = client.orderBy("title", "asc");
             expect(typeof qb.find).toBe("function");
         });
 
         it("limit() returns a QueryBuilder", () => {
-            const client = createCollectionClient<PostModel>(transport, "posts");
+            const client = createTableClient<PostModel>(transport, "posts");
             const qb = client.limit(10);
             expect(typeof qb.find).toBe("function");
         });
 
         it("offset() returns a QueryBuilder", () => {
-            const client = createCollectionClient<PostModel>(transport, "posts");
+            const client = createTableClient<PostModel>(transport, "posts");
             const qb = client.offset(5);
             expect(typeof qb.find).toBe("function");
         });
 
         it("search() returns a QueryBuilder", () => {
-            const client = createCollectionClient<PostModel>(transport, "posts");
+            const client = createTableClient<PostModel>(transport, "posts");
             const qb = client.search("hello");
             expect(typeof qb.find).toBe("function");
         });
 
         it("include() returns a QueryBuilder", () => {
-            const client = createCollectionClient<PostModel>(transport, "posts");
+            const client = createTableClient<PostModel>(transport, "posts");
             const qb = client.include("tags", "author");
             expect(typeof qb.find).toBe("function");
         });
 
         it("chains multiple fluent methods together", async () => {
-            const client = createCollectionClient<PostModel>(transport, "posts");
+            const client = createTableClient<PostModel>(transport, "posts");
             mockRequest.mockResolvedValueOnce({ data: [{ id: 1,
 title: "Match" }],
 meta: {} });
@@ -753,7 +753,7 @@ meta: {} });
     // -----------------------------------------------------------------------
     describe("id preservation in flat row (regression)", () => {
         it("find keeps id at top level of flat row", async () => {
-            const client = createCollectionClient<PostModel>(transport, "posts");
+            const client = createTableClient<PostModel>(transport, "posts");
             mockRequest.mockResolvedValueOnce({ data: [{ id: "abc",
 title: "Test" }],
 meta: {} });
@@ -764,7 +764,7 @@ meta: {} });
         });
 
         it("findById keeps id at top level of flat row", async () => {
-            const client = createCollectionClient<PostModel>(transport, "posts");
+            const client = createTableClient<PostModel>(transport, "posts");
             mockRequest.mockResolvedValueOnce({ id: 42,
 title: "Test" });
 
@@ -774,7 +774,7 @@ title: "Test" });
         });
 
         it("create keeps id at top level of flat row", async () => {
-            const client = createCollectionClient<PostModel>(transport, "posts");
+            const client = createTableClient<PostModel>(transport, "posts");
             mockRequest.mockResolvedValueOnce({ id: "new-id",
 title: "Created" });
 
@@ -784,7 +784,7 @@ title: "Created" });
         });
 
         it("update keeps id and all fields at top level of flat row", async () => {
-            const client = createCollectionClient<PostModel>(transport, "posts");
+            const client = createTableClient<PostModel>(transport, "posts");
             mockRequest.mockResolvedValueOnce({ id: "existing",
 title: "Updated",
 status: "published" });
@@ -796,7 +796,7 @@ status: "published" });
         });
 
         it("preserves all fields from server response in flat row", async () => {
-            const client = createCollectionClient<PostModel>(transport, "posts");
+            const client = createTableClient<PostModel>(transport, "posts");
             mockRequest.mockResolvedValueOnce({ id: 1,
 title: "Full",
 status: "draft",
@@ -812,7 +812,7 @@ extra_field: "kept" });
         });
 
         it("never leaks the CMS Entity wrapper (no path / values fields)", async () => {
-            const client = createCollectionClient<PostModel>(transport, "posts");
+            const client = createTableClient<PostModel>(transport, "posts");
             mockRequest.mockResolvedValueOnce({ data: [{ id: "1",
 title: "Flat" }],
 meta: { total: 1 } });
@@ -843,7 +843,7 @@ describe("FilterValues passthrough", () => {
 
     function createClientWithWs() {
         const mockWs = mockRealtime();
-        return { client: createCollectionClient(transport, "posts", mockWs),
+        return { client: createTableClient(transport, "posts", mockWs),
 mockWs };
     }
 

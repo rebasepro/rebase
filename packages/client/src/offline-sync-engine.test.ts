@@ -2,12 +2,12 @@ import { jest } from "@jest/globals";
 import { OfflineManager, type LiveResult, type OfflineStatus, type RowSnapshotMeta } from "./offline";
 import { MemoryOfflineStore, type PendingMutation } from "./offline-store";
 import { RebaseApiError } from "./transport";
-import type { CollectionClient } from "./collection";
+import type { TableClient } from "./table";
 import type { WriteOptions } from "@rebasepro/types";
 import type { FindParams } from "./transport";
 import { GeoPoint, type FindResult } from "@rebasepro/types";
 import { matchesParams, runLocalQuery } from "./offline-query";
-import { fakeCollectionClient } from "../test/support/fake-collection";
+import { fakeTableClient } from "../test/support/fake-table";
 
 type Row = Record<string, unknown>;
 
@@ -54,8 +54,8 @@ function createFakeServer() {
         return gates.get(`${op}:${String(id)}`);
     }
 
-    function client(slug: string): CollectionClient<Row> {
-        const fake = fakeCollectionClient<Row>({
+    function client(slug: string): TableClient<Row> {
+        const fake = fakeTableClient<Row>({
             async find(params?: FindParams) {
                 guard(slug, "find");
                 return runLocalQuery([...table(slug).values()], params);
@@ -212,7 +212,7 @@ describe("the local database", () => {
         const server = createFakeServer();
         const store = new MemoryOfflineStore();
         const manager = new OfflineManager(
-            { store, syncIntervalMs: 0, maxCachedRowsPerCollection: 2 },
+            { store, syncIntervalMs: 0, maxCachedRowsPerTable: 2 },
             (slug) => server.client(slug)
         );
         const posts = manager.wrap("posts", server.client("posts"));
@@ -234,7 +234,7 @@ describe("the local database", () => {
         const server = createFakeServer();
         const store = new MemoryOfflineStore();
         const manager = new OfflineManager(
-            { store, syncIntervalMs: 0, maxCachedRowsPerCollection: 2 },
+            { store, syncIntervalMs: 0, maxCachedRowsPerTable: 2 },
             (slug) => server.client(slug)
         );
         const posts = manager.wrap("posts", server.client("posts"));
@@ -778,7 +778,7 @@ describe("live queries", () => {
         const inner = server.client("posts");
         const reads: unknown[] = [];
         const listens: unknown[] = [];
-        const spied: CollectionClient<Row> = {
+        const spied: TableClient<Row> = {
             ...inner,
             findById: (id, options) => {
                 reads.push(options);
@@ -1027,7 +1027,7 @@ function createKeyedServer() {
         return row;
     }
 
-    const client = fakeCollectionClient<Row>({
+    const client = fakeTableClient<Row>({
         async create(data: Row, id?: string | number, options?: WriteOptions) {
             const body = id === undefined ? { ...data } : { ...data, id };
             return keyed("create", body, options?.idempotencyKey, () => insert(body));
@@ -1320,7 +1320,7 @@ function createProjectingServer() {
         return { ...result, data: result.data.map((row) => project(row, params)) };
     }
 
-    const client = fakeCollectionClient<Row>({
+    const client = fakeTableClient<Row>({
         async find(params?: FindParams) {
             if (!state.online) throw unreachable();
             return answer(params);

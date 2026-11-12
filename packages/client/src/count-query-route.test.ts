@@ -1,5 +1,5 @@
 import { describe, expect, it, jest } from "@jest/globals";
-import { createCollectionClient } from "./collection";
+import { createTableClient } from "./table";
 import { buildQueryBody, buildQueryString, createTransport, RebaseApiError, type FindParams } from "./transport";
 
 /**
@@ -28,7 +28,7 @@ function client(answer: (sent: Sent) => { status: number; body?: unknown }) {
         });
     });
     const transport = createTransport({ baseUrl: "http://api.test", token: "t", fetch });
-    return { posts: createCollectionClient(transport, "posts"), sent };
+    return { posts: createTableClient(transport, "posts"), sent };
 }
 
 const COUNTED = { count: 7 };
@@ -86,7 +86,7 @@ describe("count() over HTTP", () => {
 
     it("falls back to the GET against a server without the route, once per transport", async () => {
         const { posts, sent } = client(request => request.method === "POST"
-            ? { status: 404, body: { error: { code: "NOT_FOUND", message: "No POST route on collection 'posts' at this path." } } }
+            ? { status: 404, body: { error: { code: "NOT_FOUND", message: "No POST route on table 'posts' at this path." } } }
             : ok(request));
 
         expect(await posts.count(vector)).toBe(7);
@@ -103,7 +103,7 @@ describe("count() over HTTP", () => {
     });
 
     it("does not conclude the route is missing from a collection that is", async () => {
-        const unknown = { status: 404, body: { error: { code: "NOT_FOUND", message: "Unknown collection 'posts'." } } };
+        const unknown = { status: 404, body: { error: { code: "NOT_FOUND", message: "Unknown table 'posts'." } } };
         const { posts, sent } = client(() => unknown);
 
         await expect(posts.count(vector)).rejects.toBeInstanceOf(RebaseApiError);

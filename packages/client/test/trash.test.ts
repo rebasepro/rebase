@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
-import { createCollectionClient } from "../src/collection";
+import { createTableClient } from "../src/table";
 import { OfflineManager } from "../src/offline";
 import { MemoryOfflineStore } from "../src/offline-store";
 import { RebaseApiError, Transport } from "../src/transport";
@@ -21,12 +21,12 @@ const page = (data: Row[]) => ({ data, meta: { total: data.length, limit: 20, of
 
 describe("client.data.<slug>.trash", () => {
     let mockRequest: jest.Mock<RequestAnswer>;
-    let client: ReturnType<typeof createCollectionClient>;
+    let client: ReturnType<typeof createTableClient>;
 
     beforeEach(() => {
         let transport: Transport;
         ({ transport, mockRequest } = createMockTransport());
-        client = createCollectionClient(transport, "invoices");
+        client = createTableClient(transport, "invoices");
     });
 
     const call = (n = 0) => mockRequest.mock.calls[n] as [string, RequestInit & { headers?: Record<string, string> }];
@@ -162,9 +162,9 @@ describe("client.data.<slug>.trash with offline enabled", () => {
         const { transport, mockRequest } = createMockTransport();
         const manager = new OfflineManager(
             { store: new MemoryOfflineStore(), syncIntervalMs: 0 },
-            (slug) => createCollectionClient(transport, slug)
+            (slug) => createTableClient(transport, slug)
         );
-        const invoices = manager.wrap("invoices", createCollectionClient<Row>(transport, "invoices"));
+        const invoices = manager.wrap("invoices", createTableClient<Row>(transport, "invoices"));
         return { manager, invoices, mockRequest };
     }
 

@@ -164,7 +164,7 @@ describe("cookie mode: before the refresh made on load has answered", () => {
         const store = new MemoryOfflineStore();
         const rebase = track(client(server, store, { authFlowMode: "cookie" }));
 
-        const write = rebase.data.collection("posts").create({ title: "typed while the session was coming back" });
+        const write = rebase.data.table("posts").create({ title: "typed while the session was coming back" });
         await flush();
         refresh.resolve(tokenResponse("u1"));
         await write;
@@ -180,7 +180,7 @@ describe("cookie mode: before the refresh made on load has answered", () => {
         const store = new MemoryOfflineStore();
         const rebase = track(client(server, store, { authFlowMode: "cookie" }));
 
-        const write = rebase.data.collection("posts").create({ title: "typed while the session was coming back" });
+        const write = rebase.data.table("posts").create({ title: "typed while the session was coming back" });
         await flush();
         refresh.resolve(tokenResponse("u1"));
         const row = await write;
@@ -203,14 +203,14 @@ describe("cookie mode: before the refresh made on load has answered", () => {
         // A previous visit, signed in, left the row on the device.
         const earlier = track(client(server, store, { authFlowMode: "cookie" }));
         await earlier.auth.isInitialized();
-        await earlier.data.collection("posts").find();
+        await earlier.data.table("posts").find();
         earlier.close();
 
         const refresh = deferred<Response>();
         server.state.refresh = () => refresh.promise;
         server.state.dataReachable = false;
         const rebase = track(client(server, store, { authFlowMode: "cookie" }));
-        const read = rebase.data.collection("posts").find();
+        const read = rebase.data.table("posts").find();
         await flush();
         refresh.resolve(tokenResponse("u1"));
 
@@ -224,7 +224,7 @@ describe("cookie mode: before the refresh made on load has answered", () => {
         server.state.dataReachable = false;
         const store = new RecordingStore();
         const rebase = track(client(server, store, { authFlowMode: "cookie" }));
-        const posts = rebase.data.collection("posts");
+        const posts = rebase.data.table("posts");
 
         const stop = posts.observe(undefined, () => undefined);
         const work = Promise.allSettled([
@@ -254,7 +254,7 @@ describe("cookie mode: before the refresh made on load has answered", () => {
         const store = new MemoryOfflineStore();
         const rebase = track(client(server, store, { authFlowMode: "cookie" }));
 
-        await rebase.data.collection("posts").create({ title: "written signed out" });
+        await rebase.data.table("posts").create({ title: "written signed out" });
 
         expect(rebase.auth.getSession()).toBeNull();
         expect(await queuedTitles(store, "anon")).toEqual(["written signed out"]);
@@ -268,7 +268,7 @@ describe("JSON mode: the session stored on the device", () => {
         const store = new MemoryOfflineStore();
         const rebase = track(client(server, store, { storage: storageHolding(storedSession("u1", HOUR)) }));
 
-        await rebase.data.collection("posts").create({ title: "mine" });
+        await rebase.data.table("posts").create({ title: "mine" });
 
         expect(await queuedTitles(store, "u1")).toEqual(["mine"]);
         expect(await queuedTitles(store, "anon")).toEqual([]);
@@ -281,7 +281,7 @@ describe("JSON mode: the session stored on the device", () => {
         const store = new MemoryOfflineStore();
         const rebase = track(client(server, store, { storage: storageHolding(storedSession("u1", -60_000)) }));
 
-        await rebase.data.collection("posts").create({ title: "mine, offline" });
+        await rebase.data.table("posts").create({ title: "mine, offline" });
 
         expect(rebase.auth.getSession()?.user.uid).toBe("u1");
         expect(await queuedTitles(store, "u1")).toEqual(["mine, offline"]);
@@ -294,13 +294,13 @@ describe("JSON mode: the session stored on the device", () => {
         const store = new MemoryOfflineStore();
         // A previous visit, signed in as u1, left the row on the device.
         const earlier = track(client(server, store, { storage: storageHolding(storedSession("u1", HOUR)) }));
-        await earlier.data.collection("posts").find();
+        await earlier.data.table("posts").find();
         earlier.close();
 
         // u1's refresh token has since been revoked.
         server.state.dataReachable = false;
         const rebase = track(client(server, store, { storage: storageHolding(storedSession("u1", -60_000)) }));
-        const posts = rebase.data.collection("posts");
+        const posts = rebase.data.table("posts");
         await rebase.auth.isInitialized();
         expect(rebase.auth.getSession()).toBeNull();
 
@@ -317,7 +317,7 @@ describe("writes queued while signed out, once someone signs in", () => {
         server.state.dataReachable = false;
         const store = new MemoryOfflineStore();
         const rebase = track(client(server, store));
-        await rebase.data.collection("posts").create({ title: "written signed out" });
+        await rebase.data.table("posts").create({ title: "written signed out" });
         expect(await rebase.offline!.pending({ orphaned: true })).toEqual([]);
         expect(await rebase.offline!.pending()).toHaveLength(1);
         server.state.dataReachable = true;
@@ -360,7 +360,7 @@ describe("writes queued while signed out, once someone signs in", () => {
     it("clear({ orphaned: true }) leaves the signed-in user's own queue alone", async () => {
         const { server, store, rebase } = await signedOutWrite();
         server.state.dataReachable = false;
-        await rebase.data.collection("posts").create({ title: "u1's own" });
+        await rebase.data.table("posts").create({ title: "u1's own" });
 
         await rebase.offline!.clear({ orphaned: true });
 
@@ -386,7 +386,7 @@ describe("signing out, and in as somebody else", () => {
         server.state.dataReachable = false;
         const store = new MemoryOfflineStore();
         const rebase = track(client(server, store, { storage: storageHolding(storedSession("u1", HOUR)) }));
-        const posts = rebase.data.collection("posts");
+        const posts = rebase.data.table("posts");
         await posts.create({ title: "u1's draft" });
 
         await rebase.auth.signOut();

@@ -154,7 +154,7 @@ describe("anonymous server client guard, through createRebaseClient", () => {
             fetch: okFetch()
         });
 
-        await client.collection("jobs").find();
+        await client.table("jobs").find();
 
         expect(anonymousWarnings()).toHaveLength(1);
     });
@@ -167,7 +167,7 @@ describe("anonymous server client guard, through createRebaseClient", () => {
             auth: { authFlowMode: "cookie", persistSession: false }
         });
 
-        await client.collection("jobs").find();
+        await client.table("jobs").find();
 
         expect(anonymousWarnings()).toHaveLength(0);
     });
@@ -180,7 +180,7 @@ describe("anonymous server client guard, through createRebaseClient", () => {
             fetch: okFetch()
         });
 
-        await client.collection("jobs").find();
+        await client.table("jobs").find();
 
         expect(anonymousWarnings()).toHaveLength(0);
     });

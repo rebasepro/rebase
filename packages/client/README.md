@@ -68,7 +68,7 @@ client.setAuthTokenGetter(() => clerk.session?.getToken() ?? Promise.resolve(nul
 
 ### Collection Client
 
-`client.data.collection("slug")` or `client.data.myCollection` returns a `CollectionClient<M>`:
+`client.data.table("slug")` or `client.data.myCollection` returns a `TableClient<M>`:
 
 | Method | Description |
 |---|---|
@@ -190,6 +190,6 @@ const unsubscribe = client.data.products.listen(
 ## Related Packages
 
 - [`@rebasepro/common`](../common) — `QueryBuilder`, `buildRebaseData`, shared utilities
-- [`@rebasepro/types`](../types) — `Entity`, `FindResult`, `CollectionAccessor`, etc.
+- [`@rebasepro/types`](../types) — `Entity`, `FindResult`, `TableAccessor`, etc.
 - [`@rebasepro/utils`](../utils) — `toSnakeCase` and other helpers
 - [`@rebasepro/app`](../app) — React hook adapter that wraps `client.auth` for CMS integration

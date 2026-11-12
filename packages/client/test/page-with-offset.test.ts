@@ -38,7 +38,7 @@ describe("page together with offset, sent over HTTP", () => {
             anonymous: true,
             realtime: false
         });
-        const error = await client.data.collection("posts").find({ page: 2, offset: 10 }).catch((e: unknown) => e);
+        const error = await client.data.table("posts").find({ page: 2, offset: 10 }).catch((e: unknown) => e);
 
         expect(error).toEqual(expect.objectContaining({ code: "PAGE_WITH_OFFSET" }));
         expect(fetchMock).not.toHaveBeenCalled();

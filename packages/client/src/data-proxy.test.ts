@@ -18,14 +18,14 @@ const COLLECTIONS = {
     companyMembers: "company_members",
 } as const;
 
-describe("client.data proxy — strict mode (collections dictionary provided)", () => {
+describe("client.data proxy — strict mode (tables dictionary provided)", () => {
     const client = createRebaseClient({
         baseUrl: "http://localhost:3000",
-        collections: { ...COLLECTIONS },
+        tables: { ...COLLECTIONS },
     });
 
-    it("resolves a known key to a CollectionClient", () => {
-        const accessor = client.data.collection("products");
+    it("resolves a known key to a TableClient", () => {
+        const accessor = client.data.table("products");
         expect(accessor).toBeDefined();
         expect(typeof accessor.find).toBe("function");
         expect(typeof accessor.findById).toBe("function");
@@ -42,7 +42,7 @@ describe("client.data proxy — strict mode (collections dictionary provided)", 
         const wired = createRebaseClient({
             baseUrl: "http://localhost:3000",
             fetch: fetchMock as typeof fetch,
-            collections: { ...COLLECTIONS }
+            tables: { ...COLLECTIONS }
         });
 
         const products = (wired.data as Record<string, any>)["products"];
@@ -67,7 +67,7 @@ describe("client.data proxy — strict mode (collections dictionary provided)", 
             expect((e as RebaseClientError).message).toContain("prodcuts");
             expect((e as RebaseClientError).message).toContain("products");
             expect((e as RebaseClientError).message).toContain("Did you mean");
-            expect((e as RebaseClientError).message).toContain("data.collection");
+            expect((e as RebaseClientError).message).toContain("data.table");
         }
     });
 
@@ -84,7 +84,7 @@ describe("client.data proxy — strict mode (collections dictionary provided)", 
         }
     });
 
-    it("lists all known collections in the error message", () => {
+    it("lists all known tables in the error message", () => {
         const access = () => (client.data as Record<string, unknown>)["nonexistent"];
         try {
             access();
@@ -120,16 +120,16 @@ describe("client.data proxy — strict mode (collections dictionary provided)", 
         expect(result).toBeDefined();
     });
 
-    it("collection('anything') never throws — dynamic escape hatch", () => {
-        expect(() => client.data.collection("nonexistent")).not.toThrow();
-        expect(() => client.data.collection("totally-made-up")).not.toThrow();
-        const col = client.data.collection("dynamic-slug");
+    it("table('anything') never throws — dynamic escape hatch", () => {
+        expect(() => client.data.table("nonexistent")).not.toThrow();
+        expect(() => client.data.table("totally-made-up")).not.toThrow();
+        const col = client.data.table("dynamic-slug");
         expect(col).toBeDefined();
         expect(typeof col.find).toBe("function");
     });
 });
 
-describe("client.data proxy — untyped mode (no collections dictionary)", () => {
+describe("client.data proxy — untyped mode (no tables dictionary)", () => {
     const client = createRebaseClient({
         baseUrl: "http://localhost:3000",
     });
@@ -140,7 +140,7 @@ describe("client.data proxy — untyped mode (no collections dictionary)", () =>
         expect(() => (client.data as Record<string, unknown>)["anyRandomProp"]).not.toThrow();
     });
 
-    it("returns a CollectionClient for any camelCase property", () => {
+    it("returns a TableClient for any camelCase property", () => {
         const accessor = (client.data as Record<string, unknown>)["blogPosts"];
         expect(accessor).toBeDefined();
         expect(typeof (accessor as Record<string, unknown>).find).toBe("function");
@@ -153,8 +153,8 @@ describe("client.data proxy — untyped mode (no collections dictionary)", () =>
         expect((client.data as Record<string, unknown>)["$$typeof"]).toBeUndefined();
     });
 
-    it("collection() still works without a dictionary", () => {
-        expect(() => client.data.collection("anything")).not.toThrow();
+    it("table() still works without a dictionary", () => {
+        expect(() => client.data.table("anything")).not.toThrow();
     });
 
     it("emits a one-shot console.warn on first untyped access", () => {
@@ -174,9 +174,9 @@ describe("client.data proxy — untyped mode (no collections dictionary)", () =>
             const message = String(warnSpy.mock.calls[0][0]);
             expect(message).toContain("client.data.firstAccess");
             expect(message).toContain("/data/first_access");
-            expect(message).toContain("collections: collectionsDictionary");
+            expect(message).toContain("tables: tablesDictionary");
             expect(message).toContain("generated/sdk/database.types");
-            expect(message).toContain('client.data.collection("<slug>")');
+            expect(message).toContain('client.data.table("<slug>")');
 
             // Second access should NOT warn again
             warnSpy.mockClear();
@@ -189,34 +189,34 @@ describe("client.data proxy — untyped mode (no collections dictionary)", () =>
     });
 });
 
-describe("client.data — a collection whose slug the proxy reserves", () => {
-    // Codegen names the accessor `<name>Collection` for a slug whose accessor
-    // would be `collection`, `then`, `toJSON` or `$$typeof`, and maps it back
-    // in `collectionsDictionary`. This is the client half of that contract.
+describe("client.data — a table whose slug the proxy reserves", () => {
+    // Codegen names the accessor `<name>Table` for a slug whose accessor
+    // would be `table`, `then`, `toJSON` or `$$typeof`, and maps it back
+    // in `tablesDictionary`. This is the client half of that contract.
     type Database = {
-        collectionCollection: { Row: { id: string; title: string }; Slug: "collection" };
-        thenCollection: { Row: { id: string }; Slug: "then" };
+        tableTable: { Row: { id: string; title: string }; Slug: "table" };
+        thenTable: { Row: { id: string }; Slug: "then" };
     };
-    const collectionsDictionary = { collectionCollection: "collection", thenCollection: "then" } as const;
+    const tablesDictionary = { tableTable: "table", thenTable: "then" } as const;
 
-    it("reaches `/data/collection` and `/data/then` through the renamed accessors", async () => {
+    it("reaches `/data/table` and `/data/then` through the renamed accessors", async () => {
         const fetchMock = jest.fn<typeof fetch>(async () => new Response(JSON.stringify({ data: [] })));
         const client = createRebaseClient<Database>({
             baseUrl: "http://localhost:3000",
             fetch: fetchMock as typeof fetch,
             anonymous: true,
-            collections: collectionsDictionary
+            tables: tablesDictionary
         });
 
-        await client.data.collectionCollection.find();
-        expect(new URL(String(fetchMock.mock.calls[0][0])).pathname).toBe("/api/data/collection");
+        await client.data.tableTable.find();
+        expect(new URL(String(fetchMock.mock.calls[0][0])).pathname).toBe("/api/data/table");
 
-        await client.data.thenCollection.find();
+        await client.data.thenTable.find();
         expect(new URL(String(fetchMock.mock.calls[1][0])).pathname).toBe("/api/data/then");
 
         // The dynamic form keeps working for the same slug.
-        await client.data.collection("collection").find();
-        expect(new URL(String(fetchMock.mock.calls[2][0])).pathname).toBe("/api/data/collection");
+        await client.data.table("table").find();
+        expect(new URL(String(fetchMock.mock.calls[2][0])).pathname).toBe("/api/data/table");
     });
 });
 
@@ -226,48 +226,48 @@ describe("client.data.batch — the RebaseSdkData batch, over HTTP", () => {
         orderItems: { Row: { id: string; order_id: string }; Slug: "order_items" };
         batch: { Row: { id: string }; Slug: "batch" };
     };
-    const collectionsDictionary = { orders: "orders", orderItems: "order_items", batch: "batch" } as const;
+    const tablesDictionary = { orders: "orders", orderItems: "order_items", batch: "batch" } as const;
 
-    function wired(collections?: typeof collectionsDictionary) {
+    function wired(tables?: typeof tablesDictionary) {
         const fetchMock = jest.fn<typeof fetch>(async () => new Response(JSON.stringify({ data: [], meta: { operations: 1 } })));
         const client = createRebaseClient<Database>({
             baseUrl: "http://localhost:3000",
             fetch: fetchMock as typeof fetch,
             anonymous: true,
-            ...(collections ? { collections } : {})
+            ...(tables ? { tables } : {})
         });
         return { client, fetchMock };
     }
 
     it("posts to /data/_batch with the accessors resolved to slugs, as client.batch does", async () => {
-        const { client, fetchMock } = wired(collectionsDictionary);
+        const { client, fetchMock } = wired(tablesDictionary);
 
         expect(client.data.batch).toBe(client.batch);
         await client.data.batch([
-            { op: "create", collection: "orders", values: { total: 40 }, ref: "order" },
-            { op: "create", collection: "orderItems", values: { order_id: { $ref: "order.id" } } }
+            { op: "create", table: "orders", values: { total: 40 }, ref: "order" },
+            { op: "create", table: "orderItems", values: { order_id: { $ref: "order.id" } } }
         ]);
 
         expect(fetchMock).toHaveBeenCalledTimes(1);
         const [url, init] = fetchMock.mock.calls[0];
         expect(new URL(String(url)).pathname).toBe("/api/data/_batch");
         expect(init?.method).toBe("POST");
-        const body = JSON.parse(String(init?.body)) as { operations: { collection: string }[] };
-        expect(body.operations.map(o => o.collection)).toEqual(["orders", "order_items"]);
+        const body = JSON.parse(String(init?.body)) as { operations: { table: string }[] };
+        expect(body.operations.map(o => o.table)).toEqual(["orders", "order_items"]);
     });
 
-    it("is served without a dictionary too, rather than as a collection named batch", async () => {
+    it("is served without a dictionary too, rather than as a table named batch", async () => {
         const { client, fetchMock } = wired();
 
         expect("batch" in client.data).toBe(true);
-        await client.data.batch([{ op: "delete", collection: "orders", id: "1" }]);
+        await client.data.batch([{ op: "delete", table: "orders", id: "1" }]);
         expect(new URL(String(fetchMock.mock.calls[0][0])).pathname).toBe("/api/data/_batch");
     });
 
-    it("leaves a collection whose slug is batch reachable through data.collection", async () => {
-        const { client, fetchMock } = wired(collectionsDictionary);
+    it("leaves a table whose slug is batch reachable through data.table", async () => {
+        const { client, fetchMock } = wired(tablesDictionary);
 
-        await client.data.collection("batch").find();
+        await client.data.table("batch").find();
         expect(new URL(String(fetchMock.mock.calls[0][0])).pathname).toBe("/api/data/batch");
     });
 });

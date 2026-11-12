@@ -68,7 +68,7 @@ describe("a stored session refused on load", () => {
             const events: AuthChangeEvent[] = [];
             c.auth.onAuthStateChange((event) => { events.push(event); });
 
-            const result = await c.data.collection("posts").find({ limit: 20 });
+            const result = await c.data.table("posts").find({ limit: 20 });
 
             expect(result.data).toEqual(PUBLIC_ROWS);
             expect(server.sent.filter((s) => s.path.startsWith("/data/")).map((s) => s.authorization)).toEqual([undefined]);

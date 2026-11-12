@@ -255,7 +255,7 @@ describe("Subscription resilience over a real socket", () => {
 
     it("surfaces a server-side subscription error to the listener", async () => {
         const { client } = await setup((socket, frame) => {
-            const msg = "Collection not found: 'nope'";
+            const msg = "Table not found: 'nope'";
             socket.send(JSON.stringify({
                 type: "error",
                 subscriptionId: frame.payload.subscriptionId,
@@ -268,7 +268,7 @@ describe("Subscription resilience over a real socket", () => {
         client.listenCollection({ path: "nope" }, jest.fn(), onError);
 
         await waitFor(() => onError.mock.calls.length > 0, 4000, "the server's error to reach the listener");
-        expect(onError.mock.calls[0][0]).toMatchObject({ message: expect.stringContaining("Collection not found") });
+        expect(onError.mock.calls[0][0]).toMatchObject({ message: expect.stringContaining("Table not found") });
     });
 
     it("does not fire a subscribe watchdog after the caller disconnects", async () => {

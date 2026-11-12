@@ -1,7 +1,7 @@
 import { buildQueryString, FindParams, RebaseApiError } from "./transport";
-import { FindAllParams, FindResult, IterateParams, LogicalCondition, SDKCollectionClient, WhereFilterOp, WhereValueFor, WriteOptions, hasFieldOperation, isUnsupported, type ByIdReadOptions, type FilteredWriteParams, type UpdateValues, type UpsertOptions } from "@rebasepro/types";
+import { FindAllParams, FindResult, IterateParams, LogicalCondition, SDKTableClient, WhereFilterOp, WhereValueFor, WriteOptions, hasFieldOperation, isUnsupported, type ByIdReadOptions, type FilteredWriteParams, type UpdateValues, type UpsertOptions } from "@rebasepro/types";
 import { collectAllPages, normalizeOrderBy, paginateFind, withETag } from "@rebasepro/common";
-import { CollectionClient, LiveResult, ObserveOptions, RowSnapshotMeta, byIdRead, etagOf, invalidBulkBody, type ObserveByIdOptions, type RestoreOptions, type TrashClient } from "./collection";
+import { TableClient, LiveResult, ObserveOptions, RowSnapshotMeta, byIdRead, etagOf, invalidBulkBody, type ObserveByIdOptions, type RestoreOptions, type TrashClient } from "./table";
 import { SDKQueryBuilder } from "./sdk_query_builder";
 import { dehydrateMutation, dehydrateRow, hydrateMutation, hydrateRow, setOwn } from "./offline-codec";
 import { RebaseClientError } from "./errors";
@@ -71,15 +71,15 @@ export interface OfflineConfig {
      */
     store?: OfflineStore;
     /**
-     * Cached query snapshots kept per collection; the least recently written
+     * Cached query snapshots kept per table; the least recently written
      * are evicted beyond this. Defaults to 50.
      */
-    maxCachedQueriesPerCollection?: number;
+    maxCachedQueriesPerTable?: number;
     /**
-     * Cached rows kept per collection. Rows with unsynced local writes are
+     * Cached rows kept per table. Rows with unsynced local writes are
      * never evicted. Defaults to 5 000.
      */
-    maxCachedRowsPerCollection?: number;
+    maxCachedRowsPerTable?: number;
     /**
      * Ceiling for the exponential retry backoff, in milliseconds. Replay
      * retries start at one second and double up to this. `0` disables
@@ -166,7 +166,7 @@ export interface OfflineConfig {
     /**
      * How many queued creates replay as one request. Defaults to `1`: every
      * queued write is its own request, in order. Raise it (up to 1 000) and a
-     * run of consecutive offline creates in one collection drains as one
+     * run of consecutive offline creates in one table drains as one
      * `createMany` — 500 rows typed offline go back in a handful of requests
      * instead of 500 round trips.
      *
@@ -214,7 +214,7 @@ export interface OfflineStatus {
     unverifiedUser?: boolean;
 }
 
-export type { LiveResult, ObserveByIdOptions, ObserveOptions, RowSnapshotMeta } from "./collection";
+export type { LiveResult, ObserveByIdOptions, ObserveOptions, RowSnapshotMeta } from "./table";
 
 /** Which queue {@link OfflineApi.pending} and {@link OfflineApi.clear} act on. */
 export interface OfflineQueueOptions {
@@ -289,7 +289,7 @@ function dependencyRejected(refused: PendingMutation, error: Error): RebaseApiEr
 }
 
 /**
- * A refusal about what a write contains — a field the collection no longer
+ * A refusal about what a write contains — a field the table no longer
  * has, one the caller may not write, a value a constraint refuses — rather
  * than about the row or the caller as a whole.
  */
@@ -418,12 +418,12 @@ function generateOfflineStringId(): string {
 let lastOfflineNumericId = 0;
 
 /**
- * A temporary id for a collection whose ids are numbers.
+ * A temporary id for a table whose ids are numbers.
  *
  * **Negative**, which is the convention every local-first engine settles on for
  * the same reason: a real key is a positive integer or an identity sequence, so
  * the sign alone says "this one is not the server's yet" — and it stays a
- * number, which is what matters. A UUID string was minted for every collection,
+ * number, which is what matters. A UUID string was minted for every table,
  * so a `create` while offline handed back `{ id: "526e2faf-…" }` on a row the
  * generated types declare `id: number`. Anything that put that in a URL, a
  * foreign key or an `id.toFixed()` was wrong or threw until the replay
@@ -450,7 +450,7 @@ export function nextOfflineNumericId(last: number, now: number, random: number):
 }
 
 type AnyRow = Record<string, unknown>;
-type InnerFactory = (slug: string) => SDKCollectionClient<AnyRow>;
+type InnerFactory = (slug: string) => SDKTableClient<AnyRow>;
 
 /**
  * The row an optimistic write puts in the cache before the server has seen it.
@@ -479,7 +479,7 @@ function optimisticRow<M>(fields: AnyRow, id: string | number): M {
  * Whether a query answers with something narrower than whole rows: `fields`
  * returns only the columns it names (and the key), and `distinct` collapses
  * rows into their distinct projections. Either way what comes back is not a
- * row of the collection, and must not be stored as one.
+ * row of the table, and must not be stored as one.
  */
 function isProjection(params?: FindParams): boolean {
     return (params?.fields?.length ?? 0) > 0 || params?.distinct === true;
@@ -532,7 +532,7 @@ interface ScopeTicket {
     unverified?: true;
 }
 
-/** The queue's row ids for one collection — see `OfflineManager.pendingIndex`. */
+/** The queue's row ids for one table — see `OfflineManager.pendingIndex`. */
 interface PendingIds {
     /** Rows any queued write writes to. */
     writes: Set<string>;
@@ -572,7 +572,7 @@ interface CollectionState {
     loaded?: Promise<void>;
     /**
      * True once the persisted rows are in memory. Observers must not emit
-     * before this: an empty map during the load is not an empty collection,
+     * before this: an empty map during the load is not an empty table,
      * and emitting it would flash an empty list over real data.
      */
     ready: boolean;
@@ -630,7 +630,7 @@ export class OfflineManager {
     private readonly onSyncError?: OfflineConfig["onSyncError"];
     private readonly onConflict?: OfflineConfig["onConflict"];
     private readonly createInner: InnerFactory;
-    private readonly inners = new Map<string, SDKCollectionClient<AnyRow>>();
+    private readonly inners = new Map<string, SDKTableClient<AnyRow>>();
     private readonly connectivity: ConnectivityMonitor;
     private readonly keepLastUser: boolean;
     private readonly replayBatchSize: number;
@@ -663,7 +663,7 @@ export class OfflineManager {
      * touches nothing that belongs to the new user.
      */
     private scopeEpoch = 0;
-    /** The local database: normalized rows and query snapshots per collection. */
+    /** The local database: normalized rows and query snapshots per table. */
     private collections = new Map<string, CollectionState>();
     /** In-memory mirror of the current scope's queue, in replay order. */
     private queueEntries: PendingMutation[] = [];
@@ -675,7 +675,7 @@ export class OfflineManager {
         this.pendingIndex = undefined;
     }
     /**
-     * Per collection, the row ids the queue writes to and the ones it creates
+     * Per table, the row ids the queue writes to and the ones it creates
      * — {@link hasPending} and {@link isLocallyCreated}, which answering a
      * page asks once or twice per row. Each used to scan the whole queue: a
      * 500-row page against 200 queued writes read 80,000 queue entries, on
@@ -724,8 +724,8 @@ export class OfflineManager {
     constructor(config: OfflineConfig, createInner: InnerFactory) {
         this.store = config.store
             ?? (typeof indexedDB !== "undefined" ? new IndexedDBOfflineStore() : new MemoryOfflineStore());
-        this.maxCachedQueries = config.maxCachedQueriesPerCollection ?? 50;
-        this.maxCachedRows = config.maxCachedRowsPerCollection ?? 5_000;
+        this.maxCachedQueries = config.maxCachedQueriesPerTable ?? 50;
+        this.maxCachedRows = config.maxCachedRowsPerTable ?? 5_000;
         this.maxRetries = config.maxRetries ?? 5;
         this.onSyncError = config.onSyncError;
         this.onConflict = config.onConflict;
@@ -960,7 +960,7 @@ export class OfflineManager {
      */
     /**
      * A filtered write runs on the server or not at all: refused while writes
-     * are being queued, and while this collection has queued writes the
+     * are being queued, and while this table has queued writes the
      * server has not seen — the filter would be judged against rows they are
      * about to change.
      */
@@ -968,7 +968,7 @@ export class OfflineManager {
         if (this.sendsWrites() && !this.hasPendingIn(slug)) return;
         throw new RebaseClientError(
             `${method}() on "${slug}" needs the server: which rows a filter matches is the server's answer, ` +
-            "so a filtered write is not queued offline, nor sent ahead of writes this collection still has queued.",
+            "so a filtered write is not queued offline, nor sent ahead of writes this table still has queued.",
             { code: "OFFLINE_FILTERED_WRITE_UNSUPPORTED" }
         );
     }
@@ -1037,10 +1037,10 @@ export class OfflineManager {
         this.statusListeners.clear();
     }
 
-    // ─── Collection wrapping ─────────────────────────────────────────────────
+    // ─── Table wrapping ──────────────────────────────────────────────────────
 
-    wrap<M extends AnyRow>(slug: string, inner: CollectionClient<M>): CollectionClient<M> {
-        this.inners.set(slug, inner as SDKCollectionClient<AnyRow>);
+    wrap<M extends AnyRow>(slug: string, inner: TableClient<M>): TableClient<M> {
+        this.inners.set(slug, inner as SDKTableClient<AnyRow>);
 
         /**
          * `find`, and the page reader of `iterate()` / `findAll()` when `walk`
@@ -1050,7 +1050,7 @@ export class OfflineManager {
          * on. A page the server never answered here is evaluated over whatever
          * rows happen to be cached, and its `hasMore` is about those rows — so
          * offline, `findAll()` stopped at the first such page and returned a
-         * fraction of the collection as the whole of it, with nothing to tell
+         * fraction of the table as the whole of it, with nothing to tell
          * the two apart. A walk refuses that page instead.
          */
         const findPage = async (params: FindParams<M> | undefined, walk: boolean): Promise<FindResult<M>> => {
@@ -1097,10 +1097,10 @@ export class OfflineManager {
         };
         const unwalkable = () => offlineError(
             `Offline: a page of "${slug}" the server has not answered on this device is needed to ` +
-            "read the collection to the end, and the local database cannot say what is on it."
+            "read the table to the end, and the local database cannot say what is on it."
         );
 
-        const wrapped: CollectionClient<M> = {
+        const wrapped: TableClient<M> = {
             find: (params?: FindParams<M>) => findPage(params, false),
 
             // Paginates through the local database page by page as the server
@@ -1388,7 +1388,7 @@ data: u.data as AnyRow })),
              * Online only. Which rows a filter matches is the server's answer —
              * the local store holds a subset of them — so a filtered write is
              * never applied locally or queued. The rows it updated are folded
-             * into the store; a filtered delete refreshes the collection.
+             * into the store; a filtered delete refreshes the table.
              */
             updateWhere: async (query: FilteredWriteParams<M>, data: Partial<M> | UpdateValues<Partial<M>>, options?: WriteOptions) => {
                 const ticket = this.ticket() ?? await this.nextTicket();
@@ -1736,7 +1736,7 @@ data: u.data as AnyRow })),
      * write still queued is synced first, so a purge never overtakes the
      * queued delete it follows; if the queue cannot drain, the call is refused.
      */
-    private wrapTrash<M extends AnyRow>(slug: string, inner: CollectionClient<M>): TrashClient<M> {
+    private wrapTrash<M extends AnyRow>(slug: string, inner: TableClient<M>): TrashClient<M> {
         const online = async <T>(what: string, call: () => Promise<T>): Promise<T> => {
             const message = `Offline: ${what} on the trash of "${slug}" needs the server; the trash is never cached on this device.`;
             if (!this.sendsWrites()) throw offlineError(message);
@@ -1814,8 +1814,8 @@ data: u.data as AnyRow })),
 
     private observe<M extends AnyRow>(
         slug: string,
-        wrapped: CollectionClient<M>,
-        inner: CollectionClient<M>,
+        wrapped: TableClient<M>,
+        inner: TableClient<M>,
         params: FindParams<M> | undefined,
         onResult: (result: LiveResult<M>) => void,
         onError?: (error: Error) => void,
@@ -1890,8 +1890,8 @@ data: u.data as AnyRow })),
 
     private observeById<M extends AnyRow>(
         slug: string,
-        wrapped: CollectionClient<M>,
-        inner: CollectionClient<M>,
+        wrapped: TableClient<M>,
+        inner: TableClient<M>,
         id: string | number,
         onResult: (row: M | undefined, meta: RowSnapshotMeta) => void,
         onError?: (error: Error) => void,
@@ -2143,7 +2143,7 @@ data: u.data as AnyRow })),
         // obtained. This used to sort only when a locally-created row had been
         // injected — every other read handed back cache order, which is
         // insertion order, and a caller that asked for `orderBy` got whatever
-        // the store happened to hold. In the admin that is the collection's
+        // the store happened to hold. In the admin that is the table's
         // `sort` being silently ignored on every list backed by this overlay:
         // the query carries it, the server honours it, and the answer served
         // from here did not.
@@ -2269,17 +2269,17 @@ data: u.data as AnyRow })),
     }
 
     /**
-     * A temporary id of the type this collection's ids actually have.
+     * A temporary id of the type this table's ids actually have.
      *
      * There is no schema here to read it off — the generated `Database` types
      * are erased at compile time, and the whole point of this path is that the
      * server is unreachable. So it is read off the rows the local database
-     * already holds: a collection whose cached ids are numbers gets a negative
+     * already holds: a table whose cached ids are numbers gets a negative
      * number, and everything else gets a UUID.
      *
-     * A collection with nothing cached falls back to a UUID, which is the same
+     * A table with nothing cached falls back to a UUID, which is the same
      * guess as before — but that is a first write on a device that has never
-     * read the collection, which is also the case where nothing local can tell
+     * read the table, which is also the case where nothing local can tell
      * the difference. Reading one row first is enough to fix it.
      */
     private mintOfflineId(slug: string): string | number {
@@ -2493,7 +2493,7 @@ data: u.data as AnyRow })),
     /**
      * A write changed which rows belong in a list, and only the server can say
      * how — a row it generated is in no cached page, and the totals moved.
-     * Re-run every live query on the collection; queries nobody is watching
+     * Re-run every live query on the table; queries nobody is watching
      * are corrected by their next `find`.
      *
      * Coalesced per microtask so a burst of writes costs one round trip, and
@@ -2695,7 +2695,7 @@ data: u.data as AnyRow })),
         storage.persist().then((persisted) => this.patchStatus({ persisted }), () => undefined);
     }
 
-    /** The queue's row ids for one collection — see {@link pendingIndex}. */
+    /** The queue's row ids for one table — see {@link pendingIndex}. */
     private pendingIds(slug: string): PendingIds | undefined {
         if (!this.pendingIndex) {
             const index = new Map<string, PendingIds>();
@@ -2745,7 +2745,7 @@ data: u.data as AnyRow })),
         return this.pendingIds(slug)?.writes.has(String(id)) ?? false;
     }
 
-    /** Does this collection have any write the server has not seen? */
+    /** Does this table have any write the server has not seen? */
     private hasPendingIn(slug: string): boolean {
         return (this.pendingIds(slug)?.writes.size ?? 0) > 0;
     }
@@ -2953,8 +2953,8 @@ data: u.data as AnyRow })),
      * see {@link OfflineConfig.replayBatchSize}. Fewer than two means the head
      * replays on its own.
      *
-     * Consecutive, so the queue's order holds; one collection, since a bulk
-     * write is one collection's. Each is a create never sent (so its request
+     * Consecutive, so the queue's order holds; one table, since a bulk
+     * write is one table's. Each is a create never sent (so its request
      * is still its own to choose) with an id the SDK minted as a string — a
      * lost answer then cannot duplicate it, because the server refuses that
      * id the second time and the single replay recognises the row as its
@@ -3251,9 +3251,9 @@ data: u.data as AnyRow })),
                 : await this.readQueue(`${ticket.scope}|`).catch(() => []);
             // A minted id names nothing but this row, so wherever another
             // queued write carries it — a post's `author_id`, in any
-            // collection — it is a reference to this row, and has to follow it.
-            // The queue is ordered across collections for exactly this case;
-            // the id used to be moved only in the row's own collection, so the
+            // table — it is a reference to this row, and has to follow it.
+            // The queue is ordered across tables for exactly this case;
+            // the id used to be moved only in the row's own table, so the
             // post replayed pointing at an author that never existed.
             const minted = op.type === "create" && op.generatedId === true;
             for (const queued of queue) {
@@ -3393,7 +3393,7 @@ data: u.data as AnyRow })),
         if (!this.isCurrent(ticket)) return;
 
         // A write discarded for its reference was applied to rows of its own,
-        // possibly in another collection; put those back as well.
+        // possibly in another table; put those back as well.
         const touched = new Set([op.collection]);
         for (const dropped of doomed) {
             if (dropped === op || !neverCreated.length || dropped.collection === op.collection && dropped.type === "update") continue;
@@ -3535,7 +3535,7 @@ data: u.data as AnyRow })),
     }
 
     /** Replay uses unwrapped clients: a failure must never re-enqueue itself. */
-    private innerFor(slug: string): SDKCollectionClient<AnyRow> {
+    private innerFor(slug: string): SDKTableClient<AnyRow> {
         let inner = this.inners.get(slug);
         if (!inner) {
             inner = this.createInner(slug);
@@ -3590,7 +3590,7 @@ data: u.data as AnyRow })),
         }
     }
 
-    /** Re-read one collection from the store, replacing what is in memory. */
+    /** Re-read one table from the store, replacing what is in memory. */
     private async reloadCollection(slug: string): Promise<void> {
         const state = this.collections.get(slug);
         if (!state?.loaded || this.scopeHold) return; // never loaded here — nothing to keep fresh

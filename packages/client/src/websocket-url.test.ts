@@ -59,10 +59,10 @@ describe("realtime socket URL", () => {
         setWindow("https://app.example.com");
 
         const relative = createRebaseClient({ baseUrl: "/backend" });
-        relative.collection("posts").listen!(undefined, () => {});
+        relative.table("posts").listen!(undefined, () => {});
 
         const absolute = createRebaseClient({ baseUrl: "https://app.example.com/backend" });
-        absolute.collection("posts").listen!(undefined, () => {});
+        absolute.table("posts").listen!(undefined, () => {});
 
         // The address; the query after it names the socket's opt-ins.
         expect(opened[0].split("?")[0]).toBe("wss://app.example.com/backend");
@@ -75,7 +75,7 @@ describe("realtime socket URL", () => {
         setWindow("https://app.example.com");
 
         const client = createRebaseClient({});
-        client.collection("posts").listen!(undefined, () => {});
+        client.table("posts").listen!(undefined, () => {});
 
         expect(opened[0].split("?")[0]).toBe("wss://app.example.com");
     });

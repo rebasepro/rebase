@@ -75,7 +75,7 @@ describe("a session with no stated expiry", () => {
 
         await rebase.auth.signInWithEmail("alice@example.com", "pw");
         await new Promise(resolve => setTimeout(resolve, 100));
-        for (let i = 0; i < 5; i++) await rebase.data.collection("posts").find();
+        for (let i = 0; i < 5; i++) await rebase.data.table("posts").find();
 
         expect(server.calls.data).toBe(5);
         expect(server.calls.refresh).toBe(0);

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { and, cond, or, QueryBuilder } from "@rebasepro/common";
 import { buildQueryString } from "../src/transport";
-import { CollectionAccessor, WhereFilterOp } from "@rebasepro/types";
+import { TableAccessor, WhereFilterOp } from "@rebasepro/types";
 
 /**
  * The params a builder has collected. They are private, and these tests are
@@ -28,12 +28,12 @@ function createMockCollection() {
         search: notCalledByTheBuilder,
         vectorSearch: notCalledByTheBuilder,
         include: notCalledByTheBuilder,
-        find: jest.fn<CollectionAccessor["find"]>(),
-        findById: jest.fn<CollectionAccessor["findById"]>(),
-        create: jest.fn<CollectionAccessor["create"]>(),
-        update: jest.fn<CollectionAccessor["update"]>(),
-        delete: jest.fn<CollectionAccessor["delete"]>(),
-        listen: jest.fn<NonNullable<CollectionAccessor["listen"]>>()
+        find: jest.fn<TableAccessor["find"]>(),
+        findById: jest.fn<TableAccessor["findById"]>(),
+        create: jest.fn<TableAccessor["create"]>(),
+        update: jest.fn<TableAccessor["update"]>(),
+        delete: jest.fn<TableAccessor["delete"]>(),
+        listen: jest.fn<NonNullable<TableAccessor["listen"]>>()
     };
 }
 

@@ -1,9 +1,9 @@
 import { jest } from "@jest/globals";
-import type { CollectionRealtime } from "../../src/collection";
+import type { TableRealtime } from "../../src/table";
 
 /** What a collection listener and a row listener are handed. */
-export type RowsListener = Parameters<CollectionRealtime["listenCollection"]>[1];
-export type RowListener = Parameters<CollectionRealtime["listenOne"]>[1];
+export type RowsListener = Parameters<TableRealtime["listenCollection"]>[1];
+export type RowListener = Parameters<TableRealtime["listenOne"]>[1];
 
 /**
  * A realtime stand-in for a collection client: both listeners are jest mocks
@@ -13,11 +13,11 @@ export type RowListener = Parameters<CollectionRealtime["listenOne"]>[1];
 export function mockRealtime(unsubscribe: () => void = () => {}) {
     const listeners: { collection?: RowsListener; one?: RowListener } = {};
     const realtime = {
-        listenCollection: jest.fn<CollectionRealtime["listenCollection"]>((_props, onUpdate) => {
+        listenCollection: jest.fn<TableRealtime["listenCollection"]>((_props, onUpdate) => {
             listeners.collection = onUpdate;
             return unsubscribe;
         }),
-        listenOne: jest.fn<CollectionRealtime["listenOne"]>((_props, onUpdate) => {
+        listenOne: jest.fn<TableRealtime["listenOne"]>((_props, onUpdate) => {
             listeners.one = onUpdate;
             return unsubscribe;
         })

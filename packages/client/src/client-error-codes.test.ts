@@ -39,18 +39,18 @@ describe("a client-side error", () => {
 
     it("INVALID_FILTER — a filter value that is `undefined`", async () => {
         const error = await refusal(() =>
-            client().data.collection("posts").find({ where: { title: ["==", undefined] } }));
+            client().data.table("posts").find({ where: { title: ["==", undefined] } }));
 
         expect(error.code).toBe("INVALID_FILTER");
         expect(error.message).toContain("title");
         expect((error.details as { field?: string })?.field).toBe("title");
     });
 
-    it("UNKNOWN_COLLECTION — an accessor that is not in the dictionary", async () => {
-        const typed = client({ collections: { posts: "posts" } });
+    it("UNKNOWN_TABLE — an accessor that is not in the dictionary", async () => {
+        const typed = client({ tables: { posts: "posts" } });
         const error = await refusal(() => Reflect.get(typed.data, "postz"));
 
-        expect(error.code).toBe("UNKNOWN_COLLECTION");
+        expect(error.code).toBe("UNKNOWN_TABLE");
         expect(error.message).toContain("postz");
     });
 
@@ -63,7 +63,7 @@ describe("a client-side error", () => {
 
     it("REALTIME_DISABLED — `listen` on a collection of the same client", async () => {
         const error = await refusal(() =>
-            client().data.collection("posts").listen(() => undefined));
+            client().data.table("posts").listen(() => undefined));
 
         expect(error.code).toBe("REALTIME_DISABLED");
     });

@@ -1,5 +1,5 @@
 import { jest } from "@jest/globals";
-import { createCollectionClient } from "./collection";
+import { createTableClient } from "./table";
 import type { Transport } from "./transport";
 import { RebaseClientError } from "@rebasepro/types";
 import { createMockTransport as createSharedMockTransport, type RequestAnswer } from "../test/support/fake-transport";
@@ -12,7 +12,7 @@ function createMockTransport() {
     return mocks;
 }
 
-describe("createCollectionClient", () => {
+describe("createTableClient", () => {
     let transport: Transport;
     let mockRequest: jest.Mock<RequestAnswer>;
 
@@ -24,7 +24,7 @@ describe("createCollectionClient", () => {
         it("should call the /count endpoint and return the count", async () => {
             mockRequest.mockResolvedValue({ count: 42 });
 
-            const client = createCollectionClient(transport, "products");
+            const client = createTableClient(transport, "products");
             const result = await client.count();
 
             expect(mockRequest).toHaveBeenCalledWith(
@@ -37,7 +37,7 @@ describe("createCollectionClient", () => {
         it("should forward where filters to the count endpoint", async () => {
             mockRequest.mockResolvedValue({ count: 7 });
 
-            const client = createCollectionClient(transport, "products");
+            const client = createTableClient(transport, "products");
             const result = await client.count({
                 where: { status: ["==", "published"] }
             });
@@ -55,7 +55,7 @@ describe("createCollectionClient", () => {
         it("should forward orderBy to the count endpoint", async () => {
             mockRequest.mockResolvedValue({ count: 15 });
 
-            const client = createCollectionClient(transport, "items");
+            const client = createTableClient(transport, "items");
             const result = await client.count({
                 orderBy: ["created_at", "desc"]
             });
@@ -69,7 +69,7 @@ describe("createCollectionClient", () => {
         it("should NOT include limit or offset in the count request", async () => {
             mockRequest.mockResolvedValue({ count: 100 });
 
-            const client = createCollectionClient(transport, "users");
+            const client = createTableClient(transport, "users");
             // Even if the caller passes limit/offset in params, they should be stripped
             await client.count({ limit: 50,
 offset: 10 });
@@ -82,7 +82,7 @@ offset: 10 });
         it("should return 0 when meta.count is missing", async () => {
             mockRequest.mockResolvedValue({});
 
-            const client = createCollectionClient(transport, "empty");
+            const client = createTableClient(transport, "empty");
             const result = await client.count();
 
             expect(result).toBe(0);
@@ -91,7 +91,7 @@ offset: 10 });
         it("should forward searchString to the count endpoint", async () => {
             mockRequest.mockResolvedValue({ count: 3 });
 
-            const client = createCollectionClient(transport, "articles");
+            const client = createTableClient(transport, "articles");
             const result = await client.count({
                 searchString: "hello world"
             });
@@ -105,7 +105,7 @@ offset: 10 });
         it("should forward multiple where filters correctly", async () => {
             mockRequest.mockResolvedValue({ count: 5 });
 
-            const client = createCollectionClient(transport, "orders");
+            const client = createTableClient(transport, "orders");
             await client.count({
                 where: {
                     status: ["==", "active"],
@@ -130,7 +130,7 @@ offset: 0,
 hasMore: false }
             });
 
-            const client = createCollectionClient(transport, "products");
+            const client = createTableClient(transport, "products");
             const result = await client.find();
 
             expect(mockRequest).toHaveBeenCalledWith(
@@ -151,7 +151,7 @@ hasMore: false }
         it("should return a flat row directly", async () => {
             mockRequest.mockResolvedValue({ id: "42", title: "Hello" });
 
-            const client = createCollectionClient(transport, "posts");
+            const client = createTableClient(transport, "posts");
             const result = await client.findById("42");
 
             expect(mockRequest).toHaveBeenCalledWith(
@@ -171,7 +171,7 @@ hasMore: false }
                 new RebaseApiError("Not Found", { status: 404 })
             );
 
-            const client = createCollectionClient(transport, "posts");
+            const client = createTableClient(transport, "posts");
             const result = await client.findById("999");
             expect(result).toBeUndefined();
         });
@@ -181,7 +181,7 @@ hasMore: false }
         it("should return a flat row", async () => {
             mockRequest.mockResolvedValue({ id: "new-1", title: "Created" });
 
-            const client = createCollectionClient(transport, "posts");
+            const client = createTableClient(transport, "posts");
             const result = await client.create({ title: "Created" } as Record<string, unknown>);
 
             expect(result.id).toBe("new-1");
@@ -193,7 +193,7 @@ hasMore: false }
         it("should return a flat row", async () => {
             mockRequest.mockResolvedValue({ id: "1", title: "Updated" });
 
-            const client = createCollectionClient(transport, "posts");
+            const client = createTableClient(transport, "posts");
             const result = await client.update("1", { title: "Updated" } as Record<string, unknown>);
 
             expect(result.id).toBe("1");
@@ -206,7 +206,7 @@ hasMore: false }
                 new RebaseApiError("Not Found", { status: 404 })
             );
 
-            const client = createCollectionClient(transport, "posts");
+            const client = createTableClient(transport, "posts");
             await expect(
                 client.update("999", { title: "Nope" } as Record<string, unknown>)
             ).rejects.toMatchObject({ status: 404 });
@@ -220,7 +220,7 @@ hasMore: false }
                 new RebaseApiError("Not Found", { status: 404 })
             );
 
-            const client = createCollectionClient(transport, "posts");
+            const client = createTableClient(transport, "posts");
             await expect(client.delete("999")).rejects.toMatchObject({ status: 404 });
         });
 
@@ -230,7 +230,7 @@ hasMore: false }
                 new RebaseApiError("Internal Server Error", { status: 500 })
             );
 
-            const client = createCollectionClient(transport, "posts");
+            const client = createTableClient(transport, "posts");
             await expect(client.delete("1")).rejects.toThrow("Internal Server Error");
         });
     });
@@ -255,7 +255,7 @@ deliver: () => listeners.collection?.(rows) };
             mockRequest.mockResolvedValue({ count: 137 });
             const { ws, deliver } = wsDeliveringRows([{ id: "1" }, { id: "2" }]);
 
-            const client = createCollectionClient(transport, "products", ws);
+            const client = createTableClient(transport, "products", ws);
             const updates: any[] = [];
             client.listen!({ limit: 2 }, (res) => { updates.push(res); });
             deliver();
@@ -271,7 +271,7 @@ deliver: () => listeners.collection?.(rows) };
             mockRequest.mockRejectedValue(new Error("boom"));
             const { ws, deliver } = wsDeliveringRows([{ id: "1" }, { id: "2" }]);
 
-            const client = createCollectionClient(transport, "products", ws);
+            const client = createTableClient(transport, "products", ws);
             const updates: any[] = [];
             client.listen!({ limit: 2 }, (res) => { updates.push(res); });
             deliver();
@@ -299,7 +299,7 @@ deliver: () => listeners.collection?.(rows) };
 
         it("refuses an undefined filter value, as find() does, and opens nothing", async () => {
             const ws = mockWs();
-            const client = createCollectionClient(transport, "posts", ws);
+            const client = createTableClient(transport, "posts", ws);
             const onError = jest.fn<(error: Error) => void>();
 
             client.listen!({ where: { owner_id: ["!=", undefined] } }, jest.fn(), onError);
@@ -315,7 +315,7 @@ deliver: () => listeners.collection?.(rows) };
 
         it("refuses a hole in an `in` list", async () => {
             const ws = mockWs();
-            const client = createCollectionClient(transport, "posts", ws);
+            const client = createTableClient(transport, "posts", ws);
             const onError = jest.fn<(error: Error) => void>();
 
             client.listen!({ where: { id: ["in", ["a", undefined]] } }, jest.fn(), onError);
@@ -327,7 +327,7 @@ deliver: () => listeners.collection?.(rows) };
 
         it("refuses a cursor, which a subscription cannot continue from", async () => {
             const ws = mockWs();
-            const client = createCollectionClient(transport, "posts", ws);
+            const client = createTableClient(transport, "posts", ws);
             const onError = jest.fn<(error: Error) => void>();
 
             client.listen!({ orderBy: ["created_at", "desc"], limit: 20, after: "eyJrIjpbMV19" }, jest.fn(), onError);
@@ -339,7 +339,7 @@ deliver: () => listeners.collection?.(rows) };
         });
 
         it("says nothing to a listener that already left", async () => {
-            const client = createCollectionClient(transport, "posts", mockWs());
+            const client = createTableClient(transport, "posts", mockWs());
             const onError = jest.fn();
 
             const stop = client.listen!({ after: "eyJrIjpbMV19" }, jest.fn(), onError);
@@ -351,7 +351,7 @@ deliver: () => listeners.collection?.(rows) };
 
         it("observe() reports the refusal once, not once per half", async () => {
             const ws = mockWs();
-            const client = createCollectionClient(transport, "posts", ws);
+            const client = createTableClient(transport, "posts", ws);
             const onError = jest.fn<(error: Error) => void>();
 
             client.observe({ where: { owner_id: ["==", undefined] } }, jest.fn(), onError);
@@ -366,7 +366,7 @@ deliver: () => listeners.collection?.(rows) };
         it("observe() without the live half still pages by cursor", async () => {
             mockRequest.mockResolvedValue({ data: [], meta: {} });
             const ws = mockWs();
-            const client = createCollectionClient(transport, "posts", ws);
+            const client = createTableClient(transport, "posts", ws);
             const onError = jest.fn();
 
             client.observe({ after: "eyJrIjpbMV19" }, jest.fn(), onError, { realtime: false });
@@ -393,7 +393,7 @@ describe("get", () => {
     it("returns the row when it is there, typed as present", async () => {
         const { transport, mockRequest } = createMockTransport();
         mockRequest.mockResolvedValue({ id: 7, title: "Hello" });
-        const client = createCollectionClient(transport, "posts");
+        const client = createTableClient(transport, "posts");
         const row = await client.get(7);
         // No `!` and no narrowing: the point of the method.
         expect(row.title).toBe("Hello");
@@ -402,7 +402,7 @@ describe("get", () => {
     it("throws NOT_FOUND when the row is absent, where findById returns undefined", async () => {
         const { transport, mockRequest } = createMockTransport();
         mockRequest.mockResolvedValue(undefined);
-        const client = createCollectionClient(transport, "posts");
+        const client = createTableClient(transport, "posts");
 
         await expect(client.findById(7)).resolves.toBeUndefined();
         await expect(client.get(7)).rejects.toMatchObject({
@@ -414,7 +414,7 @@ describe("get", () => {
     it("names the collection and the id, so the message stands alone in a log", async () => {
         const { transport, mockRequest } = createMockTransport();
         mockRequest.mockResolvedValue(undefined);
-        const client = createCollectionClient(transport, "posts");
+        const client = createTableClient(transport, "posts");
         await expect(client.get("abc")).rejects.toThrow('No record with id "abc" in "posts".');
     });
 });

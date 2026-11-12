@@ -1,7 +1,7 @@
 import { describe, it, expect, jest, beforeEach, afterEach } from "@jest/globals";
 import { etagOf } from "@rebasepro/common";
 import { RebaseWebSocketClient } from "../src/websocket";
-import { createCollectionClient } from "../src/collection";
+import { createTableClient } from "../src/table";
 import type { Transport } from "../src/transport";
 import { defaultResponder, FaultServer, type Responder } from "./support/fault-socket";
 import { fakeTransport } from "./support/fake-transport";
@@ -122,14 +122,14 @@ describe("update() hands back the version it wrote", () => {
     }
 
     it("so the next conditional write can name it", async () => {
-        const posts = createCollectionClient<Record<string, unknown>>(transportAnswering("\"v2\""), "posts");
+        const posts = createTableClient<Record<string, unknown>>(transportAnswering("\"v2\""), "posts");
         const updated = await posts.update(1, { title: "x" }, { ifMatch: "\"v1\"" });
         expect(etagOf(updated)).toBe("\"v2\"");
         expect(Object.keys(updated)).toEqual(["id", "title"]);
     });
 
     it("and nothing from a server that sends no ETag", async () => {
-        const posts = createCollectionClient<Record<string, unknown>>(transportAnswering(undefined), "posts");
+        const posts = createTableClient<Record<string, unknown>>(transportAnswering(undefined), "posts");
         expect(etagOf(await posts.update(1, { title: "x" }))).toBeUndefined();
     });
 });

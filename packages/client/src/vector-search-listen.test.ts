@@ -26,14 +26,14 @@ const listenRequestBlock = (file: string, marker: string) => {
 
 describe("a subscription request carries every field the server refuses on", () => {
     it("the client's listenCollection forwards vectorSearch", () => {
-        const block = listenRequestBlock("./collection.ts", "ws.listenCollection(");
+        const block = listenRequestBlock("./table.ts", "ws.listenCollection(");
         expect(block).toContain("vectorSearch: params?.vectorSearch");
     });
 
     it("forwards it beside the fields it already forwarded", () => {
         // Guards against the assertion above passing on a stray mention: the
         // field has to be in the same object literal as the rest.
-        const block = listenRequestBlock("./collection.ts", "ws.listenCollection(");
+        const block = listenRequestBlock("./table.ts", "ws.listenCollection(");
         const objectLiteral = block.slice(0, block.indexOf("},"));
         for (const field of ["path:", "filter:", "orderBy:", "searchString:", "vectorSearch:"]) {
             expect(objectLiteral).toContain(field);

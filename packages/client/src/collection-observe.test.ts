@@ -1,5 +1,5 @@
 import { jest } from "@jest/globals";
-import { createCollectionClient, type CollectionRealtime, type LiveResult } from "./collection";
+import { createTableClient, type TableRealtime, type LiveResult } from "./table";
 import { fakeTransport, type RequestAnswer } from "../test/support/fake-transport";
 
 type Row = { id: string; name: string };
@@ -41,7 +41,7 @@ const silent = () => () => undefined;
 /** A socket whose collection updates this test drives by hand. */
 function createWs() {
     let push: ((rows: Record<string, unknown>[]) => void) | undefined;
-    const ws: CollectionRealtime = {
+    const ws: TableRealtime = {
         listenCollection: (_props, onUpdate) => {
             push = onUpdate;
             return () => { push = undefined; };
@@ -67,7 +67,7 @@ describe("observe() without the offline layer", () => {
             count: () => Promise.resolve({ count: 1 })
         });
         const { ws, push } = createWs();
-        const client = createCollectionClient<Row>(transport, "products", ws);
+        const client = createTableClient<Row>(transport, "products", ws);
 
         const results: LiveResult<Row>[] = [];
         const stop = client.observe(undefined, (r) => results.push(r));
@@ -88,7 +88,7 @@ describe("observe() without the offline layer", () => {
             count: () => Promise.resolve({ count: 1 })
         });
         const { ws, push } = createWs();
-        const client = createCollectionClient<Row>(transport, "products", ws);
+        const client = createTableClient<Row>(transport, "products", ws);
 
         const results: LiveResult<Row>[] = [];
         const stop = client.observe(undefined, (r) => results.push(r));
@@ -115,7 +115,7 @@ describe("observe() without the offline layer", () => {
     it("stops emitting once unsubscribed, including for a fetch still in flight", async () => {
         const find = deferred<unknown>();
         const { transport, request } = createTransport({ find: () => find.promise });
-        const client = createCollectionClient<Row>(transport, "products");
+        const client = createTableClient<Row>(transport, "products");
 
         const results: LiveResult<Row>[] = [];
         const stop = client.observe(undefined, (r) => results.push(r));
@@ -140,7 +140,7 @@ describe("observe() does not fetch what the socket already answered", () => {
     /** A socket holding `rows` for every query and every row, replayed on subscribe. */
     function createReplayingWs(rows: Record<string, unknown>[]) {
         let subscribes = 0;
-        const ws: CollectionRealtime = {
+        const ws: TableRealtime = {
             listenCollection: (_props, onUpdate) => {
                 subscribes++;
                 onUpdate(rows, { total: rows.length, hasMore: false, limit: 20, offset: 0 });
@@ -160,7 +160,7 @@ describe("observe() does not fetch what the socket already answered", () => {
             find: () => Promise.resolve({ data: [{ id: "1", name: "a" }], meta: { total: 1 } })
         });
         const { ws, subscribes } = createReplayingWs([{ id: "1", name: "a" }]);
-        const client = createCollectionClient<Row>(transport, "products", ws);
+        const client = createTableClient<Row>(transport, "products", ws);
 
         const results: LiveResult<Row>[][] = Array.from({ length: 10 }, () => []);
         const stops = results.map((into) => client.observe({ limit: 20 }, (r) => into.push(r)));
@@ -178,7 +178,7 @@ describe("observe() does not fetch what the socket already answered", () => {
     it("sends no GET for observeById when the socket replays the row", async () => {
         const { transport, request } = createTransport({});
         const { ws } = createReplayingWs([{ id: "1", name: "a" }]);
-        const client = createCollectionClient<Row>(transport, "products", ws);
+        const client = createTableClient<Row>(transport, "products", ws);
 
         const rows: (Row | undefined)[][] = Array.from({ length: 10 }, () => []);
         const stops = rows.map((into) => client.observeById("1", (row) => into.push(row)));
@@ -196,7 +196,7 @@ describe("observe() does not fetch what the socket already answered", () => {
             find: () => Promise.resolve({ data: [{ id: "1", name: "a" }], meta: { total: 1 } })
         });
         const { ws } = createWs();
-        const client = createCollectionClient<Row>(transport, "products", ws);
+        const client = createTableClient<Row>(transport, "products", ws);
 
         const results: LiveResult<Row>[] = [];
         const stop = client.observe({ limit: 20 }, (r) => results.push(r));
@@ -212,7 +212,7 @@ describe("observe() does not fetch what the socket already answered", () => {
             find: () => Promise.resolve({ data: [{ id: "1", name: "a" }], meta: { total: 1 } })
         });
         const { ws } = createReplayingWs([{ id: "1", name: "a" }]);
-        const client = createCollectionClient<Row>(transport, "products", ws);
+        const client = createTableClient<Row>(transport, "products", ws);
 
         const results: LiveResult<Row>[] = [];
         const stop = client.observe({ limit: 20 }, (r) => results.push(r), undefined, { realtime: false });
@@ -235,14 +235,14 @@ describe("observeById({ include })", () => {
         const { transport, request } = createTransport({});
         request.mockImplementation(() => Promise.resolve({ id: "1", name: "a", tags: [] }));
         const listened: unknown[] = [];
-        const ws: CollectionRealtime = {
+        const ws: TableRealtime = {
             listenCollection: silent,
             listenOne: (props) => {
                 listened.push(props);
                 return () => undefined;
             }
         };
-        const client = createCollectionClient<Row>(transport, "products", ws);
+        const client = createTableClient<Row>(transport, "products", ws);
 
         const seen: (Row | undefined)[] = [];
         const stop = client.observeById("1", (row) => seen.push(row), undefined, { include: ["tags"] });
@@ -258,7 +258,7 @@ describe("observeById({ include })", () => {
     it("loads them on the fetch when realtime is off", async () => {
         const { transport, request } = createTransport({});
         request.mockImplementation(() => Promise.resolve({ id: "1", name: "a" }));
-        const client = createCollectionClient<Row>(transport, "products");
+        const client = createTableClient<Row>(transport, "products");
 
         const stop = client.observeById("1", () => undefined, undefined, { include: ["tags"], realtime: false });
         await flush();

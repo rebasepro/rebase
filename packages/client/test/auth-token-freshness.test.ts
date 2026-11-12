@@ -117,7 +117,7 @@ describe("a client restored with an expired session", () => {
 
         // Fired at boot, before the refresh started for the restored session
         // has answered — what an app's first render does.
-        const finds = Array.from({ length: 10 }, () => c.data.collection("posts").find({ limit: 20 }));
+        const finds = Array.from({ length: 10 }, () => c.data.table("posts").find({ limit: 20 }));
         gate.resolve();
         const results = await Promise.all(finds);
 
@@ -134,7 +134,7 @@ describe("a client restored with an expired session", () => {
         const server = createServer({ refreshUser: false });
         const c = client(server.fetchFn, storageHolding(storedSession(-60_000, { uid: "" })));
 
-        const result = await c.data.collection("posts").find({ limit: 20 });
+        const result = await c.data.table("posts").find({ limit: 20 });
 
         expect(result.data).toEqual(USER_ROWS);
         expect(c.auth.getSession()?.user.uid).toBe("u1");
@@ -144,7 +144,7 @@ describe("a client restored with an expired session", () => {
         const server = createServer({ refreshFails: true });
         const c = client(server.fetchFn, storageHolding(storedSession(-60_000)));
 
-        await expect(c.data.collection("posts").find({ limit: 20 })).rejects.toMatchObject({ status: 401 });
+        await expect(c.data.table("posts").find({ limit: 20 })).rejects.toMatchObject({ status: 401 });
         // The session's own token — what the 401 recovery path has always
         // been handed — and never the anonymous read.
         expect(server.data().every((s) => s.authorization === "Bearer a1")).toBe(true);
@@ -159,7 +159,7 @@ describe("a cookie-mode client restoring its session on load", () => {
         const server = createServer({ refreshGate: gate.promise });
         const c = client(server.fetchFn, createMemoryStorage(), "cookie");
 
-        const finds = Array.from({ length: 5 }, () => c.data.collection("posts").find({ limit: 20 }));
+        const finds = Array.from({ length: 5 }, () => c.data.table("posts").find({ limit: 20 }));
         gate.resolve();
         const results = await Promise.all(finds);
 
@@ -172,7 +172,7 @@ describe("a cookie-mode client restoring its session on load", () => {
         const server = createServer({ refreshRefused: true });
         const c = client(server.fetchFn, createMemoryStorage(), "cookie");
 
-        const result = await c.data.collection("posts").find({ limit: 20 });
+        const result = await c.data.table("posts").find({ limit: 20 });
 
         expect(result.data).toEqual(PUBLIC_ROWS);
         expect(server.refreshes()).toBe(1);
@@ -190,7 +190,7 @@ describe("a session whose token the client knows has expired", () => {
         jest.setSystemTime(Date.now() + 2 * HOUR);
 
         const results = await Promise.all(
-            Array.from({ length: 10 }, (_, i) => c.data.collection("posts").find({ limit: 20, offset: i * 20 }))
+            Array.from({ length: 10 }, (_, i) => c.data.table("posts").find({ limit: 20, offset: i * 20 }))
         );
 
         for (const result of results) expect(result.data).toEqual(USER_ROWS);
@@ -204,7 +204,7 @@ describe("a session whose token the client knows has expired", () => {
         const c = client(server.fetchFn, storageHolding({ ...storedSession(HOUR), accessToken: "a2" }));
         await c.auth.isInitialized();
 
-        await Promise.all(Array.from({ length: 10 }, () => c.data.collection("posts").find({ limit: 20 })));
+        await Promise.all(Array.from({ length: 10 }, () => c.data.table("posts").find({ limit: 20 })));
 
         expect(server.refreshes()).toBe(0);
         expect(server.data()).toHaveLength(10);

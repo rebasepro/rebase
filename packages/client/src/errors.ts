@@ -1,5 +1,5 @@
 /**
- * Client-side logic error (e.g. accessing an unknown collection when a typed
+ * Client-side logic error (e.g. accessing an unknown table when a typed
  * dictionary is available). A subclass of {@link RebaseApiError}, so a single
  * `catch (e) { if (e instanceof RebaseApiError) ... }` covers it too.
  *

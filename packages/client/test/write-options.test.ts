@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
-import { createCollectionClient, etagOf } from "../src/collection";
+import { createTableClient, etagOf } from "../src/table";
 import { Transport, type ResponseMeta } from "../src/transport";
 import { createMockTransport as createSharedMockTransport, type RequestAnswer } from "./support/fake-transport";
 
@@ -23,12 +23,12 @@ const createMockTransport = () => createSharedMockTransport({ apiPath: "/api/v1"
 describe("write options", () => {
     let transport: Transport;
     let mockRequest: jest.Mock<RequestAnswer>;
-    let client: ReturnType<typeof createCollectionClient>;
+    let client: ReturnType<typeof createTableClient>;
 
     beforeEach(() => {
         ({ transport, mockRequest } = createMockTransport());
         mockRequest.mockResolvedValue({ id: "1" });
-        client = createCollectionClient(transport, "posts");
+        client = createTableClient(transport, "posts");
     });
 
     const initOf = (call = 0) => mockRequest.mock.calls[call][1] as RequestInit & {

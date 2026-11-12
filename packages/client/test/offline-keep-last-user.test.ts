@@ -104,7 +104,7 @@ async function earlierVisit(server: Backend, store: MemoryOfflineStore, uid: str
     server.state.refresh = () => tokenResponse(uid);
     const earlier = client(server, store, keepLastUser);
     await earlier.auth.isInitialized();
-    await earlier.data.collection("posts").find();
+    await earlier.data.table("posts").find();
     await flush();
     earlier.close();
 }
@@ -135,7 +135,7 @@ describe("offline.keepLastUser", () => {
 
         const rebase = offlineReload(server, store, false);
         await rebase.auth.isInitialized();
-        await rebase.data.collection("posts").create({ id: "p2", title: "typed offline" });
+        await rebase.data.table("posts").create({ id: "p2", title: "typed offline" });
 
         expect(await queuedTitles(store, "anon")).toEqual(["typed offline"]);
         expect(rebase.offline!.status().unverifiedUser).toBeUndefined();
@@ -149,7 +149,7 @@ describe("offline.keepLastUser", () => {
         const rebase = offlineReload(server, store, true);
         await rebase.auth.isInitialized();
         expect(rebase.auth.restoreOutcome()).toBe("unreachable");
-        const posts = rebase.data.collection("posts");
+        const posts = rebase.data.table("posts");
 
         expect((await posts.find()).data).toEqual([{ id: "p1", title: "only u1 can see this" }]);
         await posts.create({ id: "p2", title: "typed offline" });
@@ -167,7 +167,7 @@ describe("offline.keepLastUser", () => {
         const rebase = offlineReload(server, store, true);
         await rebase.auth.isInitialized();
         await flush();
-        await rebase.data.collection("posts").create({ id: "p2", title: "typed offline" });
+        await rebase.data.table("posts").create({ id: "p2", title: "typed offline" });
 
         // The data API is back, the session is not yet: nothing may go out
         // without the credentials of the user who made it.
@@ -178,7 +178,7 @@ describe("offline.keepLastUser", () => {
         // The refresh answers once the connection is back, and the client asks
         // again by itself when it sees the connection return.
         server.state.refresh = () => tokenResponse("u1");
-        await rebase.data.collection("posts").find();
+        await rebase.data.table("posts").find();
         await flush();
 
         expect(rebase.auth.getSession()?.user.uid).toBe("u1");
@@ -203,7 +203,7 @@ describe("offline.keepLastUser", () => {
             await flush();
             // The data API answers again; the refresh still cannot be reached.
             server.state.dataReachable = true;
-            await rebase.data.collection("posts").find();
+            await rebase.data.table("posts").find();
             await flush();
             expect(rebase.offline!.status()).toMatchObject({ online: true, unverifiedUser: true });
             return rebase;
@@ -213,7 +213,7 @@ describe("offline.keepLastUser", () => {
             const server = backend();
             const store = new MemoryOfflineStore();
             const rebase = await unconfirmed(server, store);
-            const posts = rebase.data.collection("posts");
+            const posts = rebase.data.table("posts");
             const mine = [{ id: "p1", title: "only u1 can see this" }];
 
             expect((await posts.find()).data).toEqual(mine);
@@ -229,7 +229,7 @@ describe("offline.keepLastUser", () => {
             const store = new MemoryOfflineStore();
             const rebase = await unconfirmed(server, store);
 
-            await rebase.data.collection("posts").create({ id: "p2", title: "typed before the refresh answered" });
+            await rebase.data.table("posts").create({ id: "p2", title: "typed before the refresh answered" });
 
             expect(server.writes).toEqual([]);
             expect(await queuedTitles(store, "u1")).toEqual(["typed before the refresh answered"]);
@@ -237,9 +237,9 @@ describe("offline.keepLastUser", () => {
             // Confirmed: it goes out as u1.
             server.state.refresh = () => tokenResponse("u1");
             server.state.dataReachable = false;
-            await rebase.data.collection("posts").find();
+            await rebase.data.table("posts").find();
             server.state.dataReachable = true;
-            await rebase.data.collection("posts").find();
+            await rebase.data.table("posts").find();
             await flush();
             expect(rebase.auth.getSession()?.user.uid).toBe("u1");
             expect(server.writes.map((w) => w.authorization)).toEqual(["Bearer token-u1"]);
@@ -253,11 +253,11 @@ describe("offline.keepLastUser", () => {
         const rebase = offlineReload(server, store, true);
         await rebase.auth.isInitialized();
         await flush();
-        await rebase.data.collection("posts").create({ id: "p2", title: "typed offline" });
+        await rebase.data.table("posts").create({ id: "p2", title: "typed offline" });
 
         server.state.dataReachable = true;
         server.state.refresh = refused;
-        await rebase.data.collection("posts").find();
+        await rebase.data.table("posts").find();
         await flush();
 
         expect(rebase.offline!.status().unverifiedUser).toBeUndefined();
@@ -277,7 +277,7 @@ describe("offline.keepLastUser", () => {
         const rebase = client(server, store, true);
         await rebase.auth.isInitialized();
         expect(rebase.auth.restoreOutcome()).toBe("none");
-        await rebase.data.collection("posts").create({ id: "p2", title: "typed signed out" });
+        await rebase.data.table("posts").create({ id: "p2", title: "typed signed out" });
 
         expect(await queuedTitles(store, "anon")).toEqual(["typed signed out"]);
         expect(await store.getCache(LAST_USER_KEY)).toBeUndefined();

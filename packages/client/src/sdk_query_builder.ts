@@ -7,7 +7,7 @@ import {
     OrderByTuple,
     PageWalkOptions,
     RelationAggregateSort,
-    SDKCollectionClient,
+    SDKTableClient,
     SDKQueryBuilderInterface,
     WhereFilterOp,
     WhereValueFor,
@@ -43,7 +43,7 @@ export class SDKQueryBuilder<M extends Record<string, unknown> = Record<string, 
     // methods; this field is the buffer behind them, cast once on the way out.
     private params: FindParams = { where: {} };
 
-    constructor(private collection: SDKCollectionClient<M>) {}
+    constructor(private table: SDKTableClient<M>) {}
 
     /**
      * Add a filter condition to your query.
@@ -142,8 +142,8 @@ export class SDKQueryBuilder<M extends Record<string, unknown> = Record<string, 
     /**
      * Set a free-text search string if supported by the backend.
      *
-     * By default this is a substring match across the collection's top-level
-     * string properties. A Postgres collection that declares a `search` block
+     * By default this is a substring match across the table's top-level
+     * string columns. A Postgres table that declares a `search` block
      * gets ranked full-text matching over the fields it named instead, and each
      * row comes back with a `_score` you can sort on:
      *
@@ -217,7 +217,7 @@ export class SDKQueryBuilder<M extends Record<string, unknown> = Record<string, 
      * ```
      *
      * Up to three hops deep, and `"*"` still loads every relation one hop
-     * deep. A name that is not a relation of the collection is a 400
+     * deep. A name that is not a relation of the table is a 400
      * `UNKNOWN_RELATION` — it used to be ignored, which answers 200 with the
      * field missing and reads exactly like a row that has no related row.
      *
@@ -277,7 +277,7 @@ export class SDKQueryBuilder<M extends Record<string, unknown> = Record<string, 
      * Execute the find query and return the results as flat rows.
      */
     async find(): Promise<FindResult<M>> {
-        return this.collection.find(this.params as FindParams<M>);
+        return this.table.find(this.params as FindParams<M>);
     }
 
     /**
@@ -298,7 +298,7 @@ export class SDKQueryBuilder<M extends Record<string, unknown> = Record<string, 
     async aggregate(
         params: Omit<AggregateParams<M>, "where" | "logical" | "searchString">
     ): Promise<AggregateResult> {
-        return this.collection.aggregate({
+        return this.table.aggregate({
             ...params,
             where: this.params.where as AggregateParams<M>["where"],
             logical: this.params.logical as AggregateParams<M>["logical"],
@@ -313,7 +313,7 @@ export class SDKQueryBuilder<M extends Record<string, unknown> = Record<string, 
      * single `find()` is not a ceiling on what the query can read.
      */
     iterate(options?: PageWalkOptions<M>): AsyncIterableIterator<M> {
-        return this.collection.iterate({
+        return this.table.iterate({
             ...(this.params as FindParams<M>),
             ...(this.params.limit !== undefined && { pageSize: this.params.limit }),
             ...options
@@ -322,7 +322,7 @@ export class SDKQueryBuilder<M extends Record<string, unknown> = Record<string, 
 
     /** Collect everything this query matches into one array. */
     findAll(options?: PageWalkOptions<M> & { maxRows?: number }): Promise<M[]> {
-        return this.collection.findAll({
+        return this.table.findAll({
             ...(this.params as FindParams<M>),
             ...(this.params.limit !== undefined && { pageSize: this.params.limit }),
             ...options
@@ -333,19 +333,19 @@ export class SDKQueryBuilder<M extends Record<string, unknown> = Record<string, 
      * Count the records matching this query.
      */
     async count(): Promise<number> {
-        return this.collection.count(this.params as FindParams<M>);
+        return this.table.count(this.params as FindParams<M>);
     }
 
     /**
      * Listen to realtime updates matching this query.
      *
-     * The guard that used to stand here — `if (!this.collection.listen) throw`
+     * The guard that used to stand here — `if (!this.table.listen) throw`
      * — has moved onto the client itself, which is where the same failure had
      * to be diagnosed anyway: `client.data.posts.listen(…)`, one call short of
      * this builder, answered `undefined is not a function`. The message is now
      * the same either way.
      */
     listen(onUpdate: (data: FindResult<M>) => void, onError?: (error: Error) => void): () => void {
-        return this.collection.listen(this.params as FindParams<M>, onUpdate, onError);
+        return this.table.listen(this.params as FindParams<M>, onUpdate, onError);
     }
 }

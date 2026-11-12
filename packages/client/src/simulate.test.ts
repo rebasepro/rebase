@@ -45,7 +45,7 @@ describe("simulate", () => {
         const parent = createRebaseClient({ baseUrl: "http://localhost:1234", token: "admin-token", realtime: false, fetch: fetchImpl });
         const simulated = simulateOf(parent)({ role: "customer", userId: "u_1" });
 
-        await simulated.data.collection("tickets").find();
+        await simulated.data.table("tickets").find();
 
         expect(calls).toHaveLength(1);
         expect(calls[0].url).toContain("/api/data/tickets");
@@ -60,7 +60,7 @@ describe("simulate", () => {
         const parent = createRebaseClient({ baseUrl: "http://localhost:1234", token: "admin-token", realtime: false, fetch: fetchImpl });
         const simulated = simulateOf(parent)({ apiKeyId: "key-1" });
 
-        await parent.data.collection("tickets").find();
+        await parent.data.table("tickets").find();
         expect(calls[0].headers[SIMULATE_API_KEY_ID_HEADER]).toBeUndefined();
         expect(simulated.ws).toBeUndefined();
     });

@@ -73,7 +73,7 @@ describe("createRebaseClient({ offline })", () => {
 
     it("serves cached reads and queues writes through the data proxy, then syncs", async () => {
         const { client, network, requests } = createHarness();
-        const posts = client.data.collection("posts");
+        const posts = client.data.table("posts");
 
         const online = await posts.find();
         expect(online.data).toEqual([{ id: "p1", title: "hello" }]);
@@ -101,7 +101,7 @@ describe("createRebaseClient({ offline })", () => {
 
     it("offline: true works in Node via the in-memory fallback store", async () => {
         const { client, network } = createHarness(true);
-        const posts = client.data.collection("posts");
+        const posts = client.data.table("posts");
 
         await posts.find();
         network.online = false;
@@ -113,7 +113,7 @@ describe("createRebaseClient({ offline })", () => {
 
     it("routes fluent-builder queries through the cache", async () => {
         const { client, network, requests } = createHarness();
-        const posts = client.data.collection("posts");
+        const posts = client.data.table("posts");
 
         const online = await posts.where("title", "==", "hello").find();
         expect(online.data).toHaveLength(1);
@@ -132,7 +132,7 @@ describe("createRebaseClient({ offline })", () => {
 
     it("does not serve cache on a server error — only on network failure", async () => {
         const { client, network } = createHarness();
-        const posts = client.data.collection("posts");
+        const posts = client.data.table("posts");
         await posts.find();
 
         network.serverError = true;
@@ -141,7 +141,7 @@ describe("createRebaseClient({ offline })", () => {
 
     it("drives a live query through the data proxy, offline included", async () => {
         const { client, network } = createHarness();
-        const posts = client.data.collection("posts");
+        const posts = client.data.table("posts");
         await posts.find();
 
         const results: LiveResult<Record<string, unknown>>[] = [];
@@ -169,7 +169,7 @@ describe("createRebaseClient({ offline })", () => {
         });
 
         const results: LiveResult<Record<string, unknown>>[] = [];
-        const stop = plain.data.collection("posts").observe(undefined, (r) => results.push(r));
+        const stop = plain.data.table("posts").observe(undefined, (r) => results.push(r));
         await new Promise((resolve) => setTimeout(resolve, 0));
 
         expect(results[0].data.map((r) => r.id)).toEqual(["p1"]);

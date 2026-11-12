@@ -5,7 +5,7 @@ import {
     CreateRebaseClientResult
 } from "../src/index";
 import { createMemoryStorage } from "../src/auth";
-import { CollectionClient } from "../src/collection";
+import { TableClient } from "../src/table";
 import { jsonResponse } from "./support/responses";
 import { setGlobalWebSocket } from "./support/global-websocket";
 
@@ -61,12 +61,12 @@ token: "jwt-token" });
     });
 
     // -----------------------------------------------------------------------
-    // Collection access
+    // Table access
     // -----------------------------------------------------------------------
-    describe("Collection access", () => {
-        it("exposes the explicit collection() method", () => {
+    describe("Table access", () => {
+        it("exposes the explicit table() method", () => {
             const client = createRebaseClient({ baseUrl: "https://api.example.com" });
-            const posts = client.collection("posts");
+            const posts = client.table("posts");
             expect(typeof posts.find).toBe("function");
             expect(typeof posts.findById).toBe("function");
             expect(typeof posts.create).toBe("function");
@@ -74,17 +74,17 @@ token: "jwt-token" });
             expect(typeof posts.delete).toBe("function");
         });
 
-        it("caches collection clients (returns same instance)", () => {
+        it("caches table clients (returns same instance)", () => {
             const client = createRebaseClient({ baseUrl: "https://api.example.com" });
-            const posts1 = client.collection("posts");
-            const posts2 = client.collection("posts");
+            const posts1 = client.table("posts");
+            const posts2 = client.table("posts");
             expect(posts1).toBe(posts2);
         });
 
         it("creates different clients for different slugs", () => {
             const client = createRebaseClient({ baseUrl: "https://api.example.com" });
-            const posts = client.collection("posts");
-            const users = client.collection("users");
+            const posts = client.table("posts");
+            const users = client.table("users");
             expect(posts).not.toBe(users);
         });
     });
@@ -98,7 +98,7 @@ token: "jwt-token" });
 
             expect(typeof client.auth).toBe("object");
             expect(typeof client.admin).toBe("object");
-            expect(typeof client.collection).toBe("function");
+            expect(typeof client.table).toBe("function");
             expect(typeof client.auth.signInWithEmail).toBe("function");
         });
 
@@ -112,19 +112,19 @@ token: "jwt-token" });
     // data proxy
     // -----------------------------------------------------------------------
     describe("data proxy", () => {
-        it("accesses collections via data.collection()", () => {
+        it("accesses tables via data.table()", () => {
             const client = createRebaseClient({ baseUrl: "https://api.example.com" });
-            const posts = client.data.collection("posts");
+            const posts = client.data.table("posts");
             expect(typeof posts.find).toBe("function");
         });
 
-        it("accesses collections via data.<name> shorthand", () => {
+        it("accesses tables via data.<name> shorthand", () => {
             interface TestDB {
                 posts: { Row: { title: string } };
             }
             const client = createRebaseClient<TestDB>({ baseUrl: "https://api.example.com" });
 
-            const posts: CollectionClient = client.data.posts;
+            const posts: TableClient = client.data.posts;
             expect(typeof posts).toBe("object");
             expect(typeof posts.find).toBe("function");
             expect(typeof posts.findById).toBe("function");
@@ -156,32 +156,32 @@ token: "jwt-token" });
 
                 // 1. Single word
                 const posts = client.data.posts;
-                const postsColl = client.data.collection("posts");
+                const postsColl = client.data.table("posts");
                 expect(posts).toBe(postsColl);
 
                 // 2. Two-word camelCase
                 const companyMembers = client.data.companyMembers;
-                const companyMembersColl = client.data.collection("company_members");
+                const companyMembersColl = client.data.table("company_members");
                 expect(companyMembers).toBe(companyMembersColl);
 
                 // 3. Three-word camelCase
                 const talentApplicationStatus = client.data.talentApplicationStatus;
-                const talentApplicationStatusColl = client.data.collection("talent_application_status");
+                const talentApplicationStatusColl = client.data.table("talent_application_status");
                 expect(talentApplicationStatus).toBe(talentApplicationStatusColl);
 
                 // 4. Single uppercase letter
                 const xY = client.data.xY;
-                const xYColl = client.data.collection("x_y");
+                const xYColl = client.data.table("x_y");
                 expect(xY).toBe(xYColl);
 
                 // 5. Leading lowercase (common)
                 const leadMagnetSignups = client.data.leadMagnetSignups;
-                const leadMagnetSignupsColl = client.data.collection("lead_magnet_signups");
+                const leadMagnetSignupsColl = client.data.table("lead_magnet_signups");
                 expect(leadMagnetSignups).toBe(leadMagnetSignupsColl);
 
                 // 6. Already snake_case (no-op)
                 const privateNotes = client.data.private_notes;
-                const privateNotesColl = client.data.collection("private_notes");
+                const privateNotesColl = client.data.table("private_notes");
                 expect(privateNotes).toBe(privateNotesColl);
             });
 
@@ -204,21 +204,21 @@ meta: { total: 0 } });
                 expect(urlArg.toString()).not.toContain("companyMembers");
             });
 
-            it("uses options.collections mapping if provided", () => {
+            it("uses options.tables mapping if provided", () => {
                 const client = createRebaseClient({
                     baseUrl: "https://api.example.com",
-                    collections: {
+                    tables: {
                         companyMembers: "company-members",
                         orderItems: "order-items"
                     }
                 });
 
                 const companyMembers = client.data.companyMembers;
-                const companyMembersColl = client.data.collection("company-members");
+                const companyMembersColl = client.data.table("company-members");
                 expect(companyMembers).toBe(companyMembersColl);
 
                 const orderItems = client.data.orderItems;
-                const orderItemsColl = client.data.collection("order-items");
+                const orderItemsColl = client.data.table("order-items");
                 expect(orderItems).toBe(orderItemsColl);
             });
         });
@@ -237,15 +237,15 @@ meta: { total: 0 } });
         const dictionary = { posts: "posts", orderItems: "order_items" };
 
         it("answers `in` for the accessors it serves", () => {
-            const client = createRebaseClient({ baseUrl: "https://api.example.com", collections: dictionary });
+            const client = createRebaseClient({ baseUrl: "https://api.example.com", tables: dictionary });
             expect("posts" in client.data).toBe(true);
             expect("orderItems" in client.data).toBe(true);
-            expect("collection" in client.data).toBe(true);
+            expect("table" in client.data).toBe(true);
             expect("nope" in client.data).toBe(false);
         });
 
-        it("does not turn Object.prototype names into collections", () => {
-            const client = createRebaseClient({ baseUrl: "https://api.example.com", collections: dictionary });
+        it("does not turn Object.prototype names into tables", () => {
+            const client = createRebaseClient({ baseUrl: "https://api.example.com", tables: dictionary });
             const data = client.data;
             expect(data.toString).toBe(Object.prototype.toString);
             expect(data.hasOwnProperty).toBe(Object.prototype.hasOwnProperty);
@@ -254,7 +254,7 @@ meta: { total: 0 } });
         });
 
         it("can be turned into a string, with or without a dictionary", () => {
-            const typed = createRebaseClient({ baseUrl: "https://api.example.com", collections: dictionary });
+            const typed = createRebaseClient({ baseUrl: "https://api.example.com", tables: dictionary });
             const untyped = createRebaseClient({ baseUrl: "https://api.example.com" });
             expect(String(typed.data)).toBe("[object Object]");
             expect(String(untyped.data)).toBe("[object Object]");
@@ -262,9 +262,9 @@ meta: { total: 0 } });
         });
 
         it("still refuses an unknown accessor when a dictionary is given", () => {
-            const client = createRebaseClient({ baseUrl: "https://api.example.com", collections: dictionary });
+            const client = createRebaseClient({ baseUrl: "https://api.example.com", tables: dictionary });
             expect(() => client.data.postz)
-                .toThrow(/Unknown collection accessor "postz"/);
+                .toThrow(/Unknown table accessor "postz"/);
         });
     });
 
@@ -456,7 +456,7 @@ autoRefresh: false }
             const events: string[] = [];
             client.auth.onAuthStateChange((event) => { events.push(event); });
 
-            await expect(client.data.collection("posts").find()).rejects.toThrow();
+            await expect(client.data.table("posts").find()).rejects.toThrow();
 
             expect(urls.some(u => u.includes("/auth/refresh"))).toBe(true);
             expect(events).toContain("SIGNED_OUT");
@@ -486,7 +486,7 @@ meta: { total: 1 } });
 autoRefresh: false }
             });
 
-            await client.data.collection("posts").find();
+            await client.data.table("posts").find();
 
             // The caller's handler owns recovery: it ran, it said "retry", and
             // the client did NOT also fire its own token refresh behind it.
@@ -545,7 +545,7 @@ autoRefresh: false }
             });
 
             // Make a request that will get 401 → auto-refresh → retry
-            const result = await client.data.collection("posts").find();
+            const result = await client.data.table("posts").find();
 
             // The mock fetch should have been called 3 times:
             // 1) Original request → 401

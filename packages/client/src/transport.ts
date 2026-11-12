@@ -265,7 +265,7 @@ function findParamPairs(params?: FindParams, deleted?: SoftDeletedRows): [string
     if (params.after) pairs.push(["after", params.after]);
     // Only `none`: `exact` is the server's default, so sending it says
     // nothing — and a server older than the parameter reads any `?count=` as
-    // a filter on a column named `count` (see `find` in collection.ts).
+    // a filter on a column named `count` (see `find` in table.ts).
     if (params.count === "none") pairs.push(["count", "none"]);
 
     if (params.orderBy) {
@@ -336,7 +336,7 @@ export function buildQueryString(params?: FindParams, deleted?: SoftDeletedRows)
 }
 
 /**
- * The body of `POST /data/<collection>/query`: the parameters
+ * The body of `POST /data/<table>/query`: the parameters
  * {@link buildQueryString} puts in the URL, spelled as the URL spells them —
  * each value a string, and a parameter the URL repeats (a filter with two
  * conditions on one field) a list of them. The server reads it back into the
@@ -379,7 +379,7 @@ export function writeFilterBody(query: { where?: Record<string, unknown>; logica
  * such a column sent as its own parameter is read as that parameter, and the
  * filter is never applied. Those conditions go inside `?where=` instead, in the
  * same dot-string spelling, which the server decodes through the same codec and
- * merges in. A collection with no such column sends exactly what it did before.
+ * merges in. A table with no such column sends exactly what it did before.
  */
 function appendWhere(pairs: [string, string][], where: Record<string, unknown>): void {
     assertNoUndefinedFilterValues(where);
@@ -398,7 +398,7 @@ function appendWhere(pairs: [string, string][], where: Record<string, unknown>):
 }
 
 /**
- * The query string for `GET /<collection>/aggregate`.
+ * The query string for `GET /<table>/aggregate`.
  *
  * `?select=sum(total),count()` is SQL's spelling, because whoever writes an
  * aggregate is thinking in SQL and any other spelling has to be learned first —
@@ -923,7 +923,7 @@ headers: getHeaders(retryToken, init) });
             let fallbackMessage = res.statusText;
             if (res.status === 404 && !fallbackMessage) {
                 const method = init?.method || "GET";
-                fallbackMessage = `Endpoint not found (${method} ${path}). This usually means the collection is not registered on the backend, or the frontend API URL configuration (e.g. VITE_API_URL) is missing or pointing to the wrong host.`;
+                fallbackMessage = `Endpoint not found (${method} ${path}). This usually means the table is not registered on the backend, or the frontend API URL configuration (e.g. VITE_API_URL) is missing or pointing to the wrong host.`;
             }
             // On an error status an unreadable body does not matter — the
             // status is the answer and the message falls back to `statusText`.

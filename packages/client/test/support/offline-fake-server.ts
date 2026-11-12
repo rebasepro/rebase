@@ -8,7 +8,7 @@
  * before the request reaches anything.
  */
 import { RebaseApiError, type FindParams, type FindResult, type WriteOptions } from "@rebasepro/types";
-import { fakeCollectionClient } from "./fake-collection";
+import { fakeTableClient } from "./fake-table";
 import { OfflineManager } from "../../src/offline";
 import { MemoryOfflineStore, type PendingMutation } from "../../src/offline-store";
 import { runLocalQuery } from "../../src/offline-query";
@@ -50,7 +50,7 @@ export function fakeServer() {
         const error = reject?.(op, id, data, options);
         if (error) throw error;
     };
-    const client = fakeCollectionClient<Row>({
+    const client = fakeTableClient<Row>({
         async find(params?: FindParams) {
             check("find");
             if (findGate) {

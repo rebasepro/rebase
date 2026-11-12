@@ -297,8 +297,8 @@ describe("Subscription resilience", () => {
             ws.onmessage!({ data: JSON.stringify({
                 type: "error",
                 subscriptionId: frames[0].payload.subscriptionId,
-                payload: { error: { message: "Collection not found: 'products'", code: "NOT_FOUND" } },
-                error: "Collection not found: 'products'"
+                payload: { error: { message: "Table not found: 'products'", code: "NOT_FOUND" } },
+                error: "Table not found: 'products'"
             }) });
 
             expect(onError).toHaveBeenCalled();

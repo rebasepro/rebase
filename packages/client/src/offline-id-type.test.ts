@@ -49,7 +49,7 @@ describe("the id an offline write mints", () => {
 
     it("is a negative integer for a collection keyed by a number", async () => {
         const { client, network } = harness({ id: 1, title: "hello" });
-        const posts = client.data.collection("posts");
+        const posts = client.data.table("posts");
         await posts.find();
 
         network.online = false;
@@ -62,7 +62,7 @@ describe("the id an offline write mints", () => {
 
     it("is a UUID for a collection keyed by a string", async () => {
         const { client, network } = harness({ id: "p1", title: "hello" });
-        const posts = client.data.collection("posts");
+        const posts = client.data.table("posts");
         await posts.find();
 
         network.online = false;
@@ -73,7 +73,7 @@ describe("the id an offline write mints", () => {
 
     it("mints a different id every time, and keeps them ordered", async () => {
         const { client, network } = harness({ id: 1, title: "hello" });
-        const posts = client.data.collection("posts");
+        const posts = client.data.table("posts");
         await posts.find();
 
         network.online = false;
@@ -87,7 +87,7 @@ describe("the id an offline write mints", () => {
         // Whatever shape it has, the write that reaches the server names it —
         // that is how the server's own id gets reconciled back.
         const { client, network } = harness({ id: 1, title: "hello" });
-        const posts = client.data.collection("posts");
+        const posts = client.data.table("posts");
         await posts.find();
 
         network.online = false;
@@ -106,7 +106,7 @@ describe("the id an offline write mints", () => {
         const { client, network } = harness({ id: 1, title: "hello" });
         network.online = false;
 
-        const draft = await client.data.collection("posts").create({ title: "cold" }) as { id: unknown };
+        const draft = await client.data.table("posts").create({ title: "cold" }) as { id: unknown };
         expect(typeof draft.id).toBe("string");
     });
 });

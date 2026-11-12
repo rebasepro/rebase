@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
-import { createCollectionClient } from "../src/collection";
+import { createTableClient } from "../src/table";
 import { RebaseApiError, Transport } from "../src/transport";
 import { RebasePaginationError } from "@rebasepro/common";
 import { createMockTransport as createSharedMockTransport, type RequestAnswer } from "./support/fake-transport";
@@ -29,7 +29,7 @@ function rows(from: number, count: number): JobModel[] {
     return Array.from({ length: count }, (_, i) => ({ id: from + i }));
 }
 
-describe("CollectionClient.iterate", () => {
+describe("TableClient.iterate", () => {
     let transport: Transport;
     let mockRequest: jest.Mock<RequestAnswer>;
 
@@ -38,7 +38,7 @@ describe("CollectionClient.iterate", () => {
     });
 
     it("yields every row across pages exactly once", async () => {
-        const client = createCollectionClient<JobModel>(transport, "jobs");
+        const client = createTableClient<JobModel>(transport, "jobs");
         mockRequest
             .mockResolvedValueOnce(page(rows(1, 2), { total: 5, limit: 2, offset: 0, hasMore: true }))
             .mockResolvedValueOnce(page(rows(3, 2), { total: 5, limit: 2, offset: 2, hasMore: true }))
@@ -56,7 +56,7 @@ describe("CollectionClient.iterate", () => {
     it("does not stop early when the final page is exactly full", async () => {
         // The bug this guards: inferring "done" from `rows.length < limit`.
         // Here every page is exactly `limit` long, including the last one.
-        const client = createCollectionClient<JobModel>(transport, "jobs");
+        const client = createTableClient<JobModel>(transport, "jobs");
         mockRequest
             .mockResolvedValueOnce(page(rows(1, 2), { total: 4, limit: 2, offset: 0, hasMore: true }))
             .mockResolvedValueOnce(page(rows(3, 2), { total: 4, limit: 2, offset: 2, hasMore: false }));
@@ -71,7 +71,7 @@ describe("CollectionClient.iterate", () => {
     });
 
     it("terminates on hasMore=false even when the page is full", async () => {
-        const client = createCollectionClient<JobModel>(transport, "jobs");
+        const client = createTableClient<JobModel>(transport, "jobs");
         mockRequest.mockResolvedValueOnce(page(rows(1, 3), { total: 3, limit: 3, offset: 0, hasMore: false }));
 
         const seen: number[] = [];
@@ -84,7 +84,7 @@ describe("CollectionClient.iterate", () => {
     });
 
     it("terminates on an empty page even when the server insists there is more", async () => {
-        const client = createCollectionClient<JobModel>(transport, "jobs");
+        const client = createTableClient<JobModel>(transport, "jobs");
         mockRequest
             .mockResolvedValueOnce(page(rows(1, 2), { total: 99, limit: 2, offset: 0, hasMore: true }))
             .mockResolvedValueOnce(page([], { total: 99, limit: 2, offset: 2, hasMore: true }));
@@ -99,7 +99,7 @@ describe("CollectionClient.iterate", () => {
     });
 
     it("gives up loudly on a server that never stops saying hasMore", async () => {
-        const client = createCollectionClient<JobModel>(transport, "jobs");
+        const client = createTableClient<JobModel>(transport, "jobs");
         mockRequest.mockImplementation(async () =>
             page(rows(1, 2), { total: 99, limit: 2, offset: 0, hasMore: true }));
 
@@ -113,7 +113,7 @@ describe("CollectionClient.iterate", () => {
     });
 
     it("requests the configured pageSize and advances offset by rows received", async () => {
-        const client = createCollectionClient<JobModel>(transport, "jobs");
+        const client = createTableClient<JobModel>(transport, "jobs");
         mockRequest
             .mockResolvedValueOnce(page(rows(1, 3), { total: 5, limit: 3, offset: 0, hasMore: true }))
             .mockResolvedValueOnce(page(rows(4, 2), { total: 5, limit: 3, offset: 3, hasMore: false }));
@@ -125,7 +125,7 @@ describe("CollectionClient.iterate", () => {
     });
 
     it("defaults to a page size of 200", async () => {
-        const client = createCollectionClient<JobModel>(transport, "jobs");
+        const client = createTableClient<JobModel>(transport, "jobs");
         mockRequest.mockResolvedValueOnce(page(rows(1, 1), { total: 1, limit: 200, offset: 0, hasMore: false }));
 
         for await (const _row of client.iterate()) { /* drain */ }
@@ -134,7 +134,7 @@ describe("CollectionClient.iterate", () => {
     });
 
     it("carries the caller's filters onto every page", async () => {
-        const client = createCollectionClient<JobModel>(transport, "jobs");
+        const client = createTableClient<JobModel>(transport, "jobs");
         mockRequest
             .mockResolvedValueOnce(page(rows(1, 1), { total: 2, limit: 1, offset: 0, hasMore: true }))
             .mockResolvedValueOnce(page(rows(2, 1), { total: 2, limit: 1, offset: 1, hasMore: false }));
@@ -147,7 +147,7 @@ describe("CollectionClient.iterate", () => {
     });
 
     it("stops requesting as soon as the consumer breaks out", async () => {
-        const client = createCollectionClient<JobModel>(transport, "jobs");
+        const client = createTableClient<JobModel>(transport, "jobs");
         mockRequest.mockImplementation(async () =>
             page(rows(1, 2), { total: 99, limit: 2, offset: 0, hasMore: true }));
 
@@ -176,7 +176,7 @@ describe("CollectionClient.iterate", () => {
          * back in, and no offset anywhere.
          */
         it("hands the server's cursor back as `after`, not a where clause", async () => {
-            const client = createCollectionClient<JobModel>(transport, "jobs");
+            const client = createTableClient<JobModel>(transport, "jobs");
             mockRequest
                 .mockResolvedValueOnce(page(rows(1, 2), { total: 3, limit: 2, offset: 0, hasMore: true, nextCursor: "CUR1" }))
                 .mockResolvedValueOnce(page(rows(3, 1), { total: 3, limit: 2, offset: 0, hasMore: false }));
@@ -199,7 +199,7 @@ describe("CollectionClient.iterate", () => {
         });
 
         it("names the direction the caller asked to seek in", async () => {
-            const client = createCollectionClient<JobModel>(transport, "jobs");
+            const client = createTableClient<JobModel>(transport, "jobs");
             mockRequest
                 .mockResolvedValueOnce(page([{ id: 9 }, { id: 8 }], { total: 3, limit: 2, offset: 0, hasMore: true, nextCursor: "CUR8" }))
                 .mockResolvedValueOnce(page([{ id: 7 }], { total: 3, limit: 2, offset: 0, hasMore: false }));
@@ -212,7 +212,7 @@ describe("CollectionClient.iterate", () => {
         });
 
         it("keeps the caller's own filter across the walk", async () => {
-            const client = createCollectionClient<JobModel>(transport, "jobs");
+            const client = createTableClient<JobModel>(transport, "jobs");
             mockRequest
                 .mockResolvedValueOnce(page(rows(5, 1), { total: 2, limit: 1, offset: 0, hasMore: true, nextCursor: "CUR5" }))
                 .mockResolvedValueOnce(page(rows(6, 1), { total: 2, limit: 1, offset: 0, hasMore: false }));
@@ -239,7 +239,7 @@ describe("CollectionClient.iterate", () => {
          * and it is built over every key.
          */
         it("walks a multi-key sort instead of refusing it", async () => {
-            const client = createCollectionClient<JobModel>(transport, "jobs");
+            const client = createTableClient<JobModel>(transport, "jobs");
             mockRequest
                 .mockResolvedValueOnce(page(rows(1, 2), { total: 3, limit: 2, offset: 0, hasMore: true, nextCursor: "CUR2" }))
                 .mockResolvedValueOnce(page(rows(3, 1), { total: 3, limit: 2, offset: 0, hasMore: false }));
@@ -265,7 +265,7 @@ describe("CollectionClient.iterate", () => {
             // Exactly what a relevance-ordered listing does: `hasMore` is true
             // and no cursor can describe the page, because a `_score` is
             // computed per query and stored nowhere to compare against.
-            const client = createCollectionClient<JobModel>(transport, "jobs");
+            const client = createTableClient<JobModel>(transport, "jobs");
             mockRequest.mockResolvedValue(
                 page(rows(1, 2), { total: 99, limit: 2, offset: 0, hasMore: true }));
 
@@ -275,7 +275,7 @@ describe("CollectionClient.iterate", () => {
         });
 
         it("refuses to loop when the cursor stops advancing", async () => {
-            const client = createCollectionClient<JobModel>(transport, "jobs");
+            const client = createTableClient<JobModel>(transport, "jobs");
             mockRequest.mockImplementation(async () =>
                 page([{ id: 1 }, { id: 7 }], { total: 99, limit: 2, offset: 0, hasMore: true, nextCursor: "SAME" }));
 
@@ -304,7 +304,7 @@ describe("CollectionClient.iterate", () => {
         const urls = () => mockRequest.mock.calls.map((c) => String(c[0]));
 
         it("continues from a cursor, seeking rather than offsetting", async () => {
-            const client = createCollectionClient<JobModel>(transport, "jobs");
+            const client = createTableClient<JobModel>(transport, "jobs");
             mockRequest
                 .mockResolvedValueOnce(page(rows(21, 2), { total: 23, limit: 2, offset: 0, hasMore: true, nextCursor: "C22" }))
                 .mockResolvedValueOnce(page(rows(23, 1), { total: 23, limit: 2, offset: 0, hasMore: false }));
@@ -319,7 +319,7 @@ describe("CollectionClient.iterate", () => {
         });
 
         it("continues from a cursor given to the builder", async () => {
-            const client = createCollectionClient<JobModel>(transport, "jobs");
+            const client = createTableClient<JobModel>(transport, "jobs");
             mockRequest.mockResolvedValueOnce(page(rows(21, 1), { total: 21, limit: 200, offset: 0, hasMore: false }));
 
             await drain(client.after("C20").iterate());
@@ -330,7 +330,7 @@ describe("CollectionClient.iterate", () => {
         });
 
         it("starts at the builder's offset and walks on from it", async () => {
-            const client = createCollectionClient<JobModel>(transport, "jobs");
+            const client = createTableClient<JobModel>(transport, "jobs");
             mockRequest
                 .mockResolvedValueOnce(page(rows(41, 2), { total: 43, limit: 2, offset: 40, hasMore: true }))
                 .mockResolvedValueOnce(page(rows(43, 1), { total: 43, limit: 2, offset: 42, hasMore: false }));
@@ -344,7 +344,7 @@ describe("CollectionClient.iterate", () => {
         });
 
         it("findAll() starts from the cursor too", async () => {
-            const client = createCollectionClient<JobModel>(transport, "jobs");
+            const client = createTableClient<JobModel>(transport, "jobs");
             mockRequest.mockResolvedValueOnce(page(rows(21, 1), { total: 21, limit: 200, offset: 0, hasMore: false }));
 
             await client.findAll({ after: "C20" });
@@ -355,7 +355,7 @@ describe("CollectionClient.iterate", () => {
     });
 });
 
-describe("CollectionClient.findAll", () => {
+describe("TableClient.findAll", () => {
     let transport: Transport;
     let mockRequest: jest.Mock<RequestAnswer>;
 
@@ -364,7 +364,7 @@ describe("CollectionClient.findAll", () => {
     });
 
     it("collects every page into one array", async () => {
-        const client = createCollectionClient<JobModel>(transport, "jobs");
+        const client = createTableClient<JobModel>(transport, "jobs");
         mockRequest
             .mockResolvedValueOnce(page(rows(1, 2), { total: 3, limit: 2, offset: 0, hasMore: true }))
             .mockResolvedValueOnce(page(rows(3, 1), { total: 3, limit: 2, offset: 2, hasMore: false }));
@@ -375,7 +375,7 @@ describe("CollectionClient.findAll", () => {
     });
 
     it("throws rather than returning a silently truncated array when the cap is hit", async () => {
-        const client = createCollectionClient<JobModel>(transport, "jobs");
+        const client = createTableClient<JobModel>(transport, "jobs");
         mockRequest.mockImplementation(async () =>
             page(rows(1, 2), { total: 99, limit: 2, offset: 0, hasMore: true }));
 
@@ -386,7 +386,7 @@ describe("CollectionClient.findAll", () => {
     });
 
     it("returns the rows when the match count sits exactly on the cap", async () => {
-        const client = createCollectionClient<JobModel>(transport, "jobs");
+        const client = createTableClient<JobModel>(transport, "jobs");
         mockRequest.mockResolvedValueOnce(page(rows(1, 4), { total: 4, limit: 4, offset: 0, hasMore: false }));
 
         const all = await client.findAll({ pageSize: 4, maxRows: 4 });
@@ -395,7 +395,7 @@ describe("CollectionClient.findAll", () => {
     });
 
     it("defaults its ceiling to 10 000 rows", async () => {
-        const client = createCollectionClient<JobModel>(transport, "jobs");
+        const client = createTableClient<JobModel>(transport, "jobs");
         // 11 pages of 1000 = 11 000 rows available, so the default cap bites.
         mockRequest.mockImplementation(async () =>
             page(rows(1, 1000), { total: 11_000, limit: 1000, offset: 0, hasMore: true }));
@@ -424,7 +424,7 @@ describe("count on the wire", () => {
     });
 
     it("find({ count: \"none\" }) sends ?count=none", async () => {
-        const client = createCollectionClient<JobModel>(transport, "jobs");
+        const client = createTableClient<JobModel>(transport, "jobs");
         mockRequest.mockResolvedValueOnce(page(rows(1, 1), { total: 1, limit: 10, offset: 0, hasMore: false }));
 
         await client.find({ limit: 10, count: "none" });
@@ -433,7 +433,7 @@ describe("count on the wire", () => {
     });
 
     it("a plain find sends no count parameter (exact is the server's default)", async () => {
-        const client = createCollectionClient<JobModel>(transport, "jobs");
+        const client = createTableClient<JobModel>(transport, "jobs");
         mockRequest.mockResolvedValue(page(rows(1, 1), { total: 1, limit: 10, offset: 0, hasMore: false }));
 
         await client.find({ limit: 10 });
@@ -443,7 +443,7 @@ describe("count on the wire", () => {
     });
 
     it("every page of iterate() and findAll() skips the count", async () => {
-        const client = createCollectionClient<JobModel>(transport, "jobs");
+        const client = createTableClient<JobModel>(transport, "jobs");
         const serve = () => {
             mockRequest
                 .mockResolvedValueOnce(page(rows(1, 2), { total: 3, limit: 2, offset: 0, hasMore: true, nextCursor: "C2" }))
@@ -464,7 +464,7 @@ describe("count on the wire", () => {
     });
 
     it("count() never forwards a count parameter to /count", async () => {
-        const client = createCollectionClient<JobModel>(transport, "jobs");
+        const client = createTableClient<JobModel>(transport, "jobs");
         mockRequest.mockResolvedValueOnce({ count: 7 });
 
         await expect(client.count({ count: "none", where: { status: ["==", "queued"] } })).resolves.toBe(7);
@@ -475,9 +475,9 @@ describe("count on the wire", () => {
     it("a server that reads ?count= as a filter is asked again without it, once per client", async () => {
         // Every server released before the parameter treats `count` as a
         // column name and answers 400 UNKNOWN_FILTER_FIELD.
-        const client = createCollectionClient<JobModel>(transport, "jobs");
+        const client = createTableClient<JobModel>(transport, "jobs");
         mockRequest
-            .mockRejectedValueOnce(new RebaseApiError("Unknown filter field 'count' on collection 'jobs'", {
+            .mockRejectedValueOnce(new RebaseApiError("Unknown filter field 'count' on table 'jobs'", {
                 status: 400,
                 code: "UNKNOWN_FILTER_FIELD",
                 details: { field: "count", collection: "jobs" }
@@ -487,7 +487,7 @@ describe("count on the wire", () => {
         const first = await client.find({ limit: 10, count: "none" });
         expect(first.data).toEqual([{ id: 1 }]);
         // Later reads through the same client do not send it again.
-        await createCollectionClient<JobModel>(transport, "other").find({ limit: 5, count: "none" });
+        await createTableClient<JobModel>(transport, "other").find({ limit: 5, count: "none" });
 
         expect(urls()).toEqual([
             "/data/jobs?limit=10&count=none",
@@ -498,7 +498,7 @@ describe("count on the wire", () => {
 
     it("any other unknown-field 400 is the caller's, not retried", async () => {
         // Untyped rows: the filter names a field the model does not have, on purpose.
-        const client = createCollectionClient(transport, "jobs");
+        const client = createTableClient(transport, "jobs");
         mockRequest.mockRejectedValueOnce(new RebaseApiError("Unknown filter field 'nope'", {
             status: 400,
             code: "UNKNOWN_FILTER_FIELD",

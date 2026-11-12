@@ -105,11 +105,11 @@ describe("impersonate", () => {
                 fetch: fetchMock
             });
 
-            await client.data.collection("notes").find();
+            await client.data.table("notes").find();
             const headers = fetchMock.mock.calls[0]?.[1]?.headers as Record<string, string> | undefined;
             expect(headers?.[IMPERSONATE_HEADER]).toBe("user-b");
 
-            const stop = client.data.collection("notes").listen({}, () => undefined, () => undefined);
+            const stop = client.data.table("notes").listen({}, () => undefined, () => undefined);
             await settle();
             expect(sent.find(m => m.type === "AUTHENTICATE")?.payload).toEqual({ token: "admin-token", impersonate: "user-b" });
 

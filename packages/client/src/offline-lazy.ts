@@ -4,7 +4,7 @@ import {
     type FindAllParams,
     type IterateParams,
     type LogicalCondition,
-    type SDKCollectionClient,
+    type SDKTableClient,
     type UpdateValues,
     type UpsertOptions,
     type FilteredWriteParams,
@@ -15,19 +15,19 @@ import {
 } from "@rebasepro/types";
 import type { FindParams } from "./transport";
 import type {
-    CollectionClient,
+    TableClient,
     LiveResult,
     ObserveByIdOptions,
     ObserveOptions,
     RestoreOptions,
     RowSnapshotMeta,
     TrashClient
-} from "./collection";
+} from "./table";
 import type { OfflineApi, OfflineConfig, OfflineManager, OfflineQueueOptions, OfflineStatus } from "./offline";
 import { SDKQueryBuilder } from "./sdk_query_builder";
 
 type AnyRow = Record<string, unknown>;
-type InnerFactory = (slug: string) => SDKCollectionClient<AnyRow>;
+type InnerFactory = (slug: string) => SDKTableClient<AnyRow>;
 
 /**
  * `createRebaseClient({ offline })`'s handle on the sync engine, which it
@@ -43,7 +43,7 @@ type InnerFactory = (slug: string) => SDKCollectionClient<AnyRow>;
  *
  * - Calls made before the engine has arrived are queued and run, in the order
  *   they were made, the moment it does — the scope changes the factory makes
- *   from auth events, and every collection a client wrapped meanwhile.
+ *   from auth events, and every table a client wrapped meanwhile.
  * - What answers with a promise waits for the engine and then asks it.
  * - What answers synchronously answers what the engine would have before
  *   anything ran: `status()` is the initial status, a subscription is
@@ -159,16 +159,16 @@ export class LazyOfflineManager {
      * The engine's wrapper around `inner` — itself once the engine is there,
      * and until then a client of the same shape that hands each call to it.
      */
-    wrap<M extends AnyRow>(slug: string, inner: CollectionClient<M>): CollectionClient<M> {
+    wrap<M extends AnyRow>(slug: string, inner: TableClient<M>): TableClient<M> {
         if (this.engine) return this.engine.wrap(slug, inner);
 
-        let real: CollectionClient<M> | undefined;
+        let real: TableClient<M> | undefined;
         void this.run((engine) => { real = engine.wrap(slug, inner); }).catch(() => undefined);
-        const client = async (): Promise<CollectionClient<M>> => {
+        const client = async (): Promise<TableClient<M>> => {
             if (!real) await this.run(() => undefined);
             return real!;
         };
-        const live = (start: (target: CollectionClient<M>) => () => void, onError?: (error: Error) => void): () => void =>
+        const live = (start: (target: TableClient<M>) => () => void, onError?: (error: Error) => void): () => void =>
             real ? start(real) : this.subscribe(() => start(real!), onError);
 
         const trash: TrashClient<M> = {
@@ -180,7 +180,7 @@ export class LazyOfflineManager {
             purgeMany: async (ids: (string | number)[], options?: WriteOptions) => (await client()).trash.purgeMany(ids, options)
         };
 
-        const deferred: CollectionClient<M> = {
+        const deferred: TableClient<M> = {
             find: async (params?: FindParams<M>) => (await client()).find(params),
             iterate: (params?: IterateParams<M>) => (async function* () {
                 yield* (await client()).iterate(params);

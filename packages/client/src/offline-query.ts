@@ -34,8 +34,8 @@ import { splitSearchTerms } from "@rebasepro/utils";
  * Two things it deliberately approximates, both flagged by
  * {@link isExactlyEvaluable}: `searchString` becomes a case-insensitive
  * substring scan over the row's string fields (the server runs real full-text
- * search over the collection's configured columns), and `include` cannot be
- * evaluated at all, because the related rows live in collections this query
+ * search over the table's configured columns), and `include` cannot be
+ * evaluated at all, because the related rows live in tables this query
  * knows nothing about.
  */
 
@@ -472,9 +472,9 @@ function logicalOrders(condition: LogicalCondition | FilterCondition | undefined
 
 /**
  * Can a locally evaluated answer to `params` be trusted to match the server's,
- * assuming the cache holds every row of the collection?
+ * assuming the cache holds every row of the table?
  *
- * `include` pulls in rows from other collections that this evaluator never
+ * `include` pulls in rows from other tables that this evaluator never
  * sees, and `searchString` is only approximated — both make the local answer a
  * best effort rather than an equivalent one.
  *
@@ -533,7 +533,7 @@ export function isExactlyEvaluable(params?: FindParams): boolean {
     // about rows in another table. `matchesWhere` reads `row[field]` flat, so
     // the key resolves to `undefined` on every cached row and the condition
     // excludes all of them: a 200 with an empty list, indistinguishable from
-    // "nothing matched". The cache holds one collection; it cannot answer a
+    // "nothing matched". The cache holds one table; it cannot answer a
     // question about a second, so it must not claim to.
     if (whereReachesThroughRelation(params.where)) return false;
     if (logicalReachesThroughRelation(params.logical)) return false;

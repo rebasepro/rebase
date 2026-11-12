@@ -1,5 +1,5 @@
 import { jest } from "@jest/globals";
-import { createCollectionClient, type CollectionRealtime } from "../src/collection";
+import { createTableClient, type TableRealtime } from "../src/table";
 import type { Transport } from "../src/transport";
 import { createMockTransport as createSharedMockTransport, type RequestAnswer } from "./support/fake-transport";
 import { mockRealtime, type RowsListener } from "./support/fake-realtime";
@@ -33,7 +33,7 @@ describe("SDK read methods", () => {
 
     describe("aggregate()", () => {
         it("spells the aggregates the way the route parses them", async () => {
-            const client = createCollectionClient<Post>(transport, "orders");
+            const client = createTableClient<Post>(transport, "orders");
             mockRequest.mockResolvedValueOnce({ data: [{ status: "paid", sum_total: 41822.5 }] });
 
             const rows = await client.aggregate({
@@ -48,7 +48,7 @@ describe("SDK read methods", () => {
         });
 
         it("carries the builder's filters into the aggregate", async () => {
-            const client = createCollectionClient<Post>(transport, "orders");
+            const client = createTableClient<Post>(transport, "orders");
             mockRequest.mockResolvedValueOnce({ data: [] });
 
             await client.where("status", "==", "paid")
@@ -62,7 +62,7 @@ describe("SDK read methods", () => {
         });
 
         it("returns an empty list rather than undefined for no groups", async () => {
-            const client = createCollectionClient<Post>(transport, "orders");
+            const client = createTableClient<Post>(transport, "orders");
             mockRequest.mockResolvedValueOnce({});
             expect(await client.aggregate({ select: [{ fn: "count" }] })).toEqual([]);
         });
@@ -70,7 +70,7 @@ describe("SDK read methods", () => {
 
     describe("fields() and distinct()", () => {
         it("sends the columns as a projection", async () => {
-            const client = createCollectionClient<Post>(transport, "posts");
+            const client = createTableClient<Post>(transport, "posts");
             mockRequest.mockResolvedValueOnce({ data: [], meta: {} });
 
             await client.fields("id", "title").find();
@@ -79,7 +79,7 @@ describe("SDK read methods", () => {
         });
 
         it("sends distinct only when it is on", async () => {
-            const client = createCollectionClient<Post>(transport, "posts");
+            const client = createTableClient<Post>(transport, "posts");
             mockRequest.mockResolvedValueOnce({ data: [], meta: {} });
             await client.fields("status").distinct().find();
             expect(url()).toContain("distinct=true");
@@ -94,7 +94,7 @@ describe("SDK read methods", () => {
 
     describe("orderBy nulls placement", () => {
         it("sends the third segment when one is named", async () => {
-            const client = createCollectionClient<Post>(transport, "posts");
+            const client = createTableClient<Post>(transport, "posts");
             mockRequest.mockResolvedValueOnce({ data: [], meta: {} });
 
             await client.orderBy("title", "desc", "last").find();
@@ -103,7 +103,7 @@ describe("SDK read methods", () => {
         });
 
         it("leaves a sort without one exactly as it was", async () => {
-            const client = createCollectionClient<Post>(transport, "posts");
+            const client = createTableClient<Post>(transport, "posts");
             mockRequest.mockResolvedValueOnce({ data: [], meta: {} });
 
             await client.orderBy("title", "desc").find();
@@ -115,7 +115,7 @@ describe("SDK read methods", () => {
 
     describe("after()", () => {
         it("passes the cursor through unread", async () => {
-            const client = createCollectionClient<Post>(transport, "posts");
+            const client = createTableClient<Post>(transport, "posts");
             mockRequest.mockResolvedValueOnce({ data: [], meta: {} });
 
             await client.after("OPAQUE-CURSOR").find();
@@ -132,7 +132,7 @@ describe("SDK read methods", () => {
                 calls,
                 ws: {
                     ...mockRealtime().realtime,
-                    listenCollection: jest.fn<CollectionRealtime["listenCollection"]>((_props, onUpdate) => {
+                    listenCollection: jest.fn<TableRealtime["listenCollection"]>((_props, onUpdate) => {
                         calls.push({ onUpdate });
                         return () => {};
                     })
@@ -142,7 +142,7 @@ describe("SDK read methods", () => {
 
         it("reads total and hasMore off the frame", async () => {
             const { calls, ws } = socket();
-            const client = createCollectionClient<Post>(transport, "posts", ws);
+            const client = createTableClient<Post>(transport, "posts", ws);
             const seen: unknown[] = [];
             client.listen({ limit: 2 }, (result) => seen.push(result.meta));
 
@@ -157,7 +157,7 @@ describe("SDK read methods", () => {
 
         it("keeps the last real total when a frame's count failed", async () => {
             const { calls, ws } = socket();
-            const client = createCollectionClient<Post>(transport, "posts", ws);
+            const client = createTableClient<Post>(transport, "posts", ws);
             const seen: unknown[] = [];
             client.listen({ limit: 2 }, (result) => seen.push(result.meta));
 
@@ -179,7 +179,7 @@ describe("SDK read methods", () => {
             // push, rather than on every one.
             const { calls, ws } = socket();
             mockRequest.mockResolvedValue({ count: 7 });
-            const client = createCollectionClient<Post>(transport, "posts", ws);
+            const client = createTableClient<Post>(transport, "posts", ws);
             const seen: unknown[] = [];
             client.listen({ limit: 2 }, (result) => seen.push(result.meta));
 

@@ -1,7 +1,7 @@
 import { describe, it, expect, jest, beforeEach, afterEach } from "@jest/globals";
 import { isUnsupported } from "@rebasepro/types";
 import { RebaseWebSocketClient } from "../src/websocket";
-import { createCollectionClient } from "../src/collection";
+import { createTableClient } from "../src/table";
 import type { Transport } from "../src/transport";
 import { FaultServer, type Frame, type Responder } from "./support/fault-socket";
 import { fakeTransport } from "./support/fake-transport";
@@ -34,7 +34,7 @@ function setup(responder: Responder, restTotal = 0) {
     const ws = new RebaseWebSocketClient({ websocketUrl: "ws://test", WebSocket: server.WebSocket });
     clients.push(ws);
     const { transport, counted } = transportCounting(restTotal);
-    const posts = createCollectionClient<Record<string, unknown>>(transport, "posts", ws);
+    const posts = createTableClient<Record<string, unknown>>(transport, "posts", ws);
     return { server, posts, counted };
 }
 
@@ -126,7 +126,7 @@ describe("listenCount", () => {
 
     it("is a stub that says why on a client with no socket", () => {
         const { transport } = transportCounting(0);
-        const posts = createCollectionClient<Record<string, unknown>>(transport, "posts");
+        const posts = createTableClient<Record<string, unknown>>(transport, "posts");
         expect(isUnsupported(posts.listenCount)).toBe(true);
     });
 });

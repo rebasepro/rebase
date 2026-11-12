@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { RebaseApiError, RebaseClientError } from "@rebasepro/types";
 import { createRebaseClient } from "../src/index";
-import { createCollectionClient } from "../src/collection";
+import { createTableClient } from "../src/table";
 import { createTransport } from "../src/transport";
 import { OfflineManager } from "../src/offline";
 import { MemoryOfflineStore } from "../src/offline-store";
@@ -30,7 +30,7 @@ function respond(status: number, body: string) {
 
 function client(status: number, body: string) {
     const transport = createTransport({ baseUrl: "https://api.example.com", fetch: respond(status, body) });
-    return createCollectionClient<{ id: string; title: string }>(transport, "posts");
+    return createTableClient<{ id: string; title: string }>(transport, "posts");
 }
 
 async function caught(promise: Promise<unknown>): Promise<unknown> {

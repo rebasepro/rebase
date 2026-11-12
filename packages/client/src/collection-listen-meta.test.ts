@@ -1,6 +1,6 @@
 import { jest } from "@jest/globals";
 import { DEFAULT_LIST_LIMIT } from "@rebasepro/types";
-import { createCollectionClient, type CollectionRealtime } from "./collection";
+import { createTableClient, type TableRealtime } from "./table";
 import type { FindResult } from "@rebasepro/types";
 import { fakeTransport, type RequestAnswer } from "../test/support/fake-transport";
 
@@ -16,7 +16,7 @@ const flush = () => new Promise<void>((r) => setTimeout(r, 0));
 
 function createWs() {
     let push: ((rows: Record<string, unknown>[]) => void) | undefined;
-    const ws: CollectionRealtime = {
+    const ws: TableRealtime = {
         listenCollection: (_p, onUpdate) => {
             push = onUpdate;
             return () => { push = undefined; };
@@ -37,7 +37,7 @@ describe("listen() pagination metadata", () => {
     it("reports the page size the server actually applies when none was requested", async () => {
         const transport = createTransport(() => Promise.resolve({ count: 3 }));
         const { ws, push } = createWs();
-        const client = createCollectionClient<Row>(transport, "products", ws);
+        const client = createTableClient<Row>(transport, "products", ws);
 
         const updates: FindResult<Row>[] = [];
         const stop = client.listen!(undefined, (r) => updates.push(r));
@@ -60,7 +60,7 @@ describe("listen() pagination metadata", () => {
                 : Promise.reject(new Error("count unavailable"));
         });
         const { ws, push } = createWs();
-        const client = createCollectionClient<Row>(transport, "products", ws);
+        const client = createTableClient<Row>(transport, "products", ws);
 
         const updates: FindResult<Row>[] = [];
         const stop = client.listen!({ limit: 2 }, (r) => updates.push(r));
@@ -80,7 +80,7 @@ describe("listen() pagination metadata", () => {
     it("never claims a total below the rows already skipped", async () => {
         const transport = createTransport(() => Promise.reject(new Error("nope")));
         const { ws, push } = createWs();
-        const client = createCollectionClient<Row>(transport, "products", ws);
+        const client = createTableClient<Row>(transport, "products", ws);
 
         const updates: FindResult<Row>[] = [];
         const stop = client.listen!({ limit: 2, offset: 10 }, (r) => updates.push(r));

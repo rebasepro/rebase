@@ -128,7 +128,7 @@ describe("the realtime socket across a change of account", () => {
     it("signs the socket in with the account's token when a guest becomes the account", async () => {
         const rebase = client();
         await rebase.auth.signInAnonymously();
-        rebase.data.collection("inbox").listen({}, jest.fn());
+        rebase.data.table("inbox").listen({}, jest.fn());
         await jest.advanceTimersByTimeAsync(10);
         const socket = latest();
 
@@ -144,7 +144,7 @@ describe("the realtime socket across a change of account", () => {
         const rebase = client();
         const onError = jest.fn();
 
-        rebase.data.collection("posts").listen({}, jest.fn(), onError);
+        rebase.data.table("posts").listen({}, jest.fn(), onError);
         await jest.advanceTimersByTimeAsync(10);
 
         expect(latest().sent.map(f => f.type)).toEqual(["subscribe_collection"]);
@@ -163,14 +163,14 @@ describe("the realtime socket across a change of account", () => {
         const rebase = client();
         await rebase.auth.signInWithEmail("alice@example.test", "pw");
         const mounted = jest.fn();
-        rebase.data.collection("inbox").listen({}, mounted);
+        rebase.data.table("inbox").listen({}, mounted);
         await jest.advanceTimersByTimeAsync(10);
         const alices = latest();
         alices.push([{ id: "a-1", owner: "alice" }]);
 
         await rebase.auth.signInWithEmail("bob@example.test", "pw");
         const late = jest.fn();
-        rebase.data.collection("inbox").listen({}, late);
+        rebase.data.table("inbox").listen({}, late);
         await jest.advanceTimersByTimeAsync(10);
 
         expect(alices.readyState).toBe(MockSocket.CLOSED);
@@ -185,7 +185,7 @@ describe("the realtime socket across a change of account", () => {
 
     it("re-subscribes a visitor's live query as the account they sign in to", async () => {
         const rebase = client();
-        rebase.data.collection("posts").listen({}, jest.fn());
+        rebase.data.table("posts").listen({}, jest.fn());
         await jest.advanceTimersByTimeAsync(10);
         const anonymous = latest();
 
@@ -200,7 +200,7 @@ describe("the realtime socket across a change of account", () => {
     it("re-authenticates in place when the same account refreshes its token", async () => {
         const rebase = client();
         await rebase.auth.signInWithEmail("dave@example.test", "pw");
-        rebase.data.collection("posts").listen({}, jest.fn());
+        rebase.data.table("posts").listen({}, jest.fn());
         await jest.advanceTimersByTimeAsync(10);
         const socket = latest();
 
@@ -349,9 +349,9 @@ describe("a client whose token comes from the host's own auth", () => {
         const rebase = client();
         rebase.setAuthTokenGetter(async () => "token-from-host");
 
-        rebase.data.collection("posts").listen({}, jest.fn());
+        rebase.data.table("posts").listen({}, jest.fn());
         await jest.advanceTimersByTimeAsync(10);
-        await rebase.data.collection("posts").find();
+        await rebase.data.table("posts").find();
 
         expect(latest().sent[0]).toMatchObject({ type: "AUTHENTICATE", payload: { token: "token-from-host" } });
         expect(authorizations).toEqual(["Bearer token-from-host"]);
@@ -362,7 +362,7 @@ describe("a client whose token comes from the host's own auth", () => {
         let issued = 0;
         rebase.setAuthTokenGetter(async () => `token-${++issued}`);
 
-        rebase.data.collection("posts").listen({}, jest.fn());
+        rebase.data.table("posts").listen({}, jest.fn());
         await jest.advanceTimersByTimeAsync(10);
         const first = latest();
         first.close();
@@ -375,7 +375,7 @@ describe("a client whose token comes from the host's own auth", () => {
 
     it("rebuilds a socket that was already open as the getter's user", async () => {
         const rebase = client();
-        rebase.data.collection("posts").listen({}, jest.fn());
+        rebase.data.table("posts").listen({}, jest.fn());
         await jest.advanceTimersByTimeAsync(10);
         const anonymous = latest();
         expect(authFrames(anonymous)).toHaveLength(0);
@@ -393,9 +393,9 @@ describe("a client whose token comes from the host's own auth", () => {
         const rebase = client({ token: "service-key" });
         rebase.setAuthTokenGetter(async () => null);
 
-        rebase.data.collection("posts").listen({}, jest.fn());
+        rebase.data.table("posts").listen({}, jest.fn());
         await jest.advanceTimersByTimeAsync(10);
-        await rebase.data.collection("posts").find();
+        await rebase.data.table("posts").find();
 
         expect(authFrames(latest())[0].payload).toMatchObject({ token: "service-key" });
         expect(authorizations).toEqual(["Bearer service-key"]);
@@ -405,7 +405,7 @@ describe("a client whose token comes from the host's own auth", () => {
         const rebase = client();
         rebase.setToken("token-set-later");
 
-        rebase.data.collection("posts").listen({}, jest.fn());
+        rebase.data.table("posts").listen({}, jest.fn());
         await jest.advanceTimersByTimeAsync(10);
 
         expect(authFrames(latest())[0].payload).toMatchObject({ token: "token-set-later" });
@@ -418,7 +418,7 @@ describe("a client whose token comes from the host's own auth", () => {
         const onUnauthorized = jest.fn(async () => true);
         rebase.setOnUnauthorized(onUnauthorized);
 
-        rebase.data.collection("posts").listen({}, jest.fn(), jest.fn());
+        rebase.data.table("posts").listen({}, jest.fn(), jest.fn());
         await jest.advanceTimersByTimeAsync(10);
         const socket = latest();
         const subscribe = socket.sent.find(f => f.type === "subscribe_collection")!;
@@ -449,9 +449,9 @@ describe("a client whose token comes from the host's own auth", () => {
         });
         current = "token-after-refresh";
 
-        rebase.data.collection("posts").listen({}, jest.fn());
+        rebase.data.table("posts").listen({}, jest.fn());
         await jest.advanceTimersByTimeAsync(10);
-        await rebase.data.collection("posts").find();
+        await rebase.data.table("posts").find();
 
         expect(authFrames(latest())[0].payload).toMatchObject({ token: "token-after-refresh" });
         expect(authorizations).toEqual(["Bearer token-after-refresh"]);

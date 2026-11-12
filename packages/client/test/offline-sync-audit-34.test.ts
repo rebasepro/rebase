@@ -269,7 +269,7 @@ describe("a count answered while writes are queued (M11)", () => {
 describe("the local database's bounds (L3)", () => {
     it("caps the remembered missing ids even while the row cache is under its own cap", async () => {
         const server = fakeServer();
-        const offline = new OfflineManager({ store: new MemoryOfflineStore(), syncIntervalMs: 0, maxCachedRowsPerCollection: 2 }, () => server.client);
+        const offline = new OfflineManager({ store: new MemoryOfflineStore(), syncIntervalMs: 0, maxCachedRowsPerTable: 2 }, () => server.client);
         const posts = offline.wrap("posts", server.client);
         for (const id of ["a", "b", "c", "d", "e"]) await posts.findById(id);
         const state = (Reflect.get(offline, "collections") as Map<string, { absent: Set<string> }>).get("posts")!;
@@ -278,7 +278,7 @@ describe("the local database's bounds (L3)", () => {
 
     it("forgets that an evicted query was fresh", async () => {
         const server = fakeServer();
-        const offline = new OfflineManager({ store: new MemoryOfflineStore(), syncIntervalMs: 0, maxCachedQueriesPerCollection: 1 }, () => server.client);
+        const offline = new OfflineManager({ store: new MemoryOfflineStore(), syncIntervalMs: 0, maxCachedQueriesPerTable: 1 }, () => server.client);
         const posts = offline.wrap("posts", server.client);
         for (const limit of [1, 2, 3]) await posts.find({ limit });
         const state = (Reflect.get(offline, "collections") as Map<string, { fresh: Set<string> }>).get("posts")!;

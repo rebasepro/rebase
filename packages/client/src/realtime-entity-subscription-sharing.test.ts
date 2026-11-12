@@ -1,6 +1,6 @@
 import { jest } from "@jest/globals";
 import { RebaseWebSocketClient } from "./websocket";
-import { createCollectionClient, type CollectionRealtime } from "./collection";
+import { createTableClient, type TableRealtime } from "./table";
 import { fakeRequest, type RequestAnswer } from "../test/support/fake-transport";
 
 /**
@@ -92,10 +92,10 @@ describe("record subscriptions shared across listeners", () => {
 
 describe("a collection client's row listener", () => {
     it("hands the relations it is asked for to the socket, and a row read sends them as ?include=", async () => {
-        const listenOne = jest.fn<CollectionRealtime["listenOne"]>(() => () => undefined);
-        const listenCollection = jest.fn<CollectionRealtime["listenCollection"]>(() => () => undefined);
+        const listenOne = jest.fn<TableRealtime["listenOne"]>(() => () => undefined);
+        const listenCollection = jest.fn<TableRealtime["listenCollection"]>(() => () => undefined);
         const request = jest.fn<RequestAnswer>(async () => ({ id: 1 }));
-        const collection = createCollectionClient(
+        const collection = createTableClient(
             { request: fakeRequest(request), baseUrl: "", apiPath: "/api" },
             "posts",
             { listenOne, listenCollection }

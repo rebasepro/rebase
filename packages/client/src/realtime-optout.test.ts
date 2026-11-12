@@ -78,7 +78,7 @@ describe("realtime opt-out", () => {
         const client = createRebaseClient({ baseUrl: "http://localhost:3000" });
         expect(opened).toHaveLength(0);
 
-        client.collection("posts").listen(undefined, () => { /* noop */ });
+        client.table("posts").listen(undefined, () => { /* noop */ });
 
         expect(opened).toHaveLength(1);
     });
@@ -89,8 +89,8 @@ describe("realtime opt-out", () => {
 
         const client = createRebaseClient({ baseUrl: "http://localhost:3000" });
 
-        client.collection("posts").listen(undefined, () => { /* noop */ });
-        client.collection("authors").listen(undefined, () => { /* noop */ });
+        client.table("posts").listen(undefined, () => { /* noop */ });
+        client.table("authors").listen(undefined, () => { /* noop */ });
         void client.realtime.channel("doc:1").join();
 
         expect(opened).toHaveLength(1);
@@ -162,7 +162,7 @@ describe("realtime opt-out", () => {
         setGlobalWebSocket(FakeWebSocket);
 
         const client = createRebaseClient({ baseUrl: "http://localhost:3000" });
-        client.collection("posts").listen(undefined, () => { /* noop */ });
+        client.table("posts").listen(undefined, () => { /* noop */ });
         expect(opened).toHaveLength(1);
 
         client.close();
@@ -178,11 +178,11 @@ describe("realtime opt-out", () => {
         setGlobalWebSocket(FakeWebSocket);
 
         const client = createRebaseClient({ baseUrl: "http://localhost:3000" });
-        client.collection("posts").listen(undefined, () => { /* noop */ });
+        client.table("posts").listen(undefined, () => { /* noop */ });
         expect(opened).toHaveLength(1);
 
         client.close();
-        client.collection("authors").listen(undefined, () => { /* noop */ });
+        client.table("authors").listen(undefined, () => { /* noop */ });
 
         expect(opened).toHaveLength(1);
     });
@@ -268,9 +268,9 @@ isAnonymous: false }
         // "realtime: false" through the query builder and as `undefined is not
         // a function` one call earlier. It is now a stub carrying the sentence,
         // and both spellings answer with it.
-        expect(() => client.collection("posts").listen(undefined, () => { /* noop */ }))
+        expect(() => client.table("posts").listen(undefined, () => { /* noop */ }))
             .toThrow(/realtime: false/);
-        expect(() => client.collection("posts").listenById("p1", () => { /* noop */ }))
+        expect(() => client.table("posts").listenById("p1", () => { /* noop */ }))
             .toThrow(/realtime: false/);
         expect(() => client.data.posts.include("author").listen(() => { /* noop */ }))
             .toThrow(/realtime: false/);
@@ -284,12 +284,12 @@ isAnonymous: false }
         setGlobalWebSocket(FakeWebSocket);
 
         const off = createRebaseClient({ baseUrl: "http://localhost:3000", realtime: false });
-        expect(isUnsupported(off.collection("posts").listen)).toBe(true);
-        expect(isUnsupported(off.collection("posts").listenById)).toBe(true);
+        expect(isUnsupported(off.table("posts").listen)).toBe(true);
+        expect(isUnsupported(off.table("posts").listenById)).toBe(true);
 
         const on = createRebaseClient({ baseUrl: "http://localhost:3000" });
-        expect(isUnsupported(on.collection("posts").listen)).toBe(false);
-        expect(isUnsupported(on.collection("posts").listenById)).toBe(false);
+        expect(isUnsupported(on.table("posts").listen)).toBe(false);
+        expect(isUnsupported(on.table("posts").listenById)).toBe(false);
     });
 
     it("observes without a socket instead of throwing", () => {

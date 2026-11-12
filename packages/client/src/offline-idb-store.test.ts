@@ -4,8 +4,8 @@ import { OfflineManager } from "./offline";
 import { RebaseApiError } from "./transport";
 import { dehydrateRow, hydrateRow } from "./offline-codec";
 import { EntityReference, EntityRelation, GeoPoint, Vector } from "@rebasepro/types";
-import type { CollectionClient } from "./collection";
-import { fakeCollectionClient } from "../test/support/fake-collection";
+import type { TableClient } from "./table";
+import { fakeTableClient } from "../test/support/fake-table";
 
 /**
  * The IndexedDB store against fake-indexeddb — the same structured-clone
@@ -217,7 +217,7 @@ describe("two tabs over one database", () => {
     function createServer() {
         const table = new Map<string, Record<string, unknown>>();
         const state = { online: true };
-        const client = fakeCollectionClient<Record<string, unknown>>({
+        const client = fakeTableClient<Record<string, unknown>>({
             async find() {
                 if (!state.online) throw new RebaseApiError("Could not reach the server: fetch failed", { status: 0, code: "NETWORK_ERROR" });
                 const data = [...table.values()];
@@ -298,7 +298,7 @@ describe("OfflineManager over IndexedDB", () => {
     it("queues offline writes in one manager and replays them from a fresh one", async () => {
         const table = new Map<string, Record<string, unknown>>();
         const state = { online: true };
-        const fakeClient = fakeCollectionClient<Record<string, unknown>>({
+        const fakeClient = fakeTableClient<Record<string, unknown>>({
             async find() {
                 if (!state.online) throw new RebaseApiError("Could not reach the server: fetch failed", { status: 0, code: "NETWORK_ERROR" });
                 const data = [...table.values()];

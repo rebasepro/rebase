@@ -2,9 +2,9 @@ import { jest } from "@jest/globals";
 import { isOfflineError, OfflineManager } from "./offline";
 import { MemoryOfflineStore, PendingMutation } from "./offline-store";
 import { RebaseApiError } from "./transport";
-import type { CollectionClient } from "./collection";
+import type { TableClient } from "./table";
 import type { FindParams } from "./transport";
-import { fakeCollectionClient } from "../test/support/fake-collection";
+import { fakeTableClient } from "../test/support/fake-table";
 
 type Row = Record<string, unknown>;
 
@@ -16,7 +16,7 @@ type Row = Record<string, unknown>;
  *
  * It used to throw a bare `TypeError("fetch failed")`, which is what the
  * *runtime's* `fetch` rejects with — but the manager never sees one: every
- * method here stands in for a `createCollectionClient` method, and those go
+ * method here stands in for a `createTableClient` method, and those go
  * through `transport.request`, which wraps a transport failure into a
  * `RebaseApiError` with `status: 0` before anything above it can see it.
  */
@@ -40,9 +40,9 @@ function createFakeServer() {
         }
     }
 
-    function client(slug: string): CollectionClient<Row> {
+    function client(slug: string): TableClient<Row> {
         const rows = () => [...table(slug).values()];
-        const fake = fakeCollectionClient<Row>({
+        const fake = fakeTableClient<Row>({
             async find(_params?: FindParams) {
                 assertOnline();
                 const data = rows();
@@ -751,7 +751,7 @@ describe("OfflineManager", () => {
             const server = createFakeServer();
             const store = new MemoryOfflineStore();
             const manager = new OfflineManager(
-                { store, syncIntervalMs: 0, maxCachedQueriesPerCollection: 2 },
+                { store, syncIntervalMs: 0, maxCachedQueriesPerTable: 2 },
                 (slug) => server.client(slug)
             );
             const posts = manager.wrap("posts", server.client("posts"));
@@ -775,7 +775,7 @@ describe("OfflineManager", () => {
             const server = createFakeServer();
             const store = new MemoryOfflineStore();
             const manager = new OfflineManager(
-                { store, syncIntervalMs: 0, maxCachedQueriesPerCollection: 1 },
+                { store, syncIntervalMs: 0, maxCachedQueriesPerTable: 1 },
                 (slug) => server.client(slug)
             );
             const posts = manager.wrap("posts", server.client("posts"));

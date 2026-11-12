@@ -32,7 +32,7 @@ function clientAnswering(response: () => Response) {
 describe("a one-row upsert() failure", () => {
     it("rejects with the bare message, keeping code, status and details", async () => {
         const client = clientAnswering(bulkFailure);
-        const error = await client.data.collection("posts").upsert({ id: 7, slug: "taken" }).catch((e: unknown) => e);
+        const error = await client.data.table("posts").upsert({ id: 7, slug: "taken" }).catch((e: unknown) => e);
 
         expect(error).toBeInstanceOf(RebaseApiError);
         const apiError = error as RebaseApiError;
@@ -44,7 +44,7 @@ describe("a one-row upsert() failure", () => {
 
     it("leaves createMany's row prefix alone", async () => {
         const client = clientAnswering(bulkFailure);
-        const error = await client.data.collection("posts").createMany([{ id: 7, slug: "taken" }]).catch((e: unknown) => e);
+        const error = await client.data.table("posts").createMany([{ id: 7, slug: "taken" }]).catch((e: unknown) => e);
 
         expect((error as RebaseApiError).message).toMatch(/^Row 0 of 1 \(id 7\) failed: /);
     });
@@ -53,7 +53,7 @@ describe("a one-row upsert() failure", () => {
         const client = clientAnswering(() => new Response(JSON.stringify({
             error: { message: "Row-level security refused the write", code: "FORBIDDEN" }
         }), { status: 403, headers: { "Content-Type": "application/json" } }));
-        const error = await client.data.collection("posts").upsert({ id: 7 }).catch((e: unknown) => e);
+        const error = await client.data.table("posts").upsert({ id: 7 }).catch((e: unknown) => e);
 
         expect((error as RebaseApiError).message).toBe("Row-level security refused the write");
     });

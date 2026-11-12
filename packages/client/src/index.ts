@@ -6,7 +6,7 @@ import { createCron, CreateCronOptions } from "./cron";
 import { createBackups } from "./backups";
 import { createSchema } from "./schema";
 import { createApiKeys, CreateApiKeysOptions, createPersonalKeys, CreatePersonalKeysOptions } from "./api-keys";
-import { CollectionClient, createCollectionClient, invalidBulkBody } from "./collection";
+import { TableClient, createTableClient, invalidBulkBody } from "./table";
 import { createFunctionsClient } from "./functions";
 import { createStorage } from "./storage";
 import { ClientStorageSourceRegistry } from "./storage-registry";
@@ -39,7 +39,7 @@ import { toSnakeCase } from "@rebasepro/utils";
 // This barrel is the public API of `@rebasepro/client`. It is an explicit,
 // curated list — NOT `export *` — so that adding an export to a module below
 // does not silently republish it to app developers. Internal factories
-// (`createTransport`, `createAuth`, `createCollectionClient`, …), the raw
+// (`createTransport`, `createAuth`, `createTableClient`, …), the raw
 // `Transport`, the storage-source registry impl, the JSON reviver, and the
 // concrete `SDKQueryBuilder` class are intentionally NOT re-exported: they are
 // implementation details of `createRebaseClient()` and have no external
@@ -48,17 +48,17 @@ import { toSnakeCase } from "@rebasepro/utils";
 // deliberately.
 
 // Errors — the single error type thrown by SDK HTTP calls, plus the
-// data-proxy's unknown-collection error.
+// data-proxy's unknown-table error.
 export { RebaseApiError } from "./transport";
 export { RebaseClientError } from "./errors";
 // The codes `RebaseApiError.code` carries. An open union — routes add their own
 // — so it gives completion on the common ones without pretending to be closed.
 export type { RebaseErrorCode } from "@rebasepro/types";
 
-// Query + collection types (annotate SDK results; construct via the fluent API).
+// Query + table types (annotate SDK results; construct via the fluent API).
 export type { RebaseClientConfig, RealtimeClientOptions, FindParams, FindResponse } from "./transport";
-export type { CollectionClient, RestoreOptions, TrashClient } from "./collection";
-export type { FindResult, SDKCollectionClient, SDKQueryBuilderInterface, PaginationMeta } from "@rebasepro/types";
+export type { TableClient, RestoreOptions, TrashClient } from "./table";
+export type { FindResult, SDKTableClient, SDKQueryBuilderInterface, PaginationMeta } from "@rebasepro/types";
 
 // Pagination: `iterate()` / `findAll()` parameter types and the error a walk
 // throws instead of quietly returning a truncated answer.
@@ -143,10 +143,10 @@ export type {
 // browser and needs no direct construction.
 export type { ConflictResolution, OfflineApi, OfflineConfig, OfflineQueueOptions, OfflineStatus } from "./offline";
 export { isOfflineError } from "./offline-errors";
-export type { LiveResult, ObserveByIdOptions, ObserveOptions, RowSnapshotMeta } from "./collection";
+export type { LiveResult, ObserveByIdOptions, ObserveOptions, RowSnapshotMeta } from "./table";
 // The reader for a fetched row's version. A function rather than a field so the
 // version never enters the generated `Row` type — see `etagOf`.
-export { etagOf } from "./collection";
+export { etagOf } from "./table";
 export type { BatchOperation, BatchRef, BatchResult, FieldOperation, UpdateValues, UpsertOptions } from "@rebasepro/types";
 // The types a call's own arguments and answers are written in. A browser app
 // installs `@rebasepro/client` alone, so a type it cannot import from here is a
@@ -199,19 +199,19 @@ export interface CreateRebaseClientOptions extends RebaseClientConfig {
      */
     storageSources?: StorageSourceDefinition[];
     /**
-     * Maps each `client.data` accessor to the collection slug the server
+     * Maps each `client.data` accessor to the table slug the server
      * serves (e.g. `{ companyMembers: "company-members" }`): the generated
-     * `collectionsDictionary`.
+     * `tablesDictionary`.
      *
      * **Required for a typed client** (`createRebaseClient<Database>`). The
      * types offer every accessor, but without the map the proxy sends
      * `client.data.companyMembers` to `/data/company_members`, so a kebab-case
-     * slug or a renamed accessor (`collectionCollection`) answers 404; a
+     * slug or a renamed accessor (`tableTable`) answers 404; a
      * one-time warning names the accessor. With the map, an unknown accessor
-     * throws `UNKNOWN_COLLECTION` with a suggestion. A later version will make
+     * throws `UNKNOWN_TABLE` with a suggestion. A later version will make
      * it required in the types when `Database` is supplied.
      */
-    collections?: Record<string, string>;
+    tables?: Record<string, string>;
     /**
      * Local-first sync for the data layer.
      *
@@ -241,7 +241,7 @@ export interface CreateRebaseClientOptions extends RebaseClientConfig {
 }
 
 // ─── Typed Data Proxy ────────────────────────────────────────────────────────
-// Adds typed collection accessors when `DB` is provided via the SDK generator.
+// Adds typed table accessors when `DB` is provided via the SDK generator.
 
 type KebabToCamelCase<S extends string> =
   S extends `${infer T}-${infer U}`
@@ -267,22 +267,22 @@ type DBEntry<DB, S extends string> =
         : DB[AccessorOfSlug<DB, S>];
 
 type TypedDataLayer<DB> = {
-    collection<S extends string>(slug: S): CollectionClient<
+    table<S extends string>(slug: S): TableClient<
         RowOf<DBEntry<DB, S>>,
         InsertOf<DBEntry<DB, S>>,
         UpdateOf<DBEntry<DB, S>>,
         IncludeOf<DBEntry<DB, S>, DB>
     >;
 } & {
-    [K in keyof DB]: CollectionClient<RowOf<DB[K]>, InsertOf<DB[K]>, UpdateOf<DB[K]>, IncludeOf<DB[K], DB>>;
+    [K in keyof DB]: TableClient<RowOf<DB[K]>, InsertOf<DB[K]>, UpdateOf<DB[K]>, IncludeOf<DB[K], DB>>;
 } & (
-    // Untyped, every name is a collection: the index signature is the point.
+    // Untyped, every name is a table: the index signature is the point.
     // Typed, it is the opposite — it was intersected in unconditionally, and
-    // its `[slug: string]` made `client.data.nopeCollection` compile on a
-    // `createRebaseClient<Database>`, to throw UNKNOWN_COLLECTION (or 404)
-    // at runtime. Only the by-slug `collection<M>()` overload is kept, and
+    // its `[slug: string]` made `client.data.nopeTable` compile on a
+    // `createRebaseClient<Database>`, to throw UNKNOWN_TABLE (or 404)
+    // at runtime. Only the by-slug `table<M>()` overload is kept, and
     // `batch`, without which the result is no `RebaseClient<DB>`.
-    string extends keyof DB ? RebaseSdkData : Pick<RebaseSdkData, "collection"> & Pick<RebaseSdkData<DB>, "batch">
+    string extends keyof DB ? RebaseSdkData : Pick<RebaseSdkData, "table"> & Pick<RebaseSdkData<DB>, "batch">
 );
 
 /**
@@ -290,7 +290,7 @@ type TypedDataLayer<DB> = {
  *
  * This is `RebaseClient` (from `@rebasepro/types`) with all optional
  * capabilities populated and the `data` layer narrowed to provide
- * typed collection accessors when a `DB` schema generic is supplied.
+ * typed table accessors when a `DB` schema generic is supplied.
  */
 export type CreateRebaseClientResult<DB = Record<string, unknown>> = Omit<RebaseClient<DB>, "data" | "email" | "simulate"> & {
     /**
@@ -300,7 +300,7 @@ export type CreateRebaseClientResult<DB = Record<string, unknown>> = Omit<Rebase
      * {@link RebaseClient.simulate} for what the server honours and refuses.
      *
      * Always present here, typed by the same `Database` (it is built with the
-     * same `collections` dictionary), and closable: it is a client of its own,
+     * same `tables` dictionary), and closable: it is a client of its own,
      * so release it with `close()` when done. On `RebaseClient` it is optional,
      * because a server-side client has none.
      */
@@ -400,23 +400,23 @@ export type CreateRebaseClientResult<DB = Record<string, unknown>> = Omit<Rebase
      */
     call: <T = unknown>(endpoint: string, payload?: unknown) => Promise<T>;
     /**
-     * A collection by slug — the same client `data.collection(slug)` returns,
+     * A table by slug — the same client `data.table(slug)` returns,
      * typed from the generated `Database` when the slug is one of its
-     * collections, or by the row type passed explicitly.
+     * tables, or by the row type passed explicitly.
      */
-    collection: {
-        <S extends string>(slug: S): CollectionClient<
+    table: {
+        <S extends string>(slug: S): TableClient<
             RowOf<DBEntry<DB, S>>,
             InsertOf<DBEntry<DB, S>>,
             UpdateOf<DBEntry<DB, S>>,
             IncludeOf<DBEntry<DB, S>, DB>
         >;
-        <M extends Record<string, unknown> = Record<string, unknown>>(slug: string): CollectionClient<M>;
+        <M extends Record<string, unknown> = Record<string, unknown>>(slug: string): TableClient<M>;
     };
     /**
-     * Write across collections in one transaction.
+     * Write across tables in one transaction.
      *
-     * `createMany` and friends are one collection at a time, which is the wrong
+     * `createMany` and friends are one table at a time, which is the wrong
      * shape for the writes that most need to be atomic: an order and its line
      * items, a user and their membership row, a document and its audit entry.
      * Sent as separate calls those can half-succeed, and the recovery — read
@@ -435,18 +435,18 @@ export type CreateRebaseClientResult<DB = Record<string, unknown>> = Omit<Rebase
      * `data` is aligned to `operations`: the written row for a create, upsert
      * or update, and `null` for a delete.
      *
-     * `collection` is the accessor `client.data.<accessor>` takes — `orderItems`
+     * `table` is the accessor `client.data.<accessor>` takes — `orderItems`
      * for the slug `order_items` — and is sent as the slug through the
-     * `collections` dictionary. A name that is not an accessor goes out as
+     * `tables` dictionary. A name that is not an accessor goes out as
      * written, so an untyped client can still pass the slug.
      *
      * @example
      * ```ts
      * await client.batch([
-     *     { op: "create", collection: "orders", values: { total: 40 }, ref: "order" },
-     *     { op: "create", collection: "orderItems",
+     *     { op: "create", table: "orders", values: { total: 40 }, ref: "order" },
+     *     { op: "create", table: "orderItems",
      *       values: { orderId: { $ref: "order.id" }, sku: "A-1" } },
-     *     { op: "update", collection: "stock", id: "A-1", values: { count: { $inc: -1 } } }
+     *     { op: "update", table: "stock", id: "A-1", values: { count: { $inc: -1 } } }
      * ]);
      * ```
      */
@@ -676,10 +676,10 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
     }
 
     /**
-     * Suggest the closest known collection key for a mistyped accessor.
+     * Suggest the closest known table key for a mistyped accessor.
      * Uses edit-distance-1 and prefix matching — no external dependency.
      */
-    function suggestCollection(prop: string, knownKeys: string[]): string | undefined {
+    function suggestTable(prop: string, knownKeys: string[]): string | undefined {
         // Prefix match (e.g. "prod" → "products")
         const prefixMatch = knownKeys.find(k => k.startsWith(prop) || prop.startsWith(k));
         if (prefixMatch) return prefixMatch;
@@ -729,13 +729,13 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
         return undefined;
     }
 
-    // Offline layer: wraps every collection client with a read cache and a
+    // Offline layer: wraps every table client with a read cache and a
     // write queue. Replay goes through *unwrapped* clients (the factory below)
     // so a failing replay can never re-queue itself.
     const offlineManager = options.offline
         ? new LazyOfflineManager(
             typeof options.offline === "object" ? options.offline : {},
-            (slug) => createCollectionClient(transport, slug)
+            (slug) => createTableClient(transport, slug)
         )
         : undefined;
 
@@ -811,15 +811,15 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
         ws.ensureConnected();
     }
 
-    const collectionClients = new Map<string, CollectionClient<Record<string, unknown>>>();
+    const tableClients = new Map<string, TableClient<Record<string, unknown>>>();
     let untypedWarned = false;
 
-    function collection(slug: string): CollectionClient<Record<string, unknown>> {
-        if (!collectionClients.has(slug)) {
-            const inner = createCollectionClient(transport, slug, ws);
-            collectionClients.set(slug, offlineManager ? offlineManager.wrap(slug, inner) : inner);
+    function table(slug: string): TableClient<Record<string, unknown>> {
+        if (!tableClients.has(slug)) {
+            const inner = createTableClient(transport, slug, ws);
+            tableClients.set(slug, offlineManager ? offlineManager.wrap(slug, inner) : inner);
         }
-        return collectionClients.get(slug)!;
+        return tableClients.get(slug)!;
     }
 
     /**
@@ -840,18 +840,18 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
         if (batchOptions?.idempotencyKey) headers["Idempotency-Key"] = batchOptions.idempotencyKey;
         if (batchOptions?.returning === false) headers.Prefer = "return=minimal";
 
-        // `collection` is typed as the generated accessor (`orderItems`),
+        // `table` is typed as the generated accessor (`orderItems`),
         // the name `client.data.<accessor>` takes; the route resolves it by
         // slug (`order_items`). The dictionary is the one place that knows
         // both, so it is resolved here — and a name that is not an accessor
         // goes out as written, so a slug still works.
-        const dictionary = options.collections;
+        const dictionary = options.tables;
         const wire = dictionary
             ? operations.map((operation) => {
                 if (!operation || typeof operation !== "object") return operation;
-                const name = (operation as { collection?: unknown }).collection;
+                const name = (operation as { table?: unknown }).table;
                 return typeof name === "string" && Object.hasOwn(dictionary, name)
-                    ? { ...operation, collection: dictionary[name] }
+                    ? { ...operation, table: dictionary[name] }
                     : operation;
             })
             : operations;
@@ -863,46 +863,46 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
         });
     };
 
-    const dataTarget = { collection, batch } as Record<string, unknown>;
+    const dataTarget = { table, batch } as Record<string, unknown>;
 
     /**
-     * Names the proxy never serves as a collection: the ones promise and
+     * Names the proxy never serves as a table: the ones promise and
      * serialisation machinery probe for (`then`, `toJSON`, React's
      * `$$typeof`), and everything a plain object inherits — so
-     * `client.data.toString` is `Object.prototype.toString`, not a collection
+     * `client.data.toString` is `Object.prototype.toString`, not a table
      * client, and `String(client.data)` is `"[object Object]"` rather than a
-     * throw. `prop in collections` used to walk the prototype too, which is how
-     * `toString` and `constructor` became "collections" under a dictionary.
+     * throw. `prop in tables` used to walk the prototype too, which is how
+     * `toString` and `constructor` became "tables" under a dictionary.
      */
     const isProbedName = (prop: string) => prop === "then" || prop === "toJSON" || prop === "$$typeof";
     const isReservedName = (prop: string) => isProbedName(prop) || prop in Object.prototype;
 
     const dataProxy = new Proxy(dataTarget, {
         get(_target, prop: string | symbol) {
-            if (prop === "collection") {
-                return collection;
+            if (prop === "table") {
+                return table;
             }
-            // Reserved, as `collection` is, and before the dictionary: a
-            // collection whose accessor is `batch` is reached with
-            // `data.collection("batch")`.
+            // Reserved, as `table` is, and before the dictionary: a
+            // table whose accessor is `batch` is reached with
+            // `data.table("batch")`.
             if (prop === "batch") return batch;
             if (typeof prop === "symbol") return undefined;
             if (isProbedName(prop)) return undefined;
-            if (options.collections && Object.hasOwn(options.collections, prop)) {
-                return collection(options.collections[prop]);
+            if (options.tables && Object.hasOwn(options.tables, prop)) {
+                return table(options.tables[prop]);
             }
             if (prop in Object.prototype) return Reflect.get(_target, prop);
-            if (options.collections) {
+            if (options.tables) {
                 // Strict mode: the developer supplied a typed dictionary,
                 // so we know the full set of valid accessors.
-                const knownKeys = Object.keys(options.collections);
-                const suggestion = suggestCollection(prop, knownKeys);
+                const knownKeys = Object.keys(options.tables);
+                const suggestion = suggestTable(prop, knownKeys);
                 const knownList = knownKeys.join(", ");
-                let msg = `Unknown collection accessor "${prop}". Known collections: ${knownList}.`;
+                let msg = `Unknown table accessor "${prop}". Known tables: ${knownList}.`;
                 if (suggestion) msg += ` Did you mean "${suggestion}"?`;
-                msg += ` Use data.collection("<slug>") for dynamic slugs.`;
+                msg += ` Use data.table("<slug>") for dynamic slugs.`;
                 throw new RebaseClientError(msg, {
-                    code: "UNKNOWN_COLLECTION",
+                    code: "UNKNOWN_TABLE",
                     details: { accessor: prop, known: knownKeys }
                 });
             }
@@ -918,27 +918,27 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
                 // is not the accessor in snake_case.
                 console.warn(
                     `[Rebase] Untyped data access detected: client.data.${prop} was sent to /data/${slug}, ` +
-                    `its name in snake_case, because this client has no \`collections\` dictionary. ` +
-                    `A collection whose slug is not that (a kebab-case slug, a renamed accessor) answers 404. ` +
-                    `With generated types, pass \`collections: collectionsDictionary\` (from generated/sdk/database.types) ` +
-                    `to createRebaseClient(); a typed client needs it. Otherwise use client.data.collection("<slug>").`
+                    `its name in snake_case, because this client has no \`tables\` dictionary. ` +
+                    `A table whose slug is not that (a kebab-case slug, a renamed accessor) answers 404. ` +
+                    `With generated types, pass \`tables: tablesDictionary\` (from generated/sdk/database.types) ` +
+                    `to createRebaseClient(); a typed client needs it. Otherwise use client.data.table("<slug>").`
                 );
             }
-            return collection(slug);
+            return table(slug);
         },
         // `"posts" in client.data` answers what `get` serves: with a
         // dictionary, its own accessors; without one, any name that is not
-        // reserved, since every such name reaches a collection by its slug.
+        // reserved, since every such name reaches a table by its slug.
         has(_target, prop: string | symbol) {
-            if (prop === "collection" || prop === "batch") return true;
+            if (prop === "table" || prop === "batch") return true;
             if (typeof prop === "symbol") return false;
             if (isProbedName(prop)) return false;
-            if (options.collections) return Object.hasOwn(options.collections, prop);
+            if (options.tables) return Object.hasOwn(options.tables, prop);
             return !isReservedName(prop);
         }
     });
 
-    // `data` and `collection` are typed by `DB`, which exists only at the type
+    // `data` and `table` are typed by `DB`, which exists only at the type
     // level: at runtime the proxy resolves any accessor through the dictionary,
     // so nothing here can check them against a generated `Database`.
     type Result = CreateRebaseClientResult<DB>;
@@ -1042,7 +1042,7 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
                 baseUrl: options.baseUrl,
                 apiPath: options.apiPath,
                 fetch: options.fetch,
-                collections: options.collections,
+                tables: options.tables,
                 schemaVersion: options.schemaVersion,
                 headers: { ...(options.headers ?? {}), ...simulationHeaders(simulation) },
                 realtime: false,
@@ -1054,7 +1054,7 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
         },
         baseUrl: transport.baseUrl,
         apiPath: transport.apiPath,
-        collection: collection as Result["collection"],
+        table: table as Result["table"],
         call: async <T = unknown>(endpoint: string, payload?: unknown): Promise<T> => {
             const prefix = endpoint.startsWith("/") ? "" : "/";
             // The body, verbatim — the same thing `functions.invoke()` returns.

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
-import { createCollectionClient } from "../src/collection";
+import { createTableClient } from "../src/table";
 import { createRebaseClient as _createRebaseClient } from "../src/index";
 import { buildQueryString, Transport } from "../src/transport";
 import { SDKQueryBuilder } from "../src/sdk_query_builder";
@@ -101,37 +101,37 @@ describe("find() — include passthrough", () => {
     beforeEach(() => { ({ transport, mockRequest } = createMockTransport()); });
 
     it("single include", async () => {
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createTableClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce(mockFindResponse([]));
         await c.find({ include: ["author"] });
         expect(mockRequest).toHaveBeenCalledWith("/data/posts?include=author", { method: "GET" });
     });
     it("multiple includes", async () => {
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createTableClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce(mockFindResponse([]));
         await c.find({ include: ["author", "tags", "category"] });
         expect(mockRequest).toHaveBeenCalledWith("/data/posts?include=author%2Ctags%2Ccategory", { method: "GET" });
     });
     it("wildcard include", async () => {
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createTableClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce(mockFindResponse([]));
         await c.find({ include: ["*"] });
         expect(mockRequest).toHaveBeenCalledWith("/data/posts?include=*", { method: "GET" });
     });
     it("no include omits param", async () => {
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createTableClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce(mockFindResponse([]));
         await c.find({ limit: 10 });
         expect((mockRequest.mock.calls[0][0] as string)).not.toContain("include");
     });
     it("no params at all", async () => {
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createTableClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce(mockFindResponse([]));
         await c.find();
         expect(mockRequest).toHaveBeenCalledWith("/data/posts", { method: "GET" });
     });
     it("include + limit + offset + orderBy + where combined", async () => {
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createTableClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce(mockFindResponse([]));
         await c.find({ limit: 5,
 offset: 10,
@@ -143,7 +143,7 @@ where: { status: "eq.published" } });
         expect(p).toContain("orderBy=title%3Aasc"); expect(p).toContain("include=author"); expect(p).toContain("status=eq.published");
     });
     it("empty include array omits param", async () => {
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createTableClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce(mockFindResponse([]));
         await c.find({ include: [] });
         expect((mockRequest.mock.calls[0][0] as string)).not.toContain("include");
@@ -158,7 +158,7 @@ describe("find() — one-to-one relation response", () => {
     beforeEach(() => { ({ transport, mockRequest } = createMockTransport()); });
 
     it("preserves relation object in row", async () => {
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createTableClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce(mockFindResponse([
             { id: 1,
 title: "Hello",
@@ -175,7 +175,7 @@ email: "a@b.com" });
         expect(r.data[0].title).toBe("Hello"); expect(r.data[0].author_id).toBe(5);
     });
     it("null relation", async () => {
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createTableClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce(mockFindResponse([{ id: 1,
 title: "Solo",
 author: null }]));
@@ -183,14 +183,14 @@ author: null }]));
         expect(r.data[0].author).toBeNull();
     });
     it("missing relation field entirely", async () => {
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createTableClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce(mockFindResponse([{ id: 1,
 title: "Minimal" }]));
         const r = await c.find({ include: ["author"] });
         expect(r.data[0].author).toBeUndefined();
     });
     it("relation with nested objects preserved", async () => {
-        const c = createCollectionClient<any>(transport, "posts");
+        const c = createTableClient<any>(transport, "posts");
         mockRequest.mockResolvedValueOnce(mockFindResponse([
             { id: 1,
 title: "Deep",
@@ -204,7 +204,7 @@ zip: "10001" } } }
 zip: "10001" });
     });
     it("relation with date strings preserved", async () => {
-        const c = createCollectionClient<any>(transport, "posts");
+        const c = createTableClient<any>(transport, "posts");
         mockRequest.mockResolvedValueOnce(mockFindResponse([
             { id: 1,
 title: "P",
@@ -215,7 +215,7 @@ created_at: "2024-01-15T10:30:00Z" } }
         expect(r.data[0].author.created_at).toBe("2024-01-15T10:30:00Z");
     });
     it("relation with all extra fields preserved", async () => {
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createTableClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce(mockFindResponse([
             { id: 1,
 title: "P",
@@ -239,7 +239,7 @@ describe("find() — one-to-many relation response", () => {
     beforeEach(() => { ({ transport, mockRequest } = createMockTransport()); });
 
     it("preserves array of related entities", async () => {
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createTableClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce(mockFindResponse([
             { id: 1,
 title: "P",
@@ -253,7 +253,7 @@ name: "js" }] }
 name: "ts" });
     });
     it("empty array", async () => {
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createTableClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce(mockFindResponse([{ id: 1,
 title: "P",
 tags: [] }]));
@@ -262,7 +262,7 @@ tags: [] }]));
     it("large array (50 items)", async () => {
         const tags = Array.from({ length: 50 }, (_, i) => ({ id: i + 1,
 name: `tag-${i + 1}` }));
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createTableClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce(mockFindResponse([{ id: 1,
 title: "Many",
 tags }]));
@@ -281,7 +281,7 @@ describe("find() — multiple relations", () => {
     beforeEach(() => { ({ transport, mockRequest } = createMockTransport()); });
 
     it("preserves all relation types together", async () => {
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createTableClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce(mockFindResponse([{
             id: 1,
 title: "Multi",
@@ -301,7 +301,7 @@ name: "Bob" });
 name: "Tech" });
     });
     it("mixed states: some have relations, some don't", async () => {
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createTableClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce(mockFindResponse([
             { id: 1,
 title: "Full",
@@ -326,7 +326,7 @@ name: "A" });
         expect(r.data[2].tags).toBeUndefined();
     });
     it("relation objects not confused with regular map fields", async () => {
-        const c = createCollectionClient<any>(transport, "posts");
+        const c = createTableClient<any>(transport, "posts");
         mockRequest.mockResolvedValueOnce(mockFindResponse([
             { id: 1,
 title: "P",
@@ -351,7 +351,7 @@ describe("find() — ID types in relations", () => {
     beforeEach(() => { ({ transport, mockRequest } = createMockTransport()); });
 
     it("string UUIDs", async () => {
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createTableClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce(mockFindResponse([
             { id: "uuid-1",
 title: "P",
@@ -362,7 +362,7 @@ name: "A" } }
         expect(r.data[0].id).toBe("uuid-1"); expect(r.data[0].author.id).toBe("uuid-2");
     });
     it("numeric IDs", async () => {
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createTableClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce(mockFindResponse([{ id: 42,
 title: "P",
 author: { id: 7,
@@ -371,7 +371,7 @@ name: "A" } }]));
         expect(r.data[0].id).toBe(42); expect(r.data[0].author.id).toBe(7);
     });
     it("zero ID", async () => {
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createTableClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce(mockFindResponse([{ id: 0,
 title: "P" }]));
         const r = await c.find();
@@ -387,7 +387,7 @@ describe("find() — without include", () => {
     beforeEach(() => { ({ transport, mockRequest } = createMockTransport()); });
 
     it("returns flat rows correctly", async () => {
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createTableClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce(mockFindResponse([{ id: 1,
 title: "Plain",
 author_id: 5 }]));
@@ -396,13 +396,13 @@ title: "Plain",
 author_id: 5 });
     });
     it("refuses a page without a data list", async () => {
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createTableClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce({ data: undefined,
 meta: {} });
         await expect(c.find()).rejects.toMatchObject({ code: "UNEXPECTED_RESPONSE" });
     });
     it("handles empty data array", async () => {
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createTableClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce(mockFindResponse([]));
         expect((await c.find()).data).toEqual([]);
     });
@@ -416,7 +416,7 @@ describe("findById() — relation data", () => {
     beforeEach(() => { ({ transport, mockRequest } = createMockTransport()); });
 
     it("preserves one-to-one relation in values", async () => {
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createTableClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce({ id: 1,
 title: "Hi",
 author: { id: 5,
@@ -426,7 +426,7 @@ name: "A" } });
 name: "A" });
     });
     it("preserves array relation in values", async () => {
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createTableClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce({ id: "abc",
 title: "T",
 tags: [{ id: 1,
@@ -436,19 +436,19 @@ name: "v" }] });
         expect(r!.id).toBe("abc"); expect(r!.tags).toHaveLength(2);
     });
     it("null relation", async () => {
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createTableClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce({ id: 1,
 title: "S",
 author: null });
         expect((await c.findById(1))!.author).toBeNull();
     });
     it("returns undefined for null backend response", async () => {
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createTableClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce(null);
         expect(await c.findById(99)).toBeUndefined();
     });
     it("encodes special ID characters", async () => {
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createTableClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce({ id: "a/b",
 title: "E" });
         await c.findById("a/b");
@@ -460,14 +460,14 @@ title: "E" });
      * options it is still the bare row URL.
      */
     it("findById sends a bare row URL when no relation is asked for", async () => {
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createTableClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce({ id: 1,
 title: "T" });
         await c.findById(1);
         expect((mockRequest.mock.calls[0][0] as string)).toBe("/data/posts/1");
     });
     it("findById asks for the relations named in `include`", async () => {
-        const c = createCollectionClient(transport, "posts");
+        const c = createTableClient(transport, "posts");
         mockRequest.mockResolvedValueOnce({ id: 1,
 title: "T" });
         await c.findById(1, { include: ["tags"] });
@@ -485,7 +485,7 @@ describe("create/update — relation fields", () => {
     beforeEach(() => { ({ transport, mockRequest } = createMockTransport()); });
 
     it("create sends FK, preserves relation in response", async () => {
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createTableClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce({ id: 1,
 title: "New",
 author_id: 5,
@@ -500,14 +500,14 @@ body: JSON.stringify({ title: "New",
 author_id: 5 }) });
     });
     it("create with explicit ID puts id in body", async () => {
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createTableClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce({ id: "custom",
 title: "C" });
         await c.create({ title: "C" }, "custom");
         expect(JSON.parse(mockRequest.mock.calls[0][1]!.body as string).id).toBe("custom");
     });
     it("update preserves relation data in response", async () => {
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createTableClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce({ id: 1,
 title: "U",
 author_id: 10,
@@ -518,14 +518,14 @@ name: "B" } });
 name: "B" });
     });
     it("update encodes special chars in ID", async () => {
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createTableClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce({ id: "x/y",
 title: "U" });
         await c.update("x/y", { title: "U" });
         expect(mockRequest).toHaveBeenCalledWith("/data/posts/x%2Fy", expect.any(Object), expect.any(Object));
     });
     it("delete calls correct endpoint", async () => {
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createTableClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce(undefined);
         await c.delete(42);
         expect(mockRequest).toHaveBeenCalledWith("/data/posts/42", { method: "DELETE" });
@@ -540,19 +540,19 @@ describe("QueryBuilder.include()", () => {
     beforeEach(() => { ({ transport, mockRequest } = createMockTransport()); });
 
     it("passes include to find()", async () => {
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createTableClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce(mockFindResponse([]));
         await c.include("author", "tags").find();
         expect((mockRequest.mock.calls[0][0] as string)).toContain("include=author%2Ctags");
     });
     it("wildcard *", async () => {
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createTableClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce(mockFindResponse([]));
         await c.include("*").find();
         expect((mockRequest.mock.calls[0][0] as string)).toContain("include=*");
     });
     it("chains with where + limit", async () => {
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createTableClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce(mockFindResponse([{ id: 1,
 title: "F",
 author: { id: 5,
@@ -569,7 +569,7 @@ name: "A" });
         // came back as a bare foreign key — a missing relation, with nothing
         // anywhere saying it had been dropped. Every other builder method
         // accumulates; this one now does too.
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createTableClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce(mockFindResponse([]));
         await c.include("author").include("tags").find();
         const p = decodeURIComponent(mockRequest.mock.calls[0][0] as string);
@@ -577,7 +577,7 @@ name: "A" });
     });
 
     it("carries a dotted path and the parametrised tree", async () => {
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createTableClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce(mockFindResponse([]));
         await c.include("comments.author").find();
         expect(decodeURIComponent(mockRequest.mock.calls[0][0] as string))
@@ -592,21 +592,21 @@ name: "A" });
         expect(parametrised).toContain("include={\"comments\":{\"limit\":5");
     });
     it("include + orderBy", async () => {
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createTableClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce(mockFindResponse([]));
         await c.include("author").orderBy("title", "desc").find();
         const p = mockRequest.mock.calls[0][0] as string;
         expect(p).toContain("include=author"); expect(p).toContain("orderBy=title%3Adesc");
     });
     it("include + offset", async () => {
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createTableClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce(mockFindResponse([]));
         await c.include("tags").offset(20).find();
         const p = mockRequest.mock.calls[0][0] as string;
         expect(p).toContain("include=tags"); expect(p).toContain("offset=20");
     });
     it("include + search", async () => {
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createTableClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce(mockFindResponse([]));
         await c.search("hello").include("author").find();
         const p = mockRequest.mock.calls[0][0] as string;
@@ -614,7 +614,7 @@ name: "A" });
         expect(p).toContain("searchString=hello");
     });
     it("full chain: where → orderBy → limit → offset → include", async () => {
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createTableClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce(mockFindResponse([]));
         await c.where("status", "==", "active").orderBy("title", "asc").limit(25).offset(50).include("author").find();
         const p = mockRequest.mock.calls[0][0] as string;
@@ -622,7 +622,7 @@ name: "A" });
         expect(p).toContain("limit=25"); expect(p).toContain("offset=50"); expect(p).toContain("include=author");
     });
     it("all fluent methods return this for chaining", () => {
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createTableClient<PostModel>(transport, "posts");
         const qb = c.where("title", "==", "x");
         expect(qb.orderBy("title")).toBe(qb); expect(qb.limit(1)).toBe(qb);
         expect(qb.offset(1)).toBe(qb); expect(qb.search("x")).toBe(qb); expect(qb.include("r")).toBe(qb);
@@ -631,13 +631,13 @@ name: "A" });
      * LIMITATION, not a contract: the fluent builder collects list params
      * (where/orderBy/limit/include) and terminates in `find()`. A by-id read
      * ignores every one of them, so the builder deliberately does not offer
-     * `findById` — `client.collection(...).findById(id)` is the way.
+     * `findById` — `client.table(...).findById(id)` is the way.
      *
      * If a builder-level `findById` is ever added, DELETE this test; do not
      * remove the method to make it pass again.
      */
     it("the fluent builder deliberately terminates in find(), not findById", () => {
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createTableClient<PostModel>(transport, "posts");
         const builder = c.include("author");
         expect(Reflect.get(builder, "findById")).toBeUndefined();
         expect(typeof builder.find).toBe("function");
@@ -650,7 +650,7 @@ name: "A" });
 describe("listen() — include", () => {
     it("throws without websocket", () => {
         const { transport } = createMockTransport();
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createTableClient<PostModel>(transport, "posts");
         expect(() => c.include("author").listen(jest.fn())).toThrow("Listen is only available");
     });
     it("throws the same sentence one call earlier, straight off the client", () => {
@@ -658,7 +658,7 @@ describe("listen() — include", () => {
         // mistake failed differently: this one said `undefined is not a
         // function`, the builder above said "realtime: false".
         const { transport } = createMockTransport();
-        expect(() => createCollectionClient<PostModel>(transport, "posts").listen(undefined, jest.fn()))
+        expect(() => createTableClient<PostModel>(transport, "posts").listen(undefined, jest.fn()))
             .toThrow("Listen is only available");
     });
     /**
@@ -676,7 +676,7 @@ describe("listen() — include", () => {
     it("listen carries include, fields and the page, like find does", () => {
         const mockWs = mockRealtime().realtime;
         const { transport } = createMockTransport();
-        const c = createCollectionClient<PostModel>(transport, "posts", mockWs);
+        const c = createTableClient<PostModel>(transport, "posts", mockWs);
         c.listen!({ include: ["author"],
 fields: ["id", "title"],
 page: 3,
@@ -691,14 +691,14 @@ limit: 10 }, jest.fn());
     it("listen passes searchString to WS", () => {
         const mockWs = mockRealtime().realtime;
         const { transport } = createMockTransport();
-        const c = createCollectionClient<PostModel>(transport, "posts", mockWs);
+        const c = createTableClient<PostModel>(transport, "posts", mockWs);
         c.listen!({ searchString: "hello" }, jest.fn());
         expect(mockWs.listenCollection.mock.calls[0][0].searchString).toBe("hello");
     });
     it("listen parses orderBy correctly", () => {
         const mockWs = mockRealtime().realtime;
         const { transport } = createMockTransport();
-        const c = createCollectionClient<PostModel>(transport, "posts", mockWs);
+        const c = createTableClient<PostModel>(transport, "posts", mockWs);
         c.listen!({ orderBy: ["title", "desc"] }, jest.fn());
         const args = mockWs.listenCollection.mock.calls[0][0];
         expect(args.orderBy).toEqual([["title", "desc"]]);
@@ -707,7 +707,7 @@ limit: 10 }, jest.fn());
         const unsub = jest.fn();
         const mockWs = mockRealtime(unsub).realtime;
         const { transport } = createMockTransport();
-        const c = createCollectionClient<PostModel>(transport, "posts", mockWs);
+        const c = createTableClient<PostModel>(transport, "posts", mockWs);
         const unsubResult = c.listen!({}, jest.fn());
         unsubResult();
         expect(unsub).toHaveBeenCalled();
@@ -715,7 +715,7 @@ limit: 10 }, jest.fn());
     it("listenById passes correct args", () => {
         const mockWs = mockRealtime().realtime;
         const { transport } = createMockTransport();
-        const c = createCollectionClient<PostModel>(transport, "posts", mockWs);
+        const c = createTableClient<PostModel>(transport, "posts", mockWs);
         c.listenById!("abc", jest.fn());
         expect(mockWs.listenOne).toHaveBeenCalledWith({ path: "posts",
 id: "abc" }, expect.any(Function), undefined);
@@ -723,7 +723,7 @@ id: "abc" }, expect.any(Function), undefined);
     it("listenById converts null to undefined", () => {
         const { realtime: mockWs, listeners } = mockRealtime();
         const { transport } = createMockTransport();
-        const c = createCollectionClient<PostModel>(transport, "posts", mockWs);
+        const c = createTableClient<PostModel>(transport, "posts", mockWs);
         const onUpdate = jest.fn();
         c.listenById!("x", onUpdate);
         listeners.one?.(null);
@@ -739,7 +739,7 @@ describe("Pagination with include", () => {
     beforeEach(() => { ({ transport, mockRequest } = createMockTransport()); });
 
     it("page 1", async () => {
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createTableClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce(mockFindResponse(
             [{ id: 1,
 title: "A",
@@ -759,7 +759,7 @@ hasMore: true }
 name: "X" });
     });
     it("page 2", async () => {
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createTableClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce(mockFindResponse(
             [{ id: 3,
 title: "C",
@@ -807,12 +807,12 @@ name: "Full" });
     });
     it("collection caching: same slug returns same instance", () => {
         const client = createRebaseClient({ baseUrl: "http://localhost" });
-        expect(client.collection("posts")).toBe(client.collection("posts"));
-        expect(client.collection("posts")).not.toBe(client.collection("users"));
+        expect(client.table("posts")).toBe(client.table("posts"));
+        expect(client.table("posts")).not.toBe(client.table("users"));
     });
     it("data proxy shorthand equals collection()", () => {
         const client = createRebaseClient({ baseUrl: "http://localhost" });
-        expect(client.data.posts).toBe(client.data.collection("posts"));
+        expect(client.data.posts).toBe(client.data.table("posts"));
     });
 });
 
@@ -823,7 +823,7 @@ describe("FilterValues passthrough via listen", () => {
     function setup() {
         const mockWs = mockRealtime().realtime;
         const { transport } = createMockTransport();
-        return { client: createCollectionClient(transport, "posts", mockWs),
+        return { client: createTableClient(transport, "posts", mockWs),
 mockWs };
     }
     it("==", () => { const { client, mockWs } = setup(); client.listen!({ where: { status: ["==", "published"] } }, jest.fn()); expect(mockWs.listenCollection.mock.calls[0][0].filter?.status).toEqual(["==", "published"]); });
@@ -851,21 +851,21 @@ describe("Collection slug handling", () => {
     beforeEach(() => { ({ transport, mockRequest } = createMockTransport()); });
 
     it("uses slug in basePath", async () => {
-        const c = createCollectionClient<any>(transport, "my_collection");
+        const c = createTableClient<any>(transport, "my_collection");
         mockRequest.mockResolvedValueOnce(mockFindResponse([]));
         await c.find();
         expect(mockRequest).toHaveBeenCalledWith("/data/my_collection", { method: "GET" });
     });
     it("slug appears in request path", async () => {
-        const c = createCollectionClient<any>(transport, "orders");
+        const c = createTableClient<any>(transport, "orders");
         mockRequest.mockResolvedValueOnce(mockFindResponse([{ id: 1,
 total: 100 }]));
         await c.find();
         expect(mockRequest).toHaveBeenCalledWith("/data/orders", { method: "GET" });
     });
     it("different slugs create independent paths", async () => {
-        const c1 = createCollectionClient<any>(transport, "posts");
-        const c2 = createCollectionClient<any>(transport, "users");
+        const c1 = createTableClient<any>(transport, "posts");
+        const c2 = createTableClient<any>(transport, "users");
         mockRequest.mockResolvedValueOnce(mockFindResponse([]));
         mockRequest.mockResolvedValueOnce(mockFindResponse([]));
         await c1.find(); await c2.find();
@@ -883,7 +883,7 @@ total: 100 }]));
 // covered there — see test/query_builder.test.ts, "canonical → REST mapping".
 describe("QueryBuilder operator storage (canonical tuples, unmapped)", () => {
     const { transport } = createMockTransport();
-    function qb() { return new SDKQueryBuilder(createCollectionClient(transport, "t")); }
+    function qb() { return new SDKQueryBuilder(createTableClient(transport, "t")); }
 
     it("== stored verbatim", () => { expect(whereOf(qb().where("a", "==", 1)).a).toEqual(["==", 1]); });
     it("!= stored verbatim", () => { expect(whereOf(qb().where("a", "!=", 1)).a).toEqual(["!=", 1]); });
@@ -922,7 +922,7 @@ describe("CMS relation shape — __type: 'relation' format", () => {
 
     it("REST format (flat object) preserved in row", async () => {
         // This is what drizzleResultToRestRow returns via the REST API
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createTableClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce(mockFindResponse([{
             id: 1,
 title: "Post",
@@ -942,7 +942,7 @@ email: "a@b.com" });
     it("CMS entity format (__type:relation) also preserved as-is (passthrough)", async () => {
         // If the backend somehow returns CMS-format relations through REST,
         // rowToEntity should still preserve them in values
-        const c = createCollectionClient<any>(transport, "posts");
+        const c = createTableClient<any>(transport, "posts");
         mockRequest.mockResolvedValueOnce(mockFindResponse([{
             id: 1,
 title: "Post",
@@ -963,7 +963,7 @@ email: "a@b.com" } }
     });
 
     it("REST format: many-relation returns array of flat objects", async () => {
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createTableClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce(mockFindResponse([{
             id: 1,
 title: "Post",
@@ -983,7 +983,7 @@ slug: "javascript" }
     });
 
     it("CMS format: many-relation with __type:relation objects", async () => {
-        const c = createCollectionClient<any>(transport, "posts");
+        const c = createTableClient<any>(transport, "posts");
         mockRequest.mockResolvedValueOnce(mockFindResponse([{
             id: 1,
 title: "Post",
@@ -1009,7 +1009,7 @@ values: { name: "js" } } }
 
     it("REST format: id is always stringified by backend", async () => {
         // drizzleResultToRestRow does String(row[idInfo.fieldName])
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createTableClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce(mockFindResponse([{
             id: "1",
 title: "Post",
@@ -1029,32 +1029,32 @@ describe("Transport errors during find with include", () => {
     beforeEach(() => { ({ transport, mockRequest } = createMockTransport()); });
 
     it("transport error propagates from find() with include", async () => {
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createTableClient<PostModel>(transport, "posts");
         mockRequest.mockRejectedValueOnce(new Error("Network error"));
         await expect(c.find({ include: ["author"] })).rejects.toThrow("Network error");
     });
     it("transport error propagates from findById()", async () => {
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createTableClient<PostModel>(transport, "posts");
         mockRequest.mockRejectedValueOnce(new Error("Not Found"));
         await expect(c.findById(999)).rejects.toThrow("Not Found");
     });
     it("transport error propagates from QueryBuilder.find()", async () => {
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createTableClient<PostModel>(transport, "posts");
         mockRequest.mockRejectedValueOnce(new Error("500"));
         await expect(c.include("author").find()).rejects.toThrow("500");
     });
     it("transport error propagates from create()", async () => {
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createTableClient<PostModel>(transport, "posts");
         mockRequest.mockRejectedValueOnce(new Error("Conflict"));
         await expect(c.create({ title: "X" })).rejects.toThrow("Conflict");
     });
     it("transport error propagates from update()", async () => {
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createTableClient<PostModel>(transport, "posts");
         mockRequest.mockRejectedValueOnce(new Error("Not Found"));
         await expect(c.update(1, { title: "X" })).rejects.toThrow("Not Found");
     });
     it("transport error propagates from delete()", async () => {
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createTableClient<PostModel>(transport, "posts");
         mockRequest.mockRejectedValueOnce(new Error("Forbidden"));
         await expect(c.delete(1)).rejects.toThrow("Forbidden");
     });
@@ -1071,7 +1071,7 @@ describe("Transport errors during find with include", () => {
 describe("count()", () => {
     it("hits /count and drops include", async () => {
         const { transport, mockRequest } = createMockTransport();
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createTableClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce({ count: 3 });
 
         const total = await c.count({ include: ["author"],
@@ -1093,7 +1093,7 @@ describe("Concurrent find calls with include", () => {
     beforeEach(() => { ({ transport, mockRequest } = createMockTransport()); });
 
     it("multiple concurrent finds don't interfere", async () => {
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createTableClient<PostModel>(transport, "posts");
         mockRequest
             .mockResolvedValueOnce(mockFindResponse([{ id: 1,
 title: "A",
@@ -1184,21 +1184,21 @@ describe("Flat row format — field preservation edge cases", () => {
     beforeEach(() => { ({ transport, mockRequest } = createMockTransport()); });
 
     it("undefined id field", async () => {
-        const c = createCollectionClient<any>(transport, "posts");
+        const c = createTableClient<any>(transport, "posts");
         mockRequest.mockResolvedValueOnce(mockFindResponse([{ id: undefined,
 title: "No ID" }]));
         const r = await c.find();
         expect(r.data[0].id).toBeUndefined();
     });
     it("empty string id", async () => {
-        const c = createCollectionClient<any>(transport, "posts");
+        const c = createTableClient<any>(transport, "posts");
         mockRequest.mockResolvedValueOnce(mockFindResponse([{ id: "",
 title: "Empty" }]));
         const r = await c.find();
         expect(r.data[0].id).toBe("");
     });
     it("boolean values preserved in flat row", async () => {
-        const c = createCollectionClient<any>(transport, "items");
+        const c = createTableClient<any>(transport, "items");
         mockRequest.mockResolvedValueOnce(mockFindResponse([{ id: 1,
 active: true,
 deleted: false }]));
@@ -1207,7 +1207,7 @@ deleted: false }]));
         expect(r.data[0].deleted).toBe(false);
     });
     it("null values preserved in flat row", async () => {
-        const c = createCollectionClient<any>(transport, "items");
+        const c = createTableClient<any>(transport, "items");
         mockRequest.mockResolvedValueOnce(mockFindResponse([{ id: 1,
 description: null,
 count: 0 }]));
@@ -1216,7 +1216,7 @@ count: 0 }]));
         expect(r.data[0].count).toBe(0);
     });
     it("array values preserved in flat row", async () => {
-        const c = createCollectionClient<any>(transport, "items");
+        const c = createTableClient<any>(transport, "items");
         mockRequest.mockResolvedValueOnce(mockFindResponse([{ id: 1,
 labels: ["a", "b", "c"] }]));
         const r = await c.find();
@@ -1266,7 +1266,7 @@ describe("QueryBuilder — instance isolation", () => {
     beforeEach(() => { ({ transport, mockRequest } = createMockTransport()); });
 
     it("each fluent method from collection creates new QueryBuilder", async () => {
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createTableClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValue(mockFindResponse([]));
 
         const qb1 = c.where("status", "==", "active");
@@ -1283,7 +1283,7 @@ describe("QueryBuilder — instance isolation", () => {
     });
 
     it("include() from collection creates fresh builder each time", async () => {
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createTableClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValue(mockFindResponse([]));
 
         await c.include("author").find();
@@ -1304,7 +1304,7 @@ describe("Meta passthrough", () => {
     beforeEach(() => { ({ transport, mockRequest } = createMockTransport()); });
 
     it("meta values are passed through from backend", async () => {
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createTableClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce({
             data: [{ id: 1,
 title: "P" }],
@@ -1322,7 +1322,7 @@ customField: "extra" }
         expect(r.meta.customField).toBe("extra");
     });
     it("empty meta is preserved", async () => {
-        const c = createCollectionClient<PostModel>(transport, "posts");
+        const c = createTableClient<PostModel>(transport, "posts");
         mockRequest.mockResolvedValueOnce({ data: [],
 meta: {} });
         const r = await c.find();

@@ -182,7 +182,7 @@ describe("a cookie-mode session", () => {
             // refresh. The request's 401 refreshes, the refresh is refused
             // the same way, and the session ends there.
             b.browser.refused = code;
-            await expect(page.data.collection("posts").find({ limit: 1 })).rejects.toMatchObject({ status: 401, code });
+            await expect(page.data.table("posts").find({ limit: 1 })).rejects.toMatchObject({ status: 401, code });
             expect(events).toEqual(["SIGNED_OUT"]);
             expect(page.auth.getSession()).toBeNull();
             expect(b.refreshes()).toBe(2);
@@ -209,7 +209,7 @@ describe("a cookie-mode session", () => {
         // is refused: the request's 401 refreshes, the refresh is refused.
         b.browser.cookie = "unknown-to-server";
         page.setToken("a-stale");
-        await expect(page.data.collection("posts").find({ limit: 1 })).rejects.toMatchObject({ status: 401 });
+        await expect(page.data.table("posts").find({ limit: 1 })).rejects.toMatchObject({ status: 401 });
         expect(events).toContain("SIGNED_OUT");
         expect(page.auth.getSession()).toBeNull();
 

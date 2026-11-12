@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
-import { createCollectionClient } from "./collection";
+import { createTableClient } from "./table";
 import { createTransport } from "./transport";
 
 /**
@@ -35,13 +35,13 @@ describe("a collection path that would leave /data", () => {
         [".\t./admin"]
     ])("is refused before any request (%j)", (slug) => {
         const { transport, resolved } = recordingTransport();
-        expect(() => createCollectionClient(transport, slug)).toThrow(/would leave \/data/);
+        expect(() => createTableClient(transport, slug)).toThrow(/would leave \/data/);
         expect(resolved).toHaveLength(0);
     });
 
     it("still reads a nested collection path", async () => {
         const { transport, resolved } = recordingTransport();
-        await createCollectionClient(transport, "posts/1/comments").find();
+        await createTableClient(transport, "posts/1/comments").find();
         expect(resolved[0]).toBe("/api/data/posts/1/comments");
     });
 });
@@ -49,13 +49,13 @@ describe("a collection path that would leave /data", () => {
 describe("a row id that would address the collection", () => {
     it.each([["."], [".."]])("is refused before any request (%j)", async (id) => {
         const { transport, resolved } = recordingTransport();
-        await expect(createCollectionClient(transport, "posts").delete(id)).rejects.toThrow(/not a row/);
+        await expect(createTableClient(transport, "posts").delete(id)).rejects.toThrow(/not a row/);
         expect(resolved).toHaveLength(0);
     });
 
     it("still encodes an ordinary id into one segment", async () => {
         const { transport, resolved } = recordingTransport();
-        await createCollectionClient(transport, "posts").findById("a/b?c").catch(() => undefined);
+        await createTableClient(transport, "posts").findById("a/b?c").catch(() => undefined);
         expect(resolved[0]).toBe("/api/data/posts/a%2Fb%3Fc");
     });
 });

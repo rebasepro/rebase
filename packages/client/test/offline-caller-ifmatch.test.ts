@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it } from "@jest/globals";
 import { RebaseApiError } from "@rebasepro/types";
-import { etagOf } from "../src/collection";
+import { etagOf } from "../src/table";
 import { OfflineManager, type OfflineConfig } from "../src/offline";
 import { MemoryOfflineStore, type PendingMutation } from "../src/offline-store";
 import { restoreNavigator, setNavigatorOnLine } from "./support/offline-fake-server";
-import { fakeCollectionClient } from "./support/fake-collection";
+import { fakeTableClient } from "./support/fake-table";
 
 /**
  * A precondition the caller asked for is always sent.
@@ -32,7 +32,7 @@ function fakeServer() {
         Object.defineProperty(copy, "__etag", { value: etag(s.version), enumerable: false, configurable: true });
         return copy;
     };
-    const client = fakeCollectionClient<Row>({
+    const client = fakeTableClient<Row>({
         async find() {
             if (!state.online) throw networkError();
             const data = [...rows.values()].map(r => ({ ...r.row }));
