@@ -28,7 +28,7 @@ export function useBuildLocalConfigurationPersistence(): UserConfigurationPersis
     // invisible to them: the new column width reaches storage, the table keeps
     // rendering the old one, and the next re-render snaps the column back.
     // Making a write a state change is what lets the views re-read it.
-    const [version, setVersion] = useState(0);
+    const [configVersion, setConfigVersion] = useState(0);
 
     const getTablePreferences = useCallback((slug: string): UiTablePreferences => {
         const key = storageKeyOf(slug);
@@ -42,7 +42,7 @@ export function useBuildLocalConfigurationPersistence(): UserConfigurationPersis
         const merged = mergeUiTablePreferences(getTablePreferences(slug), delta);
         cache.current[key] = merged;
         writeStoredJson(key, merged);
-        setVersion(v => v + 1);
+        setConfigVersion(v => v + 1);
     }, [getTablePreferences]);
 
     const [recentlyVisitedPaths, _setRecentlyVisitedPaths] = useState<string[]>([]);
@@ -80,12 +80,12 @@ export function useBuildLocalConfigurationPersistence(): UserConfigurationPersis
         setFavouritePaths,
         collapsedGroups,
         setCollapsedGroups
-        // eslint-disable-next-line react-hooks/exhaustive-deps -- `version`
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- `configVersion`
         // contributes nothing to the value and everything to its IDENTITY: the
         // stored preferences live in a ref, and this is the only thing telling
         // the views that read them during render that they changed.
     }), [
-        version,
+        configVersion,
         getTablePreferences,
         saveTablePreferences,
         recentlyVisitedPaths,
