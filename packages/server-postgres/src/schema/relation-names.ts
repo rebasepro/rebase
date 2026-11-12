@@ -1,6 +1,37 @@
-import { CollectionConfig, ResolvedRelation } from "@rebasepro/types";
-import { fieldKeyForColumn, getTableName } from "@rebasepro/common";
-import { toSnakeCase } from "@rebasepro/utils";
+import type { CollectionConfig, RelationDescriptor, ResolvedRelation, TableDescriptor } from "@rebasepro/types";
+import { fieldKeyForColumn, getTableName, keyForColumn } from "@rebasepro/common";
+import { toSnakeCase, toWireKey } from "@rebasepro/utils";
+
+/**
+ * The key a SQL column is served under on a table: its column's key, or — for
+ * a column the table does not describe — the camelCase of its name, which is
+ * the key a foreign key derived from it would get.
+ */
+export const servedKeyOf = (descriptor: TableDescriptor, sqlColumn: string): string =>
+    keyForColumn(descriptor, sqlColumn) ?? toWireKey(sqlColumn);
+
+/**
+ * {@link sharedRelationName}, read from descriptors: the `relationName` both
+ * sides of a link agree on, named after the table that carries the foreign key
+ * and the key that column is served under.
+ *
+ *   owning  (belongsTo)      → `{thisTable}_{key(localKey)}`
+ *   inverse (hasMany/hasOne) → `{targetTable}_{key(foreignKey)}`
+ *
+ * A many-to-many and a `via` chain keep the relation's own name.
+ */
+export function tableRelationName(
+    relation: RelationDescriptor,
+    source: TableDescriptor,
+    targetOf: (slug: string) => TableDescriptor
+): string {
+    if (relation.kind === "belongsTo") return `${source.table}_${servedKeyOf(source, relation.localKey)}`;
+    if (relation.kind === "hasMany" || relation.kind === "hasOne") {
+        const target = targetOf(relation.target);
+        return `${target.table}_${servedKeyOf(target, relation.foreignKey)}`;
+    }
+    return relation.name;
+}
 
 /**
  * The `relationName` both sides of a link must agree on.
@@ -22,6 +53,9 @@ import { toSnakeCase } from "@rebasepro/utils";
  * name (`fieldKeyForColumn` is the one definition of it), and a name built from
  * the column would differ between a collection that declares `columnName` and
  * one that does not, for the same link.
+ *
+ * TRANSITIONAL: the collection twin of {@link tableRelationName}, kept for
+ * `config-relations.ts` until it reads descriptors (next slice).
  *
  * **This is the one definition.** `generate-drizzle-schema-logic.ts` holds a
  * private copy (`computeSharedRelationName`) that this was lifted from verbatim;

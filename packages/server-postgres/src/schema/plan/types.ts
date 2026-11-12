@@ -30,7 +30,6 @@
  *   `contracts/derived-names.txt`); they are computed once, here, so the three
  *   files cannot name the same object differently.
  */
-import type { CollectionConfig } from "@rebasepro/types";
 import type { CollectionIndexSpec } from "../collection-index";
 import type { SearchColumnSpec } from "../search-column";
 import type { VectorColumnSpec, VectorIndexPlan } from "../vector-index";
@@ -411,7 +410,7 @@ export interface PlanOptions {
     databaseExtensions?: readonly string[];
 }
 
-/** A collection's SQL view, as `views.sql` creates it. See `PostgresCollectionConfig.view`. */
+/** A table's SQL view, as `views.sql` creates it (`defineView`). */
 export interface ViewPlan {
     schema: string;
     name: string;
@@ -471,7 +470,5 @@ export interface SchemaPlan {
     extensions: string[];
     /** `CREATE OR REPLACE FUNCTION …` bodies, deduplicated, in apply order. */
     functions: string[];
-    /** The collections this plan was built from, filtered to the SQL ones. */
-    collections: CollectionConfig[];
     options: PlanOptions;
 }

@@ -75,8 +75,10 @@ import {
     tableJunctionRules,
     type CompiledRulePolicy,
     type PolicyTable,
+    type RelationOfKind,
     type ResolvePolicyTable,
-    type TableJunction
+    type TableJunction,
+    type TableJunctionSide
 } from "@rebasepro/common";
 import {
     generateForeignKeyName,
@@ -122,7 +124,7 @@ import {
     type CollectionIndexSpec
 } from "../collection-index";
 import { createHash } from "node:crypto";
-import { sharedRelationName } from "../relation-names";
+import { servedKeyOf, tableRelationName } from "../relation-names";
 import { SET_UPDATED_AT_FN, setUpdatedAtFunction } from "./updated-at-trigger";
 import { keepTenantFunction, keepTenantTriggerName } from "./tenant-keep-trigger";
 import { DEFAULT_VIEW_ROLES, viewRowsName } from "./view-names";
@@ -858,11 +860,12 @@ const definedLiteralDefault = (value: unknown, type: PgType): ColumnDefault | un
  * pivot alike. {@link planPropertyColumn} hands over to it whenever the table
  * describes the column.
  */
-function planDescribedColumn(described: ColumnDescriptor, ctx: PropertyColumnContext): ColumnPlan {
-    const { collection, schema, table, auth } = ctx;
+function planDescribedColumn(described: ColumnDescriptor, ctx: DescribedColumnContext): ColumnPlan {
+    const { site, auth } = ctx;
+    const { schema, table } = site;
     const { key, column } = described;
     const isKey = described.primaryKey === true;
-    const type = describedPgType(described, { schema, table, owner: describe(collection), propName: key, column });
+    const type = describedPgType(described, site);
     const authDefinition = auth && !isKey ? authUsersColumnDefinition(column) : undefined;
 
     const plan: ColumnPlan = {
@@ -874,7 +877,7 @@ function planDescribedColumn(described: ColumnDescriptor, ctx: PropertyColumnCon
         unique: !isKey && described.unique === true,
         default: describedColumnDefault(described, type),
         sqlDefinition: authDefinition,
-        source: { kind: "property", propName: key, slug: collection.slug }
+        source: { kind: "property", propName: key, slug: ctx.slug }
     };
     if (described.generated !== undefined) {
         plan.generated = { expression: described.generated.expression, stored: true };
@@ -1043,50 +1046,28 @@ const servesView = (collection: CollectionConfig): boolean =>
  * @param options the planner's world: the extensions it may install.
  */
 export function planSchema(compiledTables: readonly CompiledTable[], options: PlanOptions = {}): SchemaPlan {
-    // B-PLAN-2: removed in step 4. The parts of the planner not yet ported to
-    // the descriptor read the tables lowered into the legacy shape.
-    const allCollections: CollectionConfig[] = lowerCompiledTables(compiledTables);
-    const descriptorOf = new Map(compiledTables.map(table => [table.descriptor.slug, table.descriptor]));
-    const requireDescriptor = (collection: CollectionConfig): TableDescriptor => {
-        const descriptor = descriptorOf.get(collection.slug);
-        if (!descriptor) throw new Error(`The planner lost the descriptor of table "${describe(collection)}".`);
-        return descriptor;
+    const descriptors = compiledTables.map(table => table.descriptor);
+    const descriptorOf = new Map(descriptors.map(descriptor => [descriptor.slug, descriptor]));
+    const targetOf = (slug: string): TableDescriptor => {
+        const target = descriptorOf.get(slug);
+        if (!target) throw new Error(`Internal: a relation points at the table "${slug}", which is not among the planned tables.`);
+        return target;
     };
-    // Before the filter, deliberately, and loudly: a `beforeQuery` that
-    // does nothing is a row filter that does nothing.
-    assertBeforeQueryIsPostgresOnly(allCollections);
+    // A view has no table, policy or enum: it is planned on its own (`views`),
+    // and resolvable as a relation target.
+    const tableDescriptors = descriptors.filter(descriptor => descriptor.kind !== "view");
 
-    // A Firestore collection has no table here, and generating one
-    // is not merely wasted output: `db push` would create it, and the doctor
-    // would then report the store the collection actually reads from as drift.
-    const relational = relationalCollections(allCollections);
-    // A collection that serves a view has no table, policy or enum: it is
-    // planned on its own (`views`), and resolvable as a relation target.
-    const collections = relational.filter(c => requireDescriptor(c).kind !== "view");
-
-    // The first collection, in declaration order, whose slug or table name is
-    // the key — what `collections.find(...)` answered, from a map built once
-    // rather than a scan per lookup.
-    const firstBySlugOrTable = new Map<string, CollectionConfig>();
-    for (const c of relational) {
-        for (const key of [c.slug, getTableName(c)]) {
-            if (!firstBySlugOrTable.has(key)) firstBySlugOrTable.set(key, c);
-        }
-    }
-    const resolveCollection: ResolveCollection = (slug) => firstBySlugOrTable.get(slug);
-
-    const declaredSchemas = Array.from(new Set(collections.flatMap(c => {
-        const declared = declaredSchemaOf(requireDescriptor(c));
+    const declaredSchemas = Array.from(new Set(tableDescriptors.flatMap(descriptor => {
+        const declared = declaredSchemaOf(descriptor);
         return declared === undefined ? [] : [declared];
     })));
     const schemas = Array.from(new Set([REBASE_SCHEMA, ...declaredSchemas]));
 
     // ── Enum types ───────────────────────────────────────────────────────────
-    // The name is derived from table + column, so two collections mapped onto
-    // the same table — or two properties whose `columnName` resolves to the
-    // same column — land on the same type. `CREATE TYPE` has no IF NOT EXISTS,
-    // so emitting it twice aborts the whole file; deduplicated by name here,
-    // once, for every renderer.
+    // The name is derived from table + column, so two tables mapped onto the
+    // same SQL table — or two columns of one SQL name — land on the same type.
+    // `CREATE TYPE` has no IF NOT EXISTS, so emitting it twice aborts the whole
+    // file; deduplicated by name here, once, for every renderer.
     //
     // Deduplicated by the name *Postgres* holds, which is the first 63 bytes,
     // and only for the same column. Two different columns deriving one name —
@@ -1097,26 +1078,34 @@ export function planSchema(compiledTables: readonly CompiledTable[], options: Pl
     const enums: EnumPlan[] = [];
     const enumOwners = new Map<string, { table: string; column: string; owner: string; shared?: { name: string; labels: string[] } }>();
     /**
-     * The enum type a defined column is typed by, appended once.
+     * The enum type a column is typed by, appended once.
      *
      * A column's own type (`<table>_<column>`) is claimed by that column alone,
      * as above. A type the definition names (`col.enum(values, { name })`) is
      * shared: every column naming it is typed by the one `CREATE TYPE`, and
      * they must agree on its values — `compileTables` refuses a disagreement
      * first, and so does this, for a plan reached any other way.
+     *
+     * `declaredSchema` is passed rather than read off the site because a
+     * junction's `public` is a resolved fact and not a declaration — emitting
+     * it as one would make the generated file reach for a `pgSchema("public")`
+     * variable that exists for nobody.
      */
-    const collectDescribedEnumType = (
-        collection: CollectionConfig,
-        described: ColumnDescriptor,
-        declaredSchema: string | undefined
-    ): void => {
-        const { key: propName, column } = described;
-        const enumType = definedEnumOf(describedPgType(described, collectionSite(collection, propName, column)));
+    const collectEnumType = (site: DefinedColumnSite, described: ColumnDescriptor, declaredSchema: string | undefined): void => {
+        const owner = `column "${described.key}" of "${site.owner}"`;
+        // A closed value set that is no enum type (`.oneOf()`) refuses an
+        // empty list as an enum type refuses one.
+        if (described.oneOf !== undefined && described.oneOf.every(value => String(value).length === 0)) {
+            throw new Error(
+                `The ${owner} is \`.oneOf()\` with no non-empty value, so no value can be written to it. ` +
+                "List the values the column accepts."
+            );
+        }
+        const enumType = definedEnumOf(describedPgType(described, site));
         if (!enumType) return;
         const { schema, name, labels } = enumType;
-        const table = getTableName(collection);
+        const { table, column } = site;
         const qualified = `${schema}.${toPostgresIdentifier(name)}`;
-        const owner = `property "${propName}" of collection "${describe(collection)}"`;
         const shared = name === `${table}_${column}` ? undefined : { name, labels };
         const claimed = enumOwners.get(qualified);
         if (claimed) {
@@ -1124,8 +1113,8 @@ export function planSchema(compiledTables: readonly CompiledTable[], options: Pl
             if (shared && claimed.shared?.name === name) {
                 if (claimed.shared.labels.join("\u0000") === labels.join("\u0000")) return;
                 throw new Error(
-                    `The enum type "${schema}"."${name}" is given the values (${labels.join(", ")}) by ${owner} and ` +
-                    `(${claimed.shared.labels.join(", ")}) by ${claimed.owner}. Columns sharing a named enum type must ` +
+                    `The enum type "${schema}"."${name}" is given the values (${labels.join(", ")}) by the ${owner} and ` +
+                    `(${claimed.shared.labels.join(", ")}) by the ${claimed.owner}. Columns sharing a named enum type must ` +
                     "list the same values, in the same order. Make them agree, or give one column its own type `name`."
                 );
             }
@@ -1140,138 +1129,57 @@ export function planSchema(compiledTables: readonly CompiledTable[], options: Pl
         enumOwners.set(qualified, { table, column, owner, shared });
         enums.push({ schema, name, qualified, declaredSchema, varName: enumType.varName, labels });
     };
-    /**
-     * Every enum type one table's properties declare, appended once.
-     *
-     * `declaredSchema` is passed rather than read off the config because a
-     * junction's synthetic collection carries `schema: "public"` as a resolved
-     * fact and not as a declaration — emitting it as one would make the
-     * generated file reach for a `pgSchema("public")` variable that exists for
-     * nobody.
-     */
-    const collectEnumTypes = (
-        collection: CollectionConfig,
-        properties: Properties,
-        declaredSchema: string | undefined,
-        columnOf: (key: string) => ColumnDescriptor | undefined
-    ): void => {
-        for (const [propName, rawProp] of Object.entries(properties)) {
-            const prop = rawProp as Property;
+    for (const descriptor of tableDescriptors) {
+        const declaredSchema = declaredSchemaOf(descriptor);
+        for (const entry of plannedColumnEntries(descriptor, targetOf)) {
             // A link is typed by its target's key, whose type its table declares.
-            const described = prop.type === "relation" ? undefined : columnOf(propName);
-            if (described) {
-                // A closed value set that is no enum type (`.oneOf()`) still
-                // refuses an empty list, as `enumLabelsOf` refuses one.
-                if (described.oneOf !== undefined && described.oneOf.every(value => String(value).length === 0)) {
-                    enumLabelsOf(propName, { type: "string", enum: [] }, collection);
-                }
-                collectDescribedEnumType(collection, described, declaredSchema);
-                continue;
-            }
-            if (!("enum" in prop) || !prop.enum) continue;
-            if (prop.type !== "string" && prop.type !== "number") continue;
-            // Refuses an empty list whatever the property's type, then declares
-            // a type only for the string ones: a `number` enum's column is
-            // NUMERIC or INTEGER on every path, so the type used to be created
-            // and referenced by nothing.
-            const labels = enumLabelsOf(propName, prop, collection);
-            if (!declaresEnumType(prop)) continue;
-            const schema = schemaOf(collection);
-            const table = getTableName(collection);
-            const column = resolveColumnName(propName, prop);
-            const name = `${table}_${column}`;
-            const qualified = `${schema}.${toPostgresIdentifier(name)}`;
-            const owner = `property "${propName}" of collection "${describe(collection)}"`;
-            const claimed = enumOwners.get(qualified);
-            if (claimed) {
-                if (claimed.table === table && claimed.column === column) continue;
-                throw new Error(
-                    `The enum ${owner} and the enum ${claimed.owner} both derive the Postgres type ` +
-                    `"${schema}"."${toPostgresIdentifier(name)}" (an enum type is named <table>_<column>, ` +
-                    "and Postgres keeps the first 63 bytes). One type cannot hold both columns' values, and a " +
-                    "type's name cannot change once a database holds it. Give one of the two columns another " +
-                    "name with `columnName`, or its collection another `table` or `schema`."
-                );
-            }
-            enumOwners.set(qualified, { table, column, owner });
-            enums.push({
-                schema,
-                name,
-                qualified,
-                declaredSchema,
-                varName: getEnumVarName(getTableName(collection), propName),
-                labels
-            });
+            if (entry.kind !== "column") continue;
+            collectEnumType(describedSite(descriptor, entry.column), entry.column, declaredSchema);
         }
-    };
-    for (const collection of collections) {
-        const descriptor = requireDescriptor(collection);
-        collectEnumTypes(
-            collection,
-            (collection.properties ?? {}) as Properties,
-            declaredSchemaOf(descriptor),
-            key => columnByKey(descriptor, key)
-        );
     }
 
     // ── The table set ────────────────────────────────────────────────────────
-    // Each collection's table, then any junction its relations imply, in the
-    // order the collections arrive. `schema.sql` and `schema.generated.ts` are
-    // compared against their committed copies, so this order is the file's.
-    const tableEntries = new Map<string, {
-        collection: CollectionConfig;
-        junction?: { relation: ResolvedRelation; source: CollectionConfig };
-    }>();
+    // Each table, then any junction its relations imply, in the order the
+    // tables arrive. `schema.sql` and `schema.generated.ts` are compared
+    // against their committed copies, so this order is the file's.
+    const tableJunctions = resolveTableJunctions(tableDescriptors);
+    const resolvePolicyTable = policyTableResolver(descriptors);
+    const tableEntries = new Map<string, TableEntry>();
     const junctionShapes = new Map<string, { keys: string; claim: string }>();
-    for (const collection of collections) {
-        const tableName = getTableName(collection);
-        if (tableName) tableEntries.set(tableName, { collection });
-        for (const [relationKey, relation] of Object.entries(resolveCollectionRelations(collection))) {
-            if (!isManyToMany(relation)) continue;
+    for (const descriptor of tableDescriptors) {
+        tableEntries.set(descriptor.table, { kind: "table", descriptor });
+        for (const relation of descriptor.relations) {
+            if (relation.kind !== "manyToMany") continue;
             const junctionTable = relation.through.table;
-            assertOneJunctionShape(junctionShapes, junctionTable, collection, relation.relationName ?? relationKey, relation);
+            assertOneJunctionShape(junctionShapes, junctionTable, descriptor, relation, targetOf(relation.target));
             if (tableEntries.has(junctionTable)) continue;
-            tableEntries.set(junctionTable, {
-                collection: { table: junctionTable, properties: {} } as CollectionConfig,
-                junction: { relation, source: collection }
-            });
+            const junction = tableJunctions.get(bareTableName(junctionTable));
+            if (!junction) throw new Error(`Internal: the junction table "${junctionTable}" of "${descriptor.slug}" was not resolved.`);
+            tableEntries.set(junctionTable, { kind: "junction", junction });
         }
     }
 
-    const junctionSpecs = resolveJunctionSpecs(collections);
-    // The junctions as the descriptors resolve them, for their policies and
-    // declaring sides: the same tables in the same order, so the same sides.
-    const descriptors = compiledTables.map(table => table.descriptor);
-    const tableJunctions = resolveTableJunctions(descriptors);
-    const resolvePolicyTable = policyTableResolver(descriptors);
-    const targetOf = (slug: string): TableDescriptor => {
-        const target = descriptorOf.get(slug);
-        if (!target) throw new Error(`Internal: a relation points at the table "${slug}", which is not among the planned tables.`);
-        return target;
-    };
-
-    // A junction's payload may declare an enum too, and the type it names is
-    // created by nobody else: no collection owns the table, so the loop above
-    // never sees the property. Appended after the collections' — the enum block
-    // is compared byte-for-byte against its committed copy, and a junction
-    // whose type interleaved with the collections' would reorder that file
-    // whenever a `through.properties` block moved.
-    for (const [junctionName, spec] of junctionSpecs) {
-        if (Object.keys(spec.properties).length === 0) continue;
-        const pivot = tableJunctions.get(junctionName)?.pivot ?? [];
-        collectEnumTypes(getJunctionCollectionConfig(spec), spec.properties, undefined,
-            key => pivot.find(pivotColumn => pivotColumn.key === key));
+    // A junction's pivot may declare an enum too, and the type it names is
+    // created by nobody else: no table owns the junction, so the loop above
+    // never sees the column. Appended after the tables' — the enum block is
+    // compared byte-for-byte against its committed copy, and a junction whose
+    // type interleaved with the tables' would reorder that file whenever a
+    // `pivot` moved.
+    for (const junction of tableJunctions.values()) {
+        const keys = new Set(junction.endpoints.map(endpoint => endpoint.junctionColumn));
+        for (const pivotColumn of junction.pivot) {
+            if (keys.has(pivotColumn.column)) continue;
+            collectEnumType(junctionSite(junction, pivotColumn), pivotColumn, undefined);
+        }
     }
 
     const triggerFunctionNeeded = { value: false };
 
     const tables: TablePlan[] = [];
-    for (const [tableName, entry] of tableEntries) {
-        tables.push(entry.junction
-            ? planJunctionTable(
-                tableName, entry.junction.relation, entry.junction.source,
-                junctionSpecs, tableJunctions, resolveCollection, resolvePolicyTable, triggerFunctionNeeded)
-            : planCollectionTable(entry.collection, requireDescriptor(entry.collection), resolveCollection, resolvePolicyTable, targetOf, triggerFunctionNeeded));
+    for (const entry of tableEntries.values()) {
+        tables.push(entry.kind === "junction"
+            ? planJunctionTable(entry.junction, targetOf, resolvePolicyTable, triggerFunctionNeeded)
+            : planCollectionTable(entry.descriptor, resolvePolicyTable, targetOf, triggerFunctionNeeded));
     }
 
     assertNoTruncationCollisions(tables, enums);
@@ -1308,11 +1216,10 @@ export function planSchema(compiledTables: readonly CompiledTable[], options: Pl
         declaredSchemas,
         enums,
         tables,
-        views: planViews(compiledTables.map(table => table.descriptor)),
-        relations: planRelations(collections, tableEntries),
+        views: planViews(descriptors),
+        relations: planRelations(tableDescriptors, tableEntries, targetOf),
         extensions,
         functions,
-        collections,
         options
     };
 }
@@ -1438,20 +1345,16 @@ function assertNoTruncationCollisions(tables: TablePlan[], enums: EnumPlan[]): v
 function assertOneJunctionShape(
     seen: Map<string, { keys: string; claim: string }>,
     junctionTable: string,
-    collection: CollectionConfig,
-    relationName: string,
-    relation: ResolvedRelation
+    descriptor: TableDescriptor,
+    relation: RelationOfKind<"manyToMany">,
+    target: TableDescriptor
 ): void {
-    if (!isManyToMany(relation)) return;
-    // A target that does not resolve plans no junction here; `resolveJunctionSpecs` skips it the same way.
-    const target: CollectionConfig | undefined = relation.target();
-    if (!target) return;
-    const sourceTable = getTableName(collection);
-    const targetTable = getTableName(target);
-    const { sourceColumn, targetColumn } = relation.through;
-    const keys = JSON.stringify([[sourceColumn, sourceTable], [targetColumn, targetTable]].sort());
-    const claim = `the relation "${relationName}" of collection "${describe(collection)}" ` +
-        `("${sourceColumn}" → ${sourceTable}, "${targetColumn}" → ${targetTable})`;
+    const sourceTable = descriptor.table;
+    const targetTable = target.table;
+    const { sourceKey, targetKey } = relation.through;
+    const keys = JSON.stringify([[sourceKey, sourceTable], [targetKey, targetTable]].sort());
+    const claim = `the relation "${relation.name}" of table "${descriptor.slug}" ` +
+        `("${sourceKey}" → ${sourceTable}, "${targetKey}" → ${targetTable})`;
     const first = seen.get(junctionTable);
     if (!first) {
         seen.set(junctionTable, { keys, claim });
@@ -1462,17 +1365,29 @@ function assertOneJunctionShape(
         `Two many-to-many relations resolve to the junction table "${junctionTable}" with different key ` +
         `columns: ${first.claim} and ${claim}. Only one table is created, so one of them would read ` +
         "and write columns that do not exist. Give the second its own junction — " +
-        `\`through: { table: "${sourceTable}_${toSnakeCase(relationName)}" }\` — or, if both are meant to ` +
+        `\`through: { table: "${sourceTable}_${toSnakeCase(relation.name)}" }\` — or, if both are meant to ` +
         "be one link, declare it once."
     );
 }
 
+/** One table the plan creates: a table's own, or a junction its relations imply. */
+type TableEntry =
+    | { kind: "table"; descriptor: TableDescriptor }
+    | { kind: "junction"; junction: TableJunction };
+
+/** Where a junction's pivot column lands. */
+const junctionSite = (junction: TableJunction, column: ColumnDescriptor): DefinedColumnSite => ({
+    schema: junction.schema,
+    table: junction.table,
+    owner: junction.table,
+    propName: column.key,
+    column: column.column
+});
+
 // ── A collection's table ─────────────────────────────────────────────────────
 
 function planCollectionTable(
-    collection: CollectionConfig,
     descriptor: TableDescriptor,
-    resolveCollection: ResolveCollection,
     resolvePolicyTable: ResolvePolicyTable,
     targetOf: (slug: string) => TableDescriptor,
     triggerFunctionNeeded: { value: boolean }
@@ -1489,12 +1404,9 @@ function planCollectionTable(
             continue;
         }
         columns.push(planDescribedColumn(entry.column, {
-            collection,
-            resolveCollection,
-            schema,
-            table,
+            site: describedSite(descriptor, entry.column),
+            slug,
             auth,
-            columnOf: key => columnByKey(descriptor, key),
             triggers,
             triggerFunctionNeeded
         }));
@@ -1677,88 +1589,17 @@ function planPrimaryKey(descriptor: TableDescriptor, columns: ColumnPlan[]): str
     return columns.filter(c => c.primaryKey).map(c => c.column);
 }
 
-/** What {@link planPropertyColumn} needs about the table the column lands on. */
-interface PropertyColumnContext {
-    /** The collection, or the synthetic one standing in for a junction. */
-    collection: CollectionConfig;
-    resolveCollection: ResolveCollection;
-    schema: string;
-    /** Bare table name — the trigger name is derived from it. */
-    table: string;
+/** What {@link planDescribedColumn} needs about the table the column lands on. */
+interface DescribedColumnContext {
+    /** Where the column lands — the trigger and an unnamed enum are named after it. */
+    site: DefinedColumnSite;
+    /** The slug the plan records as the column's source: the table's, or a junction's table name. */
+    slug: string;
     /** Whether `auth-users-columns` owns this table's columns. */
     auth: boolean;
-    /** The table's descriptor of a column, by key — a table's column or a junction's pivot. */
-    columnOf: (key: string) => ColumnDescriptor | undefined;
     /** Collected `BEFORE UPDATE` triggers, appended to. */
     triggers: TriggerPlan[];
     triggerFunctionNeeded: { value: boolean };
-}
-
-/**
- * One declared, non-linking property, as a column.
- *
- * Extracted from {@link planCollectionTable} the moment a second table needed
- * it: a `manyToMany`'s `through.properties` are columns on the junction, and
- * "declared exactly like a collection's properties" has to mean the same code
- * reads them, or it is a promise the next `columnType` or `defaultValue` change
- * quietly breaks. A junction payload column therefore gets the type, the
- * nullability, the default, the UNIQUE and the `on_update` trigger a collection
- * column with the same declaration gets — because it is the same function
- * answering.
- *
- * `relation` and `reference` do not come through here; they own a foreign key
- * and are planned by {@link planLinkColumn}.
- * A junction payload may not declare either (config validation refuses it), so
- * this is the whole of a payload column.
- */
-function planPropertyColumn(
-    propName: string,
-    prop: Property,
-    ctx: PropertyColumnContext
-): ColumnPlan {
-    const described = ctx.columnOf(propName);
-    if (described) return planDescribedColumn(described, ctx);
-    const { collection, resolveCollection, schema, table, auth } = ctx;
-
-    const isId = isIdProperty(propName, prop, collection);
-    const column = resolveColumnName(propName, prop);
-    const type = columnPgType(propName, prop, collection, resolveCollection);
-    const required = prop.validation?.required === true;
-    const defaultValue = columnDefault(propName, prop, collection, type);
-    // On an auth collection, the columns auth itself reads and writes have
-    // exactly one definition wherever the table is created from — see
-    // `auth-users-columns`. Anything else there is an ordinary field.
-    const authDefinition = auth && !isId ? authUsersColumnDefinition(column) : undefined;
-
-    const plan: ColumnPlan = {
-        key: propName,
-        column,
-        type,
-        // A primary key is NOT NULL whether or not anyone writes it.
-        nullable: !(isId || required),
-        primaryKey: isId,
-        // `validation.unique` holds for every type. The Drizzle generator
-        // honoured it on `string` and `number` only, so a unique `date` or
-        // `map` was UNIQUE in the database and not in the file drizzle-kit
-        // plans from. A primary key gets neither UNIQUE nor NOT NULL —
-        // both are implied, and emitting them made drizzle-kit plan an
-        // extra constraint against a database `db push` built without one.
-        unique: !isId && prop.validation?.unique === true,
-        default: defaultValue,
-        sqlDefinition: authDefinition,
-        source: { kind: "property", propName, slug: collection.slug }
-    };
-    if (prop.type === "date" && (prop as DateProperty).autoValue === "on_update") {
-        plan.touchOnUpdate = true;
-        ctx.triggerFunctionNeeded.value = true;
-        ctx.triggers.push({
-            schema,
-            table,
-            column,
-            name: toPostgresIdentifier(`${table}_${column}_touch`)
-        });
-    }
-    return plan;
 }
 
 /**
@@ -2056,149 +1897,118 @@ const authColumnType = (sqlType: string): PgType => {
  * reach them in different orders: `db push` loads files by name, boot walks the
  * bundle's array. The same junction was keyed `(a_id, b_id)` by one and
  * `(b_id, a_id)` by the other, and a push against a boot-built database rebuilt
- * the key. Now the side whose table sorts first, which is the order `db push`
- * already used wherever a file is named after its table.
+ * the key. Now the side whose table sorts first (then its junction column),
+ * which is the order `db push` already used wherever a file is named after its
+ * table. Compared by SQL table name, not slug: that is what every key in the
+ * field was created by.
  */
-function canonicalJunctionSide(
-    table: string,
-    relation: ResolvedRelation,
-    source: CollectionConfig,
-    spec: JunctionSpec | undefined
-): { relation: ResolvedRelation; source: CollectionConfig } {
-    if (!spec || spec.declaringSides.length < 2) return { relation, source };
-    const ordered = [...spec.declaringSides].sort((a, b) => {
-        const left = bareTableName(getTableName(a.collection));
-        const right = bareTableName(getTableName(b.collection));
+function canonicalJunctionSide(junction: TableJunction): TableJunctionSide {
+    const [first, ...rest] = junction.declaringSides;
+    if (rest.length === 0) return first ?? junction.endpoints[0];
+    return [...junction.declaringSides].sort((a, b) => {
+        const left = a.descriptor.table;
+        const right = b.descriptor.table;
         if (left !== right) return left < right ? -1 : 1;
         return a.junctionColumn < b.junctionColumn ? -1 : a.junctionColumn > b.junctionColumn ? 1 : 0;
-    });
-    const chosen = ordered[0].collection;
-    if (chosen === source) return { relation, source };
-    const resolved = Object.values(resolveCollectionRelations(chosen))
-        .find(r => isManyToMany(r) && bareTableName(r.through.table) === table);
-    return resolved ? { relation: resolved, source: chosen } : { relation, source };
+    })[0];
 }
 
 function planJunctionTable(
-    tableName: string,
-    reachedRelation: ResolvedRelation,
-    reachedSource: CollectionConfig,
-    junctionSpecs: ReturnType<typeof resolveJunctionSpecs>,
-    tableJunctions: ReadonlyMap<string, TableJunction>,
-    resolveCollection: ResolveCollection,
+    junction: TableJunction,
+    targetOf: (slug: string) => TableDescriptor,
     resolvePolicyTable: ResolvePolicyTable,
     triggerFunctionNeeded: { value: boolean }
 ): TablePlan {
-    const { relation, source } = canonicalJunctionSide(
-        bareTableName(tableName), reachedRelation, reachedSource, junctionSpecs.get(bareTableName(tableName)));
-    if (!isManyToMany(relation)) {
-        throw new Error(`Internal: junction table "${tableName}" was reached from a ${relation.kind} relation.`);
-    }
-    const table = bareTableName(tableName);
-    // Junctions live in `public`, full stop — `resolveJunctionSpecs` hardcodes
-    // that, so it is where the tables are created and where the derived RLS
+    const { relation, descriptor: source } = canonicalJunctionSide(junction);
+    const { table } = junction;
+    // Junctions live in `public`, full stop — `resolveTableJunctions` says so,
+    // so it is where the tables are created and where the derived RLS
     // policies are applied. Inheriting the endpoint's schema put the junction
     // of any m2m onto `users` in `rebase` while its policies were still created
     // against `public.<junction>`: RLS enabled on one table, rows in another.
-    const schema = "public";
-    const target = relation.target();
-    const { sourceColumn, targetColumn } = relation.through;
+    const schema = junction.schema;
+    const target = targetOf(relation.target);
+    const { sourceKey: sourceColumn, targetKey: targetColumn } = relation.through;
     // Every declaring side agrees on the edge's lifetime; the first one wins.
     const onDelete = relation.onDelete ?? "CASCADE";
 
-    const spec = junctionSpecs.get(table);
-    const junction = tableJunctions.get(table);
-    const legacyFor = (collection: CollectionConfig, column: string): string | undefined => {
+    const legacyFor = (endpoint: TableDescriptor, column: string): string | undefined => {
         // A junction column's default name is derived from the endpoint
-        // collection's slug — normally plural, so this is where the
+        // table's slug — normally plural, so this is where the
         // singularization change lands: a `categories` endpoint used to give
         // `categorie_id` and now gives `category_id`. Recorded, not used.
-        const slug = toSnakeCase(collection.slug ?? collection.name ?? "");
+        const slug = toSnakeCase(endpoint.slug);
         const legacy = legacyForeignKeyName(slug);
         return column === generateForeignKeyName(slug) && legacy !== column ? legacy : undefined;
     };
 
-    const via = linkLabel("relation", source, relation.relationName);
-    const endpoint = (collection: CollectionConfig, column: string): ColumnPlan => ({
-        key: column,
-        column,
-        type: primaryKeyPgType(collection, via),
-        nullable: false,
-        // Part of the composite key on {@link TablePlan.primaryKey}, not a
-        // key of its own — an inline `PRIMARY KEY` here would be a second one.
-        primaryKey: false,
-        unique: false,
-        legacyColumn: legacyFor(collection, column),
-        foreignKey: servesView(collection) ? undefined : foreignKeyPlan({
-            schema,
-            table,
+    const via = `relation "${source.slug}.${relation.name}"`;
+    const endpoint = (endpointTable: TableDescriptor, column: string): ColumnPlan => {
+        const key = tableKeyTarget(endpointTable, via);
+        return {
+            key: column,
             column,
-            targetSchema: schemaOf(collection),
-            targetTable: bareTableName(getTableName(collection)),
-            targetColumn: getPrimaryKeyColumn(collection, via),
-            onDelete
-        }),
-        source: { kind: "junction-key" }
-    });
+            type: key.type,
+            nullable: false,
+            // Part of the composite key on {@link TablePlan.primaryKey}, not a
+            // key of its own — an inline `PRIMARY KEY` here would be a second one.
+            primaryKey: false,
+            unique: false,
+            legacyColumn: legacyFor(endpointTable, column),
+            // Postgres refuses a foreign key into a view.
+            foreignKey: endpointTable.kind === "view" ? undefined : foreignKeyPlan({
+                schema,
+                table,
+                column,
+                targetSchema: endpointTable.schema,
+                targetTable: endpointTable.table,
+                targetColumn: key.column,
+                onDelete
+            }),
+            source: { kind: "junction-key" }
+        };
+    };
 
     const columns = [endpoint(source, sourceColumn), endpoint(target, targetColumn)];
 
     // ── The junction's own columns ───────────────────────────────────────────
-    // `through.properties`: the `role` on a membership, the `position` on a
-    // tag. Planned by the same {@link planPropertyColumn} the collection tables
-    // use, against the synthetic collection {@link getJunctionCollectionConfig}
-    // builds — so a payload property gets exactly the type, nullability,
-    // default, UNIQUE and enum type it would get on a table, and there is no
-    // second `switch (prop.type)` anywhere to disagree with the first.
+    // `pivot`: the `role` on a membership, the `position` on a tag. Planned by
+    // the same {@link planDescribedColumn} the tables use, so a pivot column
+    // gets exactly the type, nullability, default, UNIQUE and enum type it
+    // would get on a table.
     //
-    // Not supported here, and deliberately: `indexes` (declared per collection,
-    // and no collection declares a junction), `search`, `vector`, and any
-    // linking property — a payload cannot be a `relation`, a `reference` or a
-    // `vector`. Config validation refuses those with the relation named; this
-    // would otherwise reach `columnPgType` and produce a column no writer knows
-    // how to fill.
+    // Not supported here, and deliberately: `indexes`, `search`, `vector` and
+    // links — a pivot holds plain columns.
     const triggers: TriggerPlan[] = [];
-    if (spec && Object.keys(spec.properties).length > 0) {
-        const junctionCollection = getJunctionCollectionConfig(spec);
-        const keyColumns = new Set([sourceColumn, targetColumn]);
-        for (const [propName, rawProp] of Object.entries(spec.properties)) {
-            const prop = rawProp as Property;
-            const plan = planPropertyColumn(propName, prop, {
-                collection: junctionCollection,
-                resolveCollection,
-                schema,
-                table,
-                auth: false,
-                columnOf: key => junction?.pivot.find(pivotColumn => pivotColumn.key === key),
-                triggers,
-                triggerFunctionNeeded
-            });
-            // A payload column that resolves onto a key column would be a
-            // second definition of it — refused by `checkJunctionPayload` at
-            // boot, and skipped here so a config that got past it still
-            // produces a table rather than a duplicate-column CREATE.
-            if (keyColumns.has(plan.column)) continue;
-            columns.push(plan);
-        }
+    const keyColumns = new Set([sourceColumn, targetColumn]);
+    for (const pivotColumn of junction.pivot) {
+        // A pivot column on a key column would be a second definition of it;
+        // the compiler leaves it out, and so does this.
+        if (keyColumns.has(pivotColumn.column)) continue;
+        columns.push(planDescribedColumn(pivotColumn, {
+            site: junctionSite(junction, pivotColumn),
+            slug: table,
+            auth: false,
+            triggers,
+            triggerFunctionNeeded
+        }));
     }
 
     // Junction tables are generated tables like any other: locked by default,
     // with derived policies — reads follow the endpoints' visibility, writes
     // follow the declaring side's update rules. Without them they were the one
     // kind of generated table with no RLS at all.
-    const junctionTable = junction ? junctionPolicyTable(junction) : undefined;
-    const policies = junction && junctionTable
-        ? withoutLiveSupersededNames(tableJunctionRules(junction).flatMap((rule, index) =>
-            compileTableSecurityRule(junctionTable, rule, resolvePolicyTable, false, rule.name ?? `#${index}`)))
-        : [];
+    const junctionTable = junctionPolicyTable(junction);
+    const policies = withoutLiveSupersededNames(tableJunctionRules(junction).flatMap((rule, index) =>
+        compileTableSecurityRule(junctionTable, rule, resolvePolicyTable, false, rule.name ?? `#${index}`)));
 
     return {
         schema,
         table,
         qualified: `${schema}.${table}`,
-        varName: getTableVarName(tableName),
+        varName: getTableVarName(table),
         kind: "junction",
-        declaringSlugs: junction?.declaringSides.map(side => side.descriptor.slug) ?? [],
+        declaringSlugs: junction.declaringSides.map(side => side.descriptor.slug),
         columns,
         primaryKey: [sourceColumn, targetColumn],
         // Always, and with no opt-out: the junction is the platform's table,
@@ -2220,158 +2030,131 @@ function planJunctionTable(
  * The `relations(...)` entries the generated file carries.
  *
  * Both sides of a link must share a `relationName` or Drizzle cannot pair them;
- * `sharedRelationName` is the rule, and each side derives it independently.
+ * `tableRelationName` is the rule, and each side derives it independently.
  */
 function planRelations(
-    collections: CollectionConfig[],
-    tableEntries: Map<string, { collection: CollectionConfig; junction?: { relation: ResolvedRelation; source: CollectionConfig } }>
+    tables: readonly TableDescriptor[],
+    tableEntries: ReadonlyMap<string, TableEntry>,
+    targetOf: (slug: string) => TableDescriptor
 ): RelationPlan[] {
     const plans: RelationPlan[] = [];
+    const keyOf = (descriptor: TableDescriptor, via: string): string => tableKeyTarget(descriptor, via).key;
 
     // Every relation whose foreign key lives on its target's table, grouped by
-    // that target's slug, in the order the scan below used to meet them —
-    // collections in declaration order, each one's relations in order. Built
-    // once: the scan ran once per collection over every other collection's
-    // relations, N² in the collection count (24 ms at 200, 204 ms at 1,000).
-    const fkOnTargetBySlug = new Map<string, Array<{ other: CollectionConfig; otherRel: ResolvedForeignKeyOnTarget }>>();
-    for (const other of collections) {
-        for (const otherRel of Object.values(resolveCollectionRelations(other))) {
-            if (!hasForeignKeyOnTarget(otherRel)) continue;
-            let otherTarget: CollectionConfig;
-            try {
-                otherTarget = otherRel.target();
-            } catch {
-                continue;
-            }
-            const list = fkOnTargetBySlug.get(otherTarget.slug) ?? [];
+    // that target's slug, in table order and each table's relations in order.
+    // Built once: a scan per table over every other table's relations is N²
+    // in the table count.
+    const fkOnTargetBySlug = new Map<string, Array<{ other: TableDescriptor; otherRel: RelationOfKind<"hasOne" | "hasMany"> }>>();
+    for (const other of tables) {
+        for (const otherRel of other.relations) {
+            if (otherRel.kind !== "hasOne" && otherRel.kind !== "hasMany") continue;
+            const list = fkOnTargetBySlug.get(otherRel.target) ?? [];
             list.push({ other, otherRel });
-            fkOnTargetBySlug.set(otherTarget.slug, list);
+            fkOnTargetBySlug.set(otherRel.target, list);
         }
     }
 
     for (const [tableName, entry] of tableEntries) {
         const tableVar = getTableVarName(tableName);
 
-        if (entry.junction) {
-            const { relation, source } = entry.junction;
-            if (!isManyToMany(relation)) continue;
-            const target = relation.target();
-            const via = linkLabel("relation", source, relation.relationName);
+        if (entry.kind === "junction") {
+            // The side the junction was first reached from.
+            const { relation, descriptor: source } = entry.junction.endpoints[0];
+            const target = targetOf(relation.target);
+            const via = `relation "${source.slug}.${relation.name}"`;
             // Each `one()` here pairs with a `many(junction, { relationName })`
             // on its endpoint, so each takes the name that endpoint's own
-            // relation derives — the rule `addJunctionSides` in
-            // `config-relations.ts` builds the runtime's relations by.
-            //
-            // The far side is looked up as the target's many-to-many through
-            // this same junction. It used to be matched on the *owning* side's
-            // name, which `tags.posts` never carries, so the synthesized name
-            // won and `tags`' `many(…, { relationName: "posts" })` had nothing
-            // to pair with: `with: { posts: true }` threw. Only a junction
-            // nothing points back through needs the synthesized name.
-            const owningRelationName = sharedRelationName(relation, source);
-            let inverse: ResolvedRelation | undefined;
-            try {
-                inverse = Object.values(resolveCollectionRelations(target)).find(r =>
-                    r.kind === "manyToMany" && bareTableName(r.through.table) === bareTableName(tableName));
-            } catch {
-                // A target whose relations cannot be resolved declares no inverse.
-            }
+            // relation derives. The far side is the target's many-to-many
+            // through this same junction; only a junction nothing points back
+            // through needs the synthesized name.
+            const owningRelationName = tableRelationName(relation, source, targetOf);
+            const inverse = target.relations.find(r =>
+                r.kind === "manyToMany" && bareTableName(r.through.table) === bareTableName(tableName));
             const inverseRelationName = inverse
-                ? sharedRelationName(inverse, target)
-                : `${tableName}_${relation.through.targetColumn}`;
+                ? tableRelationName(inverse, target, targetOf)
+                : `${tableName}_${relation.through.targetKey}`;
             plans.push({
                 tableVar,
-                key: relation.through.sourceColumn,
+                key: relation.through.sourceKey,
                 kind: "one",
-                targetVar: getTableVarName(getTableName(source)),
+                targetVar: getTableVarName(source.table),
                 relationName: owningRelationName,
-                fields: [relation.through.sourceColumn],
-                references: [getPrimaryKeyName(source, via)]
+                fields: [relation.through.sourceKey],
+                references: [keyOf(source, via)]
             });
             // A self-referencing link is its own inverse: one name, one
             // endpoint table, and drizzle refuses two relations named alike.
             if (inverseRelationName === owningRelationName) continue;
             // The file declares no variable for a view to pair with.
-            if (servesView(target)) continue;
+            if (target.kind === "view") continue;
             plans.push({
                 tableVar,
-                key: relation.through.targetColumn,
+                key: relation.through.targetKey,
                 kind: "one",
-                targetVar: getTableVarName(getTableName(target)),
+                targetVar: getTableVarName(target.table),
                 relationName: inverseRelationName,
-                fields: [relation.through.targetColumn],
-                references: [getPrimaryKeyName(target, via)]
+                fields: [relation.through.targetKey],
+                references: [keyOf(target, via)]
             });
             continue;
         }
 
-        const collection = entry.collection;
-        // `resolveCollectionRelations` already deduplicates, but an alias entry
-        // for the same foreign key would otherwise emit twice.
+        const descriptor = entry.descriptor;
+        // An alias entry for the same foreign key would otherwise emit twice.
         const emitted = new Set<string>();
-        for (const [key, relation] of Object.entries(resolveCollectionRelations(collection))) {
-            let target: CollectionConfig;
-            try {
-                target = relation.target();
-            } catch {
-                // A link to a collection outside this bundle is not a relation
-                // this file can describe.
-                continue;
-            }
-            // Nor is a link into a view, which the file declares no table for.
-            if (servesView(target)) continue;
-            const targetVar = getTableVarName(getTableName(target));
-            const relationName = sharedRelationName(relation, collection);
+        for (const relation of descriptor.relations) {
+            const target = targetOf(relation.target);
+            // A link into a view is not a relation this file can describe: it
+            // declares no table for one.
+            if (target.kind === "view") continue;
+            const targetVar = getTableVarName(target.table);
+            const relationName = tableRelationName(relation, descriptor, targetOf);
             const dedupe = `${relationName}::${relation.kind}`;
             if (emitted.has(dedupe)) continue;
             emitted.add(dedupe);
+            const via = `relation "${descriptor.slug}.${relation.name}"`;
 
             switch (relation.kind) {
                 case "belongsTo":
                     plans.push({
                         tableVar,
-                        key,
+                        key: relation.name,
                         kind: "one",
                         targetVar,
                         relationName,
-                        // `localKey` is a COLUMN and the generated object is
-                        // keyed by PROPERTY: `user_id` is exposed as `userId`,
-                        // and emitting the column produces a file that does not
-                        // compile.
-                        fields: [fieldKeyForColumn(collection, relation.localKey)],
-                        references: [getPrimaryKeyName(target, linkLabel("relation", collection, key))]
+                        // The generated object is keyed by the column's KEY:
+                        // `user_id` is exposed as `userId`, and emitting the
+                        // column produces a file that does not compile.
+                        fields: [servedKeyOf(descriptor, relation.localKey)],
+                        references: [keyOf(target, via)]
                     });
                     break;
                 case "hasOne":
                     // The foreign key lives on the TARGET table, so this side
                     // states the join from its own end: its source key against
                     // the target's foreign key, under the owning side's name.
-                    // Drizzle has no `one()` paired by `relationName` alone:
-                    // `one(target, { relationName })` is not a `RelationConfig`
-                    // (TS2345) and `createOne` reads `config.fields.reduce(...)`.
-                    // A bare `one(target)` is paired by table, which throws once
-                    // the target has two links back here or the link is to its
-                    // own table.
+                    // Drizzle has no `one()` paired by `relationName` alone,
+                    // and a bare `one(target)` is paired by table, which throws
+                    // once the target has two links back here or the link is to
+                    // its own table.
                     plans.push({
                         tableVar,
-                        key,
+                        key: relation.name,
                         kind: "one",
                         targetVar,
                         relationName,
-                        fields: [relation.sourceKey
-                            ? fieldKeyForColumn(collection, relation.sourceKey)
-                            : getPrimaryKeyName(collection, linkLabel("relation", collection, key))],
-                        references: [fieldKeyForColumn(target, relation.foreignKeyOnTarget)],
+                        fields: [relation.sourceKey ? servedKeyOf(descriptor, relation.sourceKey) : keyOf(descriptor, via)],
+                        references: [servedKeyOf(target, relation.foreignKey)],
                         nullable: true
                     });
                     break;
                 case "hasMany":
-                    plans.push({ tableVar, key, kind: "many", targetVar, relationName });
+                    plans.push({ tableVar, key: relation.name, kind: "many", targetVar, relationName });
                     break;
                 case "manyToMany":
                     plans.push({
                         tableVar,
-                        key,
+                        key: relation.name,
                         kind: "many",
                         targetVar: getTableVarName(relation.through.table),
                         relationName
@@ -2386,14 +2169,14 @@ function planRelations(
 
         // Reciprocals the far side declares and this one does not. Drizzle
         // needs both halves of a pair to exist for a relational query to work.
-        for (const { other, otherRel } of fkOnTargetBySlug.get(collection.slug) ?? []) {
-            if (other.slug === collection.slug) continue;
-            const relationName = sharedRelationName(otherRel, other);
+        for (const { other, otherRel } of fkOnTargetBySlug.get(descriptor.slug) ?? []) {
+            if (other.slug === descriptor.slug) continue;
+            const relationName = tableRelationName(otherRel, other, targetOf);
             const dedupe = `${relationName}::belongsTo`;
             if (emitted.has(dedupe)) continue;
             emitted.add(dedupe);
-            const otherVar = getTableVarName(getTableName(other));
-            const fieldKey = fieldKeyForColumn(collection, otherRel.foreignKeyOnTarget);
+            const otherVar = getTableVarName(other.table);
+            const fieldKey = servedKeyOf(descriptor, otherRel.foreignKey);
             plans.push({
                 tableVar,
                 key: `_synth_${otherVar}_${fieldKey}`,
@@ -2404,8 +2187,8 @@ function planRelations(
                 // The column the far side points at: its primary key,
                 // unless the link names another one with `sourceKey`.
                 references: [otherRel.sourceKey
-                    ? fieldKeyForColumn(other, otherRel.sourceKey)
-                    : getPrimaryKeyName(other, linkLabel("relation", other, otherRel.relationName))]
+                    ? servedKeyOf(other, otherRel.sourceKey)
+                    : keyOf(other, `relation "${other.slug}.${otherRel.name}"`)]
             });
         }
     }

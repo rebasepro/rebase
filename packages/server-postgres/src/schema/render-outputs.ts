@@ -155,8 +155,7 @@ export interface RenderSchemaOutputsOptions {
  * - `boot-policies.adminRole-*.adminRequestRole-*.json`: `planCollectionPolicies`
  *   for the four role-availability combinations.
  * - `relational-columns.json`, `junction-tables.json`: the legacy-column slices.
- * - `plan.json`: `planSchema` itself, functions stripped and the dead
- *   `collections` back-reference left out.
+ * - `plan.json`: `planSchema` itself, functions stripped.
  *
  * Planned in slug order, with the planner's environment pinned. An output that
  * throws is recorded as `THROWS: <message>` in its own file, so a refusal is
@@ -207,7 +206,7 @@ export function renderSchemaOutputs(
         }
         emit("relational-columns.json", () => toStableJson(planRelationalColumns(sorted)));
         emit("junction-tables.json", () => toStableJson(planJunctionTables(sorted)));
-        emit("plan.json", () => toStableJson(planSchema(sorted, { databaseExtensions }), ["collections"]));
+        emit("plan.json", () => toStableJson(planSchema(sorted, { databaseExtensions })));
         return files;
     });
 }
