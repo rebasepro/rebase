@@ -86,7 +86,7 @@ The frontend imports a table's **type** from `backend/schema`, never a value:
 erased from the bundle, so the backend's hooks and server code never reach the
 browser. The backend imports nothing from the frontend.
 
-## `<RebaseCMS>` props
+## RebaseCMS props
 
 <span class="since-badge" data-since="0.31">Since 0.31</span>
 

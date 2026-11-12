@@ -186,6 +186,13 @@ Every key is optional. A key you leave out keeps what the panel derived.
 | `customViews` | `(string \| TableCustomView)[]` | More ways to render the rows: `{ key, name, Builder }`, or the key of one registered on `<RebaseCMS collectionViews>`. |
 | `defaultSize` | `"xs" \| "s" \| "m" \| "l" \| "xl"` | The default row height. |
 
+`kanban` takes two keys:
+
+| Key | Type | Effect |
+|---|---|---|
+| `columnField` | column key | The column the board's columns come from: a `col.enum([...])` or `.oneOf([...])` of strings. |
+| `orderField` | text column key | Where a card's position within its column is stored, as a fractional order key. Without it the order resets on every read. |
+
 ### Columns and slots
 
 | Option | Type | Effect |
@@ -197,10 +204,16 @@ Every key is optional. A key you leave out keeps what the panel derived.
 | `additionalFields` | `TableAdditionalField[]` | Computed columns. See [Additional columns](/docs/frontend/additional-columns/). |
 | `hideIdFromCollection` | `boolean` | Hide the id column. |
 
-A computed column is `{ key, name, width?, Builder?, dependencies?, value? }`:
-`Builder` renders the cell from `{ row, id, context }`, `dependencies` names the
-fields whose change re-renders it, and `value` gives the cell's value for
-export. Name it in `fieldOrder` as `"key" as AdditionalFieldKey`.
+A computed column takes:
+
+| Key | Type | Effect |
+|---|---|---|
+| `key` | `string` | Identifies the column. Name it in `fieldOrder` as `"total" as AdditionalFieldKey`. |
+| `name` | `string` | The header. |
+| `width` | `number` | The width, in pixels. |
+| `Builder` | `(props) => ReactNode` | Renders the cell from `{ row, id, context }`. |
+| `dependencies` | field path or paths | The fields whose change re-renders the cell. |
+| `value` | `(props) => string \| number` | The cell's value, for export. May be async. |
 
 ### Query defaults
 
@@ -239,8 +252,24 @@ See [Filters and sort](/docs/frontend/view-modes/#filters-presets-and-sort).
 | `localChangesBackup` | `"manual_apply" \| "auto_apply" \| false` | Keep unsaved edits in local storage. |
 | `hideIdFromForm` | `boolean` | Hide the id from the form. |
 
-A section is `{ key, title?, fields, collapsed?, collapsible?, readVariant? }`,
-with `readVariant` `"grid"` or `"summary"`.
+`form` takes:
+
+| Key | Type | Effect |
+|---|---|---|
+| `sidebar` | field ids | The fields pulled out into the rail beside the form. |
+| `sections` | sections | The sections of the main column, below. |
+| `showRecordMeta` | `boolean` | Show the record's id and timestamps in the rail. |
+
+Each section takes:
+
+| Key | Type | Effect |
+|---|---|---|
+| `key` | `string` | Identifies the section; also the `id` of its anchor. |
+| `title` | `string` | The heading. None when omitted. |
+| `fields` | field ids | The fields in the section, in order. |
+| `collapsed` | `boolean` | Starts collapsed. |
+| `collapsible` | `boolean` | Can be collapsed. |
+| `readVariant` | `"grid" \| "summary"` | How the section reads when the record is shown rather than edited. |
 
 ### Actions, views and overrides
 
@@ -307,9 +336,13 @@ A `col.enum([...])`, a `.oneOf([...])`, or an array of either:
 | `previewAsTag` | `boolean` | On a `col.enum()`: drawn as a chip. |
 | `clearable` | `boolean` | On a `col.enum()`: adds a control that sets the value to `null`. |
 
-An `EnumLabel` is `{ label, color?, disabled? }`. `color` is a chip colour key
-(`"green"`, `"orangeDark"`) or a `{ color, text }` scheme; `disabled` shows the
-value without offering it for selection.
+An `EnumLabel` takes:
+
+| Key | Type | Effect |
+|---|---|---|
+| `label` | `string` | The text on the chip and in the select. |
+| `color` | `ColorKey \| ColorScheme` | A chip colour key (`"green"`, `"orangeDark"`) or a `{ color, text }` scheme. A value without one keeps its seeded colour. |
+| `disabled` | `boolean` | Shown, but not offered for selection. |
 
 ### Number columns
 
@@ -346,9 +379,16 @@ drawn, never what is stored.
 | `clearable` | `boolean` | Adds a control that sets the value to `null`. |
 | `urlPreview` | `PreviewType \| boolean` | How the stored URL is previewed. |
 
-`storage` takes `path(context)`, `fileName(context)`, `processFile(file)`,
-`postProcess(pathOrUrl)` and `previewUrl(fileName)`. The serializable options
-stay on `col.storage({ … })`; see [File uploads](/docs/collections/file-uploads/).
+`storage` takes functions only; the serializable options stay on
+`col.storage({ … })` (see [File uploads](/docs/collections/file-uploads/)):
+
+| Key | Signature | Effect |
+|---|---|---|
+| `path` | `(context) => string` | The folder a file is uploaded to, replacing the column's `path` template. |
+| `fileName` | `(context) => string \| Promise<string>` | The stored file name, replacing the column's `fileName` template. |
+| `processFile` | `(file) => Promise<File>` | Transforms a file before it is uploaded. |
+| `postProcess` | `(pathOrUrl) => Promise<string>` | Transforms the stored path or URL before it is written to the column. |
+| `previewUrl` | `(fileName) => string` | The URL to preview a stored file at. |
 
 ### Array columns
 

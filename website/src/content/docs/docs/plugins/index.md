@@ -74,7 +74,7 @@ const openOrdersPlugin: RebasePlugin = {
     key: "open_orders",
     lifecycle: {
         onMount: (context) => {
-            stopListening = context.data.collection("orders").listen(
+            stopListening = context.data.orders.listen(
                 { where: { status: ["==", "open"] } },
                 ({ data }) => console.log(`${data.length} open orders`)
             );
