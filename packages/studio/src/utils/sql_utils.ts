@@ -1,7 +1,6 @@
 import { astVisitor, parse, type Statement } from "pgsql-ast-parser";
-import { csvRecord, toSnakeCase } from "@rebasepro/utils";
-import type { AdminCollection } from "@rebasepro/cms-types";
-import type { SqlScriptResult } from "@rebasepro/types";
+import { csvRecord } from "@rebasepro/utils";
+import type { SqlScriptResult, TableDescriptor } from "@rebasepro/types";
 import type { TableInfo } from "../components/SQLEditor/sql_editor_types";
 
 /** The statements in `sqlText`, or `null` when the parser cannot read it. */
@@ -263,36 +262,43 @@ function tableReadOnce(sqlText: string, table: string): true | CellEditResolutio
 }
 
 /**
- * A collection whose records a query's rows can be opened as.
+ * A table whose records a query's rows can be opened as.
  */
-export interface ResolvedQueryCollection {
+export interface ResolvedQueryCollection<C> {
     /** The table, as the database named it. */
     tableName: string;
     schemaName: string;
-    /** The matched collection */
-    collection: AdminCollection;
+    /** The table's slug, as the server declares it. */
+    slug: string;
+    /** What the record is opened with: the CMS collection the slug resolves to. */
+    collection: C;
     /** The result column that holds the table's primary key. */
     pkColumn: string;
 }
 
 /**
- * The collections a result's rows can be opened as: those whose table one of
- * the result's columns was read from, with the table's (single-column) primary
- * key read too, under a name no other column of the result has.
+ * The tables a result's rows can be opened as: those the server declares
+ * (`descriptors`, matched by SQL table and schema) whose table one of the
+ * result's columns was read from, with the table's (single-column) primary key
+ * read too, under a name no other column of the result has — and that
+ * `collectionFor` can open, by slug (the CMS's collection; nothing without a
+ * CMS on the page).
  *
  * Matched on the provenance the database reported. A text match took the
  * result's `id` for every table of a join: `SELECT p.id, a.name FROM posts p
  * JOIN authors a …` offered to open the author whose id was the post's.
  */
-export function resolveQueryCollections(provenance: ResultProvenance, collections: AdminCollection[]): ResolvedQueryCollection[] {
-    const results: ResolvedQueryCollection[] = [];
+export function resolveQueryCollections<C>(
+    provenance: ResultProvenance,
+    descriptors: readonly TableDescriptor[],
+    collectionFor: (slug: string) => C | undefined
+): ResolvedQueryCollection<C>[] {
+    const results: ResolvedQueryCollection<C>[] = [];
     for (const table of provenance.tables) {
-        const collection = collections.find(c => {
-            const tableName = ("table" in c ? c.table : undefined) || toSnakeCase(c.slug);
-            const schemaName = ("schema" in c ? c.schema : undefined) || "public";
-            return tableName === table.table && schemaName === table.schema;
-        });
-        if (!collection || table.primaryKey.length !== 1) continue;
+        const descriptor = descriptors.find(d => d.table === table.table && d.schema === table.schema);
+        if (!descriptor || table.primaryKey.length !== 1) continue;
+        const collection = collectionFor(descriptor.slug);
+        if (collection === undefined) continue;
         const [keyColumn] = table.primaryKey;
         const holders = provenance.columns.filter(column =>
             column.source?.schema === table.schema &&
@@ -301,7 +307,7 @@ export function resolveQueryCollections(provenance: ResultProvenance, collection
         if (holders.length !== 1) continue;
         const pkColumn = holders[0].name;
         if (provenance.columns.filter(column => column.name === pkColumn).length !== 1) continue;
-        results.push({ tableName: table.table, schemaName: table.schema, collection, pkColumn });
+        results.push({ tableName: table.table, schemaName: table.schema, slug: descriptor.slug, collection, pkColumn });
     }
     return results;
 }

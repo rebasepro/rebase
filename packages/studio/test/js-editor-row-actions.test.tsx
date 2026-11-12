@@ -3,6 +3,9 @@
  */
 import React from "react";
 import { describe, expect, it, jest, beforeEach } from "@jest/globals";
+import { col, defineTable } from "@rebasepro/types";
+import { compileTables } from "@rebasepro/common";
+import { readyTables } from "./helpers/tableDescriptors";
 import { fireEvent, render, screen } from "@testing-library/react";
 
 /**
@@ -37,12 +40,16 @@ const appContext = {
 };
 const appClient = { admin: { listUsersPaginated }, data: dataLayer };
 const apiConfig = { apiUrl: "http://api.test", apiPath: "/api", getAuthToken: async () => "admin-token" };
-const registry = {
-    collections: [
-        { slug: "posts", name: "Posts", properties: { title: { type: "string" } } },
-        { slug: "authors", name: "Authors", properties: { name: { type: "string" } } }
-    ]
+/** The tables the server serves, and the CMS collections their rows open with. */
+const served = readyTables(compileTables([
+    defineTable("posts", { columns: { id: col.serial().primaryKey(), title: col.text() }, rls: "admin-only" }),
+    defineTable("authors", { columns: { id: col.serial().primaryKey(), name: col.text() }, rls: "admin-only" })
+]));
+const cmsCollections: Record<string, { slug: string; name: string }> = {
+    posts: { slug: "posts", name: "Posts" },
+    authors: { slug: "authors", name: "Authors" }
 };
+const registry = { getCollection: (slug: string) => cmsCollections[slug] };
 
 jest.mock("@rebasepro/app", () => ({
     useRebaseContext: () => appContext,
@@ -53,6 +60,7 @@ jest.mock("@rebasepro/app", () => ({
     useModeController: () => ({ mode: "light", setMode: jest.fn() }),
     useStudioUrlController: () => ({}),
     useStudioCollectionRegistry: () => registry,
+    useTableDescriptors: () => served,
     useStudioSidePanelController: () => ({ open: jest.fn(), close: jest.fn() }),
     IconForView: () => null,
     ErrorView: ({ error }: { error: unknown }) => <div role="alert">{String(error)}</div>,

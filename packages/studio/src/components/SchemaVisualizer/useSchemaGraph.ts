@@ -1,9 +1,8 @@
 import { useMemo, useState, useCallback, useEffect } from "react";
 import type { Node, Edge } from "@xyflow/react";
 import { MarkerType } from "@xyflow/react";
-import { isPostgresCollectionConfig } from "@rebasepro/types";
-import type { Relation, ResolvedRelation } from "@rebasepro/types";
-import { getTableName, resolveCollectionRelations } from "@rebasepro/common";
+import { columnTypeLabel } from "@rebasepro/types";
+import type { ColumnDescriptor, ColumnType, RelationDescriptor, TableDescriptor } from "@rebasepro/types";
 import {
     cachedLayout,
     getCardinalityLabel,
@@ -16,25 +15,28 @@ import {
 import type { RelationEdgeData } from "./schema-visualizer.utils";
 import type { LayoutPositions } from "./dagre-layout";
 import { canLayOutOffThread } from "./layout-runner";
-import type { AdminCollection, AdminPostgresCollection } from "@rebasepro/cms-types";
 
-// ─── Column info extracted from a collection ──────────────────────────
+// ─── Column info extracted from a table descriptor ────────────────────
 
 export interface ColumnInfo {
+    /** The SQL column name: what the diagram shows, and what a foreign key's handle is named by. */
     name: string;
+    /** The key on a JSON row, in the SDK and in filters. */
+    key: string;
+    /** The Postgres type's kind (`uuid`, `text`, `enum`…). */
     type: string;
-    /**
-     * The type the collection declares — `string`, `number`, `date`… — or
-     * `FK` for a relation's key. Not the database's column type: the diagram
-     * is drawn from the collections, and a property's column type depends on
-     * more than its `type` (`columnType`, `isId`, integer validation).
-     */
+    /** The Postgres type as SQL spells it: `varchar(255)`, `integer[]`, `numeric(10, 2)`. */
     typeLabel: string;
     isPrimaryKey: boolean;
     isForeignKey: boolean;
+    /** `NOT NULL`. */
     isRequired: boolean;
+    /** A single-column `UNIQUE` constraint. */
+    isUnique: boolean;
+    /** A Postgres enum, or a closed value set (`.oneOf`). */
     isEnum: boolean;
     enumValues?: string[];
+    /** The `belongsTo` relation this column is the foreign key of. */
     relationName?: string;
 }
 
@@ -42,6 +44,7 @@ export interface ColumnInfo {
 
 export interface TableNodeData {
     tableName: string;
+    /** The name the table was defined under. */
     collectionName: string;
     slug: string;
     columns: ColumnInfo[];
@@ -53,90 +56,82 @@ export interface TableNodeData {
     [key: string]: unknown;
 }
 
-// ─── Extract columns from a AdminCollection ─────────────────────────
+// ─── Columns of a table descriptor ────────────────────────────────────
 
-const extractColumns = (collection: AdminCollection): ColumnInfo[] => {
-    const columns: ColumnInfo[] = [];
-    const properties = collection.properties ?? {};
+function enumValuesOf(column: ColumnDescriptor): string[] | undefined {
+    if (column.type.kind === "enum") return [...column.type.values];
+    if (column.oneOf) return column.oneOf.map(String);
+    return undefined;
+}
 
-    for (const [propName, prop] of Object.entries(properties)) {
-        if (prop.type === "relation") continue; // Relations are shown as edges, not columns
+const columnInfo = (column: ColumnDescriptor): ColumnInfo => {
+    const enumValues = enumValuesOf(column);
+    return {
+        name: column.column,
+        key: column.key,
+        type: column.type.kind,
+        typeLabel: columnTypeLabel(column.type),
+        isPrimaryKey: column.primaryKey === true,
+        isForeignKey: column.foreignKeyOf !== undefined,
+        isRequired: !column.nullable,
+        isUnique: column.unique === true,
+        isEnum: enumValues !== undefined,
+        ...(enumValues ? { enumValues } : {}),
+        ...(column.foreignKeyOf !== undefined ? { relationName: column.foreignKeyOf } : {})
+    };
+};
 
-        const isPk =
-            ("isId" in prop && Boolean(prop.isId)) ||
-            (!Object.values(properties).some(
-                (p) => "isId" in p && Boolean(p.isId)
-            ) &&
-                propName === "id");
-
-        const isEnum = prop.type === "string" && "enum" in prop && Boolean(prop.enum);
-
-        let enumValues: string[] | undefined;
-        if (isEnum && "enum" in prop && prop.enum) {
-            const enumProp = prop.enum;
-            if (Array.isArray(enumProp)) {
-                enumValues = enumProp.map((v: unknown) =>
-                    typeof v === "string" ? v : String((v as Record<string, unknown>)?.id ?? v)
-                );
-            } else if (typeof enumProp === "object" && enumProp !== null) {
-                enumValues = Object.keys(enumProp);
-            }
+/**
+ * Every column the server serves, in physical order. A `belongsTo` whose key
+ * column was withheld from this caller still names its column, so the edge
+ * has a handle to leave from.
+ */
+const extractColumns = (table: TableDescriptor): ColumnInfo[] => {
+    const columns = table.columns.map(columnInfo);
+    for (const relation of table.relations) {
+        if (relation.kind !== "belongsTo") continue;
+        const existing = columns.find((c) => c.name === relation.localKey);
+        if (existing) {
+            existing.isForeignKey = true;
+            existing.relationName = relation.name;
+            continue;
         }
-
         columns.push({
-            name: propName,
-            type: prop.type,
-            typeLabel: prop.type,
-            isPrimaryKey: isPk,
-            isForeignKey: false,
-            isRequired: Boolean(prop.validation?.required),
-            isEnum,
-            enumValues
+            name: relation.localKey,
+            key: relation.localField,
+            type: "foreignKey",
+            typeLabel: "FK",
+            isPrimaryKey: false,
+            isForeignKey: true,
+            isRequired: false,
+            isUnique: false,
+            isEnum: false,
+            relationName: relation.name
         });
     }
-
-    // Add FK columns from owning relations
-    if (isPostgresCollectionConfig(collection)) {
-        try {
-            const resolvedRelations = resolveCollectionRelations(collection);
-            for (const rel of Object.values(resolvedRelations)) {
-                if (rel.kind === "belongsTo" && rel.localKey) {
-                    // Only add if not already present as a regular column
-                    if (!columns.some((c) => c.name === rel.localKey)) {
-                        columns.push({
-                            name: rel.localKey,
-                            type: "number",
-                            typeLabel: "FK",
-                            isPrimaryKey: false,
-                            isForeignKey: true,
-                            isRequired: false,
-                            isEnum: false,
-                            relationName: rel.relationName
-                        });
-                    } else {
-                        // Mark existing column as FK
-                        const existing = columns.find((c) => c.name === rel.localKey);
-                        if (existing) {
-                            existing.isForeignKey = true;
-                            existing.relationName = rel.relationName;
-                        }
-                    }
-                }
-            }
-        } catch {
-            // Ignore resolution errors
-        }
-    }
-
     return columns;
 };
 
-// ─── Build graph from collections ─────────────────────────────────────
+/** The integer type a column that points at a serial key holds. */
+const SERIAL_REFERENCE: Partial<Record<ColumnType["kind"], ColumnType>> = {
+    smallserial: { kind: "smallint" },
+    serial: { kind: "integer" },
+    bigserial: { kind: "bigint" }
+};
+
+/** The type label of a junction column: the type of the key it points at (a serial's integer). */
+function keyTypeLabel(table: TableDescriptor | undefined): string {
+    const key = table?.columns.find((column) => column.primaryKey === true);
+    if (!key) return "FK";
+    return columnTypeLabel(SERIAL_REFERENCE[key.type.kind] ?? key.type);
+}
+
+// ─── Build graph from the tables ──────────────────────────────────────
 
 /**
- * Every table and relation the collections declare, not yet placed. Edges
- * carry their column handles without a side; {@link placeGraph} picks the
- * side once it knows where the tables are.
+ * Every table and relation the server declares, not yet placed. Edges carry
+ * their column handles without a side; {@link placeGraph} picks the side once
+ * it knows where the tables are.
  */
 interface SchemaGraph {
     nodes: Node[];
@@ -144,25 +139,26 @@ interface SchemaGraph {
 }
 
 const buildGraph = (
-    collections: AdminCollection[],
+    tables: readonly TableDescriptor[],
     liveRls: Set<string> | null
 ): SchemaGraph => {
     /**
      * Is RLS on for this table?
      *
      * The database is the authority whenever we could reach it. Declaring rules
-     * in code is not the same as having them applied, and the hosted console
-     * never sees the declarations at all — see `useLiveRlsTables`. Only when
-     * there is no SQL capability do we fall back to what the config says.
+     * is not the same as having them applied — see `useLiveRlsTables`. Only
+     * when there is no SQL capability do we fall back to the declaration:
+     * every declared table's posture enables RLS.
      */
-    const isRlsEnabled = (schema: string, tableName: string, declaresRules: boolean): boolean =>
-        liveRls ? liveRls.has(`${schema}.${tableName}`) : declaresRules;
+    const isRlsEnabled = (schema: string, tableName: string, declared: boolean): boolean =>
+        liveRls ? liveRls.has(`${schema}.${tableName}`) : declared;
 
     const nodes: Node[] = [];
     const edges: Edge[] = [];
     const tableToNodeId = new Map<string, string>();
     // Track columns per node so we can resolve handle IDs for edges
     const nodeColumns = new Map<string, ColumnInfo[]>();
+    const bySlug = new Map(tables.map((table) => [table.slug, table]));
 
     // Helper: find the PK column name for a node (falls back to "id")
     const getPkHandle = (nodeId: string): string => {
@@ -179,36 +175,26 @@ const buildGraph = (
         return fk ? `source-${fk.name}` : "source-default";
     };
 
-    // 1. Create nodes for each collection
-    //
-    // Named by `getTableName`, the table `db push` creates: `table`, or the
-    // slug in snake case. The slug as it stands (`blog-posts`) names a table
-    // the database does not have, and the live RLS answer is keyed by the real
-    // one.
-    for (const collection of collections) {
-        if (!isPostgresCollectionConfig(collection)) continue;
+    const drawn = tables.filter((table) => table.kind === "table");
 
-        const tableName = getTableName(collection);
-        const nodeId = `table-${tableName}`;
-        tableToNodeId.set(tableName, nodeId);
+    // 1. A node for each table, named by its SQL table — the live RLS answer
+    //    is keyed by it.
+    for (const table of drawn) {
+        const nodeId = `table-${table.table}`;
+        tableToNodeId.set(table.slug, nodeId);
 
-        const columns = extractColumns(collection);
+        const columns = extractColumns(table);
         nodeColumns.set(nodeId, columns);
 
         const nodeData: TableNodeData = {
-            tableName,
-            collectionName: collection.name,
-            slug: collection.slug,
+            tableName: table.table,
+            collectionName: table.name,
+            slug: table.slug,
             columns,
             isJunction: false,
             isUnmanaged: false,
-            rlsEnabled: isRlsEnabled(
-                collection.schema ?? "public",
-                tableName,
-                Boolean(collection.securityRules && collection.securityRules.length > 0)
-            ),
-            historyEnabled: Boolean(collection.history),
-            icon: typeof collection.icon === "string" ? collection.icon : undefined
+            rlsEnabled: isRlsEnabled(table.schema, table.table, true),
+            historyEnabled: table.history === true
         };
 
         nodes.push({
@@ -220,35 +206,15 @@ y: 0 },
         });
     }
 
-    // 2. Create junction table nodes and edges
+    // 2. Junction table nodes and edges
     const processedJunctions = new Set<string>();
 
-    for (const collection of collections) {
-        if (!isPostgresCollectionConfig(collection)) continue;
-
-        const tableName = getTableName(collection);
-        const sourceNodeId = tableToNodeId.get(tableName);
+    for (const table of drawn) {
+        const sourceNodeId = tableToNodeId.get(table.slug);
         if (!sourceNodeId) continue;
 
-        let resolvedRelations: Record<string, ResolvedRelation>;
-        try {
-            resolvedRelations = resolveCollectionRelations(collection);
-        } catch {
-            continue;
-        }
-
-        for (const [relationKey, rel] of Object.entries(resolvedRelations)) {
-            let targetCollection: AdminCollection;
-            try {
-                targetCollection = rel.target();
-            } catch {
-                continue;
-            }
-
-            if (!isPostgresCollectionConfig(targetCollection)) continue;
-
-            const targetTable = getTableName(targetCollection);
-            const targetNodeId = tableToNodeId.get(targetTable);
+        for (const rel of table.relations) {
+            const targetNodeId = tableToNodeId.get(rel.target);
             if (!targetNodeId) continue;
 
             // Draw the side that owns the storage: a foreign key on this table,
@@ -261,93 +227,20 @@ y: 0 },
             const edgeData: RelationEdgeData = {
                 cardinality: rel.cardinality,
                 direction,
-                relationName: rel.relationName ?? relationKey,
+                relationName: rel.name,
                 hasJunction: rel.kind === "manyToMany",
                 hasJoinPath: false,
                 label: getCardinalityLabel(rel.cardinality, direction)
             };
 
-            if (rel.kind === "manyToMany" && !processedJunctions.has(rel.through.table)) {
-                // Many-to-many: create junction node + two edges
+            if (rel.kind === "manyToMany") {
+                if (processedJunctions.has(rel.through.table)) continue;
                 processedJunctions.add(rel.through.table);
-                const junctionNodeId = `junction-${rel.through.table}`;
-
-                const junctionColumns: ColumnInfo[] = [
-                    {
-                        name: rel.through.sourceColumn,
-                        type: "number",
-                        typeLabel: "FK",
-                        isPrimaryKey: true,
-                        isForeignKey: true,
-                        isRequired: true,
-                        isEnum: false
-                    },
-                    {
-                        name: rel.through.targetColumn,
-                        type: "number",
-                        typeLabel: "FK",
-                        isPrimaryKey: true,
-                        isForeignKey: true,
-                        isRequired: true,
-                        isEnum: false
-                    }
-                ];
-                nodeColumns.set(junctionNodeId, junctionColumns);
-
-                nodes.push({
-                    id: junctionNodeId,
-                    type: "tableNode",
-                    position: { x: 0,
-y: 0 },
-                    data: {
-                        tableName: rel.through.table,
-                        collectionName: rel.through.table,
-                        slug: rel.through.table,
-                        columns: junctionColumns,
-                        isJunction: true,
-                        isUnmanaged: false,
-                        // Junction tables get derived policies rather than
-                        // declared ones, so the config can never say — but the
-                        // database can, and usually says yes.
-                        rlsEnabled: isRlsEnabled("public", rel.through.table, false),
-                        historyEnabled: false
-                    } satisfies TableNodeData
-                });
-
-                // Source table → junction (junction references source PK)
-                const sourcePk = nodeColumns.get(sourceNodeId)?.find((c) => c.isPrimaryKey);
-                edges.push({
-                    id: `edge-${sourceNodeId}-${junctionNodeId}`,
-                    source: sourceNodeId,
-                    target: junctionNodeId,
-                    sourceHandle: sourcePk ? `source-${sourcePk.name}` : "source-default",
-                    targetHandle: `target-${rel.through.sourceColumn}`,
-                    type: "relationEdge",
-                    data: { ...edgeData,
-label: "1:N" } as Record<string, unknown>,
-                    markerEnd: { type: MarkerType.ArrowClosed,
-width: 16,
-height: 16 }
-                });
-
-                // Junction → target table
-                edges.push({
-                    id: `edge-${junctionNodeId}-${targetNodeId}`,
-                    source: junctionNodeId,
-                    target: targetNodeId,
-                    sourceHandle: `source-${rel.through.targetColumn}`,
-                    targetHandle: getPkHandle(targetNodeId),
-                    type: "relationEdge",
-                    data: { ...edgeData,
-label: "N:1" } as Record<string, unknown>,
-                    markerEnd: { type: MarkerType.ArrowClosed,
-width: 16,
-height: 16 }
-                });
-            } else if (rel.kind === "belongsTo") {
+                drawJunction(table, rel, sourceNodeId, targetNodeId, edgeData);
+            } else {
                 // A foreign key on this table.
                 edges.push({
-                    id: `edge-${sourceNodeId}-${targetNodeId}-${relationKey}`,
+                    id: `edge-${sourceNodeId}-${targetNodeId}-${rel.name}`,
                     source: sourceNodeId,
                     target: targetNodeId,
                     sourceHandle: getFkHandle(sourceNodeId, rel.localKey),
@@ -361,6 +254,94 @@ height: 16 }
             }
         }
     }
+
+    // Many-to-many: a junction node, and two edges.
+    function drawJunction(
+        table: TableDescriptor,
+        rel: Extract<RelationDescriptor, { kind: "manyToMany" }>,
+        sourceNodeId: string,
+        targetNodeId: string,
+        edgeData: RelationEdgeData
+    ): void {
+        const junctionNodeId = `junction-${rel.through.table}`;
+        const junctionColumns: ColumnInfo[] = [
+            {
+                name: rel.through.sourceKey,
+                key: rel.through.sourceKey,
+                type: "foreignKey",
+                typeLabel: keyTypeLabel(table),
+                isPrimaryKey: true,
+                isForeignKey: true,
+                isRequired: true,
+                isUnique: false,
+                isEnum: false
+            },
+            {
+                name: rel.through.targetKey,
+                key: rel.through.targetKey,
+                type: "foreignKey",
+                typeLabel: keyTypeLabel(bySlug.get(rel.target)),
+                isPrimaryKey: true,
+                isForeignKey: true,
+                isRequired: true,
+                isUnique: false,
+                isEnum: false
+            },
+            ...rel.through.pivot.map(columnInfo)
+        ];
+        nodeColumns.set(junctionNodeId, junctionColumns);
+
+        nodes.push({
+            id: junctionNodeId,
+            type: "tableNode",
+            position: { x: 0,
+y: 0 },
+            data: {
+                tableName: rel.through.table,
+                collectionName: rel.through.table,
+                slug: rel.through.table,
+                columns: junctionColumns,
+                isJunction: true,
+                isUnmanaged: false,
+                // A junction gets derived policies, and the server switches
+                // RLS on for it like any table it declares.
+                rlsEnabled: isRlsEnabled(table.schema, rel.through.table, true),
+                historyEnabled: false
+            } satisfies TableNodeData
+        });
+
+        // Source table → junction (junction references source PK)
+        const sourcePk = nodeColumns.get(sourceNodeId)?.find((c) => c.isPrimaryKey);
+        edges.push({
+            id: `edge-${sourceNodeId}-${junctionNodeId}`,
+            source: sourceNodeId,
+            target: junctionNodeId,
+            sourceHandle: sourcePk ? `source-${sourcePk.name}` : "source-default",
+            targetHandle: `target-${rel.through.sourceKey}`,
+            type: "relationEdge",
+            data: { ...edgeData,
+label: "1:N" } as Record<string, unknown>,
+            markerEnd: { type: MarkerType.ArrowClosed,
+width: 16,
+height: 16 }
+        });
+
+        // Junction → target table
+        edges.push({
+            id: `edge-${junctionNodeId}-${targetNodeId}`,
+            source: junctionNodeId,
+            target: targetNodeId,
+            sourceHandle: `source-${rel.through.targetKey}`,
+            targetHandle: getPkHandle(targetNodeId),
+            type: "relationEdge",
+            data: { ...edgeData,
+label: "N:1" } as Record<string, unknown>,
+            markerEnd: { type: MarkerType.ArrowClosed,
+width: 16,
+height: 16 }
+        });
+    }
+
     return {
         nodes,
         edges
@@ -499,7 +480,7 @@ const EMPTY_GRAPH: SchemaGraph = {
 const NO_POSITIONS: LayoutPositions = {};
 
 export const useSchemaGraph = (
-    collections: AdminCollection[] | undefined,
+    descriptors: readonly TableDescriptor[] | undefined,
     /**
      * `schema.table` for every table the database reports RLS on, or `null`
      * when there is no SQL capability to ask. See {@link useLiveRlsTables}.
@@ -519,8 +500,8 @@ export const useSchemaGraph = (
     const relayout = useCallback(() => setVersion((v) => v + 1), []);
 
     const graph = useMemo(
-        () => (collections && collections.length > 0 ? buildGraph(collections, liveRls) : EMPTY_GRAPH),
-        [collections, liveRls]
+        () => (descriptors && descriptors.length > 0 ? buildGraph(descriptors, liveRls) : EMPTY_GRAPH),
+        [descriptors, liveRls]
     );
 
     const tables = graph.nodes.filter((node) => !isJunctionNode(node)).length;

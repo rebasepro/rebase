@@ -1284,7 +1284,7 @@ export interface RebaseTranslations {
     studio_new_collection_add?: string;
     studio_tool_schema?: string;
     studio_tool_schema_description?: string;
-    studio_js_collections_tab?: string;
+    studio_js_tables_tab?: string;
     studio_collections_editor_empty?: string;
     studio_collections_editor_pick?: string;
     studio_collections_editor_read_only?: string;
@@ -1671,10 +1671,17 @@ export interface RebaseTranslations {
     studio_branches_denied_title?: string;
     studio_branches_denied_hint?: string;
     studio_branches_read_failed?: string;
-    studio_schema_no_collections?: string;
-    studio_schema_no_collections_body?: string;
+    studio_schema_no_tables_declared?: string;
+    studio_schema_no_tables_declared_body?: string;
     studio_schema_introspect_hint?: string;
     studio_schema_visualizer_source?: string;
+    studio_schema_outdated_title?: string;
+    studio_schema_outdated_body?: string;
+    studio_schema_no_auth_title?: string;
+    studio_schema_no_auth_body?: string;
+    studio_schema_load_failed?: string;
+    studio_rls_declared_withheld?: string;
+    studio_rls_save_needs_schema_read?: string;
     studio_schema_laying_out?: string;
     studio_schema_neighbourhood?: string;
     studio_schema_neighbourhood_depth_1?: string;

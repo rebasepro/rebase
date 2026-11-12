@@ -51,6 +51,12 @@ export interface StudioSchemaEditing {
 }
 
 export interface StudioBridge {
+    /**
+     * The CMS's collections, for what only a CMS can do: open a row Studio
+     * found (a SQL or script result) in the CMS's record editor. Not a schema
+     * source — Studio renders every schema-aware view from the tables the
+     * server serves (`useTableDescriptors`), with or without a CMS.
+     */
     collectionRegistry: CollectionRegistryController;
     schemaEditing: StudioSchemaEditing;
     sidePanelController: SidePanelController;
@@ -211,7 +217,11 @@ export function useStudioSchemaEditing(): StudioSchemaEditing {
     return useContext(StudioBridgeContext).schemaEditing;
 }
 
-/** Collection registry — returns noop if the admin is not present. */
+/**
+ * The CMS's collection registry, to open a row in the CMS's editor — a noop
+ * (it resolves nothing) when no CMS is present. For the schema, read
+ * `useTableDescriptors`.
+ */
 export function useStudioCollectionRegistry(): CollectionRegistryController {
     return useContext(StudioBridgeContext).collectionRegistry;
 }

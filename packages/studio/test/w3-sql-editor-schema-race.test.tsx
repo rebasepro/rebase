@@ -35,6 +35,8 @@ const databaseAdmin: Record<string, unknown> = {
     fetchCurrentDatabase: async () => "app_prod"
 };
 
+import { NO_TABLES } from "./helpers/tableDescriptors";
+
 jest.mock("@rebasepro/app", () => ({
     useTranslation: () => ({
         t: (key: string) => lookupEn(key) ?? key,
@@ -42,6 +44,7 @@ jest.mock("@rebasepro/app", () => ({
     }),
     useRebaseContext: () => ({ databaseAdmin }),
     useStudioCollectionRegistry: () => ({ collections: [], getCollection: () => undefined }),
+    useTableDescriptors: () => NO_TABLES,
     useStudioSidePanelController: () => ({ open: jest.fn(), close: jest.fn() }),
     useSnackbarController: () => ({ open: jest.fn() }),
     useModeController: () => ({ mode: "light", setMode: jest.fn() }),

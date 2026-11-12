@@ -1,11 +1,35 @@
 
-import React, { useRef, useEffect, useImperativeHandle } from "react";
+import React, { useRef, useEffect, useImperativeHandle, useState } from "react";
 import Editor, { Monaco, OnMount } from "@monaco-editor/react";
 import type { editor } from "monaco-editor";
 import { cls, defaultBorderMixin, FileIcon } from "@rebasepro/ui";
 import { useModeController } from "@rebasepro/app";
 import { ALL_WHERE_FILTER_OPS } from "@rebasepro/types";
 import type { MonacoEditorHandle } from "../SQLEditor/MonacoEditor";
+import type { TableInfo } from "./table_access";
+
+const NO_TABLES: readonly TableInfo[] = [];
+
+/**
+ * Ambient typings for the served tables: a row type per table from its column
+ * keys, and `client.data.<accessor>` for each table one property reaches
+ * (the rest are reached with `client.data.table("<slug>")`).
+ */
+export function tableTypings(tables: readonly TableInfo[]): string {
+    const lines: string[] = [];
+    for (const table of tables) {
+        const rowName = `${table.slug.replace(/[^a-zA-Z0-9_]/g, "_")}_Row`;
+        const rowType = table.columns.length > 0
+            ? `{ ${table.columns.map(key => `${JSON.stringify(key)}: any`).join("; ")} }`
+            : "Record<string, any>";
+        lines.push(`/** Table: ${table.name} (${table.slug}) */`);
+        lines.push(`interface ${rowName} ${rowType}`);
+        if (table.accessor) {
+            lines.push(`declare namespace client.data { const ${table.accessor}: TableClient<${rowName}>; }`);
+        }
+    }
+    return lines.join("\n");
+}
 
 /**
  * Shape of `monaco.languages.typescript` at runtime.
@@ -15,7 +39,7 @@ interface MonacoTypeScriptApi {
     typescriptDefaults: {
         setCompilerOptions(options: Record<string, unknown>): void;
         setDiagnosticsOptions(options: Record<string, unknown>): void;
-        addExtraLib(content: string, filePath: string): void;
+        addExtraLib(content: string, filePath: string): { dispose(): void };
     };
     ScriptTarget: Record<string, number>;
     ModuleKind: Record<string, number>;
@@ -259,7 +283,7 @@ interface RebaseClient {
  */
 declare const client: RebaseClient;
 
-/** Execution context with user and collection information. */
+/** Execution context with user and table information. */
 interface JSEditorContext {
     /** The user the script runs as: the one picked in "Run as", or you. \`null\` under "No Auth". */
     user: {
@@ -268,23 +292,20 @@ interface JSEditorContext {
         email: string | null;
         roles?: string[];
     } | null;
-    /** Registered collections with their property names. */
-    collections: Array<{
+    /** The tables the server serves, with their column keys. */
+    tables: Array<{
         slug: string;
         name: string;
-        properties: string[];
+        /** The property that reaches it on \`client.data\`, when one does; else \`client.data.table(slug)\`. */
+        accessor?: string;
+        columns: string[];
+        primaryKey: string[];
     }>;
 }
 
-/** Execution context — contains info about the selected user and registered collections. */
+/** Execution context — contains info about the selected user and the tables. */
 declare const context: JSEditorContext;
 `;
-
-export type CollectionInfo = {
-    slug: string;
-    name: string;
-    properties: string[];
-};
 
 export type JSMonacoEditorProps = {
     /** The script and its selection, read when Run acts on them. */
@@ -295,10 +316,8 @@ export type JSMonacoEditorProps = {
     className?: string;
     readOnly?: boolean;
     autoFocus?: boolean;
-    /** Collection slugs for basic autocomplete */
-    collectionSlugs?: string[];
-    /** Full collection info with property names for richer type generation */
-    collections?: CollectionInfo[];
+    /** The tables the server serves: typed accessors on `client.data`. */
+    tables?: readonly TableInfo[];
 };
 
 export const JSMonacoEditor = ({
@@ -309,8 +328,7 @@ export const JSMonacoEditor = ({
     className,
     readOnly = false,
     autoFocus = true,
-    collectionSlugs = [],
-    collections = []
+    tables = NO_TABLES
 }: JSMonacoEditorProps) => {
     const { mode } = useModeController();
     const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
@@ -318,6 +336,8 @@ export const JSMonacoEditor = ({
     const onRunRef = useRef(onRun);
     onRunRef.current = onRun;
     const typesRegisteredRef = useRef(false);
+    /** Monaco, once the editor has mounted: the table typings wait for it. */
+    const [monacoApi, setMonacoApi] = useState<MonacoTypeScriptApi | null>(null);
 
     useImperativeHandle(ref, () => ({
         getSelectedText: () => {
@@ -384,39 +404,21 @@ export const JSMonacoEditor = ({
                 "ts:rebase-client.d.ts"
             );
 
-            // Generate collection-specific types from registered collections
-            if (collections.length > 0) {
-                const lines: string[] = [];
-                for (const col of collections) {
-                    // Generate a typed interface for each collection
-                    const ifaceName = col.slug.replace(/[^a-zA-Z0-9_]/g, "_");
-                    const propsType = col.properties.length > 0
-                        ? `{ ${col.properties.map(p => `${p}: any`).join("; ")} }`
-                        : "Record<string, any>";
-                    lines.push(`/** Collection: ${col.name} (${col.slug}) */`);
-                    lines.push(`interface ${ifaceName}_Row ${propsType}`);
-                    lines.push(`declare namespace client.data { const ${col.slug}: TableClient<${ifaceName}_Row>; }`);
-                }
-                ts.typescriptDefaults.addExtraLib(
-                    lines.join("\n"),
-                    "ts:rebase-collections.d.ts"
-                );
-            } else if (collectionSlugs.length > 0) {
-                // Fallback: just slug names without property info
-                const collectionHints = collectionSlugs.map(slug =>
-                    `/** Collection: ${slug} */\ndeclare namespace client.data { const ${slug}: TableClient; }`
-                ).join("\n");
-                ts.typescriptDefaults.addExtraLib(
-                    collectionHints,
-                    "ts:rebase-collections.d.ts"
-                );
-            }
+            setMonacoApi(ts);
         }
 
         if (autoFocus) {
             editorInstance.focus();
         }
     };
+
+    // The tables arrive over the network, usually after the editor mounted:
+    // their typings follow them, replacing the last set.
+    useEffect(() => {
+        if (!monacoApi || tables.length === 0) return;
+        const lib = monacoApi.typescriptDefaults.addExtraLib(tableTypings(tables), "ts:rebase-tables.d.ts");
+        return () => lib.dispose();
+    }, [monacoApi, tables]);
 
     return (
         <div className={cls("relative w-full h-full overflow-hidden", className)}>

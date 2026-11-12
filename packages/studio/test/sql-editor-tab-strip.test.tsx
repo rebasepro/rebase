@@ -40,10 +40,13 @@ const translation = {
 
 // Listed rather than proxied onto the real module: `@rebasepro/app`'s barrel
 // pulls in react-router, which this package's jest has no ESM transform for.
+import { NO_TABLES } from "./helpers/tableDescriptors";
+
 jest.mock("@rebasepro/app", () => ({
     useTranslation: () => translation,
     useRebaseContext: () => ({ databaseAdmin }),
     useStudioCollectionRegistry: () => ({ collections: [], getCollection: () => undefined }),
+    useTableDescriptors: () => NO_TABLES,
     useStudioSidePanelController: () => ({ open: jest.fn(), close: jest.fn() }),
     useSnackbarController: () => ({ open: jest.fn() }),
     useModeController: () => ({ mode: "light", setMode: jest.fn() }),

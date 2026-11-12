@@ -3,6 +3,9 @@
  */
 import React from "react";
 import { describe, expect, it, jest, beforeEach } from "@jest/globals";
+import { col, defineTable } from "@rebasepro/types";
+import { compileTables } from "@rebasepro/common";
+import { readyTables } from "./helpers/tableDescriptors";
 import { fireEvent, render, screen } from "@testing-library/react";
 import type { SqlScriptResult } from "@rebasepro/types";
 
@@ -100,7 +103,10 @@ const databaseAdmin = {
 };
 const rebaseContext = { databaseAdmin, authController: { user: { uid: "admin-1", email: "admin@example.test", displayName: null, roles: ["admin"] } } };
 const translation = { t: (key: string) => key, i18n: { language: "en" } };
-const registry = { collections: [{ slug: "posts", name: "Posts", properties: { title: { type: "string" } } }], getCollection: () => undefined };
+const registry = { getCollection: () => undefined };
+const served = readyTables(compileTables([
+    defineTable("posts", { columns: { id: col.serial().primaryKey(), title: col.text() }, rls: "admin-only" })
+]));
 const sidePanel = { open: jest.fn(), close: jest.fn() };
 const snackbar = { open: jest.fn() };
 const mode = { mode: "light", setMode: jest.fn() };
@@ -116,6 +122,7 @@ jest.mock("@rebasepro/app", () => ({
     useApiConfig: () => apiConfig,
     useApiBase: () => "http://api.test/api",
     useStudioCollectionRegistry: () => registry,
+    useTableDescriptors: () => served,
     useStudioSidePanelController: () => sidePanel,
     useStudioUrlController: () => ({}),
     useSnackbarController: () => snackbar,

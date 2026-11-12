@@ -1,6 +1,7 @@
 
 import { IconForView } from "@rebasepro/app";
-import { useStudioCollectionRegistry, useStudioSidePanelController } from "@rebasepro/app";
+import { useStudioCollectionRegistry, useStudioSidePanelController, useTableDescriptors } from "@rebasepro/app";
+import type { AdminCollection } from "@rebasepro/cms-types";
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -247,7 +248,15 @@ export const SQLEditor = () => {
     const { databaseAdmin, client } = useRebaseContext();
     const sidePanelController = useStudioSidePanelController();
     const snackbarController = useSnackbarController();
+    // Which tables a row can be opened as: the server's tables, by SQL name,
+    // opened with the CMS collection their slug resolves to. Without a CMS on
+    // the page the bridge resolves nothing, and no row is offered.
     const collectionRegistry = useStudioCollectionRegistry();
+    const { tables: declaredTables } = useTableDescriptors();
+    const collectionFor = useCallback(
+        (slug: string): AdminCollection | undefined => collectionRegistry.getCollection(slug),
+        [collectionRegistry]
+    );
 
     const { t } = useTranslation();
 
@@ -1247,14 +1256,13 @@ truncatedFrom: null });
     const readFromAppDatabase = activeTab.lastExecutedConnection !== null &&
         (activeTab.lastExecutedConnection.database === undefined || activeTab.lastExecutedConnection.database === appDatabase);
     const lastProvenance = activeTab.lastProvenance;
-    const registryCollections = collectionRegistry.collections;
-    const actionableCollections = useMemo((): ResolvedQueryCollection[] => lastProvenance && registryCollections && readFromAppDatabase
-        ? resolveQueryCollections(lastProvenance, registryCollections)
+    const actionableCollections = useMemo((): ResolvedQueryCollection<AdminCollection>[] => lastProvenance && readFromAppDatabase
+        ? resolveQueryCollections(lastProvenance, declaredTables, collectionFor)
             .filter(mc => resultColumnKeys.includes(mc.pkColumn))
-        : [], [lastProvenance, registryCollections, readFromAppDatabase, resultColumnKeys]);
+        : [], [lastProvenance, declaredTables, collectionFor, readFromAppDatabase, resultColumnKeys]);
 
     // For each row, determine which entities can be opened
-    const getRowEntityActions = useCallback((rowData: Record<string, unknown>): { collection: ResolvedQueryCollection, entityId: string | number }[] => {
+    const getRowEntityActions = useCallback((rowData: Record<string, unknown>): { collection: ResolvedQueryCollection<AdminCollection>, entityId: string | number }[] => {
         if (!rowData) return [];
         return actionableCollections
             .filter(mc => rowData[mc.pkColumn] != null)
@@ -1304,7 +1312,7 @@ id: String(ra.entityId) })}
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     sidePanelController?.open({
-                                        path: ra.collection.collection.slug,
+                                        path: ra.collection.slug,
                                         id: ra.entityId,
                                         collection: ra.collection.collection,
                                         updateUrl: false
@@ -1337,7 +1345,7 @@ id: String(ra.entityId) })}
                                 dense
                                 onClick={() => {
                                     sidePanelController?.open({
-                                        path: ra.collection.collection.slug,
+                                        path: ra.collection.slug,
                                         id: ra.entityId,
                                         collection: ra.collection.collection,
                                         updateUrl: false

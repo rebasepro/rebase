@@ -5,7 +5,9 @@ import { en } from "../../app/src/locales/en";
 import React from "react";
 import { describe, expect, it, jest, beforeEach } from "@jest/globals";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { summarizeScopes, type ApiKeyMasked } from "@rebasepro/types";
+import { col, defineTable, summarizeScopes, type ApiKeyMasked } from "@rebasepro/types";
+import { compileTables } from "@rebasepro/common";
+import { readyTables } from "./helpers/tableDescriptors";
 
 /**
  * The key panel speaks scopes: what a key may call is its scopes, which rows
@@ -31,6 +33,11 @@ const client = {
     admin: { listRoles }
 };
 
+/** The tables the server serves: the slugs a `data:*` scope can name. */
+const served = readyTables(compileTables([
+    defineTable("posts", { columns: { id: col.serial().primaryKey() }, rls: "admin-only" })
+]));
+
 const translate = (key: string, vars?: Record<string, string | number>): string => {
     let text: string = en[key as keyof typeof en] ?? key;
     for (const [name, value] of Object.entries(vars ?? {})) text = text.replace(`{{${name}}}`, String(value));
@@ -41,7 +48,7 @@ jest.mock("@rebasepro/app", () => ({
     useTranslation: () => ({ t: translate, i18n: { language: "en" } }),
     useRebaseClient: () => client,
     useSnackbarController: () => ({ open: jest.fn() }),
-    useStudioCollectionRegistry: () => ({ collections: [{ slug: "posts", name: "Posts" }] }),
+    useTableDescriptors: () => served,
     useStorageSources: () => ({ registry: {}, sources: {} }),
     useApiBase: () => undefined,
     useApiConfig: () => undefined,

@@ -27,19 +27,18 @@ import {
     useIsDarkMode
 } from "@rebasepro/ui";
 import {
-    useStudioCollectionRegistry,
     IconForView,
+    useTableDescriptors,
     useTranslation
 } from "@rebasepro/app";
 
-import { isPostgresCollectionConfig } from "@rebasepro/types";
-import { getTableName } from "@rebasepro/common";
+import type { TableDescriptor } from "@rebasepro/types";
 import { useSchemaGraph } from "./useSchemaGraph";
 import { useLiveRlsTables } from "./useLiveRls";
 import type { NeighbourhoodDepth, TableNodeData } from "./useSchemaGraph";
 import { TableNode } from "./TableNode";
 import { RelationEdge } from "./RelationEdge";
-import type { AdminCollection } from "@rebasepro/cms-types";
+import { schemaSourceProblem, SchemaSourceProblemView } from "../schema-source";
 
 // ─── Custom node / edge type registrations ────────────────────────────
 
@@ -54,9 +53,9 @@ const edgeTypes = {
 // ─── Inner component (needs ReactFlowProvider) ─────────────────────────
 
 function SchemaVisualizerCanvas({
-    collections
+    tables
 }: {
-    collections: AdminCollection[];
+    tables: readonly TableDescriptor[];
 }) {
     const { t } = useTranslation();
     const reactFlowInstance = useReactFlow();
@@ -79,7 +78,7 @@ function SchemaVisualizerCanvas({
         relationCount,
         layingOut,
         neighbourhood
-    } = useSchemaGraph(collections, liveRls, focus, depth);
+    } = useSchemaGraph(tables, liveRls, focus, depth);
 
     const [nodes, setNodes] = useState<Node[]>([]);
     const [edges, setEdges] = useState<Edge[]>([]);
@@ -188,22 +187,22 @@ duration: 400 }
         }
     }, [sidebarSize]);
 
-    // Group collections for sidebar
-    const postgresCollections = useMemo(
-        () => collections.filter(isPostgresCollectionConfig),
-        [collections]
+    // The tables, for the sidebar (a view has no node of its own).
+    const drawnTables = useMemo(
+        () => tables.filter((table) => table.kind === "table"),
+        [tables]
     );
 
-    const filteredCollections = useMemo(() => {
-        if (!searchQuery.trim()) return postgresCollections;
+    const filteredTables = useMemo(() => {
+        if (!searchQuery.trim()) return drawnTables;
         const q = searchQuery.toLowerCase();
-        return postgresCollections.filter(
-            (c) =>
-                c.name.toLowerCase().includes(q) ||
-                getTableName(c).toLowerCase().includes(q) ||
-                c.slug?.toLowerCase().includes(q)
+        return drawnTables.filter(
+            (table) =>
+                table.name.toLowerCase().includes(q) ||
+                table.table.toLowerCase().includes(q) ||
+                table.slug.toLowerCase().includes(q)
         );
-    }, [postgresCollections, searchQuery]);
+    }, [drawnTables, searchQuery]);
 
     // Junction table nodes — every one in the schema, drawn or not.
     const junctionNodes = useMemo(
@@ -215,7 +214,7 @@ duration: 400 }
     );
 
     /**
-     * The RLS answer for one collection, from the same place the graph used.
+     * The RLS answer for one table, from the same place the graph used.
      *
      * The graph's nodes already carry it, so look it up there rather than
      * re-deriving — that is what kept the sidebar dots, the node badges and the
@@ -227,7 +226,7 @@ duration: 400 }
         [allNodes]
     );
     const rlsEnabledFor = useCallback(
-        (collection: AdminCollection): boolean => rlsByNodeId.get(`table-${getTableName(collection)}`) ?? false,
+        (table: TableDescriptor): boolean => rlsByNodeId.get(`table-${table.table}`) ?? false,
         [rlsByNodeId]
     );
 
@@ -304,10 +303,10 @@ duration: 400 }
 
                     {/* Table list */}
                     <div className="flex-grow overflow-y-auto no-scrollbar p-1">
-                        {/* Regular collections */}
+                        {/* Declared tables */}
                         <div className="space-y-0.5">
-                            {filteredCollections.map((collection) => {
-                                const table = getTableName(collection);
+                            {filteredTables.map((descriptor) => {
+                                const table = descriptor.table;
                                 const nodeId = `table-${table}`;
                                 const isSelected = selectedTable === nodeId;
                                 return (
@@ -326,13 +325,8 @@ duration: 400 }
                                         <div className="shrink-0 mr-1.5 text-text-disabled dark:text-text-disabled-dark">
                                             <IconForView
                                                 collectionOrView={{
-                                                    slug: collection.slug,
-                                                    name: collection.name,
-                                                    icon:
-                                                        typeof collection.icon ===
-                                                        "string"
-                                                            ? collection.icon
-                                                            : undefined
+                                                    slug: descriptor.slug,
+                                                    name: descriptor.name
                                                 }}
                                                 size="smallest"
                                             />
@@ -342,9 +336,9 @@ duration: 400 }
                                                 variant="caption"
                                                 className="text-xs truncate font-medium"
                                             >
-                                                {collection.name}
+                                                {descriptor.name}
                                             </Typography>
-                                            {table !== collection.name && (
+                                            {table !== descriptor.name && (
                                                 <Typography
                                                     variant="caption"
                                                     className="text-[10px] text-text-disabled dark:text-text-disabled-dark font-mono truncate"
@@ -356,15 +350,15 @@ duration: 400 }
                                         <div className="flex items-center gap-1 shrink-0 ml-1">
                                             {/* Same source as the node badge and the
                                                 "RLS protected" total: the database when
-                                                it could be asked, the config otherwise.
-                                                Reading `securityRules` directly here made
-                                                the three disagree. */}
-                                            {rlsEnabledFor(collection) && (
+                                                it could be asked, the declaration otherwise.
+                                                Reading the rules directly here made the
+                                                three disagree. */}
+                                            {rlsEnabledFor(descriptor) && (
                                                 <Tooltip title="RLS enabled">
                                                     <div className="w-1.5 h-1.5 rounded-full bg-green-500"/>
                                                 </Tooltip>
                                             )}
-                                            {collection.history && (
+                                            {descriptor.history && (
                                                 <Tooltip title="History enabled">
                                                     <div className="w-1.5 h-1.5 rounded-full bg-blue-400"/>
                                                 </Tooltip>
@@ -504,8 +498,8 @@ duration: 400 }
                                 Schema Visualizer
                             </Typography>
                             {/* What this diagram is drawn from. Everything on it
-                                but the RLS markers comes from the collection
-                                configs, not from the database's catalog. */}
+                                but the RLS markers comes from the tables the
+                                server serves, not from the database's catalog. */}
                             <Typography
                                 variant="caption"
                                 className="text-text-secondary dark:text-text-secondary-dark truncate"
@@ -726,23 +720,21 @@ duration: 400 }
 
 export const SchemaVisualizer = () => {
     const { t } = useTranslation();
-    const { collections: registryCollections } =
-        useStudioCollectionRegistry() as {
-            collections?: AdminCollection[];
-        };
+    // The tables the server serves — with or without a CMS on the page.
+    const descriptors = useTableDescriptors();
+    const problem = schemaSourceProblem(descriptors);
+
+    if (problem && descriptors.tables.length === 0) {
+        return <SchemaSourceProblemView problem={problem}/>;
+    }
 
     /**
-     * `undefined` and `[]` are different answers, and this view used to render
-     * the same spinner for both. A project that declares no collections — a
-     * fresh scaffold, a backend-only project someone opened the console
-     * against — sat on "Loading schema…" forever, because there was nothing
-     * coming.
-     *
-     * `undefined` is the Studio bridge before the admin's collection registry
-     * has registered itself: genuinely still loading. `[]` is that registry
-     * saying there is nothing to draw.
+     * Still loading and nothing to draw are different answers, and this view
+     * once rendered the same spinner for both. A project that declares no
+     * tables — a fresh scaffold, a backend someone opened the console against
+     * — sat on "Loading schema…" forever, because there was nothing coming.
      */
-    if (registryCollections === undefined) {
+    if (descriptors.status === "loading") {
         return (
             <div className="flex items-center justify-center h-full w-full">
                 <div className="text-center space-y-3">
@@ -751,22 +743,22 @@ export const SchemaVisualizer = () => {
                         variant="body2"
                         color="secondary"
                     >
-                        Loading schema…
+                        {t("studio_schema_loading")}
                     </Typography>
                 </div>
             </div>
         );
     }
 
-    if (registryCollections.length === 0) {
+    if (!descriptors.tables.some((table) => table.kind === "table")) {
         return (
             <div className="flex items-center justify-center h-full w-full p-6">
                 <div className="max-w-md text-center space-y-2">
                     <Typography variant="subtitle2" className="block">
-                        {t("studio_schema_no_collections")}
+                        {t("studio_schema_no_tables_declared")}
                     </Typography>
                     <Typography variant="body2" color="secondary" className="block">
-                        {t("studio_schema_no_collections_body")}
+                        {t("studio_schema_no_tables_declared_body")}
                     </Typography>
                     <Typography variant="body2" color="secondary" className="block">
                         {t("studio_schema_introspect_hint")}
@@ -776,12 +768,10 @@ export const SchemaVisualizer = () => {
         );
     }
 
-    const collections = registryCollections;
-
     return (
         <div className="flex h-full w-full bg-surface-card overflow-hidden text-text-primary dark:text-text-primary-dark">
             <ReactFlowProvider>
-                <SchemaVisualizerCanvas collections={collections}/>
+                <SchemaVisualizerCanvas tables={descriptors.tables}/>
             </ReactFlowProvider>
         </div>
     );

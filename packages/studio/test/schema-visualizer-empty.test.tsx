@@ -5,15 +5,19 @@ import { en } from "../../app/src/locales/en";
 import React from "react";
 import { describe, expect, it, jest, beforeEach } from "@jest/globals";
 import { render, screen } from "@testing-library/react";
+import type { TableDescriptorsState } from "@rebasepro/app";
+import { failedTables, LOADING_TABLES, NO_TABLES, unavailableTables } from "./helpers/tableDescriptors";
 
 /**
- * `undefined` and `[]` are different answers. The Schema Visualizer rendered
- * "Loading schema…" for both, so a project that declares no collections — a
- * fresh scaffold, a backend someone opened the console against — sat on a
- * spinner forever waiting for something that was never coming.
+ * Still loading, nothing declared and nothing served are different answers.
+ * The Schema Visualizer once rendered "Loading schema…" for all of them, so a
+ * project that declares no tables — a fresh scaffold, a backend someone opened
+ * the console against — sat on a spinner forever waiting for something that
+ * was never coming. And a tenant whose runtime predates `GET
+ * /api/schema/tables` must be told to upgrade, not shown an empty schema.
  */
 
-let registryCollections: unknown[] | undefined;
+let tables: TableDescriptorsState = LOADING_TABLES;
 
 jest.mock("@rebasepro/app", () => ({
     useTranslation: () => ({
@@ -21,7 +25,7 @@ jest.mock("@rebasepro/app", () => ({
         i18n: { language: "en" }
     }),
     useNavigationGroupLabel: () => (group: string) => group,
-    useStudioCollectionRegistry: () => ({ collections: registryCollections }),
+    useTableDescriptors: () => tables,
     useStudioSidePanelController: () => ({ open: jest.fn(), replace: jest.fn(), close: jest.fn() }),
     useStudioCapabilities: () => ({ codebase: false }),
     useApiBase: () => "http://api.test/api",
@@ -29,39 +33,70 @@ jest.mock("@rebasepro/app", () => ({
     useSnackbarController: () => ({ open: jest.fn() }),
     useRebaseContext: () => ({}),
     useRebaseClient: () => ({}),
-    ErrorView: () => null
+    ErrorView: ({ title, error, onRetry }: { title: string; error: string; onRetry?: () => void }) => (
+        <div role="alert">
+            <span>{title}</span>
+            <span>{error}</span>
+            {onRetry && <button onClick={onRetry}>Retry</button>}
+        </div>
+    )
 }));
-
-// The canvas pulls in @xyflow/react and dagre; nothing below reaches it.
-jest.mock("../src/components/SchemaVisualizer/SchemaVisualizerCanvasBody", () => ({}), { virtual: true });
 
 import { SchemaVisualizer } from "../src/components/SchemaVisualizer/SchemaVisualizer";
 
 beforeEach(() => {
-    registryCollections = undefined;
+    tables = LOADING_TABLES;
 });
 
 describe("SchemaVisualizer with nothing to draw", () => {
 
-    it("waits while the registry has not answered yet", () => {
-        registryCollections = undefined;
+    it("waits while the server has not answered yet", () => {
         render(<SchemaVisualizer/>);
         expect(screen.getByText(/Loading schema/i)).toBeTruthy();
     });
 
-    it("says nothing is declared once the registry answers with none", () => {
-        registryCollections = [];
+    it("says nothing is declared once the server answers with no tables", () => {
+        tables = NO_TABLES;
         render(<SchemaVisualizer/>);
 
-        expect(screen.getByText(/No collections declared/i)).toBeTruthy();
+        expect(screen.getByText(en.studio_schema_no_tables_declared)).toBeTruthy();
         expect(screen.queryByText(/Loading schema/i)).toBeNull();
     });
 
-    it("names a command that exists, and the view that adds one", () => {
-        registryCollections = [];
+    it("names where a table is declared, and a command that exists", () => {
+        tables = NO_TABLES;
         render(<SchemaVisualizer/>);
 
         expect(screen.getByText(/rebase schema introspect/)).toBeTruthy();
-        expect(screen.getByText(/Edit collections/)).toBeTruthy();
+        expect(screen.getByText(/backend\/schema/)).toBeTruthy();
+    });
+});
+
+describe("SchemaVisualizer when the server serves no schema", () => {
+
+    it("tells a console user to upgrade a runtime that predates the route — and does not crash", () => {
+        tables = unavailableTables("predates-route");
+        render(<SchemaVisualizer/>);
+
+        expect(screen.getByText(en.studio_schema_outdated_title)).toBeTruthy();
+        expect(screen.getByText(en.studio_schema_outdated_body)).toBeTruthy();
+        expect(screen.queryByText(en.studio_schema_no_tables_declared)).toBeNull();
+    });
+
+    it("says so when the backend has no auth to describe its tables to", () => {
+        tables = unavailableTables("no-auth");
+        render(<SchemaVisualizer/>);
+
+        expect(screen.getByText(en.studio_schema_no_auth_title)).toBeTruthy();
+    });
+
+    it("reports a failed request with a retry", () => {
+        const retry = jest.fn();
+        tables = failedTables(new Error("Bad gateway"), retry);
+        render(<SchemaVisualizer/>);
+
+        expect(screen.getByRole("alert").textContent).toContain("Bad gateway");
+        screen.getByRole("button", { name: "Retry" }).click();
+        expect(retry).toHaveBeenCalled();
     });
 });

@@ -29,7 +29,7 @@ import {
     useApiConfig,
     useRebaseClient,
     useStorageSources,
-    useStudioCollectionRegistry,
+    useTableDescriptors,
     useTranslation
 } from "@rebasepro/app";
 import {
@@ -226,7 +226,7 @@ export function CreateApiKeyDialog({
 }) {
     const client = useRebaseClient<RebaseClient>();
     const { t } = useTranslation();
-    const collectionRegistry = useStudioCollectionRegistry();
+    const descriptors = useTableDescriptors();
     const storageSources = useStorageSources();
     const apiConfig = useApiConfig();
     const apiBase = useApiBase();
@@ -254,12 +254,19 @@ export function CreateApiKeyDialog({
 
     /* ── What a target can name, for the scopes that take one ── */
 
-    const collections = useMemo(
-        () => (collectionRegistry?.collections ?? [])
-            .map(col => col.slug)
-            .filter((slug): slug is string => !!slug)
-            .sort((a, b) => a.localeCompare(b)),
-        [collectionRegistry?.collections]
+    /**
+     * The slugs a `data:*` scope can name: the tables the server serves. When
+     * it serves none (a runtime older than the route, or the request failed)
+     * the target is typed instead — and the server refuses a slug it does not
+     * serve.
+     */
+    const tableSlugs = useMemo(
+        () => descriptors.unavailable || descriptors.status === "error"
+            ? null
+            : descriptors.tables
+                .map(table => table.slug)
+                .sort((a, b) => a.localeCompare(b)),
+        [descriptors.unavailable, descriptors.status, descriptors.tables]
     );
 
     const buckets = useMemo(() => {
@@ -299,7 +306,7 @@ export function CreateApiKeyDialog({
 
     const optionsFor = (summary: ScopeSummary): { value: string; label: string }[] | null => {
         switch (summary.target) {
-            case "collection": return collections.map(slug => ({ value: slug, label: slug }));
+            case "collection": return tableSlugs ? tableSlugs.map(slug => ({ value: slug, label: slug })) : null;
             case "bucket": return buckets;
             case "function": return functionNames.map(fn => ({ value: fn, label: `${fn}()` }));
             default: return null;

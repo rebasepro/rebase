@@ -1,6 +1,7 @@
 
 import React, { useState } from "react";
 import { useTranslation } from "@rebasepro/app";
+import { tableAccessExpression, type TableInfo } from "./table_access";
 import {
     cls,
     defaultBorderMixin,
@@ -22,13 +23,8 @@ export interface JSSnippet {
     isFavorite?: boolean;
 }
 
-interface CollectionInfo {
-    slug: string;
-    properties: string[];
-}
-
 interface JSEditorSidebarProps {
-    collections: CollectionInfo[];
+    tables: TableInfo[];
     snippets: JSSnippet[];
     history: string[];
     onSelectSnippet: (code: string) => void;
@@ -90,7 +86,7 @@ const QUICK_REFERENCE: { label: string; code: string; description: string }[] = 
 ];
 
 export const JSEditorSidebar = ({
-    collections,
+    tables,
     snippets,
     history,
     onSelectSnippet,
@@ -104,8 +100,8 @@ export const JSEditorSidebar = ({
         <div className={cls("flex flex-col h-full w-full bg-surface-card border-r", defaultBorderMixin)}>
             <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "collections" | "snippets" | "history" | "reference")} variant="boxy" className="border-b border-hairline">
                 <Tab value="collections">
-                    <Tooltip title="Browse collections">
-                        <span className="text-xs">{t("studio_js_collections_tab")}</span>
+                    <Tooltip title="Browse tables">
+                        <span className="text-xs">{t("studio_js_tables_tab")}</span>
                     </Tooltip>
                 </Tab>
                 <Tab value="reference">
@@ -127,21 +123,21 @@ export const JSEditorSidebar = ({
                     <div className="flex flex-col h-full">
                         <div className={cls("flex items-center justify-between px-3 py-2 border-b bg-surface-sheet min-h-[48px]", defaultBorderMixin)}>
                             <Typography variant="caption" className="font-semibold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">
-                                {t("studio_js_collections_tab")}
+                                {t("studio_js_tables_tab")}
                             </Typography>
                         </div>
                         <div className="flex-grow overflow-y-auto p-1 space-y-1 no-scrollbar">
-                            {collections.length === 0 ? (
+                            {tables.length === 0 ? (
                                 <div className="p-4 text-center">
                                     <Typography variant="caption" className="text-text-disabled dark:text-text-disabled-dark">
-                                        No collections found
+                                        {t("studio_schema_no_tables")}
                                     </Typography>
                                 </div>
                             ) : (
-                                collections.map(col => (
+                                tables.map(table => (
                                     <CollectionItem
-                                        key={col.slug}
-                                        collection={col}
+                                        key={table.slug}
+                                        collection={table}
                                         onInsertCode={onInsertCode}
                                     />
                                 ))
@@ -278,7 +274,7 @@ export const JSEditorSidebar = ({
 
 // ─── Sub-components ──────────────────────────────────────────────────
 
-function CollectionItem({ collection, onInsertCode }: { collection: CollectionInfo; onInsertCode: (code: string) => void }) {
+function CollectionItem({ collection, onInsertCode }: { collection: TableInfo; onInsertCode: (code: string) => void }) {
     const [expanded, setExpanded] = useState(false);
 
     return (
@@ -305,16 +301,16 @@ function CollectionItem({ collection, onInsertCode }: { collection: CollectionIn
                         className="opacity-0 group-hover:opacity-100 text-text-disabled hover:text-primary transition-all"
                         onClick={(e) => {
                             e.stopPropagation();
-                            onInsertCode(`const result = await client.data.${collection.slug}.find({ limit: 20 });\nreturn result;`);
+                            onInsertCode(`const result = await ${tableAccessExpression(collection)}.find({ limit: 20 });\nreturn result;`);
                         }}
                     >
                         <PlusIcon size={iconSize.smallest}/>
                     </IconButton>
                 </Tooltip>
             </div>
-            {expanded && collection.properties.length > 0 && (
+            {expanded && collection.columns.length > 0 && (
                 <div className={cls("ml-5 mt-1 space-y-0.5 border-l", defaultBorderMixin)}>
-                    {collection.properties.map(prop => (
+                    {collection.columns.map(prop => (
                         <div
                             key={prop}
                             className="flex items-center p-1 pl-2 hover:bg-surface-hover rounded-r cursor-pointer transition-colors group/prop relative min-h-[28px]"

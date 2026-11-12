@@ -12,10 +12,13 @@ import React from "react";
 import { describe, expect, it, jest } from "@jest/globals";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 
+import { NO_TABLES } from "./helpers/tableDescriptors";
+
 jest.mock("@rebasepro/app", () => ({
     useTranslation: () => ({ t: (key: string) => key, i18n: { language: "en" } }),
     useRebaseContext: () => ({}),
     useStudioCollectionRegistry: () => ({ collections: [], getCollection: () => undefined }),
+    useTableDescriptors: () => NO_TABLES,
     useStudioSidePanelController: () => ({ open: jest.fn(), close: jest.fn() }),
     useSnackbarController: () => ({ open: jest.fn() }),
     useModeController: () => ({ mode: "light", setMode: jest.fn() }),

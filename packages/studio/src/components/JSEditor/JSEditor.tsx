@@ -1,7 +1,6 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { Highlight, themes } from "prism-react-renderer";
-import { toSnakeCase } from "@rebasepro/utils";
 import {
     Button,
     CellRendererParams,
@@ -35,7 +34,7 @@ import {
     VirtualTableColumn,
     XIcon
 } from "@rebasepro/ui";
-import { useStudioUrlController, useStudioCollectionRegistry, useStudioSidePanelController } from "@rebasepro/app";
+import { useStudioUrlController, useStudioCollectionRegistry, useStudioSidePanelController, useTableDescriptors } from "@rebasepro/app";
 import { useRebaseContext, useRebaseClient, useSnackbarController, useApiConfig, useTranslation, useModeController, ErrorView, SelectableUser, IconForView } from "@rebasepro/app";
 
 import { createMemoryStorage, createRebaseClient, type CreateAuthOptions } from "@rebasepro/client";
@@ -45,6 +44,7 @@ import { JSEditorSidebar, JSSnippet } from "./JSEditorSidebar";
 import { AuthSimulationSelector } from "../AuthSimulationSelector";
 import { useRunAsUsers } from "../useRunAsUsers";
 import { toCsv } from "../../utils/sql_utils";
+import { slugOfProperty, tableInfosOf, type TableInfo } from "./table_access";
 import type { AdminCollection } from "@rebasepro/cms-types";
 
 // ─── Types ───────────────────────────────────────────────────────────
@@ -150,34 +150,38 @@ function formatJSON(value: unknown): string {
     }
 }
 
-// ─── Helpers: Collection matching for JS results ────────────────────
+// ─── Helpers: Table matching for JS results ─────────────────────────
 
 interface MatchedJSCollection {
     collectionSlug: string;
+    /** The CMS collection the record is opened with. */
     collection: AdminCollection;
+    /** The row key that holds the table's (single-column) primary key. */
     pkColumn: string;
 }
 
-/** The script without its comments: a collection named in one is not where rows came from. */
+/** The script without its comments: a table named in one is not where rows came from. */
 function withoutComments(code: string): string {
     return code.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
 }
 
 /**
- * Given the raw SDK result, try to detect which collection its rows belong to.
- * JS SDK results typically come back as `{ data: [{ id, values }] }` or plain arrays.
+ * Given the raw SDK result, try to detect which table its rows belong to.
+ * JS SDK results typically come back as `{ data: [...] }` or plain arrays.
  * The heuristic: the executed code, outside its comments, names exactly one
- * collection — `collection("<slug>")` or `client.data.<slug>` — and the result has
- * rows with an "id" column. A script naming two could have returned either's
- * rows, and an action on a row would open the other collection's row with the
- * same id, so it gets none.
+ * table — `table("<slug>")` or `client.data.<accessor>` — the server declares
+ * it with a single-column primary key, the result has rows carrying that key,
+ * and the CMS on the page can open it (`collectionFor`). A script naming two
+ * could have returned either's rows, and an action on a row would open the
+ * other table's row with the same key, so it gets none.
  */
 function detectCollectionsInResult(
     executedCode: string,
     resultValue: unknown,
-    collections: AdminCollection[]
+    tables: readonly TableInfo[],
+    collectionFor: (slug: string) => AdminCollection | undefined
 ): MatchedJSCollection[] {
-    if (!resultValue || !collections?.length) return [];
+    if (!resultValue || tables.length === 0) return [];
     const code = withoutComments(executedCode);
 
     // Extract table slugs mentioned in the code
@@ -190,17 +194,16 @@ function detectCollectionsInResult(
         mentionedSlugs.add(m[1]);
     }
 
-    // Match: client.data.<slug>. (dot-access pattern)
+    // Match: client.data.<accessor>. (dot-access pattern)
     const dotAccessRegex = /client\.data\.([a-zA-Z_][a-zA-Z0-9_]*)\./g;
     while ((m = dotAccessRegex.exec(code)) !== null) {
-        if (!["table", "find", "findById", "create", "update", "delete"].includes(m[1])) {
-            mentionedSlugs.add(m[1]);
+        if (!["table", "batch"].includes(m[1])) {
+            mentionedSlugs.add(slugOfProperty(m[1], tables));
         }
     }
 
     if (mentionedSlugs.size !== 1) return [];
 
-    // Check if result has rows with an "id" field
     let rows: Record<string, unknown>[] = [];
     const rv = resultValue as Record<string, unknown>;
     if (rv?.data && Array.isArray(rv.data)) {
@@ -209,23 +212,15 @@ function detectCollectionsInResult(
         rows = resultValue;
     }
 
-    const hasId = rows.length > 0 && rows.some(r => r?.id != null);
-    if (!hasId) return [];
-
     const matched: MatchedJSCollection[] = [];
     for (const slug of mentionedSlugs) {
-        const normalised = toSnakeCase(slug);
-        const col = collections.find(c => {
-            const tableName = ("table" in c ? c.table : undefined) || toSnakeCase(c.slug);
-            return c.slug === slug || tableName === normalised || toSnakeCase(c.slug) === normalised;
-        });
-        if (col) {
-            matched.push({
-                collectionSlug: col.slug,
-                collection: col,
-                pkColumn: "id"
-            });
-        }
+        const table = tables.find(t => t.slug === slug);
+        if (!table || table.primaryKey.length !== 1) continue;
+        const [pkColumn] = table.primaryKey;
+        if (!rows.some(r => r?.[pkColumn] != null)) continue;
+        const collection = collectionFor(slug);
+        if (!collection) continue;
+        matched.push({ collectionSlug: slug, collection, pkColumn });
     }
 
     return matched;
@@ -239,7 +234,14 @@ export function JSEditor() {
     const rebaseClient = useRebaseClient();
     const apiConfig = useApiConfig();
     const snackbar = useSnackbarController();
+    // The tables come from the server; the CMS, when one is on the page, opens
+    // a row of one (the bridge resolves nothing without it).
+    const descriptors = useTableDescriptors();
     const collectionRegistry = useStudioCollectionRegistry();
+    const collectionFor = useCallback(
+        (slug: string): AdminCollection | undefined => collectionRegistry.getCollection(slug),
+        [collectionRegistry]
+    );
     const sidePanelController = useStudioSidePanelController();
     const { t } = useTranslation();
 
@@ -290,28 +292,19 @@ code: DEFAULT_CODE }])
     // Derived
     const activeTab = tabs.find(t => t.id === activeTabId) ?? tabs[0];
 
-    // Collection info for the sidebar and Monaco
-    const collectionInfos = useMemo(() => {
-        const collections = collectionRegistry?.collections ?? [];
-        return collections.map(col => ({
-            slug: col.slug,
-            name: col.name,
-            properties: Object.keys(col.properties ?? {})
-        }));
-    }, [collectionRegistry?.collections]);
-
-    const collectionSlugs = useMemo(() => collectionInfos.map(c => c.slug), [collectionInfos]);
+    // The tables, for the sidebar, Monaco and the script's `context.tables`.
+    const tableInfos = useMemo(() => tableInfosOf(descriptors.tables), [descriptors.tables]);
 
     /**
-     * Name a real collection in the starter script once the registry knows one.
+     * Name a real table in the starter script once the server has served one.
      *
-     * The registry is empty on first paint — in the hosted console it arrives
-     * over the network — so the placeholder-free default cannot be built in the
+     * The tables are not there on first paint — they arrive over the network —
+     * so the placeholder-free default cannot be built in the
      * `useState` initialiser. Rewriting only a tab whose content is still
      * *exactly* the untouched default means this can never overwrite anything
      * anyone typed, and never fires twice.
      */
-    const firstSlug = collectionSlugs[0];
+    const firstSlug = tableInfos[0]?.slug;
     useEffect(() => {
         if (!firstSlug) return;
         setTabs(prev => {
@@ -494,7 +487,7 @@ timestamp: Date.now() });
                         email: currentUser.email,
                         roles: currentUser.roles
                     } : null),
-                collections: collectionInfos
+                tables: tableInfos
             };
 
             // Create async function with `client` and `context` injected
@@ -546,7 +539,7 @@ timestamp: Date.now() });
             // them. The app's own client is left alone.
             release?.();
         }
-    }, [activeTab?.code, buildClient, authMode, selectedUser, currentUser, collectionInfos]);
+    }, [activeTab?.code, buildClient, authMode, selectedUser, currentUser, tableInfos]);
 
     // ─── Snippet management ──────────────────────────────────────
 
@@ -626,12 +619,8 @@ data: rows };
     // opens and saves them as the signed-in user.
     const matchedCollections = useMemo(() => {
         if (!result?.value || result.error || !result.ranAsSignedInUser) return [];
-        return detectCollectionsInResult(
-            result.code,
-            result.value,
-            collectionRegistry?.collections ?? []
-        );
-    }, [result, collectionRegistry?.collections]);
+        return detectCollectionsInResult(result.code, result.value, tableInfos, collectionFor);
+    }, [result, tableInfos, collectionFor]);
 
     const getRowEntityActions = useCallback((rowData: Record<string, unknown>): { collection: MatchedJSCollection; entityId: string | number }[] => {
         if (!rowData || matchedCollections.length === 0) return [];
@@ -787,7 +776,7 @@ message: t("studio_sql_markdown_copy_failed") });
                     minPanelSizePx={200}
                     firstPanel={
                         <JSEditorSidebar
-                            collections={collectionInfos}
+                            tables={tableInfos}
                             snippets={snippets}
                             history={history}
                             onSelectSnippet={(code) => updateActiveCode(code)}
@@ -891,8 +880,7 @@ message: t("studio_sql_markdown_copy_failed") });
                                                     value={activeTab?.code ?? ""}
                                                     onChange={updateActiveCode}
                                                     onRun={(selectedText) => executeCode(selectedText)}
-                                                    collectionSlugs={collectionSlugs}
-                                                    collections={collectionInfos}
+                                                    tables={tableInfos}
                                                     autoFocus
                                                 />
                                             </div>

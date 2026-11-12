@@ -3,7 +3,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { act, renderHook, waitFor } from "@testing-library/react";
-import type { AdminCollection } from "@rebasepro/cms-types";
+import { blogSchema as schema } from "./helpers/schemaFixtures";
 
 /**
  * Where the schema visualizer's layout runs.
@@ -83,23 +83,6 @@ jest.mock(
 );
 
 import { useSchemaGraph } from "../src/components/SchemaVisualizer/useSchemaGraph";
-
-function schema(prefix: string): AdminCollection[] {
-    const authors: AdminCollection = {
-        slug: `${prefix}_authors`,
-        name: "Authors",
-        properties: { name: { type: "string", name: "Name" } }
-    };
-    const posts: AdminCollection = {
-        slug: `${prefix}_posts`,
-        name: "Posts",
-        properties: {
-            title: { type: "string", name: "Title" },
-            author: { type: "relation", name: "Author", relation: { kind: "belongsTo", target: () => authors, localKey: "author_id" } }
-        }
-    } as AdminCollection;
-    return [authors, posts];
-}
 
 const realCreateObjectURL = URL.createObjectURL;
 

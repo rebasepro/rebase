@@ -39,6 +39,8 @@ const appContext = {
 const appClient = { admin: { listUsersPaginated } };
 const apiConfig = { apiUrl: "http://api.test", apiPath: "/api", getAuthToken: async () => "admin-token" };
 
+import { NO_TABLES } from "./helpers/tableDescriptors";
+
 jest.mock("@rebasepro/app", () => ({
     useRebaseContext: () => appContext,
     useRebaseClient: () => appClient,
@@ -47,7 +49,8 @@ jest.mock("@rebasepro/app", () => ({
     useTranslation: () => ({ t: (key: string) => key, i18n: { language: "en" } }),
     useModeController: () => ({ mode: "light", setMode: jest.fn() }),
     useStudioUrlController: () => ({}),
-    useStudioCollectionRegistry: () => ({ collections: [] }),
+    useStudioCollectionRegistry: () => ({ getCollection: () => undefined }),
+    useTableDescriptors: () => NO_TABLES,
     useStudioSidePanelController: () => ({ open: jest.fn(), close: jest.fn() }),
     IconForView: () => null,
     ErrorView: ({ error }: { error: unknown }) => <div role="alert">{String(error)}</div>,

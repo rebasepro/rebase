@@ -3,7 +3,7 @@
  */
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { renderHook } from "@testing-library/react";
-import type { AdminCollection } from "@rebasepro/cms-types";
+import { chainSchema } from "./helpers/schemaFixtures";
 
 /**
  * A schema too large to draw whole.
@@ -33,23 +33,8 @@ jest.mock("dagre", () => {
 
 import { LARGE_SCHEMA_TABLES, useSchemaGraph } from "../src/components/SchemaVisualizer/useSchemaGraph";
 
-/**
- * `count` tables in a chain — each belongs to the one before it — where
- * `c5` is also pointed at by `c100` and `c200`, and has a many-to-many to
- * `c300`. So `c5` is the most connected table.
- */
-function chain(prefix: string, count: number): AdminCollection[] {
-    const collections: AdminCollection[] = [];
-    const at = (i: number) => collections[i];
-    for (let i = 0; i < count; i++) {
-        const properties: Record<string, unknown> = { label: { type: "string", name: "Label" } };
-        if (i > 0) properties.previous = { type: "relation", name: "Previous", relation: { kind: "belongsTo", target: () => at(i - 1), localKey: "previous_id" } };
-        if (i === 100 || i === 200) properties.hub = { type: "relation", name: "Hub", relation: { kind: "belongsTo", target: () => at(5), localKey: "hub_id" } };
-        if (i === 5 && count > 300) properties.peers = { type: "relation", name: "Peers", relation: { kind: "manyToMany", target: () => at(300), through: { table: `${prefix}_peers` } } };
-        collections.push({ slug: `${prefix}_c${i}`, table: `${prefix}_c${i}`, name: `C${i}`, properties } as AdminCollection);
-    }
-    return collections;
-}
+/** See `chainSchema`: `<prefix>_c<i>`, `c5` the most connected. */
+const chain = (prefix: string, count: number) => chainSchema(`${prefix}_`, count);
 
 const ids = (nodes: { id: string }[]) => nodes.map(node => node.id).sort();
 

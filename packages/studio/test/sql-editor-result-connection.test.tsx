@@ -7,7 +7,10 @@ import { describe, expect, it, jest, beforeEach, afterEach } from "@jest/globals
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { en } from "../../app/src/locales/en";
 import { lookupEn } from "./en-translation";
+import { col, defineTable } from "@rebasepro/types";
 import type { SqlScriptResult } from "@rebasepro/types";
+import { compileTables } from "@rebasepro/common";
+import { readyTables } from "./helpers/tableDescriptors";
 
 /**
  * What the SQL console says about where the rows on screen came from, and what
@@ -62,14 +65,20 @@ const translation = {
     i18n: { language: "en" }
 };
 
+/** The CMS's collection for the table, which "Open …" opens the record with. */
 const ordersCollection = { slug: "orders", name: "Orders", table: "orders", properties: {} };
+/** The table as the server declares it: what a row is matched to. */
+const servedTables = readyTables(compileTables([
+    defineTable("orders", { columns: { id: col.text().primaryKey(), status: col.text() }, rls: "admin-only" })
+]));
 const sidePanelOpen = jest.fn((_props: Record<string, unknown>) => undefined);
 const snackbarOpen = jest.fn((_props: Record<string, unknown>) => undefined);
 
 jest.mock("@rebasepro/app", () => ({
     useTranslation: () => translation,
     useRebaseContext: () => ({ databaseAdmin }),
-    useStudioCollectionRegistry: () => ({ collections: [ordersCollection], getCollection: () => undefined }),
+    useStudioCollectionRegistry: () => ({ getCollection: (slug: string) => slug === "orders" ? ordersCollection : undefined }),
+    useTableDescriptors: () => servedTables,
     useStudioSidePanelController: () => ({ open: sidePanelOpen, close: jest.fn() }),
     useSnackbarController: () => ({ open: snackbarOpen }),
     useModeController: () => ({ mode: "light", setMode: jest.fn() }),

@@ -23,7 +23,9 @@ const appClient = {
     data: { record: (value: string) => { recorded.push(value); } }
 };
 const apiConfig = { apiUrl: "http://api.test", getAuthToken: async () => "admin-token" };
-const registry = { collections: [] };
+const registry = { getCollection: () => undefined };
+
+import { NO_TABLES } from "./helpers/tableDescriptors";
 
 jest.mock("@rebasepro/app", () => ({
     useRebaseContext: () => appContext,
@@ -34,6 +36,7 @@ jest.mock("@rebasepro/app", () => ({
     useModeController: () => ({ mode: "light", setMode: jest.fn() }),
     useStudioUrlController: () => ({}),
     useStudioCollectionRegistry: () => registry,
+    useTableDescriptors: () => NO_TABLES,
     useStudioSidePanelController: () => ({ open: jest.fn(), close: jest.fn() }),
     IconForView: () => null,
     ErrorView: ({ error }: { error: unknown }) => <div role="alert">{String(error)}</div>,

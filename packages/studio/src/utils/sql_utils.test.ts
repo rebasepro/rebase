@@ -1,8 +1,9 @@
 
 import { describe, it, expect } from "@jest/globals";
 import { acceptsAutoLimit, buildExplainSql, COLUMN_WIDTHS_REMEMBERED, formatSql, groupSchemaRows, keepLatestColumnWidths, rememberColumnWidth, needsDestructiveConfirmation, quoteIdentifier, quoteTableName, resolveCellEdit, resolveQueryCollections, resultsToCsv, toCsv, withAutoLimit, type ResultProvenance } from "./sql_utils";
+import { col, defineTable } from "@rebasepro/types";
 import type { SqlScriptColumn, SqlScriptTable } from "@rebasepro/types";
-import type { AdminCollection } from "@rebasepro/cms-types";
+import { compileTables } from "@rebasepro/common";
 
 /**
  * The provenance below is what Postgres 18 reports for each query — the
@@ -209,14 +210,13 @@ describe("quoteIdentifier", () => {
 });
 
 describe("resolveQueryCollections", () => {
-    const collections: AdminCollection[] = [
-        { slug: "users", name: "Users", table: "users", properties: {} },
-        { slug: "posts", name: "Posts", table: "posts", properties: {} },
-        { slug: "authors", name: "Authors", table: "authors", properties: {} }
-    ];
+    const declared = (name: string) => defineTable(name, { columns: { id: col.serial().primaryKey(), name: col.text() }, rls: "admin-only" });
+    const descriptors = compileTables([declared("users"), declared("posts"), declared("authors")]);
+    /** What the CMS opens a record with, by slug: everything here. */
+    const openable = (slug: string) => ({ slug });
 
     it("offers a table's records only by the key the database says is that table's", () => {
-        const matched = resolveQueryCollections({ columns: [read("id", "posts"), read("name", "authors")], tables: [posts, authors] }, collections);
+        const matched = resolveQueryCollections({ columns: [read("id", "posts"), read("name", "authors")], tables: [posts, authors] }, descriptors, openable);
         expect(matched.map(m => [m.tableName, m.pkColumn])).toEqual([["posts", "id"]]);
     });
 
@@ -224,18 +224,29 @@ describe("resolveQueryCollections", () => {
         const matched = resolveQueryCollections({
             columns: [read("post_id", "posts", "id"), read("author_key", "authors", "id")],
             tables: [posts, authors]
-        }, collections);
+        }, descriptors, openable);
         expect(matched.map(m => [m.tableName, m.pkColumn])).toEqual([["posts", "post_id"], ["authors", "author_key"]]);
     });
 
     it("does not offer a key column another column of the result shares a name with", () => {
-        const matched = resolveQueryCollections({ columns: [read("id", "posts"), read("id", "authors")], tables: [posts, authors] }, collections);
+        const matched = resolveQueryCollections({ columns: [read("id", "posts"), read("id", "authors")], tables: [posts, authors] }, descriptors, openable);
         expect(matched).toEqual([]);
     });
 
-    it("does not match a collection's table in another schema", () => {
+    it("does not match a declared table in another schema", () => {
         const archivedUsers = table("users", ["id"], { schema: "archive" });
-        expect(resolveQueryCollections({ columns: [read("id", "users", "id", "archive")], tables: [archivedUsers] }, collections)).toEqual([]);
+        expect(resolveQueryCollections({ columns: [read("id", "users", "id", "archive")], tables: [archivedUsers] }, descriptors, openable)).toEqual([]);
+    });
+
+    it("matches by the SQL table the server declares, and hands back its slug", () => {
+        const writers = compileTables([defineTable("writers", { table: "authors", columns: { id: col.serial().primaryKey() }, rls: "admin-only" })]);
+        const matched = resolveQueryCollections({ columns: [read("id", "authors")], tables: [authors] }, writers, openable);
+        expect(matched.map(m => [m.tableName, m.slug])).toEqual([["authors", "writers"]]);
+    });
+
+    it("offers nothing the CMS cannot open — with no CMS on the page, no row is", () => {
+        const matched = resolveQueryCollections({ columns: [read("id", "posts")], tables: [posts] }, descriptors, () => undefined);
+        expect(matched).toEqual([]);
     });
 });
 

@@ -29,6 +29,8 @@ const built: Array<Record<string, unknown>> = [];
 /** How many of those clients were released after their run. */
 let closed = 0;
 
+import { NO_TABLES } from "./helpers/tableDescriptors";
+
 jest.mock("@rebasepro/app", () => ({
     useRebaseContext: () => ({
         authController: { user: { uid: "admin-1", email: "admin@example.test", displayName: null, roles: session.roles } }
@@ -39,7 +41,8 @@ jest.mock("@rebasepro/app", () => ({
     useTranslation: () => ({ t: (key: string) => key, i18n: { language: "en" } }),
     useModeController: () => ({ mode: "light", setMode: jest.fn() }),
     useStudioUrlController: () => ({}),
-    useStudioCollectionRegistry: () => ({ collections: [] }),
+    useStudioCollectionRegistry: () => ({ getCollection: () => undefined }),
+    useTableDescriptors: () => NO_TABLES,
     useStudioSidePanelController: () => ({ open: jest.fn(), close: jest.fn() }),
     IconForView: () => null,
     ErrorView: ({ error }: { error: unknown }) => <div role="alert">{String(error)}</div>,

@@ -3,7 +3,9 @@
  */
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { renderHook } from "@testing-library/react";
-import type { AdminCollection } from "@rebasepro/cms-types";
+import { col, defineTable } from "@rebasepro/types";
+import { compileTables } from "@rebasepro/common";
+import { blogSchema as schema } from "./helpers/schemaFixtures";
 
 /**
  * How often the schema visualizer runs its layout.
@@ -33,23 +35,6 @@ jest.mock("dagre", () => {
 });
 
 import { useSchemaGraph, type TableNodeData } from "../src/components/SchemaVisualizer/useSchemaGraph";
-
-function schema(prefix: string): AdminCollection[] {
-    const authors: AdminCollection = {
-        slug: `${prefix}_authors`,
-        name: "Authors",
-        properties: { name: { type: "string", name: "Name" } }
-    };
-    const posts: AdminCollection = {
-        slug: `${prefix}_posts`,
-        name: "Posts",
-        properties: {
-            title: { type: "string", name: "Title" },
-            author: { type: "relation", name: "Author", relation: { kind: "belongsTo", target: () => authors, localKey: "author_id" } }
-        }
-    } as AdminCollection;
-    return [authors, posts];
-}
 
 beforeEach(() => {
     mockLayoutCalls.count = 0;
@@ -84,8 +69,10 @@ describe("the schema visualizer's layout", () => {
 
     it("runs again when the schema changes", () => {
         renderHook(() => useSchemaGraph(schema("change"), null));
-        const changed = schema("change");
-        changed.push({ slug: "change_tags", name: "Tags", properties: { label: { type: "string", name: "Label" } } });
+        const changed = [
+            ...schema("change"),
+            ...compileTables([defineTable("change_tags", { columns: { id: col.serial().primaryKey(), label: col.text() }, rls: "admin-only" })])
+        ];
         renderHook(() => useSchemaGraph(changed, null));
 
         expect(mockLayoutCalls.count).toBe(2);

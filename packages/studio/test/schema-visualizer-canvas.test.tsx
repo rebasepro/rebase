@@ -5,7 +5,9 @@ import { en } from "../../app/src/locales/en";
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import type { AdminCollection } from "@rebasepro/cms-types";
+import type { TableDescriptorsState } from "@rebasepro/app";
+import { chainSchema } from "./helpers/schemaFixtures";
+import { readyTables } from "./helpers/tableDescriptors";
 
 /**
  * The schema visualizer's canvas around its layout: it says "laying out"
@@ -16,7 +18,7 @@ import type { AdminCollection } from "@rebasepro/cms-types";
  * under test is what this view gives it, not how it paints.
  */
 
-let registryCollections: AdminCollection[] | undefined;
+let tables: TableDescriptorsState = readyTables([]);
 
 jest.mock("@rebasepro/app", () => ({
     useTranslation: () => ({
@@ -24,7 +26,7 @@ jest.mock("@rebasepro/app", () => ({
             (en[key as keyof typeof en] ?? key).replace(/\{\{(\w+)\}\}/g, (_: string, name: string) => String(params?.[name] ?? "")),
         i18n: { language: "en" }
     }),
-    useStudioCollectionRegistry: () => ({ collections: registryCollections }),
+    useTableDescriptors: () => tables,
     useRebaseContext: () => ({}),
     IconForView: () => null
 }));
@@ -88,17 +90,8 @@ jest.mock(
 
 import { SchemaVisualizer } from "../src/components/SchemaVisualizer/SchemaVisualizer";
 
-/** A chain of tables, each belonging to the one before; `c5` also has `c100` and `c200` pointing at it. */
-function chain(count: number): AdminCollection[] {
-    const collections: AdminCollection[] = [];
-    for (let i = 0; i < count; i++) {
-        const properties: Record<string, unknown> = { label: { type: "string", name: "Label" } };
-        if (i > 0) properties.previous = { type: "relation", name: "Previous", relation: { kind: "belongsTo", target: () => collections[i - 1], localKey: "previous_id" } };
-        if (i === 100 || i === 200) properties.hub = { type: "relation", name: "Hub", relation: { kind: "belongsTo", target: () => collections[5], localKey: "hub_id" } };
-        collections.push({ slug: `c${i}`, table: `c${i}`, name: `Table ${i}`, properties } as AdminCollection);
-    }
-    return collections;
-}
+/** A chain of tables `c<i>`, each belonging to the one before; `c5` also has `c100` and `c200` pointing at it. */
+const chain = (count: number) => readyTables(chainSchema("", count, false));
 
 const drawn = () => screen.getByRole("list", { name: "canvas" }).textContent;
 
@@ -117,13 +110,13 @@ describe("the schema visualizer's canvas", () => {
         const realCreateObjectURL = URL.createObjectURL;
         URL.createObjectURL = () => "blob:layout";
         try {
-            registryCollections = chain(3);
+            tables = chain(3);
             render(<SchemaVisualizer/>);
 
             expect(screen.getByRole("status").textContent).toBe("Laying out the diagram…");
             expect(drawn()).toBe("");
             // The list does not wait for the layout.
-            expect(screen.getByText("Table 2")).toBeTruthy();
+            expect(screen.getByText("c2")).toBeTruthy();
 
             await waitFor(() => expect(mockWorkers).toHaveLength(1));
             await act(() => mockWorkers[0].run());
@@ -137,18 +130,18 @@ describe("the schema visualizer's canvas", () => {
     });
 
     it("draws a large schema one neighbourhood at a time, moved from the list", async () => {
-        registryCollections = chain(320);
+        tables = chain(320);
         render(<SchemaVisualizer/>);
 
-        expect(screen.getByText(/Showing 5 of 320 tables: Table 5 and the tables around it/)).toBeTruthy();
+        expect(screen.getByText(/Showing 5 of 320 tables: c5 and the tables around it/)).toBeTruthy();
         expect(drawn()).toBe("table-c4table-c5table-c6table-c100table-c200");
         await waitFor(() => expect(mockFitView).toHaveBeenCalledTimes(1));
 
         // Every table is still listed, drawn or not.
-        fireEvent.click(screen.getByText("Table 250"));
+        fireEvent.click(screen.getByText("c250"));
 
         await waitFor(() => expect(drawn()).toBe("table-c249table-c250table-c251"));
-        expect(screen.getByText(/Showing 3 of 320 tables: Table 250/)).toBeTruthy();
+        expect(screen.getByText(/Showing 3 of 320 tables: c250/)).toBeTruthy();
         await waitFor(() => expect(mockFitView).toHaveBeenCalledTimes(2));
 
         fireEvent.click(screen.getByRole("button", { name: "2 relations away" }));
@@ -158,7 +151,7 @@ describe("the schema visualizer's canvas", () => {
     });
 
     it("draws a schema of 300 tables whole", () => {
-        registryCollections = chain(300);
+        tables = chain(300);
         render(<SchemaVisualizer/>);
 
         expect(screen.queryByText(/Showing/)).toBeNull();

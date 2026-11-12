@@ -40,10 +40,13 @@ const translation = {
     i18n: { language: "en" }
 };
 
+import { NO_TABLES } from "./helpers/tableDescriptors";
+
 jest.mock("@rebasepro/app", () => ({
     useTranslation: () => translation,
     useRebaseContext: () => ({ databaseAdmin }),
     useStudioCollectionRegistry: () => ({ collections: [], getCollection: () => undefined }),
+    useTableDescriptors: () => NO_TABLES,
     useStudioSidePanelController: () => ({ open: jest.fn(), close: jest.fn() }),
     useSnackbarController: () => ({ open: jest.fn() }),
     useModeController: () => ({ mode: "light", setMode: jest.fn() }),

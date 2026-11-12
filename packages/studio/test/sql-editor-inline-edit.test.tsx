@@ -93,10 +93,13 @@ const translation = {
 
 const snackbarOpen = jest.fn((_props: { type: string; message: string }) => undefined);
 
+import { NO_TABLES } from "./helpers/tableDescriptors";
+
 jest.mock("@rebasepro/app", () => ({
     useTranslation: () => translation,
     useRebaseContext: () => ({ databaseAdmin }),
     useStudioCollectionRegistry: () => ({ collections: [], getCollection: () => undefined }),
+    useTableDescriptors: () => NO_TABLES,
     useStudioSidePanelController: () => ({ open: jest.fn(), close: jest.fn() }),
     useSnackbarController: () => ({ open: snackbarOpen }),
     useModeController: () => ({ mode: "light", setMode: jest.fn() }),
