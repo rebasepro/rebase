@@ -23,6 +23,8 @@ export * from "./define_collection";
 export { composeCallbacks } from "@rebasepro/common";
 export * from "./collections";
 export * from "./admin_collection";
+// `customizeTable`'s types: the deltas a frontend states over a table's default collection.
+export * from "./table_customization";
 export * from "./rebase_context";
 export * from "./types";
 export * from "./controllers";
