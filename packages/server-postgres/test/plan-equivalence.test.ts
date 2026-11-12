@@ -31,8 +31,9 @@ import {
     lowerTables,
     isSchemaDefinitionError
 } from "@rebasepro/common";
-import { isPostgresCollectionConfig, type CollectionConfig, type PostgresCollectionConfig, type Relation, type SecurityRule } from "@rebasepro/types";
+import type { CollectionConfig, Relation } from "@rebasepro/types";
 
+import { INPUT_ADJUSTMENTS, lowerSet, sharedDefaultRules } from "./helpers/plan-tables";
 import {
     PLAN_REFUSALS,
     loadPlanCorpus,
@@ -118,62 +119,8 @@ ALLOWED_DIFFERENCES.push(
     { set: "real-schema.openstreetmap", output: "schema.generated.no-policies.ts", reason: RENAMED }
 );
 
-/**
- * A legacy field stripped from a set before it is converted, because the table
- * model cannot say it and the conversion refuses it — with why no golden
- * depends on it. Applied once, in place, before anything is planned (the
- * relation cache is per collection object).
- */
-const INPUT_ADJUSTMENTS: { set: string; reason: string; apply: (collections: CollectionConfig[]) => void }[] = [
-    {
-        set: "property-matrix",
-        reason: "`arrs.ofTuple` declares a tuple (`of: [string, number]`), which no JSON shape of the table model can say. " +
-            "The planner reads no `of` from a tuple — the column is `jsonb` either way — so dropping it changes no planned byte; " +
-            "only the OpenAPI document described the tuple.",
-        apply: collections => {
-            const property = collections.find(c => c.slug === "arrs")?.properties.ofTuple;
-            if (property?.type === "array") delete property.of;
-        }
-    },
-    {
-        set: "property-matrix",
-        reason: "`authors.commentsVia` is a `via` relation written with `path` instead of `joinPath`, so it has no join path " +
-            "and nothing can traverse it; the conversion refuses it. A `via` relation plans no column, constraint, junction " +
-            "or Drizzle relation, so removing it (and the property addressing it) changes no planned byte.",
-        apply: collections => {
-            const authors = collections.find(c => c.slug === "authors");
-            if (!authors || !isPostgresCollectionConfig(authors)) return;
-            delete authors.properties.commentsVia;
-            authors.relations = authors.relations?.filter(relation => relation.relationName !== "commentsVia");
-        }
-    }
-];
-
-/**
- * The directory's `defaultSecurityRules`, as the loader leaves them: the one
- * rules array several collections share by reference (the loader assigns the
- * same array to every collection that declares none).
- */
-function sharedDefaultRules(collections: readonly CollectionConfig[]): readonly SecurityRule[] | undefined {
-    // Where the loader applied defaults, no collection is left without rules;
-    // an in-memory fixture sharing a constant between some collections is not
-    // a directory with defaults.
-    if (collections.some(collection => !collection.securityRules?.length)) return undefined;
-    const counts = new Map<readonly SecurityRule[], number>();
-    for (const collection of collections) {
-        const rules = collection.securityRules;
-        if (rules && rules.length > 0) counts.set(rules, (counts.get(rules) ?? 0) + 1);
-    }
-    for (const [rules, count] of counts) if (count > 1) return rules;
-    return undefined;
-}
-
 /** A set through both bridges: lifted, then lowered. */
-function throughBridges(collections: readonly CollectionConfig[]): PostgresCollectionConfig[] {
-    const defaultSecurityRules = sharedDefaultRules(collections);
-    const { tables, defaultRls } = collectionsToTableDefs(collections, defaultSecurityRules ? { defaultSecurityRules } : {});
-    return lowerTables(tables, defaultRls ? { defaultRls } : {});
-}
+const throughBridges = lowerSet;
 
 function adjusted(set: PlanCorpusSet): CollectionConfig[] {
     return set.collections;

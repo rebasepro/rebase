@@ -10,12 +10,14 @@ import {
     isPostgresCollectionConfig,
     policy
 } from "@rebasepro/types";
+import type { ColumnDescriptor, RelationDescriptor, TableDescriptor } from "@rebasepro/types";
 import { getPolicyOperations } from "@rebasepro/utils";
-import { getTableName } from "./relations";
 import { resolveCollectionRelations } from "./relations";
 import { isManyToMany } from "@rebasepro/types";
 import { securityRuleToConditions } from "./policy/securityRuleToConditions";
-import { defaultPoliciesDisabled } from "./auth-default-policies";
+import { tableDefaultPoliciesDisabled } from "./auth-default-policies";
+import { claimCastOf, policyTableFromDescriptor, type PolicyColumn, type PolicyTable } from "./policy/policy-table";
+import { policyTableFromCollection } from "./policy/legacy-policy-table";
 
 /**
  * RLS derivation for many-to-many junction tables.
@@ -279,25 +281,15 @@ function buildJunctionCollectionConfig(args: {
     } as CollectionConfig;
 }
 
-/** The property marked as the row id (falls back to `id`). */
-function getIdPropertyName(collection: CollectionConfig): string {
-    for (const [name, prop] of Object.entries(collection.properties ?? {})) {
-        if (prop && typeof prop === "object" && "isId" in prop && (prop as { isId?: unknown }).isId) {
-            return name;
-        }
-    }
-    return "id";
-}
-
 /** `EXISTS (SELECT 1 FROM endpoint WHERE endpoint.pk = junction.fk [AND extra])`. */
-function existsEndpoint(endpoint: JunctionEndpoint, extra?: PolicyExpression): PolicyExpression {
+function existsEndpoint(endpoint: PolicyJunctionEndpoint, extra?: PolicyExpression): PolicyExpression {
     const correlation = policy.compare(
-        policy.field(getIdPropertyName(endpoint.collection)),
+        policy.field(endpoint.table.idKey),
         "eq",
         policy.outerField(endpoint.junctionColumn)
     );
     return policy.existsIn({
-        table: endpoint.collection.slug,
+        table: endpoint.table.slug,
         where: extra ? policy.and(correlation, extra) : correlation
     });
 }
@@ -367,14 +359,43 @@ function coversUpdate(rule: SecurityRule): boolean {
 }
 
 /**
+ * One end of a junction, as the policy compiler reads it: the table, and the
+ * junction column holding its key.
+ *
+ * @group Policies
+ */
+export interface PolicyJunctionEndpoint {
+    table: PolicyTable;
+    /** Junction column holding this endpoint's key. */
+    junctionColumn: string;
+}
+
+/**
+ * A junction table, as its derived rules are built from: its two endpoints
+ * and every table declaring a relation through it (whose update rules the
+ * edge writes inherit).
+ *
+ * @group Policies
+ */
+export interface PolicyJunction {
+    /** Bare table name. */
+    table: string;
+    schema: string;
+    /** The two endpoints, in [source, target] order of the first declaring relation. */
+    endpoints: [PolicyJunctionEndpoint, PolicyJunctionEndpoint];
+    /** Every table that declares a relation through this junction. */
+    declaringSides: PolicyJunctionEndpoint[];
+}
+
+/**
  * The full derived policy set for a junction table: the locked server/admin
  * baseline, the endpoint-visibility read grant, inherited write grants, and
  * inherited restrictive gates. Returns `[]` when every declaring collection set
  * `disableDefaultPolicies` — the junction is then the author's to police, and
  * stays locked (RLS is still enabled) until they write policies for it.
  */
-export function getJunctionSecurityRules(spec: JunctionSpec): SecurityRule[] {
-    if (spec.declaringSides.every(side => defaultPoliciesDisabled(side.collection))) {
+export function junctionRules(spec: PolicyJunction): SecurityRule[] {
+    if (spec.declaringSides.every(side => tableDefaultPoliciesDisabled(side.table))) {
         return [];
     }
 
@@ -408,10 +429,7 @@ export function getJunctionSecurityRules(spec: JunctionSpec): SecurityRule[] {
     // 3. Writes follow the owning side's explicit update rules.
     const writeGrants: PolicyExpression[] = [];
     for (const side of spec.declaringSides) {
-        const explicitRules = (isPostgresCollectionConfig(side.collection)
-            ? side.collection.securityRules
-            : undefined) ?? [];
-        const updateRules = explicitRules.filter(coversUpdate);
+        const updateRules = side.table.rules.filter(coversUpdate);
 
         const permissive = updateRules.filter(r => r.mode !== "restrictive");
         const restrictive = updateRules.filter(r => r.mode === "restrictive");
@@ -458,4 +476,200 @@ export function getJunctionSecurityRules(spec: JunctionSpec): SecurityRule[] {
     }
 
     return rules;
+}
+
+/** The policy compiler's view of a legacy junction spec's endpoint. */
+function legacyEndpoint(endpoint: JunctionEndpoint): PolicyJunctionEndpoint {
+    const table = policyTableFromCollection(endpoint.collection);
+    // Only a Postgres collection's rules reach a junction's edge writes.
+    return {
+        table: isPostgresCollectionConfig(endpoint.collection) ? table : { ...table, rules: [] },
+        junctionColumn: endpoint.junctionColumn
+    };
+}
+
+/**
+ * {@link junctionRules} for a legacy junction spec: the server's
+ * `GET /api/schema/tables` still resolves junctions from the collections
+ * tables were lowered into. Deleted with the lowering.
+ */
+export function getJunctionSecurityRules(spec: JunctionSpec): SecurityRule[] {
+    return junctionRules({
+        table: spec.table,
+        schema: spec.schema,
+        endpoints: [legacyEndpoint(spec.endpoints[0]), legacyEndpoint(spec.endpoints[1])],
+        declaringSides: spec.declaringSides.map(legacyEndpoint)
+    });
+}
+
+// ── Junctions of compiled tables ─────────────────────────────────────────────
+
+/** The `manyToMany` arm of {@link RelationDescriptor}. */
+export type ManyToManyDescriptor = Extract<RelationDescriptor, { kind: "manyToMany" }>;
+
+/**
+ * One end of a junction of compiled tables.
+ *
+ * @group Policies
+ */
+export interface TableJunctionEndpoint {
+    descriptor: TableDescriptor;
+    /** Junction column holding this endpoint's key. */
+    junctionColumn: string;
+}
+
+/**
+ * A table that declares a `manyToMany` through the junction.
+ *
+ * @group Policies
+ */
+export interface TableJunctionSide extends TableJunctionEndpoint {
+    relation: ManyToManyDescriptor;
+}
+
+/**
+ * A junction table, resolved from the `manyToMany` relations of compiled
+ * tables: what the schema planner creates and the policy compiler derives the
+ * junction's rules for.
+ *
+ * @group Policies
+ */
+export interface TableJunction {
+    /** Bare table name. */
+    table: string;
+    /** Always `public`: the planner creates every junction there. */
+    schema: string;
+    /** The two endpoints, in [source, target] order of the first declaring relation. */
+    endpoints: [TableJunctionSide, TableJunctionEndpoint];
+    /** Every table that declares a relation through this junction, in input order. */
+    declaringSides: TableJunctionSide[];
+    /**
+     * The junction's own columns beyond the two keys (`pivot`), merged across
+     * every declaring side. Empty when there are none.
+     */
+    pivot: ColumnDescriptor[];
+}
+
+/**
+ * Walk every table's `manyToMany` relations and aggregate the junction tables
+ * they declare, keyed by junction table. Two tables may declare one junction
+ * from opposite sides (`posts.tags` and `tags.posts` through `posts_tags`);
+ * both become `declaringSides`, so the derived write grants consider both.
+ * A relation whose target is not among `descriptors` is skipped, as is a view.
+ *
+ * Input order decides the endpoints' order and the sides' — sort by slug at
+ * the boundary, as the planner does.
+ *
+ * @group Policies
+ */
+export function resolveTableJunctions(descriptors: readonly TableDescriptor[]): Map<string, TableJunction> {
+    const bySlug = new Map(descriptors.map(descriptor => [descriptor.slug, descriptor]));
+    const junctions = new Map<string, TableJunction>();
+    for (const descriptor of descriptors) {
+        for (const relation of descriptor.relations) {
+            if (relation.kind !== "manyToMany") continue;
+            const target = bySlug.get(relation.target);
+            if (!target) continue;
+            const raw = relation.through.table;
+            // The CREATE TABLE path strips a schema prefix from the name and
+            // creates in `public`; the policies target the same table.
+            const table = raw.includes(".") ? raw.split(".").pop() ?? raw : raw;
+            const side: TableJunctionSide = { descriptor, junctionColumn: relation.through.sourceKey, relation };
+            const existing = junctions.get(table);
+            if (!existing) {
+                junctions.set(table, {
+                    table,
+                    schema: "public",
+                    endpoints: [side, { descriptor: target, junctionColumn: relation.through.targetKey }],
+                    declaringSides: [side],
+                    pivot: mergePivot([], relation.through.pivot, table, descriptor)
+                });
+                continue;
+            }
+            // Merged whether or not this side is new: one table can reach a
+            // junction under two relation names, and every column each asks
+            // for has to exist.
+            existing.pivot = mergePivot(existing.pivot, relation.through.pivot, table, descriptor);
+            if (!existing.declaringSides.some(s => s.descriptor === descriptor)) existing.declaringSides.push(side);
+        }
+    }
+    return junctions;
+}
+
+/**
+ * Fold one side's `pivot` into the junction's, refusing a disagreement: one
+ * table is created, so two descriptions of a column that are not the same
+ * description have no correct answer.
+ */
+function mergePivot(
+    into: ColumnDescriptor[],
+    incoming: readonly ColumnDescriptor[],
+    table: string,
+    descriptor: TableDescriptor
+): ColumnDescriptor[] {
+    if (incoming.length === 0) return into;
+    const merged = [...into];
+    for (const column of incoming) {
+        const already = merged.find(existing => existing.key === column.key);
+        if (!already) {
+            merged.push(column);
+            continue;
+        }
+        if (JSON.stringify(already) !== JSON.stringify(column)) {
+            throw new Error(
+                `The junction table "${table}" is declared from more than one side, and they disagree ` +
+                `about the pivot column "${column.key}": "${descriptor.slug}" describes it differently than ` +
+                "another declaring table does. One table is created, so both `pivot` lists have to describe " +
+                "the same column — or only one side should declare it."
+            );
+        }
+    }
+    return merged;
+}
+
+/**
+ * The policy compiler's view of a junction table: its two key columns (by
+ * column name, as the junction rules name them) and its pivot columns.
+ *
+ * @group Policies
+ */
+export function junctionPolicyTable(junction: TableJunction): PolicyTable {
+    const columns: Record<string, PolicyColumn> = {};
+    for (const endpoint of junction.endpoints) {
+        columns[endpoint.junctionColumn] = { column: endpoint.junctionColumn, claimCast: "text" };
+    }
+    // After the keys, so a pivot column colliding with a key column cannot
+    // replace it.
+    for (const column of junction.pivot) {
+        if (column.key === JUNCTION_PIVOT_KEY || column.key in columns) continue;
+        columns[column.key] = { column: column.column, claimCast: claimCastOf(column.type) };
+    }
+    return {
+        slug: junction.table,
+        table: junction.table,
+        schema: junction.schema,
+        columns,
+        links: {},
+        idKey: "id",
+        rules: [],
+        auth: false
+    };
+}
+
+/**
+ * The derived rules of a junction of compiled tables ({@link junctionRules}).
+ *
+ * @group Policies
+ */
+export function tableJunctionRules(junction: TableJunction): SecurityRule[] {
+    const endpoint = (end: TableJunctionEndpoint): PolicyJunctionEndpoint => ({
+        table: policyTableFromDescriptor(end.descriptor),
+        junctionColumn: end.junctionColumn
+    });
+    return junctionRules({
+        table: junction.table,
+        schema: junction.schema,
+        endpoints: [endpoint(junction.endpoints[0]), endpoint(junction.endpoints[1])],
+        declaringSides: junction.declaringSides.map(endpoint)
+    });
 }

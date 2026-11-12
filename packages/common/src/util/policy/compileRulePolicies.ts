@@ -1,9 +1,10 @@
 import { declaredRlsPolicyShape, isRedactedSecurityRule, DEFAULT_DATA_SOURCE_KEY, REBASE_ADMIN_REQUEST_ROLE, REBASE_ADMIN_ROLE, RLS_IS_REQUEST_ROLE_SQL, type CollectionConfig, type PolicyExpression, type SecurityOperation, type SecurityRule } from "@rebasepro/types";
 import { adminRequestPolicyName, getPolicyNamesForRule } from "@rebasepro/utils";
-import { findRelation, getTableName, resolveCollectionRelations } from "../relations";
 import { securityRuleToConditions } from "./securityRuleToConditions";
 import { policyShorthandColumns } from "./policyCondition";
-import { policyToPostgres, type PolicyCompileOptions } from "./policyToPostgres";
+import { compilePolicyExpression, type LegacyPolicyCompileOptions, type PolicyCompileOptions } from "./policyToPostgres";
+import type { PolicyTable } from "./policy-table";
+import { legacyTableResolver, policyTableFromCollection } from "./legacy-policy-table";
 
 /**
  * One Postgres policy a security rule compiles to: its name and the clauses
@@ -39,7 +40,8 @@ export interface CompiledRulePolicy {
     adminRequestTarget?: true;
 }
 
-export interface RulePolicyCompileOptions extends PolicyCompileOptions {
+/** The switches {@link compileTableRulePolicies} and {@link compileRulePolicies} share. */
+export interface RulePolicySwitches {
     /**
      * The caller runs admin requests as a role inside `rebase_admin` (the
      * Postgres driver from the release that introduced `rls.adminPolicies`), so
@@ -59,6 +61,12 @@ export interface RulePolicyCompileOptions extends PolicyCompileOptions {
     adminRequestRole?: boolean;
 }
 
+/** Options for {@link compileTableRulePolicies}. */
+export interface RulePolicyCompileOptions extends PolicyCompileOptions, RulePolicySwitches {}
+
+/** Options for the legacy-collection {@link compileRulePolicies}. */
+export interface LegacyRulePolicyCompileOptions extends LegacyPolicyCompileOptions, RulePolicySwitches {}
+
 /**
  * The policies one security rule compiles to — one per operation.
  *
@@ -72,13 +80,13 @@ export interface RulePolicyCompileOptions extends PolicyCompileOptions {
  * operations a rule expands to, which clauses each operation takes, and the
  * deny-all fallback for a clause that compiled to nothing.
  */
-export function compileRulePolicies(
-    collection: CollectionConfig,
+export function compileTableRulePolicies(
+    table: PolicyTable,
     rule: SecurityRule,
     options?: RulePolicyCompileOptions
 ): CompiledRulePolicy[] {
     const ops = rule.operations && rule.operations.length > 0 ? rule.operations : [rule.operation ?? "all"];
-    const tableName = getTableName(collection);
+    const tableName = table.table;
     if (isRedactedSecurityRule(rule)) {
         // The marker stands for SQL this process was not shown. A policy
         // compiled from it would grant or deny by a guess.
@@ -87,7 +95,7 @@ export function compileRulePolicies(
             "a rule whose SQL it withheld. It describes a policy; it cannot become one. Write the rule itself."
         );
     }
-    assertShorthandColumns(collection, rule, tableName);
+    assertShorthandColumns(table, rule);
     const policyNames = getPolicyNamesForRule(rule, tableName);
     const { usingExpr, withCheckExpr } = securityRuleToConditions(rule, { table: tableName });
     const mode = rule.mode ?? "permissive";
@@ -95,7 +103,7 @@ export function compileRulePolicies(
     // In the compiler, not on the rule, because a policy's name hashes the rule
     // — narrowing it there would rename every policy in every database. Never on
     // a restrictive policy: it can only take access away, from everyone.
-    const shape = declaredRlsPolicyShape(collection.dataSource ?? DEFAULT_DATA_SOURCE_KEY);
+    const shape = declaredRlsPolicyShape(table.database ?? DEFAULT_DATA_SOURCE_KEY);
     const narrowed = mode === "permissive" && shape.policyTarget === "requestRole";
     const forRequestRoles = (clause: string): string => narrowed ? `(${clause}) AND ${RLS_IS_REQUEST_ROLE_SQL}` : clause;
     // A grant only the server context or an admin can pass goes `TO
@@ -113,8 +121,8 @@ export function compileRulePolicies(
         const forAdmins = adminOnly
             && (!needsUsing || requiresServerOrAdmin(usingExpr))
             && (!needsWithCheck || requiresServerOrAdmin(withCheckExpr));
-        let using = needsUsing && usingExpr ? policyToPostgres(usingExpr, collection, options) : null;
-        let withCheck = needsWithCheck && withCheckExpr ? policyToPostgres(withCheckExpr, collection, options) : null;
+        let using = needsUsing && usingExpr ? compilePolicyExpression(usingExpr, table, options) : null;
+        let withCheck = needsWithCheck && withCheckExpr ? compilePolicyExpression(withCheckExpr, table, options) : null;
         // A clause that compiled to nothing denies rather than opens.
         if (!using && needsUsing) using = "false";
         if (!withCheck && needsWithCheck) withCheck = "false";
@@ -151,33 +159,43 @@ export function compileRulePolicies(
 }
 
 /**
- * Refuse a `PolicyShorthand` condition / check naming a key that is no column
- * of the table — no property, and no `belongsTo` relation (which addresses its
- * foreign-key column). The compiler snake-cases a name it does not know, so a
- * typo would otherwise reach `CREATE POLICY` as a column that does not exist,
- * fail there, and leave the table with RLS on and no policy.
+ * {@link compileTableRulePolicies} against a legacy collection: the CMS's
+ * collection editor and the server code still holding lowered collections
+ * call this. Moves with the CMS view model.
  */
-function assertShorthandColumns(collection: CollectionConfig, rule: SecurityRule, tableName: string): void {
+export function compileRulePolicies(
+    collection: CollectionConfig,
+    rule: SecurityRule,
+    options?: LegacyRulePolicyCompileOptions
+): CompiledRulePolicy[] {
+    const resolveCollection = options?.resolveCollection;
+    return compileTableRulePolicies(policyTableFromCollection(collection, resolveCollection), rule, {
+        resolveTable: legacyTableResolver(resolveCollection),
+        ...(options?.adminRole !== undefined ? { adminRole: options.adminRole } : {}),
+        ...(options?.adminRequestRole !== undefined ? { adminRequestRole: options.adminRequestRole } : {})
+    });
+}
+
+/**
+ * Refuse a `PolicyShorthand` condition / check naming a key that is no column
+ * of the table — no column key, and no `belongsTo` relation (which addresses
+ * its foreign-key column). The compiler snake-cases a name it does not know,
+ * so a typo would otherwise reach `CREATE POLICY` as a column that does not
+ * exist, fail there, and leave the table with RLS on and no policy.
+ */
+function assertShorthandColumns(table: PolicyTable, rule: SecurityRule): void {
     const clauses = [["condition", rule.condition], ["check", rule.check]] as const;
     for (const [clause, condition] of clauses) {
         for (const column of policyShorthandColumns(condition)) {
-            if (addressesColumn(collection, column)) continue;
+            if (Object.prototype.hasOwnProperty.call(table.columns, column)) continue;
+            if (Object.prototype.hasOwnProperty.call(table.links, column)) continue;
+            const keys = [...Object.keys(table.columns), ...Object.keys(table.links)];
             throw new Error(
-                `A rule on "${tableName}" names "${column}" in its \`${clause}\`, and "${tableName}" has no such ` +
+                `A rule on "${table.table}" names "${column}" in its \`${clause}\`, and "${table.table}" has no such ` +
                 "column. A shorthand's keys are column keys of the table: name one of " +
-                `${Object.keys(collection.properties ?? {}).map(k => `"${k}"`).join(", ") || "its columns"}.`
+                `${keys.map(k => `"${k}"`).join(", ") || "its columns"}.`
             );
         }
-    }
-}
-
-function addressesColumn(collection: CollectionConfig, key: string): boolean {
-    if (collection.properties && Object.prototype.hasOwnProperty.call(collection.properties, key)) return true;
-    try {
-        return findRelation(resolveCollectionRelations(collection), key)?.kind === "belongsTo";
-    } catch {
-        // A relation whose target is not in this bundle: it names no column here.
-        return false;
     }
 }
 

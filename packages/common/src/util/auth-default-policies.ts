@@ -1,7 +1,8 @@
-import { CollectionConfig, SecurityRule, SecurityOperation, AuthCollectionConfig, PolicyExpression, isPostgresCollectionConfig, policy, declaredRlsPolicyShape, DEFAULT_DATA_SOURCE_KEY } from "@rebasepro/types";
-import { getTableName } from "./relations";
-import { buildTenantSecurityRule } from "./tenant";
+import { CollectionConfig, SecurityRule, SecurityOperation, PolicyExpression, policy, declaredRlsPolicyShape, DEFAULT_DATA_SOURCE_KEY } from "@rebasepro/types";
+import { tenantSecurityRule } from "./tenant";
 import { getPolicyNamesForRules } from "@rebasepro/utils";
+import type { PolicyTable } from "./policy/policy-table";
+import { policyTableFromCollection } from "./policy/legacy-policy-table";
 
 /**
  * Default RLS policies injected by the schema generator.
@@ -74,22 +75,6 @@ const SERVER_OR_ADMIN_EXPR: PolicyExpression = policy.or(
 /** Write operations that must be admin-gated by default on auth collections. */
 const DEFAULT_GUARDED_OPS: SecurityOperation[] = ["insert", "update", "delete"];
 
-/** Whether a collection is flagged as an authentication collection. */
-function isAuthCollection(collection: CollectionConfig): boolean {
-    const auth = collection.auth;
-    return auth === true || (typeof auth === "object" && (auth as AuthCollectionConfig)?.enabled === true);
-}
-
-/** The property marked as the row id (falls back to `id`). */
-function getIdPropertyName(collection: CollectionConfig): string {
-    for (const [name, prop] of Object.entries(collection.properties ?? {})) {
-        if (prop && typeof prop === "object" && "isId" in prop && (prop as { isId?: unknown }).isId) {
-            return name;
-        }
-    }
-    return "id";
-}
-
 /**
  * Returns the security rules that should be applied to a collection: the
  * author's explicit `securityRules` plus the framework defaults described in
@@ -124,29 +109,34 @@ function adminWriteGate(tableName: string): SecurityRule {
  * including the `disableDefaultPolicies` one, where it is the only permissive-
  * looking thing that stays. See `./tenant.ts`.
  */
-function tenantRule(collection: CollectionConfig): SecurityRule[] {
-    const rule = buildTenantSecurityRule(collection);
-    return rule ? [rule] : [];
+function tenantRule(table: PolicyTable): SecurityRule[] {
+    return table.tenant ? [tenantSecurityRule(table.table, table.tenant)] : [];
 }
 
 /**
- * Whether a collection goes without the injected baseline: its own
- * `disableDefaultPolicies` when it says, otherwise the database's
+ * Whether a table goes without the injected baseline: its own
+ * `defaultPolicies` when it says, otherwise its database's
  * `rls.defaultPolicies` (`database({ rls: { defaultPolicies: false } })`).
+ *
+ * @group Policies
  */
-export function defaultPoliciesDisabled(collection: CollectionConfig): boolean {
-    if (!isPostgresCollectionConfig(collection)) return false;
-    if (collection.disableDefaultPolicies !== undefined) return collection.disableDefaultPolicies;
-    return !declaredRlsPolicyShape(collection.dataSource ?? DEFAULT_DATA_SOURCE_KEY).defaultPolicies;
+export function tableDefaultPoliciesDisabled(table: PolicyTable): boolean {
+    if (table.defaultPolicies !== undefined) return !table.defaultPolicies;
+    return !declaredRlsPolicyShape(table.database ?? DEFAULT_DATA_SOURCE_KEY).defaultPolicies;
 }
 
-export function getEffectiveSecurityRules(collection: CollectionConfig): SecurityRule[] {
-    const explicit = [...(collection.securityRules ?? [])];
+/** {@link tableDefaultPoliciesDisabled} for a legacy collection (the CMS's). */
+export function defaultPoliciesDisabled(collection: CollectionConfig): boolean {
+    return tableDefaultPoliciesDisabled(policyTableFromCollection(collection));
+}
 
-    const tableName = getTableName(collection);
+export function tableEffectiveRules(table: PolicyTable): SecurityRule[] {
+    const explicit = [...table.rules];
+
+    const tableName = table.table;
     const injected: SecurityRule[] = [];
 
-    if (defaultPoliciesDisabled(collection)) {
+    if (tableDefaultPoliciesDisabled(table)) {
         // The opt-out drops the *permissive* defaults — the ones that grant.
         // The restrictive admin-write gate on an auth collection is not among
         // them, because it is different in kind: a restrictive policy is ANDed
@@ -166,7 +156,7 @@ export function getEffectiveSecurityRules(collection: CollectionConfig): Securit
         // it could express nothing except "let every tenant read every other
         // tenant's rows", which is not a thing `disableDefaultPolicies` is for
         // — that flag is about taking over the *grants*.
-        return [...explicit, ...tenantRule(collection), ...(isAuthCollection(collection)
+        return [...explicit, ...tenantRule(table), ...(table.auth
             ? [adminWriteGate(tableName)]
             : [])];
     }
@@ -187,12 +177,12 @@ export function getEffectiveSecurityRules(collection: CollectionConfig): Securit
         check: SERVER_OR_ADMIN_EXPR
     });
 
-    if (isAuthCollection(collection)) {
+    if (table.auth) {
         // Self-read: a user can always read their own row.
         injected.push({
             name: `${tableName}_default_self_read`,
             operations: ["select"],
-            condition: policy.compare(policy.field(getIdPropertyName(collection)), "eq", policy.authUid())
+            condition: policy.compare(policy.field(table.idKey), "eq", policy.authUid())
         });
 
         // Restrictive gate: AND'd with all other policies, so no permissive rule
@@ -204,9 +194,14 @@ export function getEffectiveSecurityRules(collection: CollectionConfig): Securit
 
     // Last, so it reads as what it is: a restriction ANDed over everything
     // above it, author rules included.
-    injected.push(...tenantRule(collection));
+    injected.push(...tenantRule(table));
 
     return [...explicit, ...injected];
+}
+
+/** {@link tableEffectiveRules} for a legacy collection (the CMS's, and the server's lowered ones). */
+export function getEffectiveSecurityRules(collection: CollectionConfig): SecurityRule[] {
+    return tableEffectiveRules(policyTableFromCollection(collection));
 }
 
 /**
@@ -220,22 +215,26 @@ export function getEffectiveSecurityRules(collection: CollectionConfig): Securit
  * so the next push asserts them again. Callers use this to say, in the generated
  * DDL, which policies are injected and how to take them off.
  */
-export function getInjectedSecurityRules(collection: CollectionConfig): SecurityRule[] {
-    if (defaultPoliciesDisabled(collection)) {
+export function tableInjectedRules(table: PolicyTable): SecurityRule[] {
+    if (tableDefaultPoliciesDisabled(table)) {
         // Not empty for an auth collection, nor for a tenant-scoped one: both
         // restrictive rules are still injected, and the generated DDL has to
         // say so — a policy in the database that the author never wrote and
         // cannot find in this list is exactly the surprise this function exists
         // to prevent.
-        return [...tenantRule(collection), ...(isAuthCollection(collection)
-            ? [adminWriteGate(getTableName(collection))]
+        return [...tenantRule(table), ...(table.auth
+            ? [adminWriteGate(table.table)]
             : [])];
     }
 
-    const explicitCount = (collection.securityRules ?? []).length;
-    // getEffectiveSecurityRules appends the defaults after the author's rules,
-    // so everything past the author's count is injected.
-    return getEffectiveSecurityRules(collection).slice(explicitCount);
+    // tableEffectiveRules appends the defaults after the author's rules, so
+    // everything past the author's count is injected.
+    return tableEffectiveRules(table).slice(table.rules.length);
+}
+
+/** {@link tableInjectedRules} for a legacy collection (the CMS's, and the server's lowered ones). */
+export function getInjectedSecurityRules(collection: CollectionConfig): SecurityRule[] {
+    return tableInjectedRules(policyTableFromCollection(collection));
 }
 
 /**
@@ -255,8 +254,13 @@ export function getInjectedSecurityRules(collection: CollectionConfig): Security
  * with a button offering to import them back into the codebase that produced
  * them. There is one derivation now, and this is it.
  */
+export function tableGeneratedPolicyNames(table: PolicyTable): Set<string> {
+    return getPolicyNamesForRules(tableEffectiveRules(table), table.table);
+}
+
+/** {@link tableGeneratedPolicyNames} for a legacy collection (the CMS's). */
 export function getGeneratedPolicyNames(collection: CollectionConfig): Set<string> {
-    return getPolicyNamesForRules(getEffectiveSecurityRules(collection), getTableName(collection));
+    return tableGeneratedPolicyNames(policyTableFromCollection(collection));
 }
 
 /**
@@ -286,5 +290,5 @@ export function getEffectiveSecurityRulesOnce(collection: CollectionConfig): Sec
  * for the panel, whose collections may already carry their injected rules.
  */
 export function getGeneratedPolicyNamesOnce(collection: CollectionConfig): Set<string> {
-    return getPolicyNamesForRules(getEffectiveSecurityRulesOnce(collection), getTableName(collection));
+    return getPolicyNamesForRules(getEffectiveSecurityRulesOnce(collection), policyTableFromCollection(collection).table);
 }

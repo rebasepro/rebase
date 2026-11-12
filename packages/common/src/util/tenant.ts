@@ -22,7 +22,8 @@ import {
     type CollectionTenantConfig,
     type EntityStatus,
     type PolicyExpression,
-    type SecurityRule
+    type SecurityRule,
+    type TenantDescriptor
 } from "@rebasepro/types";
 import { getTableName } from "./relations";
 
@@ -43,7 +44,7 @@ export function getTenantConfig(collection: CollectionConfig | undefined): Colle
 }
 
 /** The roles tenancy does not apply to, defaulted. */
-export function tenantBypassRoles(tenant: CollectionTenantConfig): readonly string[] {
+export function tenantBypassRoles(tenant: Pick<TenantDescriptor, "bypassRoles">): readonly string[] {
     return tenant.bypassRoles ?? DEFAULT_TENANT_BYPASS_ROLES;
 }
 
@@ -76,7 +77,7 @@ export const TENANT_INDEX_REASON = "tenant scope";
  * correlated `EXISTS` over the membership table, which are the two ways a
  * deployment answers "which tenant is this caller in".
  */
-export function tenantScopeExpression(tenant: CollectionTenantConfig): PolicyExpression {
+export function tenantScopeExpression(tenant: TenantDescriptor): PolicyExpression {
     const match: PolicyExpression = isTenantClaimSource(tenant.from)
         ? policy.compare(policy.field(tenant.field), "eq", policy.authClaim(tenant.from.claim))
         : policy.existsIn({
@@ -116,17 +117,21 @@ export function tenantScopeExpression(tenant: CollectionTenantConfig): PolicyExp
  * WITH CHECK clause for INSERT/UPDATE, which is exactly the coverage wanted,
  * as one policy with one name instead of four.
  */
-export function buildTenantSecurityRule(collection: CollectionConfig): SecurityRule | undefined {
-    const tenant = getTenantConfig(collection);
-    if (!tenant) return undefined;
+export function tenantSecurityRule(tableName: string, tenant: TenantDescriptor): SecurityRule {
     const expression = tenantScopeExpression(tenant);
     return {
-        name: tenantPolicyName(getTableName(collection)),
+        name: tenantPolicyName(tableName),
         mode: "restrictive",
         operation: "all",
         condition: expression,
         check: expression
     };
+}
+
+/** {@link tenantSecurityRule} for a legacy collection, or `undefined` when it is not tenant-scoped. */
+export function buildTenantSecurityRule(collection: CollectionConfig): SecurityRule | undefined {
+    const tenant = getTenantConfig(collection);
+    return tenant ? tenantSecurityRule(getTableName(collection), tenant) : undefined;
 }
 
 // ── The write path ───────────────────────────────────────────────────────────

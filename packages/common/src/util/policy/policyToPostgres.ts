@@ -1,17 +1,27 @@
-import { ANONYMOUS_USER_IDS, CollectionConfig, PolicyExpression, PolicyOperand, PolicyCompareOperator, Property, ResolvedRelation, ExistsInPolicyExpression, RLS_IS_ANONYMOUS_SQL, RLS_JWT_SQL, RLS_ROLES_SQL, RLS_UID_SQL, rewriteLegacyRlsFunctions } from "@rebasepro/types";
+import { ANONYMOUS_USER_IDS, CollectionConfig, PolicyExpression, PolicyOperand, PolicyCompareOperator, ExistsInPolicyExpression, RLS_IS_ANONYMOUS_SQL, RLS_JWT_SQL, RLS_ROLES_SQL, RLS_UID_SQL, rewriteLegacyRlsFunctions } from "@rebasepro/types";
 import { toSnakeCase } from "@rebasepro/utils";
-import { findRelation, getTableName, resolveCollectionRelations } from "../relations";
+import type { ClaimCastType, PolicyColumn, PolicyTable, ResolvePolicyTable } from "./policy-table";
+import { legacyTableResolver, policyTableFromCollection } from "./legacy-policy-table";
 
 /**
- * Options for {@link policyToPostgres}.
+ * Options for {@link compilePolicyExpression}.
  */
 export interface PolicyCompileOptions {
     /**
-     * Resolve a collection by slug. Required to compile
+     * Resolve a table by slug. Required to compile
      * {@link ExistsInPolicyExpression} (`policy.existsIn`) — the compiler needs
-     * the joined collection to derive its table name / schema. When omitted, the
-     * join table falls back to a snake_cased slug.
+     * the joined table's name and schema. When omitted, the join table falls
+     * back to a snake_cased slug.
      */
+    resolveTable?: ResolvePolicyTable;
+}
+
+/**
+ * Options for the legacy-collection entry points ({@link policyToPostgres},
+ * `compileRulePolicies`), which the CMS still calls with a collection.
+ */
+export interface LegacyPolicyCompileOptions {
+    /** Resolve a collection by slug, for `existsIn` joins and relation targets. */
     resolveCollection?: (slug: string) => CollectionConfig | undefined;
 }
 
@@ -21,15 +31,15 @@ export interface PolicyCompileOptions {
  * (aliased) while `outerField` refers to the outer RLS row (table-qualified).
  */
 interface CompileScope {
-    /** Collection whose columns a bare `field` operand resolves against. */
-    fieldCollection?: CollectionConfig;
+    /** The table whose columns a bare `field` operand resolves against. */
+    fieldTable?: PolicyTable;
     /** SQL prefix for `field` operands (`""` at top level, `"alias".` in a subquery). */
     fieldPrefix: string;
-    /** The outer RLS collection, for `outerField` operands. */
-    outerCollection?: CollectionConfig;
+    /** The outer RLS table, for `outerField` operands. */
+    outerTable?: PolicyTable;
     /** SQL prefix for `outerField` operands (`""` at top level, `"schema"."table".` in a subquery). */
     outerPrefix: string;
-    resolveCollection?: (slug: string) => CollectionConfig | undefined;
+    resolveTable?: ResolvePolicyTable;
     /** Monotonic counter for generating unique subquery aliases. */
     alias: { n: number };
     /**
@@ -71,15 +81,27 @@ interface CompileScope {
  * `policy-shapes-equivalence.test.ts` runs every shape against Postgres both
  * ways.
  */
-export function policyToPostgres(expr: PolicyExpression, collection?: CollectionConfig, options?: PolicyCompileOptions): string {
+export function compilePolicyExpression(expr: PolicyExpression, table?: PolicyTable, options?: PolicyCompileOptions): string {
     return compile(expr, {
-        fieldCollection: collection,
+        fieldTable: table,
         fieldPrefix: "",
-        outerCollection: collection,
+        outerTable: table,
         outerPrefix: "",
-        resolveCollection: options?.resolveCollection,
+        resolveTable: options?.resolveTable,
         alias: { n: 0 },
         inInitPlan: false
+    });
+}
+
+/**
+ * {@link compilePolicyExpression} against a legacy collection. The CMS's
+ * collection editor still holds one; the backend compiles against a
+ * {@link PolicyTable}. Moves with the CMS view model.
+ */
+export function policyToPostgres(expr: PolicyExpression, collection?: CollectionConfig, options?: LegacyPolicyCompileOptions): string {
+    const resolveCollection = options?.resolveCollection;
+    return compilePolicyExpression(expr, collection ? policyTableFromCollection(collection, resolveCollection) : undefined, {
+        resolveTable: legacyTableResolver(resolveCollection)
     });
 }
 
@@ -250,7 +272,7 @@ function compile(expr: PolicyExpression, scope: CompileScope): string {
             // own subquery over the same table, and there a bare name binds to the
             // inner scope, collapsing `m.x = {x}` into the tautology `m.x = m.x`.
             return substituteRawPlaceholders(sqlText, (col) =>
-                `${outerQualifier(scope)}${resolveColumnName(col, scope.outerCollection)}`);
+                `${outerQualifier(scope)}${resolveColumnName(col, scope.outerTable)}`);
         }
     }
 }
@@ -372,9 +394,9 @@ function dollarQuoteTagAt(sql: string, at: number): string | undefined {
  * `outerField` operands bind to the (table-qualified) outer RLS row.
  */
 function compileExistsIn(expr: ExistsInPolicyExpression, scope: CompileScope): string {
-    const join = scope.resolveCollection?.(expr.table);
-    const joinTable = join ? getTableName(join) : toSnakeCase(expr.table);
-    const joinSchema = schemaOf(join) ?? schemaOf(scope.outerCollection) ?? "public";
+    const join = scope.resolveTable?.(expr.table);
+    const joinTable = join ? join.table : toSnakeCase(expr.table);
+    const joinSchema = join?.schema ?? scope.outerTable?.schema ?? "public";
     const alias = `_ex${scope.alias.n++}`;
 
     // `outerField` inside the subquery must be qualified with the outer table,
@@ -382,11 +404,11 @@ function compileExistsIn(expr: ExistsInPolicyExpression, scope: CompileScope): s
     const outerPrefix = outerQualifier(scope);
 
     const innerScope: CompileScope = {
-        fieldCollection: join,
+        fieldTable: join,
         fieldPrefix: `"${alias}".`,
-        outerCollection: scope.outerCollection,
+        outerTable: scope.outerTable,
         outerPrefix,
-        resolveCollection: scope.resolveCollection,
+        resolveTable: scope.resolveTable,
         alias: scope.alias,
         inInitPlan: scope.inInitPlan
     };
@@ -405,9 +427,9 @@ const COMPARE_SQL: Record<PolicyCompareOperator, string> = {
 function operandToSql(operand: PolicyOperand, scope: CompileScope): string {
     switch (operand.kind) {
         case "field":
-            return `${scope.fieldPrefix}${resolveColumnName(operand.name, scope.fieldCollection)}`;
+            return `${scope.fieldPrefix}${resolveColumnName(operand.name, scope.fieldTable)}`;
         case "outerField":
-            return `${scope.outerPrefix}${resolveColumnName(operand.name, scope.outerCollection)}`;
+            return `${scope.outerPrefix}${resolveColumnName(operand.name, scope.outerTable)}`;
         case "literal":
             return quoteLiteral(operand.value);
         case "authUid":
@@ -423,119 +445,23 @@ function operandToSql(operand: PolicyOperand, scope: CompileScope): string {
     }
 }
 
-/** Postgres types a text claim is cast to. `"text"` is the no-cast case. */
-type ClaimCastType = "text" | "uuid" | "bigint" | "numeric";
-
 /**
  * The Postgres type a claim has to be cast to, to be compared with `operand`.
  *
  * `"text"` means "no cast": a claim already is text, and a `text` / `varchar`
  * column compares with it directly and keeps using its index.
  *
- * Resolved from the *property*, and through a relation's target when the column
- * is a foreign key — a `belongsTo` tenant field is the ordinary shape, and its
- * column's type is the target collection's primary key type rather than
- * anything visible on the property itself. Unknown resolves to `"text"`, which
- * is the safe direction: a redundant `text` comparison costs nothing, while a
- * missing `uuid` cast is a `CREATE POLICY` that fails and leaves a table with
- * RLS enabled and no policy — which denies every row.
+ * Read from the column the operand names — a `belongsTo` link's foreign key
+ * column has the target's key type, which is the ordinary shape of a tenant
+ * field. Unknown resolves to `"text"`, which is the safe direction: a
+ * redundant `text` comparison costs nothing, while a missing `uuid` cast is a
+ * `CREATE POLICY` that fails and leaves a table with RLS enabled and no
+ * policy — which denies every row.
  */
 function claimCastType(operand: PolicyOperand, scope: CompileScope): ClaimCastType {
     if (operand.kind !== "field" && operand.kind !== "outerField") return "text";
-    const collection = operand.kind === "field" ? scope.fieldCollection : scope.outerCollection;
-    return propertyClaimCastType(operand.name, collection, scope.resolveCollection);
-}
-
-/**
- * What `name` on `collection` compares against a text claim as.
- *
- * `depth` stops a `reference` cycle — two collections whose keys point at each
- * other — from recursing forever. Two hops is more than any real declaration
- * needs.
- */
-function propertyClaimCastType(
-    name: string,
-    collection: CollectionConfig | undefined,
-    resolveCollection: ((slug: string) => CollectionConfig | undefined) | undefined,
-    depth = 0
-): ClaimCastType {
-    const prop = collection?.properties?.[name] as Property | undefined;
-    if (!prop || depth > 2) return "text";
-
-    switch (prop.type) {
-        case "string": {
-            const sp = prop as { isId?: unknown; columnType?: unknown; enum?: unknown };
-            if (sp.enum) return "text";
-            return sp.isId === "uuid" || sp.columnType === "uuid" ? "uuid" : "text";
-        }
-        case "number": {
-            const np = prop as { columnType?: string; isId?: unknown; validation?: { integer?: boolean } };
-            if (np.columnType === "numeric") return "numeric";
-            if (np.columnType || np.validation?.integer || np.isId) return "bigint";
-            // A `number` with no `columnType` and no `validation.integer` is
-            // NUMERIC — see `numberType` in the schema planner.
-            return "numeric";
-        }
-        case "reference":
-            return primaryKeyClaimCastType(
-                resolveTargetCollection((prop as { path?: string }).path, resolveCollection),
-                resolveCollection,
-                depth
-            );
-        case "relation":
-            return primaryKeyClaimCastType(
-                relationTarget(name, prop, collection, resolveCollection),
-                resolveCollection,
-                depth
-            );
-        default:
-            return "text";
-    }
-}
-
-/** The cast a column pointing at `target`'s primary key needs. */
-function primaryKeyClaimCastType(
-    target: CollectionConfig | undefined,
-    resolveCollection: ((slug: string) => CollectionConfig | undefined) | undefined,
-    depth: number
-): ClaimCastType {
-    if (!target) return "text";
-    for (const [key, property] of Object.entries(target.properties ?? {})) {
-        if (!(property as { isId?: unknown })?.isId) continue;
-        return propertyClaimCastType(key, target, resolveCollection, depth + 1);
-    }
-    // No declared key: the implicit `id TEXT PRIMARY KEY`.
-    return "text";
-}
-
-/**
- * A relation's target slug, whatever form the declaration took.
- *
- * `target` is a slug on a plain object and a thunk on a builder — the two
- * shapes `resolveRelation` normalises — and this runs on the raw property,
- * before that resolution.
- */
-function relationTargetSlug(relation: { target?: unknown } | undefined): string | undefined {
-    const target = relation?.target;
-    if (typeof target === "string") return target;
-    if (typeof target !== "function") return undefined;
-    try {
-        const slug = ((target as () => unknown)() as { slug?: unknown })?.slug;
-        return typeof slug === "string" ? slug : undefined;
-    } catch {
-        // A thunk needing a registry this compilation does not have. `text` is
-        // the fallback, and a fallback is not worth failing a compile over.
-        return undefined;
-    }
-}
-
-function resolveTargetCollection(
-    slug: string | undefined,
-    resolveCollection: ((slug: string) => CollectionConfig | undefined) | undefined
-): CollectionConfig | undefined {
-    if (!slug || !resolveCollection) return undefined;
-    // A `reference` path may be nested; the collection is its last segment.
-    return resolveCollection(slug) ?? resolveCollection(slug.split("/").pop() as string);
+    const table = operand.kind === "field" ? scope.fieldTable : scope.outerTable;
+    return columnOf(operand.name, table)?.claimCast ?? "text";
 }
 
 /**
@@ -579,104 +505,30 @@ const CLAIM_CAST_GUARDS: Record<Exclude<ClaimCastType, "text">, string> = {
 
 /**
  * SQL prefix that qualifies a column of the outer RLS row (`"schema"."table".`),
- * or `""` when the collection is unknown.
+ * or `""` when the table is unknown.
  */
 function outerQualifier(scope: CompileScope): string {
-    const table = scope.outerCollection ? getTableName(scope.outerCollection) : undefined;
+    const table = scope.outerTable?.table;
     if (!table) return "";
-    return `"${schemaOf(scope.outerCollection) ?? "public"}"."${table}".`;
-}
-
-function schemaOf(collection?: CollectionConfig): string | undefined {
-    return (collection as { schema?: string } | undefined)?.schema || undefined;
-}
-
-function resolveColumnName(propName: string, collection?: CollectionConfig): string {
-    const prop = collection?.properties?.[propName] as Property | undefined;
-    if (prop && "columnName" in prop && typeof (prop as { columnName?: unknown }).columnName === "string") {
-        return quoteColumnIdentifier((prop as { columnName: string }).columnName);
-    }
-    const relationColumn = belongsToColumn(propName, prop, collection);
-    if (relationColumn) return quoteColumnIdentifier(relationColumn);
-    return quoteColumnIdentifier(toSnakeCase(propName));
+    return `"${scope.outerTable?.schema ?? "public"}"."${table}".`;
 }
 
 /**
- * The foreign key column a `relation` property addresses, when it has one.
- *
- * A `belongsTo` property is a *link*, and its column is the relation's
- * `localKey` — `org` addresses `org_id`. `toSnakeCase` cannot know that, so a
- * rule naming a relation (`ownerField: "org"`, a tenancy declaration over a
- * `belongsTo`) compiled to a comparison against a column called `org`, which
- * does not exist. `CREATE POLICY` then fails, and a table with RLS enabled and
- * no policy denies every row — the loudest possible symptom for the quietest
- * possible cause, since the rule reads exactly right.
- *
- * Only `belongsTo`. Every other kind puts its column on the target table, in a
- * junction row, or nowhere at all, and there is no column here to name.
+ * The column a rule's key names: a column key, or a `belongsTo` link, which
+ * addresses its foreign key column — `org` compares `org_id`. A rule naming a
+ * relation (`ownerField: "org"`, a tenancy declaration over a `belongsTo`)
+ * once compiled to a column called `org`, which does not exist; `CREATE
+ * POLICY` then failed and the table denied every row.
  */
-function belongsToColumn(
-    propName: string,
-    prop: Property | undefined,
-    collection?: CollectionConfig
-): string | undefined {
-    if (prop?.type !== "relation") return undefined;
-    const relation = resolvePropertyRelation(propName, collection);
-    return relation?.kind === "belongsTo" ? relation.localKey : undefined;
+function columnOf(key: string, table: PolicyTable | undefined): PolicyColumn | undefined {
+    if (!table) return undefined;
+    if (Object.prototype.hasOwnProperty.call(table.columns, key)) return table.columns[key];
+    if (Object.prototype.hasOwnProperty.call(table.links, key)) return table.links[key];
+    return undefined;
 }
 
-/**
- * The resolved relation a `relation` property stands for, by the only name
- * both declarations share: the property's own key.
- *
- * A property may carry the link inline (`relation: { kind, target }`) or name
- * an entry in the collection's `relations` array — and the second form is
- * matched by the property key, so there is nothing on the property to read.
- * `resolveCollectionRelations` normalises both under that key, which is why
- * this asks it rather than reading the property.
- */
-function resolvePropertyRelation(
-    propName: string,
-    collection: CollectionConfig | undefined
-): ResolvedRelation | undefined {
-    if (!collection) return undefined;
-    try {
-        return findRelation(resolveCollectionRelations(collection), propName);
-    } catch {
-        // A relation whose target is not in this bundle. The old spelling is
-        // no worse than failing to compile at all.
-        return undefined;
-    }
-}
-
-/**
- * The collection a `relation` property points at.
- *
- * Preferred over the property's raw `target` because only the resolved
- * relation covers both declarations, and because a resolved `target()` hands
- * back the collection itself — no registry needed. The slug path stays as the
- * fallback for a `target` written as a plain string, which cannot become a
- * collection without one.
- */
-function relationTarget(
-    propName: string,
-    prop: Property,
-    collection: CollectionConfig | undefined,
-    resolveCollection: ((slug: string) => CollectionConfig | undefined) | undefined
-): CollectionConfig | undefined {
-    const relation = resolvePropertyRelation(propName, collection);
-    if (relation) {
-        try {
-            const target = relation.target();
-            if (target) return target;
-        } catch {
-            // A thunk needing a registry this compilation does not have.
-        }
-    }
-    return resolveTargetCollection(
-        relationTargetSlug((prop as { relation?: { target?: unknown } }).relation),
-        resolveCollection
-    );
+function resolveColumnName(key: string, table?: PolicyTable): string {
+    return quoteColumnIdentifier(columnOf(key, table)?.column ?? toSnakeCase(key));
 }
 
 /**
