@@ -47,20 +47,20 @@ Please adhere to these principles when working with Rebase, as they ensure relia
 
 2. **Never convert to `any`:** TypeScript strictness is critical. Never use `as any` type assertions. Use proper typing, `unknown`, or explicit type narrowing instead.
 
-3. **Follow the Schema-as-Code approach:** Schemas are defined as standalone TypeScript files. The visual Studio generates TypeScript via AST manipulation — it does NOT run raw SQL. Always define collections in code first.
+3. **Follow the Schema-as-Code approach:** Tables are TypeScript files in `backend/schema/` — `defineTable` / `defineAuthTable` / `defineView` from `@rebasepro/server/schema`, exported from `backend/schema/index.ts`, each with a required `rls`. How a table looks in the admin panel is a separate, optional file in `frontend/src/cms/` (`customizeTable`). The visual Studio edits those files via AST manipulation — it does NOT run raw SQL. Always define tables in code first; see `rebase-collections`. A project that still has `config/collections/` has not been migrated: `rebase migrate collections-to-tables` (see `rebase-collections/references/migrate-from-collections.md`).
 
 4. **Know which schema loop this project is on:**
-   - `rebase schema generate` — converts collection definitions to Drizzle ORM schema.
+   - `rebase schema generate` — compiles the tables in `backend/schema/` to the Drizzle ORM schema.
    - **Boot applies it, on the managed database (the default) and on your own
      `DATABASE_URL` alike.** `rebase dev` generates the schema and the backend
      creates the missing tables additively at every start
      (`REBASE_MIGRATE_ON_BOOT=ensure`, the default; `none` opts out), so an
-     added collection or field needs no push step.
+     added table or column needs no push step.
    - **Versioned changes on your own `DATABASE_URL`:** `rebase db push`
      (development) or `rebase db generate && rebase db migrate` (production).
    - What boot's additive apply deliberately leaves alone, on either database:
      any change that is not purely additive — a renamed column, a narrowed
-     type, a removed field. Those need `rebase db push` or a migration. Since
+     type, a removed column. Those need `rebase db push` or a migration. Since
      0.25 both run on the managed database too (Atlas plans against a throwaway
      in-memory PGlite); on 0.24 and earlier they need a `DATABASE_URL`.
 
@@ -69,7 +69,7 @@ Please adhere to these principles when working with Rebase, as they ensure relia
    connector), plus `rebase cloud connect <url>` once per self-hosted server.
    See `references/mcp-tools.md`.
 
-6. **Use Rebase MCP Server tools when available:** For data operations, user management, and collection browsing, prefer the MCP tools (`list_documents`, `get_document`, `create_document`, etc.) over writing manual API calls.
+6. **Use Rebase MCP Server tools when available:** For data operations, user management, and table browsing, prefer the MCP tools (`query_table`, `get_row`, `create_row`, `update_row`, `delete_row`, and on a deployed backend `list_tables` / `describe_table`) over writing manual API calls.
 
 7. **Respect the monorepo structure:** See `references/monorepo.md` for the full list of packages and when to use each.
 
@@ -82,25 +82,27 @@ Please adhere to these principles when working with Rebase, as they ensure relia
 The things you will be asked to do most, end to end. Everything below this
 section is background; this is the actual sequence.
 
-**Add a collection**
+**Add a table**
 
-1. Write `config/collections/<slug>.ts`, default-exporting a `defineCollection`
-   call from `@rebasepro/cms-types`.
-2. Add it to the `collections` array in `config/collections/index.ts` — for
-   its place in the admin navigation. The barrel is a sort order, not a
-   registry: the runtime, the admin panel, `rebase build`, `rebase schema
-   generate` and `rebase generate-sdk` all load every collection file in the
-   directory, listed or not. Leaving a file out of the array does not disable
-   it; to remove a collection, delete its file.
-3. `rebase schema generate` — collections become
-   `backend/src/schema.generated.ts`. `rebase dev` does this for you on start
-   and on every save under `config/collections/`, together with the SDK types in
-   `generated/sdk/`, so on a running dev server the step is a way to see the
-   file now.
-4. **Nothing.** Boot creates the new table, on the managed database or your
-   own. Restart `rebase dev` (or let it restart itself) and the collection is
-   there. For a production database whose schema moves by migrations:
-   `rebase db generate && rebase db migrate`.
+1. Write `backend/schema/<table>.ts`:
+   `export const posts = defineTable("posts", { columns, relations, rls })`
+   with `col.*` and `rel.*` from `@rebasepro/server/schema`. At least one
+   column is `.primaryKey()`; `rls` is required (`"admin-only"` until you know
+   who should read it).
+2. Export it from `backend/schema/index.ts`: `export { posts } from "./posts";`.
+   Only what `index.ts` exports is served, and a table defined next to it but
+   not exported is refused. To remove a table, delete its file and its export.
+3. `rebase verify` — the tables compile, or every problem is listed with the
+   table, the column and the fix.
+4. **Nothing else, under `rebase dev`.** On start and on every save under
+   `backend/schema/` it regenerates `backend/src/schema.generated.ts` and the
+   SDK types in `generated/sdk/`, and boot creates the new table, on the
+   managed database or your own. With `rebase dev` stopped, that is
+   `rebase schema generate` and `rebase generate-sdk`. For a production database
+   whose schema moves by migrations: `rebase db generate && rebase db migrate`.
+5. Optional: `frontend/src/cms/<table>.tsx` with
+   `customizeTable<typeof posts>("posts", { … })`, passed to
+   `<RebaseCMS tableCustomizations>`. The table is in the admin panel without it.
 
 **Add a backend function**
 
@@ -112,7 +114,7 @@ section is background; this is the actual sequence.
    handler)`. A function is **public until you do** — webhook receivers need
    that — and `app.use()` written after a route never covers it. For an action
    a narrower role or an API key should reach, declare a scope under
-   `auth.scopes` on the users collection and guard with `requireScope` instead
+   `auth.scopes` on the users table (`defineAuthTable`) and guard with `requireScope` instead
    of `requireAdmin` (see `rebase-custom-functions`).
 3. Read configuration inside the handler with `requireEnv(c, "NAME")`. A
    `process.env` read at module scope (`new Stripe(process.env.KEY!)`) throws at
@@ -122,24 +124,25 @@ section is background; this is the actual sequence.
 
 **Add an RLS rule**
 
-Rules live on the collection in `securityRules` and become Postgres policies
-at boot, or when `rebase db push` (or a migration) runs. Declaring one is not
-applying it — the rule takes effect on
-the next start, not on the next save — junction tables of many-to-many
-relations included.
+Rules live on the table in `rls` and become Postgres policies at boot, or when
+`rebase db push` (or a migration) runs. Declaring one is not applying it — the
+rule takes effect on the next start, not on the next save — junction tables of
+many-to-many relations included.
 
 ```typescript
-import { defineCollection } from "@rebasepro/cms-types";
+import { defineTable, col } from "@rebasepro/server/schema";
 import { policy } from "@rebasepro/types";
 
-export default defineCollection({
-    slug: "posts",
-    name: "Posts",
-    table: "posts",
-    securityRules: [
-        // Owner-only, the short form.
-        { operations: ["select", "update", "delete"], ownerField: "author_id" },
-        // A StructuredSecurityRule, when the admin UI should also understand it:
+export const posts = defineTable("posts", {
+    columns: {
+        id: col.uuid().primaryKey().defaultRandom(),
+        status: col.enum(["draft", "published"]).notNull().default("draft"),
+        authorId: col.uuid().notNull().onCreateUser()
+    },
+    rls: [
+        // Owner-only, the short form. `.onCreateUser()` fills the column.
+        { operations: ["select", "update", "delete"], ownerField: "authorId" },
+        // A structured rule, when the admin UI should also understand it:
         // raw `using` SQL is treated as unknown client-side, this is not.
         {
             operation: "select",
@@ -148,10 +151,11 @@ export default defineCollection({
                 policy.rolesOverlap(["editor"])
             )
         }
-    ],
-    properties: { /* … */ }
+    ]
 });
 ```
+
+Every rule form is in `rebase-security`.
 
 **Deploy**
 
@@ -167,16 +171,15 @@ When you initialize a Rebase project via the CLI (`rebase init`), the generated 
 
 ```
 <project-root>/
-├── frontend/             # React frontend (Vite)
+├── frontend/             # React frontend (Vite); src/cms/ holds customizeTable files
 ├── backend/
+│   ├── schema/           # The tables: one defineTable per file
+│   │   └── index.ts      # Exports every table served, and optionally defaultRls
 │   ├── functions/        # Custom backend functions (one file per function)
+│   ├── storage.ts        # `storageAuthorize` — who may read/write which keys
+│   ├── resources.ts      # Declared databases, buckets and topics
 │   └── src/
 │       └── schema.generated.ts  # Auto-generated Drizzle schema — never edit
-├── config/               # Shared between frontend and backend
-│   ├── index.ts          # Exports `collections` and `storageAuthorize`
-│   ├── collections/      # TypeScript collection files (one per collection)
-│   │   └── index.ts      # Sort order + defaultSecurityRules (not a registry)
-│   └── storage.ts        # `storageAuthorize` — who may read/write which keys
 ├── scripts/              # Standalone SDK scripts
 ├── rebase.json           # Which apps this project deploys, and how
 ├── .rebase/              # Dev-server state, and the managed database's data
@@ -189,8 +192,9 @@ When you initialize a Rebase project via the CLI (`rebase init`), the generated 
 
 > **There is no `backend/src/index.ts`.** A scaffolded project has no hand-written
 > server entry point: `rebase dev`, `rebase start` and the published image all boot
-> from the bundle, reading `config/index.ts` for collections and `storageAuthorize`
-> and taking everything else from the environment. The runtime builds and starts
+> from the bundle, reading `backend/schema/index.ts` for the tables,
+> `backend/storage.ts` for `storageAuthorize` and `backend/hooks.ts` for global
+> hooks, and taking everything else from the environment. The runtime builds and starts
 > the backend, not the project. Run `rebase eject` if you want to own the entry
 > point — that is what writes `backend/src/index.ts` (an `initializeRebaseBackend()`
 > call) and `backend/src/env.ts`.
@@ -200,9 +204,10 @@ When you initialize a Rebase project via the CLI (`rebase init`), the generated 
 | File | Purpose |
 |------|---------|
 | `.env` | Environment variables — secrets, DATABASE_URL, JWT_SECRET |
-| `config/collections/*.ts` | Collection definitions (schema-as-code) |
-| `config/index.ts` | Exports `collections` and `storageAuthorize` — what the runtime boots from |
-| `config/storage.ts` | `storageAuthorize`: who may read, write, delete and list which keys |
+| `backend/schema/*.ts` | The tables (schema-as-code): `defineTable`, `defineAuthTable`, `defineView` |
+| `backend/schema/index.ts` | Exports the tables the backend serves, and `defaultRls` |
+| `backend/storage.ts` | `storageAuthorize`: who may read, write, delete and list which keys |
+| `frontend/src/cms/*.tsx` | CMS customizations: `customizeTable` per table, `defineFirestoreCollection` |
 | `backend/functions/*.ts` | Custom backend functions, served at `/api/functions/<name>` |
 | `rebase.json` | Declares the project's apps (backend, static frontends) for deployment |
 | `backend/src/schema.generated.ts` | Auto-generated by `rebase schema generate` — DO NOT edit manually |
@@ -237,7 +242,7 @@ pieces you can call yourself:
 - **`provision` is required on `createRebaseBackend`:** `true` creates what the
   backend serves (tables, RLS policies, change capture), `false` changes nothing
   in the database (a script, a test, a second process), and
-  `{ collections, realtime }` picks. `initializeRebaseBackend` passes `true`
+  `{ collections, realtime }` picks (`collections` is the table schema). `initializeRebaseBackend` passes `true`
   (`false` under `REBASE_PROVISION=false`).
 - **Functions and crons are values** (0.25+): `functions: { "send-invoice": sendInvoice }`
   and `crons: { nightly: defineCron({ … }) }`, or `functions: await loadFunctions(dir)`
@@ -257,7 +262,12 @@ for `psql`:
 ```typescript
 // backend/scripts/x.ts: the backend workspace is the one that can import the driver.
 import { openRebase } from "@rebasepro/server-postgres";
-import { collections } from "../../config/collections";
+import { lowerTables } from "@rebasepro/common";
+import * as schema from "../schema";
+
+// `openRebase` still takes the tables in the server's internal form; a later
+// release takes the defineTable results directly. `rebase console` needs none of this.
+const collections = lowerTables([schema.users, schema.posts], { defaultRls: schema.defaultRls });
 
 const rebase = await openRebase({ databaseUrl: process.env.DATABASE_URL!, collections });
 const { data: posts } = await rebase.dataAsAdmin.posts.find({ limit: 10 });
@@ -279,13 +289,14 @@ await rebase.close();
 - Opening changes nothing in the database and reads no environment variable.
   `withAuth` against a database no server has booted on fails rather than run
   unfiltered.
-- A write to a `history: true` collection records its history entry the way a
+- A write to a `history: true` table records its history entry the way a
   server write does: in the write's transaction, as whoever the write ran as.
   On a database with no history table (no backend with history has booted on
   it), those writes are refused with `HISTORY_UNAVAILABLE`. Reads still work.
 
 `rebase console` opens the same object in a Node REPL, with `rebase` and the
-project's `collections` in scope and top-level await. It finds the database the
+project's tables (loaded from `backend/schema`, in scope as `collections`) and
+top-level await. It finds the database the
 way `rebase db push` does, the managed one included. `rebase console -e "<code>"`
 runs one snippet and prints its result as JSON on stdout; every log line goes to
 stderr, so stdout pipes:
@@ -334,10 +345,10 @@ Read these when you need them, not before.
 
 ### Schema Drift
 
-- **Schema out of sync:** Run `rebase doctor` to detect three-way drift between collections, generated Drizzle schema, and the live database.
-- **`schema.generated.ts` is stale:** Run `rebase schema generate` to regenerate it from your collection definitions.
+- **Schema out of sync:** Run `rebase doctor` to detect three-way drift between the tables in `backend/schema`, the generated Drizzle schema, and the live database.
+- **`schema.generated.ts` is stale:** Run `rebase schema generate` to regenerate it from `backend/schema`.
 - **Migrations pending:** Run `rebase db migrate` to apply outstanding migration files.
-- **Column type mismatch after manual DB edit:** Never edit the database manually. Always modify collection files → restart `rebase dev`, which adds what is missing, then `rebase db push` for a rename, a narrowed type or a removed field (dev, the managed database included), or `rebase db generate && rebase db migrate` (prod).
+- **Column type mismatch after manual DB edit:** Never edit the database manually. Always modify the table in `backend/schema/` → restart `rebase dev`, which adds what is missing, then `rebase db push` for a rename, a narrowed type or a removed column (dev, the managed database included), or `rebase db generate && rebase db migrate` (prod).
 
 ### CLI & Tooling
 

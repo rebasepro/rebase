@@ -62,8 +62,8 @@ import { rebase } from "@rebasepro/server";
 // In a cron job, custom function, or hook:
 
 // Data operations (admin-level: RLS applies, evaluated as the `admin` role)
-const { data: posts } = await rebase.dataAsAdmin.collection<Record<string, unknown>>("posts").find({ limit: 10 });
-await rebase.dataAsAdmin.collection<Record<string, unknown>>("orders").create({ status: "pending", total: 99.99 });
+const { data: posts } = await rebase.dataAsAdmin.table("posts").find({ limit: 10 });
+await rebase.dataAsAdmin.table("orders").create({ status: "pending", total: 99.99 });
 
 // Send an email
 await rebase.email.send({

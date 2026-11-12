@@ -1,312 +1,894 @@
 ---
 name: rebase-collections
-description: Comprehensive guide for defining Rebase collections, property types, validation, and schema configuration. Use this skill when the user needs help creating collections, adding properties, configuring field types, understanding the schema-as-code approach, making a collection searchable — including when search returns nothing for content stored in a map/JSONB property — or declaring indexes on a collection.
+description: How to define a Rebase data model — tables in backend/schema with defineTable / defineAuthTable / defineView (col.*, rel.*, json.*, a required rls), table hooks and column transforms, views, search and indexes — and how each table becomes a collection in the CMS, customized with customizeTable in frontend/src/cms (labels, icons, enum colours, kanban, form layout, custom fields) or declared with defineFirestoreCollection for Firestore. Use it whenever the user creates or changes a table, a column, a relation or a hook, makes a table searchable (including when search finds nothing for content stored in a JSON column), declares an index, changes how a table looks in the admin, or is migrating a project from config/collections (read references/migrate-from-collections.md for that).
 ---
 
-# Rebase Collections
+# Rebase tables and collections
 
-Rebase collections are the core building blocks of your data model. They define the structure, validation, and UI configuration of your data — all in TypeScript.
+A Rebase project's data model is **tables**, declared in TypeScript in
+`backend/schema/`. That declaration is the only thing the backend knows about
+the data. From it Rebase generates the Postgres tables and their row-level
+security policies, serves every table over REST (`/api/data/<slug>`),
+realtime and MCP, and types the SDK.
 
-## Core Concepts
+The **CMS** (the admin panel) is a layer on top. It reads each table's
+compiled descriptor from `GET /api/schema/tables` and derives a default
+*collection* for it: a list, a form, filters, relation tabs. A project changes
+how one looks with `customizeTable` in `frontend/src/cms/`. "Collection" is
+the CMS's word; the backend, the SDK and the MCP tools all say "table".
 
-### Collections
+| Concern | Where | Written with |
+|---|---|---|
+| Columns, keys, relations, validation, who reads which rows, server hooks, search, indexes | `backend/schema/<table>.ts` | `defineTable`, `col.*`, `rel.*`, `json.*` from `@rebasepro/server/schema` |
+| Which tables exist, and the shared `rls` | `backend/schema/index.ts` | `export { posts } from "./posts"`, `export const defaultRls` |
+| Labels, icons, groups, view modes, kanban, form layout, enum colours, custom fields, actions | `frontend/src/cms/<table>.tsx` | `customizeTable<typeof posts>("posts", { … })` from `@rebasepro/cms` |
+| A Firestore collection shown in the CMS | `frontend/src/cms/<name>.ts` | `defineFirestoreCollection({ … })` from `@rebasepro/firebase` |
 
-A collection is a TypeScript object written with `defineCollection` from `@rebasepro/cms-types` (or annotated as `PostgresCollectionConfig` from `@rebasepro/types`, which checks less — see the Kanban checklist below). Each collection maps to a database table (the `table` property, which defaults to the snake-cased `slug`) and generates:
-- Full CRUD REST endpoints at `/api/data/{slug}`
-- Admin panel views (table, forms, cards, kanban, list)
+> **IMPORTANT FOR AGENTS:** `defineCollection`, `config/collections`,
+> `properties`, `securityRules`, `callbacks`, `admin: { … }` blocks and
+> `relation` properties are gone, with no aliases. If a project still has
+> `config/collections/`, it has not been migrated: read
+> [references/migrate-from-collections.md](references/migrate-from-collections.md)
+> and run `rebase migrate collections-to-tables` instead of editing it.
 
-### Properties
+## Adding a table, end to end
 
-Properties define the fields of your collection. Rebase supports these built-in property types:
+1. **Write the table** in `backend/schema/<table>.ts`:
 
-| Type | Description | PostgreSQL Column |
-|------|-------------|-------------------|
-| `string` | Text fields, URLs, emails, markdown, file uploads | `VARCHAR` / `TEXT` |
-| `number` | Integers and decimals | `NUMERIC`, or `INTEGER` with `validation.integer` or as a key |
-| `boolean` | True/false toggles | `BOOLEAN` |
-| `date` | Date and datetime values | `TIMESTAMPTZ` |
-| `map` | Nested objects (JSON) | `JSONB` |
-| `array` | Lists of values | `JSONB` or native arrays |
-| `relation` | Foreign key to another collection (SQL JOINs) | FK column or junction table |
-| `reference` | Stored pointer to an entity of another collection (document databases) | The target's primary-key type, with an FK |
-| `geopoint` | Latitude/longitude pairs | `JSONB` |
-| `vector` | Embedding vectors for similarity search | `VECTOR` |
-| `binary` | Raw bytes; crosses the API as a base64 string | `BYTEA` |
+```ts
+// backend/schema/tasks.ts
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { users } from "./users";
 
-### Reference vs Relation
-
-> **IMPORTANT FOR AGENTS:** Understand the difference between `reference` and `relation` — they are NOT interchangeable.
-
-| Feature | `relation` (Postgres) | `reference` (document databases) |
-|---------|-------------------------|---------------------|
-| Backend | SQL JOINs, FK constraints | Stores a collection path + entity ID |
-| Cascade rules | `onDelete`, `onUpdate` | None of its own (on Postgres its FK takes the `belongsTo` default: `SET NULL`, or `RESTRICT` when required) |
-| Junction tables | Yes (many-to-many) | No |
-| Multi-hop joins | Yes (`joinPath`) | No |
-| Inverse lookups | Yes (`kind: "hasMany"` / `"hasOne"`) | No |
-| Where to use | **PostgresCollectionConfig** | FirebaseCollectionConfig — `PostgresCollectionConfig`'s properties type excludes it |
-| Stored value | FK column(s) managed by framework | An `EntityReference` (id + path): a Firestore `DocumentReference` |
-
-**Use `relation` for all new Postgres collections.** `reference` is the native primitive of document databases (Firestore).
-
-### Schema-as-Code
-
-Collections are defined as standalone TypeScript files under `config/collections/` relative to the project root, each default-exporting one collection. Every such file is loaded, whether or not it is listed in the `collections` array of that directory's `index.ts` — the array only orders the admin navigation (see **Schema Migration Workflow** below). The visual Studio edits these files via AST manipulation — it never runs raw SQL. This preserves custom callbacks and complex configuration.
-
-## Defining a Collection
-
-```typescript
-import { defineCollection } from "@rebasepro/cms-types";
-
-const productsCollection = defineCollection({
-    name: "Products",
-    singularName: "Product",
-    slug: "products",
-    table: "products",
-    description: "Product catalog with pricing and inventory",
-    history: true,
-    properties: {
-        id: {
-            name: "ID",
-            type: "number",
-            isId: "increment"
-        },
-        name: {
-            name: "Product Name",
-            type: "string",
-            validation: { required: true }
-        },
-        price: {
-            name: "Price",
-            type: "number",
-            validation: { required: true, min: 0 }
-        },
-        description: {
-            name: "Description",
-            type: "string",
-            admin: { multiline: true }
-        },
-        published: {
-            name: "Published",
-            type: "boolean",
-            defaultValue: false
-        },
-        createdAt: {
-            name: "Created At",
-            type: "date",
-            mode: "date_time",
-            autoValue: "on_create",
-            admin: { readOnly: true, hideFromCollection: true }
-        },
-        category: {
-            name: "Category",
-            type: "string",
-            enum: [
-                { id: "electronics", label: "Electronics", color: "blue" },
-                { id: "clothing", label: "Clothing", color: "purple" },
-                { id: "books", label: "Books", color: "green" }
-            ]
-        }
+export const tasks = defineTable("tasks", {
+    columns: {
+        id: col.uuid().primaryKey().defaultRandom(),
+        title: col.text().notNull().validate({ min: 3, max: 200 }),
+        status: col.enum(["todo", "doing", "done"]).notNull().default("todo"),
+        dueDate: col.date(),
+        ownerId: col.uuid().notNull().onCreateUser(),
+        createdAt: col.timestamptz().onCreateNow(),
+        updatedAt: col.timestamptz().onUpdateNow(),
+        __order: col.text().describe("Fractional index maintained by the Kanban board")
     },
-    admin: {
-        icon: "ShoppingBag",
-        group: "E-Commerce",
-        defaultViewMode: "table",
-        enabledViews: ["table", "cards"],
-        openEntityMode: "split",
-        inlineEditing: true,
-        exportable: true,
-        selectionEnabled: true,
-        propertiesOrder: [
-            "name", "price", "category", "description",
-            "published", "createdAt"
+    relations: {
+        owner: rel.belongsTo(() => users)
+    },
+    rls: [
+        { operations: ["select", "insert", "update", "delete"], ownerField: "ownerId" }
+    ]
+});
+```
+
+2. **Export it** from `backend/schema/index.ts`. Only what `index.ts` exports
+   is served, and a `defineTable` in a sibling file that `index.ts` does not
+   export is refused:
+
+```ts no-verify
+// backend/schema/index.ts
+export { users } from "./users";
+export { tasks } from "./tasks";
+```
+
+3. **Check it compiles**: `rebase verify` (Claude Code runs it after every edit
+   under `backend/schema/` and `frontend/src/cms/`, through the post-edit hook
+   `rebase init` installs). It reports every problem with the table, the column
+   and what to write instead. It reads `backend/schema` only: a mistake in a
+   `customizeTable` file is a type error (run the frontend's typecheck), or a
+   throw when the module loads.
+
+4. **Apply it.** With `pnpm dev` running, saving the file is the whole step:
+   it regenerates `backend/src/schema.generated.ts` and the SDK types, restarts
+   the backend, and boot creates the missing table, columns and policies. With
+   `pnpm dev` stopped: `rebase schema generate`, then `rebase db push` in
+   development, or `rebase db generate` + `rebase db migrate` for production.
+   See [Applying a schema change](#applying-a-schema-change).
+
+5. **Optionally customize it in the CMS** — it is already in the panel without
+   this. `frontend/src/cms/tasks.tsx`:
+
+```tsx
+// frontend/src/cms/tasks.tsx
+import { customizeTable } from "@rebasepro/cms";
+import type { tasks } from "../../../backend/schema/tasks";
+
+export const tasksCms = customizeTable<typeof tasks>("tasks", {
+    name: "Tasks",
+    singularName: "Task",
+    icon: "ListTodo",
+    group: "Work",
+    defaultViewMode: "kanban",
+    enabledViews: ["kanban", "table"],
+    kanban: { columnField: "status", orderField: "__order" },
+    fields: {
+        status: {
+            enumLabels: {
+                todo: { label: "To do", color: "gray" },
+                doing: { label: "Doing", color: "orange" },
+                done: { label: "Done", color: "green" }
+            }
+        },
+        __order: { hidden: true, disabled: true }
+    }
+});
+```
+
+   and list it in `App.tsx`: `<RebaseCMS tableCustomizations={[tasksCms]} />`
+   (projects usually collect them in `frontend/src/cms/index.ts`).
+
+6. **Use it** from code: `client.data.tasks.find()` in the browser,
+   `rebase.dataAsAdmin.tasks` in functions and crons, `context.data.table("tasks")`
+   in a hook. See `rebase-sdk`.
+
+The frontend imports the table's **type** only (`import type { tasks }`). A
+type import is erased from the bundle, so hooks and server code never reach
+the browser. A value import from `backend/` in frontend code is the one thing
+not to write; `check:templates` refuses it in the scaffolds.
+
+## The `backend/schema` directory
+
+```text
+backend/
+├── schema/
+│   ├── index.ts      # exports every table and view, and optionally defaultRls
+│   ├── users.ts      # defineAuthTable("users", …)
+│   ├── posts.ts      # defineTable("posts", …)
+│   └── tags.ts       # defineTable("tags", …)
+├── hooks.ts          # optional: hooks for every table
+├── functions/
+└── crons/
+```
+
+One file per table is a convention. What counts is what `index.ts` exports:
+
+```ts
+// backend/schema/index.ts
+import type { DefaultRls } from "@rebasepro/server/schema";
+
+export { users } from "./users";
+export { posts } from "./posts";
+export { tags } from "./tags";
+
+// What every table declared with `rls: "inherit"` takes.
+export const defaultRls: DefaultRls = [
+    { operation: "select", access: "authenticated" }
+];
+```
+
+The directory is `backend/schema` unless `rebase.json` names another one with
+the `tables` key of the backend app; every CLI command that reads the tables
+also takes `--schema-dir <dir>`. (`rebase.json`'s `schema` key is something
+else: the generated Drizzle module.) A project with no `backend/schema/index.ts`
+declares no tables: the backend reads them from the live database instead and
+serves only those with row-level security enabled.
+
+`@rebasepro/server/schema` loads no server code, so schema files are plain
+TypeScript that the frontend can `import type` from.
+
+## `defineTable(name, config)`
+
+| Key | What it does |
+|---|---|
+| `columns` | **Required.** `col.*` builders by key, in physical order. At least one is `.primaryKey()`: there is no implicit `id`. |
+| `rls` | **Required.** `"admin-only"`, `"inherit"`, or a non-empty list of rules. See [Row-level security](#row-level-security-rls). |
+| `relations` | `rel.*` builders by relation name. See [Relations](#relations). |
+| `slug` | The name in the API, the SDK and in scopes. The table's name when omitted. |
+| `table` | The SQL table name, when it differs from the name. |
+| `schema` | The Postgres schema. `public` when omitted. |
+| `database` | A non-default Postgres database declared in `backend/resources.ts`. |
+| `description` | What the table holds; shown in OpenAPI and the MCP tool descriptions. |
+| `defaultPolicies` | `false` generates only your rules, without the admin baseline policies. Refused with `"admin-only"`. |
+| `tenant` | `{ field, from: { claim } \| { membership: { table, userField, tenantField } }, bypassRoles? }`: every row scoped to a tenant. |
+| `softDelete` | `true` or `{ field }`: a delete stamps a timestamp column (`deletedAt` by default) instead of removing the row; stamped rows are hidden from reads. |
+| `history` | `true` records every write in the history table (see `rebase-entity-history`). |
+| `search` | Ranked full-text search. See [Search](#search). |
+| `indexes` | Indexes, each with the query it serves. See [Indexes](#indexes). |
+| `hooks` | Server-side lifecycle hooks. See [Table hooks](#table-hooks). |
+| `strictWrites` | `false` accepts a write naming a column the table does not declare (one filled by a trigger, say). A 400 otherwise. |
+| `metadata` | Any data you want served with the table's descriptor. |
+
+`defineAuthTable` declares the users table, `defineView` a SQL view; both are
+below.
+
+### Names
+
+| Name | Default | Override |
+|---|---|---|
+| SQL table | the name | `table: "blog_posts"` |
+| API slug, SDK accessor, scope target | the name | `slug: "articles"` |
+| Postgres schema | `public` | `schema: "content"` |
+| SQL column of a column | the snake_case of its key | `.column("legacy_name")` |
+
+A column's key is its name on the JSON row, in the SDK, in filters and sorts;
+its SQL name is the snake_case of the key (`publishDate` → `publish_date`).
+`.column()` maps a key to any other SQL name, which is how a table adopts an
+existing database's names without changing what clients see.
+
+The slug matters beyond the URL: foreign-key and junction column names are
+derived from it, so changing the slug of a deployed table can rename columns.
+Derived names are frozen once deployed — set `slug`, `table`, `localKey`,
+`through` explicitly rather than renaming.
+
+## Columns
+
+A column is a `col.*` builder refined by modifiers. The builder decides the
+Postgres type; the modifiers say the rest. Builders are immutable, so a column
+can be declared once and shared between tables.
+
+```ts
+import { defineTable, col } from "@rebasepro/server/schema";
+
+export const products = defineTable("products", {
+    columns: {
+        id:        col.uuid().primaryKey().defaultRandom(),
+        sku:       col.varchar(32).notNull().unique(),
+        name:      col.text().notNull().validate({ min: 2, max: 120, trim: true }),
+        price:     col.numeric(10, 2).notNull().validate({ min: 0 }),
+        status:    col.enum(["draft", "active", "retired"]).notNull().default("draft"),
+        tags:      col.array(col.text()).validate({ maxItems: 10 }),
+        photo:     col.storage({ path: "products/", accept: ["image/*"], maxBytes: "5MB" }),
+        createdBy: col.uuid().onCreateUser().readOnly(),
+        createdAt: col.timestamptz().notNull().onCreateNow(),
+        updatedAt: col.timestamptz().notNull().onUpdateNow()
+    },
+    rls: "admin-only"
+});
+```
+
+### Builders
+
+| Builder | Postgres type | Wire type |
+|---|---|---|
+| `col.uuid()` | `UUID` | `string` |
+| `col.text()`, `col.varchar(n?)`, `col.char(n?)` | `TEXT`, `VARCHAR(n)`, `CHAR(n)` (n defaults to 255) | `string` |
+| `col.enum(values, { name? })` | a Postgres enum type, `<table>_<column>` unless named | the union of `values` |
+| `col.smallint()`, `col.integer()`, `col.bigint()` | `SMALLINT`, `INTEGER`, `BIGINT` | `number` |
+| `col.serial()`, `col.smallserial()`, `col.bigserial()` | the serial types (for existing schemas; prefer `.identity()`) | `number` |
+| `col.real()`, `col.doublePrecision()`, `col.numeric(p?, s?)` | `REAL`, `DOUBLE PRECISION`, `NUMERIC` | `number` |
+| `col.boolean()` | `BOOLEAN` | `boolean` |
+| `col.timestamptz()`, `col.date()`, `col.time()` | `TIMESTAMPTZ`, `DATE`, `TIME` | ISO `string` (a write also takes a `Date`) |
+| `col.jsonb<T>()` / `col.jsonb(shape)` | `JSONB` | `T`, or the shape's type — see [JSON columns](#json-columns) |
+| `col.json<T>()` / `col.json(shape)` | `JSON` | as `jsonb`; prefer `jsonb` |
+| `col.array(inner)` | `<inner>[]` | an array of the inner wire type (no arrays of arrays) |
+| `col.vector(dims, { index? })` | `vector(dims)` (pgvector), HNSW cosine index unless told otherwise | `number[]` |
+| `col.bytea()` | `BYTEA` | base64 `string` |
+| `col.geopoint()` | `JSONB` | `{ latitude: number; longitude: number }` |
+| `col.storage(options)` | `TEXT` (`.multiple()`: `TEXT[]`) | the file's path |
+| `col.custom<T>("sqlType")` | any other Postgres type, as written | `T` (default `string`) |
+
+### Modifiers
+
+| Modifier | On | Effect |
+|---|---|---|
+| `.notNull()` | every column | `NOT NULL`; required on create unless it has a default. Columns are **nullable** otherwise, as in SQL. |
+| `.primaryKey()` | every column | part of the primary key (several make a composite key, in declaration order) |
+| `.unique()` | every column | single-column `UNIQUE`; a duplicate is a `409` |
+| `.default(value)` / `.defaultSql(expr)` / `.dbDefault()` | every column | a default; the column may be left out of a create |
+| `.generatedAs(expr)` | every column | `GENERATED ALWAYS AS (expr) STORED`; never writable |
+| `.column(name)` | every column | the SQL column name |
+| `.readOnly()` | every column | client writes refused; server code and the database still fill it |
+| `.private()` | every column | never on the wire, in the SDK or OpenAPI; server code and hooks see it |
+| `.access({ read?, write? })` | every column | per-role read and write (lists of role names) |
+| `.describe(text)` | every column | the description in OpenAPI and MCP |
+| `.validate(rules)` | every column | checked before every write; a `400` naming the column |
+| `.transform({ beforeSave?, afterRead? })` | every column | field-level hooks, see [Column transforms](#column-transforms) |
+| `.oneOf(values)` | text and numeric columns | only these values, typed as their union (on a text column, use it as an array item: `col.array(col.text().oneOf([...]))`; a single closed set of strings is `col.enum`) |
+| `.defaultRandom()` | `col.uuid()` | `DEFAULT gen_random_uuid()` |
+| `.identity()` | integer columns | `GENERATED BY DEFAULT AS IDENTITY` — the form for an integer key |
+| `.onCreateNow()` / `.onUpdateNow()` | temporal columns | the server stamps the time on create / on every write |
+| `.onCreateUser()` / `.onUpdateUser()` | text columns, `col.uuid()` | the server writes the caller's id on create / on every write |
+| `.userId()` | text columns, `col.uuid()`, `text[]` items | the column holds a Rebase user id: the CMS renders the user picker, and whoever may write the table may look users up |
+| `.multiple()` | `col.storage()` | several files (`TEXT[]`) |
+
+A stamp overwrites whatever the client sent. `.onCreateUser()` is how a
+column that a row-level security rule compares with the caller (`ownerField`)
+gets its value: a column the caller fills is a column the caller can lie about.
+
+### Validation rules
+
+| Rule | Text and storage | Numeric | Temporal | Arrays |
+|---|---|---|---|---|
+| `min`, `max` | length | inclusive bounds | earliest / latest | |
+| `length` | exact length | | | |
+| `matches`, `matchesFlags`, `matchesMessage` | a pattern and its error | | | |
+| `email`, `url` | address / URL | | | |
+| `trim`, `lowercase`, `uppercase` | normalized before storing | | | |
+| `lessThan`, `moreThan`, `positive`, `negative`, `integer` | | exclusive bounds, sign, whole | | |
+| `minItems`, `maxItems` | | | | item count |
+| `requiredMessage` | every type | | | |
+
+### Storage columns
+
+`col.storage({ path, source?, accept?, maxBytes?, imageResize?, public?, fileName?, metadata?, includeBucketUrl?, storeUrl? })`
+holds a file's path. `path` is required (a template: `"listings/{id}/"`), `source` names a bucket
+declared in `backend/resources.ts`. The upload route enforces `accept` and
+`maxBytes`. Who may upload and download which paths is the backend's
+`storageAuthorize` hook (see `rebase-storage`). A file inside a JSON document is
+`json.storage(options)`.
+
+## JSON columns
+
+`col.jsonb<T>()` types a document for TypeScript only. `col.jsonb(shape)` with
+a `json.*` shape also tells the server: it validates each field, applies
+defaults, stamps dates, runs field transforms, tracks `json.storage()` files,
+lets `search` name a path inside it, and lets the CMS build a form for it.
+
+```ts
+import { defineTable, col, json } from "@rebasepro/server/schema";
+
+export const pages = defineTable("pages", {
+    columns: {
+        id: col.uuid().primaryKey().defaultRandom(),
+        settings: col.jsonb<{ theme?: "light" | "dark"; pinned?: boolean }>(),
+        seo: col.jsonb(json.object({
+            title: json.string().validate({ max: 60 }).required(),
+            canonicalUrl: json.string().validate({ url: true }),
+            noIndex: json.boolean().default(false)
+        })),
+        blocks: col.jsonb(json.array(json.oneOf({
+            text: json.string(),
+            image: json.storage({ path: "pages/blocks/" })
+        })))
+    },
+    rls: "admin-only"
+});
+```
+
+Builders: `json.string()`, `json.number()`, `json.boolean()`, `json.date()`,
+`json.geopoint()`, `json.storage(options)`, `json.object(fields, { additional? })`,
+`json.array(of)`, `json.oneOf(variants)` (a union of `{ type, value }` blocks),
+`json.unknown()`. Modifiers: `.required()`, `.default()`, `.describe()`,
+`.validate()`, `.transform()`, `.oneOf()` (string and number),
+`.onCreateNow()` / `.onUpdateNow()` (dates), `.onCreateUser()` /
+`.onUpdateUser()` / `.userId()` (strings). Fields are optional unless
+`.required()`.
+
+Today a document is an object or an array at the top, `json.oneOf()` is only
+an array item, and `json.unknown()` is only an array item; the compiler refuses
+the other placements by name.
+
+## Relations
+
+A table's `relations` name its links to other tables, each a `rel.*` call
+keyed by the relation's name: what `include` asks for and what a write names to
+set the link. The target is a thunk, `() => users`, so two tables may point at
+each other in either import order, with no type annotation.
+
+| Kind | The key lives | Returns | Options |
+|---|---|---|---|
+| `rel.belongsTo` | on **this** table | one row | `localKey`, `notNull`, `unique`, `onDelete`, `onUpdate`, `index`, `constraint` |
+| `rel.hasOne` | on the **target**, unique | one row | `foreignKey`, `sourceKey` |
+| `rel.hasMany` | on the **target** | many rows | `foreignKey`, `sourceKey` |
+| `rel.manyToMany` | in a **junction table** Rebase creates | many rows | `through`, `sourceKey`, `targetKey`, `pivot`, `onDelete` |
+| `rel.via` | where `steps` say | one or many | `steps` (required), `cardinality` |
+
+Every kind also takes `access: { read?, write? }` and `private: true`.
+
+```ts
+// backend/schema/posts.ts
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { authors } from "./authors";
+import { tags } from "./tags";
+
+export const posts = defineTable("posts", {
+    columns: {
+        id: col.uuid().primaryKey().defaultRandom(),
+        title: col.text().notNull(),
+        // Bound: this is the SQL column `author_id`, the relation's localKey.
+        authorId: col.uuid()
+    },
+    relations: {
+        author: rel.belongsTo(() => authors),
+        tags: rel.manyToMany(() => tags, { pivot: { sortOrder: col.integer().default(0) } })
+    },
+    rls: "admin-only"
+});
+```
+
+```ts
+// backend/schema/authors.ts
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { posts } from "./posts";
+
+export const authors = defineTable("authors", {
+    columns: {
+        id: col.uuid().primaryKey().defaultRandom(),
+        name: col.text().notNull()
+    },
+    relations: {
+        // reads posts.author_id
+        posts: rel.hasMany(() => posts)
+    },
+    rls: "admin-only"
+});
+```
+
+**`belongsTo` binds or derives its column.** Its SQL column is `localKey`, or
+`<relation name in the singular>_id` (`author` → `author_id`). When `columns`
+has a column with that SQL name, the relation uses it (its type must be the
+target key's type, and its own `.notNull()` / `.unique()` say what the link
+is). Otherwise the relation adds the column, served as the camelCase of its
+SQL name (`authorId`), and `notNull: true` / `unique: true` on the relation
+apply to it. Either way the column gets an index and a `FOREIGN KEY`.
+
+A relation and a column may not share a key: the relation's key is what
+`include` names, so the foreign-key column takes another (`authorId`, not
+`author`). A `belongsTo` relation's name stands for its column in `indexes`,
+`tenant` and rules (`ownerField: "author"`).
+
+**Derived names**, when you do not write them: `hasOne` / `hasMany` read
+`<singular slug of this table>_id` on the target; a junction is the two SQL
+table names sorted and joined by `_` (`posts_tags`), with columns
+`<singular slug>_id` and `<singular relation name>_id`.
+
+**Delete rules**: `onDelete` defaults to `"restrict"` for a `NOT NULL` key,
+`"set null"` otherwise, and `"cascade"` for a junction link. Ask for
+`"cascade"` explicitly when deleting the parent should delete the rows.
+
+**`rel.via`** reads through joins you spell out:
+`rel.via(() => orders, { steps: [{ table: "order_items", on: { from: "id", to: "product_id" } }, { table: "orders", on: { from: "order_id", to: "id" } }] })`
+(from `app/backend/schema/products.ts`). It is read-only, except a one-step
+to-one chain (written like `hasOne`) and a two-step to-many chain through one
+table (written like `manyToMany`).
+
+**Reading and writing:** relations are not included unless asked:
+`client.data.posts.include("author", "tags").find()`. A row always carries the
+foreign key (`post.authorId`) and carries `post.author` only when included. A
+write sets a to-one link by key (`{ author: "u7" }`) and a to-many link as a
+list (`{ tags: ["t1", "t2"] }`); junction columns travel as `_pivot`. In the
+CMS, every to-many relation becomes a tab under the record.
+
+Refused when the schema compiles: a target that is not a table or view of the
+schema, a relation and a column with the same key, a bound column of the wrong
+type, two relations on one column, a `belongsTo` to a composite key, two
+`manyToMany` resolving to one junction with different columns.
+
+## Row-level security (`rls`)
+
+Every table says who reaches its rows, and there is no default: leaving `rls`
+out is a type error, and the compiler refuses a table without a usable posture.
+
+| `rls` | Means |
+|---|---|
+| `"admin-only"` | RLS on, only the admin baseline: the `admin` role and server code reach rows. The posture to start with until you have decided. |
+| `"inherit"` | The `defaultRls` exported from `backend/schema/index.ts`; refused when there is none. |
+| a list of rules | The policies to generate. `[]` is refused. |
+
+```ts
+import { defineTable, col } from "@rebasepro/server/schema";
+
+export const articles = defineTable("articles", {
+    columns: {
+        id: col.uuid().primaryKey().defaultRandom(),
+        status: col.enum(["draft", "published"]).notNull().default("draft"),
+        authorId: col.uuid().notNull().onCreateUser()
+    },
+    rls: [
+        // Anyone reads the published ones.
+        { operation: "select", access: "public", condition: { status: "published" } },
+        // Authors read and edit their own, drafts included.
+        { operations: ["select", "insert", "update"], ownerField: "authorId" },
+        // Editors may delete.
+        { operation: "delete", roles: ["editor"] }
+    ]
+});
+```
+
+Rule forms: owner (`ownerField`), `access: "public" | "authenticated"` (with an
+optional `condition` / `check`), structured (`condition: policy.…`), raw SQL
+(`using` / `withCheck`), roles only. Every table also gets the admin baseline
+policies unless `defaultPolicies: false`. The full rule reference, `policy.*`
+helpers and what fails closed are in `rebase-security`; roles and the auth side
+are in `rebase-auth`.
+
+## Table hooks
+
+`hooks` run on the server, for every door into the table (REST, SDK,
+realtime, MCP, `rebase.dataAsAdmin`), and their code never leaves the server.
+The auth system's own writes (sign-up, OAuth, admin user management) do not
+run them.
+
+| Hook | Runs | Returns |
+|---|---|---|
+| `beforeQuery` | before every read | a filter to AND in (`{ filter }` / `{ logical }`), or nothing |
+| `afterRead` | on every row leaving the server | the row to serve |
+| `beforeSave` | before a create or update, in its transaction | the values to write; throw to refuse (`400 CALLBACK_REJECTED`) |
+| `afterSave` | after the write, before commit | nothing; a throw rolls back |
+| `afterSaveError` | after a failed write rolled back | nothing |
+| `beforeDelete` | before a delete, in its transaction | `false` or throw to refuse |
+| `afterDelete` | after the delete, before commit | nothing; a throw rolls back |
+
+Every hook receives `table` (the descriptor), `path` and `context`
+(`context.user`, and `context.data` scoped to the caller, in the same
+transaction). `beforeSave` / `afterSave` also get `id`, `values`,
+`previousValues` and `status` (`"new" | "existing" | "copy"`); `afterRead` and
+the delete hooks get the row as `values`. An update's `values` hold only the
+changed fields: read the rest from `previousValues`.
+
+```ts
+import { defineTable, col } from "@rebasepro/server/schema";
+import { RebaseApiError } from "@rebasepro/types";
+
+export const articles = defineTable("articles", {
+    columns: {
+        id: col.uuid().primaryKey().defaultRandom(),
+        title: col.text().notNull(),
+        slug: col.text().notNull().unique(),
+        status: col.enum(["draft", "published"]).notNull().default("draft")
+    },
+    rls: "admin-only",
+    hooks: {
+        beforeSave: async ({ values, previousValues, context }) => {
+            const title = values.title ?? previousValues?.title;
+            if (title && !values.slug && !previousValues?.slug) {
+                values.slug = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+            }
+            if (values.slug) {
+                const taken = await context.data.table("articles").count({ where: { slug: ["==", values.slug] } });
+                if (taken > 0 && values.slug !== previousValues?.slug) {
+                    throw new RebaseApiError("That slug is taken", { status: 409, code: "SLUG_TAKEN" });
+                }
+            }
+            return values;
+        },
+        beforeDelete: ({ values }) => {
+            if (values.status === "published") throw new Error("Unpublish the article before deleting it.");
+        }
+    }
+});
+```
+
+Import `RebaseApiError` from `@rebasepro/types` (schema files load no server
+code). `app/backend/schema/orders.ts` is a worked `afterSave` / `afterDelete`
+pair that keeps another table's totals in sync through `context.data`.
+
+- Work that leaves the database (e-mail, a webhook) does not belong in a hook
+  body: enqueue a job instead (see `rebase-cron-jobs` / the jobs docs); a job
+  enqueued from a hook commits with the write.
+- `afterRead` masks what a caller receives; a value a caller must never see is
+  better withheld with `.private()` or `.access({ read })`.
+- Several concerns on one table: `hooks: composeTableHooks(auditTrail, slugify)`
+  with `composeTableHooks` from `@rebasepro/common`.
+- Hooks for **every** table: `export const hooks: TableHooks = { … }` from
+  `backend/hooks.ts` (the `hooks` option of `initializeRebaseBackend` when
+  ejected). They run before each table's own hooks, which run before column
+  transforms.
+- Hooks attached after boot: `backend.setTableHooks(slug, hooks)` replaces the
+  table's declared hooks; pass `composeTableHooks(declared, yours)` to add.
+- A hook is a plain function: test it by calling
+  `tasks.config.hooks?.beforeSave?.(props)` with a `context` from
+  `createCallContext` (`@rebasepro/server`).
+
+### Column transforms
+
+`.transform({ beforeSave, afterRead })` on a column returns the value to store
+or to serve. `value` is `T | null` unless `.notNull()` comes **before**
+`.transform()` (`T | undefined` on a JSON field unless `.required()` first).
+
+```ts
+import { defineTable, col } from "@rebasepro/server/schema";
+
+export const contacts = defineTable("contacts", {
+    columns: {
+        id: col.uuid().primaryKey().defaultRandom(),
+        email: col.text().notNull().transform({
+            beforeSave: ({ value }) => value.trim().toLowerCase()
+        }),
+        iban: col.text().transform({
+            afterRead: ({ value, context }) =>
+                value && !context.user?.roles?.includes("finance") ? `•••• ${value.slice(-4)}` : value
+        })
+    },
+    rls: "admin-only"
+});
+```
+
+For trimming and case alone, the `trim` / `lowercase` / `uppercase`
+validation rules need no code.
+
+## The users table: `defineAuthTable`
+
+`defineAuthTable` is a `defineTable` for the table authentication reads and
+writes. It adds the auth columns you did not declare (email, password hash,
+`roles`, verification state…), always adds a self-read policy and an admin-only
+write gate on the privilege columns, and takes an `auth` block
+(`roles`, `scopes`, `personalKeys`). A project has at most one.
+`app/backend/schema/users.ts` and the scaffold's `backend/schema/users.ts` are
+the worked examples; roles and scopes are in `rebase-auth`.
+
+## Views: `defineView`
+
+```ts
+// backend/schema/artist_stats.ts
+import { defineView, col } from "@rebasepro/server/schema";
+
+export const artistStats = defineView("artist_stats", {
+    query: `SELECT lower(artist) AS artist, count(*)::int AS songs, max(fame) AS fame
+            FROM songs GROUP BY 1`,
+    columns: {
+        artist: col.text().primaryKey(),
+        songs: col.integer().notNull(),
+        fame: col.integer()
+    }
+});
+```
+
+Export it from `index.ts` like a table. It reads like one (`find`, `count`,
+`aggregate`, `listen`, REST, MCP, the CMS) and is never written: every write is
+`405 TABLE_READ_ONLY`. A plain view runs as the caller (`security_invoker`),
+so the base tables' policies decide its rows, and it has no `rls`.
+`materialized: true` stores the rows and serves them only to `roles`
+(`["admin"]` by default): never put rows in one that some of its readers may
+not see. `db push` creates it after the tables; a changed query recreates it.
+Reach for a view whenever an app would otherwise keep an analytic query in raw
+`rebase.sql()`.
+
+## Search
+
+By default `.search("term")` is a case-insensitive substring match across the
+table's top-level text columns. It cannot see inside `jsonb` or array columns,
+does not rank and cannot use an index.
+
+**This is the most common "search is broken" report.** If a table keeps
+searchable content in a JSON column (tags, certifications, a questionnaire),
+none of it is reachable by the default, and the search box returns nothing with
+no error. Check where the content lives before anything else, then declare a
+`search` block:
+
+```ts
+import { defineTable, col, json } from "@rebasepro/server/schema";
+
+export const talents = defineTable("talents", {
+    columns: {
+        id: col.uuid().primaryKey().defaultRandom(),
+        fullName: col.text().notNull(),
+        location: col.text(),
+        interests: col.array(col.text()),
+        questionnaire: col.jsonb(json.object({ certifications: json.string() }))
+    },
+    rls: "admin-only",
+    search: {
+        language: "spanish",     // stemming + stopwords; default "simple" (neither)
+        unaccent: true,          // `auditoria` matches `auditoría`
+        fuzzy: true,             // `iso14000` reaches `ISO 14001`
+        fields: [
+            { path: "fullName", weight: "A" },
+            { path: "questionnaire.certifications", weight: "A" },
+            "location",          // weight B
+            "interests"          // a text[]
         ]
     }
 });
-
-export default productsCollection;
-
 ```
 
-> **Presentation lives under `admin`.** Keys written `admin.x` below go inside a nested
-> `admin: { … }` block, not at the top level. The backend never reads inside it, which is
-> what lets a BaaS or headless project have no React in its dependency tree at all.
-<!-- docs-verify: ignore -->
-> **There is no `AdminCollectionConfig` wrapper type** — do not import one. The block is
-> typed by a **program-level augmentation**: put one triple-slash reference in the config
-> package,
->
-> ```ts
-> /// <reference types="@rebasepro/cms-types" />
-> ```
->
-> and `admin` is typed on every collection and every property from then on. An
-> augmentation applies to a whole TypeScript *program*, and `config/` and `frontend/` are
-> separate programs, which is why the reference belongs in `config/`. Without it, `admin`
-> is opaque and a typo compiles.
+Rows then come back with a sortable `_score`:
+`client.data.talents.search("auditor iso 14001").orderBy("_score", "desc").find()`.
+`search(term, { explain: true })` adds `_matches` (which field matched, with a
+highlighted snippet).
 
+- **Nothing is inferred.** A field is indexed only if named in `fields`, and a
+  path that does not resolve is refused when the schema compiles.
+- **A path may name** a text column, a `text[]`, a JSON column, or a dotted path
+  into one; a JSON path indexes every string at or below it. Enums, uuids,
+  `json` (not `jsonb`) and numeric arrays are refused — filter them with `where`.
+- **Set `language`** to the content's language deliberately, and `unaccent` in
+  an accented language (Postgres stems `auditoría` and `auditoria` to different
+  lexemes).
+- **Weights are `A`–`D`**, default `B`: names at `A`, long free text at `D`.
+- **It creates schema**: a generated `tsvector` column and a GIN index (and with
+  `fuzzy` a trigram column and index). Adding a stored generated column rewrites
+  the table, so on a large live table treat it as a planned migration.
+- For exact matching on a known field, use `where` instead.
 
-### Collection Options
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `name` | `string` | — | Display name (plural). E.g. `"Products"` |
-| `singularName` | `string` | — | Singular display name. E.g. `"Product"` |
-| `slug` | `string` | — | URL slug for API and routing |
-| `table` | `string` | `toSnakeCase(slug)` | PostgreSQL table name. Set it only when the table name differs from the slug |
-| `schema` | `string` | `"public"` | PostgreSQL schema name |
-| `description` | `string` | — | Description shown in the UI (supports Markdown) |
-| `admin.icon` | `string \| ReactNode` | — | Lucide icon name or React element |
-| `admin.group` | `string` | `"Views"` | Sidebar group heading |
-| `dataSource` | `string \| DatabaseHandle` | `"(default)"` | Routes the collection to a database declared with `database("<key>")` in `config/resources.ts`. Pass the handle (`import { analytics } from "../resources"`, `dataSource: analytics`) — `defineCollection` records its key — or the key as a string. See **Data sources & multiple backends** below. |
-| `engine` | `string` | resolved from `dataSource` | The engine behind the collection (`"postgres"`/`"firestore"`). Stamped during normalization; set it only to override. There is no collection-level `driver` field |
-| `databaseId` | `string` | — | Physical DB/schema/Firestore-database within the engine |
-| `history` | `boolean` | `false` | Enable entity audit trail (needs the backend `history` option or `REBASE_HISTORY`) |
-| `admin.defaultViewMode` | `ViewMode` | `"list"` | Default view: `"list"`, `"table"`, `"cards"`, `"kanban"`, or a custom view's `key` |
-| `admin.enabledViews` | `ViewMode[]` | the four built-ins plus every custom view | Enabled view modes (`kanban` only when an `enum` property exists) |
-| `admin.customViews` | `(string \| CollectionCustomView)[]` | — | Extra renderings of the same query, offered in the view switcher |
-| `admin.openEntityMode` | `"split" \| "side_panel" \| "full_screen" \| "dialog"` | from the view: `"split"` for list, `"full_screen"` for table and cards, `"side_panel"` for kanban and custom views | How entities open when clicked |
-| `admin.defaultEntityAction` | `"edit" \| "view"` | `"edit"` | Click behavior: open form or read-only view |
-| `admin.kanban` | `{ columnProperty: string }` | — | Kanban column config (requires enum property). **Always pair with `admin.orderProperty`** — see **Kanban boards** below |
-| `admin.propertiesOrder` | `string[]` | — | Field display order in forms and table |
-| `admin.form` | `FormLayoutConfig` | — | Form layout: `sidebar`, `sections`, `showRecordMeta`. See **Form layout** below |
-| `admin.entityViews` | `(string \| EntityCustomView)[]` | — | Custom tabs on entity detail |
-| `admin.display` | `EntityDisplay` | derived | What fills each display role — `title`, `subtitle`, `image`, `status`, `date`, `tags`. Each takes a property path or a resolver (may be async). See **Entity display** below |
-| `admin.previewProperties` | `string[]` | — | Properties shown when this collection is referenced |
-| `admin.listProperties` | `string[]` | — | Columns to display in list view |
-| `admin.selectionEnabled` | `boolean` | `true` | Enable row selection checkboxes |
-| `admin.selectionController` | `SelectionController` | — | A selection you hold, from `useSelectionController(collection)`; read as rows and ids |
-| `admin.inlineEditing` | `boolean` | `true` | Allow inline editing in collection table view |
-| `admin.exportable` | `boolean \| ExportConfig` | `true` | Offer Export in the toolbar. `false` removes it; an `ExportConfig` keeps it and adds fields |
-| `admin.pagination` | `boolean \| number` | `true` (50) | Enable pagination. Set a number to customize page size |
-| `admin.defaultSize` | `"xs" \| "s" \| "m" \| "l" \| "xl"` | `"m"` | Default rendered row size |
-| `admin.fixedFilter` | `FilterValues` | — | Permanent filter that cannot be changed by users |
-| `admin.defaultFilter` | `FilterValues` | — | Initial filter (can be changed by users) |
-| `admin.filterPresets` | `FilterPreset[]` | — | Quick-access filter buttons in toolbar |
-| `admin.sort` | `OrderBySpec` | — | Default sort order: one key, `["createdAt", "desc"]`, or several in order of significance, `[["roles", "asc"], ["createdAt", "desc"]]` |
-| `admin.orderProperty` | `string` | — | Property key for drag-and-drop ordering (Kanban/general). Must name a **string** property — never a number. See **Kanban boards** below |
-| `admin.formAutoSave` | `boolean` | `false` | Auto-save form on field change |
-| `admin.formView` | `FormViewConfig` | — | Custom component replacing the default entity form |
-| `admin.hideFromNavigation` | `boolean` | `false` | Hide from sidebar (still accessible via URL) |
-| `admin.hideFromEntityViews` | `boolean` | `false` | Hide from a parent entity's tab strip when reached as a child view. Independent of `hideFromNavigation` |
-| `admin.hideIdFromForm` | `boolean` | `false` | Hide ID field in entity form. Prefer `admin.form.showRecordMeta`, which moves the id to the metadata rail instead of hiding it |
-| `admin.hideIdFromCollection` | `boolean` | `false` | Hide ID column in collection table |
-| `admin.defaultSelectedView` | `string \| Function` | — | Auto-open a custom view/subcollection tab |
-| `admin.sideDialogWidth` | `number \| string` | — | Width of side dialog in pixels |
-| `admin.alwaysApplyDefaultValues` | `boolean` | `false` | Re-apply defaults on every update |
-| `admin.includeJsonView` | `boolean` | `true` | Offer the raw values in the record inspector |
-| `admin.localChangesBackup` | `"manual_apply" \| "auto_apply" \| false` | `"manual_apply"` | Local changes backup strategy |
-| `admin.disableDefaultActions` | `("edit" \| "copy" \| "delete")[]` | — | Disable built-in actions |
-| `admin.additionalFields` | `AdditionalFieldDelegate[]` | — | Virtual computed columns for views |
-| `admin.entityActions` | `EntityAction[]` | — | Custom action buttons (see Entity Actions section) |
-| `admin.Actions` | `ComponentRef[]` | — | Custom toolbar action components |
-| `callbacks` | `CollectionCallbacks<M, USER>` | — | Lifecycle hooks (see Collection Callbacks section) |
-| `admin.browserCallbacks` | `CollectionCallbacks<M, USER>` | — | The same hooks, run in the panel — see **Collection Callbacks** |
-| `relations` | `Relation[]` | — | Explicit relation definitions (usually auto-extracted from properties) |
-| `securityRules` | `SecurityRule[]` | — | Row Level Security policies |
-| `disableDefaultPolicies` | `boolean` | `false` | Drop the injected baseline policies (admin/server SELECT; on an auth collection also self-read and an admin-only write gate) and own the table's RLS entirely |
-| `search` | `SearchConfig` | — | Opt in to ranked full-text search over named fields (Postgres only). See **Search** below |
-| `indexes` | `CollectionIndex[]` | — | Ordinary indexes on the table (Postgres only). See **Indexes** below |
-| `softDelete` | `boolean \| { field?: string }` | — | `delete` stamps a timestamp and reads hide stamped rows. `true` uses `deletedAt`; the collection must declare that `date` property itself (Postgres only) |
-| `tenant` | `CollectionTenantConfig` | — | Scope every row to a tenant, e.g. `{ field: "orgId", from: { claim: "org_id" } }`; the property must already be declared (Postgres only) |
-| `strictWrites` | `boolean` | `true` | Reject with a 400 a write naming a field the collection does not declare |
-| `metadata` | `Record<string, unknown>` | — | Free-form data for your own code; Rebase does not read it |
-| `childCollections` | `() => CollectionConfig[]` | — | Nested child collections (populated automatically) |
-| `ownerId` | `string` | — | Owner user ID (for plugins/custom code) |
-| `auth` | `boolean | AuthCollectionConfig` | — | Mark collection as authentication collection (user management, reset password, etc.) |
-| `admin.components` | `CollectionComponentOverrideMap` | — | Collection-scoped UI component overrides |
-
-
-
-## Kanban boards
-
-A Kanban board is **three** decisions, not one. Ship all three together; each one
-missing produces a board that renders, looks configured, and silently does not
-reorder.
-
-### 1. `kanban` and `orderProperty` are two halves of one feature
+## Indexes
 
 ```ts
-import { PostgresCollectionConfig } from "@rebasepro/types";
+import { defineTable, col, rel } from "@rebasepro/server/schema";
+import { authors } from "./authors";
 
-const tasksCollection: PostgresCollectionConfig = {
-    name: "Tasks",
-    slug: "tasks",
-    table: "tasks",
-    properties: {
-        id: { name: "ID", type: "string", isId: "uuid" },
-        title: { name: "Title", type: "string" },
-        status: {
-            name: "Status",
-            type: "string",
-            enum: [
-                { id: "todo", label: "To do" },
-                { id: "doing", label: "Doing" },
-                { id: "done", label: "Done" }
-            ]
-        },
-        // The order key. Machinery, not content — hide it.
-        __order: {
-            name: "Order",
-            type: "string",
-            admin: { disabled: true, hideFromCollection: true }
-        }
+export const posts = defineTable("posts", {
+    columns: {
+        id: col.uuid().primaryKey().defaultRandom(),
+        status: col.enum(["draft", "published"]).notNull().default("draft"),
+        publishDate: col.timestamptz(),
+        workspaceId: col.uuid().notNull(),
+        slug: col.text().notNull()
     },
-    admin: {
-        defaultViewMode: "kanban",
-        enabledViews: ["kanban", "table"],
-        kanban: { columnProperty: "status" },
-        orderProperty: "__order"      // ← never omit this
-    }
-};
+    relations: { author: rel.belongsTo(() => authors) },
+    rls: "admin-only",
+    indexes: [
+        // One btree serves the filter and the sort.
+        { columns: ["status", { column: "publishDate", direction: "desc" }],
+          reason: "admin list: filter by status, newest first" },
+        // Partial: only published rows.
+        { columns: ["publishDate"], where: { column: "status", op: "=", value: "published" },
+          reason: "public feed: published posts by date" },
+        // `author` is the belongsTo: it resolves to author_id.
+        { columns: ["author", { column: "publishDate", direction: "desc" }],
+          reason: "an author's posts, newest first" },
+        { columns: ["workspaceId", "slug"], unique: true, reason: "one slug per workspace" }
+    ]
+});
 ```
 
-Declaring `kanban` without `orderProperty` still gives you a draggable board:
-moving a card between columns writes `columnProperty` and sticks. Its position
-*within* a column has nowhere to be stored, so it snaps back on the next read,
-and the board renders an amber "ordering is not configured" bar above the
-columns. Nothing errors. Reviewing the config will not show you the bug — only
-opening the board will.
+| Field | Notes |
+|---|---|
+| `columns` | **Required.** Column keys or `belongsTo` relation names (never SQL names), or `{ column, direction?, nulls? }`. |
+| `reason` | The query it serves, in one line. Optional but strongly recommended: `rebase doctor` prints it beside the index's usage. Not part of the index's identity. |
+| `using` | `"btree"` (default), `"gin"` (containment over arrays / JSON), `"brin"`. |
+| `where` | Partial index, structured: `{ column, op, value }`, `op` in `=`, `!=`, `<`, `<=`, `>`, `>=`, `in`, `is null`, `is not null`, nested under `{ and: [...] }`. No SQL strings, no `or`. |
+| `unique` | btree, composites only (single-column uniqueness is `.unique()`). |
+| `include` | btree covering columns. |
 
-### 2. The order property is a `string`
+- **A `belongsTo` column is indexed already.** Do not add a lone
+  `{ columns: ["author"] }` "for the foreign key"; declare it only as the lead
+  of a composite. A `hasMany` / `manyToMany` is refused: the key is on the other
+  table, so declare the index there.
+- **Order is identity.** Postgres uses a leading subset only; never reorder
+  keys to tidy a declaration, and never declare a `desc` twin of an `asc` index.
+- **Never a plain index for text search or embeddings**: that is `search` and
+  `col.vector(dims, { index })`.
+- **Do not index the primary key.**
+- **Changing a declaration is a DROP and a CREATE.** Fine on a dev database;
+  on a large live table, say so before suggesting the edit.
+- Ownership is by name (`<table>_<columns>_ix_<7 hex>`): an index Rebase did
+  not create is never touched by `db push`, so do not tell a user to re-create a
+  hand-written index defensively, and never rename one to look generated.
 
-Reordering writes a `fractional-indexing` key — `"i0"`, `"i1"`, `"i0i"` — not an
-index. Keys use the **base36, lower-case** alphabet
-`0123456789abcdefghijklmnopqrstuvwxyz`: Postgres does the sorting and its default
-collation is not byte ordering, so the library's default base62 output (`"a0"`,
-mixing cases) sorts differently in the database than in the key.
+## Several databases
 
-Consequences worth knowing before you pick a type:
+A table on a non-default Postgres database names it with `database`, a
+reference declared in `backend/resources.ts`:
 
-- `type: "number"` can never hold a key. A `sortOrder` number leaves the board
-  permanently asking to be initialised, and the initialisation then fails writing
-  a string into a numeric column.
-- A plain counter in a string column — `"1"`, `"12"`, `"000001"` — is rejected
-  just as hard. `fractional-indexing` cannot interpolate against it, so the board
-  treats it as absent.
-- `generateKeyBetween(a, b)` **without the alphabet argument** produces base62
-  keys the board rejects. Always pass `ORDER_KEY_DIGITS`.
+```ts no-verify
+// backend/resources.ts
+import { database } from "@rebasepro/types";
+export const warehouse = database("warehouse");   // DATABASE_URL__WAREHOUSE
 
-### 3. Rows created outside the admin need a key assigned
+// backend/schema/orders.ts
+import { warehouse } from "../resources";
+export const orders = defineTable("orders", { database: warehouse, columns: { … }, rls: "admin-only" });
+```
 
-Nothing assigns an order key on insert — not the REST API, not the SDK, not a
-cron, not a seed script, not a migration. Those rows land with `__order` null and
-the board shows *"Some items don't have order values. Initialize to enable
-drag-and-drop reordering."* Clicking **Initialize** backfills one page; the next
-cron run brings the bar straight back.
+Routing is automatic: REST, the SDK, realtime, `context.data` and the CMS all
+reach the right database. Every server source is Postgres with its own RLS;
+MongoDB is retired, and a `database()` with another engine is refused at boot.
+Firestore is a frontend data source only — see [Firestore](#firestore-collections).
 
-**If a backend writes rows into a board collection, it assigns the key.**
+## Type inference
+
+```ts
+import type { InferRow, InferInsert, InferUpdate } from "@rebasepro/server/schema";
+import type { tasks } from "./tasks";
+
+export type Task = InferRow<typeof tasks>;         // what REST returns
+export type NewTask = InferInsert<typeof tasks>;   // what a create takes
+export type TaskPatch = InferUpdate<typeof tasks>; // what an update takes
+```
+
+These are wire types. A `.notNull()` column is `T` on a row, any other
+`T | null`; a column with a default is optional on insert; `.private()` columns
+are absent; `.readOnly()` and stamped columns are absent from `InferUpdate`.
+
+## The CMS: how a table becomes a collection
+
+Every table the backend serves appears in the panel with no code. The CMS
+derives a collection from the descriptor: a field per column (the editor from
+the column's type: enum → select, `.userId()` → user picker, `col.storage()` →
+uploader, `json.*` shape → nested form), a tab per to-many relation, a picker
+per `belongsTo` (it replaces its foreign-key column in the form), and columns
+the server stamps or marks `.readOnly()` drawn read-only.
+
+`customizeTable` states what should differ, and nothing else:
+
+```tsx
+// frontend/src/cms/posts.tsx  (abridged from app/frontend/src/cms/posts.tsx)
+import { customizeTable, updateRecord } from "@rebasepro/cms";
+import type { posts } from "../../../backend/schema/posts";
+
+export const postsCms = customizeTable<typeof posts>("posts", {
+    name: "Blog posts",
+    singularName: "Blog post",
+    icon: "FileText",
+    group: "Content",
+    defaultViewMode: "cards",
+    display: { title: "title", subtitle: "excerpt", image: "hero_image", status: "status", date: "publish_date" },
+    form: {
+        sidebar: ["status", "publish_date", "author", "tags"],
+        sections: [
+            { key: "post", fields: ["title", "slug", "hero_image", "excerpt"] },
+            { key: "body", title: "Content", fields: ["content"] }
+        ]
+    },
+    kanban: { columnField: "status", orderField: "__order" },
+    filterPresets: [{ label: "Published", filterValues: { status: ["==", "published"] }, sort: ["publish_date", "desc"] }],
+    entityActions: [
+        {
+            key: "publish",
+            name: "Publish",
+            icon: "Send",
+            isEnabled: ({ row }) => row?.status !== "published",
+            onClick: ({ id, context }) =>
+                updateRecord(context, "posts", id, { status: "published", publish_date: new Date().toISOString() }, "Post published")
+        }
+    ],
+    fields: {
+        slug: { filledByServer: true },
+        excerpt: { multiline: true },
+        content: { oneOf: { text: { markdown: true } } },
+        status: {
+            enumLabels: {
+                draft: { label: "Draft", color: "gray" },
+                published: { label: "Published", color: "green" }
+            }
+        },
+        publish_date: { name: "Publish date", mode: "date_time", clearable: true },
+        __order: { disabled: true, hidden: true }
+    }
+});
+```
+
+- **The first argument is the table's slug**, and with `<typeof posts>` it,
+  every field key, every enum value and each option's applicability are checked
+  against the table. One type argument, even when the slug differs from the name.
+- **`fields.<key>`** takes a column key or a relation name. Every field: `name`,
+  `description`, `hidden`, `hiddenInForm`, `disabled`, `readOnly`, `Field`,
+  `Preview`, `Filter`, `columnWidth`, `filledByServer`, `span` (1–4 of the form
+  grid), `customProps`, `conditions`, `dynamicProps`. Text: `multiline`,
+  `markdown`, `previewAsTag`, `clearable`, `urlPreview`, `referenceTo`. Closed
+  sets: `enumLabels`, `enumOrder`. Numbers: `format`. Dates: `mode`,
+  `timezone`. Storage: `storage` (browser-side upload functions). Arrays: `of`,
+  `sortable`, `expanded`. JSON: `fields`, `fieldOrder`, `oneOf`, `keyValue`.
+  Relations: `previewFields`, `widget`, `fixedFilter`, `renderInForm`.
+- **Table options**: `name`, `singularName`, `description`, `icon` (Lucide name),
+  `group`, `hideFromNavigation`, `defaultViewMode`, `enabledViews`, `kanban`,
+  `customViews`, `fieldOrder`, `listFields`, `previewFields`, `display`,
+  `additionalFields`, `sort`, `fixedFilter`, `defaultFilter`, `filterPresets`,
+  `pagination`, `inlineEditing`, `exportable`, `openEntityMode`, `form`,
+  `formView`, `includeJsonView`, `entityActions`, `disableDefaultActions`,
+  `entityViews`, `Actions`, `components`, `browserCallbacks`.
+- **Components are imported by value** (`Field: RatingField`), never as string
+  paths or lazy thunks; `customizeTable` throws on those, on an unknown option
+  (naming the nearest one, or the new name of an old `admin` option such as
+  `propertiesOrder` → `fieldOrder`), and on two customizations of one slug.
+- **At runtime** a customization naming a field the server does not serve to
+  this caller is skipped with a development warning, not an error.
+- **`browserCallbacks` run in the browser** after the server's hooks: they ship
+  to every visitor and secure nothing. Validation and access belong in the table.
+- **Set `span`** on the fields you customize: `2` + `2` for two short values
+  that belong together, `4` for anything that reads long.
+
+Register them on `<RebaseCMS tableCustomizations={tableCustomizations} />`,
+usually collected in `frontend/src/cms/index.ts`
+(`export const tableCustomizations = [postsCms, authorsCms]`, in navigation
+order). Custom components, views, actions and replacing built-in parts are in
+`rebase-customize-admin`; record tabs and field widgets in `rebase-custom-views`.
+
+### Kanban boards
+
+A board is three decisions; ship all three together:
+
+1. **`kanban: { columnField, orderField }`.** `columnField` is a `col.enum([...])`
+   (or `.oneOf` strings). Without `orderField` a card's position within a column
+   has nowhere to be stored: it snaps back on the next read, and the board shows
+   an amber "ordering is not configured" bar. Nothing errors.
+2. **`orderField` is a text column** (`__order: col.text()` in the table,
+   `fields: { __order: { hidden: true, disabled: true } }` in the
+   customization). Reordering writes a `fractional-indexing` key in the base36
+   lower-case alphabet `0123456789abcdefghijklmnopqrstuvwxyz`; a number column
+   or a plain counter cannot hold one.
+3. **Rows created outside the panel need a key.** Nothing assigns one on insert
+   (not REST, the SDK, a cron or a seed), so those rows land with `__order` null
+   and the board asks to "Initialize". A backend that writes rows into a board
+   table assigns the key:
 
 ```ts
 import { generateKeyBetween } from "fractional-indexing";
 
 const ORDER_KEY_DIGITS = "0123456789abcdefghijklmnopqrstuvwxyz";
+const leads = client.data.table("leads");
 
-const leads = client.data.collection("leads");
-
-// The last key currently in use. `is-not-null` is not optional: a descending
-// sort is NULLS FIRST in this driver, so without it this reads back one of the
-// very rows that has no key, and every insert lands on the same "i0".
+// The last key in use. `is-not-null` matters: a descending sort is NULLS FIRST.
 const { data: last } = await leads.find({
     where: { __order: ["is-not-null", null] },
     orderBy: ["__order", "desc"],
@@ -316,1926 +898,68 @@ let cursor: string | null = (last[0]?.__order as string | undefined) ?? null;
 
 for (const candidate of shortlist) {
     cursor = generateKeyBetween(cursor, null, ORDER_KEY_DIGITS);
-    await leads.create({ /* … */ status: "new", __order: cursor });
+    await leads.create({ ...candidate, status: "new", __order: cursor });
 }
 ```
 
-Note the `cursor` carried across the loop. Calling
-`generateKeyBetween(null, null, …)` per row instead hands every row of the batch
-the same key — valid enough to clear the warning bar, useless as an order.
-Re-reading the max inside the loop is correct but costs a round-trip per row.
+Carry the cursor across the loop: `generateKeyBetween(null, null, …)` per row
+hands every row the same key.
 
-### The config validator checks two of these for you
+## Firestore collections
 
-`assertCollectionConfigs` runs wherever the collections are loaded — server
-boot, `rebase schema generate`, `rebase doctor` — so you do not have to
-remember:
+Firestore is a frontend concern: the backend knows nothing about it, and
+Firestore collections are never in `backend/schema`. Declare them with
+`defineFirestoreCollection` from `@rebasepro/firebase` in `frontend/src/cms/`
+and pass them to `<RebaseCMS externalCollections={[…]} />`:
 
-- `kanban` (or a `kanban` entry in `enabledViews`/`defaultViewMode`) with no
-  `orderProperty` → **warning**, naming the property to add. It boots: the board
-  works, it just does not reorder.
-- `orderProperty` naming a property that does not exist, or one that is not a
-  `string` → **error**, and the boot fails. Both are unambiguously broken, and
-  the fix is one line.
+```ts
+// frontend/src/cms/events.ts
+import { defineFirestoreCollection } from "@rebasepro/firebase";
 
-Nothing checks decision 3 — no static check can tell which code paths write to
-a collection. That one is on you.
-
-### Checklist
-
-Before calling a Kanban collection done:
-
-- [ ] `kanban.columnProperty` names an **enum** property
-- [ ] `orderProperty` is set, and names a **string** property
-- [ ] that property is hidden (`admin: { disabled: true, hideFromCollection: true }`)
-- [ ] every code path that creates rows in this collection assigns an order key
-- [ ] the property exists in `properties` — under `defineCollection` the key is
-      checked against them, so a missing one narrows to `never` and fails to
-      typecheck; under `PostgresCollectionConfig` it is a plain `string` and a
-      typo goes through silently
-- [ ] the schema was regenerated and pushed after adding it (**Schema Migration
-      Workflow** below) — the column has to exist before anything can write a key
-
-## Search
-
-By default `.search("term")` is a case-insensitive **substring** match OR-ed
-across the collection's top-level `string` properties. It cannot see inside
-`map` (JSONB) or `array` properties, does not rank, and cannot use an index.
-
-**This is the single most common "search is broken" report.** If a collection
-keeps searchable content in a `map` — tags, certifications, a questionnaire, an
-answers blob — none of it is reachable by the default, and the search box
-returns nothing with no error. When a user says search finds nothing for content
-they can plainly see on the record, check where that content lives before
-anything else.
-
-Declare a `search` block to fix it. Postgres only.
-
-```typescript
-const talents: PostgresCollectionConfig = {
-    slug: "talents",
-    table: "talents",
-    name: "Candidates",
-    properties: { /* … */ },
-    search: {
-        language: "spanish",     // stemming + stopwords; default "simple" (neither)
-        unaccent: true,          // `auditoria` matches `auditoría`
-        fuzzy: true,             // `iso14000` reaches `ISO 14001`
-        fields: [
-            { path: "full_name", weight: "A" },
-            { path: "questionnaire.certifications", weight: "A" },  // into the JSONB
-            "location",                                             // defaults to weight B
-            "interests"                                             // a string[]
-        ]
-    }
-};
-```
-
-Rows then come back with a sortable `_score`:
-
-```typescript
-client.data.talents.search("auditor iso 14001").orderBy("_score", "desc").find()
-```
-
-### Rules an agent must not get wrong
-
-- **Nothing is inferred.** A field is indexed only if named in `fields`. A path
-  that does not resolve is a **boot error**, not a warning — so a config that
-  boots is a config whose search fields are all real.
-- **A path may name** a `string` property, a `string[]` property, a `map`, or a
-  dotted path inside a map (`"questionnaire.certifications"`). A map path
-  indexes every string value at or below it, at any depth. JSON *keys* are never
-  indexed.
-- **Enums, UUIDs, `json` (not `jsonb`) columns and numeric arrays are refused.**
-  Enums are a fixed vocabulary — filter them with `where`, which is exact and
-  indexed.
-- **`language` defaults to `"simple"`**, which does no stemming. Set it to the
-  content's language deliberately; a stemmer applied to the wrong language
-  silently mangles lexemes.
-- **`unaccent` is not cosmetic** in an accented language. Postgres stems
-  `auditoría` → `auditor` and `auditoria` → `auditori`, *different lexemes*, so
-  without it a query typed without accents misses every row that has them.
-- **Weights are `A`–`D`**, strongest to weakest, defaulting to `B`. Put names and
-  identifiers at `A` and long free text at `D`, or a passing mention in a bio
-  outranks the field the user actually meant.
-- **Declaring it creates schema**: one generated `tsvector` column plus a GIN
-  index (and, with `fuzzy`, a second column and a trigram index). Boot-ensure
-  adds them; adding a stored generated column rewrites the table, so on a large
-  live table treat it as a planned migration.
-- **Do not add it to a Firestore collection.** It is refused at boot.
-
-### Explaining a match
-
-`client.data.x.search(term, { explain: true })` returns `_matches` per row —
-which declared field matched, plus a `<mark>`-highlighted snippet. This is
-usually what someone means by "show me why this result appeared". Per-query, not
-config: it costs a `ts_headline` per field per row.
-
-### When *not* to reach for it
-
-If the user wants exact matching on a known field, use `where` — it is exact,
-indexed, and needs no schema. The `search` block is for free-text queries a
-human types.
-
-## Indexes
-
-A collection declares the indexes its queries need, in `indexes`. Postgres only
-— refused at boot on another engine, not silently ignored.
-
-```typescript
-const posts: PostgresCollectionConfig = {
-    slug: "posts",
-    table: "posts",
-    name: "Blog posts",
-    properties: { /* … */ },
-    indexes: [
-        // Filter by status, newest first. ONE index serves the filter and the
-        // sort, because a btree can be read in order.
-        { on: ["status", { prop: "publishDate", direction: "desc" }],
-          reason: "admin list: filter by status, newest first" },
-        // Partial: the index holds only published rows, and stays small as
-        // drafts accumulate.
-        { on: ["publishDate"],
-          where: { prop: "status", op: "=", value: "published" },
-          reason: "public feed is published-only" },
-        // `author` is a belongsTo — it resolves to author_id. Its column is
-        // already indexed by default (`relation.index`), so declare it only
-        // as the lead of a composite like this one.
-        { on: ["author", { prop: "publishDate", direction: "desc" }],
-          reason: "an author's posts, newest first" }
-    ]
-};
-```
-
-### Rules an agent must not get wrong
-
-- **`on` takes property keys, never column names.** A `belongsTo` resolves to
-  its `localKey`, so `author` → `author_id`. Writing `author_id` yourself works
-  for most properties and is refused for a relation — and getting this backwards
-  is how you index nothing on the one case people reach for. A `hasMany` or
-  many-to-many property is refused: the foreign key is on the *other* table, so
-  declare the index there.
-- **A `belongsTo` column is indexed already.** `relation.index` defaults to
-  `true`, and that derived index is skipped when the column leads one you
-  declared. Do not add a lone `{ on: ["author"] }` "for the foreign key".
-- **`reason` is required**, and it is prose, not SQL. Say what query it serves.
-  It is what gets printed beside "0 scans in 34 days, 412 MB" later, and it is
-  deliberately not part of the index's identity, so rewording it rebuilds
-  nothing.
-- **Order is the index's identity.** Postgres uses a *leading subset* only:
-  `["ownerId", "createdAt"]` serves a filter on `ownerId`, and on both, and
-  **never** on `createdAt` alone. Do not reorder keys to "tidy" a declaration.
-- **Do not declare a `desc` twin.** A btree is scanned backwards just as fast,
-  so a lone `DESC` index is redundant with its `ASC` one. `direction` earns its
-  place only when an `ORDER BY` mixes directions.
-- **Never suggest a plain index for text search or embeddings.** Trigram search
-  is the `search` block; ANN is a `vector` property's `index`. Both build their
-  own index, and an index needing `gin_trgm_ops` or `vector_cosine_ops` is
-  refused here at build time.
-- **Do not add `unique: true` to a single column** whose property already has
-  `validation.unique` — that is the same guarantee declared twice, and it is
-  refused. Single-column uniqueness is `validation.unique`; `unique` here is for
-  composites.
-- **Do not index the primary key.** `<table>_pkey` already covers exactly those
-  columns, and declaring it is refused.
-- **Changing a declaration is a DROP and a CREATE**, no `CONCURRENTLY`, with a
-  window in between where the index does not exist. Fine on a dev database; on a
-  large live table, say so before suggesting the edit.
-
-### The shape
-
-| Field | Type | Notes |
-|-------|------|-------|
-| `on` | `(string \| IndexKey)[]` | **Required.** 1–5 keys. `IndexKey` is `{ prop, direction?, nulls? }`. |
-| `reason` | `string` | **Required.** One line of prose. |
-| `using` | `"btree" \| "gin" \| "brin"` | Default `btree`. No `gist`, no `hash`. |
-| `where` | `IndexPredicate` | Partial index. See below. |
-| `unique` | `boolean` | btree only, composites only. |
-| `include` | `string[]` | btree only. Payload columns for index-only scans; may not overlap `on`. |
-
-`where` is **structured, never a SQL string**: `{ prop, op, value }` with `op`
-one of `=`, `!=`, `<`, `<=`, `>`, `>=`, `in`, `is null`, `is not null`, nested
-under `{ and: [...] }`. There is no `or` — an OR predicate means the index
-should probably not be partial; declare two indexes instead.
-
-`gin` is containment over an `array` or JSONB `map`. `brin` is a
-naturally-ordered column on an append-only table. Neither takes `direction` or
-`nulls`.
-
-### Why hand-written indexes were disappearing
-
-Worth knowing when a user says an index they created is gone. `rebase db push`
-is declarative, so an index on a managed table absent from `schema.sql` was
-drift, and Atlas planned `DROP INDEX` — which is not a destructive pattern, so
-the auto-approved apply took it silently.
-
-Ownership is now decided by the name: `<table>_<columns>_ix_<7 hex>` (`_ux_` if
-unique), which no other namer produces. A declaration you delete drops as
-intended; an index Rebase did not create is excluded from the diff and never
-touched. **Do not tell a user to re-create a hand-written index defensively, and
-do not rename one to look generated** — the hash is over the index's semantics
-and the name is frozen in `contracts/derived-names.txt`.
-
-On 0.24 that exclusion still missed an index whose name holds `[`, `]`, `*` or
-`?` (Atlas read `orders_idx[v1]` as a glob, matched nothing, and dropped it),
-and a `.` in an index's name failed every push. From 0.25 every name is matched
-exactly.
-
-Declared indexes are created by `rebase db push` *and* by boot-time schema
-ensure (`CREATE INDEX CONCURRENTLY IF NOT EXISTS`), so a deployment that never
-runs `db push` still gets them.
-
-## Views
-
-A collection can serve a SQL view instead of a table — reach for one when an
-app would otherwise keep an analytic query in raw `rebase.sql()`:
-
-```typescript
-export default defineCollection({
-    slug: "artists",
-    name: "Artists",
-    table: "artist_stats",
-    view: {
-        query: "SELECT lower(artist) AS artist, count(*)::int AS songs FROM songs GROUP BY 1",
-        materialized: false,          // true stores the rows; refresh them with `refresh()`
-        // roles: ["admin"]           // who may read a materialized view (default ["admin"])
-    },
-    properties: {
-        artist: { name: "Artist", type: "string", isId: true },   // a view has no PK: one property must be isId
-        songs: { name: "Songs", type: "number" },
-    },
-});
-```
-
-### Rules an agent must not get wrong
-
-- **Read-only.** Every write is a 405 `COLLECTION_READ_ONLY`. Write to the tables the view reads.
-- **No `securityRules`, `history`, `softDelete`, `tenant` or `search`** on a view — refused at boot.
-  A plain view runs as the caller (`security_invoker`), so the base tables' policies already decide its rows.
-- **A materialized view has no row-level security.** It is served whole, only to `view.roles` — a rule held in Postgres: the rows are stored under `<table>_rebase_rows` (owner only) and the collection's name is a gate over them. Query the collection's name.
-  Never put rows in one that some of its readers may not see.
-- **`db push` creates it** (Rebase applies `views.sql` after the tables); a changed query recreates it. A
-  materialized view's rows are as of its last `refresh()` — schedule one from a cron job.
-- `indexes` only on a materialized view; `refresh({ concurrently: true })` needs the `isId` columns to be unique.
-
-## Data sources & multiple backends
-
-A collection lives in a **data source** identified by `collection.dataSource`
-(default `"(default)"`). A data source has an **engine** (`postgres`,
-`firestore`, custom → drives editor capabilities) and a **transport**:
-
-- **`server`** — through the Rebase backend/client. Postgres is the only server
-  engine. This is the default; such collections need no registration.
-- **`direct`** — straight from the client to an external backend via its SDK
-  (e.g. Firestore). The Rebase backend is not in the data path.
-- **`custom`** — a developer-supplied `DataDriver`.
-
-Register the non-default (direct/custom) sources once; server engines ride the
-client and only need a backend bootstrapper.
-
-```tsx no-verify
-// Frontend — register direct/custom sources (Postgres rides the client)
-<Rebase
-  client={rebaseClient}
-  dataSources={[
-    { key: "analytics", engine: "firestore", transport: "direct", driver: firestoreDriver }
-  ]}
-/>
-
-// A collection opts in by key:
-{ slug: "events", dataSource: "analytics", properties: { /* … */ } }
-```
-
-```ts no-verify
-// Backend — several Postgres databases in one instance.
-// config/resources.ts:
-//   export const warehouse = database("warehouse");          // DATABASE_URL__WAREHOUSE
-//   export const analytics = database("analytics", {         // client-side only:
-//       engine: "firestore", transport: "direct"             // the backend skips it
-//   });
-// config/collections/orders.ts:
-//   defineCollection({ slug: "orders", dataSource: warehouse, … })
-```
-
-Routing is automatic and resolved by collection path: list/entity views,
-references, board, import/export, realtime and `context.data` all hit the right
-database with no per-collection wiring. Every server source is Postgres, with
-its own RLS policies. MongoDB support was removed: a `database()` declared with
-`engine: "mongodb"` (or any engine but Postgres) is refused at boot.
-
-> **There is no collection-level `driver` field**, and no `drivers` prop on
-> `<Rebase>`. A collection names its source with `dataSource`; `engine`
-> (`"postgres"`, `"firestore"`, …) is stamped from that source during
-> normalization. The Firestore collection type declares it as its literal
-> discriminant (`engine: "firestore"`).
-
-## Common Property Options (BaseProperty)
-
-All property types share these base options:
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `name` | `string` | derived from the key (`publishDate` → "Publish Date") | Display label for the field |
-| `description` | `string` | — | Help text displayed under the field |
-| `columnName` | `string` | auto from key | Explicit DB column name (bypasses snake_case conversion) |
-| `validation` | `PropertyValidationSchema` | — | Validation rules (see below) |
-| `defaultValue` | per type | — | Default value for new entities (typed by each property type, not on `BaseProperty`) |
-| `excludeFromApi` | `boolean` | — | Never served by the API, to any caller, nor in generated SDK/OpenAPI types (server-side; sugar for `access: { read: [], write: [] }`) |
-| `access` | `{ read?: string[]; write?: string[] }` | — | Field-level roles: an unreadable field is absent from the response, an unwritable one is a 400 `FIELD_NOT_WRITABLE` |
-| `databaseDefault` | ``boolean \| "sql`…`"`` | `false` | The database fills the column on create (`DEFAULT <expression>`), so a required field may be left out of a create |
-| `propertyConfig` | `string` | — | Reuse a globally defined property config by key |
-| `dynamicProps` | `(props) => Partial<Property>` | — | Dynamic property overrides based on entity values |
-| `conditions` | `PropertyConditions` | — | JSON Logic-based declarative conditions |
-| `callbacks` | `PropertyCallbacks` | — | Per-field `afterRead` and `beforeSave` hooks |
-
-### UI Options (AdminPropertyOptions)
-
-All property types support a `admin` object for display configuration:
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `admin.columnWidth` | `number` | — | Column width in pixels (table view) |
-| `admin.hideFromCollection` | `boolean` | — | Hide from collection table view |
-| `admin.readOnly` | `boolean` | — | Render as read-only preview |
-| `admin.disabled` | `boolean \| PropertyDisabledConfig` | — | Disable editing |
-| `admin.span` | `1 \| 2 \| 3 \| 4` | `4`, or `2` for a pair of like compact fields | Field width over the four-column form grid. Set it from the content — see **Form layout** |
-| `admin.filledByServer` | `boolean` | `false` | The server fills it on create (e.g. a `beforeSave` hook), so the form lets a record be created without it |
-| `admin.customProps` | `unknown` | — | Custom props passed to the field component |
-| `admin.Field` | `ComponentRef` | — | Custom field component |
-| `admin.Preview` | `ComponentRef` | — | Custom preview/cell component |
-| `admin.filterOperators` | `WhereFilterOp[]` | — | Narrow the filter operators offered for this property (`[]` disables filtering on it) |
-| `admin.Filter` | `ComponentRef` | — | Custom filter field for this property |
-
-### Form layout
-
-The id and the audit timestamps go to a metadata rail. Every other field takes
-the **full width** unless its property sets `admin.span` — with one cautious
-exception: two **neighbouring** fields with the same small editor (two numbers,
-two switches, two dates of the same mode, two selects with short options) share
-a row, as long as neither has a long label, help text over 60 characters,
-`conditions` or a custom `Field`. A free-text string is never paired, and the
-form never looks at which property is the title.
-
-That default only covers what a schema can prove. Whether two strings belong
-together — city / country, provider / region — is something only you can tell,
-so column layout is your job, and you should do it for every collection you
-write.
-
-**Set `admin.span` from what the field holds, not from its type.** Two string
-properties are not a pair just because both are strings — Namespace beside
-Custom Domain, or Git Branch beside Git Repository URL, puts unrelated values
-next to each other and the reader zig-zags. Before writing spans, read each
-property and ask how long its value really is and what it belongs with:
-
-- **`4` (full width)** — anything read as prose or that can run long: names and
-  titles people read, descriptions, URLs, emails, paths, ids and namespaces,
-  markdown, multiline text, files, maps, arrays of anything but short tags, and
-  any field with a long `description` under it. When unsure, leave it at 4.
-- **`2` + `2`** — two short values that belong together: first / last name,
-  start / end date, city / country, min / max, currency / amount, provider /
-  region.
-- **`3` + `1`** — a value and its short qualifier: street / number, amount /
-  unit, title / status badge.
-- **`1`** — numbers, booleans, short enums and codes (ISO country, currency,
-  priority) placed beside their siblings, e.g. four counters on one row.
-
-Rules that keep the result clean:
-
-- **Spans in a row add up to exactly 4.** Nothing widens a field to close a gap,
-  so a row of `2` with no partner leaves half a row empty. Once you set a span on
-  a field, the automatic pairing leaves it alone — set its partner's too.
-- **Order the properties so pairs are adjacent.** Rows fill in declaration order
-  (or `sections[].properties` order), so a pair split by another field breaks.
-- **Pair by meaning, never to save height.** A field with nothing that belongs
-  beside it stays at 4. A long form is solved with `sections`, not columns.
-- Spans are ignored on narrow layouts (side panel, split pane, phone), so a
-  collection still has to read well as one column.
-
-```typescript
-import { defineCollection } from "@rebasepro/cms-types";
-
-const projectsCollection = defineCollection({
-    slug: "projects",
-    table: "projects",
-    name: "Projects",
-    properties: {
-        name: { name: "Name", type: "string" },               // 4
-        subdomain: { name: "Subdomain", type: "string" },     // 4: a URL part, not a pair for Name
-        provider: {
-            name: "Cloud provider",
-            type: "string",
-            enum: { gcp: "Google Cloud", aws: "AWS" },
-            admin: { span: 2 }
-        },
-        region: { name: "Cloud region", type: "string", admin: { span: 2 } }, // read with provider
-        startsAt: { name: "Starts", type: "date", admin: { span: 2 } },
-        endsAt: { name: "Ends", type: "date", admin: { span: 2 } },
-        seats: { name: "Seats", type: "number", admin: { span: 1 } },
-        active: { name: "Active", type: "boolean", admin: { span: 1 } },
-        plan: {
-            name: "Plan",
-            type: "string",
-            enum: { team: "Team", business: "Business" },
-            admin: { span: 2 }
-        }
+export const firestoreEvents = defineFirestoreCollection({
+    slug: "fs_events",
+    path: "events",
+    name: "Live Events (Firestore)",
+    dataSource: "firestore",
+    fields: {
+        type: { name: "Event Type", type: "string", required: true },
+        payload: { name: "Payload", type: "map" },
+        // A reference to a row of the `customers` Postgres table.
+        customerId: { name: "Customer", type: "reference", target: "customers" }
     }
 });
 ```
 
-Reach for `admin.form` to group and move fields:
+The browser reads and writes Firestore directly: row-level security, the REST
+API, the SDK, hooks and storage authorization do not apply, and Firebase
+Security Rules decide access. The data source is registered with
+`useFirestoreDataSource`; see the Firebase page of the docs.
 
-```typescript
-import { defineCollection } from "@rebasepro/cms-types";
+## Applying a schema change
 
-const postsCollection = defineCollection({
-    slug: "posts",
-    table: "posts",
-    name: "Posts",
-    properties: {
-        title: { name: "Title", type: "string" },
-        body: { name: "Body", type: "string", admin: { markdown: true } },
-        status: { name: "Status", type: "string" },
-        publishedAt: { name: "Published at", type: "date" },
-        notes: { name: "Notes", type: "string" }
-    },
-    admin: {
-        form: {
-            // Fields beside the main column rather than in it.
-            sidebar: ["status", "publishedAt"],
-            sections: [
-                { key: "content", properties: ["title", "body"] },
-                {
-                    key: "internal",
-                    title: "Internal",
-                    properties: ["notes"],
-                    collapsed: true
-                }
-            ],
-            // id / created / updated at the foot of the rail. Default `true`.
-            showRecordMeta: true
-        }
-    }
-});
-```
-
-A property no section names is never dropped — it lands in a trailing group, so
-adding a column to the database cannot make a field silently invisible. A
-validation error inside a collapsed section expands it. On layouts too narrow
-for a rail (side panel, split pane, phone) the rail renders as a leading
-section and spans are ignored.
-
-## String Properties
-
-```typescript
-title: {
-    name: "Title",
-    type: "string",
-    validation: { required: true, min: 3, max: 200 },
-    admin: { multiline: false }
-}
-```
-
-### String-Specific Options
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `columnType` | `"varchar" \| "text" \| "char" \| "uuid"` | `"text"` (`"uuid"` for an `isId: "uuid"` key) | Database column type. `validation.max` does not bound `text`; `varchar`/`char` take their width from it (255 when unset) |
-| `isId` | `boolean \| "manual" \| "uuid" \| string` | — | Mark as primary key with generation strategy |
-| `enum` | `EnumValues` | — | Dropdown/picklist values |
-| `admin.multiline` | `boolean` | `false` | Multi-line text area |
-| `admin.markdown` | `boolean` | `false` | Markdown editor with preview. Uses the `RichTextEditor` component (`import { RichTextEditor } from "@rebasepro/cms/editor"`) — a full WYSIWYG editor supporting Markdown, JSON, and HTML output. |
-| `url` | `boolean` | — | The string holds a URL (emitted as `format: "uri"` in OpenAPI); renders as a link |
-| `admin.urlPreview` | `boolean \| PreviewType` | — | Upgrade that link to an inline preview. `PreviewType`: `"image"`, `"video"`, `"audio"`, `"file"` |
-| `email` | `boolean` | — | Email field rendering |
-| `storage` | `StorageConfig` | — | File upload configuration (see Storage section) |
-| `userSelect` | `boolean` | — | Render as user picker (value = user ID). Admin form only — no FK to the users table |
-| `autoValue` | `"user_on_create" \| "user_on_update"` | — | Stamp the acting user's uid (from the call context, never the body) on create, or on every write |
-| `admin.previewAsTag` | `boolean` | — | Render value as a colored tag/chip |
-| `admin.clearable` | `boolean` | `false` | Show a button that sets the value to `null` |
-
-### String isId Strategies
-
-| Value | Behavior |
-|-------|----------|
-| `true` / `"manual"` | User-defined ID, must be entered manually |
-| `"uuid"` | Auto-generated UUID via `gen_random_uuid()` (a `uuid` column) |
-| Any other string | Raw SQL default expression, e.g. `"nanoid()"`. The function must exist — nothing creates it |
-| `"increment"` | Refused at config load: a **number** strategy |
-
-`"cuid"` is refused at config load: there is no `cuid()` function in Postgres, so
-boot stops with an error naming the property. Use `"uuid"`, or a SQL strategy
-whose function you create in a migration.
-
-A collection where no property has `isId` gets an implicit
-`id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text`: the database fills it, so
-creating a row needs no key from the admin form, REST or the SDK.
-
-### String Validation
-
-```typescript
-validation: {
-    required: true,
-    min: 3,            // Minimum string length
-    max: 200,          // Maximum string length
-    matches: /^[a-z]+$/,  // Regex pattern (string or RegExp)
-    matchesMessage: "Only lowercase letters allowed",
-    unique: true,
-    uniqueInArray: true,
-    requiredMessage: "Title is required",
-    trim: true,        // Trim whitespace before validation
-    lowercase: true,   // Transform to lowercase before validation
-    uppercase: false,   // Transform to uppercase before validation
-}
-```
-
-### Storage Configuration (File Uploads)
-
-When a string property has `storage`, it becomes a file upload field. The stored value is the file path (or URL) in your storage provider.
-
-```typescript
-avatar: {
-    name: "Avatar",
-    type: "string",
-    storage: {
-        storagePath: "avatars/{id}",
-        acceptedFiles: ["image/*"],
-        maxSize: 5 * 1024 * 1024, // 5MB
-        fileName: "{rand}_{file.name}.{file.ext}",
-        metadata: { cacheControl: "max-age=31536000" },
-        imageResize: {
-            maxWidth: 400,
-            maxHeight: 400,
-            mode: "cover",
-            format: "webp",
-            quality: 80
-        },
-        previewUrl: (path) => `https://cdn.example.com/${path}`,
-        processFile: async (file) => { /* transform before upload */ return file; },
-        postProcess: async (pathOrUrl) => { /* transform saved value */ return pathOrUrl; }
-    }
-}
-```
-
-| StorageConfig Option | Type | Default | Description |
-|---------------------|------|---------|-------------|
-| `storagePath` | `string \| (ctx) => string` | **required** | Upload destination path. Placeholders: `{file}`, `{file.name}`, `{file.ext}`, `{rand}`, `{id}` (`{entityId}` is read the same), `{propertyKey}`, `{path}` |
-| `acceptedFiles` | `FileType[]` | all | Allowed MIME types. E.g. `["image/*"]`, `["application/pdf"]` |
-| `maxSize` | `number` | — | Max file size in bytes |
-| `fileName` | `string \| (ctx) => string` | — | Custom filename. Same placeholders as `storagePath` |
-| `metadata` | `Record<string, unknown>` | — | Upload metadata (e.g. Firebase `UploadMetadata`) |
-| `imageResize` | `ImageResize` | — | Resize images before upload |
-| `previewUrl` | `(fileName) => string` | — | Custom preview URL builder |
-| `processFile` | `(file: File) => Promise<File>` | — | Transform file before upload |
-| `postProcess` | `(pathOrUrl) => Promise<string>` | — | Transform saved path/URL after upload |
-| `includeBucketUrl` | `boolean` | `false` | Include bucket URL in saved path |
-| `storeUrl` | `boolean` | `false` | Save download URL instead of storage path |
-| `public` | `boolean` | `false` | Store under the public prefix, served by stable token-less URLs (avatars, storefront images) instead of short-lived signed URLs |
-| `storageSource` | `string` (or a `bucket()` handle) | `undefined` (default backend) | Named storage source key — routes uploads to a specific backend registered in the backend `storage` map or in `storageSources` on `<Rebase>`. Must match a `StorageSourceDefinition.key`. |
-
-#### Per-Property Backend Binding
-
-When using multiple storage backends, use `storageSource` to route a specific property's uploads to a named backend:
-
-```typescript
-// Route this property's uploads to Firebase Storage
-image: {
-    type: "string",
-    storage: {
-        storageSource: "firebase",
-        storagePath: "products/{id}",
-        acceptedFiles: ["image/*"],
-    }
-}
-```
-
-### ImageResize Options
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `maxWidth` | `number` | — | Max width in pixels |
-| `maxHeight` | `number` | — | Max height in pixels |
-| `mode` | `"contain" \| "cover"` | `"contain"` | Resize fitting mode |
-| `format` | `"original" \| "jpeg" \| "png" \| "webp"` | `"original"` | Output format |
-| `quality` | `number` (0-100) | `80` | Quality for JPEG/WebP |
-
-## Number Properties
-
-```typescript
-price: {
-    name: "Price",
-    type: "number",
-    validation: { required: true, min: 0, positive: true }
-}
-```
-
-### Number-Specific Options
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `columnType` | `"integer" \| "real" \| "double precision" \| "numeric" \| "bigint" \| "serial" \| "bigserial"` | `numeric` (`integer` with `validation.integer` or as a key) | Database column type. Ignored beside `isId: "increment"` |
-| `precision` / `scale` | `number` | — | `NUMERIC(precision, scale)` |
-| `isId` | `boolean \| "manual" \| "increment" \| string` | — | Mark as primary key |
-| `enum` | `EnumValues` | — | Dropdown values |
-
-### Number isId Strategies
-
-| Value | Behavior |
-|-------|----------|
-| `true` / `"manual"` | User-defined numeric ID |
-| `"increment"` | Auto-incrementing integer (`INTEGER GENERATED BY DEFAULT AS IDENTITY`) |
-| Any other string | Raw SQL default expression |
-| `"uuid"` | Refused at config load: a **string** strategy |
-
-### Number Validation
-
-```typescript
-validation: {
-    required: true,
-    min: 0,
-    max: 1000,
-    lessThan: 1001,
-    moreThan: -1,
-    positive: true,
-    negative: false,
-    integer: true,
-    unique: true
-}
-```
-
-## Boolean Properties
-
-```typescript
-published: {
-    name: "Published",
-    type: "boolean",
-    defaultValue: false,
-    validation: { required: true }
-}
-```
-
-No additional options beyond `BaseProperty`.
-
-## Date Properties
-
-```typescript
-createdAt: {
-    name: "Created At",
-    type: "date",
-    mode: "date_time",
-    autoValue: "on_create",
-    admin: { clearable: false, readOnly: true }
-}
-
-updatedAt: {
-    name: "Updated At",
-    type: "date",
-    mode: "date_time",
-    autoValue: "on_update",
-    admin: { readOnly: true }
-}
-```
-
-### Date-Specific Options
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `columnType` | `"timestamp" \| "date" \| "time"` | `"timestamp"` | Database column type (with timezone) |
-| `mode` | `"date" \| "date_time"` | `"date_time"` | Date-only or date + time picker |
-| `autoValue` | `"on_create" \| "on_update"` | — | Auto-set timestamp on create or every update |
-| `timezone` | `string` | — | Timezone string for display |
-| `admin.clearable` | `boolean` | `false` | Show clear button to set value to `null` |
-
-### Date Validation
-
-```typescript
-validation: {
-    required: true,
-    min: new Date("2020-01-01"),
-    max: new Date("2030-12-31")
-}
-```
-
-## Map Properties (Nested Objects)
-
-Maps store nested objects as `JSONB` in PostgreSQL. They can define their own inner properties schema.
-
-```typescript no-verify
-address: {
-    name: "Address",
-    type: "map",
-    properties: {
-        street: { name: "Street", type: "string" },
-        city: { name: "City", type: "string", validation: { required: true } },
-        zip: { name: "ZIP Code", type: "string" },
-        country: { name: "Country", type: "string", enum: [
-            { id: "US", label: "United States" },
-            { id: "UK", label: "United Kingdom" }
-        ]}
-    },
-    propertiesOrder: ["street", "city", "zip", "country"],
-    admin: { expanded: true, spreadChildren: true }
-}
-```
-
-### Map-Specific Options
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `columnType` | `"json" \| "jsonb"` | `"jsonb"` | Database column type |
-| `properties` | `Properties` | — | Nested property schema (same types as collection properties) |
-| `propertiesOrder` | `string[]` | — | Display order of nested fields. Stays on the property, not in `admin` — `sortProperties` in `@rebasepro/common` reads it |
-| `admin.previewProperties` | `string[]` | — | Properties shown in preview/collapsed state |
-| `keyValue` | `boolean` | — | Render as key-value table with arbitrary keys (no `properties` needed) |
-
-### Map UI Options
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `admin.expanded` | `boolean` | — | Expand map fields by default in forms |
-| `admin.minimalistView` | `boolean` | — | Compact rendering |
-| `admin.spreadChildren` | `boolean` | — | Spread child fields as if they were top-level form fields |
-
-> **IMPORTANT FOR AGENTS:** If `validation.required` is not set on the map property itself, an empty object `{}` is considered valid even if inner properties have `required: true`. Always set `validation: { required: true }` on the map if the entire object is mandatory.
-
-## Array Properties
-
-Arrays can contain any element type (except nested arrays). They map to native Postgres arrays for primitives or `JSONB` for complex types.
-
-```typescript
-tags: {
-    name: "Tags",
-    type: "array",
-    of: { type: "string" },
-    validation: { min: 1, max: 10 }
-}
-
-gallery: {
-    name: "Gallery",
-    type: "array",
-    of: {
-        type: "string",
-        storage: {
-            storagePath: "products/{id}/gallery",
-            acceptedFiles: ["image/*"]
-        }
-    }
-}
-
-metadata: {
-    name: "Metadata",
-    type: "array",
-    of: {
-        type: "map",
-        properties: {
-            key: { name: "Key", type: "string", validation: { required: true } },
-            value: { name: "Value", type: "string" }
-        }
-    },
-    admin: { expanded: true }
-}
-```
-
-### Array-Specific Options
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `columnType` | `"json" \| "jsonb" \| "text[]" \| "integer[]" \| "boolean[]" \| "numeric[]"` | auto | Database column type. Primitives default to native arrays |
-| `of` | `Property \| Property[]` | — | Element type definition. Use a single `Property` for homogeneous arrays |
-| `oneOf` | `{ properties, propertiesOrder?, typeField?, valueField? }` | — | Discriminated union for heterogeneous arrays (e.g. blog blocks) |
-| `admin.sortable` | `boolean` | `true` | Allow drag-and-drop reordering |
-| `admin.canAddElements` | `boolean` | `true` | Allow adding new elements |
-
-### Array UI Options
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `admin.expanded` | `boolean` | — | Expand array items by default |
-| `admin.minimalistView` | `boolean` | — | Compact rendering |
-| `admin.Field` | `ComponentRef` | — | Custom field component for the entire array |
-
-### Array Validation
-
-```typescript
-validation: {
-    required: true,
-    min: 1,    // Minimum number of elements
-    max: 20    // Maximum number of elements
-}
-```
-
-### oneOf (Discriminated Union Arrays)
-
-Use `oneOf` for content blocks with different types (e.g. blog content):
-
-```typescript
-content: {
-    name: "Content Blocks",
-    type: "array",
-    oneOf: {
-        typeField: "type",   // default: "type"
-        valueField: "value", // default: "value"
-        properties: {
-            text: {
-                name: "Text Block",
-                type: "string",
-                admin: { markdown: true }
-            },
-            image: {
-                name: "Image",
-                type: "string",
-                storage: { storagePath: "blog/{id}/content" }
-            },
-            quote: {
-                name: "Quote",
-                type: "map",
-                properties: {
-                    text: { name: "Quote Text", type: "string" },
-                    author: { name: "Author", type: "string" }
-                }
-            }
-        }
-    }
-}
-// Stored as: [{ type: "text", value: "# Hello" }, { type: "image", value: "path/to/img.jpg" }]
-```
-
-## Property Validation
-
-Every property supports a `validation` object with these common options.
-
-**Where it runs:** the server checks `validation` on REST, realtime-socket and MCP
-writes — what a caller sent. In-process writes (`rebase.dataAsAdmin`
-in functions and cron jobs, `context.data` in callbacks,
-seed scripts) are trusted and NOT checked: there only the database's constraints
-hold (`required` → NOT NULL, `unique` → unique index, enum type, `varchar`/`char`
-width). Validate in your own code what server code writes.
-
-| Option | Type | Applies To | Description |
-|--------|------|-----------|-------------|
-| `required` | `boolean` | All | Field is mandatory |
-| `requiredMessage` | `string` | All | Custom error message when required validation fails |
-| `unique` | `boolean` | All | Value must be unique across all entities |
-| `uniqueInArray` | `boolean` | All | Value must be unique within parent array |
-| `min` | `number \| Date` | String (length), Number, Date, Array (count) | Minimum value/length/count/date |
-| `max` | `number \| Date` | String (length), Number, Date, Array (count) | Maximum value/length/count/date |
-| `matches` | `string \| RegExp` | String | Regex pattern |
-| `matchesMessage` | `string` | String | Error message for regex mismatch |
-| `trim` | `boolean` | String | Trim whitespace before validation |
-| `lowercase` | `boolean` | String | Transform to lowercase |
-| `uppercase` | `boolean` | String | Transform to uppercase |
-| `length` | `number` | String | Exact string length |
-| `lessThan` | `number` | Number | Value must be less than |
-| `moreThan` | `number` | Number | Value must be greater than |
-| `positive` | `boolean` | Number | Value must be positive |
-| `negative` | `boolean` | Number | Value must be negative |
-| `integer` | `boolean` | Number | Value must be an integer |
-
-## Enum Values
-
-Use the `enum` property on `string` or `number` types to define picklist options:
-
-```typescript no-verify
-status: {
-    name: "Status",
-    type: "string",
-    defaultValue: "draft",
-    enum: [
-        { id: "draft", label: "Draft", color: "gray" },
-        { id: "published", label: "Published", color: "green" },
-        { id: "archived", label: "Archived", color: "red", disabled: true }
-    ]
-}
-```
-
-Each `EnumValueConfig` entry supports:
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `id` | `string \| number` | Stored value |
-| `label` | `string` | Display text |
-| `color` | `ColorKey \| ColorScheme` | Optional chip color |
-| `disabled` | `boolean` | Option is visible but not selectable |
-
-`EnumValues` can also be a `Record<string | number, string | EnumValueConfig>` for simpler definitions:
-
-```typescript no-verify
-enum: {
-    draft: "Draft",
-    published: { id: "published", label: "Published", color: "green" }  // a config entry still needs its `id`
-}
-```
-
-### PostgreSQL Enum Database Constraints
-
-When `rebase schema generate` is run, any `string` property configured with an `enum` generates a corresponding PostgreSQL `ENUM` type named `<table>_<column>` (e.g. `CREATE TYPE "public"."posts_status" AS ENUM('draft', 'published')`). An empty enum is refused at config load.
-
-If you write custom server functions, backend callback handlers, or perform manual database updates:
-1. **Validation Constraints**: Pushing or inserting a value that is NOT defined in the collection's enum options will be rejected by the enum type itself (`invalid input value for enum`).
-2. **Adding Enum Options**: adding a value is additive — `rebase db push` (or `rebase db generate` + `rebase db migrate`) and the boot-time schema ensure both apply `ALTER TYPE … ADD VALUE IF NOT EXISTS`. **Removing** a value is not: Postgres cannot drop a value from an enum type, so it needs a hand-written migration that rewrites the rows still using it and recreates the type.
-
-
-## Relations (Inline Property API)
-
-Relations are defined **directly on the property** using `type: "relation"`. The framework automatically extracts these into the collection's internal `relations[]` at normalization time — you do **not** need a separate `relations[]` array.
-
-### Many-to-One (Owning)
-
-```typescript
-import { PostgresCollectionConfig } from "@rebasepro/types";
-import authorsCollection from "./authors";
-
-const postsCollection: PostgresCollectionConfig = {
-    name: "Posts",
-    slug: "posts",
-    table: "posts",
-    properties: {
-        author: {
-            name: "Author",
-            type: "relation",
-            relation: { kind: "belongsTo", target: () => authorsCollection }
-        }
-    }
-};
-```
-
-This automatically creates an `author_id` foreign key column on the `posts` table,
-served on the wire as `authorId`.
-
-### Many-to-Many
-
-```typescript
-tags: {
-    name: "Tags",
-    type: "relation",
-    relation: { kind: "manyToMany", target: () => tagsCollection }
-}
-```
-
-This automatically creates a `posts_tags` junction table with `post_id` and `tag_id` columns.
-
-### One-to-Many
-
-```typescript
-comments: {
-    name: "Comments",
-    type: "relation",
-    relation: {
-        kind: "hasMany",
-        target: () => commentsCollection,
-        foreignKeyOnTarget: "post_id"
-    }
-}
-```
-
-### Relation Property Options
-
-The link goes under `relation`, and its `kind` decides which fields apply.
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `kind` | `"belongsTo" \| "hasOne" \| "hasMany" \| "manyToMany" \| "via"` | — | **Required.** Which kind of link |
-| `target` | `() => CollectionConfig` | — | Target collection (a thunk, to survive circular imports) |
-| `localKey` | `string` | `<relationName>_id` | `belongsTo` only — column on THIS table |
-| `index` | `boolean` | `true` | `belongsTo` only — btree index on `localKey` (skipped when the column already leads an index) |
-| `foreignKeyOnTarget` | `string` | `<thisCollection>_id` | `hasOne`/`hasMany` only — column on the TARGET's table |
-| `sourceKey` | `string` | this collection's primary key | `hasOne`/`hasMany` only — the (unique) column on THIS table that `foreignKeyOnTarget` holds, for a natural-key link |
-| `through` | `{ table?, sourceColumn?, targetColumn?, properties? }` | derived | `manyToMany` only; `sourceColumn` names THIS collection. `properties` declares payload columns on the junction row, served under `_pivot` |
-| `joinPath` | `JoinStep[]` | — | `via` only; writable when single-hop, read-only otherwise |
-| `cardinality` | `"one" \| "many"` | — | `via` only — a join chain cannot imply it |
-| `relationName` | `string` | property key | The name it is addressed by: `include`, admin tab, nested path segment |
-| `onDelete` | `OnAction` | `"restrict"` if required, else `"set null"` | Cascade rule on delete |
-| `onUpdate` | `OnAction` | — (Postgres `NO ACTION`) | Cascade rule on update |
-| `overrides` | `Partial<CollectionConfig>` | — | Override target collection config when rendered as subcollection tab |
-| `admin.fixedFilter` | `FilterValues` | — | Filter applied when selecting related entities |
-| `admin.includeId` | `boolean` | `true` | Show entity ID in the reference preview |
-| `admin.includeEntityLink` | `boolean` | `true` | Show link to open the related entity |
-| `isId` | `boolean` | — | Mark as primary key |
-| `validation` | `{ required?: boolean }` | — | On the **property**, not inside `relation` — a relation carrying its own `validation` is a boot error |
-
-### Relation UI Options
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `admin.widget` | `"select" \| "dialog"` | `"select"` | UI widget for selecting relations |
-| `admin.previewProperties` | `string[]` | — | Properties shown in relation preview (max 3) |
-| `admin.renderInForm` | `boolean` | `false` | Also render a **many**-relation as a picker inside the form, beside its tab |
-
-### Cascade Rules (OnAction)
-
-| Action | Behavior |
-|--------|----------|
-| `"cascade"` | Propagate change to related rows |
-| `"restrict"` | Prevent if related rows exist |
-| `"set null"` | Set FK to NULL |
-| `"no action"` | Defer to constraint check |
-| `"set default"` | Set FK to default value |
-
-Unset, `onDelete` is `"restrict"` for a required `belongsTo` and `"set null"`
-for an optional one. `required` says the child cannot exist without a parent, not
-that deleting the parent should delete the child — ask for `"cascade"` when that
-is what you mean. A `manyToMany` junction row is the exception: it defaults to
-`"cascade"`, because what it deletes is the link and not the target.
-
-### Multi-Hop Joins (joinPath)
-
-Use `joinPath` for advanced relationships that traverse multiple tables. When set, it overrides `localKey`, `foreignKeyOnTarget`, and `through`.
-
-Each `JoinStep` defines one JOIN operation:
-
-```typescript
-interface JoinStep {
-    table: string;          // Table to join TO
-    on: {
-        from: string | string[];  // Column(s) on the PREVIOUS table
-        to: string | string[];    // Column(s) on THIS table
-    };
-}
-```
-
-**Example: Users → Permissions through Roles (4-table join)**
-
-```typescript
-permissions: {
-    name: "Permissions",
-    type: "relation",
-    relation: {
-        kind: "via",
-        target: () => permissionsCollection,
-        cardinality: "many",
-        joinPath: [
-            {
-                table: "user_roles",
-                on: { from: "id", to: "user_id" }          // users.id = user_roles.user_id
-            },
-            {
-                table: "roles",
-                on: { from: "role_id", to: "id" }          // user_roles.role_id = roles.id
-            },
-            {
-                table: "role_permissions",
-                on: { from: "id", to: "role_id" }          // roles.id = role_permissions.role_id
-            },
-            {
-                table: "permissions",
-                on: { from: "permission_id", to: "id" }    // role_permissions.permission_id = permissions.id
-            }
-        ]
-    }
-}
-```
-
-**Example: Composite key join**
-
-```typescript
-customer: {
-    name: "Customer",
-    type: "relation",
-    relation: {
-        kind: "via",
-        target: () => customersCollection,
-        cardinality: "one",
-        joinPath: [
-            {
-                table: "customers",
-                on: {
-                    from: ["company_code", "region_id"],  // orders table columns
-                    to: ["code", "region_id"]             // customers table columns
-                }
-            }
-        ]
-    }
-}
-```
-
-A single-hop `via` is writable through a create or update: a to-one chain of one step (the target holds the key; send the target's id or `null`) or a to-many chain through one junction table (send a list of ids, no `_pivot`). A longer chain is read-only — a write naming it is refused with `400 RELATION_NOT_WRITABLE` — because it does not say which row to write. A nested write through any `via` is refused.
-
-> **See full documentation:** [Relations](https://rebase.pro/docs/collections/relations)
-
-## Collection Callbacks (Lifecycle Hooks)
-
-> **IMPORTANT FOR AGENTS**: Collections support **lifecycle callbacks** that let you run custom logic when entities are created, updated, read, or deleted. Use these to **sync data between collections**, transform data, validate business rules, or trigger side effects. **Do NOT use raw SQL triggers, cron jobs, or external scripts** when a callback can solve the problem.
-
-### Generic Type Parameters
-
-`CollectionCallbacks<M, USER>` accepts two generic type parameters:
-
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `M` | `Record<string, unknown>` | Entity values type — maps to your collection's property schema |
-| `USER` | `User` | User type — extends the base `User` type with custom fields |
-
-```typescript
-import { PostgresCollectionConfig, CollectionCallbacks } from "@rebasepro/types";
-
-// A `type`, not an `interface`: only a type alias gets the implicit index
-// signature that satisfies `Record<string, unknown>`.
-type Product = {
-    name: string;
-    price: number;
-    slug: string;
-    status: string;
-};
-
-const callbacks: CollectionCallbacks<Product> = {
-    beforeSave: async ({ values, status }) => {
-        // `values` is typed as Partial<Product>
-        if (values.name) {
-            values.slug = values.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-        }
-        return values;
-    }
-};
-```
-
-### RebaseCallContext\<USER\>
-
-All callbacks receive a `context` property of type `RebaseCallContext<USER>`. This is the subset of the full `RebaseContext` that is available in both frontend and backend (server-side) execution:
-
-| Property | Type | Description |
-|----------|------|-------------|
-| `context.client` | `RebaseCallbackClient` | Invoke backend functions, storage, email, `dataAsAdmin`. Has **no** `data` — `context.client.data` does not compile |
-| `context.data` | `RebaseSdkData` | The query accessor in a callback — `context.data.products.create(...)`. Runs with the privilege of whatever triggered the callback, on the write's own transaction |
-| `context.storageSource` | `StorageSource` | File storage operations |
-| `context.user` | `USER \| undefined` | Authenticated user (set by backend in server-side callbacks) |
-| `context.credential` | `CallerCredential \| undefined` | The API key a write was made with, since 0.26. Unset for a session |
-
-### Reserved `context.user` Values
-
-The `context.user` object is populated by the auth middleware. In server-side callbacks, it contains one of these reserved identities:
-
-| Caller | `context.user.uid` | `context.user.roles` |
-|---|---|---|
-| JWT-authenticated end-user | Real user ID (e.g. `"abc123"`) | Their assigned roles (e.g. `["viewer"]`) |
-| Server-side `rebase.dataAsAdmin` (cron jobs, custom functions), or the static service key | `"service"` | `["admin"]` |
-| Service API key (`rk_…`) | `"api-key:{id}"` | `["service"]` plus the roles it was given (e.g. `["service", "admin"]`) |
-| Personal API key | the owner's uid | the owner's roles as they are now |
-| Anonymous (no token; only reaches data with `requireAuth: false`) | `"anonymous"` | `["anon"]` |
-
-> **IMPORTANT FOR AGENTS:** `rebase.dataAsAdmin` calls (used in cron jobs, afterSave side-effects, custom functions) run through the native driver scoped as the service identity, so callbacks see `uid: "service"`, `roles: ["admin"]`. Use this to gate behavior — e.g., skip PII masking for admin/service reads:
->
-> ```typescript
-> afterRead: async ({ row, context }) => {
->     // Server-side reads (cron jobs, admin) see real values
->     if (context.user?.roles?.includes("admin")) return row;
->     // End-user reads get masked values
->     return { ...row, email: "***@***.***" };
-> }
-> ```
-
-> **WARNING FOR AGENTS:** Do NOT confuse `RebaseCallContext` (available in callbacks, both client & server) with `RebaseContext` (full context available only on the frontend, includes `authController`, `snackbarController`, `sidePanelController`, etc.). Entity callbacks always receive `RebaseCallContext`.
-
-### Callback Example
-
-```typescript
-const jobSubmissionsCollection: PostgresCollectionConfig<{
-    title: string;
-    slug: string;
-    status: string;
-    description: string;
-    company_id: string;
-    createdAt: string;
-}> = {
-    name: "Job Submissions",
-    slug: "job_submissions",
-    table: "job_submissions",
-    callbacks: {
-        // Runs BEFORE saving — transform or validate data
-        beforeSave: async ({ values, status }) => {
-            if (values.title) {
-                values.slug = values.title.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-            }
-            if (status === "new") {
-                values.createdAt = new Date().toISOString();
-            }
-            return values;
-        },
-
-        // Runs AFTER saving — trigger side effects, sync other collections
-        afterSave: async ({ values, id, previousValues, context }) => {
-            if (values.status === "approved" && previousValues?.status !== "approved") {
-                await context.data.collection<Record<string, unknown>>("jobs").create({
-                    title: values.title,
-                    description: values.description,
-                    company_id: values.company_id,
-                    status: "published",
-                    source_submission_id: id,
-                });
-            }
-        },
-
-        // Runs BEFORE deleting — block or validate
-        beforeDelete: async ({ row }) => {
-            if (row.status === "published") {
-                throw new Error("Cannot delete published submissions");
-            }
-        },
-
-        // Runs AFTER deleting — cleanup related data
-        afterDelete: async ({ id, context }) => {
-            console.log(`Submission ${id} deleted`);
-        },
-
-        // Runs AFTER reading — transform for display
-        afterRead: async ({ row }) => {
-            return {
-                ...row,
-                displayName: `${row.title} (${row.company_name})`
-            };
-        }
-    },
-    properties: { /* ... */ }
-};
-```
-
-### Available Callbacks
-
-| Callback | When It Runs | Return Value | Can Block? |
-|----------|-------------|--------------|------------|
-| `beforeSave` | Before write to DB (after validation) | Modified `values` (`Partial<EntityValues<M>>`) | Yes (throw to block) |
-| `afterSave` | After the write, **before the commit** | `void` | Yes — a throw rolls the write back |
-| `afterSaveError` | After a failed write | `void` | No |
-| `afterRead` | After reading from DB | Modified row (`Record<string, unknown>`) | No |
-| `beforeQuery` | Before any read is compiled (list, get, count, aggregate, relation loads) | `{ filter?, logical? }` to AND into the query, or nothing | Narrows only — it cannot widen a read. Postgres only; refused at boot on other engines |
-| `beforeDelete` | Before deletion | `void \| boolean` | Yes (throw, or return `false`) |
-| `afterDelete` | After the delete, **before the commit** | `void` | Yes — a throw rolls the delete back |
-
-> **IMPORTANT FOR AGENTS:** on Postgres, `beforeSave`, the SQL and `afterSave` (or
-> `beforeDelete`, the delete and `afterDelete`) run inside **one transaction**, and
-> `context.data` writes through it. A throw from an after-hook rolls the write back
-> with everything the callbacks wrote, and answers 400 `CALLBACK_REJECTED` with
-> `details.stage` naming the hook. Catch a failed `context.data` write inside the
-> hook and only that write is undone — the rest commits. Never make a network call
-> from an after-hook: it holds the transaction open for the round trip.
-
-### `callbacks` runs on the server. `admin.browserCallbacks` runs in the panel.
-
-Same hooks, same props, different runtime — and `callbacks` is almost always
-the one you want. It runs on every path that reaches the server (REST, the SDK,
-realtime, `dataAsAdmin`), and its bodies are stripped out of the admin bundle,
-so a secret read inside one never leaves the machine.
-
-`admin.browserCallbacks` is for a collection on a `direct`/`custom` transport,
-which the panel reads and writes itself with no server in the path — nothing
-server-side sees those operations, so `callbacks` can never fire for them. It
-ships to every visitor in full: no secrets in it, and redaction written there is
-presentation, not security. On a normal server-backed collection it runs *in
-addition* to the server's, so anything written there must be idempotent. Both
-blocks are handed rows as the server sends them (ISO dates, a belongsTo as its
-foreign key), on every write the panel makes, and the browser's `context.data`
-reads the same rows; a write through it runs `browserCallbacks` too.
-
-```typescript
-admin: {
-    browserCallbacks: {
-        afterRead: ({ row }) => ({ ...row, label: [row.city, row.code].join(" · ") })
-    }
-}
-```
-
-### Callback Props Reference
-
-**`beforeSave` / `afterSave` / `afterSaveError` Props:**
-
-| Prop | Type | Description |
-|------|------|-------------|
-| `values` | `Partial<EntityValues<M>>` | Entity values being saved |
-| `id` | `string \| number` (optional in `beforeSave` and `afterSaveError`) | Entity ID (`undefined` for new entities in `beforeSave`, and for a create that failed) |
-| `previousValues` | `Partial<EntityValues<M>> \| undefined` | Previous values (for updates) |
-| `status` | `EntityStatus` | `"new"`, `"existing"`, or `"copy"` |
-| `collection` | `CollectionConfig<M>` | The collection definition |
-| `path` | `string` | Collection path |
-| `context` | `RebaseCallContext<USER>` | Context with `client`, `data`, `storageSource`, `user` |
-| `error` | `unknown` | `afterSaveError` only — what the save threw |
-
-**`afterRead` Props:**
-
-| Prop | Type | Description |
-|------|------|-------------|
-| `row` | `Record<string, unknown>` | The fetched row (flat — `{ id, ...columns }`) |
-| `collection` | `CollectionConfig<M>` | The collection definition |
-| `path` | `string` | Collection path |
-| `context` | `RebaseCallContext<USER>` | Context |
-
-**`beforeDelete` / `afterDelete` Props:**
-
-| Prop | Type | Description |
-|------|------|-------------|
-| `row` | `Record<string, unknown>` | The row being deleted (flat — `{ id, ...columns }`) |
-| `id` | `string \| number` | Entity ID |
-| `collection` | `CollectionConfig<M>` | The collection definition |
-| `path` | `string` | Collection path |
-| `context` | `RebaseCallContext<USER>` | Context |
-
-### Property-Level Callbacks
-
-Individual properties also support `callbacks` with `afterRead` and `beforeSave`:
-
-```typescript
-title: {
-    name: "Title",
-    type: "string",
-    callbacks: {
-        beforeSave: async ({ value, values }) => {
-            // Transform just this property's value before saving
-            return value?.trim().replace(/\s+/g, " ");
-        },
-        afterRead: async ({ value }) => {
-            // Transform just this property's value after reading
-            return value?.toUpperCase();
-        }
-    }
-}
-```
-
-### Combining callback sets — `composeCallbacks` (0.25+)
-
-A collection has one `callbacks` object. When two independent behaviours belong
-on it — an audit trail and a slug generator, a tenant scope and a soft-delete
-filter — compose them instead of merging the bodies by hand:
-
-```typescript
-import { composeCallbacks, defineCollection } from "@rebasepro/cms-types";
-import type { CollectionCallbacks } from "@rebasepro/types";
-
-const slugFromTitle: CollectionCallbacks = {
-    beforeSave: ({ values }) =>
-        typeof values.title === "string"
-            ? { ...values, slug: values.title.toLowerCase().replace(/[^a-z0-9]+/g, "-") }
-            : values
-};
-
-const auditTrail: CollectionCallbacks = {
-    afterSave: async ({ id, context }) => {
-        await context.data.collection("audit_log").create({ entity: "posts", entity_id: String(id), by: context.user?.uid ?? null });
-    }
-};
-
-export default defineCollection({
-    slug: "posts",
-    name: "Posts",
-    table: "posts",
-    properties: {
-        title: { type: "string", name: "Title" },
-        slug: { type: "string", name: "Slug" }
-    },
-    callbacks: composeCallbacks(slugFromTitle, auditTrail)
-});
-```
-
-`composeCallbacks(...sets)` (from `@rebasepro/cms-types` or `@rebasepro/server`)
-runs the sets in the order given, and each hook combines exactly as the backend
-combines its global → collection → property tiers:
-
-- `beforeSave` and `afterRead` **chain**: each set sees what the previous one
-  returned (a returned object is shallow-merged over the values).
-- `beforeQuery` narrowings are **AND-ed**: every set sees the caller's query.
-- `beforeDelete` **vetoes** if any set returns `false`; every set still runs.
-- `afterSave` and `afterDelete` run in order, awaited; a throw stops them.
-- `afterSaveError`: every set runs even if one throws; the first error is
-  rethrown at the end.
-- A hook exists on the result only if some set has it; `undefined` sets are
-  skipped.
-
-> **IMPORTANT FOR AGENTS:** `backend.setCollectionCallbacks(slug, callbacks)`
-> **replaces** the callbacks the collection declared — it does not add to them.
-> To attach more at runtime and keep the declared ones, compose them:
-> `backend.setCollectionCallbacks("posts", composeCallbacks(posts.callbacks, mine))`.
-
-### Testing a callback — `createCallContext` (0.25+)
-
-A callback is a plain function of one props object, so a unit test calls it.
-`createCallContext(partial)` (from `@rebasepro/server` or `@rebasepro/common`)
-builds the `context` it receives:
-
-```typescript
-import { createCallContext } from "@rebasepro/server";
-import type { User } from "@rebasepro/types";
-import posts from "../config/collections/posts";
-
-const editor: User = { uid: "u1", displayName: null, email: null, photoURL: null,
-    providerId: "password", isAnonymous: false, roles: ["editor"] };
-
-const values = await posts.callbacks!.beforeSave!({
-    collection: posts, path: "posts", status: "new",
-    values: { title: "Hello World" },
-    context: createCallContext({ user: editor })
-});
-```
-
-- A field you pass is used as it is. `user` stays **absent** unless you pass it
-  — how a write with no signed-in caller looks on the server.
-- A `client`, `data` or `storageSource` you leave out throws on first **use**,
-  naming the field (`context.data was not provided to createCallContext…`), so
-  the test fails at the line that needed it. For a real data plane pass
-  `data: buildSdkData(driver)` (`@rebasepro/common`).
-
-### Common Use Cases
-
-- **Syncing data between collections** — Use `afterSave` to copy/move entities from one collection to another (e.g., approved submissions → published jobs)
-- **Computed fields** — Use `beforeSave` to generate slugs, timestamps, or derived values
-- **Validation** — Use `beforeSave` to enforce business rules beyond schema validation
-- **Notifications** — Not from the `afterSave` body: it runs inside the write's transaction, so an email, Slack message or webhook call there holds the transaction open and cannot be taken back if the write rolls back. Enqueue a job, or send it after the write returns — see [Hooks](https://rebase.pro/docs/backend/hooks#side-effects-that-must-not-hold-the-transaction)
-- **Cascade operations** — Use `afterDelete` to clean up related records in other collections
-- **Data enrichment** — Use `afterRead` to add computed/virtual fields for display
-
-> **See full documentation:** [Collection Callbacks](https://rebase.pro/docs/collections/callbacks)
-
-## Entity Actions (Custom UI Buttons)
-
-> **IMPORTANT FOR AGENTS**: Collections support **custom action buttons** that appear in the collection table view and entity form. Use these for workflow actions like "Approve", "Send Email", "Export PDF", "Clone to Staging", etc. Do NOT build separate pages or scripts for common admin actions.
-
-Add an `entityActions` array to any collection definition:
-
-```tsx
-const jobSubmissionsCollection: PostgresCollectionConfig = {
-    name: "Job Submissions",
-    slug: "job_submissions",
-    table: "job_submissions",
-    properties: { /* ... */ },
-    admin: {
-        entityActions: [
-            {
-                name: "Approve",
-                icon: <CheckCircleIcon />,
-                // Only show for pending submissions
-                isEnabled: ({ row }) => row?.status === "pending",
-                onClick: async ({ id, context, onCollectionChange }) => {
-                    if (id === undefined || !context) return;
-                    await context.data.collection<Record<string, unknown>>("job_submissions").update(id, {
-                        status: "approved"
-                    });
-                    context.snackbarController?.open({
-                        type: "success",
-                        message: "Submission approved!"
-                    });
-                    onCollectionChange?.();
-                }
-            },
-            {
-                name: "Export PDF",
-                collapsed: true,  // Show in overflow menu
-                includeInForm: true,
-                onClick: async ({ id }) => {
-                    window.open(`/api/functions/export-pdf/${id}`);
-                }
-            }
-        ]
-    }
-};
-
-```
-
-### EntityAction Interface
-
-| Property | Type | Default | Description |
-|----------|------|---------|-------------|
-| `name` | `string` | — | Button label |
-| `key` | `string` | — | Override default actions: `"edit"`, `"delete"`, `"copy"` |
-| `icon` | `ReactElement \| string` | — | Optional icon — a rendered element or a Lucide icon name. On the action itself, not under `admin` |
-| `onClick` | `(props: EntityActionClickProps) => void \| Promise<void>` | — | Action handler |
-| `isEnabled` | `(props: EntityActionClickProps) => boolean` | — | Conditionally disable the action |
-| `disabledReason` | `(props: EntityActionClickProps) => string \| undefined` | — | Why a disabled action is unavailable — shown under its name in a menu and as a disabled button's tooltip. Give one whenever you give `isEnabled` |
-| `collapsed` | `boolean` | `true` | `true`: in the ⋮ menu. `false`: a labelled button in the record's bar (edit and read-only views, folding back into the menu when the bar is short of room) and an icon on the table row. Reserve it for the one or two actions the record is opened for |
-| `includeInForm` | `boolean` | `true` | Show on the record (edit and read-only views); `false` leaves it on the collection's rows only |
-| `showActionsInListView` | `boolean` | `false` | Show inline on each row in list view |
-
-### EntityActionClickProps
-
-The `onClick` and `isEnabled` handlers receive:
-
-| Prop | Type | Description |
-|------|------|-------------|
-| `row` | `Record<string, unknown> \| undefined` | The record as the server sends the row: ISO dates, a belongsTo as its foreign-key column, `id` only where the table has that column |
-| `id` | `string \| number \| undefined` | The record's id |
-| `context` | `RebaseContext<USER>` | Full context (includes `snackbarController`, `authController`, etc.) |
-| `path` | `string \| undefined` | Collection path the record is at, subcollection segments included |
-| `collection` | `AdminCollection<M> \| undefined` | Collection definition |
-| `formContext` | `FormContext \| undefined` | Form state (when called from a form): `values` are the form's, unsaved edits included |
-| `sidePanelController` | `SidePanelController \| undefined` | Side panel control |
-| `selectionController` | `SelectionController \| undefined` | The collection view's selection, by id: `selection` (`{ type: "rows", ids, rows }` or a query), `isSelected(id)`, `toggleSelection(row, selected?)` |
-| `view` | `"collection" \| "form"` | Where the action was triggered |
-| `openEntityMode` | `"side_panel" \| "full_screen" \| "split" \| "dialog"` | How the entity form is opened |
-| `highlightRow` | `(id) => void` | Highlight a row by its id |
-| `unhighlightRow` | `(id) => void` | Remove highlight |
-| `navigateBack` | `() => void` | Navigate back (e.g., after deleting) |
-| `onCollectionChange` | `() => void` | Refresh the collection view |
-
-## Entity Custom Views (Tabs)
-
-Collections support `entityViews` — custom React components that appear as **tabs** in the entity detail view. Use these for previews, analytics, related items, or any custom UI per entity.
-
-Entity views can be registered:
-1. **Globally** in the `<RebaseCMS>` component via the `entityViews` prop
-2. **Per-collection** by referencing view keys in the collection's `entityViews` array
-
-```tsx
-// Global registration in App.tsx
-const entityViews = [
-    {
-        key: "blog_preview",
-        name: "Preview",
-        Builder: BlogEntryPreview,
-        position: "start" as const
-    }
-];
-
-<RebaseCMS collections={collections} entityViews={entityViews}/>
-
-// Per-collection reference in collection definition
-const postsCollection: PostgresCollectionConfig = {
-    name: "Posts",
-    slug: "posts",
-    table: "posts",
-    properties: { /* ... */ },
-    admin: {
-        entityViews: ["blog_preview"]  // References the global view by key
-    }
-};
-
-```
-
-The `Builder` component receives:
-- `row` — The saved record as the server sends the row (ISO dates, a belongsTo as its foreign-key column, `id` only where the table has that column); `undefined` for a new record
-- `modifiedValues` — Current form values, unsaved edits included, typed for the editor (a date is a `Date`)
-- `formContext` — Form state and methods
-- `collection` — The collection definition
-
-### TypeScript Strict Checks in Custom Views
-
-Under strict TypeScript checks (`strictNullChecks: true`), since `row` is typed as optional (`row?: Record<string, unknown>`), accessing `row.field` directly will cause compilation errors like:
-`error TS18048: 'row' is possibly 'undefined'.`
-
-Always add a guard clause at the very beginning of your custom view component to handle the undefined state:
-```typescript
-function MyCustomView({ row }: EntityCustomViewParams) {
-    if (!row) {
-        return null; // or show a loading/error state
-    }
-    // …`row` is narrowed from here on
-}
-```
-This narrows the type of `row` for the remainder of the component, allowing safe property access (e.g. `row.field`). The record's id is the `id` prop beside it, a string, absent with `row` for a new record: `row` has an `id` column only where the table does.
-
-## Entity Preview & Title Resolution
-
-### Entity display
-
-Six roles — `title`, `subtitle`, `image`, `status`, `date`, `tags` — fill every
-surface that draws a record. Each is derived from the properties, and each can be
-stated as a property path or as a function:
-
-```typescript
-admin: {
-    display: {
-        title: "name",
-        image: "cover",
-        // A resolver is handed the row as the server sends it, and the record's id (a string) beside it.
-        subtitle: ({ row }) => `in ${String(row.city)}`,
-        // A resolver may be async: this reads a document the record does not carry.
-        status: async ({ id, context }) =>
-            (await context.data.audits.findById(`${id}/latest`))?.state
-    }
-}
-```
-
-While an async resolver is in flight the surface shows the derived value and swaps
-the resolved one in; results are cached per record and per role. Return
-`undefined` when a record has nothing for a role — the surface picks its own
-fallback. Prefer a path when the value is on the record: it keeps the property's
-own rendering (an enum stays a chip, a date stays formatted).
-
-`admin.titleProperty` was the old name of `display.title`. It has been removed;
-`display.title` takes the same string.
-
-### Title Property Selection
-When `display.title` is not set, the property used as the entity's display title (previews, headers) is resolved from the property *schema*. Only a `string`, a to-one `relation` or a `reference` can qualify; primary keys, foreign-key columns, `uuid` columns, `storage` fields and `admin.hideFromCollection` fields never do. Then:
-1. If `propertiesOrder` is explicitly defined on the collection, the first qualifying property in that order is chosen.
-2. If no `propertiesOrder` is defined, the candidates are ranked — a string whose key names a label (`name`, `title`, `label`, `displayName`, `username`, …) first, then other short free text, email, enums, multiline/markdown text, relations and user pickers, and references last — with ties broken by declaration order.
-
-For a concrete record, a candidate whose value is empty, repeats the record id or looks like an identifier (a UUID, an ObjectId) is skipped in favour of the next.
-
-### Relation Previews in Tables
-When `propertiesOrder` is explicitly set, relation properties are *not* automatically filtered out of the default preview columns (whereas they are excluded from unordered defaults to avoid slow join operations).
-
-### What a title value renders as
-Whatever the title property holds, the panel renders a string: a date is formatted, an array is joined, and a relation — which arrives as `{ id, data: { values } }` rather than as text — is looked through for the first of `name`, `title`, `label` or `displayName` on the related row, falling back to its id. So a title may name a `relation` property and still read as a name rather than a uuid. This is not an exported helper and there is nothing to import: it is what every surface that draws a record already does.
-
-## Collection-Scoped Component Overrides
-
-You can override built-in UI components for a specific collection by adding a `components` map to its definition. This is a collection-level implementation of Docusaurus-style swizzling.
-
-Only collection-scoped components can be overridden here. App-level components (such as `Shell.AppBar` or `HomePage`) must be overridden globally at the `<Rebase>` root.
-
-```tsx
-import { PostgresCollectionConfig } from "@rebasepro/types";
-
-const productsCollection: PostgresCollectionConfig = {
-    name: "Products",
-    slug: "products",
-    table: "products",
-    properties: { ... },
-    admin: {
-        components: {
-            // Eject Mode: Replace the empty state view entirely
-            "Collection.EmptyState": { Component: ProductCustomEmptyState },
-        
-            // Wrap Mode: Wrap the built-in form, augmenting it
-            "Entity.Form": {
-                // `OriginalComponent` is injected at runtime when `wrap: true`; the
-                // override slot's type does not model it, hence the cast.
-                Component: (({ OriginalComponent, ...props }: {
-                    OriginalComponent: React.ComponentType<Record<string, unknown>>
-                }) => (
-                    <div>
-                        <div className="bg-amber-100 p-2 text-amber-800 text-sm">Editing Product</div>
-                        <OriginalComponent {...props} />
-                    </div>
-                )) as unknown as React.ComponentType<Record<string, unknown>>,
-                wrap: true
-            }
-        }
-    }
-};
-
-```
-
-`OriginalComponent` is the component as the app level left it: when
-`<Rebase components>` also overrides `"Entity.Form"`, the collection's wrapper
-receives that app-level override, not the built-in (0.25+; in 0.24 and earlier
-it always received the built-in, and the app-level override did not render for
-this collection). An eject at collection level (no `wrap`) replaces both.
-
-### Collection-Scoped Overridable Components
-
-The keys are the `CollectionComponentName` union in
-`@rebasepro/cms-types`. They are string keys, not exported components — see the
-**rebase-admin** skill.
-
-| Component Key | Description |
+| Situation | Command |
 |---|---|
-| `"Collection.View"` | The entire collection landing page |
-| `"Collection.Table"` | The default table view |
-| `"Collection.Card"` | The card view item wrapper |
-| `"Collection.EmptyState"` | Displayed when a collection has no items |
-| `"Collection.Actions"` | Toolbar buttons above the table/cards |
-| `"Collection.FilterField"` | The per-property filter input |
-| `"Entity.Form"` | The detail form for creating/updating |
-| `"EditView.FormActions"` | Form submission/cancel button bar |
-| `"DetailView"` | Read-only detail view |
-| `"Entity.SidePanel"` | The side panel container for form/detail |
-| `"EntityPreview"` | Inline reference/relation chip preview |
-| `"Entity.MissingReference"` | Rendered when a referenced entity is deleted or missing |
+| `pnpm dev` running | Save the file. Boot creates missing tables, columns, enum types and policies. |
+| Check after an edit | `rebase verify` (`--json` names each file and fix) |
+| Regenerate without `pnpm dev` | `rebase schema generate` (writes `backend/src/schema.generated.ts`), then `rebase generate-sdk` |
+| What boot leaves alone (rename, narrowed type, removed column) in development | `rebase db push` (`--dry-run` prints the SQL; destructive changes need `--allow-destructive`) |
+| Production | `rebase db generate` (writes `drizzle/migrations/*.sql`), review, then `rebase db migrate` |
+| Relax `NOT NULL` / drop columns on a deployed backend | `rebase schema reconcile` (`--drop table.column`) |
+| Schema and database disagree | `rebase doctor` |
+| Adopt an existing database | `rebase schema introspect` (writes `defineTable` modules with `rls: "admin-only"`) |
 
-> **IMPORTANT FOR AGENTS:** three of these do **not** carry the `Entity.` prefix
-> the others do — `"DetailView"`, `"EntityPreview"` and `"EditView.FormActions"`.
-> Writing `"Entity.DetailView"`, `"Entity.Preview"` or `"Entity.FormActions"`
-> type-errors against `CollectionComponentName`, and in plain JavaScript it is a
-> key nothing ever reads: the override silently does not apply.
-
-App-scoped keys (set on `<Rebase>` rather than per collection) are
-`"Shell.AppBar"`, `"Shell.Drawer"`, `"Shell.DrawerNavigationItem"`,
-`"Shell.DrawerNavigationGroup"`, `"HomePage"`, `"HomePage.CollectionCard"` and
-`"Auth.LoginView"`.
-
-## Authentication Collection Configuration (auth)
-
-You can mark a collection as an authentication collection by setting the `auth` property to `true` (shorthand for `{ enabled: true }`) or providing an `AuthCollectionConfig` object.
-
-This is the collection used for user credentials, password hashing, and user management. Rebase auto-injects required auth actions (like resetting passwords) and routes them through this config.
-
-```typescript
-import { PostgresCollectionConfig } from "@rebasepro/types";
-
-const customUsersCollection: PostgresCollectionConfig = {
-    name: "Members",
-    slug: "members",
-    table: "members",
-    auth: {
-        enabled: true,
-        // Override default user creation flow
-        onCreateUser: async (values, ctx) => {
-            const hash = await ctx.hashPassword("welcome123");
-            return {
-                values: { ...values, passwordHash: hash, emailVerified: true },
-                temporaryPassword: "welcome123"
-            };
-        },
-        // Override default password reset flow
-        onResetPassword: async (userId, ctx) => {
-            if (ctx.emailConfigured) {
-                const tempPassword = "reset_" + Math.random().toString(36).substring(2, 8);
-                // Rebase hashes and saves a returned `temporaryPassword` itself,
-                // signs the account out and shows it to the admin
-                return { temporaryPassword: tempPassword, invitationSent: false };
-            }
-            return { invitationSent: false };
-        },
-        // Override/disable default user management actions
-        actions: {
-            resetPassword: true // Or false to disable, or a custom EntityAction to replace the UI
-        }
-    },
-    properties: { ... }
-};
-```
-
-## Vector Properties
-
-For similarity search and AI embeddings:
-
-```typescript
-embedding: {
-    name: "Embedding",
-    type: "vector",
-    dimensions: 1536  // Required — must match your model's output dimensions
-}
-```
-
-| Option | Type | Description |
-|--------|------|-------------|
-| `dimensions` | `number` | **Required.** Number of dimensions in the vector |
-| `index` | `VectorIndexConfig \| false` | ANN index. Omitted, one HNSW index for cosine distance. `false` creates none. |
-
-**Every vector column gets an ANN index by default** — HNSW, cosine — so
-`vectorSearch` is approximate and fast rather than an exact scan. Cosine because
-that is what `vectorSearch` measures with unless a `distance` is passed, and
-**an index serves exactly one operator**: an `l2` query against a cosine-only
-index quietly goes back to scanning. Index several by naming several, at the
-cost of a separate build and separate storage each:
-
-```typescript
-embedding: {
-    name: "Embedding",
-    type: "vector",
-    dimensions: 1536,
-    index: {
-        method: "hnsw",              // or "ivfflat"
-        distance: ["cosine", "l2"],  // one index each
-        m: 24,                       // hnsw
-        efConstruction: 128          // hnsw
-        // lists: 200                // ivfflat only
-    }
-}
-```
-
-- `ivfflat` partitions by centroid, so an index built on an empty or tiny table
-  has useless partitions — build it after the data is loaded, and set `lists`.
-  `hnsw` needs no training data and works on an empty table, which is why it is
-  the default.
-- `index: false` keeps the exact scan deliberately.
-- **Above 2000 dimensions pgvector can index neither type**, so the column is
-  created unindexed and the boot says so. A 3072-dimension embedding does not
-  fail to boot; it scans.
-- pgvector itself is a prerequisite. The scaffold's database image ships it; a
-  database someone else provisioned needs the extension available and a role
-  that can run `CREATE EXTENSION vector;` once.
-
-## Geopoint Properties
-
-```typescript
-location: {
-    name: "Location",
-    type: "geopoint"
-}
-// Stored as JSONB: { latitude: number, longitude: number }
-```
-
-## Security Rules (RLS)
-
-Collections support **Row Level Security** via the `securityRules` array. This generates PostgreSQL RLS policies:
-
-```typescript
-const postsCollection: PostgresCollectionConfig = {
-    name: "Posts",
-    slug: "posts",
-    table: "posts",
-    securityRules: [
-        // Anyone can read published posts
-        { operation: "select", using: "{status} = 'published'" },
-        // Authors can see/edit their own
-        { operations: ["select", "insert", "update"], ownerField: "authorId" },
-        // Only admins can delete
-        { operation: "delete", roles: ["admin"] }
-    ],
-    properties: { /* ... */ }
-};
-```
-
-### Security Rule Types
-
-Rules are a discriminated union — you must use exactly one of: `ownerField`, `access: "public"`, a structured `condition`/`check`, raw `using`/`withCheck`, or roles-only. They cannot be mixed (enforced at the type level).
-
-| Variant | Key Field | Generates |
-|---------|-----------|-----------|
-| `OwnerSecurityRule` | `ownerField: "user_id"` | `USING ((user_id)::text = (SELECT rebase.uid()))`: `rebase.uid()` is text, so the column is cast |
-| `PublicSecurityRule` | `access: "public"` | `USING (true)` — no row filter, not anonymous access |
-| `StructuredSecurityRule` | `condition: policy.…` (`check` defaults to it) | USING/WITH CHECK compiled from a `PolicyExpression` — the recommended form for a non-trivial condition, because the admin UI evaluates the same expression |
-| `RawSQLSecurityRule` | `using: "..."` | Custom USING/WITH CHECK clause |
-| `RawSQLCheckOnlySecurityRule` | `withCheck: "..."` alone | WITH CHECK only — the shape of an INSERT policy |
-| `RolesOnlySecurityRule` | (none of the above) | Roles-only, no row filter |
-
-### Common Options (SecurityRuleBase)
-
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `name` | `string` | auto-generated | Human-readable policy name (must be unique per table) |
-| `operation` | `SecurityOperation` | `"all"` | Single operation: `"select"`, `"insert"`, `"update"`, `"delete"`, `"all"` |
-| `operations` | `SecurityOperation[]` | — | Multiple operations (generates one policy per operation) |
-| `mode` | `"permissive" \| "restrictive"` | `"permissive"` | Permissive rules are OR'd; restrictive are AND'd |
-| `roles` | `string[]` | — | Application-level roles (Rebase roles, NOT Postgres roles). Can be combined with any variant |
-| `pgRoles` | `string[]` | `["public"]` | Advanced: native PostgreSQL database roles for the `TO` clause |
-
-### SQL Context Functions
-
-In raw SQL expressions (`using`, `withCheck`), these functions are available:
-- `rebase.uid()` — the current user's ID
-- `rebase.roles()` — comma-separated app role IDs
-- `rebase.jwt()` — full JWT claims as JSONB
-- `{column_name}` — resolves to `table.column_name`
-
-> The pre-1.0 spellings `auth.uid()` / `auth.roles()` / `auth.jwt()` are still
-> rewritten to the `rebase.*` ones on compile, so old rules keep working — but
-> the backend names the collections carrying them at boot. Write `rebase.*`.
-
-> **See full documentation:** [Security Rules](https://rebase.pro/docs/collections/security-rules)
-
-## Dynamic Properties (Conditions)
-
-For declarative, JSON-serializable dynamic behavior, use `conditions` instead of `dynamicProps`:
-
-```typescript
-discount_percentage: {
-    name: "Discount %",
-    type: "number",
-    conditions: {
-        // Only show when sale_enabled is true
-        hidden: { "!": { "var": "values.sale_enabled" } },
-        // Required when visible
-        required: { "var": "values.sale_enabled" },
-        // Min 0, max 100
-        min: 0,
-        max: 100
-    }
-}
-```
-
-Available condition fields: `disabled`, `disabledMessage`, `clearOnDisabled`, `hidden`, `readOnly`, `required`, `requiredMessage`, `min`, `max`, `defaultValue`, `enumConditions`, `allowedEnumValues`, `excludedEnumValues`, `referencePath`, `referenceFilter`, `canAddElements`, `sortable`, `acceptedFiles`, `maxFileSize`.
-
-`hidden`, `readOnly` and `disabled` also take a plain `true` for the
-unconditional case — the field is never shown, never editable — instead of a
-rule that is always true:
-
-```typescript
-internal_note: {
-    name: "Internal note",
-    type: "string",
-    conditions: { hidden: true }   // keep it in the collection, out of the form
-}
-```
-
-## Schema Migration Workflow
-
-**Every collection file in `config/collections/` is loaded, listed or not.** The
-barrel is a sort order, not a registry: the runtime, the admin panel, `rebase
-build`, `schema generate` and `generate-sdk` scan the directory. Add a new file to
-the `collections` array exported by `config/collections/index.ts` to set its place
-in the admin navigation; to remove a collection, delete its file:
-
-```typescript title="config/collections/index.ts"
-import postsCollection from "./posts.js";
-import productsCollection from "./products.js";   // ← the new one
-
-export const collections = [postsCollection, productsCollection];
-```
-
-A file left out of the array is still created, served at `/api/data/<slug>`,
-typed in the SDK and shown in the panel — it just sorts after the listed ones in
-the navigation. Every
-top-level `.ts`/`.js` file in the directory other than `index`, tests and
-`.d.ts` must import cleanly and default-export a collection: one that does not
-fails the load, at boot and in every command. The index's other job is
-`defaultSecurityRules`, which every collection declaring no rules inherits.
-
-Then apply the changes to the database. While `rebase dev` is running, saving
-the file already regenerates the Drizzle schema and the SDK types in
-`generated/sdk/`, and boot creates the missing tables and columns. The commands
-below are for everything else:
-
-```bash
-# All commands run from the project root directory unless noted
-
-# 1. Regenerate the Drizzle schema from your collection definitions
-rebase schema generate
-
-# 2a. Development — push changes directly
-rebase db push
-
-# 2b. Production — generate and review migration files
-rebase db generate
-rebase db migrate
-```
+Every one of these compiles the tables first and stops with a
+`SchemaDefinitionError` listing each problem with the table, the column or
+relation, and what to write instead — e.g. a table with no primary key, or
+`rls: "inherit"` with no `defaultRls` exported. All take `--schema-dir <dir>`.
+Never pass `--allow-destructive` against anything but a local development
+database. Never hand-edit `schema.generated.ts`.
 
 ## References
 
-- **Documentation:** [rebase.pro/docs](https://rebase.pro/docs)
-- **GitHub:** [github.com/rebasepro/rebase](https://github.com/rebasepro/rebase)
+- [references/migrate-from-collections.md](references/migrate-from-collections.md) — moving a project from `config/collections` to `backend/schema` + `frontend/src/cms`
+- `rebase-security` — every `rls` rule form, `policy.*`, field access, fail-closed design
+- `rebase-auth` — the users table, roles, scopes
+- `rebase-sdk` — reading and writing tables from code
+- `rebase-customize-admin`, `rebase-custom-views` — React components in the CMS
+- Docs: <https://rebase.pro/docs/schema/>, <https://rebase.pro/docs/collections/relations/>, <https://rebase.pro/docs/frontend/customize-table/>

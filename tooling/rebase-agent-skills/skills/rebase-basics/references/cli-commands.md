@@ -29,13 +29,13 @@ output so Node ESM can load it; `--check` reports instead of rewriting.
 
 | Option | Alias | Description |
 |--------|-------|-------------|
-| `--headless` | — | Backend only: no admin panel, no collections. Prompts when omitted |
+| `--headless` | — | Backend only: no admin panel, no `backend/schema`. Prompts when omitted |
 | `--template` | `-t` | Starter template to scaffold from: `blog` (default), `ecommerce` or `blank` |
 | `--git` | `-g` | Initialize a git repository |
 | `--install` | `-i` | Install dependencies with the detected PM |
 | `--no-install` | — | Install nothing, and do not ask |
 | `--database-url` | — | PostgreSQL connection string (skip prompt) |
-| `--introspect` | — | Generate collections from that database (implies `--template blank`; needs `--install`) |
+| `--introspect` | — | Generate `backend/schema` from that database (implies `--template blank`; needs `--install`) |
 | `--project` | — | Link the scaffold to a Rebase Cloud project |
 | `--setup-key` | — | One-time key authenticating that cloud link (with `--project`) |
 | `--yes` | `-y` | Non-interactive mode (use all defaults; git init and the install are skipped unless `--git` / `--install` is passed) |
@@ -44,12 +44,12 @@ output so Node ESM can load it; `--check` reports instead of rewriting.
 #### What gets scaffolded
 
 ```bash
-rebase init my-api   --headless   # backend/ alone — REST, auth, storage, realtime, backups. No collections, no UI, no React
-rebase init my-app                # config/ + backend/ + frontend/ — the backend plus the admin panel (default)
+rebase init my-api   --headless   # backend/ alone — REST, auth, storage, realtime, backups. No backend/schema, no UI, no React
+rebase init my-app                # backend/ (with backend/schema) + frontend/ (with src/cms) — the backend plus the admin panel (default)
 ```
 
-`--headless` introspects the collections from the database at boot rather than reading
-config files, so there is nothing to declare and nothing to keep in sync. It
+`--headless` reads the tables from the database at boot rather than from
+`backend/schema`, so there is nothing to declare and nothing to keep in sync. It
 serves only tables with `ENABLE ROW LEVEL SECURITY` — a table without RLS has no
 authorization model, so serving it would hand every row to every logged-in user.
 
@@ -82,7 +82,7 @@ rebase init my-app --yes --database-url "postgresql://user:pass@host:5432/db" --
 3. Previously saved port from `.rebase-dev-port` (port affinity)
 4. Deterministic hash from project path (unique per project)
 
-**Generated files stay current on their own.** On startup and on every save under `config/collections/`, the CLI regenerates the Drizzle schema (`backend/src/schema.generated.ts`) and the SDK types (`generated/sdk/`). There is no flag for it and nothing to run by hand.
+**Generated files stay current on their own.** On startup and on every save under `backend/schema/`, the CLI regenerates the Drizzle schema (`backend/src/schema.generated.ts`) and the SDK types (`generated/sdk/`). There is no flag for it and nothing to run by hand.
 
 ```bash
 # Start everything (default)
@@ -94,7 +94,7 @@ rebase dev --backend-only --port 3005
 
 ### `rebase build`
 
-Builds the apps declared in `rebase.json`. For the `backend` app this produces a **bundle** — compiled collections, functions and schema plus a manifest — which is the artifact the runtime (and `rebase start`) loads. For `static` apps it runs the declared build command and reports where the output landed.
+Builds the apps declared in `rebase.json`. For the `backend` app this produces a **bundle** — compiled tables, functions and schema plus a manifest — which is the artifact the runtime (and `rebase start`) loads. For `static` apps it runs the declared build command and reports where the output landed.
 
 Takes an optional list of app names; with none, every app in the manifest is built.
 
@@ -102,7 +102,7 @@ Takes an optional list of app names; with none, every app in the manifest is bui
 |--------|-------|-------------|
 | `--output` | `--out` | Bundle output directory (default: `dist-bundle`) |
 | `--skip-type-check` | | Compile without type checking (iteration only) |
-| `--skip-schema` | | Do not regenerate the database schema from collections |
+| `--skip-schema` | | Do not regenerate the database schema from the tables |
 | `--no-static` | | Do not fold the frontend assets into the backend bundle |
 | `--skip-static-build` | | Fold already-built assets without re-running the app's build |
 | `--no-vendor` | | Do not install the dependencies into the bundle (they install on every start instead) |
@@ -143,10 +143,10 @@ booting and prints that line.
 
 | Command | Description |
 |---------|-------------|
-| `rebase schema generate` | Generate Drizzle schema from collection definitions |
-| `rebase schema introspect` | Introspect a live database → generate Rebase collection files. Since 0.25 each table's RLS policies land in its `securityRules` (the `<table>_default_*` ones Rebase adds are left out), so the `db push` after it keeps them |
-| `rebase schema stale` | Report generated schema files the collections have moved past. `--fix` regenerates them |
-| `rebase schema reconcile` | Through the running backend (Rebase Cloud included): relax NOT NULL on properties made optional and on undeclared columns that block inserts (data kept), and drop the undeclared columns named with `--drop <collection>.<column>`. Prints the plan and asks; show it to the human and never pass `--yes` for them |
+| `rebase schema generate` | Generate the Drizzle schema from the tables in `backend/schema` |
+| `rebase schema introspect` | Read a live database → write one `defineTable` module per table into `backend/schema`, and an export line for each in its `index.ts`. Every table it writes says `rls: "admin-only"`: write the real rules before anyone but an admin needs the rows |
+| `rebase schema stale` | Report generated schema files the tables have moved past. `--fix` regenerates them |
+| `rebase schema reconcile` | Through the running backend (Rebase Cloud included): relax NOT NULL on columns made nullable and on undeclared columns that block inserts (data kept), and drop the undeclared columns named with `--drop <table>.<column>`. Prints the plan and asks; show it to the human and never pass `--yes` for them |
 | `rebase schema --help` | Show schema command help |
 
 > **IMPORTANT FOR AGENTS:** Schema commands are delegated to the active database driver plugin (e.g. `@rebasepro/server-postgres`). The plugin must be installed in `backend/package.json` or the command will fail with `Could not detect an active database plugin`.
@@ -155,7 +155,7 @@ booting and prints that line.
 
 | Option | Alias | Description |
 |--------|-------|-------------|
-| `--collections` | `-c` | Path to collections directory |
+| `--schema-dir` | — | The schema directory, whose `index.ts` exports the tables (default: `backend/schema`, or `rebase.json`'s `apps.<backend>.tables`) |
 | `--output` | `-o` | Output path for generated schema |
 | `--watch` | `-w` | Watch for changes and regenerate automatically |
 
@@ -163,10 +163,9 @@ booting and prints that line.
 
 | Option | Alias | Description |
 |--------|-------|-------------|
-| `--output` | `-o` | Output directory for generated collection files |
-| `--collections` | `-c` | Collections directory |
+| `--schema-dir` | — | Where the table modules are written (default: `backend/schema`) |
 | `--schema` | — | The Postgres schema to read |
-| `--force` | — | Overwrite collection files that are already there |
+| `--force` | — | Overwrite table modules that are already there |
 | `--data-inference` / `--no-data-inference` | — | Sample up to 100 rows per table to detect formats, or read the structure only. Without either it asks; with no terminal, structure only |
 | `--database-url` / `--docker` | — | Read that database, or the compose one, instead of the one `rebase db url` prints |
 
@@ -174,14 +173,14 @@ booting and prints that line.
 
 | Command | Description |
 |---------|-------------|
-| `rebase db push` | Apply schema directly to database (development only) |
+| `rebase db push` | Apply schema directly to database (development only). `--dry-run` prints the SQL; a change that drops data needs `--allow-destructive` |
 | `rebase db generate` | Generate SQL migration files |
-| `rebase db migrate` | Run pending SQL migrations |
+| `rebase db migrate` | Run pending SQL migrations. `--refuse-destructive` applies nothing when a pending file drops or narrows data; `--baseline <version>` for a database boot already created |
 | `rebase db branch` | Database branching (create, list, switch, delete, info, diff, prune) — needs a real PostgreSQL. `prune` asks first; with no terminal it needs `--yes`, and since 0.25 it exits 1 without it |
 | `rebase db backup` | Write a backup of the current database (default `./backups` where you run `rebase`; unknown options are refused) |
 | `rebase db backups list` | List the backups taken so far |
 | `rebase db restore` | Restore the database from a backup |
-| `rebase db pull` | Copy another database into local development: `--from <url>`, optionally `--anonymize` (name-based and best-effort, in one transaction: if it fails, the affected tables are emptied and named and it exits 1). One-directional — it can never write to a remote database. (Turning a database into collection files is `rebase schema introspect`) |
+| `rebase db pull` | Copy another database into local development: `--from <url>`, optionally `--anonymize` (name-based and best-effort, in one transaction: if it fails, the affected tables are emptied and named and it exits 1). One-directional — it can never write to a remote database. (Turning a database into `defineTable` files is `rebase schema introspect`) |
 | `rebase db url` | Print the connection string this project uses — nothing else goes to stdout, so it pipes. After `rebase dev --docker` it, like every command, uses the Docker database until a `rebase dev` without the flag |
 | `rebase db stop` | Stop the managed local database. It comes back on the same port, and a running `rebase dev` reconnects once any command starts it again |
 | `rebase db reset` | Delete and recreate the managed local database |
@@ -192,6 +191,10 @@ booting and prints that line.
 <!-- docs-verify: ignore -->
 > **IMPORTANT FOR AGENTS:** There is no `rebase db studio`. The CLI accepts exactly
 > the subcommands above and exits 1 on anything else.
+
+`push`, `generate` and `migrate` take `--schema-dir <dir>` like the schema
+commands, and compile the tables first: a table the server would refuse stops
+them with a `SchemaDefinitionError` that names the table, the column and the fix.
 
 > **IMPORTANT FOR AGENTS:** Like schema commands, `push`, `generate`, `migrate`, `branch`, `backup`, `backups`, `restore`, `request-role` and `provision` are delegated to the active database driver plugin, which provides the actual implementation. `url`, `pull`, `stop`, `reset` and `branch switch` are answered by the CLI itself.
 
@@ -214,12 +217,12 @@ rebase db branch switch --off   # back to the main database
 
 | Command | Description |
 |---------|-------------|
-| `rebase console` | New in 0.25. A Node REPL with the project open: `rebase` (`dataAsAdmin`, `sql(query, { params })`, `withAuth(user)` → `{ data }`) and `collections` in scope, top-level await. Opening the database changes nothing in it |
+| `rebase console` | New in 0.25. A Node REPL with the project open: `rebase` (`dataAsAdmin`, `sql(query, { params })`, `withAuth(user)` → `{ data }`) and the project's tables (as `collections`) in scope, top-level await. Opening the database changes nothing in it |
 
 | Option | Alias | Description |
 |--------|-------|-------------|
 | `--eval` | `-e` | Run this code instead of the REPL, print its awaited result as JSON on stdout, and exit 1 if it throws |
-| `--collections` | `-c` | Collections directory (default: `config/collections`) |
+| `--schema-dir` | — | The schema directory (default: `backend/schema`) |
 | `--database-url` | — | Open this database instead of the project's |
 | `--docker` | — | Use the database from docker compose, starting it if needed |
 
@@ -241,19 +244,19 @@ The same object from a script is `openRebase` from `@rebasepro/server-postgres`
 
 | Command | Description |
 |---------|-------------|
-| `rebase generate-sdk` | Generate a typed JS/TS SDK from collection definitions |
+| `rebase generate-sdk` | Generate a typed JS/TS SDK from the tables in `backend/schema` |
 
 | Option | Alias | Default | Description |
 |--------|-------|---------|-------------|
-| `--collections` (or `--collections-dir`) | `-c` | `config/collections` under the project root | Path to collections directory |
+| `--schema-dir` | — | `backend/schema` (or `rebase.json`'s `apps.<backend>.tables`) | The schema directory |
 | `--output` (or `--out`) | `-o` | `./generated/sdk` | Output path for generated SDK |
-| `--register` | — | — | Also type server-side data (`dataAsAdmin`, a function's or cron's `rebase`): writes the types and the `Register` declaration to `config/generated/` and remembers it in `rebase.json` |
-| `--from` / `--token` | — | — | Fetch the schema from a running project (`link` = this checkout's linked one) instead of local collection files; the token defaults to `$REBASE_SERVICE_KEY` |
+| `--register` | — | — | Also type server-side data (`dataAsAdmin`, a function's or cron's `rebase`): writes the types and the `Register` declaration to `backend/generated/` and remembers it in `rebase.json` |
+| `--from` / `--token` | — | — | Fetch the schema from a running project (`link` = this checkout's linked one) instead of `backend/schema`; the token defaults to `$REBASE_SERVICE_KEY` |
 
-The SDK generator uses `jiti` for dynamic TypeScript import of collection files. It loads every top-level collection file in the directory — the same files the backend serves — whether or not the `index.ts` barrel lists them, and a file that does not load is an error, as it is at boot.
+The generator compiles the tables `backend/schema/index.ts` exports — the same tables the backend serves — and a table the compiler refuses is an error, as it is at boot.
 
 ```bash
-rebase generate-sdk --collections-dir ./config/collections --output ./generated/sdk
+rebase generate-sdk --schema-dir ./backend/schema --output ./generated/sdk
 ```
 
 ### Auth Commands
@@ -280,12 +283,12 @@ rebase auth reset-password user@example.com MyNewPass!
 
 | Command | Description |
 |---------|-------------|
-| `rebase doctor` | Detect three-way schema drift between collections, Drizzle schema, and live DB. `--policies` also audits the RLS policies (the CI-gate form) |
-| `rebase verify` | Offline checks that the collections are safe to ship: config validity, RLS coverage, migration freshness. `--live` also checks DATABASE_URL (migrations applied, the rls-check audit); `--json`, `--quiet`. Exits 1 on an error, not on a warning |
+| `rebase doctor` | Detect three-way schema drift between the tables in `backend/schema`, the Drizzle schema, and live DB. `--policies` also audits the RLS policies (the CI-gate form) |
+| `rebase verify` | Offline checks that the tables are safe to ship: they compile, `rls` coverage of per-user tables, migration freshness (it does not read `frontend/src/cms`: a `customizeTable` mistake is a type error, or a throw when the module loads). `--live` also checks DATABASE_URL (migrations applied, the rls-check audit); `--json`, `--quiet`. Exits 1 on an error, not on a warning |
 | `rebase status` | Show every declared resource (databases, buckets, topics, queues, crons, functions) and whether the variables it reads are set. `--json` for scripts |
 | `rebase resources` | List the resources this project declares, declared and implicit. `--write` regenerates the committed resource graph; `--check` fails when it is stale, and `--check --json` is the CI form (error envelope, exit 1) |
 
-> **IMPORTANT FOR AGENTS:** `rebase doctor` compares collection definitions, the generated Drizzle schema (`schema.generated.ts`), and the actual PostgreSQL database. Run it after any manual DB changes or when suspecting schema drift.
+> **IMPORTANT FOR AGENTS:** `rebase doctor` compares the tables in `backend/schema`, the generated Drizzle schema (`schema.generated.ts`), and the actual PostgreSQL database. Run it after any manual DB changes or when suspecting schema drift.
 
 ### API Keys
 
@@ -305,7 +308,7 @@ rebase auth reset-password user@example.com MyNewPass!
 | Command | Description |
 |---------|-------------|
 | `rebase skills install` | Install these skills for your AI coding assistant. `--agent claude,cursor` (or `all`) skips detection, and is required without a TTY. `--mcp` also registers the MCP server, `--hooks` the Claude Code `rebase verify` hook; `--force` replaces edited files |
-| `rebase skills --hooks` | Install only the Claude Code hook that runs `rebase verify --quiet` after each edit under `config/collections/` |
+| `rebase skills --hooks` | Install only the Claude Code hook that runs `rebase verify --quiet` after each edit under `backend/schema/` or `frontend/src/cms/` |
 
 ### Other commands
 
@@ -314,6 +317,8 @@ rebase auth reset-password user@example.com MyNewPass!
 | `rebase generate view <slug>` | Scaffold a custom admin screen; `--collection <slug>` makes it a record tab (`--name`, `--icon`, `--dry-run`, `--force`) |
 | `rebase storage orphans` | List the stored files no row names (`--delete` to delete them) |
 | `rebase storage move` | Copy a folder of files to another storage source (`--from`, `--to`, `--prefix`, `--delete-source`) |
+| `rebase migrate collections-to-tables [dir]` | Move a project from `config/collections` to `backend/schema` + `frontend/src/cms`, proven by byte-identical SQL. `--dry-run`, `--check`, `--json`, `--force`, `--skip-sdk-calls`. See `rebase-collections/references/migrate-from-collections.md` |
+| `rebase migrate sdk-calls [dir]` | Rewrite the project's own SDK calls for the rename: `data.collection("x")` → `data.table("x")` and the rest. `--dry-run`, `--json`, `--force` |
 | `rebase cloud …` | Rebase Cloud: `login`, `link`, `deploy`, `tokens create`, and more — `rebase cloud --help` (see the `rebase-cloud` skill) |
 
 ### Usage Sharing
