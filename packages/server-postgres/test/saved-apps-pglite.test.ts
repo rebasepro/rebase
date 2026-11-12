@@ -11,7 +11,8 @@
  */
 import { describe, expect, it, beforeEach, afterEach } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
-import type { CollectionConfig } from "@rebasepro/types";
+import { col, defineTable } from "@rebasepro/types";
+import { compileTables, lowerTables } from "@rebasepro/common";
 import { createSavedAppStore, MAX_APP_CODE_LENGTH, SavedAppError, type SavedAppStore } from "../../server/src/apps/saved-apps";
 import { MCP_TOOLS, type McpToolContext } from "../../server/src/mcp/mcp-tools";
 import { fakeDataDriver } from "../../server/test/helpers/server-a-fakes";
@@ -99,7 +100,13 @@ describe("saved apps", () => {
  * removes it. The compiler is a stand-in; the server's is tested with show_app.
  */
 describe("the saved-app tools", () => {
-    const ORDERS: CollectionConfig = { slug: "orders", table: "orders", name: "Orders", properties: { status: { type: "string", name: "Status" } } };
+    /** The table the apps read, as the backend holds it: its descriptor and the config the data path reads. */
+    const ORDERS = defineTable("orders", {
+        columns: { id: col.uuid().primaryKey().defaultRandom(), status: col.text() },
+        rls: "admin-only"
+    });
+    const TABLES = compileTables([ORDERS]);
+    const COLLECTIONS = lowerTables([ORDERS], { describe: slug => TABLES.find(table => table.slug === slug) });
 
     function context(caller: { uid: string; roles: string[] }): McpToolContext {
         return {
@@ -113,7 +120,8 @@ describe("the saved-app tools", () => {
                     }
                 }
             }),
-            collections: [ORDERS],
+            tables: TABLES,
+            collections: COLLECTIONS,
             caller: { ...caller, scopes: ["data:read", "data:write"], clientId: "test" },
             compileApp: async (source: string) => source.includes("syntax error")
                 ? { ok: false as const, error: "Line 1: syntax error" }
@@ -128,11 +136,11 @@ describe("the saved-app tools", () => {
     };
 
     it("saves, lists, opens and deletes an app", async () => {
-        await expect(run("save_app", { title: "Broken", collections: ["orders"], code: "syntax error" }))
+        await expect(run("save_app", { title: "Broken", tables: ["orders"], code: "syntax error" }))
             .rejects.toThrow("Line 1: syntax error");
 
-        const saved = await run("save_app", { title: "Order desk", collections: ["orders"], code: APP.code, visibility: "team" }) as { id: string; code?: string };
-        expect(saved).toMatchObject({ title: "Order desk", collections: ["orders"], visibility: "team", ownerId: "ada" });
+        const saved = await run("save_app", { title: "Order desk", tables: ["orders"], code: APP.code, visibility: "team" }) as { id: string; code?: string };
+        expect(saved).toMatchObject({ title: "Order desk", tables: ["orders"], visibility: "team", ownerId: "ada" });
         expect(saved.code).toBeUndefined();
 
         expect(await run("list_apps", {}, CY)).toEqual({ apps: [expect.objectContaining({ id: saved.id, title: "Order desk" })] });
@@ -147,7 +155,7 @@ describe("the saved-app tools", () => {
     });
 
     it("refuses to share for someone without the admin role", async () => {
-        await expect(run("save_app", { title: "x", collections: ["orders"], code: APP.code, visibility: "team" }, BOB))
+        await expect(run("save_app", { title: "x", tables: ["orders"], code: APP.code, visibility: "team" }, BOB))
             .rejects.toThrow("takes the admin role");
     });
 });

@@ -478,7 +478,7 @@ describe("a read reached over any door sees its backend as rebase", () => {
             headers: { "content-type": "application/json", accept: "application/json, text/event-stream", authorization: `Bearer ${mcpToken}` },
             body: JSON.stringify({
                 jsonrpc: "2.0", id: 1, method: "tools/call",
-                params: { name: "query_collection", arguments: { collection: "delta_items" } }
+                params: { name: "query_table", arguments: { table: "delta_items" } }
             })
         });
         const text = await res.text();
