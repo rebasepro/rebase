@@ -30,6 +30,7 @@ import {
 } from "@rebasepro/types";
 
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
+import { tablesFrom } from "../helpers/tables.js";
 import { createPostgresAdapter } from "../../src/PostgresAdapter.js";
 import { createPostgresDatabaseConnection } from "../../src/connection.js";
 import { initializeRebaseBackend, _resetRebaseMock } from "../../../server/src/index.js";
@@ -135,7 +136,7 @@ describe("RLS simulator on the data API (E2E)", () => {
             app,
             // The boot attaches its realtime socket to one; nothing here dials it.
             server: createServer(),
-            collections: [ticketsCollection, secretsCollection],
+            ...tablesFrom([ticketsCollection, secretsCollection]),
             database: createPostgresAdapter({
                 connection: connection.db,
                 connectionString: container.connectionString
