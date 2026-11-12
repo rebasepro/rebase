@@ -28,6 +28,7 @@ import { planCustomizations, printCmsIndex } from "./customization";
 import { planFirestoreCollection } from "./firestore";
 import { findSplitConstants, planSplitConstants } from "./split-constants";
 import { rewriteSdkCalls } from "./sdk-calls";
+import { refreshSkillsStep } from "./skills-step";
 import { Journal } from "./journal";
 import { createSchemaModuleImporter } from "../../utils/import-schema-module";
 import { LegacyLoadError, loadLegacyProject } from "./load-legacy";
@@ -383,6 +384,9 @@ export async function migrateCollectionsToTables(options: MigrateOptions): Promi
             detail: `Nothing the codemod carried imports these, so they were not moved: ${unmoved.join(", ")}. Move what is still used before deleting config/.`
         });
     }
+
+    const skills = refreshSkillsStep(root);
+    if (skills) plan.manualSteps.push(skills);
 
     // What would be written.
     const files: PlannedFile[] = [];
