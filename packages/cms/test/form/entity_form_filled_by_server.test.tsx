@@ -41,8 +41,32 @@ jest.mock("@rebasepro/app", () => {
 });
 
 import { EntityForm } from "../../src/form/EntityForm";
-import postsCollection from "../../../../app/config/collections/posts";
+import { col, defineTable } from "@rebasepro/types";
+import { compileTables } from "@rebasepro/common";
+import { collectionFromTable } from "../../src/tables/project_table";
+import { applyTableCustomization } from "../../src/tables/apply_customization";
+import { customizeTable } from "../../src/tables/customize_table";
 import { rowOf, saving } from "../helpers/form_rows";
+
+/**
+ * The reference app's posts, as `app/backend/schema/posts.ts` declares the two
+ * columns that matter here — `slug` is NOT NULL and its `beforeSave` derives it
+ * from the title — and as `app/frontend/src/cms/posts.tsx` customizes it
+ * (`fields.slug.filledByServer`).
+ */
+const [postsTable] = compileTables([defineTable("posts", {
+    columns: {
+        id: col.uuid().primaryKey().defaultRandom(),
+        title: col.text().notNull(),
+        slug: col.text().notNull().unique(),
+        excerpt: col.text().validate({ max: 300 })
+    },
+    rls: "admin-only"
+})]);
+const postsCollection = applyTableCustomization(
+    collectionFromTable(postsTable, { tables: [postsTable] }),
+    customizeTable("posts", { fields: { slug: { filledByServer: true } } })
+);
 
 type Row = Record<string, unknown>;
 
