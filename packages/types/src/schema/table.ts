@@ -54,15 +54,19 @@ export interface TableConfig<C extends ColumnsShape, R extends RelationsShape = 
      */
     defaultPolicies?: false;
     /** Scope every row to a tenant. */
-    tenant?: TableTenant<Extract<keyof C, string>>;
+    tenant?: TableTenant<NoInfer<Extract<keyof C, string>>>;
     /** Deleting stamps a timestamp column instead of removing the row. */
-    softDelete?: boolean | { field?: Extract<keyof C, string> };
+    softDelete?: boolean | { field?: NoInfer<Extract<keyof C, string>> };
     /** Record every write in the history table. */
     history?: boolean;
     /** Full-text search over these columns. */
     search?: SearchConfig;
-    /** Indexes, each with the query it serves. */
-    indexes?: readonly TableIndex<Extract<keyof C, string> | Extract<keyof R, string>>[];
+    /**
+     * Indexes, each with the query it serves. The keys are not inferred from:
+     * without `NoInfer`, a key naming nothing made TypeScript infer a relation
+     * of that name instead of refusing it.
+     */
+    indexes?: readonly TableIndex<NoInfer<Extract<keyof C, string> | Extract<keyof R, string>>>[];
     /** Server-side lifecycle hooks. */
     hooks?: TableHooks<RowOfColumns<C>, InsertOfColumns<C>, USER>;
     /** `false` accepts writes naming columns the table does not declare. */
@@ -258,7 +262,7 @@ export interface ViewConfig<C extends ColumnsShape, R extends RelationsShape = R
     /** Relations to read through. No constraint is created for a view. */
     relations?: R;
     /** Indexes on a materialized view's stored rows. */
-    indexes?: readonly TableIndex<Extract<keyof C, string>>[];
+    indexes?: readonly TableIndex<NoInfer<Extract<keyof C, string>>>[];
     /** Read hooks. A view is never written. */
     hooks?: Pick<TableHooks<RowOfColumns<C>, RowOfColumns<C>, USER>, "beforeQuery" | "afterRead">;
     /** Opaque data, served with the view's descriptor. */
