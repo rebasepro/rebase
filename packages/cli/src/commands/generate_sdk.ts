@@ -11,8 +11,9 @@
 import fs from "fs";
 import path from "path";
 import chalk from "chalk";
-import { CollectionConfig, computeSchemaVersion, deserializeCollections } from "@rebasepro/types";
+import { CollectionConfig, computeSchemaVersion, deserializeCollections, type TableDescriptor } from "@rebasepro/types";
 import { CodegenError, generateSDK, GeneratedFile, toCollectionAccessor } from "@rebasepro/codegen";
+import { collectionsToTableDefs, compileTables, isSchemaDefinitionError } from "@rebasepro/common";
 import { detectPackageManager, getPMCommands } from "../utils/package-manager";
 import { findProjectRoot, readEnvFile } from "../utils/project";
 import { DEV_BACKEND_URL_ENV } from "../utils/dev-server";
@@ -139,6 +140,16 @@ function writeRegistration(dir: string, databaseTypes: string): void {
  * Returns the directory written, or null when there was nothing to do.
  * Throws when a `register.ts` there is not ours, as `generate-sdk` refuses.
  */
+/**
+ * The table descriptors the SDK generator reads, from collections: lifted with
+ * `collectionsToTableDefs` and compiled. The boundary until this command reads
+ * `backend/schema` (and `GET /api/schema/tables` for `--from`) itself.
+ */
+function tablesForSdk(collections: CollectionConfig[]): TableDescriptor[] {
+    const { tables, defaultRls } = collectionsToTableDefs(collections);
+    return compileTables(tables, defaultRls ? { defaultRls } : {});
+}
+
 export async function writeRegistrationForBuild(collectionsDir: string, registerDatabase: boolean): Promise<string | null> {
     const dir = registrationDir(collectionsDir);
     if (!registerDatabase && !hasRegistration(dir)) return null;
@@ -146,7 +157,7 @@ export async function writeRegistrationForBuild(collectionsDir: string, register
     const collections = await loadCollections(collectionsDir);
     if (collections.length === 0) return null;
     collections.sort((a, b) => a.slug.localeCompare(b.slug));
-    const databaseTypes = generateSDK(collections, { includeReadme: false })
+    const databaseTypes = generateSDK(tablesForSdk(collections), { includeReadme: false })
         .find((file) => file.path === "database.types.ts")?.content;
     if (databaseTypes === undefined) return null;
     writeRegistration(dir, databaseTypes);
@@ -615,8 +626,14 @@ export async function generateSdkCommand(args: GenerateSDKArgs): Promise<void> {
     console.log(chalk.cyan("  → Generating SDK files..."));
     let files: GeneratedFile[];
     try {
-        files = generateSDK(collections, { baseUrl: resolveExampleBaseUrl(cwd) });
+        files = generateSDK(tablesForSdk(collections), { baseUrl: resolveExampleBaseUrl(cwd) });
     } catch (err) {
+        // A collection the table model cannot say: named, with why.
+        if (isSchemaDefinitionError(err)) {
+            console.log("");
+            console.log(chalk.red(`  ✗ ${err.message}`));
+            process.exit(1);
+        }
         // A schema that cannot be expressed as valid TypeScript — two slugs
         // that collide on one accessor, a slug with no usable name. The
         // generator refuses rather than emitting a file that does not compile,

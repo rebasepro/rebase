@@ -1,10 +1,12 @@
 /**
  * @rebasepro/codegen
  *
- * Generates a purely typed Typescript database definition.
+ * Generates the typed SDK — a purely typed TypeScript database definition —
+ * from table descriptors: what `compileTables` makes of `backend/schema`, what
+ * `GET /api/schema/tables` serves, and what introspection reports.
  */
 
-import { CollectionConfig } from "@rebasepro/types";
+import type { TableDescriptor } from "@rebasepro/types";
 import { generateTypedefs } from "./generate-types";
 
 export { generateTypedefs, CodegenError } from "./generate-types";
@@ -12,6 +14,11 @@ export { toPascalCase, toCamelCase, toSafeIdentifier, toCollectionAccessor, inde
 
 // ─── Public API ────────────────────────────────────────────────────
 
+/**
+ * One file of a generated SDK.
+ *
+ * @group SDK generation
+ */
 export interface GeneratedFile {
     /** Relative file path within the output directory */
     path: string;
@@ -19,6 +26,11 @@ export interface GeneratedFile {
     content: string;
 }
 
+/**
+ * Options of {@link generateSDK}.
+ *
+ * @group SDK generation
+ */
 export interface GenerateSDKOptions {
     /** Whether to include a README file (default: true) */
     includeReadme?: boolean;
@@ -31,15 +43,23 @@ export interface GenerateSDKOptions {
     baseUrl?: string;
 }
 
+/**
+ * The typed SDK for a set of tables: `database.types.ts` (see
+ * {@link generateTypedefs}) and, unless switched off, a README.
+ *
+ * @param tables The table descriptors, in any order.
+ *
+ * @group SDK generation
+ */
 export function generateSDK(
-    collections: CollectionConfig[],
+    tables: readonly TableDescriptor[],
     options: GenerateSDKOptions = {}
 ): GeneratedFile[] {
     const files: GeneratedFile[] = [];
 
     files.push({
         path: "database.types.ts",
-        content: generateTypedefs(collections)
+        content: generateTypedefs(tables)
     });
 
     if (options.includeReadme !== false) {
@@ -79,13 +99,13 @@ export function generateSDK(
 The generated \`Row\` uses each field's **wire** name — the key it arrives under in
 JSON — and nothing here renames anything.
 
-- **A declared property is its key in the collection.** A property keyed
-  \`createdAt\` is \`row.createdAt\`, whatever \`columnName\` says. A column name is
-  the name of a different thing: where the value lives, not what the API calls it.
+- **A column is its key in \`columns\`.** A column keyed \`createdAt\` is
+  \`row.createdAt\`, whatever \`.column()\` says. A column name is the name of a
+  different thing: where the value lives, not what the API calls it.
 - **A foreign key derived from a relation is camelCase**, because that is what
   the wire carries. A \`belongsTo\` named \`author\` gives you \`row.authorId\`, not
   the column spelling.
-- **A collection accessor is camelCase too** (\`my-notes\` → \`rebase.data.myNotes\`),
+- **A table accessor is camelCase too** (\`my-notes\` → \`rebase.data.myNotes\`),
   which is what \`collectionsDictionary\` maps back to the slug.
   A slug whose accessor the client reserves (\`collection\`, \`then\`, \`toJSON\`)
   is generated as \`<name>Collection\`: \`rebase.data.collectionCollection\`.
@@ -98,11 +118,11 @@ backend answers to.
 | Type | What it describes |
 |---|---|
 | \`Row\` | What a read serves. Nullable columns are \`T \\| null\`; relations appear only when \`include\` names them. |
-| \`Insert\` | What \`create()\` accepts. Server-assigned ids are optional; a \`belongsTo\` target may be named either way (\`{ author: 5 }\` or \`{ authorId: 5 }\`). |
+| \`Insert\` | What \`create()\` accepts. A column with a default, an identity or a stamp is optional; a \`belongsTo\` target may be named either way (\`{ author: 5 }\` or \`{ authorId: 5 }\`). A view takes no writes: \`never\`. |
 | \`Update\` | What \`update()\` accepts. Everything optional, and the primary key is not settable. |
 
-A property marked \`excludeFromApi\` is absent from all three: the API surface
-does not mention it, in either direction. The server holds the same line — a
+A column marked \`.private()\` is absent from all three: the API surface does
+not mention it, in either direction. The server holds the same line — a
 read never serves the column and a write naming it is refused — so this is a
 guarantee rather than a description, and nothing generated names a password
 hash.

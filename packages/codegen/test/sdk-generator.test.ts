@@ -1,29 +1,21 @@
 import { describe, it, expect, jest } from "@jest/globals";
+import { compileTables } from "@rebasepro/common";
+import { col, defineAuthTable, defineTable, defineView, json, rel } from "@rebasepro/types";
 import { toPascalCase, toCamelCase, toSafeIdentifier, toCollectionAccessor, indent } from "../src/utils";
 import { generateTypedefs } from "../src/generate-types";
 import { generateSDK } from "../src/index";
-import type { CollectionConfig, EnumValues, PostgresProperty } from "@rebasepro/types";
+import { block, compiledOnly, generate, keysOf, rawTable } from "./helpers/tables";
 
 // ─── Test Fixtures ─────────────────────────────────────────────────
 
-const authorsCollection: CollectionConfig = {
-    name: "Authors",
-    singularName: "Author",
-    slug: "authors",
-    table: "authors",
-    properties: {
-        id: { name: "ID",
-type: "number",
-isId: "increment",
-validation: { required: true } },
-        name: { name: "Name",
-type: "string",
-validation: { required: true } },
-        email: { name: "Email",
-type: "string" }
-    }
-};
-
+const authors = defineTable("authors", {
+    columns: {
+        id: col.integer().primaryKey().identity(),
+        name: col.text().notNull(),
+        email: col.text()
+    },
+    rls: "admin-only"
+});
 describe("Utils", () => {
     describe("toPascalCase", () => {
         it("converts snake_case to PascalCase", () => {
@@ -97,649 +89,556 @@ describe("Utils", () => {
     });
 });
 
-describe("propertyToTypeScriptType mapping", () => {
-    it("maps basic types correctly", () => {
-        const col: CollectionConfig = {
-            slug: "types_collection",
-            name: "types_collection",
-            properties: {
-                bool: { type: "boolean" },
-                dt: { type: "date" },
-                geo: { type: "geopoint" },
-                vec: { type: "vector", dimensions: 3 },
-                bin: { type: "binary" },
-                // Deliberately invalid: a type no property has must still map to `unknown`.
-                unknown: { type: "something-weird" } as unknown as PostgresProperty
-            }
-        };
-        // A `reference` is a Firestore-only property.
-        const refs: CollectionConfig = {
-            slug: "refs_collection",
-            name: "refs_collection",
-            engine: "firestore",
-            properties: {
-                ref: { type: "reference" }
-            }
-        };
-
-        const ts = generateTypedefs([col, refs]);
-        expect(ts).toContain("bool?: boolean | null;");
-        expect(ts).toContain("dt?: string | null;");
-        expect(ts).toContain("geo?: { latitude: number; longitude: number; } | null;");
-        expect(ts).toContain("ref?: string | number | null;");
-        expect(ts).toContain("vec?: number[] | null;");
-        expect(ts).toContain("bin?: string | null;");
-        expect(ts).toContain("unknown?: unknown | null;");
+describe("column types", () => {
+    it("maps every Postgres type to its wire type", () => {
+        const ts = generate(defineTable("types_table", {
+            columns: {
+                id: col.uuid().primaryKey().defaultRandom(),
+                bool: col.boolean(),
+                ts: col.timestamptz(),
+                day: col.date(),
+                clock: col.time(),
+                geo: col.geopoint(),
+                vec: col.vector(3),
+                bin: col.bytea(),
+                count: col.integer(),
+                big: col.bigint(),
+                money: col.numeric(10, 2),
+                ratio: col.doublePrecision(),
+                name: col.varchar(80),
+                code: col.char(2),
+                file: col.storage({ path: "files/" }),
+                doc: col.jsonb()
+            },
+            rls: "admin-only"
+        }));
+        const row = block(ts, "Row", "typesTable");
+        expect(row).toContain("id: string;");
+        expect(row).toContain("bool?: boolean | null;");
+        expect(row).toContain("ts?: string | null;");
+        expect(row).toContain("day?: string | null;");
+        expect(row).toContain("clock?: string | null;");
+        expect(row).toContain("geo?: { latitude: number; longitude: number; } | null;");
+        expect(row).toContain("vec?: number[] | null;");
+        expect(row).toContain("bin?: string | null;");
+        expect(row).toContain("count?: number | null;");
+        expect(row).toContain("big?: number | null;");
+        expect(row).toContain("money?: number | null;");
+        expect(row).toContain("ratio?: number | null;");
+        expect(row).toContain("name?: string | null;");
+        expect(row).toContain("code?: string | null;");
+        expect(row).toContain("file?: string | null;");
+        expect(row).toContain("doc?: Record<string, unknown> | null;");
     });
 
-    describe("string enum mapping", () => {
-        it("maps string array enum", () => {
-            const col: CollectionConfig = {
-                slug: "posts",
-                name: "posts",
-                properties: {
-                    status: {
-                        type: "string",
-                        // Not an `EnumValues` shape (bare ids), but one `enumIds` tolerates, as `enumToObjectEntries` does.
-                        enum: ["draft", "published"] as unknown as EnumValues
-                    }
-                }
-            };
-
-            const ts = generateTypedefs([col]);
-            expect(ts).toContain('status?: "draft" | "published" | null;');
-        });
-
-        it("maps string array of objects enum", () => {
-            const col: CollectionConfig = {
-                slug: "posts",
-                name: "posts",
-                properties: {
-                    status: {
-                        type: "string",
-                        enum: [
-                            { id: "draft",
-label: "Draft" },
-                            { id: "published",
-label: "Published" }
-                        ]
-                    }
-                }
-            };
-
-            const ts = generateTypedefs([col]);
-            expect(ts).toContain('status?: "draft" | "published" | null;');
-        });
-
-        it("maps string record enum using keys", () => {
-            const col: CollectionConfig = {
-                slug: "posts",
-                name: "posts",
-                properties: {
-                    status: {
-                        type: "string",
-                        enum: {
-                            draft: "Draft",
-                            published: "Published"
-                        }
-                    }
-                }
-            };
-
-            const ts = generateTypedefs([col]);
-            expect(ts).toContain('status?: "draft" | "published" | null;');
-        });
+    it("types a column of a type Rebase serves but does not create as unknown", () => {
+        // What introspection reports for `inet`, `citext`, `interval`, … .
+        const ts = generateTypedefs([rawTable("hosts", [
+            { key: "id", column: "id", type: { kind: "uuid" }, nullable: false, primaryKey: true },
+            { key: "address", column: "address", type: { kind: "other", sqlType: "inet" }, nullable: true }
+        ])]);
+        expect(block(ts, "Row", "hosts")).toContain("address?: unknown | null;");
     });
 
-    describe("number enum mapping", () => {
-        it("maps number array enum", () => {
-            const col: CollectionConfig = {
-                slug: "posts",
-                name: "posts",
-                properties: {
-                    level: {
-                        type: "number",
-                        // Not an `EnumValues` shape (bare ids), but one `enumIds` tolerates, as `enumToObjectEntries` does.
-                        enum: [1, 2, 3] as unknown as EnumValues
-                    }
-                }
-            };
+    it("types a temporal column as a string on a read and a string or Date on a write", () => {
+        const ts = generate(defineTable("events", {
+            columns: { id: col.uuid().primaryKey().defaultRandom(), at: col.timestamptz().notNull() },
+            rls: "admin-only"
+        }));
+        expect(block(ts, "Row", "events")).toContain("at: string;");
+        expect(block(ts, "Insert", "events")).toContain("at: string | Date;");
+        expect(block(ts, "Update", "events")).toContain("at?: string | Date;");
+    });
 
-            const ts = generateTypedefs([col]);
-            expect(ts).toContain("level?: 1 | 2 | 3 | null;");
+    describe("closed value sets", () => {
+        it("types a Postgres enum as the union of its values", () => {
+            const ts = generate(defineTable("posts", {
+                columns: { id: col.uuid().primaryKey().defaultRandom(), status: col.enum(["draft", "published"]) },
+                rls: "admin-only"
+            }));
+            expect(ts).toContain('status?: "draft" | "published" | null;');
         });
 
-        it("maps number array of objects enum", () => {
-            const col: CollectionConfig = {
-                slug: "posts",
-                name: "posts",
-                properties: {
-                    level: {
-                        type: "number",
-                        enum: [
-                            { id: 10,
-label: "Low" },
-                            { id: 20,
-label: "High" }
-                        ]
-                    }
-                }
-            };
+        it("types a text `oneOf` as the union of its values", () => {
+            const ts = generate(defineTable("posts", {
+                columns: { id: col.uuid().primaryKey().defaultRandom(), status: col.text().oneOf(["draft", "published"]) },
+                rls: "admin-only"
+            }));
+            expect(ts).toContain('status?: "draft" | "published" | null;');
+        });
 
-            const ts = generateTypedefs([col]);
+        it("types a numeric `oneOf` — a number enum — as a union of numeric literals", () => {
+            const ts = generate(defineTable("posts", {
+                columns: { id: col.uuid().primaryKey().defaultRandom(), level: col.integer().oneOf([10, 20]) },
+                rls: "admin-only"
+            }));
             expect(ts).toContain("level?: 10 | 20 | null;");
         });
 
-        it("maps number record enum using keys", () => {
-            const col: CollectionConfig = {
-                slug: "posts",
-                name: "posts",
-                properties: {
-                    level: {
-                        type: "number",
-                        enum: {
-                            1: "Low",
-                            2: "High"
-                        }
-                    }
-                }
-            };
+        it("types the items of a text array with a closed set", () => {
+            const ts = generate(defineTable("posts", {
+                columns: { id: col.uuid().primaryKey().defaultRandom(), labels: col.array(col.text().oneOf(["a", "b"])) },
+                rls: "admin-only"
+            }));
+            expect(ts).toContain('labels?: Array<"a" | "b"> | null;');
+        });
 
-            const ts = generateTypedefs([col]);
-            expect(ts).toContain("level?: 1 | 2 | null;");
+        it("widens a numeric set that carries something no number literal can be", () => {
+            const ts = generateTypedefs([rawTable("posts", [
+                { key: "id", column: "id", type: { kind: "uuid" }, nullable: false, primaryKey: true },
+                { key: "level", column: "level", type: { kind: "integer" }, nullable: true, oneOf: [1, "x"] }
+            ])]);
+            expect(ts).toContain("level?: number | null;");
         });
     });
 
-    describe("map property mapping", () => {
-        it("maps nested properties recursively", () => {
-            const col: CollectionConfig = {
-                slug: "users",
-                name: "users",
-                properties: {
-                    profile: {
-                        type: "map",
-                        properties: {
-                            age: { type: "number" },
-                            tagline: { type: "string" }
-                        }
-                    }
-                }
-            };
-
-            const ts = generateTypedefs([col]);
-            // Nested fields carry their own `validation`; none of these declare it, so
-            // each is optional and nullable rather than silently required.
-            expect(ts).toContain("profile?: { age?: number | null; tagline?: string | null; } | null;");
+    describe("JSON documents", () => {
+        it("types an object from its shape: required keys required, the rest optional and nullable", () => {
+            const ts = generate(defineTable("users", {
+                columns: {
+                    id: col.uuid().primaryKey().defaultRandom(),
+                    profile: col.jsonb(json.object({ age: json.number(), tagline: json.string().required(), seen: json.date() }))
+                },
+                rls: "admin-only"
+            }));
+            expect(ts).toContain("profile?: { age?: number | null; tagline: string; seen?: string | null; } | null;");
         });
 
-        it("falls back to Record<string, any> if properties is absent", () => {
-            const col: CollectionConfig = {
-                slug: "users",
-                name: "users",
-                properties: {
-                    metadata: {
-                        type: "map"
-                    }
-                }
-            };
-
-            const ts = generateTypedefs([col]);
-            expect(ts).toContain("metadata?: Record<string, unknown> | null;");
-        });
-    });
-
-    describe("array property mapping", () => {
-        it("maps typed array using the 'of' property", () => {
-            const col: CollectionConfig = {
-                slug: "articles",
-                name: "articles",
-                properties: {
-                    tags: {
-                        type: "array",
-                        of: { type: "string" }
-                    }
-                }
-            };
-
-            const ts = generateTypedefs([col]);
-            expect(ts).toContain("tags?: Array<string> | null;");
+        it("types nested objects, arrays, geopoints and closed sets inside a document", () => {
+            const ts = generate(defineTable("places", {
+                columns: {
+                    id: col.uuid().primaryKey().defaultRandom(),
+                    meta: col.jsonb(json.object({
+                        where: json.geopoint().required(),
+                        tags: json.array(json.string().oneOf(["x", "y"])),
+                        inner: json.object({ flag: json.boolean() })
+                    }))
+                },
+                rls: "admin-only"
+            }));
+            expect(ts).toContain(
+                "meta?: { where: { latitude: number; longitude: number; }; tags?: Array<\"x\" | \"y\"> | null; " +
+                "inner?: { flag?: boolean | null; } | null; } | null;"
+            );
         });
 
-        it("falls back to Array<any> if 'of' property is absent", () => {
-            const col: CollectionConfig = {
-                slug: "articles",
-                name: "articles",
-                properties: {
-                    generic: {
-                        type: "array"
-                    }
-                }
-            };
+        it("types an open object with no declared field as a record, and a document with no shape too", () => {
+            const ts = generate(defineTable("users", {
+                columns: {
+                    id: col.uuid().primaryKey().defaultRandom(),
+                    open: col.jsonb(json.object({}, { additional: true })),
+                    bare: col.json()
+                },
+                rls: "admin-only"
+            }));
+            expect(ts).toContain("open?: Record<string, unknown> | null;");
+            expect(ts).toContain("bare?: Record<string, unknown> | null;");
+        });
 
-            const ts = generateTypedefs([col]);
+        it("types typed blocks as the union of their variants", () => {
+            const ts = generate(defineTable("pages", {
+                columns: {
+                    id: col.uuid().primaryKey().defaultRandom(),
+                    content: col.jsonb(json.array(json.oneOf({ text: json.string(), quote: json.object({ by: json.string() }) }, { typeField: "kind" })))
+                },
+                rls: "admin-only"
+            }));
+            expect(ts).toContain(
+                "content?: Array<{ kind: \"text\"; value: string; } | { kind: \"quote\"; value: { by?: string | null; }; }> | null;"
+            );
+        });
+
+        it("types a JSON array of anything as `Array<unknown>`", () => {
+            const ts = generate(defineTable("articles", {
+                columns: { id: col.uuid().primaryKey().defaultRandom(), generic: col.jsonb(json.array(json.unknown())) },
+                rls: "admin-only"
+            }));
             expect(ts).toContain("generic?: Array<unknown> | null;");
         });
     });
-});
 
-describe("generateTypedefs schemas configurations", () => {
-    describe("Insert type requirements", () => {
-        it("makes properties optional in Insert if validation required is false", () => {
-            const col: CollectionConfig = {
-                slug: "books",
-                name: "books",
-                properties: {
-                    title: { type: "string" }
-                }
-            };
-
-            const ts = generateTypedefs([col]);
-            expect(ts).toContain("Insert: {");
-            expect(ts).toContain("title?: string | null;");
-        });
-
-        it("makes properties required in Insert if validation required is true", () => {
-            const col: CollectionConfig = {
-                slug: "books",
-                name: "books",
-                properties: {
-                    title: { type: "string",
-validation: { required: true } }
-                }
-            };
-
-            const ts = generateTypedefs([col]);
-            expect(ts).toContain("Insert: {");
-            expect(ts).toContain("title: string;");
-        });
-
-        it("types a day key as the other manual keys are: its YYYY-MM-DD string in Row", () => {
-            const col: CollectionConfig = {
-                name: "Scores",
-                slug: "scores",
-                properties: {
-                    day: { name: "Day", type: "date", columnType: "date", isId: "manual" },
-                    sid: { name: "Player", type: "string", isId: "manual" }
-                }
-            };
-
-            const ts = generateTypedefs([col]);
-            const row = ts.slice(ts.indexOf("Row: {"), ts.indexOf("Insert: {"));
-            expect(row).toContain("day: string;");
-            const insert = ts.slice(ts.indexOf("Insert: {"), ts.indexOf("Update: {"));
-            expect(insert).toContain("day?: string | Date;");
-            expect(insert).toContain("sid?: string;");
-        });
-
-        it("makes a databaseDefault column optional in Insert, and keeps it in Row", () => {
-            const col: CollectionConfig = {
-                slug: "books",
-                name: "books",
-                properties: {
-                    code: { type: "string", validation: { required: true }, databaseDefault: true }
-                }
-            };
-
-            const ts = generateTypedefs([col]);
-            const insert = ts.slice(ts.indexOf("Insert: {"), ts.indexOf("Update: {"));
-            expect(insert).toContain("code?: string;");
-            const row = ts.slice(ts.indexOf("Row: {"), ts.indexOf("Insert: {"));
-            expect(row).toContain("code: string;");
-        });
-
-        it("makes isId: 'increment' key optional in Insert even if validation required is true", () => {
-            const col: CollectionConfig = {
-                slug: "books",
-                name: "books",
-                properties: {
-                    id: { type: "number",
-isId: "increment",
-validation: { required: true } }
-                }
-            };
-
-            const ts = generateTypedefs([col]);
-            expect(ts).toContain("Insert: {");
-            expect(ts).toContain("id?: number;");
-        });
-
-        it("makes isId: 'uuid' key optional in Insert even if validation required is true", () => {
-            const col: CollectionConfig = {
-                slug: "books",
-                name: "books",
-                properties: {
-                    id: { type: "string",
-isId: "uuid",
-validation: { required: true } }
-                }
-            };
-
-            const ts = generateTypedefs([col]);
-            expect(ts).toContain("Insert: {");
-            expect(ts).toContain("id?: string;");
-        });
-
-        it("keeps isId: 'manual' key required in Insert if validation required is true", () => {
-            const col: CollectionConfig = {
-                slug: "books",
-                name: "books",
-                properties: {
-                    id: { type: "string",
-isId: "manual",
-validation: { required: true } }
-                }
-            };
-
-            const ts = generateTypedefs([col]);
-            expect(ts).toContain("Insert: {");
-            expect(ts).toContain("id: string;");
-        });
-
-        it("keeps isId: true key required in Insert if validation required is true", () => {
-            const col: CollectionConfig = {
-                slug: "books",
-                name: "books",
-                properties: {
-                    id: { type: "string",
-isId: true,
-validation: { required: true } }
-                }
-            };
-
-            const ts = generateTypedefs([col]);
-            expect(ts).toContain("Insert: {");
-            expect(ts).toContain("id: string;");
-        });
-    });
-
-    describe("Update type optionality", () => {
-        it("makes all direct fields optional in Update", () => {
-            const col: CollectionConfig = {
-                slug: "books",
-                name: "books",
-                properties: {
-                    id: { type: "number",
-isId: "increment",
-validation: { required: true } },
-                    title: { type: "string",
-validation: { required: true } }
-                }
-            };
-
-            const ts = generateTypedefs([col]);
-            expect(ts).toContain("Update: {");
-            expect(ts).toContain("id?: number;");
-            expect(ts).toContain("title?: string;");
-        });
+    it("types a native array from its element type", () => {
+        const ts = generate(defineTable("articles", {
+            columns: {
+                id: col.uuid().primaryKey().defaultRandom(),
+                tags: col.array(col.text()),
+                scores: col.array(col.integer()),
+                files: col.storage({ path: "a/" }).multiple()
+            },
+            rls: "admin-only"
+        }));
+        expect(ts).toContain("tags?: Array<string> | null;");
+        expect(ts).toContain("scores?: Array<number> | null;");
+        expect(ts).toContain("files?: Array<string> | null;");
     });
 });
 
-describe("Collection relations and FK resolutions", () => {
-    it("handles target primary key type resolution for FK columns", () => {
-        const authorsCol: CollectionConfig = {
-            slug: "authors",
-            name: "authors",
-            engine: "postgres",
-            properties: {
-                id: { type: "number",
-isId: "increment" }
-            }
-        };
+describe("Insert: what a create may leave out", () => {
+    const books = defineTable("books", {
+        columns: {
+            id: col.integer().primaryKey().identity(),
+            title: col.text().notNull(),
+            subtitle: col.text(),
+            code: col.text().notNull().dbDefault(),
+            slug: col.text().notNull().defaultSql("gen_short_id()"),
+            status: col.enum(["draft", "live"]).notNull().default("draft"),
+            createdAt: col.timestamptz().notNull().onCreateNow(),
+            createdBy: col.uuid().notNull().onCreateUser(),
+            seq: col.serial().notNull(),
+            words: col.integer().generatedAs("0"),
+            locked: col.text().readOnly()
+        },
+        rls: "admin-only"
+    });
 
-        const postsCol: CollectionConfig = {
-            slug: "posts",
-            name: "posts",
-            engine: "postgres",
-            properties: {
-                id: { type: "number",
-isId: "increment" },
-                author: {
-                    type: "relation",
-                    relation: {
-                        kind: "belongsTo",
-                        target: () => authorsCol,
-                        localKey: "author_id",
-                    }
-                }
-            }
-        };
+    it("requires a NOT NULL column with no default, and offers the rest as optional", () => {
+        const insert = block(generate(books), "Insert", "books");
+        expect(insert).toContain("title: string;");
+        expect(insert).toContain("subtitle?: string | null;");
+    });
 
-        const ts = generateTypedefs([postsCol, authorsCol]);
+    it("leaves out an identity, a database default, a SQL default, a literal default, a stamp and a serial", () => {
+        const insert = block(generate(books), "Insert", "books");
+        expect(insert).toContain("id?: number;");
+        expect(insert).toContain("code?: string;");
+        expect(insert).toContain("slug?: string;");
+        expect(insert).toContain('status?: "draft" | "live";');
+        expect(insert).toContain("createdAt?: string | Date;");
+        expect(insert).toContain("createdBy?: string;");
+        expect(insert).toContain("seq?: number;");
+    });
 
-        // Row should have authorId as number since authors PK (id) is number
-        expect(ts).toContain("posts: {");
-        expect(ts).toContain("Row: {");
-        // The foreign key is emitted under its wire name — the Drizzle field
-        // key, which is the JSON key the row arrives with. `author_id` is the
+    it("keeps a defaulted column required on Row", () => {
+        const row = block(generate(books), "Row", "books");
+        expect(row).toContain("code: string;");
+        expect(row).toContain('status: "draft" | "live";');
+    });
+
+    it("takes a generated and a read-only column off both write types, and keeps them on Row", () => {
+        const ts = generate(books);
+        for (const name of ["Insert", "Update"] as const) {
+            expect(keysOf(block(ts, name, "books"))).not.toContain("words");
+            expect(keysOf(block(ts, name, "books"))).not.toContain("locked");
+        }
+        expect(block(ts, "Row", "books")).toContain("words?: number | null;");
+        expect(block(ts, "Row", "books")).toContain("locked?: string | null;");
+    });
+
+    it("requires a key the caller supplies, and a uuid key with a default is optional", () => {
+        const ts = generate(
+            defineTable("manual", { columns: { id: col.text().primaryKey(), note: col.text() }, rls: "admin-only" }),
+            defineTable("generated", { columns: { id: col.uuid().primaryKey().defaultRandom() }, rls: "admin-only" })
+        );
+        expect(block(ts, "Insert", "manual")).toContain("id: string;");
+        expect(block(ts, "Insert", "generated")).toContain("id?: string;");
+    });
+
+    it("types a day key as its YYYY-MM-DD string, required on create", () => {
+        const ts = generate(defineTable("scores", {
+            columns: { day: col.date().primaryKey(), sid: col.text().primaryKey() },
+            rls: "admin-only"
+        }));
+        expect(block(ts, "Row", "scores")).toContain("day: string;");
+        expect(block(ts, "Insert", "scores")).toContain("day: string | Date;");
+        expect(block(ts, "Insert", "scores")).toContain("sid: string;");
+    });
+});
+
+describe("Update: every column optional, the key not reassignable", () => {
+    it("makes every writable column optional and leaves the key out", () => {
+        const update = block(generate(defineTable("books", {
+            columns: { id: col.integer().primaryKey().identity(), title: col.text().notNull() },
+            rls: "admin-only"
+        })), "Update", "books");
+        expect(update).toContain("title?: string;");
+        expect(update).not.toMatch(/^\s+id\??:/m);
+    });
+});
+
+describe("relations and foreign keys", () => {
+    const numericAuthors = defineTable("authors", { columns: { id: col.integer().primaryKey().identity() }, rls: "admin-only" });
+    const uuidAuthors = defineTable("authors", { columns: { id: col.uuid().primaryKey().defaultRandom() }, rls: "admin-only" });
+
+    it("types a derived foreign key as the target's key, under its wire key", () => {
+        const posts = defineTable("posts", {
+            columns: { id: col.integer().primaryKey().identity() },
+            relations: { author: rel.belongsTo(() => numericAuthors, { localKey: "author_id" }) },
+            rls: "admin-only"
+        });
+        const ts = generate(posts, numericAuthors);
+        // The foreign key is emitted under its wire name. `author_id` is the
         // column behind it and is not a name the API ever answers to.
-        expect(ts).toContain("authorId?: number | null;");
+        expect(block(ts, "Row", "posts")).toContain("authorId?: number | null;");
         expect(ts).not.toContain("author_id");
     });
 
-    it("defaults to string | number when target primary key cannot be resolved", () => {
-        const postsCol: CollectionConfig = {
-            slug: "posts",
-            name: "posts",
-            engine: "postgres",
-            properties: {
-                id: { type: "number",
-isId: "increment" },
-                author: {
-                    type: "relation",
-                    relation: {
-                        kind: "belongsTo",
-                        // A real collection whose *primary key* cannot be determined — which is
-                        // what this test is about. A target with no slug at all is now a
-                        // configuration error rather than a silent degradation.
-                        target: () => ({ slug: "no_properties", name: "no-properties", properties: {} }),
-                        localKey: "author_id",
-                    }
-                }
-            }
-        };
-
-        const ts = generateTypedefs([postsCol]);
-
-        expect(ts).toContain("posts: {");
-        expect(ts).toContain("Row: {");
-        expect(ts).toContain("authorId?: string | number | null;");
+    it("types a link into a table outside the run by its own column, its row as an open record", () => {
+        const posts = defineTable("posts", {
+            columns: { id: col.integer().primaryKey().identity() },
+            relations: { author: rel.belongsTo(() => uuidAuthors) },
+            rls: "admin-only"
+        });
+        const ts = generateTypedefs(compiledOnly([posts, uuidAuthors], ["posts"]));
+        expect(block(ts, "Row", "posts")).toContain("authorId?: string | null;");
+        expect(block(ts, "Row", "posts")).toContain("author?: Record<string, unknown>;");
+        expect(block(ts, "Relations", "posts")).toContain("author: never;");
     });
 
-    // `required` lives on the property, next to every other field's. It used to
-    // also live on the relation, and the two readers disagreed: the DDL
-    // generator asked the property and made the column NOT NULL, codegen asked
-    // the relation and typed the field optional. A `create()` without it
-    // typechecked and then failed at the database.
-    it("a required relation property yields a non-null Row field and a mandatory Insert field", () => {
-        const authorsCol: CollectionConfig = {
-            slug: "authors",
-            name: "authors",
-            engine: "postgres",
-            properties: {
-                id: { type: "string", isId: "uuid" }
-            }
-        };
-
-        const postsCol: CollectionConfig = {
-            slug: "posts",
-            name: "posts",
-            engine: "postgres",
-            properties: {
-                id: { type: "number", isId: "increment" },
-                author: {
-                    type: "relation",
-                    validation: { required: true },
-                    relation: { kind: "belongsTo", target: () => authorsCol, localKey: "author_id" }
-                }
-            }
-        };
-
-        const ts = generateTypedefs([postsCol, authorsCol]);
-
-        expect(ts).toContain("posts: {");
-        expect(ts).toContain("Row: {");
-        // target is a string uuid and the relation is required
-        expect(ts).toContain("authorId: string;");
-        expect(ts).not.toContain("authorId?: string | null;");
-        // …and the write side agrees: a create must name the author, under
-        // either spelling — the server's required check reads both.
+    // A required link: NOT NULL in the database, so non-null on Row, and a
+    // create must name it — under either spelling, which the server's required
+    // check reads both of.
+    it("requires a NOT NULL link on create, under either of its names", () => {
+        const posts = defineTable("posts", {
+            columns: { id: col.integer().primaryKey().identity() },
+            relations: { author: rel.belongsTo(() => uuidAuthors, { localKey: "author_id", notNull: true }) },
+            rls: "admin-only"
+        });
+        const ts = generate(posts, uuidAuthors);
+        expect(block(ts, "Row", "posts")).toContain("authorId: string;");
         expect(ts).toContain("} & ({ authorId: string } | { author: string });");
     });
 
-    // Same fact, declared the other way: the relation lives in `relations` and
-    // a property addresses it by name. The property is still where `required`
-    // is read from.
-    it("reads required from the property that addresses a relations[] entry", () => {
-        const authorsCol: CollectionConfig = {
-            slug: "authors",
-            name: "authors",
-            engine: "postgres",
-            properties: {
-                id: { type: "string", isId: "uuid" }
-            }
-        };
-
-        const postsCol: CollectionConfig = {
-            slug: "posts",
-            name: "posts",
-            engine: "postgres",
-            properties: {
-                id: { type: "number", isId: "increment" },
-                author: { type: "relation", validation: { required: true } }
+    it("binds a declared foreign-key column, typed and placed by its declaration", () => {
+        const posts = defineTable("posts", {
+            columns: {
+                id: col.integer().primaryKey().identity(),
+                authorRef: col.uuid().column("author_id").notNull().describe("who wrote it"),
+                title: col.text()
             },
-            relations: [
-                {
-                    kind: "belongsTo",
-                    relationName: "author",
-                    target: () => authorsCol,
-                    localKey: "author_id"
-                }
-            ]
-        };
+            relations: { author: rel.belongsTo(() => uuidAuthors, { localKey: "author_id" }) },
+            rls: "admin-only"
+        });
+        const ts = generate(posts, uuidAuthors);
+        expect(keysOf(block(ts, "Row", "posts"))).toEqual(["id", "authorRef", "title", "author"]);
+        expect(block(ts, "Insert", "posts")).toContain("authorRef: string;");
+        expect(block(ts, "Insert", "posts")).toContain("author: string;");
+    });
 
-        const ts = generateTypedefs([postsCol, authorsCol]);
+    it("lists a column that is nothing but the link with the relations, as a derived one is", () => {
+        const posts = defineTable("posts", {
+            columns: { id: col.integer().primaryKey().identity(), authorId: col.uuid(), title: col.text() },
+            relations: { author: rel.belongsTo(() => uuidAuthors) },
+            rls: "admin-only"
+        });
+        expect(keysOf(block(generate(posts, uuidAuthors), "Row", "posts"))).toEqual(["id", "title", "authorId", "author"]);
+    });
 
-        expect(ts).toContain("authorId: string;");
+    it("writes an unconstrained link by its key alone", () => {
+        // `constraint: false` keeps a bare column: the server writes it by its
+        // key, and does not map the relation's name onto it.
+        const posts = defineTable("posts", {
+            columns: { id: col.integer().primaryKey().identity(), authorId: col.uuid() },
+            relations: { author: rel.belongsTo(() => uuidAuthors, { constraint: false, index: false }) },
+            rls: "admin-only"
+        });
+        const insert = block(generate(posts, uuidAuthors), "Insert", "posts");
+        expect(insert).toContain("authorId?: string | null;");
+        expect(keysOf(insert)).not.toContain("author");
     });
 
     it("types a relation as the target's own row, inlined — the shape a read serves", () => {
-        const tagsCol: CollectionConfig = {
-            slug: "tags",
-            name: "tags",
-            engine: "postgres",
-            properties: {
-                id: { type: "number",
-isId: "increment" }
-            }
-        };
-
-        const postsCol: CollectionConfig = {
-            slug: "posts",
-            name: "posts",
-            engine: "postgres",
-            properties: {
-                id: { type: "number",
-isId: "increment" },
-                tags: {
-                    type: "relation",
-                    relation: {
-                        kind: "manyToMany",
-                        target: () => tagsCol,
-                    }
-                }
-            }
-        };
-
-        const ts = generateTypedefs([postsCol, tagsCol]);
-
-        // `include: ["tags"]` inlines each tag's own columns. The
-        // `{ __type: "relation" }` envelope this used to emit is the admin's
-        // view-model and never reaches a `find()`.
+        const tags = defineTable("tags", { columns: { id: col.integer().primaryKey().identity() }, rls: "admin-only" });
+        const posts = defineTable("posts", {
+            columns: { id: col.integer().primaryKey().identity() },
+            relations: { tags: rel.manyToMany(() => tags) },
+            rls: "admin-only"
+        });
+        const ts = generate(posts, tags);
         expect(ts).toContain("tags?: Array<Database[\"tags\"][\"Row\"]>;");
         expect(ts).not.toContain("__type: \"relation\"");
     });
 
-    it("falls back to an open record when the target is not in this generation run", () => {
-        const postsCol: CollectionConfig = {
-            slug: "posts",
-            name: "posts",
-            engine: "postgres",
-            properties: {
-                id: { type: "number",
-isId: "increment" },
-                author: {
-                    type: "relation",
-                    relation: {
-                        kind: "belongsTo",
-                        target: () => ({ slug: "authors", name: "authors", properties: {} }),
-                        localKey: "author_id"
-                    }
-                }
-            }
-        };
-
-        const ts = generateTypedefs([postsCol]);
-
-        expect(ts).toContain("authorId?: string | number | null;");
-        expect(ts).toContain("author?: Record<string, unknown>;");
+    it("types a junction's payload as `_pivot`, on a read and on a write", () => {
+        const tags = defineTable("tags", { columns: { id: col.uuid().primaryKey().defaultRandom() }, rls: "admin-only" });
+        const posts = defineTable("posts", {
+            columns: { id: col.uuid().primaryKey().defaultRandom() },
+            relations: {
+                tags: rel.manyToMany(() => tags, {
+                    pivot: { position: col.integer(), addedAt: col.timestamptz().notNull() }
+                })
+            },
+            rls: "admin-only"
+        });
+        const ts = generate(posts, tags);
+        expect(block(ts, "Row", "posts")).toContain(
+            "tags?: Array<Database[\"tags\"][\"Row\"] & { _pivot?: { position?: number | null; addedAt: string; } }>;"
+        );
+        expect(block(ts, "Insert", "posts")).toContain(
+            "tags?: Array<string | { id: string; _pivot?: { position?: number | null; addedAt?: string | Date; } }>;"
+        );
     });
 
-    it("a relation that shadows its own foreign key is typed as both", () => {
-        // The read serves the scalar column, until `include` names the relation
-        // — which nests the target under the same key and takes the column's
-        // place. Typing it as only one of the two is how `job.companyId`
-        // reached the query layer as an object.
-        //
-        // The clash is between the relation's *name* and the foreign key's
-        // *wire* name, so it takes a relation named `companyId` to produce it.
-        // A relation named `company_id` beside a `companyId` column no longer
-        // collides at all — which is a second thing camel-casing the wire
-        // bought, not a case this test stopped covering.
-        const companiesCol: CollectionConfig = {
-            slug: "companies",
-            name: "companies",
-            engine: "postgres",
-            properties: {
-                id: { type: "string",
-isId: "uuid" }
-            }
-        };
-
-        const jobsCol: CollectionConfig = {
-            slug: "jobs",
-            name: "jobs",
-            engine: "postgres",
-            properties: {
-                id: { type: "string",
-isId: "uuid" }
+    it("writes a hasMany as the targets' keys and a hasOne by naming the target row", () => {
+        const profiles = defineTable("profiles", { columns: { id: col.integer().primaryKey().identity() }, rls: "admin-only" });
+        const comments = defineTable("comments", { columns: { id: col.uuid().primaryKey().defaultRandom() }, rls: "admin-only" });
+        const writers = defineTable("writers", {
+            columns: { id: col.integer().primaryKey().identity() },
+            relations: {
+                profile: rel.hasOne(() => profiles, { foreignKey: "writer_id" }),
+                comments: rel.hasMany(() => comments, { foreignKey: "writer_id" })
             },
-            relations: [
-                {
-                    kind: "belongsTo",
-                    relationName: "companyId",
-                    target: () => companiesCol,
-                    localKey: "company_id"
-                }
-            ]
-        };
+            rls: "admin-only"
+        });
+        const insert = block(generate(writers, profiles, comments), "Insert", "writers");
+        expect(insert).toContain("profile?: number | null;");
+        expect(insert).toContain("comments?: Array<string | { id: string }>;");
+    });
+});
 
-        const ts = generateTypedefs([jobsCol, companiesCol]);
+describe("Row, Insert and Update describe different things", () => {
+    const posts = defineTable("posts", {
+        columns: {
+            id: col.uuid().primaryKey().defaultRandom(),
+            title: col.text().notNull(),
+            subtitle: col.text(),
+            secret: col.text().private()
+        },
+        relations: { author: rel.belongsTo(() => authors) },
+        rls: "admin-only"
+    });
 
-        expect(ts).toContain("companyId?: string | Database[\"companies\"][\"Row\"] | null;");
+    it("marks the primary key required on Row", () => {
+        expect(block(generate(posts, authors), "Row", "posts")).toContain("id: string;");
+    });
+
+    it("types a nullable column as nullable, not merely absent", () => {
+        expect(block(generate(posts, authors), "Row", "posts")).toContain("subtitle?: string | null;");
+    });
+
+    it("leaves a private column out of every type", () => {
+        const ts = generate(posts, authors);
+        for (const name of ["Row", "Insert", "Update"] as const) {
+            expect(block(ts, name, "posts")).not.toContain("secret");
+        }
+    });
+
+    it("does not let Update reassign the primary key, and keeps the foreign key writable", () => {
+        const update = block(generate(posts, authors), "Update", "posts");
+        expect(update).not.toMatch(/^\s+id\??:/m);
+        expect(update).toContain("title?: string;");
+        expect(update).toContain("authorId?: number | null;");
+    });
+
+    it("accepts both write shapes for a belongsTo relation", () => {
+        const insert = block(generate(posts, authors), "Insert", "posts");
+        expect(insert).toContain("authorId?: number | null;");
+        expect(insert).toContain("author?: number | null;");
+        expect(insert).not.toContain("string | number");
+    });
+
+    it("treats every column of a composite key as part of the row's identity", () => {
+        const ts = generate(defineTable("company_translation", {
+            columns: { id: col.integer().primaryKey(), locale: col.text().primaryKey(), name: col.text() },
+            rls: "admin-only"
+        }));
+        expect(block(ts, "Row", "companyTranslation")).toContain("id: number;");
+        expect(block(ts, "Row", "companyTranslation")).toContain("locale: string;");
+        expect(block(ts, "Insert", "companyTranslation")).toMatch(/^\s+id: number;/m);
+        expect(block(ts, "Insert", "companyTranslation")).toMatch(/^\s+locale: string;/m);
+        const update = block(ts, "Update", "companyTranslation");
+        expect(update).not.toMatch(/^\s+(id|locale)\??:/m);
+        expect(update).toContain("name?: string | null;");
+    });
+});
+
+/**
+ * `.private()` means one thing: the API surface does not mention the column,
+ * in either direction — and a link whose foreign key is private goes with it.
+ * The assertions are over the rule, derived from the fixture, not over a list
+ * of names.
+ */
+describe("a private column is off every generated type", () => {
+    const owners = defineTable("owners", { columns: { id: col.uuid().primaryKey().defaultRandom() }, rls: "admin-only" });
+    const hidden = {
+        credential: col.text().private(),
+        attempts: col.integer().notNull().private(),
+        lockedOut: col.boolean().private(),
+        rotatedAt: col.timestamptz().private(),
+        recoveryCodes: col.array(col.text()).private(),
+        internalNotes: col.jsonb(json.object({ note: json.string() })).private(),
+        closed: col.text().access({ read: [], write: [] }),
+        auditorId: col.uuid().column("auditor_id").private()
+    };
+    const vault = defineTable("vault", {
+        columns: { id: col.uuid().primaryKey().defaultRandom(), label: col.text().notNull(), ...hidden },
+        relations: {
+            owner: rel.belongsTo(() => owners, { localKey: "owner_id" }),
+            auditor: rel.belongsTo(() => owners, { localKey: "auditor_id" })
+        },
+        rls: "admin-only"
+    });
+    const generated = generate(vault, owners);
+    const forbidden = [...Object.keys(hidden), "auditor"];
+
+    it.each(["Row", "Insert", "Update"] as const)("%s names none of them", name => {
+        const keys = keysOf(block(generated, name, "vault"));
+        expect(keys).toContain("label");
+        for (const key of forbidden) expect(keys).not.toContain(key);
+    });
+
+    it("keeps the open link, its foreign key and its include", () => {
+        for (const name of ["Row", "Insert", "Update"] as const) {
+            expect(keysOf(block(generated, name, "vault"))).toEqual(expect.arrayContaining(["owner", "ownerId"]));
+        }
+        expect(block(generated, "Relations", "vault")).toContain("owner: \"owners\";");
+        expect(block(generated, "Relations", "vault")).not.toContain("auditor");
+    });
+
+    it("keeps a column everyone may read and nobody may write on Row only", () => {
+        const ts = generate(owners, defineTable("stats", {
+            columns: { id: col.uuid().primaryKey().defaultRandom(), computed: col.text().access({ write: [] }), salary: col.integer().access({ read: ["hr"], write: ["hr"] }) },
+            relations: { owner: rel.belongsTo(() => owners, { localKey: "owner_id" }) },
+            rls: "admin-only"
+        }));
+        expect(keysOf(block(ts, "Row", "stats"))).toContain("computed");
+        expect(keysOf(block(ts, "Insert", "stats"))).not.toContain("computed");
+        expect(keysOf(block(ts, "Update", "stats"))).not.toContain("computed");
+        // A role rule is not a closure: some caller may.
+        for (const name of ["Row", "Insert", "Update"] as const) expect(keysOf(block(ts, name, "stats"))).toContain("salary");
+    });
+
+    it("hides the auth table's secrets whatever the declaration says", () => {
+        const users = defineAuthTable("users", {
+            columns: { id: col.uuid().primaryKey().defaultRandom(), email: col.text().notNull(), passwordHash: col.text() },
+            rls: "admin-only"
+        });
+        const ts = generate(users);
+        for (const name of ["Row", "Insert", "Update"] as const) expect(keysOf(block(ts, name, "users"))).not.toContain("passwordHash");
+        expect(block(ts, "Row", "users")).toContain("email: string;");
+    });
+});
+
+describe("views and tenants", () => {
+    it("types a view's reads and no writes", () => {
+        const titles = defineView("post_titles", {
+            query: "select id, title from posts",
+            columns: { id: col.uuid().primaryKey(), title: col.text() }
+        });
+        const ts = generate(titles);
+        expect(block(ts, "Row", "postTitles")).toContain("title?: string | null;");
+        expect(ts).toContain("    Insert: never;\n    Update: never;");
+    });
+
+    it("types a tenant column NOT NULL, as the planner makes it", () => {
+        const ts = generate(defineTable("projects", {
+            columns: { id: col.uuid().primaryKey().defaultRandom(), orgId: col.uuid() },
+            tenant: { field: "orgId", from: { claim: "org_id" } },
+            rls: "admin-only"
+        }));
+        expect(block(ts, "Row", "projects")).toContain("orgId: string;");
     });
 });
 
 describe("generateSDK configurations", () => {
+    const tables = compileTables([authors]);
+
     it("does not generate README.md if includeReadme is false", () => {
-        const files = generateSDK([authorsCollection], { includeReadme: false });
-        expect(files.map(f => f.path)).toEqual(["database.types.ts"]);
+        expect(generateSDK(tables, { includeReadme: false }).map(f => f.path)).toEqual(["database.types.ts"]);
     });
 
     it("generates the README by default", () => {
-        // Only the opt-out branch was covered, so `includeReadme` defaulting to
-        // off — or the README disappearing entirely — went unnoticed.
         for (const options of [undefined, {}, { includeReadme: true }]) {
-            const files = generateSDK([authorsCollection], options);
+            const files = generateSDK(tables, options);
             expect(files.map(f => f.path)).toEqual(["database.types.ts", "README.md"]);
             const readme = files.find(f => f.path === "README.md")!;
             expect(readme.content).toContain("createRebaseClient");
@@ -749,400 +648,71 @@ describe("generateSDK configurations", () => {
 
     /**
      * `rebase dev` binds a port derived from the project's path, not 3001, and
-     * the README's example connected to 3001 whatever the project was on —
-     * while the snippet `generate-sdk` printed beside it named the real one.
+     * the README's example connected to 3001 whatever the project was on.
      */
     it("connects the README's example to the address it is given", () => {
-        const readme = generateSDK([authorsCollection], { baseUrl: "http://localhost:3755" })
-            .find(f => f.path === "README.md")!.content;
-
+        const readme = generateSDK(tables, { baseUrl: "http://localhost:3755" }).find(f => f.path === "README.md")!.content;
         expect(readme).toContain("baseUrl: 'http://localhost:3755'");
         expect(readme).not.toContain("3001");
         expect(readme).toContain("collections: collectionsDictionary");
     });
 
-    it("always emits the typedefs, and they reflect the collections passed in", () => {
-        const files = generateSDK([authorsCollection]);
-        const types = files.find(f => f.path === "database.types.ts")!;
+    it("always emits the typedefs, and they reflect the tables passed in", () => {
+        const types = generateSDK(tables).find(f => f.path === "database.types.ts")!;
         expect(types.content).toContain("export interface Database");
         expect(types.content).toContain("authors:");
     });
 
     /**
-     * The README is the first thing a developer reads after generating, and it
-     * taught the naming rule from before 0.14: that a field keeps its *column*
-     * name, so `created_at` is `row.created_at`. It has not been true since —
-     * a declared property is its key in the collection, and a foreign key
-     * derived from a relation arrives camelCased (`author_id` → `authorId`).
-     *
-     * A reader who believed it wrote `row.created_at` and `{ author_id: 5 }`,
-     * both of which are compile errors against the types generated in the same
-     * directory. Two snake_case examples were the whole of the damage, so the
-     * check is that neither spelling comes back.
+     * The README taught the naming rule from before 0.14 — that a field keeps
+     * its *column* name. A declared column is its key, and a derived foreign
+     * key arrives camelCased (`author_id` → `authorId`).
      */
     it("teaches the wire names, not the column names", () => {
-        const readme = generateSDK([authorsCollection])
-            .find(f => f.path === "README.md")!.content;
-
-        // The old paragraph's own two examples, banned outright.
+        const readme = generateSDK(tables).find(f => f.path === "README.md")!.content;
         expect(readme).not.toContain("created_at");
         expect(readme).not.toContain("author_id");
-
-        // And the rule behind them, so a different snake_case field cannot
-        // reintroduce the same advice under another name.
         expect(readme).not.toMatch(/\brow\.[a-z0-9]+_/);
         expect(readme).not.toMatch(/\{\s*[a-z0-9]+_[a-z0-9_]*:/);
-
-        // What replaced it.
         expect(readme).toContain("row.authorId");
         expect(readme).toContain("row.createdAt");
     });
 });
 
-/**
- * `Row` describes what a read serves; `Insert` and `Update` describe what a
- * write accepts. They were near-identical, and all three were wrong in the same
- * direction: everything optional, nothing nullable, the primary key writable
- * and the documented relation-write shape missing.
- */
-describe("Row, Insert and Update describe different things", () => {
-    /**
-     * The body of one of the three blocks, so an assertion cannot match the
-     * wrong one. Scoped to a collection as well as a block: the generator emits
-     * collections in slug order, so `posts` is not the first one in the file
-     * however the fixtures are passed in.
-     */
-    function block(ts: string, name: "Row" | "Insert" | "Update", slug = "posts"): string {
-        const collection = ts.indexOf(`  ${slug}: {`);
-        expect(collection).toBeGreaterThan(-1);
-        const start = ts.indexOf(`    ${name}: {`, collection);
-        expect(start).toBeGreaterThan(-1);
-        return ts.slice(start, ts.indexOf("    };", start));
-    }
-
-    const authorsCol: CollectionConfig = {
-        slug: "authors",
-        name: "authors",
-        properties: { id: { type: "number", isId: "increment" } }
-    };
-
-    const postsCol: CollectionConfig = {
-        slug: "posts",
-        name: "posts",
-        properties: {
-            id: { type: "string", isId: "uuid" },
-            title: { type: "string", validation: { required: true } },
-            subtitle: { type: "string" },
-            secret: { type: "string", excludeFromApi: true },
-            author: { type: "relation", relation: { kind: "belongsTo", target: () => authorsCol } }
-        }
-    };
-
-    it("marks the primary key required on Row, whatever its validation says", () => {
-        // Introspection sets `isId` and never sets `validation.required`, so
-        // `row.id` was `string | undefined` for every baas project.
-        expect(block(generateTypedefs([postsCol, authorsCol]), "Row")).toContain("id: string;");
-    });
-
-    it("types an optional column as nullable, not merely absent", () => {
-        // The column is on every row a read returns; what varies is whether the
-        // value is null. `subtitle?: string` said the key might not be there.
-        expect(block(generateTypedefs([postsCol, authorsCol]), "Row"))
-            .toContain("subtitle?: string | null;");
-    });
-
-    it("leaves excludeFromApi columns out of every type", () => {
-        // One rule, both directions — see the dedicated suite below.
-        const ts = generateTypedefs([postsCol, authorsCol]);
-        for (const name of ["Row", "Insert", "Update"] as const) {
-            expect(block(ts, name)).not.toContain("secret");
-        }
-    });
-
-    it("does not let Update reassign the primary key", () => {
-        const update = block(generateTypedefs([postsCol, authorsCol]), "Update");
-        expect(update).not.toMatch(/^\s+id\??:/m);
-        expect(update).toContain("title?: string;");
-        // The foreign key is still writable — it is a column, not the row's own key.
-        expect(update).toContain("authorId?: number | null;");
-    });
-
-    it("accepts both write shapes for a belongsTo relation", () => {
-        // The server takes either: `{ author: 5 }`, which the write transformer
-        // maps onto the foreign-key column, or `{ authorId: 5 }`, which passes
-        // through. Only the second was generated, so the documented form was a
-        // type error.
-        const insert = block(generateTypedefs([postsCol, authorsCol]), "Insert");
-        expect(insert).toContain("authorId?: number | null;");
-        expect(insert).toContain("author?: number | null;");
-    });
-
-    it("offers the relation write key the server actually accepts", () => {
-        // The write transformer looks the payload key up in `properties` and
-        // only treats it as a relation if what it finds there is one. So the
-        // accepted key is the property key — a relation whose `relationName`
-        // differs is not reachable under that name, and offering it would have
-        // written to a column that does not exist.
-        const renamed: CollectionConfig = {
-            slug: "posts",
-            name: "posts",
-            properties: {
-                id: { type: "string", isId: "uuid" },
-                author: {
-                    type: "relation",
-                    relation: {
-                        kind: "belongsTo",
-                        relationName: "author_rel",
-                        target: () => authorsCol,
-                        localKey: "author_id"
-                    }
-                }
-            }
-        };
-
-        const insert = block(generateTypedefs([renamed, authorsCol]), "Insert");
-        expect(insert).toContain("author?: number | null;");
-        expect(insert).toContain("authorId?: number | null;");
-        expect(insert).not.toContain("author_rel");
-    });
-
-    it("types a foreign key from the target's primary key on writes too", () => {
-        // Insert hardcoded `string | number`, so a string typechecked against a
-        // numeric-keyed target while Row knew better.
-        expect(block(generateTypedefs([postsCol, authorsCol]), "Insert"))
-            .not.toContain("string | number");
-    });
-
-    it("treats every column of a composite key as part of the row's identity", () => {
-        // Several `isId` properties are one key: each is on every row, each is
-        // writable on insert like a single key the caller supplies, and none
-        // can be reassigned by an update.
-        const translations: CollectionConfig = {
-            slug: "company_translation",
-            name: "company_translation",
-            properties: {
-                id: { type: "number", isId: true },
-                locale: { type: "string", isId: "manual" },
-                name: { type: "string" }
-            }
-        };
-        const ts = generateTypedefs([translations]);
-        const row = block(ts, "Row", "companyTranslation");
-        expect(row).toContain("id: number;");
-        expect(row).toContain("locale: string;");
-        const insert = block(ts, "Insert", "companyTranslation");
-        expect(insert).toMatch(/^\s+id\??: number;/m);
-        expect(insert).toMatch(/^\s+locale\??: string;/m);
-        const update = block(ts, "Update", "companyTranslation");
-        expect(update).not.toMatch(/^\s+(id|locale)\??:/m);
-        expect(update).toContain("name?: string | null;");
-    });
-});
-
-/**
- * `excludeFromApi` means one thing: the API surface does not mention the
- * property, in either direction. `Insert` used to keep such columns writable —
- * "stripped from responses, not from writes" — which left the generated types
- * as the one place a secret was still named, and offered it to a client as
- * something to send.
- *
- * The assertions below are over the *rule*, derived from the fixture, not over
- * a list of names. Pinning `passwordHash` and `emailVerificationToken` is how
- * this kept coming back: every sibling generator was fixed for those two names
- * and stayed wrong for the rule.
- */
-describe("excludeFromApi keeps a property off every generated type", () => {
-    const owners: CollectionConfig = {
-        slug: "owners",
-        name: "owners",
-        properties: {
-            id: {
-                name: "ID",
-                type: "string",
-                isId: "uuid"
-            }
-        }
-    };
-
-    /** Excluded properties, one per shape the generator emits differently. */
-    const excludedProperties = {
-        credential: {
-            name: "Credential",
-            type: "string",
-            excludeFromApi: true
-        },
-        attempts: {
-            name: "Attempts",
-            type: "number",
-            validation: { required: true },
-            excludeFromApi: true
-        },
-        lockedOut: {
-            name: "Locked out",
-            type: "boolean",
-            excludeFromApi: true
-        },
-        rotatedAt: {
-            name: "Rotated at",
-            type: "date",
-            excludeFromApi: true
-        },
-        recoveryCodes: {
-            name: "Recovery codes",
-            type: "array",
-            of: { name: "Code", type: "string" },
-            excludeFromApi: true
-        },
-        internalNotes: {
-            name: "Internal notes",
-            type: "map",
-            properties: { note: { name: "Note", type: "string" } },
-            excludeFromApi: true
-        },
-        // Declared under one name, stored under another. The server strips a
-        // row by both, so a generated type may name neither — and the relation
-        // below claims exactly this column as its foreign key.
-        legacyOwner: {
-            name: "Legacy owner",
-            type: "string",
-            columnName: "owner_id",
-            excludeFromApi: true
-        },
-        // A relation can be excluded too; the included target is stripped by
-        // the property key, like any other column.
-        auditor: {
-            name: "Auditor",
-            type: "relation",
-            relation: { kind: "belongsTo", target: () => owners, localKey: "auditor_id" },
-            excludeFromApi: true
-        }
-    } as const;
-
-    const vault: CollectionConfig = {
-        slug: "vault",
-        name: "vault",
-        properties: {
-            id: {
-                name: "ID",
-                type: "string",
-                isId: "uuid"
-            },
-            label: {
-                name: "Label",
-                type: "string",
-                validation: { required: true }
-            },
-            owner: {
-                name: "Owner",
-                type: "relation",
-                relation: { kind: "belongsTo", target: () => owners, localKey: "owner_id" }
-            },
-            ...excludedProperties
-        }
-    };
-
-    /** Every name a property was declared or stored under. */
-    const forbidden = Object.entries(excludedProperties).flatMap(([key, prop]) => {
-        const columnName = (prop as { columnName?: string }).columnName;
-        return columnName ? [key, columnName] : [key];
-    });
-
-    /** The keys one emitted block declares, ignoring the types they carry. */
-    function emittedKeys(body: string): string[] {
-        return [...body.matchAll(/^ {6}"?([^"?:]+)"?\??:/gm)].map(m => m[1]);
-    }
-
-    // Anchored on the collection, not on the first `Row: {` in the file: the
-    // generator sorts by slug, so which collection comes first is not the order
-    // the fixtures were passed in.
-    function block(ts: string, name: "Row" | "Insert" | "Update", slug = "vault"): string[] {
-        const collection = ts.indexOf(`  ${slug}: {`);
-        expect(collection).toBeGreaterThan(-1);
-        const start = ts.indexOf(`    ${name}: {`, collection);
-        expect(start).toBeGreaterThan(-1);
-        return emittedKeys(ts.slice(start, ts.indexOf("    };", start)));
-    }
-
-    const generated = generateTypedefs([vault, owners]);
-
-    it.each(["Row", "Insert", "Update"] as const)("%s names none of them", name => {
-        const keys = block(generated, name);
-        // Guards against passing because nothing was generated at all.
-        expect(keys).toContain("label");
-        for (const forbiddenKey of forbidden) {
-            expect(keys).not.toContain(forbiddenKey);
-        }
-    });
-
-    it("keeps the unmarked siblings, including the relation and its foreign key", () => {
-        // `owner_id` is the excluded `legacyOwner`'s column, so the relation
-        // that stores its key there loses the scalar — but the relation itself
-        // is not excluded and is still readable and writable by name.
-        expect(block(generated, "Row")).toContain("owner");
-        expect(block(generated, "Insert")).toContain("owner");
-        expect(block(generated, "Update")).toContain("owner");
-    });
-
-    it("drops the foreign key of an excluded to-one relation, as the server does", () => {
-        // The excluded `auditor` relation stores its key in `auditor_id`,
-        // served as `auditorId`. `auditorId: 7` names the auditor exactly as
-        // `auditor: 7` does, so the server's read strip removes it from every
-        // row and its write refusal answers it VALIDATION_EXCLUDED_FIELDS
-        // (`restrictedFieldNames` in @rebasepro/common). This test used to
-        // pin the opposite, from before the server took the key with the
-        // relation; the generated types described a field nobody is served.
-        for (const name of ["Row", "Insert", "Update"] as const) {
-            expect(block(generated, name)).not.toContain("auditorId");
-        }
-    });
-});
-
-describe("generateTypedefs is independent of collection order", () => {
-    // `rebase generate-sdk` sorts by slug before generating, and both
-    // `generate-sdk && git diff --exit-code` and `rebase doctor` compare the
-    // generator's output against the file it wrote. While the sort lived only
-    // in the command, a project whose filename order differed from its slug
-    // order had its SDK reported permanently out of date, and re-running the
-    // printed fix rewrote the file in the order it was already in.
-    const articles: CollectionConfig = {
-        slug: "articles",
-        name: "articles",
-        properties: { title: { type: "string" } }
-    };
-    const authors: CollectionConfig = {
-        slug: "authors",
-        name: "authors",
-        properties: { name: { type: "string" } }
-    };
+describe("generateTypedefs is independent of table order", () => {
+    // `rebase generate-sdk && git diff --exit-code` and `rebase doctor` compare
+    // the generator's output against the file it wrote.
+    const tables = compileTables([
+        defineTable("authors", { columns: { id: col.uuid().primaryKey(), name: col.text() }, rls: "admin-only" }),
+        defineTable("articles", { columns: { id: col.uuid().primaryKey(), title: col.text() }, rls: "admin-only" })
+    ]);
 
     it("emits byte-identical output for a shuffled input", () => {
-        expect(generateTypedefs([authors, articles])).toEqual(generateTypedefs([articles, authors]));
+        expect(generateTypedefs([...tables].reverse())).toEqual(generateTypedefs(tables));
     });
 
     it("does not reorder the array it was given", () => {
-        const input = [authors, articles];
+        const input = [...tables];
         generateTypedefs(input);
-        expect(input.map(c => c.slug)).toEqual(["authors", "articles"]);
+        expect(input.map(t => t.slug)).toEqual(["authors", "articles"]);
     });
 });
 
 describe("a slug the client proxy reserves gets a renamed accessor", () => {
     // `client.data.collection` is the dynamic `collection(slug)` function, and
     // `then`, `toJSON` and `$$typeof` are answered `undefined` so promise and
-    // serialisation probes do not mistake the proxy for something else. A
-    // collection whose accessor was one of those names generated a property
-    // that could never be reached.
+    // serialisation probes do not mistake the proxy for something else.
     const slugs = ["collection", "then", "toJSON", "posts"];
-    const collections: CollectionConfig[] = slugs.map(slug => ({
-        slug,
-        name: slug,
-        properties: { title: { type: "string" } }
-    }));
+    const tables = compileTables(slugs.map(slug => defineTable(slug, {
+        table: `t_${slug.toLowerCase()}`,
+        columns: { id: col.uuid().primaryKey(), title: col.text() },
+        rls: "admin-only"
+    })));
 
     it("emits `<name>Collection` and maps it back to the slug", () => {
         const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
         try {
-            const output = generateTypedefs(collections);
+            const output = generateTypedefs(tables);
             expect(output).toContain("  collectionCollection: \"collection\",");
             expect(output).toContain("  thenCollection: \"then\",");
             expect(output).toContain("  toJSONCollection: \"toJSON\",");
@@ -1161,10 +731,7 @@ describe("a slug the client proxy reserves gets a renamed accessor", () => {
     });
 
     it("refuses when the renamed accessor collides with another slug's", () => {
-        const clash = [
-            collections[0],
-            { slug: "collection_collection", name: "collection_collection", properties: {} }
-        ];
+        const clash = [tables[0], rawTable("collection_collection")];
         const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
         try {
             expect(() => generateTypedefs(clash)).toThrow(/collectionCollection/);

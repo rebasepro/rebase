@@ -33,6 +33,7 @@ import pg from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { CollectionConfig } from "@rebasepro/types";
 import { generateTypedefs } from "@rebasepro/codegen";
+import { collectionsToTableDefs, compileTables } from "@rebasepro/common";
 
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { ensureCollectionTables, type Queryable } from "../../src/schema/ensure-collection-tables.js";
@@ -170,7 +171,8 @@ describe("property kinds: the wire value has the generated type (E2E)", () => {
     });
 
     it("every property kind reads back as the type the generated SDK declares", async () => {
-        const typedefs = generateTypedefs([wireTypes]);
+        // The generator reads descriptors: the collection, lifted and compiled.
+        const typedefs = generateTypedefs(compileTables(collectionsToTableDefs([wireTypes]).tables));
         const [fetched] = await driver.restFetchService.fetchCollectionForRest("wire-types", {});
         const row = overTheWire(fetched);
 

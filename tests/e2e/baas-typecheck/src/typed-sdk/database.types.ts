@@ -43,8 +43,8 @@ export interface Database {
     Row: {
       id: number;
       body: string;
-      postId: string;
       reviewerId?: number | null;
+      postId: string;
       post?: Database["posts"]["Row"];
       reviewer?: Database["authors"]["Row"];
       postTags?: Array<Database["tags"]["Row"]>;
@@ -73,7 +73,7 @@ export interface Database {
       body?: string | null;
     };
     Insert: {
-      id?: string;
+      id: string;
       body?: string | null;
     };
     Update: {

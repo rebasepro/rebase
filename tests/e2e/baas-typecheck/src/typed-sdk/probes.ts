@@ -9,7 +9,7 @@
  * One bad key per call: two in one literal collapse into a single error, and
  * the directive cannot say which of them it caught.
  *
- * `database.types.ts` is the codegen's output for `collections.ts`, kept in
+ * `database.types.ts` is the codegen's output for `schema.ts`, kept in
  * step by `packages/codegen/test/baas-typecheck-fixture.test.ts`.
  */
 import { createRebaseClient } from "@rebasepro/client";

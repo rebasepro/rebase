@@ -1,5 +1,6 @@
-import { getDeclaredSubcollections, CollectionConfig, Property, Properties, MapProperty, ArrayProperty, StringProperty, NumberProperty, DateProperty, ResolvedRelation } from "@rebasepro/types";
-import { effectiveAccess, fieldKeyForColumn, findRelation, isRelationRequired, resolveCollectionRelations, restrictedFieldNames, sortCollectionsBySlug } from "@rebasepro/common";
+import type { ColumnDescriptor, ColumnType, JsonShape, RelationDescriptor, TableDescriptor } from "@rebasepro/types";
+import { isNumericColumnType, isTemporalColumnType } from "@rebasepro/types";
+import { sortCollectionsBySlug } from "@rebasepro/common";
 import { toCollectionAccessor, toSafeIdentifier } from "./utils";
 
 /**
@@ -8,7 +9,9 @@ import { toCollectionAccessor, toSafeIdentifier } from "./utils";
  * Thrown rather than emitted. The generator used to concatenate whatever it was
  * given, so a slug that collided with another one, or that was not an
  * identifier, produced a file that either failed to compile or — worse —
- * compiled while quietly routing one collection to another's slug.
+ * compiled while quietly routing one table to another's slug.
+ *
+ * @group SDK generation
  */
 export class CodegenError extends Error {
     constructor(message: string) {
@@ -23,7 +26,7 @@ const IDENTIFIER = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
  * A property name for the emitted TypeScript: verbatim when it is a valid
  * identifier, quoted otherwise.
  *
- * Every key that reaches the output goes through here. Column names are not
+ * Every key that reaches the output goes through here. Column keys are not
  * required to be identifiers — `"order"`, `"user id"`, a quoted Postgres
  * identifier — and the previous behaviour of camel-casing them into shape
  * renamed the column in the type while the wire kept the original, so the
@@ -38,171 +41,182 @@ function emitKey(key: string): string {
  *
  * `"${value}"` was the previous form. A value containing a quote closed the
  * literal early, which at best broke the file and at worst let a slug from a
- * remote contract inject top-level statements into a file the developer
+ * remote schema inject top-level statements into a file the developer
  * compiles and bundles.
  */
 function emitString(value: string): string {
     return JSON.stringify(value);
 }
 
-/** The `id`s of an enum declared as an array, an array of `{ id }`, or an object map. */
-function enumIds(raw: unknown): (string | number)[] {
-    if (Array.isArray(raw)) {
-        return raw.map((entry: string | number | { id: string | number }) =>
-            entry && typeof entry === "object" ? entry.id : entry);
+const GEOPOINT_TYPE = "{ latitude: number; longitude: number; }";
+
+/** A closed value set as a union of literals: strings escaped, numbers only when every value is one. */
+function literalUnion(values: readonly (string | number)[], numeric: boolean): string | undefined {
+    if (values.length === 0) return undefined;
+    if (numeric) {
+        const numbers = values.map(Number);
+        // A numeric set carrying something that is not a number cannot be
+        // written as a union of numeric literals. Widening to `number` is
+        // imprecise; emitting `NaN | undefined` is invalid.
+        if (numbers.some(n => !Number.isFinite(n))) return undefined;
+        return numbers.map(n => String(n)).join(" | ");
     }
-    if (raw && typeof raw === "object") return Object.keys(raw);
-    return [];
+    return values.map(v => emitString(String(v))).join(" | ");
 }
 
-function propertyToTypeScriptType(prop: Property): string {
-    switch (prop.type) {
-        case "string": {
-            const sp = prop as StringProperty;
-            if (sp.enum) {
-                const ids = enumIds(sp.enum);
-                if (ids.length === 0) return "string";
-                return ids.map(v => emitString(String(v))).join(" | ");
-            }
-            return "string";
-        }
-        case "number": {
-            const np = prop as NumberProperty;
-            if (np.enum) {
-                const ids = enumIds(np.enum);
-                const numbers = ids.map(Number);
-                // A numeric enum carrying something that is not a number cannot
-                // be written as a union of numeric literals. Widening to
-                // `number` is imprecise; emitting `NaN | undefined` is invalid.
-                if (ids.length === 0 || numbers.some(n => !Number.isFinite(n))) return "number";
-                return numbers.map(n => String(n)).join(" | ");
-            }
-            return "number";
-        }
+/**
+ * The TypeScript type of a value of one Postgres type, as the wire serves it.
+ *
+ * A Postgres enum and a `.oneOf()` set are literal unions; a timestamp, a date
+ * and a time are ISO strings; `bytea` is base64; a vector is its numbers; a
+ * type Rebase serves but does not create (`other`) is `unknown`.
+ */
+function scalarType(type: ColumnType, oneOf: readonly (string | number)[] | undefined): string {
+    if (type.kind === "enum") return literalUnion(type.values, false) ?? "string";
+    if (isNumericColumnType(type)) return (oneOf && literalUnion(oneOf, true)) ?? "number";
+    switch (type.kind) {
+        case "text":
+        case "varchar":
+        case "char":
+        case "uuid":
+            return (oneOf && literalUnion(oneOf, false)) ?? "string";
         case "boolean":
             return "boolean";
+        case "timestamptz":
         case "date":
-            return "string"; // ISO 8601 string over the wire
-        case "geopoint":
-            return "{ latitude: number; longitude: number; }";
-        case "reference":
-            return "string | number";
-        case "relation":
-            return "string | number";
-        case "map": {
-            const mapProp = prop as MapProperty;
-            if (mapProp.properties) {
-                const inner = Object.entries(mapProp.properties)
-                    .map(([k, v]) => {
-                        const child = v as Property;
-                        // Nested fields carry validation like any other. Emitting
-                        // them all required claimed a shape the payload does not
-                        // have to satisfy.
-                        const optional = !child.validation?.required;
-                        const type = propertyToTypeScriptType(child);
-                        return `${emitKey(k)}${optional ? "?" : ""}: ${optional ? `${type} | null` : type};`;
-                    })
-                    .join(" ");
-                return `{ ${inner} }`;
-            }
-            return "Record<string, unknown>";
-        }
-        case "array": {
-            const arrProp = prop as ArrayProperty;
-            if (arrProp.of) {
-                return `Array<${propertyToTypeScriptType(arrProp.of as Property)}>`;
-            }
-            return "Array<unknown>";
-        }
+        case "time":
+            return "string";
         case "vector":
             return "number[]";
-        case "binary":
+        case "bytea":
             return "string";
+        case "json":
+        case "jsonb":
+            return "Record<string, unknown>";
         default:
             return "unknown";
     }
 }
 
 /**
- * Unwrap a relation target that arrived as a module namespace rather than the
- * collection itself — `target: () => import("./authors")` is a common slip.
+ * The TypeScript type of a JSON document, from the shape the table declares.
+ *
+ * An object types its declared fields — a field the shape does not mark
+ * `required` may be absent or null — and an open object (`additional`) with no
+ * declared field is a record. A typed block list (`json.oneOf`) is the union of
+ * its blocks, each a `{ <typeField>: "<variant>"; <valueField>: … }`.
  */
-function resolveTargetCollection(relation: ResolvedRelation): CollectionConfig | undefined {
-    try {
-        let target = relation.target() as CollectionConfig & { default?: CollectionConfig; __esModule?: boolean };
-        if (target && (target.default || target.__esModule)) {
-            target = (target.default ?? target) as typeof target;
+function jsonType(shape: JsonShape): string {
+    switch (shape.kind) {
+        case "string":
+            return (shape.oneOf && literalUnion(shape.oneOf, false)) ?? "string";
+        case "number":
+            return (shape.oneOf && literalUnion(shape.oneOf, true)) ?? "number";
+        case "boolean":
+            return "boolean";
+        case "date":
+            return "string";
+        case "geopoint":
+            return GEOPOINT_TYPE;
+        case "object": {
+            const entries = Object.entries(shape.fields);
+            if (entries.length === 0 && shape.additional) return "Record<string, unknown>";
+            const inner = entries
+                .map(([key, field]) => {
+                    const optional = !field.required;
+                    const type = jsonType(field);
+                    return `${emitKey(key)}${optional ? "?" : ""}: ${optional ? `${type} | null` : type};`;
+                })
+                .join(" ");
+            return `{ ${inner} }`;
         }
-        return target;
-    } catch {
-        return undefined;
+        case "array":
+            return `Array<${jsonType(shape.of)}>`;
+        case "oneOf": {
+            const variants = Object.entries(shape.variants);
+            // A block whose discriminator and value share a key cannot be
+            // written as an object type (a remote schema can say anything).
+            if (variants.length === 0 || shape.typeField === shape.valueField) return "unknown";
+            return variants
+                .map(([name, variant]) => `{ ${emitKey(shape.typeField)}: ${emitString(name)}; ${emitKey(shape.valueField)}: ${jsonType(variant)}; }`)
+                .join(" | ");
+        }
+        default:
+            return "unknown";
     }
 }
 
-/** The TypeScript type of a foreign key: whatever the target's primary key is. */
-function foreignKeyType(relation: ResolvedRelation): string {
-    const target = resolveTargetCollection(relation);
-    if (!target?.properties) return "string | number";
-    const idProp = Object.entries(target.properties).find(([_, p]) => (p as Record<string, unknown>).isId);
-    if (!idProp) return "string | number";
-    return (idProp[1] as Property).type === "number" ? "number" : "string";
+/** The TypeScript type of a column's value on a read. */
+function columnType(column: ColumnDescriptor): string {
+    if (column.semantic === "geopoint") return GEOPOINT_TYPE;
+    if (column.json && (column.type.kind === "json" || column.type.kind === "jsonb")) return jsonType(column.json);
+    if (column.type.kind === "array") return `Array<${scalarType(column.type.of, column.element?.oneOf)}>`;
+    return scalarType(column.type, column.oneOf);
 }
 
 /**
- * The property's `isId`, on the property kinds that declare one.
- *
- * `Property` is a union and only `StringProperty`, `NumberProperty` and
- * `DateProperty` carry `isId`, so it cannot be read off the union directly — which is what
- * double-casting `prop` to `Record<string, unknown>` was for, twice. The union
- * discriminates on `type`, so narrowing gets there with no claim at all, and
- * with the declared type (`boolean | "manual" | "uuid" | string`) intact
- * instead of flattened to `unknown`.
+ * The TypeScript type of a key: `number` for a numeric column, `string` for
+ * every other — what a foreign key, a link written by the relation's name and
+ * a to-many membership hold.
  */
-function declaredIsId(prop: Property): StringProperty["isId"] | NumberProperty["isId"] | DateProperty["isId"] {
-    return prop.type === "string" || prop.type === "number" || prop.type === "date" ? prop.isId : undefined;
-}
-
-/** Whether a property is the collection's primary key. */
-function isPrimaryKey(prop: Property): boolean {
-    return Boolean(declaredIsId(prop));
+function keyType(column: ColumnDescriptor | undefined): string {
+    if (!column) return "string | number";
+    return isNumericColumnType(column.type) ? "number" : "string";
 }
 
 /**
- * Whether the server assigns this primary key, so a write does not have to.
- * `true` and `"manual"` both mean the caller supplies it.
+ * A column's type on a write: its own type (a temporal column also as a
+ * `Date`), or `null` too when it is nullable.
+ *
+ * `Row` has typed a nullable column `T | null` for a while; its write twins
+ * did not, so the one way to clear a value — `update(id, { publishedAt: null })`,
+ * `{ authorId: null }` to unassign, the edit-form round trip of a row that came
+ * back with nulls in it — was a compile error the server would have accepted.
+ * A primary key is never null.
  */
-function isAutoAssignedId(prop: Property): boolean {
-    const isId = declaredIsId(prop);
-    return Boolean(isId) && isId !== "manual" && isId !== true;
+function writableType(column: ColumnDescriptor, tsType: string): string {
+    // A temporal value is written as a `Date` as readily as an ISO string: the
+    // client sends it through `JSON.stringify`, which spells it as the ISO
+    // string the server stores. `Row` keeps `string`, because that is what a
+    // read returns.
+    const written = isTemporalColumnType(column.type) ? `${tsType} | Date` : tsType;
+    return column.nullable ? `${written} | null` : written;
 }
 
 /**
- * The type an *included* relation arrives as: the target's own row, inlined.
- *
- * This is what the read pipeline actually serves — `toRestRow` puts the
- * target's flat columns where the relation was, and the SDK and the HTTP API
- * both go through it. It is deliberately *not* a `{ __type: "relation" }`
- * envelope: that shape is the admin's view-model and never reaches a
- * developer's `find()`.
- *
- * Falls back to an open record when the target is not part of this generation
- * run, since there is no `Row` to point at.
+ * Whether a create may leave the column out: it may be null, or the database
+ * or the server fills it — a default of any kind (a literal, SQL, a random
+ * uuid, an identity, one the database owns), a serial, a stamp.
  */
-function includedRelationType(
-    relation: ResolvedRelation,
-    accessors: Map<string, string>
-): string {
-    const target = resolveTargetCollection(relation);
-    const slug = target?.slug ?? relation.targetSlug;
-    const accessor = slug ? accessors.get(slug) : undefined;
-    const rowType = accessor
-        ? `Database[${emitString(accessor)}]["Row"]`
-        : "Record<string, unknown>";
-    // A read of a many-to-many whose junction carries columns serves them on
-    // each target as `_pivot` — see `ManyToManyRelation.through.properties`.
-    const pivot = relation.kind === "manyToMany" ? pivotType(relation.through.properties, "read") : undefined;
-    const elementType = pivot ? `${rowType} & { _pivot?: ${pivot} }` : rowType;
-    return relation.cardinality === "many" ? `Array<${elementType}>` : elementType;
+function insertOptional(column: ColumnDescriptor): boolean {
+    if (column.nullable) return true;
+    if (column.default !== undefined || column.stamp !== undefined) return true;
+    const kind = column.type.kind;
+    return kind === "smallserial" || kind === "serial" || kind === "bigserial";
+}
+
+/** Nobody may read it: `.private()`, or `access({ read: [] })`. */
+function unreadable(column: ColumnDescriptor): boolean {
+    return column.private === true || column.access?.read?.length === 0;
+}
+
+/** Nobody may write it: `.private()`, `.readOnly()`, generated, or `access({ write: [] })`. */
+function unwritable(column: ColumnDescriptor): boolean {
+    return column.private === true || column.readOnly === true || column.generated !== undefined
+        || column.access?.write?.length === 0;
+}
+
+/** One emitted `key: type;` line, already indented. */
+function line(key: string, type: string, optional: boolean): string {
+    return `      ${emitKey(key)}${optional ? "?" : ""}: ${type};`;
+}
+
+type BelongsTo = Extract<RelationDescriptor, { kind: "belongsTo" }>;
+
+/** Everything the generator needs to know about the tables of one run. */
+interface Run {
+    accessors: Map<string, string>;
+    bySlug: Map<string, TableDescriptor>;
 }
 
 /**
@@ -212,19 +226,19 @@ function includedRelationType(
  * of generating this at all, and `collectionsDictionary` maps it back to the
  * slug the wire uses. Two slugs that safe down to the same identifier cannot
  * both have it: the interface would not compile, and the dictionary — an object
- * literal — would silently keep only the last, routing one collection's reads
- * to the other's table. There is no defensible way to pick, so this refuses.
+ * literal — would silently keep only the last, routing one table's reads to
+ * the other's. There is no defensible way to pick, so this refuses.
  */
-function buildAccessors(collections: CollectionConfig[]): Map<string, string> {
+function buildAccessors(tables: readonly TableDescriptor[]): Map<string, string> {
     const accessors = new Map<string, string>();
     const bySafeName = new Map<string, string>();
 
-    for (const collection of collections) {
-        const slug = collection.slug;
+    for (const table of tables) {
+        const slug = table.slug;
         if (typeof slug !== "string" || slug.length === 0) {
             throw new CodegenError(
-                "A collection has no slug, so it has no name to generate a type for. " +
-                "Every collection needs a unique `slug`."
+                "A table has no slug, so it has no name to generate a type for. " +
+                "Every table needs a unique `slug`."
             );
         }
 
@@ -240,7 +254,7 @@ function buildAccessors(collections: CollectionConfig[]): Map<string, string> {
         const accessor = toCollectionAccessor(slug);
         if (accessor !== safe) {
             console.warn(
-                `[codegen] The collection ${emitString(slug)} would be \`client.data.${safe}\`, a name ` +
+                `[codegen] The table ${emitString(slug)} would be \`client.data.${safe}\`, a name ` +
                 `the client reserves, so its typed accessor is \`client.data.${accessor}\`. ` +
                 `\`client.data.collection(${emitString(slug)})\` reaches it too.`
             );
@@ -249,7 +263,7 @@ function buildAccessors(collections: CollectionConfig[]): Map<string, string> {
         const existing = bySafeName.get(accessor);
         if (existing !== undefined) {
             throw new CodegenError(
-                `The collections ${emitString(existing)} and ${emitString(slug)} both generate the ` +
+                `The tables ${emitString(existing)} and ${emitString(slug)} both generate the ` +
                 `accessor "${accessor}", so only one of them could be reached from the generated client ` +
                 "and the other's reads would silently go to the wrong table. Rename one of the slugs."
             );
@@ -262,108 +276,178 @@ function buildAccessors(collections: CollectionConfig[]): Map<string, string> {
     return accessors;
 }
 
-/**
- * A column's type on a write: its own type (a date also as a `Date`), or
- * `null` too when it is not required.
- *
- * `Row` has typed a non-required column `T | null` for a while; its write twins
- * did not, so the one way to clear a value — `update(id, { publishedAt: null })`,
- * `{ authorId: null }` to unassign, the edit-form round trip of a row that came
- * back with nulls in it — was a compile error the server would have accepted.
- * A primary key is never null, required or not.
- */
-function writableType(prop: Property, tsType: string): string {
-    // A date is written as a `Date` as readily as an ISO string: the client
-    // sends it through `JSON.stringify`, which spells it as the ISO string the
-    // server stores. `Row` keeps `string`, because that is what a read returns.
-    const written = prop.type === "date" ? `${tsType} | Date` : tsType;
-    return prop.validation?.required || isPrimaryKey(prop) ? written : `${written} | null`;
-}
-
-/** One emitted `key: type;` line, already indented. */
-function line(key: string, type: string, optional: boolean): string {
-    return `      ${emitKey(key)}${optional ? "?" : ""}: ${type};`;
+/** The single key column of a table, or its first, for the type a link to it holds. */
+function keyColumnOf(table: TableDescriptor | undefined): ColumnDescriptor | undefined {
+    if (!table) return undefined;
+    const key = table.primaryKey[0];
+    return key === undefined ? undefined : table.columns.find(column => column.key === key);
 }
 
 /**
- * The keys nobody can reach take off the API surface — in *both* directions.
- *
- * `excludeFromApi` means one thing: the API surface does not mention this
- * property. `Row` already honoured that; `Insert` and `Update` deliberately did
- * not, on the reading that the column is stripped from responses rather than
- * from writes. That left the generated types as the one place a password hash
- * was still named, and it invited a client to send one. The server refuses
- * such a field on a write (`VALIDATION_EXCLUDED_FIELDS`), so nothing generated
- * advertises it.
- *
- * Read through `effectiveAccess`, so the flag and its longhand
- * `access: { read: [], write: [] }` produce the same file. A *role* rule is
- * deliberately not honoured here and `Row` is unchanged by one: a generated type
- * is one shape for every caller, and there is no `Row` that is right for both a
- * reader who holds `hr` and one who does not. The server is the enforcement
- * point; the types describe the surface a caller may name.
- *
- * Every spelling the server restricts, read from the server's own function
- * (`restrictedFieldNames`): the property name, its column name, and — for a
- * closed to-one relation — the foreign key that names the same row. Keying on
- * the property and column alone, which this used to, kept `authorId` on all
- * three types for an `excludeFromApi` `author`, though the server strips it
- * from every read and refuses it on every write.
+ * The type a link to a relation's target holds: whatever the target's key is —
+ * or, for a target outside this run, whatever the `belongsTo`'s own foreign-key
+ * column holds.
  */
-function excludedApiKeys(collection: CollectionConfig): Set<string> {
-    const unreadable = closedNames(collection, "read");
-    const unwritable = closedNames(collection, "write");
-    return new Set([...unreadable].filter(name => unwritable.has(name)));
+function targetKeyType(relation: RelationDescriptor, run: Run, plan: TablePlan): string {
+    const own = relation.kind === "belongsTo" ? plan.byKey.get(relation.localField) : undefined;
+    return keyType(keyColumnOf(run.bySlug.get(relation.target)) ?? own);
 }
 
-/**
- * The names nobody may read (or write), as the server judges them: no viewer
- * is the trusted plane, which every role-naming rule admits, so what is left
- * is exactly the empty rules.
- *
- * `restrictedFieldNames` resolves the relations of a closed relation property
- * to find its foreign key. When those cannot be resolved — already warned
- * about by the caller — the property and column names are still closed.
- */
-function closedNames(collection: CollectionConfig, kind: "read" | "write"): Set<string> {
-    try {
-        return restrictedFieldNames(collection, undefined, kind).refused;
-    } catch {
-        const names = new Set<string>();
-        for (const [key, rawProp] of Object.entries((collection.properties ?? {}) as Properties)) {
-            const prop = rawProp as Property;
-            if (effectiveAccess(prop)?.[kind]?.length !== 0) continue;
-            names.add(key);
-            if (prop.columnName) names.add(prop.columnName);
+/** Two column types that a foreign key may hold between: identical, a serial read as its integer. */
+function sameKeyType(a: ColumnType, b: ColumnType): boolean {
+    const plain = (type: ColumnType): ColumnType => {
+        switch (type.kind) {
+            case "smallserial": return { kind: "smallint" };
+            case "serial": return { kind: "integer" };
+            case "bigserial": return { kind: "bigint" };
+            default: return type;
         }
-        return names;
-    }
+    };
+    return JSON.stringify(plain(a)) === JSON.stringify(plain(b));
 }
 
 /**
- * The keys nobody may write: `access: { write: [] }`, readable or not.
- *
- * Off `Insert` and `Update` for the same reason `excludedApiKeys` takes a
- * hidden property off all three — except that a field everyone can read but
- * nobody can write stays on `Row`. The server refuses one on any write with
- * `VALIDATION_EXCLUDED_FIELDS`, for every caller, `admin` included, so a
- * generated `create({ computed })` compiled and could only ever be a 400.
- *
- * A write rule naming *roles* is not this: some caller can write it, and one
- * generated shape cannot say which. A closed to-one relation's foreign key is:
- * the server refuses `reviewerId` exactly as it refuses `reviewer`.
+ * The key a foreign-key column is served under when a relation derives it:
+ * `author_id` → `authorId`, each later segment keeping its own casing. The
+ * same rule as `toWireKey` in `@rebasepro/utils` (which this package does not
+ * depend on); used only to recognise such a column, never to name one.
  */
-function unwritableKeys(collection: CollectionConfig): Set<string> {
-    return closedNames(collection, "write");
+function derivedFieldKey(localKey: string): string {
+    const segments = localKey.split(/[-_ ]+/).filter(Boolean);
+    if (segments.length <= 1) return localKey;
+    return segments
+        .map((segment, index) => index === 0
+            ? segment.charAt(0).toLowerCase() + segment.slice(1)
+            : segment.charAt(0).toUpperCase() + segment.slice(1))
+        .join("");
 }
 
-export function generateTypedefs(input: CollectionConfig[]): string {
+/**
+ * Whether a `belongsTo`'s column is nothing but the link: the column the
+ * relation would derive (its key the derived key of `localKey`, the target's
+ * key type, no rule, default or flag of its own), over a constraint.
+ *
+ * Such a column is listed with the relations, after the table's own columns —
+ * where a derived foreign key always is, so declaring the column a relation
+ * would derive does not move it in the generated types.
+ */
+function isLinkOnly(column: ColumnDescriptor, relation: BelongsTo, run: Run): boolean {
+    if (!relation.constraint) return false;
+    if (column.derived) return true;
+    if (derivedFieldKey(relation.localKey) !== column.key) return false;
+    if (column.primaryKey || column.default !== undefined || column.generated !== undefined || column.readOnly || column.private) return false;
+    if (column.access !== undefined || column.stamp !== undefined || column.validate !== undefined || column.oneOf !== undefined) return false;
+    if (column.description !== undefined || column.storage !== undefined || column.semantic !== undefined) return false;
+    if (column.vectorIndex !== undefined || column.json !== undefined || column.element !== undefined || column.transforms !== undefined) return false;
+    const targetKey = keyColumnOf(run.bySlug.get(relation.target));
+    return targetKey === undefined || sameKeyType(column.type, targetKey.type);
+}
+
+/** One table, split the way every block reads it. */
+interface TablePlan {
+    table: TableDescriptor;
+    /** The table's own columns, in physical order. */
+    columns: ColumnDescriptor[];
+    /** Each `belongsTo`, with its foreign-key column when that column is listed with the relations. */
+    links: { relation: BelongsTo; column: ColumnDescriptor | undefined }[];
+    /** Keys nobody can read or write: off every type. */
+    excluded: Set<string>;
+    /** Keys nobody may write: off `Insert` and `Update`. */
+    unwritable: Set<string>;
+    byKey: Map<string, ColumnDescriptor>;
+}
+
+function planTable(table: TableDescriptor, run: Run): TablePlan {
+    const byKey = new Map(table.columns.map(column => [column.key, column]));
+    const linkColumns = new Set<string>();
+    const links: TablePlan["links"] = [];
+    for (const relation of table.relations) {
+        if (relation.kind !== "belongsTo") continue;
+        const column = byKey.get(relation.localField);
+        const listedWithRelation = column !== undefined && isLinkOnly(column, relation, run);
+        if (listedWithRelation && column) linkColumns.add(column.key);
+        links.push({ relation, column: listedWithRelation ? column : undefined });
+    }
+
+    // A column nobody may read *and* nobody may write is off the surface in
+    // both directions; one nobody may write is off `Insert` and `Update`. A
+    // `belongsTo` goes with its foreign-key column: `author: 7` names the same
+    // row `authorId: 7` does, and an include of a hidden link would serve it.
+    const excluded = new Set<string>();
+    const unwritableKeys = new Set<string>();
+    for (const column of table.columns) {
+        const closedWrite = unwritable(column);
+        if (closedWrite) unwritableKeys.add(column.key);
+        if (closedWrite && unreadable(column)) excluded.add(column.key);
+    }
+    for (const relation of table.relations) {
+        if (relation.kind !== "belongsTo") continue;
+        if (excluded.has(relation.localField)) excluded.add(relation.name);
+        if (unwritableKeys.has(relation.localField)) unwritableKeys.add(relation.name);
+    }
+    for (const key of excluded) unwritableKeys.add(key);
+
+    return {
+        table,
+        columns: table.columns.filter(column => !linkColumns.has(column.key)),
+        links,
+        excluded,
+        unwritable: unwritableKeys,
+        byKey
+    };
+}
+
+/**
+ * The type an *included* relation arrives as: the target's own row, inlined.
+ *
+ * This is what the read pipeline actually serves — the target's flat columns
+ * where the relation was, through the SDK and the HTTP API alike. It is
+ * deliberately *not* a `{ __type: "relation" }` envelope: that shape is the
+ * panel's view-model and never reaches a developer's `find()`.
+ *
+ * Falls back to an open record when the target is not part of this generation
+ * run, since there is no `Row` to point at.
+ */
+function includedRelationType(relation: RelationDescriptor, run: Run): string {
+    const accessor = run.accessors.get(relation.target);
+    const rowType = accessor
+        ? `Database[${emitString(accessor)}]["Row"]`
+        : "Record<string, unknown>";
+    // A read of a many-to-many whose junction carries columns serves them on
+    // each target as `_pivot`.
+    const pivot = relation.kind === "manyToMany" ? pivotType(relation.through.pivot, "read") : undefined;
+    const elementType = pivot ? `${rowType} & { _pivot?: ${pivot} }` : rowType;
+    return relation.cardinality === "many" ? `Array<${elementType}>` : elementType;
+}
+
+/**
+ * Generate the typed SDK's `database.types.ts` from table descriptors — what
+ * `compileTables` produces, `GET /api/schema/tables` serves and introspection
+ * reports.
+ *
+ * Emits `Database` (per table: `Row`, `Insert`, `Update`, `Relations`, `Slug`),
+ * `CollectionName`, `collectionsDictionary`, `CollectionsDictionary` and the
+ * `include` helpers `RelationsOf`, `RelationKeys`, `RelationTarget`,
+ * `IncludeOptionsFor`, `IncludeFor` and `RowWith`.
+ *
+ * Deterministic: tables are emitted in slug order whatever order they arrive
+ * in, so `rebase doctor` can regenerate in memory and diff against the file.
+ *
+ * @throws {CodegenError} when two slugs produce one accessor, or a slug has
+ *   nothing an accessor can be built from.
+ *
+ * @group SDK generation
+ */
+export function generateTypedefs(input: readonly TableDescriptor[]): string {
     // Sorted here rather than only in `generate-sdk`: the output is
     // order-dependent and `rebase doctor` regenerates it in memory to diff
     // against the file on disk. While only the writer sorted, a project whose
     // file order differed from its slug order was reported permanently stale.
-    const collections = sortCollectionsBySlug(input);
-    const accessors = buildAccessors(collections);
+    const tables = sortCollectionsBySlug(input);
+    const run: Run = {
+        accessors: buildAccessors(tables),
+        bySlug: new Map(tables.map(table => [table.slug, table]))
+    };
     const lines: string[] = [
         "/**",
         " * This file was auto-generated by Rebase.",
@@ -373,272 +457,28 @@ export function generateTypedefs(input: CollectionConfig[]): string {
         "export interface Database {"
     ];
 
-    for (const collection of collections) {
-        const properties = (collection.properties ?? {}) as Properties;
-
-        // Resolve relations
-        let resolvedRelations: Record<string, ResolvedRelation> = {};
-        try {
-            resolvedRelations = resolveCollectionRelations(collection);
-        } catch (e) {
-            // Swallowed before, which made this the quietest way to ship a
-            // wrong type. The foreign-key columns are emitted from the resolved
-            // relations rather than from the properties, so losing them drops
-            // both the relation fields *and* columns that exist in the
-            // database — and the resulting error surfaces in the user's code,
-            // typechecking against a `Database` that is missing `author_id`,
-            // with nothing pointing back at generation.
-            //
-            // A target thunk usually throws because of a circular import; the
-            // boot-time relation validator names the same cause.
-            console.warn(
-                `[rebase] Could not resolve the relations of "${collection.slug}", so its generated ` +
-                "type has no relation fields and none of their foreign-key columns. This is usually a " +
-                "circular import in the collection files — make sure the target is `() => otherCollection` " +
-                `and not evaluated at module load.\n  ${e instanceof Error ? e.message : String(e)}`
-            );
-        }
-
-        // Subcollections are collections in their own right and are addressed
-        // over a nested path, not as `client.data.<name>`. Generating them here
-        // would invent an accessor the client does not serve, so they are
-        // skipped — loudly, because doing it silently is how a developer
-        // concludes the generator is broken.
-        //
-        // `getDeclaredSubcollections` rather than a local shape. What stood here
-        // declared `subcollections?: unknown[]` and tested it with
-        // `Array.isArray` — but the field is `() => CollectionConfig[]`, a thunk,
-        // so that test was always false and this warning has never once fired.
-        // The two declarations of the same field disagreed, and the
-        // double cast between them is what let the wrong one compile.
-        //
-        // The thunk is called inside the same `try` shape the relation resolver
-        // above uses: it exists to defer a circular import, and evaluating it
-        // during codegen can throw for exactly that reason. A count that cannot
-        // be taken is not worth failing a generate over.
-        const declared = getDeclaredSubcollections(collection);
-        let subcollectionCount = 0;
-        if (declared) {
-            try {
-                subcollectionCount = declared().length;
-            } catch {
-                // Declared, but not resolvable from here. Still worth saying.
-                subcollectionCount = -1;
-            }
-        }
-        if (subcollectionCount !== 0) {
-            console.warn(
-                `[rebase] "${collection.slug}" declares ${subcollectionCount < 0 ? "" : `${subcollectionCount} `}subcollection(s), which are ` +
-                "not part of the generated Database: they are reached over a nested path " +
-                `(\`data/${collection.slug}/<id>/<relation>\`), not as a top-level accessor. Register a ` +
-                "subcollection as a collection of its own if you want a typed accessor for it."
-            );
-        }
-
-        lines.push(`  ${emitKey(accessors.get(collection.slug)!)}: {`);
-
-        // ── Row Type ──
-        //
-        // What a read serves.
-        //
-        // ## A `belongsTo` has three shapes, and all three are typed
-        //
-        // One relation, three places it appears, and the wire is not symmetric
-        // about it — so the types are not either:
-        //
-        //  1. **Write** — `Insert`/`Update` accept *either* the foreign key
-        //     under its own wire name (`{ authorId: 5 }`) or the relation
-        //     property (`{ author: 5 }`), because the write transformer maps
-        //     the second onto the first. Emitted by `emitWritableRelations`.
-        //  2. **Read** — a row carries `authorId`. Always: it is a column.
-        //  3. **Read with `include`** — the target's own row arrives under
-        //     `author`. Emitted below as optional, because it is absent from
-        //     every read that did not name it; the generated `RowWith` makes it
-        //     required for a read that did.
-        //
-        // The three collapse in exactly one case — a relation named identically
-        // to its own foreign key, where 3 is served *over* 2 — handled below.
-        //
-        // `fields` narrows which columns a read returns, but a column is
-        // optional here only because the value may be absent or null, never
-        // because the caller might not have asked for it: a projection is a
-        // choice made at one call site, and typing every column optional to
-        // describe it would make every row unusable everywhere else.
-        lines.push("    Row: {");
-        const emittedKeys = new Set<string>();
-
-        // Off the surface entirely — see `excludedApiKeys`. Seeding the emitted
-        // set means every later pass (foreign keys, relations, unresolved
-        // relations) skips them too, since each of those already refuses to
-        // emit a key twice.
-        const excluded = excludedApiKeys(collection);
-        for (const key of excluded) emittedKeys.add(key);
-
-        // 1. Direct properties
-        for (const [key, rawProp] of Object.entries(properties)) {
-            const prop = rawProp as Property;
-            if (prop.type === "relation") continue;
-            if (excluded.has(key)) continue;
-
-            const tsType = propertyToTypeScriptType(prop);
-            // A primary key is on every row a read can return, whether or not
-            // anyone wrote `validation: { required: true }` next to it —
-            // introspection never does, so `row.id` was `string | undefined`
-            // for every baas project.
-            const isRequired = Boolean(prop.validation?.required) || isPrimaryKey(prop);
-            lines.push(line(key, isRequired ? tsType : `${tsType} | null`, !isRequired));
-            emittedKeys.add(key);
-        }
-
-        // 2. FK columns from relations.
-        //
-        // Emitted under the relation's *wire* name, which is what
-        // `fieldKeyForColumn` answers: `localKey` is the database column
-        // (`author_id`) and the row arrives keyed `authorId`. Emitting the
-        // column, which this used to do, described a key the JSON does not
-        // carry and hid the one it does — including from `where` and `orderBy`,
-        // which are keyed off this type. The column name is not a second name
-        // for the field: it is the name of a different thing.
-        for (const [relKey, relation] of Object.entries(resolvedRelations)) {
-            if (relation.kind === "belongsTo" && relation.localKey) {
-                const fkKey = fieldKeyForColumn(collection, relation.localKey);
-                if (emittedKeys.has(fkKey)) continue;
-
-                const fkType = foreignKeyType(relation);
-
-                // A relation addressed by the same name as its own foreign key
-                // is served *over* that column when the read includes it: the
-                // query nests the target under the relation name, and the
-                // scalar it shadows is gone. Both outcomes are real, so the
-                // column is typed as both — which is what stops a plain
-                // `const id: string = row.author_id` from compiling.
-                const shadowedByInclude = relKey === fkKey;
-                const tsType = shadowedByInclude
-                    ? `${fkType} | ${includedRelationType(relation, accessors)}`
-                    : fkType;
-
-                const isRequired = isRelationRequired(collection, relation) && !shadowedByInclude;
-                lines.push(line(fkKey, isRequired ? tsType : `${tsType} | null`, !isRequired));
-                emittedKeys.add(fkKey);
-            }
-        }
-
-        // 3. Relation fields — the target's own row, inlined.
-        //
-        // Optional throughout: a relation is only loaded when the read names it
-        // in `include`, so it is absent from every other read.
-        for (const [key, relation] of Object.entries(resolvedRelations)) {
-            if (emittedKeys.has(key)) continue;
-            lines.push(line(key, includedRelationType(relation, accessors), true));
-            emittedKeys.add(key);
-        }
-
-        // A `relation` property whose relation could not be resolved — an
-        // engine without relation support, or a target that did not load. It is
-        // still a column on the row, so it is still typed, just not precisely.
-        for (const [key, rawProp] of Object.entries(properties)) {
-            if ((rawProp as Property).type !== "relation") continue;
-            if (emittedKeys.has(key)) continue;
-            lines.push(line(key, "Record<string, unknown>", true));
-            emittedKeys.add(key);
-        }
-        lines.push("    };");
-
-        // ── Insert Type ──
-        //
-        // What `create()` accepts, minus the `excludeFromApi` columns — the
-        // property is off the API surface in both directions, so a generated
-        // client never names it — and minus every field nobody may write.
-        lines.push("    Insert: {");
-        const notWritable = new Set([...excluded, ...unwritableKeys(collection)]);
-        emittedKeys.clear();
-        for (const key of notWritable) emittedKeys.add(key);
-
-        for (const [key, rawProp] of Object.entries(properties)) {
-            const prop = rawProp as Property;
-            if (prop.type === "relation") continue;
-            if (notWritable.has(key)) continue;
-            const tsType = propertyToTypeScriptType(prop);
-            // A column the database fills (`databaseDefault`) may be left out
-            // of a create, as an id the database generates may.
-            const isOptional = !prop.validation?.required || isAutoAssignedId(prop) || Boolean(prop.databaseDefault);
-            lines.push(line(key, writableType(prop, tsType), isOptional));
-            emittedKeys.add(key);
-        }
-
-        const eitherSpelling = emitWritableRelations(lines, collection, properties, resolvedRelations, emittedKeys, false);
-        // A required `belongsTo` written under either of its names: see
-        // `emitWritableRelations`. One `& (A | B)` per such relation, so each is
-        // satisfied on its own.
-        lines.push(eitherSpelling.length === 0 ? "    };" : `    } & ${eitherSpelling.join(" & ")};`);
-
-        // ── Update Type ──
-        //
-        // Everything optional, and the primary key left out: an update
-        // addresses a row by id, it does not reassign one. Accepting `id` here
-        // typechecked `update(id, { id: someoneElses })`.
-        lines.push("    Update: {");
-        emittedKeys.clear();
-        for (const key of notWritable) emittedKeys.add(key);
-        for (const [key, rawProp] of Object.entries(properties)) {
-            const prop = rawProp as Property;
-            if (prop.type === "relation") continue;
-            if (isPrimaryKey(prop)) continue;
-            if (notWritable.has(key)) continue;
-            lines.push(line(key, writableType(prop, propertyToTypeScriptType(prop)), true));
-            emittedKeys.add(key);
-        }
-        emitWritableRelations(lines, collection, properties, resolvedRelations, emittedKeys, true);
-        lines.push("    };");
-
-        // ── Relations ──
-        //
-        // Which relations this collection has, and which collection each one
-        // reaches. Not a shape a read ever returns — it is the *graph*, and
-        // `include` is the one parameter that needs it: `IncludeFor` below
-        // walks it to constrain an include's keys to relations that exist, at
-        // every level, and `RowWith` reads it to make an included relation
-        // non-optional on the row that comes back.
-        //
-        // Emitted as the accessor NAME rather than the target's `Row`, so a
-        // self-referencing or mutually-referencing relation is a finite string
-        // instead of a type that expands forever.
-        // A collection with no relations gets `Record<never, never>`, not `{}`:
-        // the same type for `keyof` (never), but `{}` is what typescript-eslint's
-        // recommended `no-empty-object-type` refuses, in every project that
-        // lints its generated SDK.
-        //
-        // An `excludeFromApi` relation is left out: the server answers an
-        // include naming one as it answers a typo (`UNKNOWN_RELATION`), so
-        // `IncludeFor` must not offer it.
-        const includable = Object.entries(resolvedRelations).filter(([key]) => !excluded.has(key));
-        if (includable.length === 0) {
-            lines.push("    Relations: Record<never, never>;");
+    for (const table of tables) {
+        const plan = planTable(table, run);
+        lines.push(`  ${emitKey(run.accessors.get(table.slug)!)}: {`);
+        emitRow(lines, plan, run);
+        if (table.kind === "view") {
+            // A view is never written: the server refuses a create, an update
+            // and a delete on one, so no write is typed.
+            lines.push("    Insert: never;");
+            lines.push("    Update: never;");
         } else {
-            lines.push("    Relations: {");
+            emitInsert(lines, plan, run);
+            emitUpdate(lines, plan, run);
         }
-        for (const [key, relation] of includable) {
-            const target = resolveTargetCollection(relation);
-            const slug = target?.slug ?? relation.targetSlug;
-            const accessor = slug ? accessors.get(slug) : undefined;
-            // A target outside this generation run has no accessor to name, so
-            // the relation is typed as reaching nothing rather than as reaching
-            // something that does not exist.
-            lines.push(`      ${emitKey(key)}: ${accessor ? emitString(accessor) : "never"};`);
-        }
-        if (includable.length > 0) lines.push("    };");
+        emitRelations(lines, plan, run);
 
         // ── Slug ──
         //
-        // The name the wire knows this collection by. The entry is keyed by the
+        // The name the wire knows this table by. The entry is keyed by the
         // accessor (`orderItems`), and the client's typed `collection(slug)`
-        // has to get from one to the other: it used to re-derive the accessor
-        // from the slug at the type level, handling `-` and nothing else, so
-        // `collection("order_items")` — every snake_case table — came back
-        // untyped. Written by the one function that chose the accessor, so the
-        // two cannot disagree.
-        lines.push(`    Slug: ${emitString(collection.slug)};`);
-
+        // has to get from one to the other. Written by the one function that
+        // chose the accessor, so the two cannot disagree.
+        lines.push(`    Slug: ${emitString(table.slug)};`);
         lines.push("  };");
     }
 
@@ -647,16 +487,14 @@ export function generateTypedefs(input: CollectionConfig[]): string {
     lines.push("export type CollectionName = keyof Database;");
     lines.push("");
     lines.push("export const collectionsDictionary = {");
-    for (const collection of collections) {
-        lines.push(`  ${emitKey(accessors.get(collection.slug)!)}: ${emitString(collection.slug)},`);
+    for (const table of tables) {
+        lines.push(`  ${emitKey(run.accessors.get(table.slug)!)}: ${emitString(table.slug)},`);
     }
     lines.push("} as const;");
     lines.push("");
-    // Describes the const above rather than restating its keys. The previous
-    // `{ [K in CollectionName]: K }` said every value equalled its key, which is
-    // false for any slug that is not already an identifier — `myNotes` maps to
-    // `"my-notes"` — so the export the CLI tells people to pass did not satisfy
-    // its own published type.
+    // Describes the const above rather than restating its keys: `myNotes`
+    // maps to `"my-notes"`, so a `{ [K in CollectionName]: K }` would be false
+    // for every slug that is not already an identifier.
     lines.push("export type CollectionsDictionary = typeof collectionsDictionary;");
     lines.push("");
     lines.push(...includeHelperLines());
@@ -665,28 +503,130 @@ export function generateTypedefs(input: CollectionConfig[]): string {
 }
 
 /**
+ * `Row` — what a read serves.
+ *
+ * ## A `belongsTo` has three shapes, and all three are typed
+ *
+ *  1. **Write** — `Insert`/`Update` accept *either* the foreign key under its
+ *     own wire name (`{ authorId: 5 }`) or the relation's name
+ *     (`{ author: 5 }`). Emitted by `emitWritableRelations`.
+ *  2. **Read** — a row carries `authorId`. Always: it is a column.
+ *  3. **Read with `include`** — the target's own row arrives under `author`.
+ *     Optional, because it is absent from every read that did not name it; the
+ *     generated `RowWith` makes it required for a read that did.
+ *
+ * `fields` narrows which columns a read returns, but a column is optional here
+ * only because the value may be null, never because the caller might not have
+ * asked for it: a projection is a choice made at one call site.
+ */
+function emitRow(lines: string[], plan: TablePlan, run: Run): void {
+    lines.push("    Row: {");
+    const emitted = new Set<string>(plan.excluded);
+    // A primary key is on every row a read can return, and so is every
+    // `NOT NULL` column; the rest may be null.
+    for (const column of plan.columns) {
+        if (emitted.has(column.key)) continue;
+        const type = columnType(column);
+        lines.push(line(column.key, column.nullable ? `${type} | null` : type, column.nullable));
+        emitted.add(column.key);
+    }
+    // The foreign keys listed with their relations, under their wire names.
+    for (const { relation, column } of plan.links) {
+        if (!column || emitted.has(column.key)) continue;
+        const type = targetKeyType(relation, run, plan);
+        lines.push(line(column.key, column.nullable ? `${type} | null` : type, column.nullable));
+        emitted.add(column.key);
+    }
+    // The relations — the target's own row, inlined. Optional throughout: a
+    // relation is only loaded when the read names it in `include`.
+    for (const relation of plan.table.relations) {
+        if (emitted.has(relation.name)) continue;
+        lines.push(line(relation.name, includedRelationType(relation, run), true));
+        emitted.add(relation.name);
+    }
+    lines.push("    };");
+}
+
+/**
+ * `Insert` — what `create()` accepts: no hidden column and nothing nobody may
+ * write; a column the database or the server fills may be left out.
+ */
+function emitInsert(lines: string[], plan: TablePlan, run: Run): void {
+    lines.push("    Insert: {");
+    const emitted = new Set<string>(plan.unwritable);
+    for (const column of plan.columns) {
+        if (emitted.has(column.key)) continue;
+        lines.push(line(column.key, writableType(column, columnType(column)), insertOptional(column)));
+        emitted.add(column.key);
+    }
+    const eitherSpelling = emitWritableRelations(lines, plan, run, emitted, false);
+    // A required `belongsTo` written under either of its names: one
+    // `& (A | B)` per such relation, so each is satisfied on its own.
+    lines.push(eitherSpelling.length === 0 ? "    };" : `    } & ${eitherSpelling.join(" & ")};`);
+}
+
+/**
+ * `Update` — everything optional, and the primary key left out: an update
+ * addresses a row by its key, it does not reassign one.
+ */
+function emitUpdate(lines: string[], plan: TablePlan, run: Run): void {
+    lines.push("    Update: {");
+    const emitted = new Set<string>(plan.unwritable);
+    for (const column of plan.columns) {
+        if (column.primaryKey || emitted.has(column.key)) continue;
+        lines.push(line(column.key, writableType(column, columnType(column)), true));
+        emitted.add(column.key);
+    }
+    emitWritableRelations(lines, plan, run, emitted, true);
+    lines.push("    };");
+}
+
+/**
+ * `Relations` — which relations the table has, and which table each one
+ * reaches. Not a shape a read returns: it is the *graph*, and `include` is the
+ * one parameter that needs it. `IncludeFor` walks it to constrain an include's
+ * keys at every level, and `RowWith` reads it to make an included relation
+ * non-optional on the row that comes back.
+ *
+ * Emitted as the accessor NAME rather than the target's `Row`, so a
+ * self-referencing relation is a finite string instead of a type that expands
+ * forever. A table with no relations gets `Record<never, never>`, not `{}`,
+ * which typescript-eslint's `no-empty-object-type` refuses in every project
+ * that lints its generated SDK. A hidden relation is left out: the server
+ * answers an include naming one as it answers a typo.
+ */
+function emitRelations(lines: string[], plan: TablePlan, run: Run): void {
+    const includable = plan.table.relations.filter(relation => !plan.excluded.has(relation.name));
+    if (includable.length === 0) {
+        lines.push("    Relations: Record<never, never>;");
+        return;
+    }
+    lines.push("    Relations: {");
+    for (const relation of includable) {
+        const accessor = run.accessors.get(relation.target);
+        // A target outside this generation run has no accessor to name, so the
+        // relation is typed as reaching nothing rather than as reaching
+        // something that does not exist.
+        lines.push(`      ${emitKey(relation.name)}: ${accessor ? emitString(accessor) : "never"};`);
+    }
+    lines.push("    };");
+}
+
+/**
  * The `include` type machinery, emitted into the generated file.
  *
  * It lives here rather than in `@rebasepro/types` because it is the *graph*
- * that makes it work, and the graph only exists once a project's collections
- * have been generated. `IncludeSpec` in `@rebasepro/types` is deliberately
- * unconstrained — a hand-written row type has no relations in it to check
- * against — and these narrow it for a project that does have them.
- *
- * Two things a caller gets:
+ * that makes it work, and the graph only exists once a project's tables have
+ * been generated. `IncludeSpec` in `@rebasepro/types` is deliberately
+ * unconstrained; these narrow it for a project that has relations.
  *
  * - `IncludeFor<"posts">` — an include whose keys are relations that exist,
- *   recursively, so `include: { comments: { include: { authr: true } } }` is a
- *   compile error rather than a 400 at runtime.
+ *   recursively, so a typo is a compile error rather than a 400 at runtime.
  * - `RowWith<"posts", I>` — the row a read with that include returns, where
- *   every included relation is **present** rather than optional. `Row` types a
- *   relation as optional because it is absent from every read that did not ask
- *   for it; once a read has asked, `row.author.name` should not need a `?.`.
+ *   every included relation is **present** rather than optional.
  *
  * The depth bound matches the server's (`MAX_INCLUDE_DEPTH`), and is spelled as
  * a decrementing tuple because TypeScript has no arithmetic — `Prev[3]` is `2`.
- * Without a bound, a self-referencing relation makes the type infinite and the
- * compiler gives up with "type instantiation is excessively deep".
  */
 function includeHelperLines(): string[] {
     return [
@@ -753,66 +693,50 @@ function includeHelperLines(): string[] {
 }
 
 /**
- * The two ways a write can name a `belongsTo` target, both of which the server
- * accepts: the foreign key under its own wire name (`{ authorId: 5 }`, which
- * passes through to the `author_id` column untouched) and the relation
- * *property* (`{ author: 5 }`, which the write transformer maps onto that
- * column).
+ * Every relation write the server performs, typed.
  *
- * Only the first was generated, so the documented and idiomatic write shape was
- * a type error.
+ * - A `belongsTo` is written under either of two names: its foreign key's wire
+ *   key (`{ authorId: 5 }`) and the relation's name (`{ author: 5 }`), which
+ *   the server maps onto the column — the second only over a constraint
+ *   (`rel.belongsTo(…, { constraint: false })` keeps a bare column, written by
+ *   its key alone). A **required** `belongsTo` is satisfied by either: on an
+ *   `Insert` both names go in optional, and the requirement comes back as one
+ *   returned `({ authorId: T } | { author: T })` for the caller to intersect
+ *   with the object. Both stay in the object so `keyof Insert` names them.
+ * - A `hasOne`, and a single-hop to-one `via`, is written by naming the target
+ *   row; `null` unlinks it.
+ * - A to-many membership (`hasMany`, `manyToMany`, a single-hop to-many `via`)
+ *   is written as the targets' keys, or `{ id }`, or `{ id, _pivot }` where the
+ *   junction declares payload columns. A multi-hop `via` is read-only.
  *
- * The second form is emitted under the **property key**, not the resolved
- * relation name, because that is what the transformer keys off: it looks the
- * payload key up in `properties` and only treats it as a relation if what it
- * finds there is one. A relation whose `relationName` differs from its property
- * key is reachable as the property and not as the name, so emitting the name
- * would have offered a key that writes to a column that does not exist.
- *
- * A **required** `belongsTo` is satisfied by either spelling — the server's
- * required check reads both (`write-validation.ts`). Emitting each name as a
- * required key made a create name the same row twice to compile. So on an
- * `Insert` both names go in optional, and the requirement comes back as one
- * returned `({ authorId: T } | { author: T })` for the caller to intersect
- * with the object. Both stay in the object so `keyof Insert` still names them.
+ * The target's key type is the one `Row` uses for the link.
  */
 function emitWritableRelations(
     lines: string[],
-    collection: CollectionConfig,
-    properties: Properties,
-    resolvedRelations: Record<string, ResolvedRelation>,
+    plan: TablePlan,
+    run: Run,
     emittedKeys: Set<string>,
     allOptional: boolean
 ): string[] {
     // Every name each `belongsTo` can still be written under, so `emit` knows
     // whether a required one has a second spelling to fall back on.
-    const spellings = new Map<ResolvedRelation, string[]>();
-    const addSpelling = (relation: ResolvedRelation, key: string): void => {
+    const spellings = new Map<BelongsTo, string[]>();
+    const addSpelling = (relation: BelongsTo, key: string): void => {
         if (emittedKeys.has(key)) return;
         const keys = spellings.get(relation) ?? [];
         if (!keys.includes(key)) keys.push(key);
         spellings.set(relation, keys);
     };
-    for (const relation of Object.values(resolvedRelations)) {
-        if (relation.kind === "belongsTo" && relation.localKey) {
-            addSpelling(relation, fieldKeyForColumn(collection, relation.localKey));
-        }
-    }
-    for (const [key, rawProp] of Object.entries(properties)) {
-        if ((rawProp as Property).type !== "relation") continue;
-        const relation = findRelation(resolvedRelations, key);
-        if (relation?.kind === "belongsTo" && relation.localKey) addSpelling(relation, key);
-    }
+    for (const { relation } of plan.links) addSpelling(relation, relation.localField);
+    for (const { relation } of plan.links) if (relation.constraint) addSpelling(relation, relation.name);
 
     const eitherSpelling: string[] = [];
-    // The target's primary key type is the same one `Row` uses. A hardcoded
-    // `string | number` here accepted a string for a numeric-keyed target.
-    const emit = (key: string, relation: ResolvedRelation): void => {
+    const emit = (key: string, relation: BelongsTo): void => {
         if (emittedKeys.has(key)) return;
-        const required = isRelationRequired(collection, relation);
+        const required = plan.byKey.get(relation.localField)?.nullable === false;
         // A foreign key that is not required can be unassigned, which is a
         // write of `null` — see `writableType`.
-        const type = required ? foreignKeyType(relation) : `${foreignKeyType(relation)} | null`;
+        const type = required ? targetKeyType(relation, run, plan) : `${targetKeyType(relation, run, plan)} | null`;
         const names = spellings.get(relation) ?? [key];
         const oneOfSeveral = required && !allOptional && names.length > 1;
         lines.push(line(key, type, allOptional || !required || oneOfSeveral));
@@ -822,53 +746,26 @@ function emitWritableRelations(
         }
     };
 
-    for (const relation of Object.values(resolvedRelations)) {
-        if (relation.kind === "belongsTo" && relation.localKey) {
-            emit(fieldKeyForColumn(collection, relation.localKey), relation);
-        }
+    for (const { relation } of plan.links) emit(relation.localField, relation);
+    for (const { relation } of plan.links) if (relation.constraint) emit(relation.name, relation);
+
+    for (const relation of plan.table.relations) {
+        if (emittedKeys.has(relation.name)) continue;
+        const toOneWritable = relation.kind === "hasOne"
+            || (relation.kind === "via" && relation.cardinality === "one" && relation.writable);
+        if (!toOneWritable) continue;
+        lines.push(line(relation.name, `${targetKeyType(relation, run, plan)} | null`, true));
+        emittedKeys.add(relation.name);
     }
 
-    for (const [key, rawProp] of Object.entries(properties)) {
-        if ((rawProp as Property).type !== "relation") continue;
-        const relation = findRelation(resolvedRelations, key);
-        if (relation?.kind === "belongsTo" && relation.localKey) emit(key, relation);
-    }
-
-    // A `hasOne` is written by naming the target row: the server points the
-    // target's foreign key at this row (`inverseRelationUpdates`), and `null`
-    // unlinks it. Its resolved relation says `writable: true`, but only
-    // `belongsTo` and the to-many kinds were emitted, so the write the server
-    // performs was a type error. A single-hop to-one `via` (one step, the
-    // target holds the key) is written the same way, by the join-path writer.
-    // Keyed by the property, as the second `belongsTo` spelling is: the write
-    // transformer only recognises the relation through the property that
-    // declares it.
-    for (const [key, rawProp] of Object.entries(properties)) {
-        if ((rawProp as Property).type !== "relation" || emittedKeys.has(key)) continue;
-        const relation = findRelation(resolvedRelations, key);
-        const toOneWritable = relation?.kind === "hasOne"
-            || (relation?.kind === "via" && relation.cardinality === "one" && relation.writable);
-        if (!relation || !toOneWritable) continue;
-        lines.push(line(key, `${foreignKeyType(relation)} | null`, true));
-        emittedKeys.add(key);
-    }
-
-    // A to-many membership: `hasMany` (the targets' foreign key is pointed at
-    // this row) and `manyToMany` (junction rows). The server writes both on a
-    // create and an update — bare keys, or `{ id }`, or `{ id, _pivot }` where
-    // the junction declares payload columns — but only `belongsTo` was
-    // emitted, so the field a read returns could not be written back. A
-    // single-hop to-many `via` is written as its one junction's rows and
-    // carries no payload; a multi-hop one is read-only (`writable: false`) and
-    // stays off.
-    for (const [key, relation] of Object.entries(resolvedRelations)) {
-        if (relation.cardinality !== "many" || !relation.writable) continue;
-        if (emittedKeys.has(key)) continue;
-        const fk = foreignKeyType(relation);
-        const pivot = relation.kind === "manyToMany" ? pivotType(relation.through.properties, "write") : undefined;
+    for (const relation of plan.table.relations) {
+        if (relation.cardinality !== "many" || emittedKeys.has(relation.name)) continue;
+        if (relation.kind === "via" && !relation.writable) continue;
+        const fk = targetKeyType(relation, run, plan);
+        const pivot = relation.kind === "manyToMany" ? pivotType(relation.through.pivot, "write") : undefined;
         const element = `${fk} | { id: ${fk}${pivot ? `; _pivot?: ${pivot}` : ""} }`;
-        lines.push(line(key, `Array<${element}>`, true));
-        emittedKeys.add(key);
+        lines.push(line(relation.name, `Array<${element}>`, true));
+        emittedKeys.add(relation.name);
     }
 
     return eitherSpelling;
@@ -876,18 +773,16 @@ function emitWritableRelations(
 
 /**
  * The `_pivot` a many-to-many link carries: the junction's payload columns,
- * typed as a row's columns are on a read and as a write's on a write. `undefined`
- * when the junction declares none, so there is no `_pivot` to name.
+ * typed as a row's columns are on a read and as a write's on a write.
+ * `undefined` when the junction declares none, so there is no `_pivot` to name.
  */
-function pivotType(pivotProperties: Properties, direction: "read" | "write"): string | undefined {
-    const entries = Object.entries(pivotProperties);
-    if (entries.length === 0) return undefined;
-    const fields = entries.map(([key, rawProp]) => {
-        const prop = rawProp as Property;
-        const tsType = propertyToTypeScriptType(prop);
-        const required = Boolean(prop.validation?.required);
-        const type = direction === "write" ? writableType(prop, tsType) : (required ? tsType : `${tsType} | null`);
-        return `${emitKey(key)}${required && direction === "read" ? "" : "?"}: ${type};`;
+function pivotType(pivot: readonly ColumnDescriptor[], direction: "read" | "write"): string | undefined {
+    if (pivot.length === 0) return undefined;
+    const fields = pivot.map(column => {
+        const tsType = columnType(column);
+        const required = !column.nullable;
+        const type = direction === "write" ? writableType(column, tsType) : (required ? tsType : `${tsType} | null`);
+        return `${emitKey(column.key)}${required && direction === "read" ? "" : "?"}: ${type};`;
     });
     return `{ ${fields.join(" ")} }`;
 }

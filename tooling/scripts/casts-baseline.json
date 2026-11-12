@@ -19,9 +19,6 @@
   "packages/cms-types": {
     "as unknown as": 1
   },
-  "packages/codegen (tests)": {
-    "as unknown as": 4
-  },
   "packages/common": {
     "as unknown as": 1
   },

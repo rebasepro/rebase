@@ -3,8 +3,10 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import * as ts from "typescript";
+import { compileTables } from "@rebasepro/common";
+import { col, defineTable, json, rel, type TableDescriptor } from "@rebasepro/types";
 import { generateTypedefs, CodegenError } from "../src/generate-types";
-import { CollectionConfig } from "@rebasepro/types";
+import { rawTable } from "./helpers/tables";
 
 /**
  * The generator writes TypeScript by concatenating strings, and every test
@@ -43,100 +45,100 @@ function compile(source: string): string[] {
     }
 }
 
-function expectCompiles(collections: unknown[]): string {
-    const source = generateTypedefs(collections as CollectionConfig[]);
+function expectCompiles(tables: TableDescriptor[]): string {
+    const source = generateTypedefs(tables);
     expect(compile(source)).toEqual([]);
     return source;
 }
 
+/** A key column every hand-written table below shares. */
+const ID = { key: "id", column: "id", type: { kind: "uuid" as const }, nullable: false, primaryKey: true as const };
+
 describe("the generated file compiles", () => {
-    it("for a realistic schema with relations, enums, maps and arrays", () => {
-        const authors = {
-            slug: "authors",
-            properties: {
-                id: { type: "number", isId: "increment" },
-                name: { type: "string", validation: { required: true } }
-            }
-        };
-        const posts = {
-            slug: "posts",
-            properties: {
-                id: { type: "string", isId: "uuid" },
-                title: { type: "string", validation: { required: true } },
-                status: { type: "string", enum: ["draft", "published"] },
-                meta: { type: "map", properties: { views: { type: "number" } } },
-                tags: { type: "array", of: { type: "string" } },
-                author: { type: "relation", relation: { kind: "belongsTo", target: () => authors } }
-            }
-        };
-        expectCompiles([posts, authors]);
+    it("for a realistic schema with relations, enums, JSON documents and arrays", () => {
+        const authors = defineTable("authors", {
+            columns: { id: col.integer().primaryKey().identity(), name: col.text().notNull() },
+            rls: "admin-only"
+        });
+        const tags = defineTable("tags", { columns: { id: col.uuid().primaryKey().defaultRandom() }, rls: "admin-only" });
+        const posts = defineTable("posts", {
+            columns: {
+                id: col.uuid().primaryKey().defaultRandom(),
+                title: col.text().notNull(),
+                status: col.enum(["draft", "published"]),
+                level: col.integer().oneOf([1, 2]),
+                meta: col.jsonb(json.object({ views: json.number(), blocks: json.array(json.oneOf({ text: json.string() })) })),
+                labels: col.array(col.text()),
+                geo: col.geopoint(),
+                createdAt: col.timestamptz().notNull().onCreateNow()
+            },
+            relations: {
+                author: rel.belongsTo(() => authors, { notNull: true }),
+                tags: rel.manyToMany(() => tags, { pivot: { position: col.integer() } })
+            },
+            rls: "admin-only"
+        });
+        expectCompiles(compileTables([posts, authors, tags]));
     });
 
-    it("for property names that are not identifiers", () => {
-        // A column is not required to be a JS identifier. Renaming it into one
-        // described a field the wire does not serve; quoting keeps both the
+    it("for column keys that are not identifiers", () => {
+        // A column key is not required to be a JS identifier. Renaming it into
+        // one described a field the wire does not serve; quoting keeps both the
         // real name and a file that compiles.
-        const source = expectCompiles([{
-            slug: "rows",
-            properties: {
-                "user id": { type: "string" },
-                "order": { type: "number" },
-                "créé_à": { type: "date" }
-            }
-        }]);
+        const source = expectCompiles([rawTable("rows", [
+            ID,
+            { key: "user id", column: "user_id", type: { kind: "text" } },
+            { key: "order", column: "order", type: { kind: "integer" } },
+            { key: "créé_à", column: "cree_a", type: { kind: "timestamptz" } },
+            { key: "my-field", column: "my_field_a", type: { kind: "text" } },
+            { key: "my_field", column: "my_field_b", type: { kind: "integer" } }
+        ])]);
         expect(source).toContain('"user id"?: string | null;');
         expect(source).toContain('"créé_à"?: string | null;');
+        expect(source).toContain('"my-field"');
+        expect(source).toContain("my_field?: number | null;");
     });
 
     it("for a slug that is not an identifier", () => {
-        const source = expectCompiles([{ slug: "my-notes", properties: { a: { type: "string" } } }]);
+        const source = expectCompiles([rawTable("my-notes", [ID])]);
         expect(source).toContain('myNotes: "my-notes",');
     });
 
     it("for a slug that begins with a digit", () => {
         // `2faCodes: {` is a syntax error in both the interface and the object
         // literal. Quoting it keeps the accessor reachable as `data["2faCodes"]`.
-        const source = expectCompiles([{ slug: "2fa_codes", properties: { id: { type: "string", isId: true } } }]);
+        const source = expectCompiles([rawTable("2fa_codes", [ID])]);
         expect(source).toContain('"2faCodes"');
     });
 
-    it("for TypeScript keywords used as slugs and property names", () => {
+    it("for TypeScript keywords used as slugs and column keys", () => {
         expectCompiles([
-            { slug: "default", properties: { class: { type: "string" }, function: { type: "number" } } },
-            { slug: "import", properties: { a: { type: "string" } } }
+            rawTable("default", [ID, { key: "class", column: "class" }, { key: "function", column: "function", type: { kind: "integer" } }]),
+            rawTable("import", [ID, { key: "a", column: "a" }])
         ]);
     });
 
-    it("for two properties that differ only by separator", () => {
-        // `my-field` and `my_field` both camel-cased to `myField`, so the row
-        // declared the same key twice with two different types.
-        const source = expectCompiles([{
-            slug: "posts",
-            properties: {
-                "my-field": { type: "string" },
-                "my_field": { type: "number" }
-            }
-        }]);
-        expect(source).toContain('"my-field"');
-        expect(source).toContain("my_field");
-    });
-
     it("when an enum value contains quotes, backslashes and newlines", () => {
-        const source = expectCompiles([{
-            slug: "posts",
-            properties: {
-                status: { type: "string", enum: ['a"b', "c\\d", "e\nf", "`${x}`"] }
-            }
-        }]);
+        const source = expectCompiles([rawTable("posts", [
+            ID,
+            { key: "status", column: "status", type: { kind: "enum", values: ['a"b', "c\\d", "e\nf", "`${x}`"] } },
+            { key: "kind", column: "kind", oneOf: ["a-1", 'b"2'] }
+        ])]);
         expect(source).toContain('"a\\"b"');
         expect(source).toContain('"e\\nf"');
     });
 
-    it("when an enum is declared as an object whose keys contain quotes", () => {
-        expectCompiles([{
-            slug: "kinds",
-            properties: { kind: { type: "string", enum: { "a-1": "A one", 'b"2': "B two" } } }
-        }]);
+    it("when a JSON field's key or a block's discriminator is not an identifier", () => {
+        expectCompiles([rawTable("docs", [ID, {
+            key: "body", column: "body", type: { kind: "jsonb" },
+            json: {
+                kind: "object",
+                fields: {
+                    "a-b": { kind: "string" },
+                    'c"d': { kind: "array", of: { kind: "oneOf", typeField: "the type", valueField: "v-v", variants: { 'x"': { kind: "number" } } } }
+                }
+            }
+        }])]);
     });
 });
 
@@ -194,36 +196,32 @@ describe("untrusted input cannot inject TypeScript", () => {
      * there as inert string content. It is that untrusted input cannot add a
      * declaration to the file, and cannot stop it compiling.
      */
-    const cases: Array<[string, unknown]> = [
-        ["a slug", {
-            slug: 'posts", OWNED: globalThis, x: "',
-            properties: { title: { type: "string" } }
-        }],
-        ["an enum value", {
-            slug: "posts",
-            properties: {
-                status: { type: "string", enum: ['a"; }; }; };\nexport const OWNED = 1;\ninterface I { x: "'] }
-            }
-        }],
-        ["a property name", {
-            slug: "posts",
-            properties: { 'a: string; }; }; };\nexport const OWNED = 1;\ninterface I { b': { type: "string" } }
-        }],
-        ["a relation's foreign-key column", {
-            slug: "posts",
-            properties: { id: { type: "string", isId: "uuid" } },
-            relations: [{
-                kind: "belongsTo",
-                relationName: "author",
-                target: () => ({ slug: "authors", properties: { id: { type: "string", isId: "uuid" } } }),
-                localKey: 'author_id?: string; }; }; };\nexport const OWNED = 1;\ninterface I { x'
-            }]
-        }]
+    const hostile = 'x"; }; }; };\nexport const OWNED = 1;\ninterface I { y: "';
+    const target = rawTable("authors", [ID]);
+    const cases: Array<[string, TableDescriptor[]]> = [
+        ["a slug", [rawTable('posts", OWNED: globalThis, x: "', [ID])]],
+        ["an enum value", [rawTable("posts", [ID, { key: "status", column: "status", type: { kind: "enum", values: [hostile] } }])]],
+        ["a oneOf value", [rawTable("posts", [ID, { key: "status", column: "status", oneOf: [hostile] }])]],
+        ["a column key", [rawTable("posts", [ID, { key: `a: string; }; }; };\nexport const OWNED = 1;\ninterface I { b`, column: "b" }])]],
+        ["a JSON field key and variant", [rawTable("posts", [ID, {
+            key: "doc", column: "doc", type: { kind: "jsonb" },
+            json: { kind: "oneOf", typeField: hostile, valueField: hostile, variants: { [hostile]: { kind: "object", fields: { [hostile]: { kind: "string" } } } } }
+        }])]],
+        ["a relation's name and foreign key", [target, rawTable("posts", [
+            ID,
+            { key: hostile, column: "author_id", type: { kind: "uuid" }, foreignKeyOf: hostile }
+        ], [{
+            name: hostile, kind: "belongsTo", target: "authors", cardinality: "one",
+            localKey: "author_id", localField: hostile, index: true, constraint: true
+        }])]],
+        ["a relation's target", [rawTable("posts", [ID], [{
+            name: "tags", kind: "hasMany", target: hostile, cardinality: "many", foreignKey: "post_id"
+        }])]]
     ];
 
-    for (const [what, collection] of cases) {
+    for (const [what, tables] of cases) {
         it(`through ${what}`, () => {
-            const source = generateTypedefs([collection] as CollectionConfig[]);
+            const source = generateTypedefs(tables);
             expect(topLevelDeclarations(source)).toEqual(EXPECTED_DECLARATIONS);
             expect(compile(source)).toEqual([]);
         });
@@ -234,7 +232,7 @@ describe("untrusted input cannot inject TypeScript", () => {
         // what the request path uses. Escaping is the fix; sanitising the value
         // would generate a client that asks for a collection that is not there.
         const slug = 'posts", OWNED: 1, x: "';
-        const source = generateTypedefs([{ slug, name: "Posts", properties: {} }]);
+        const source = generateTypedefs([rawTable(slug, [ID])]);
         expect(source).toContain(`: ${JSON.stringify(slug)},`);
     });
 });
@@ -243,29 +241,18 @@ describe("schemas that cannot be generated are rejected, not emitted", () => {
     it("refuses two slugs that produce the same accessor", () => {
         // The interface would not compile, and `collectionsDictionary` — an
         // object literal — would silently keep only the last, sending one
-        // collection's reads to the other's table.
-        expect(() => generateTypedefs([
-            { slug: "my-notes", name: "My notes", properties: {} },
-            { slug: "my_notes", name: "My notes", properties: {} }
-        ])).toThrow(CodegenError);
-
-        expect(() => generateTypedefs([
-            { slug: "my-notes", name: "My notes", properties: {} },
-            { slug: "my_notes", name: "My notes", properties: {} }
-        ])).toThrow(/my-notes.*my_notes|my_notes.*my-notes/);
+        // table's reads to the other's.
+        const clash = [rawTable("my-notes", [ID]), rawTable("my_notes", [ID])];
+        expect(() => generateTypedefs(clash)).toThrow(CodegenError);
+        expect(() => generateTypedefs(clash)).toThrow(/my-notes.*my_notes|my_notes.*my-notes/);
     });
 
-    it("refuses a collection with no slug", () => {
-        // Deliberately invalid: the generator must refuse a collection that has no slug at all.
-        expect(() => generateTypedefs([{ name: "Nameless", properties: {} } as unknown as CollectionConfig]))
-            .toThrow(CodegenError);
-        expect(() => generateTypedefs([{ slug: "", name: "Empty", properties: {} }]))
-            .toThrow(CodegenError);
+    it("refuses a table with no slug", () => {
+        expect(() => generateTypedefs([rawTable("", [ID])])).toThrow(CodegenError);
     });
 
     it("refuses a slug with nothing an accessor can be built from", () => {
-        expect(() => generateTypedefs([{ slug: "!!!", name: "Bangs", properties: {} }]))
-            .toThrow(CodegenError);
+        expect(() => generateTypedefs([rawTable("!!!", [ID])])).toThrow(CodegenError);
     });
 });
 
@@ -316,38 +303,25 @@ function compileWithConsumer(source: string, consumer: string): string[] {
  * beside them still compiles.
  */
 describe("the generated include types", () => {
-    const authors: CollectionConfig = {
-        slug: "authors",
-        name: "authors",
-        properties: {
-            id: { type: "string", isId: "uuid" },
-            name: { type: "string", validation: { required: true } }
-        }
-    };
-    const comments: CollectionConfig = {
-        slug: "comments",
-        name: "comments",
-        properties: {
-            id: { type: "string", isId: "uuid" },
-            body: { type: "string", validation: { required: true } },
-            author: { type: "relation", relation: { kind: "belongsTo", target: () => authors } }
-        }
-    };
-    const posts: CollectionConfig = {
-        slug: "posts",
-        name: "posts",
-        properties: {
-            id: { type: "string", isId: "uuid" },
-            title: { type: "string", validation: { required: true } },
-            author: { type: "relation", relation: { kind: "belongsTo", target: () => authors } },
-            comments: {
-                type: "relation",
-                relation: { kind: "hasMany", target: () => comments, foreignKeyOnTarget: "post_id" }
-            }
-        }
-    };
+    const authors = defineTable("authors", {
+        columns: { id: col.uuid().primaryKey().defaultRandom(), name: col.text().notNull() },
+        rls: "admin-only"
+    });
+    const comments = defineTable("comments", {
+        columns: { id: col.uuid().primaryKey().defaultRandom(), body: col.text().notNull() },
+        relations: { author: rel.belongsTo(() => authors) },
+        rls: "admin-only"
+    });
+    const posts = defineTable("posts", {
+        columns: { id: col.uuid().primaryKey().defaultRandom(), title: col.text().notNull() },
+        relations: {
+            author: rel.belongsTo(() => authors),
+            comments: rel.hasMany(() => comments, { foreignKey: "post_id" })
+        },
+        rls: "admin-only"
+    });
 
-    const schema = () => generateTypedefs([authors, comments, posts]);
+    const schema = () => generateTypedefs(compileTables([authors, comments, posts]));
 
     it("names each relation's target collection", () => {
         // The graph, as accessor names rather than the target's `Row` — a
@@ -415,99 +389,62 @@ describe("the generated include types", () => {
  * `tests/e2e/baas-typecheck/src/typed-sdk/probes.ts`.
  */
 describe("the generated write types, per relation kind", () => {
-    const authors: CollectionConfig = {
-        slug: "authors",
-        name: "authors",
-        properties: {
-            id: { type: "number", isId: "increment" },
-            name: { type: "string", validation: { required: true } },
-            profile: {
-                type: "relation",
-                relation: { kind: "hasOne", target: () => profiles, foreignKeyOnTarget: "author_id" }
-            },
-            profileVia: {
-                type: "relation",
-                relation: {
-                    kind: "via", cardinality: "one", target: () => profiles,
-                    joinPath: [{ table: "profiles", on: { from: "id", to: "author_id" } }]
-                }
-            },
-            teamProfile: {
-                type: "relation",
-                relation: {
-                    kind: "via", cardinality: "one", target: () => profiles,
-                    joinPath: [
-                        { table: "teams", on: { from: "team_id", to: "id" } },
-                        { table: "profiles", on: { from: "id", to: "team_id" } }
-                    ]
-                }
-            },
-            commentsVia: {
-                type: "relation",
-                relation: {
-                    kind: "via", cardinality: "many", target: () => comments,
-                    joinPath: [
-                        { table: "authors_comments", on: { from: "id", to: "author_id" } },
-                        { table: "comments", on: { from: "comment_id", to: "id" } }
-                    ]
-                }
-            },
-            roleComments: {
-                type: "relation",
-                relation: {
-                    kind: "via", cardinality: "many", target: () => comments,
-                    joinPath: [
-                        { table: "author_roles", on: { from: "id", to: "author_id" } },
-                        { table: "roles_comments", on: { from: "role_id", to: "role_id" } },
-                        { table: "comments", on: { from: "comment_id", to: "id" } }
-                    ]
-                }
-            }
-        }
-    };
-    const profiles: CollectionConfig = {
-        slug: "profiles",
-        name: "profiles",
-        properties: { id: { type: "number", isId: "increment" } }
-    };
-    const comments: CollectionConfig = {
-        slug: "comments",
-        name: "comments",
-        properties: {
-            id: { type: "number", isId: "increment" },
-            body: { type: "string", validation: { required: true } },
-            post: {
-                type: "relation",
-                validation: { required: true },
-                relation: { kind: "belongsTo", target: () => posts, localKey: "post_id" }
-            },
-            author: {
-                type: "relation",
-                validation: { required: true },
-                relation: { kind: "belongsTo", target: () => authors, localKey: "author_id" }
-            }
-        }
-    };
-    const posts: CollectionConfig = {
-        slug: "posts",
-        name: "posts",
-        properties: {
-            id: { type: "string", isId: "uuid" },
-            title: { type: "string", validation: { required: true } },
-            moderator: {
-                type: "relation",
-                excludeFromApi: true,
-                relation: { kind: "belongsTo", target: () => authors, localKey: "moderator_id" }
-            },
-            reviewer: {
-                type: "relation",
-                access: { write: [] },
-                relation: { kind: "belongsTo", target: () => authors, localKey: "reviewer_id" }
-            }
-        }
-    };
+    const profiles = defineTable("profiles", { columns: { id: col.integer().primaryKey().identity() }, rls: "admin-only" });
+    const authors = defineTable("authors", {
+        columns: { id: col.integer().primaryKey().identity(), name: col.text().notNull() },
+        relations: {
+            profile: rel.hasOne(() => profiles, { foreignKey: "author_id" }),
+            profileVia: rel.via(() => profiles, { cardinality: "one", steps: [{ table: "profiles", on: { from: "id", to: "author_id" } }] }),
+            teamProfile: rel.via(() => profiles, {
+                cardinality: "one",
+                steps: [
+                    { table: "teams", on: { from: "team_id", to: "id" } },
+                    { table: "profiles", on: { from: "id", to: "team_id" } }
+                ]
+            }),
+            commentsVia: rel.via(() => comments, {
+                cardinality: "many",
+                steps: [
+                    { table: "authors_comments", on: { from: "id", to: "author_id" } },
+                    { table: "comments", on: { from: "comment_id", to: "id" } }
+                ]
+            }),
+            roleComments: rel.via(() => comments, {
+                cardinality: "many",
+                steps: [
+                    { table: "author_roles", on: { from: "id", to: "author_id" } },
+                    { table: "roles_comments", on: { from: "role_id", to: "role_id" } },
+                    { table: "comments", on: { from: "comment_id", to: "id" } }
+                ]
+            })
+        },
+        rls: "admin-only"
+    });
+    const comments = defineTable("comments", {
+        columns: { id: col.integer().primaryKey().identity(), body: col.text().notNull() },
+        relations: {
+            post: rel.belongsTo(() => posts, { localKey: "post_id", notNull: true }),
+            author: rel.belongsTo(() => authors, { localKey: "author_id", notNull: true })
+        },
+        rls: "admin-only"
+    });
+    // The table model closes the foreign-key column, and the relation follows
+    // it: `moderator`'s key is private, `reviewer`'s nobody may write.
+    const posts = defineTable("posts", {
+        columns: {
+            id: col.uuid().primaryKey().defaultRandom(),
+            title: col.text().notNull(),
+            moderatorId: col.integer().column("moderator_id").private(),
+            reviewerId: col.integer().column("reviewer_id").readOnly()
+        },
+        relations: {
+            moderator: rel.belongsTo(() => authors, { localKey: "moderator_id" }),
+            reviewer: rel.belongsTo(() => authors, { localKey: "reviewer_id" })
+        },
+        rls: "admin-only"
+    });
 
-    const schema = () => generateTypedefs([authors, comments, posts, profiles]);
+    const schema = () => generateTypedefs(compileTables([authors, comments, posts, profiles]));
 
     it("satisfies a required belongsTo with either spelling, and with neither refuses", () => {
         // The server's required check reads both the foreign key and the
@@ -534,13 +471,11 @@ describe("the generated write types, per relation kind", () => {
         `)).toEqual([]);
     });
 
-    it("takes a closed to-one relation's foreign key with it, as the server does", () => {
-        // The server's read strip and write refusal (`restrictedFieldNames`,
-        // `apiHiddenFieldNames`) restrict the foreign key of a closed
-        // belongsTo alongside the relation: `moderatorId` is stripped from
-        // every read and refused on every write, `reviewerId` is readable and
-        // refused on every write. The generator used to key on the property
-        // name and column only, and kept both foreign keys everywhere.
+    it("takes a closed foreign key's relation with it", () => {
+        // A closed foreign key takes its relation with it: `moderatorId` is
+        // stripped from every read and refused on every write, and so is
+        // `moderator`; `reviewerId` is readable and refused on every write,
+        // and `reviewer` is includable and refused on every write.
         expect(compileWithConsumer(schema(), `
             import type { Database, IncludeFor } from "./database.types";
             declare const row: Database["posts"]["Row"];

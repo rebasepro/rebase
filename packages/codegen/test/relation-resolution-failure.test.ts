@@ -1,72 +1,51 @@
-import { describe, it, expect, beforeEach, afterEach, jest } from "@jest/globals";
+import { describe, it, expect, jest } from "@jest/globals";
+import { compileTables, isSchemaDefinitionError } from "@rebasepro/common";
+import { col, defineTable, rel } from "@rebasepro/types";
 import { generateTypedefs } from "../src/generate-types";
-import type { CollectionConfig } from "@rebasepro/types";
+import { block, compiledOnly } from "./helpers/tables";
 
 /**
- * What the generated `Database` type contains when a collection's relations
- * cannot be resolved.
+ * A relation whose target cannot be resolved never reaches the generator.
  *
- * `resolveCollectionRelations` throws when a target thunk cannot be evaluated —
- * a circular import is the usual cause, and the boot-time relation validator
- * calls that out by name. Here it was caught with `catch { /* ignore *\/ }`,
- * leaving `resolvedRelations` empty, and generation carried on.
- *
- * The output is then a `Database` type for that collection with no relation
- * fields and, worse, none of the foreign-key columns those relations imply —
- * because the FK columns are emitted from the resolved relations, not from the
- * properties. So `data.posts.find({ where: { author_id: … } })` stops
- * typechecking against a column that exists in the database, and the error
- * surfaces in the user's code with nothing pointing back at generation.
- *
- * Silently emitting an incomplete type is the failure worth refusing to be
- * quiet about.
+ * The collection generator resolved relation thunks itself; when one threw (a
+ * circular import, usually) it warned and emitted the table without the
+ * relation *or its foreign key*, so `where: { authorId }` stopped compiling
+ * with nothing pointing back at generation. Descriptors carry relations
+ * already resolved to a slug: a thunk that throws is refused when the schema
+ * is compiled, naming the table and the relation, before any SDK is written —
+ * and a relation into a table outside the run keeps its foreign key.
  */
-const posts: CollectionConfig = {
-    slug: "posts",
-    name: "Posts",
-    table: "posts",
-    properties: { id: { type: "string", isId: true }, title: { type: "string" } },
-    relations: [{
-        kind: "belongsTo",
-        relationName: "author",
-        localKey: "author_id",
-        target: () => { throw new Error("Cannot access 'users' before initialization"); }
-    }]
-};
-
-describe("generateTypedefs when relations cannot be resolved", () => {
-    let warn: ReturnType<typeof jest.spyOn>;
-
-    beforeEach(() => { warn = jest.spyOn(console, "warn").mockImplementation(() => { /* quiet */ }); });
-    afterEach(() => warn.mockRestore());
-
-    it("still generates the rest of the file", () => {
-        const output = generateTypedefs([posts]);
-
-        expect(output).toContain("posts");
-        expect(output).toContain("title");
+describe("a relation that cannot be resolved", () => {
+    it("is refused when the schema is compiled, naming the table, the relation and the cause", () => {
+        const posts = defineTable("posts", {
+            columns: { id: col.text().primaryKey(), title: col.text() },
+            relations: { author: rel.belongsTo(() => { throw new Error("Cannot access 'users' before initialization"); }) },
+            rls: "admin-only"
+        });
+        let problems: string[] = [];
+        try {
+            compileTables([posts]);
+        } catch (error) {
+            if (isSchemaDefinitionError(error)) problems = error.problems.map(p => `${p.table}.${p.key ?? ""}: ${p.message}`);
+        }
+        expect(problems).toEqual([expect.stringMatching(/^posts\.author: .*before initialization/)]);
     });
 
-    it("says which collection lost its relations, and why", () => {
-        generateTypedefs([posts]);
-
-        const said = warn.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
-        expect(said).toContain("posts");
-        expect(said).toMatch(/before initialization/);
-    });
-
-    it("does not warn for a collection whose relations resolve", () => {
-        const users: CollectionConfig = {
-            slug: "users", name: "Users", table: "users",
-            properties: { id: { type: "string", isId: true } }
-        };
-        const ok: CollectionConfig = {
-            ...posts,
-            relations: [{ kind: "belongsTo", relationName: "author", localKey: "author_id", target: () => users }]
-        };
-
-        generateTypedefs([ok, users]);
-
-        expect(warn).not.toHaveBeenCalled();
+    it("keeps the foreign key and the include of a relation into a table outside the run, and says nothing", () => {
+        const users = defineTable("users", { columns: { id: col.text().primaryKey() }, rls: "admin-only" });
+        const posts = defineTable("posts", {
+            columns: { id: col.text().primaryKey(), title: col.text() },
+            relations: { author: rel.belongsTo(() => users, { localKey: "author_id" }) },
+            rls: "admin-only"
+        });
+        const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+        try {
+            const ts = generateTypedefs(compiledOnly([posts, users], ["posts"]));
+            expect(block(ts, "Row", "posts")).toContain("authorId?: string | null;");
+            expect(block(ts, "Row", "posts")).toContain("author?: Record<string, unknown>;");
+            expect(warn).not.toHaveBeenCalled();
+        } finally {
+            warn.mockRestore();
+        }
     });
 });
