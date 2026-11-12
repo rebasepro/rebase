@@ -1,50 +1,48 @@
 #!/usr/bin/env node
 /**
- * Every collection example in the docs is a collection the server would accept.
+ * Every table example in the docs is a schema the backend would accept, and
+ * every `customizeTable` example is one the panel would accept.
  *
- * The docs had a whole class of example that compiles and cannot boot. `admin`
- * was introduced in 0.11 and the panel's keys moved into it, but `widget`,
- * `defaultFilter`, `fixedFilter`, `sort`, `entityActions`, `entityViews`,
- * `additionalFields`, `exportable`, `components` and `Actions` are all still
- * real names — just one level down. A fence writing one at the top of a
- * collection typechecks (excess-property checking does not reach a variable
- * that is never annotated), reads perfectly, and makes
- * `assertCollectionConfigs` refuse to start:
- *
- *     `widget` is no longer read here. `widget` belongs in the property's
- *     `admin` block — write `admin: { widget: … }`.
- *
- * Three of those were live in `collections/index.md` and `relations.md` when
- * this gate was written, next to one — `overrides: EntityOverrides` — naming a
- * type that has never existed at all.
+ * The docs had a whole class of example that compiles and cannot boot. When
+ * the panel's keys moved into the collection's `admin` block in 0.11,
+ * `widget`, `defaultFilter`, `sort` and `entityActions` stayed real names one
+ * level down, so a fence writing one at the top of a collection typechecked
+ * and refused to start; three were live when the first version of this gate
+ * ran. The table model has the same class in new shapes: a table without a
+ * primary key, `rls: []`, `defaultPolicies: false` beside `"admin-only"`, a
+ * `belongsTo` bound to a column of the wrong type, a varchar whose length
+ * contradicts its `max`, a feature the planner cannot lower yet. Every one of
+ * them typechecks; every one stops `rebase db generate`, `db push` and boot
+ * with a `SchemaDefinitionError`.
  *
  * ## What it does
  *
- * Extracts every fenced TypeScript block in the **English** docs that declares
- * a collection (`defineCollection(`, or a `…CollectionConfig` annotation),
- * *evaluates* it with every import and free name stubbed, and hands the
- * resulting objects to `findCollectionConfigProblems` — the same function
- * `@rebasepro/server` runs at boot — with `unknownKeys: "error"`, which is the
- * strictest setting a project can ask for.
+ * Extracts every fenced TypeScript block in the **English** docs and the agent
+ * skills that calls `defineTable`, `defineAuthTable`, `defineView` or
+ * `customizeTable` — and every excerpt that builds columns — *evaluates* it
+ * with the real builders (see `docs-verify/table-snippets.mjs` for what is
+ * stubbed and why), and hands the definitions to `compileTables` and
+ * `lowerTables`: the compiler every door that reads `backend/schema` runs, and
+ * the lowering into what the planner and runtime read. `customizeTable` runs
+ * for real and refuses an unknown option, a legacy `admin` name or a component
+ * that is not a value.
  *
  * Compiling is not enough and running is not a substitute for compiling: the
  * two gates catch different halves. `verify:docs` compiles the same fences
- * against the real types and finds a key that exists nowhere; this one finds a
- * key that exists somewhere else.
+ * against the real types and finds a name that exists nowhere; this one finds
+ * a schema the compiler refuses.
  *
  * ## Opting out
  *
- * A fence that is deliberately a fragment — an object literal cut out of a
- * larger one, with no `slug` and no intention of being pasted whole — marks
- * itself:
+ * A fence that is deliberately not runnable marks itself:
  *
  *     <!-- doc-examples: fragment -->
  *     ```typescript
- *     admin: { … }
+ *     relations: { … }
  *     ```
  *
  * Every mark is an example nobody validates, so the bar is "this is not a
- * config", not "this fails".
+ * schema", not "this fails".
  *
  *     TSX_TSCONFIG_PATH=tsconfig.typecheck.json node --import tsx tooling/scripts/check-doc-examples.mjs
  *     pnpm check:doc-examples
@@ -52,8 +50,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { collectionSnippets } from "./docs-verify/collection-snippets.mjs";
-import { findCollectionConfigProblems } from "../../packages/server/src/collections/validate-config.ts";
+import { tableSnippets } from "./docs-verify/table-snippets.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -61,91 +58,63 @@ const red = (s) => `\x1b[31m${s}\x1b[0m`;
 const green = (s) => `\x1b[32m${s}\x1b[0m`;
 const dim = (s) => `\x1b[2m${s}\x1b[0m`;
 
-const { results, fragments } = await collectionSnippets(ROOT);
-
-/**
- * The collections each page declares, for a tenancy membership to find.
- *
- * A membership names another collection, and a page shows that one in a fence
- * of its own, one file per fence as a project has them. Validated fence by
- * fence, the membership named no collection at all. So it is looked up among
- * the page's other fences, and checked against it (its fields, its own-row
- * read rule) as boot checks it; only the fence's own collections are reported.
- */
-const declaredOnPage = new Map();
-for (const { snippet, collections, error } of results) {
-    if (error) continue;
-    declaredOnPage.set(snippet.file, [...(declaredOnPage.get(snippet.file) ?? []), ...collections]);
-}
-
-/** The page's collections this fence's memberships name and the fence does not declare. */
-function membershipTargets(collections, file) {
-    const own = new Set(collections.map((c) => c.slug));
-    const named = new Set(collections
-        .map((c) => c.tenant?.from?.membership?.collection)
-        .filter((slug) => typeof slug === "string" && !own.has(slug)));
-    const targets = new Map();
-    for (const c of declaredOnPage.get(file) ?? []) {
-        if (named.has(c.slug) && !targets.has(c.slug)) targets.set(c.slug, c);
-    }
-    return [...targets.values()];
-}
+const { results, fragments } = await tableSnippets(ROOT);
 
 const findings = [];
-let collectionCount = 0;
+let tables = 0;
+let customizations = 0;
 
-for (const { snippet, collections, error } of results) {
+for (const { snippet, problems, error, whole, ...counts } of results) {
     const where = `${snippet.file}:${snippet.line}`;
+    tables += counts.tables;
+    customizations += counts.customizations;
 
     if (error) {
         findings.push({
             where,
             message:
                 `the example could not be evaluated — ${error.message}. A fence that cannot ` +
-                "run is a fence a reader cannot paste. If it is deliberately a fragment, mark " +
-                "it `<!-- doc-examples: fragment -->`."
+                "run is a fence a reader cannot paste." +
+                (whole ? "" : " If it is deliberately not runnable, mark it `<!-- doc-examples: fragment -->`.")
         });
         continue;
     }
-
-    if (collections.length === 0) {
+    if (whole && counts.tables === 0 && counts.customizations === 0) {
         findings.push({
             where,
             message:
-                "the example names a collection type but produced no collection object — it is " +
-                "either a fragment, which should say so with `<!-- doc-examples: fragment -->`, " +
-                "or a config whose `slug` went missing."
+                "the example calls a table builder or customizeTable but produced nothing — the call " +
+                "is in a branch that never runs, or the fence is an excerpt that should say so with " +
+                "`<!-- doc-examples: fragment -->`."
         });
         continue;
     }
+    for (const message of problems) findings.push({ where, message });
+}
 
-    collectionCount += collections.length;
-    const targets = membershipTargets(collections, snippet.file);
-    const borrowed = new Set(targets.map((c) => c.slug));
-    // `"error"` rather than the default `"warn"`: a key nobody recognises may be
-    // deliberate metadata in somebody's project, and is never that in a doc.
-    for (const problem of findCollectionConfigProblems([...collections, ...targets], { unknownKeys: "error" })) {
-        // A borrowed collection's own problems are reported at its own fence.
-        if (borrowed.has(problem.path.split(".")[0])) continue;
-        findings.push({ where, message: `${problem.path}: ${problem.message}` });
-    }
+if (tables === 0) {
+    // The docs teach tables on dozens of pages; reading none means the
+    // recogniser broke, not that there is nothing to check.
+    console.error(red("✗ Doc examples: no table definition found in any fence — the gate is checking nothing."));
+    process.exit(2);
 }
 
 if (findings.length === 0) {
     console.log(green(
-        `✓ Doc examples: ${collectionCount} collection(s) across ${results.length} fence(s) ` +
-        `are configs the server accepts${fragments ? ` (${fragments} marked as fragments)` : ""}.`
+        `✓ Doc examples: ${tables} table(s) and ${customizations} customization(s) across ${results.length} fence(s) ` +
+        `compile, lower and customize${fragments ? ` (${fragments} marked as fragments)` : ""}.`
     ));
     process.exit(0);
 }
 
-console.error(red(`\n✗ ${findings.length} problem(s) in the docs' collection examples:\n`));
+console.error(red(`\n✗ ${findings.length} problem(s) in the docs' table examples:\n`));
 for (const { where, message } of findings) {
     console.error(`    ${where}`);
     console.error(dim(`      ${message}`));
 }
 console.error(dim(
-    "\n  These are the errors `assertCollectionConfigs` raises at boot, against the same" +
-    "\n  objects. A reader who pastes one of these examples gets a server that will not start.\n"
+    "\n  These are the errors `rebase db generate`, `db push` and boot raise (or `customizeTable`" +
+    "\n  throws), against the same definitions. A reader who pastes one of these examples gets" +
+    "\n  a backend that will not start.\n"
 ));
 process.exit(1);

@@ -411,7 +411,13 @@ and its locales.`
 so a fence writing one at the top of a collection typechecks, reads well,
 and makes \`assertCollectionConfigs\` exit. Three were live, next to an
 \`overrides: EntityOverrides\` row naming a type that never existed. This
-runs the examples and hands the objects to the boot-time validator.`
+runs the examples and hands the objects to the boot-time validator.
+
+Since 0.31 the examples are tables: a fence can typecheck and still be a
+schema \`compileTables\` refuses (no primary key, \`rls: []\`, a bound key of
+the wrong type) or one the planner cannot lower yet. The fences run with the
+real builders and go through compileTables and lowerTables, the two steps
+every door that reads backend/schema takes; customizeTable runs for real.`
     },
     {
         run: "check:schema-sample",
