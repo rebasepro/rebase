@@ -1635,11 +1635,11 @@ export class PostgresBackendDriver implements DataDriver {
 
         // An upsert that finds its row is an update of that row, and runs as
         // one: the update gate, `beforeSave` told "existing" with the stored
-        // values, `on_update` stamps only, history "update". Every upsert door
+        // values, update stamps only, history "update". Every upsert door
         // (`?on_conflict=`, bulk and `_batch` upserts, the SDK, the socket)
         // reached the create pipeline instead, and the INSERT's conflict branch
         // wrote it over the stored row: omitted fields reset to their
-        // `defaultValue`, `user_on_create` handed to whoever ran the import,
+        // `.default()`, an `.onCreateUser()` column handed to whoever ran the import,
         // hooks told the row was new, and a row the caller's `beforeQuery`
         // hides updated and then answered 500. The read runs in the write's
         // transaction; a row it cannot see is still met safely by the
