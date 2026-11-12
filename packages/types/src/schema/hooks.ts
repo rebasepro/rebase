@@ -159,7 +159,9 @@ export interface ColumnBeforeSaveProps<T = unknown, USER extends User = User> ex
     values: TableRow;
     /** The row as it was, on an update. */
     previousValues?: TableRow;
+    /** The row's id. Absent on a create whose id the database generates. */
     id?: string | number;
+    /** Whether the row is new, existing, or a copy. */
     status: EntityStatus;
 }
 

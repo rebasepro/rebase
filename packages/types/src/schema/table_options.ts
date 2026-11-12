@@ -31,7 +31,15 @@ export type DefaultRls = "admin-only" | readonly [SecurityRule, ...SecurityRule[
 export interface TableIndexKey<Keys extends string = string> {
     /** A column key, or a `belongsTo` relation (its foreign-key column). */
     column: Keys | (string & {});
+    /**
+     * Sort order of this key. Ascending when omitted; `gin` and `brin` indexes
+     * take none.
+     */
     direction?: "asc" | "desc";
+    /**
+     * Where `NULL`s sort. When omitted, Postgres's own placement: last under `asc`,
+     * first under `desc`.
+     */
     nulls?: "first" | "last";
 }
 
@@ -57,6 +65,10 @@ export type TableIndexPredicate<Keys extends string = string> =
  * @group Schema
  */
 export interface TableIndex<Keys extends string = string> {
+    /**
+     * The index's keys, in order: a column key (or `belongsTo` relation), or a
+     * `TableIndexKey` to give one a sort order. At least one.
+     */
     columns: readonly [Keys | TableIndexKey<Keys>, ...(Keys | TableIndexKey<Keys>)[]];
     /** `btree` when omitted. `gin` and `brin` take no direction. */
     using?: "btree" | "gin" | "brin";

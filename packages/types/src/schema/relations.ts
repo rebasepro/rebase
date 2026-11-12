@@ -78,6 +78,10 @@ export interface BelongsToOptions extends RelationAccessOptions {
     unique?: boolean;
     /** `RESTRICT` when the column is `NOT NULL`, `SET NULL` otherwise. */
     onDelete?: OnAction;
+    /**
+     * What the foreign key does when the referenced key changes. No `ON UPDATE`
+     * clause when omitted, so Postgres's default applies: `NO ACTION`.
+     */
     onUpdate?: OnAction;
     /** `false` skips the index on the foreign key that is otherwise created. */
     index?: boolean;

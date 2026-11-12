@@ -306,14 +306,23 @@ export interface FieldPreviewProps {
     property: Property;
     /** How much room the surface gives it. */
     size: "small" | "medium" | "large";
+    /** Most height the surface gives the preview, in pixels. Unlimited when omitted. */
     height?: number;
+    /** Most width the surface gives the preview, in pixels. Unlimited when omitted. */
     width?: number;
     /** The field's `customProps`. */
     customProps?: unknown;
     /** Whether the preview may react to clicks. */
     interactive?: boolean;
+    /** An image preview fills its container completely. Images only. */
     fill?: boolean;
+    /** Relations draw as plain text rather than as cards. */
     textOnly?: boolean;
+    /**
+     * One line that cannot grow (a card slot, a chip, a fixed-height cell): a
+     * block value — Markdown, multi-line text, a map, an array — draws an excerpt or
+     * a count instead. Inferred from the preview's nesting when omitted.
+     */
     compact?: boolean;
 }
 
@@ -749,6 +758,10 @@ export interface TableKanban<Column extends string = string, Order extends strin
  * @group Table customization
  */
 export type TableDisplayResolver<Row = Record<string, unknown>, R = unknown, USER extends User = User> = {
+    /**
+     * Given the row, its id and the panel's context, return the slot's value —
+     * `undefined` leaves the slot empty.
+     */
     resolve(params: { row: Row; id: string; context: RebaseContext<USER> }): R | undefined | Promise<R | undefined>;
 }["resolve"];
 
