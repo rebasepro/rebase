@@ -118,13 +118,13 @@ const batch = (app: Hono<HonoEnv>, body: unknown, headers?: Record<string, strin
     });
 
 describe("POST /_batch", () => {
-    it("writes across two collections in one call, in order", async () => {
+    it("writes across two tables in one call, in order", async () => {
         const { app, calls } = createHarness();
 
         const res = await batch(app, {
             operations: [
-                { op: "create", collection: "orders", values: { total: 40 }, ref: "order" },
-                { op: "create", collection: "order_items", values: { order_id: 1, sku: "A-1" } }
+                { op: "create", table: "orders", values: { total: 40 }, ref: "order" },
+                { op: "create", table: "order_items", values: { order_id: 1, sku: "A-1" } }
             ]
         });
 
@@ -144,8 +144,8 @@ describe("POST /_batch", () => {
 
         const res = await batch(app, {
             operations: [
-                { op: "create", collection: "orders", values: { total: 40 }, ref: "order" },
-                { op: "create", collection: "order_items", values: { order_id: { $ref: "order.id" }, sku: "A-1" } }
+                { op: "create", table: "orders", values: { total: 40 }, ref: "order" },
+                { op: "create", table: "order_items", values: { order_id: { $ref: "order.id" }, sku: "A-1" } }
             ]
         });
 
@@ -168,8 +168,8 @@ describe("POST /_batch", () => {
 
         const res = await batch(app, {
             operations: [
-                { op: "create", collection: "order_items", values: { order_id: { $ref: "order.id" } } },
-                { op: "create", collection: "orders", values: { total: 40 }, ref: "order" }
+                { op: "create", table: "order_items", values: { order_id: { $ref: "order.id" } } },
+                { op: "create", table: "orders", values: { total: 40 }, ref: "order" }
             ]
         });
 
@@ -183,8 +183,8 @@ describe("POST /_batch", () => {
 
         const res = await batch(app, {
             operations: [
-                { op: "create", collection: "orders", values: { total: 1 }, ref: "o" },
-                { op: "create", collection: "orders", values: { total: 2 }, ref: "o" }
+                { op: "create", table: "orders", values: { total: 1 }, ref: "o" },
+                { op: "create", table: "orders", values: { total: 2 }, ref: "o" }
             ]
         });
 
@@ -192,11 +192,26 @@ describe("POST /_batch", () => {
         expect((await res.json() as { error: { message: string } }).error.message).toMatch(/reuses the ref/);
     });
 
-    it("refuses an unknown collection without touching the driver", async () => {
+    it("refuses an operation that names its table as `collection`, saying `table`", async () => {
         const { app, calls } = createHarness();
 
         const res = await batch(app, {
-            operations: [{ op: "create", collection: "nope", values: {} }]
+            operations: [{ op: "create", collection: "orders", values: { total: 1 } }]
+        });
+
+        expect(res.status).toBe(400);
+        const { error } = await res.json() as { error: { code: string; message: string } };
+        expect(error.code).toBe("INVALID_BATCH_BODY");
+        expect(error.message).toContain("missing `table`");
+        expect(error.message).toContain("`collection` is the old spelling");
+        expect(calls).toHaveLength(0);
+    });
+
+    it("refuses an unknown table without touching the driver", async () => {
+        const { app, calls } = createHarness();
+
+        const res = await batch(app, {
+            operations: [{ op: "create", table: "nope", values: {} }]
         });
 
         expect(res.status).toBe(400);
@@ -207,7 +222,7 @@ describe("POST /_batch", () => {
         const { app, calls } = createHarness();
 
         const res = await batch(app, {
-            operations: [{ op: "create", collection: "orders", values: { totl: 40 } }]
+            operations: [{ op: "create", table: "orders", values: { totl: 40 } }]
         });
 
         expect(res.status).toBe(400);
@@ -222,13 +237,13 @@ describe("POST /_batch", () => {
         // rule went unasked and the answer was the INSERT's NOT NULL failure —
         // after the operations before it had written.
         for (const operation of [
-            { op: "create", collection: "customers", values: { email: "a@b.c" } },
-            { op: "upsert", collection: "customers", values: { email: "a@b.c" }, onConflict: ["email"] }
+            { op: "create", table: "customers", values: { email: "a@b.c" } },
+            { op: "upsert", table: "customers", values: { email: "a@b.c" }, onConflict: ["email"] }
         ]) {
             const { app, calls } = createHarness();
 
             const res = await batch(app, {
-                operations: [{ op: "create", collection: "orders", values: { total: 1 } }, operation]
+                operations: [{ op: "create", table: "orders", values: { total: 1 } }, operation]
             });
 
             expect(res.status).toBe(400);
@@ -243,7 +258,7 @@ describe("POST /_batch", () => {
         const { app, calls } = createHarness();
 
         const res = await batch(app, {
-            operations: [{ op: "update", collection: "customers", id: 1, values: { email: "a@b.c" } }]
+            operations: [{ op: "update", table: "customers", id: 1, values: { email: "a@b.c" } }]
         });
 
         expect(res.status).toBe(200);
@@ -257,7 +272,7 @@ describe("POST /_batch", () => {
         const { app } = createHarness();
 
         const res = await batch(app, {
-            operations: [{ op: "create", collection: "orders", values: { total: { $inc: 1 } } }]
+            operations: [{ op: "create", table: "orders", values: { total: { $inc: 1 } } }]
         });
 
         expect(res.status).toBe(400);
@@ -269,7 +284,7 @@ describe("POST /_batch", () => {
         const { app, calls } = createHarness();
 
         const res = await batch(app, {
-            operations: [{ op: "update", collection: "orders", id: 1, values: { total: { $inc: -1 } } }]
+            operations: [{ op: "update", table: "orders", id: 1, values: { total: { $inc: -1 } } }]
         });
 
         expect(res.status).toBe(200);
@@ -284,7 +299,7 @@ describe("POST /_batch", () => {
 
         const res = await batch(app, {
             operations: [
-                { op: "upsert", collection: "orders", values: { total: 1 }, onConflict: ["total"] }
+                { op: "upsert", table: "orders", values: { total: 1 }, onConflict: ["total"] }
             ]
         });
 
@@ -299,7 +314,7 @@ describe("POST /_batch", () => {
 
         const res = await batch(app, {
             operations: [
-                { op: "upsert", collection: "orders", values: { email: "a@b.c" }, onConflict: ["email"] }
+                { op: "upsert", table: "orders", values: { email: "a@b.c" }, onConflict: ["email"] }
             ]
         });
 
@@ -312,7 +327,7 @@ describe("POST /_batch", () => {
 
         const res = await batch(app, {
             operations: Array.from({ length: 1001 }, () => ({
-                op: "create", collection: "orders", values: { total: 1 }
+                op: "create", table: "orders", values: { total: 1 }
             }))
         });
 
@@ -337,7 +352,7 @@ describe("POST /_batch", () => {
         const { app } = createHarness({ noBatchWrite: true });
 
         const res = await batch(app, {
-            operations: [{ op: "create", collection: "orders", values: { total: 1 } }]
+            operations: [{ op: "create", table: "orders", values: { total: 1 } }]
         });
 
         expect(res.status).toBe(400);
@@ -349,8 +364,8 @@ describe("POST /_batch", () => {
 
         const res = await batch(app, {
             operations: [
-                { op: "create", collection: "orders", values: { total: 1 } },
-                { op: "create", collection: "orders", values: { total: 2 } }
+                { op: "create", table: "orders", values: { total: 1 } },
+                { op: "create", table: "orders", values: { total: 2 } }
             ]
         });
 
@@ -362,8 +377,8 @@ describe("POST /_batch", () => {
 
         const res = await batch(app, {
             operations: [
-                { op: "delete", collection: "orders", id: 1 },
-                { op: "create", collection: "orders", values: { total: 2 } }
+                { op: "delete", table: "orders", id: 1 },
+                { op: "create", table: "orders", values: { total: 2 } }
             ]
         });
 
@@ -377,7 +392,7 @@ describe("POST /_batch", () => {
 
         for (const op of ["update", "delete"]) {
             const res = await batch(app, {
-                operations: [{ op, collection: "orders", values: { total: 1 } }]
+                operations: [{ op, table: "orders", values: { total: 1 } }]
             });
             expect(res.status).toBe(400);
         }
@@ -388,8 +403,8 @@ describe("POST /_batch", () => {
 
         const res = await batch(app, {
             operations: [
-                { op: "create", collection: "orders", values: { total: 1 } },
-                { op: "delete", collection: "orders", id: 5 }
+                { op: "create", table: "orders", values: { total: 1 } },
+                { op: "delete", table: "orders", id: 5 }
             ]
         }, { Prefer: "return=minimal" });
 

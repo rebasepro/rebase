@@ -416,7 +416,7 @@ describe("a write's statements (E2E)", () => {
             expect(reads(bulk.statements, "comments")).toEqual([]);
 
             const batch = await statementsOf(() => http("POST", "/_batch", {
-                body: { operations: [{ op: "update", collection: "posts", id, values: { title: "batch" } }] }
+                body: { operations: [{ op: "update", table: "posts", id, values: { title: "batch" } }] }
             }));
             expect(batch.result.status).toBe(200);
             expect(reads(batch.statements, "comments")).toEqual([]);
@@ -1006,7 +1006,7 @@ describe("a write's statements (E2E)", () => {
             expect(bulk.status).toBe(404);
             expect(bulk.json.error.message).toContain("No row with id 987654");
             const batch = await http("POST", "/_batch", {
-                body: { operations: [{ op: "update", collection: "posts", id: "987654", values: { title: "x" } }] }
+                body: { operations: [{ op: "update", table: "posts", id: "987654", values: { title: "x" } }] }
             });
             expect(batch.status).toBe(404);
             expect(batch.json.error.message).toContain("No row with id \"987654\"");

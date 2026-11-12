@@ -183,7 +183,7 @@ describe("view collections (E2E)", () => {
 
     it("refuses every write to a view collection", async () => {
         const artistsData = of(rebase.dataAsAdmin, "artists");
-        await expect(artistsData.create({ artist: "x", songs: 1 })).rejects.toMatchObject({ statusCode: 405, code: "COLLECTION_READ_ONLY" });
+        await expect(artistsData.create({ artist: "x", songs: 1 })).rejects.toMatchObject({ statusCode: 405, code: "TABLE_READ_ONLY" });
         await expect(artistsData.update("muse", { songs: 9 })).rejects.toMatchObject({ statusCode: 405 });
         await expect(artistsData.createMany([{ artist: "a" }, { artist: "b" }])).rejects.toMatchObject({ statusCode: 405 });
         await expect(artistsData.delete("muse")).rejects.toMatchObject({ statusCode: 405 });

@@ -3,7 +3,7 @@
  * all have row-level security off, says which tables it skipped and why.
  *
  * Boot already logged them, with the SQL. The data API did not: `/api/data/x`
- * answered `NO_COLLECTIONS` "the database has no tables to derive them from",
+ * answered `NO_TABLES` "the database has no tables to derive them from",
  * over a database holding two — so a developer reading the response went
  * looking for tables that were there, instead of enabling RLS on them.
  *
@@ -78,7 +78,7 @@ describe("a BaaS database whose tables have RLS off (E2E)", () => {
     it("names the skipped tables and the fix on the data API, instead of saying there are none", async () => {
         const answer = await errorAt("/api/data/customers");
         expect(answer.status).toBe(404);
-        expect(answer.code).toBe("NO_COLLECTIONS");
+        expect(answer.code).toBe("NO_TABLES");
         expect(answer.message).not.toMatch(/has no tables/);
         expect(answer.message).toContain("public.customers");
         expect(answer.message).toContain("public.orders");
@@ -103,7 +103,7 @@ describe("a BaaS database whose tables have RLS off (E2E)", () => {
     it("says the same on the docs", async () => {
         const answer = await errorAt("/api/docs");
         expect(answer.status).toBe(404);
-        expect(answer.code).toBe("NO_COLLECTIONS");
+        expect(answer.code).toBe("NO_TABLES");
         expect(answer.message).toContain("public.customers");
         expect(answer.message).not.toMatch(/has no tables/);
     });

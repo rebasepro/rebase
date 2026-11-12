@@ -414,7 +414,7 @@ describe("storage per-object authorization", () => {
             // A membership table, as a real project would consult.
             const members = [{ teamId: "t1", userId: "alice" }];
             const data = {
-                collection: () => ({
+                table: () => ({
                     find: async (q?: Record<string, unknown>) => {
                         seen.push(q);
                         return { data: members as Record<string, unknown>[] };
@@ -426,7 +426,7 @@ describe("storage per-object authorization", () => {
             let received: unknown;
             await mount(async ctx => {
                 received = ctx.data;
-                const rows = await ctx.data!.collection("team_members").find({ where: { userId: ["==", "alice"] } });
+                const rows = await ctx.data!.table("team_members").find({ where: { userId: ["==", "alice"] } });
                 return rows.data.length > 0;
             }, () => data);
 

@@ -16,7 +16,7 @@ import pg from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { integer, pgTable, serial, varchar } from "drizzle-orm/pg-core";
 import { Hono } from "hono";
-import type { AggregateParams, AggregateRow, CollectionConfig, DataDriver, SDKCollectionClient } from "@rebasepro/types";
+import type { AggregateParams, AggregateRow, CollectionConfig, DataDriver, SDKTableClient } from "@rebasepro/types";
 import { buildSdkData } from "@rebasepro/common";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
@@ -62,8 +62,8 @@ describe("aggregate orderBy, over HTTP and in process (E2E)", () => {
     }
 
     /** The in-process door: `rebase.data.orders.aggregate`. */
-    function inProcess(): SDKCollectionClient<Order> {
-        return buildSdkData(driver).collection<Order>("orders");
+    function inProcess(): SDKTableClient<Order> {
+        return buildSdkData(driver).table<Order>("orders");
     }
 
     beforeAll(async () => {

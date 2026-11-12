@@ -120,7 +120,7 @@ function createHarness(
         baseUrl: "http://rebase.test",
         realtime: false,
         token: "t",
-        ...(dictionary ? { collections: dictionary } : {}),
+        ...(dictionary ? { tables: dictionary } : {}),
         fetch: async (input: RequestInfo | URL, init?: RequestInit) =>
             app.request(String(input).replace("http://rebase.test", ""), init)
     });
@@ -133,7 +133,7 @@ describe("upsert() through the REST route", () => {
         // "unlike `create` it does not fail when the row is already there".
         const { client, saves } = createHarness();
 
-        const row = await client.data.collection("posts").upsert({ id: 1, title: "again" });
+        const row = await client.data.table("posts").upsert({ id: 1, title: "again" });
 
         expect(row).toMatchObject({ id: 1, title: "again" });
         expect(saves).toHaveLength(1);
@@ -143,7 +143,7 @@ describe("upsert() through the REST route", () => {
     it("upserts on the named target", async () => {
         const { client, saves } = createHarness();
 
-        await client.data.collection("posts").upsert({ id: 1, title: "again" }, { onConflict: ["id"] });
+        await client.data.table("posts").upsert({ id: 1, title: "again" }, { onConflict: ["id"] });
 
         expect(saves[0]).toMatchObject({ upsert: true, onConflict: ["id"] });
     });
@@ -151,7 +151,7 @@ describe("upsert() through the REST route", () => {
     it("resolves to undefined with returning: false, as create does", async () => {
         const { client } = createHarness();
 
-        const row = await client.data.collection("posts").upsert({ id: 1, title: "again" }, { returning: false });
+        const row = await client.data.table("posts").upsert({ id: 1, title: "again" }, { returning: false });
 
         expect(row).toBeUndefined();
     });
@@ -160,7 +160,7 @@ describe("upsert() through the REST route", () => {
         // The other half of the contract: a create of a taken key still fails.
         const { client } = createHarness();
 
-        await expect(client.data.collection("posts").create({ id: 1, title: "dup" }))
+        await expect(client.data.table("posts").create({ id: 1, title: "dup" }))
             .rejects.toMatchObject({ status: 409 });
     });
 });
@@ -177,7 +177,7 @@ describe("batch() through the REST route", () => {
         const { client, batches } = createHarness([posts, orderItems], { posts: "posts", orderItems: "order_items" });
 
         const result = await client.batch([
-            { op: "create", collection: "orderItems", values: { sku: "A-1" } }
+            { op: "create", table: "orderItems", values: { sku: "A-1" } }
         ]);
 
         expect(result.data).toEqual([{ id: 7, sku: "A-1" }]);
@@ -187,7 +187,7 @@ describe("batch() through the REST route", () => {
     it("still accepts the slug itself", async () => {
         const { client, batches } = createHarness([posts, orderItems], { posts: "posts", orderItems: "order_items" });
 
-        await client.batch([{ op: "create", collection: "order_items", values: { sku: "A-2" } }]);
+        await client.batch([{ op: "create", table: "order_items", values: { sku: "A-2" } }]);
 
         expect(batches[0][0]).toMatchObject({ path: "order_items" });
     });
@@ -195,7 +195,7 @@ describe("batch() through the REST route", () => {
     it("sends the name verbatim on a client without a dictionary", async () => {
         const { client, batches } = createHarness([posts, orderItems]);
 
-        await client.batch([{ op: "create", collection: "order_items", values: { sku: "A-3" } }]);
+        await client.batch([{ op: "create", table: "order_items", values: { sku: "A-3" } }]);
 
         expect(batches[0][0]).toMatchObject({ path: "order_items" });
     });
@@ -213,7 +213,7 @@ describe("aggregate() through the REST route", () => {
     it("says when the groups were cut off at the default", async () => {
         const { client } = createHarness();
 
-        const rows = await client.data.collection("posts").aggregate(byTitle);
+        const rows = await client.data.table("posts").aggregate(byTitle);
 
         expect(rows).toHaveLength(50);
         expect(rows.meta).toEqual({ limit: 50, offset: 0, hasMore: true });
@@ -222,7 +222,7 @@ describe("aggregate() through the REST route", () => {
     it("pages past them with offset", async () => {
         const { client } = createHarness();
 
-        const rows = await client.data.collection("posts").aggregate({ ...byTitle, offset: 50 });
+        const rows = await client.data.table("posts").aggregate({ ...byTitle, offset: 50 });
 
         expect(rows.map(row => row.title)).toEqual(
             Array.from({ length: GROUPS - 50 }, (_, i) => `t${50 + i}`)
@@ -233,7 +233,7 @@ describe("aggregate() through the REST route", () => {
     it("returns every group under a limit that holds them", async () => {
         const { client } = createHarness();
 
-        const rows = await client.data.collection("posts").aggregate({ ...byTitle, limit: 100 });
+        const rows = await client.data.table("posts").aggregate({ ...byTitle, limit: 100 });
 
         expect(rows).toHaveLength(GROUPS);
         expect(rows.meta?.hasMore).toBe(false);
@@ -244,7 +244,7 @@ describe("aggregate() through the REST route", () => {
         // `JSON.stringify` or a deep equality of the result sees.
         const { client } = createHarness();
 
-        const rows = await client.data.collection("posts").aggregate(byTitle);
+        const rows = await client.data.table("posts").aggregate(byTitle);
 
         expect(Object.keys(rows)).not.toContain("meta");
         expect(JSON.parse(JSON.stringify(rows))).toHaveLength(50);

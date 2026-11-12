@@ -58,9 +58,9 @@ export function mountOpenApiDocs(app: Hono<HonoEnv>, basePath: string, options: 
         // so the two surfaces cannot start disagreeing about why.
         const explain = (c: { json: (v: unknown, s: number) => Response }) => c.json({
             error: {
-                message: "This project serves no collections yet, so there is no API to document. " +
+                message: "This project serves no tables yet, so there is no API to document. " +
                     noCollectionsCause(unprotectedTables),
-                code: "NO_COLLECTIONS"
+                code: "NO_TABLES"
             }
         }, 404);
         app.get(`${basePath}/docs`, explain);

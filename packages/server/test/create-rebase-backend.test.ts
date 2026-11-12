@@ -284,7 +284,7 @@ describe("building a backend does nothing on its own", () => {
         const res = await backend.fetch(new Request("http://local/api/functions/whoami"));
         expect(res.status).toBe(200);
 
-        expect(typeof backend.rebase.dataAsAdmin.collection).toBe("function");
+        expect(typeof backend.rebase.dataAsAdmin.table).toBe("function");
         expect(typeof backend.rebase.sql).toBe("function");
         expect(backend.rebase.email.isConfigured()).toBe(false);
         // The control plane reaches this backend's own routes in-process.

@@ -51,7 +51,7 @@ describe("mountOpenApiDocs", () => {
         expect([401, 403]).toContain(res.status);
     });
 
-    it("answers both paths with NO_COLLECTIONS when there are none to document", async () => {
+    it("answers both paths with NO_TABLES when there are none to document", async () => {
         // A spec of zero paths is not useful and a Try-It button next to
         // nothing is worse than an absent tab — so still a 404. But a *bare*
         // 404 is indistinguishable from a wrong URL or a dead server, and the
@@ -64,7 +64,7 @@ describe("mountOpenApiDocs", () => {
             const res = await a.request(path);
             expect(res.status).toBe(404);
             const body = await res.json() as { error?: { code?: string; message?: string } };
-            expect(body.error?.code).toBe("NO_COLLECTIONS");
+            expect(body.error?.code).toBe("NO_TABLES");
             expect(body.error?.message).toContain("db push");
         }
     });

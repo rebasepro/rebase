@@ -275,7 +275,7 @@ export function getTableForCollection(collection: CollectionConfig, registry: Po
     const tableName = getTableName(collection);
     const table = registry.getTable(tableName);
     if (!table) {
-        throw new Error(`Table not found for collection '${collection.slug}' (table: ${tableName})`);
+        throw new Error(`Table not found for '${collection.slug}' (table: ${tableName})`);
     }
     return table;
 }
@@ -415,7 +415,7 @@ export function primaryKeyColumns(
     return primaryKeys.map(info => {
         const column = table[info.fieldName as keyof typeof table] as AnyPgColumn | undefined;
         if (!column) {
-            throw new Error(`ID field '${info.fieldName}' not found in table for collection '${collectionPath}'`);
+            throw new Error(`ID field '${info.fieldName}' not found in table '${collectionPath}'`);
         }
         return column;
     });

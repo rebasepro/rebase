@@ -459,7 +459,7 @@ export class FetchService {
             : undefined;
         if (!idColumn) {
             throw ApiError.badRequest(
-                `Cannot sort by '${orderBy}' on collection '${collectionPath}': the subquery correlates on a ` +
+                `Cannot sort by '${orderBy}' on table '${collectionPath}': the subquery correlates on a ` +
                 "single key column, and this collection has none or has a composite one.",
                 "ORDER_BY_FIELD_NOT_SORTABLE",
                 { field: orderBy, collection: collectionPath }
@@ -637,7 +637,7 @@ target });
         // knob, because a deployment that wants the lenient behaviour wants it
         // for both.
         const collectionName = collection?.slug ?? collection?.name;
-        const onCollection = collectionName ? ` on collection '${collectionName}'` : "";
+        const onCollection = collectionName ? ` on table '${collectionName}'` : "";
 
         // A declared to-many relation is a different mistake from a typo, and
         // saying "unknown field" about a field the collection plainly declares
@@ -798,7 +798,7 @@ target });
         for (const { key, relation } of counted) {
             if (relation.cardinality === "one") {
                 throw ApiError.badRequest(
-                    `Cannot count relation '${key}' on collection '${collectionName}': ` +
+                    `Cannot count relation '${key}' on table '${collectionName}': ` +
                     "it is a to-one relation. `count` totals the rows of a to-many relation.",
                     "INVALID_INCLUDE",
                     { relation: key, collection: collectionName }
@@ -807,7 +807,7 @@ target });
         }
         if (Object.prototype.hasOwnProperty.call(collection.properties ?? {}, INCLUDE_COUNT_KEY)) {
             throw ApiError.badRequest(
-                `Cannot serve \`count\` on collection '${collectionName}': it declares a property named ` +
+                `Cannot serve \`count\` on table '${collectionName}': it declares a property named ` +
                 `'${INCLUDE_COUNT_KEY}', which is where the totals would go.`,
                 "INVALID_INCLUDE",
                 { collection: collectionName, field: INCLUDE_COUNT_KEY }
@@ -1253,7 +1253,7 @@ target });
         return idInfoArray.map(info => {
             const column = table[info.fieldName as keyof typeof table] as AnyPgColumn | undefined;
             if (!column) {
-                throw new Error(`ID field '${info.fieldName}' not found in table for collection '${collectionPath}'`);
+                throw new Error(`ID field '${info.fieldName}' not found in table '${collectionPath}'`);
             }
             return column;
         });
@@ -1478,7 +1478,7 @@ target });
         const targetPks = requirePrimaryKeys(hop.targetCollection, this.registry);
         const targetIdColumn = targetTable[targetPks[0].fieldName as keyof typeof targetTable] as AnyPgColumn;
         if (!targetIdColumn) {
-            throw new Error(`ID field '${targetPks[0].fieldName}' not found in table for collection '${hop.targetCollection.slug}'`);
+            throw new Error(`ID field '${targetPks[0].fieldName}' not found in table '${hop.targetCollection.slug}'`);
         }
 
         return DrizzleConditionBuilder.buildRelationScopeCondition(
@@ -1651,7 +1651,7 @@ target });
         const idField = table[idInfo.fieldName as keyof typeof table] as AnyPgColumn;
 
         if (!idField) {
-            throw new Error(`ID field '${idInfo.fieldName}' not found in table for collection '${collectionPath}'`);
+            throw new Error(`ID field '${idInfo.fieldName}' not found in table '${collectionPath}'`);
         }
 
         // ONE read, then relations.
@@ -1750,7 +1750,7 @@ target });
         const keys = primaryKeyColumns(table, requirePrimaryKeys(collection, this.registry), collectionPath);
         const keyNames = keys.map(column => {
             const entry = Object.entries(getTableColumns(table)).find(([, candidate]) => candidate === column);
-            if (!entry) throw new Error(`Key column '${column.name}' not found in table for collection '${collectionPath}'`);
+            if (!entry) throw new Error(`Key column '${column.name}' not found in table '${collectionPath}'`);
             return entry[0];
         });
         const limit = Math.max(1, pageSize);

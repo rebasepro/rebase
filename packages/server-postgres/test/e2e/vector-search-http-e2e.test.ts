@@ -126,7 +126,7 @@ describe("vector search over HTTP (E2E)", () => {
     const sdk = () => createRebaseClient({ baseUrl: plainOrigin, token: "unused-by-this-app" });
 
     it("answers a 1,536-dimension search from the SDK, nearest first", async () => {
-        const result = await sdk().data.collection("docs").find({
+        const result = await sdk().data.table("docs").find({
             vectorSearch: { property: "embedding", vector: embeddingFor(42) },
             limit: 5
         });
@@ -145,7 +145,7 @@ describe("vector search over HTTP (E2E)", () => {
     });
 
     it("thresholded, it reports no total, and `hasMore` from one row past the page", async () => {
-        const docsClient = sdk().data.collection("docs");
+        const docsClient = sdk().data.table("docs");
         const all = await docsClient.find({ vectorSearch: { property: "embedding", vector: embeddingFor(7) }, limit: 30 });
         const distances = all.data.map(row => Number(row._distance));
         // Exactly 12 rows inside the threshold.
@@ -169,7 +169,7 @@ describe("vector search over HTTP (E2E)", () => {
     });
 
     it("counts a thresholded 1,536-dimension search from the SDK, which the same count in the URL cannot", async () => {
-        const docsClient = sdk().data.collection("docs");
+        const docsClient = sdk().data.table("docs");
         const all = await docsClient.find({ vectorSearch: { property: "embedding", vector: embeddingFor(7) }, limit: 30 });
         const distances = all.data.map(row => Number(row._distance));
         const threshold = (distances[11] + distances[12]) / 2;

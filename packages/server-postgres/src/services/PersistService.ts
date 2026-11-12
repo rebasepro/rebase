@@ -515,7 +515,7 @@ export class PersistService {
         const returningKeys: Record<string, AnyPgColumn> = {};
         idInfoArray.forEach(info => {
             const field = table[info.fieldName as keyof typeof table] as AnyPgColumn;
-            if (!field) throw new Error(`Primary key field '${info.fieldName}' not found in table for collection '${effectiveCollectionPath}'`);
+            if (!field) throw new Error(`Primary key field '${info.fieldName}' not found in table '${effectiveCollectionPath}'`);
             returningKeys[info.fieldName] = field;
         });
 

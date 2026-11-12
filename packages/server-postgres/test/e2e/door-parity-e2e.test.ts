@@ -29,7 +29,7 @@ import { Hono } from "hono";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { WebSocket as NodeWebSocket } from "ws";
-import type { CollectionConfig, DataDriver, SDKCollectionClient } from "@rebasepro/types";
+import type { CollectionConfig, DataDriver, SDKTableClient } from "@rebasepro/types";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
 import { PostgresCollectionRegistry } from "../../src/collections/PostgresCollectionRegistry.js";
@@ -274,19 +274,19 @@ describe("door parity: one operation, one answer (E2E)", () => {
         },
         "rest-batch": {
             create: async (id, { values }) => fromHttp(
-                await http("POST", "/_batch", { operations: [{ op: "create", collection: "docs", values: { id, ...values } }] }),
+                await http("POST", "/_batch", { operations: [{ op: "create", table: "docs", values: { id, ...values } }] }),
                 json => ({ row: json.data[0] })
             ),
             update: async (id, { values }) => fromHttp(
-                await http("POST", "/_batch", { operations: [{ op: "update", collection: "docs", id, values }] }),
+                await http("POST", "/_batch", { operations: [{ op: "update", table: "docs", id, values }] }),
                 json => ({ row: json.data[0] })
             ),
             upsert: async (id, { values }) => fromHttp(
-                await http("POST", "/_batch", { operations: [{ op: "upsert", collection: "docs", values: { id, ...values } }] }),
+                await http("POST", "/_batch", { operations: [{ op: "upsert", table: "docs", values: { id, ...values } }] }),
                 json => ({ row: json.data[0] })
             ),
             delete: async (id) =>
-                fromHttp(await http("POST", "/_batch", { operations: [{ op: "delete", collection: "docs", id }] }))
+                fromHttp(await http("POST", "/_batch", { operations: [{ op: "delete", table: "docs", id }] }))
         },
         socket: {
             create: async (id, { values }) => fromFrame(

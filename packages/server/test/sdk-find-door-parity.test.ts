@@ -111,7 +111,7 @@ function overHttp(driver: DataDriver) {
         token: "t",
         fetch: ((input: RequestInfo | URL, init?: RequestInit) =>
             app.request(String(input).replace("http://rebase.test", ""), init)) as typeof fetch
-    }).data.collection("posts");
+    }).data.table("posts");
 }
 
 /**
@@ -183,7 +183,7 @@ describe("find() asks the driver the same thing in-process as over HTTP", () => 
         const local = recordingDriver();
 
         const overWire = await overHttp(http.driver).find(params);
-        const inProcess = await buildSdkData(local.driver).collection("posts").find(params);
+        const inProcess = await buildSdkData(local.driver).table("posts").find(params);
 
         expect(question(local.asked)).toEqual(question(http.asked));
         expect(http.asked.page).toHaveLength(1);
@@ -198,7 +198,7 @@ describe("find() asks the driver the same thing in-process as over HTTP", () => 
 
     it("forwards the vector search itself, not only its count", async () => {
         const { driver, asked } = recordingDriver();
-        await buildSdkData(driver).collection("posts")
+        await buildSdkData(driver).table("posts")
             .vectorSearch("embedding", [0.1, 0.2, 0.3], { distance: "cosine" })
             .limit(2)
             .find();
@@ -214,7 +214,7 @@ describe("find() asks the driver the same thing in-process as over HTTP", () => 
             { vectorSearch: { property: "embedding", vector: [0.1, 0.2, 0.3], threshold: 0.5 }, limit: 2 }
         ] satisfies FindParams[]) {
             const { driver, asked } = recordingDriver();
-            const { meta } = await buildSdkData(driver).collection("posts").find(params);
+            const { meta } = await buildSdkData(driver).table("posts").find(params);
             expect({ params, counts: asked.count.length }).toEqual({ params, counts: 0 });
             // Asked for one row past the page instead, so `hasMore` is still known.
             expect(asked.page[0][1]).toMatchObject({ limit: (params.limit ?? DEFAULT_LIST_LIMIT) + 1 });
@@ -239,7 +239,7 @@ describe("count() counts the same rows in-process as over HTTP", () => {
         const local = recordingDriver();
 
         const overWire = await overHttp(http.driver).count(params);
-        const inProcess = await buildSdkData(local.driver).collection("posts").count!(params);
+        const inProcess = await buildSdkData(local.driver).table("posts").count!(params);
 
         expect(question(local.asked).count).toEqual(question(http.asked).count);
         expect(http.asked.count).toHaveLength(1);

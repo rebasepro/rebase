@@ -100,7 +100,7 @@ const SEGMENT_WITH_COMPANIES: FindParams = {
 
 type SegmentRow = { id: string; companies?: Array<{ id: string }> };
 type ScopedDriver = DataDriver & {
-    data: { collection(slug: string): { find(query: FindParams): Promise<{ data: SegmentRow[] }> } };
+    data: { table(slug: string): { find(query: FindParams): Promise<{ data: SegmentRow[] }> } };
 };
 
 const companyIds = (row: SegmentRow | undefined): string[] =>
@@ -130,7 +130,7 @@ describe("a cron's dataAsAdmin include through an owner-scoped junction (E2E)", 
                 name: "Agent worker",
                 schedule: "* * * * *",
                 async handler({ rebase }) {
-                    const result = await rebase.dataAsAdmin.collection("segments").find(SEGMENT_WITH_COMPANIES);
+                    const result = await rebase.dataAsAdmin.table("segments").find(SEGMENT_WITH_COMPANIES);
                     read = result.data as SegmentRow[];
                 }
             })
@@ -207,7 +207,7 @@ describe("a cron's dataAsAdmin include through an owner-scoped junction (E2E)", 
         // Without this the cron's answer below proves nothing: an unpoliced
         // junction would hand every edge to everyone.
         const stranger = await asUser(STRANGER);
-        const { data } = await stranger.data.collection("segments").find(SEGMENT_WITH_COMPANIES);
+        const { data } = await stranger.data.table("segments").find(SEGMENT_WITH_COMPANIES);
         expect(data).toEqual([]);
     });
 
@@ -219,7 +219,7 @@ describe("a cron's dataAsAdmin include through an owner-scoped junction (E2E)", 
 
     it("returns the same edges to the cron as to the owner's own request", async () => {
         const owner = await asUser(OWNER);
-        const { data } = await owner.data.collection("segments").find(SEGMENT_WITH_COMPANIES);
+        const { data } = await owner.data.table("segments").find(SEGMENT_WITH_COMPANIES);
         const [inCron] = await readInCron();
         expect(companyIds(inCron)).toEqual(companyIds(data[0]));
         expect(companyIds(data[0])).toHaveLength(2);

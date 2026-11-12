@@ -1509,7 +1509,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             const collection = this.registry.getCollectionByPath(request.path);
             if (!collection) {
                 const registered = this.registry.getCollections().map(c => c.slug).join(", ");
-                const msg = `Collection not found: '${request.path}'. Registered: [${registered}]`;
+                const msg = `Table not found: '${request.path}'. Registered: [${registered}]`;
                 logger.error(`[RealtimeService] ${msg}`);
                 this.sendError(clientId, msg, subscriptionId);
                 return;
@@ -1684,7 +1684,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             const collection = this.registry.getCollectionByPath(request.path);
             if (!collection) {
                 const registered = this.registry.getCollections().map(c => c.slug).join(", ");
-                const msg = `Collection not found: '${request.path}'. Registered: [${registered}]`;
+                const msg = `Table not found: '${request.path}'. Registered: [${registered}]`;
                 logger.error(`[RealtimeService] ${msg}`);
                 this.sendError(clientId, msg, subscriptionId);
                 return;

@@ -99,7 +99,7 @@ describe("a request that simulates access", () => {
         ["POST", "/data/posts/bulk", { rows: [{ title: "x" }] }],
         ["PATCH", "/data/posts/bulk", { updates: [{ id: "p1", data: { title: "x" } }] }],
         ["POST", "/data/posts/bulk/delete", { ids: ["p1"] }],
-        ["POST", "/data/_batch", { operations: [{ op: "create", collection: "posts", values: { title: "x" } }] }],
+        ["POST", "/data/_batch", { operations: [{ op: "create", table: "posts", values: { title: "x" } }] }],
         ["POST", "/history/posts/p1/history/h1/revert", undefined],
         ["POST", "/functions/charge", {}]
     ])("refuses %s %s with SIMULATION_READ_ONLY and writes nothing", async (method, path, body) => {

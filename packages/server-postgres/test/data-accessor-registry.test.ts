@@ -1,6 +1,6 @@
 import { describe, it, expect, jest } from "@jest/globals";
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
-import type { CollectionConfig, SDKCollectionClient } from "@rebasepro/types";
+import type { CollectionConfig, SDKTableClient } from "@rebasepro/types";
 import { spiedDrizzle } from "./helpers/spg-a-db";
 import { quietRealtime, registryServing, testUser } from "./helpers/spg-a-driver";
 
@@ -30,7 +30,7 @@ function buildDriver() {
     return { driver, paths, fetchService };
 }
 
-const accessor = (data: unknown, name: string) => (data as Record<string, SDKCollectionClient>)[name];
+const accessor = (data: unknown, name: string) => (data as Record<string, SDKTableClient>)[name];
 
 describe("driver.data resolves accessors through the registry", () => {
     it("reaches `my-notes` as `data.myNotes`", async () => {

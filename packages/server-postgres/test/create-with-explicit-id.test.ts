@@ -105,7 +105,7 @@ afterEach(async () => {
 
 describe("create(values, id) inserts the row under that id", () => {
     it("in-process `data.x.create(values, id)` of a new id inserts it", async () => {
-        const created = await driverOver(db).data.collection("docs").create({ title: "fresh", tenant: "a" }, 999);
+        const created = await driverOver(db).data.table("docs").create({ title: "fresh", tenant: "a" }, 999);
 
         expect(created.id).toBe(999);
         const row = await rowOf(999);

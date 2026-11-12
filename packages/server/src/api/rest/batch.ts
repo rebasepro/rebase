@@ -2,9 +2,9 @@ import { BATCH_REF_KEY } from "@rebasepro/types";
 import { ApiError } from "../errors";
 
 /**
- * Cross-collection writes that land together or not at all.
+ * Cross-table writes that land together or not at all.
  *
- * `/bulk` is one collection at a time, which is the wrong shape for the writes
+ * `/bulk` is one table at a time, which is the wrong shape for the writes
  * that most need atomicity: an order and its line items, a user and their
  * membership row, a document and its audit entry. Sent as separate requests
  * they can half-succeed, and the recovery — read back, work out which half
@@ -33,8 +33,8 @@ export type BatchOp = typeof BATCH_OPS[number];
 /** One operation, after the envelope has been checked but before RLS sees it. */
 export interface ParsedBatchOperation {
     op: BatchOp;
-    /** The collection slug, validated against the collections this API serves. */
-    collection: string;
+    /** The table slug, validated against the tables this API serves. */
+    table: string;
     id?: unknown;
     values?: Record<string, unknown>;
     onConflict?: string[];
@@ -124,7 +124,7 @@ export function resolveBatchRefs(
 export function parseBatchBody(
     body: unknown,
     options: {
-        knownCollections: ReadonlySet<string>;
+        knownTables: ReadonlySet<string>;
         maxOperations: number;
     }
 ): ParsedBatchOperation[] {
@@ -132,7 +132,7 @@ export function parseBatchBody(
 
     if (!Array.isArray(operations)) {
         throw ApiError.badRequest(
-            "Expected a JSON body of { operations: [ { op, collection, … } ] }.",
+            "Expected a JSON body of { operations: [ { op, table, … } ] }.",
             "INVALID_BATCH_BODY"
         );
     }
@@ -160,16 +160,17 @@ export function parseBatchBody(
                 "INVALID_BATCH_BODY"
             );
         }
-        const collection = raw.collection;
-        if (typeof collection !== "string" || collection === "") {
-            throw ApiError.badRequest(`${at} is missing \`collection\`.`, "INVALID_BATCH_BODY");
+        const table = raw.table;
+        if (typeof table !== "string" || table === "") {
+            const renamed = typeof raw.collection === "string" ? " An operation names its table as `table`; `collection` is the old spelling." : "";
+            throw ApiError.badRequest(`${at} is missing \`table\`.${renamed}`, "INVALID_BATCH_BODY");
         }
-        if (!options.knownCollections.has(collection)) {
+        if (!options.knownTables.has(table)) {
             // Named rather than enumerated, for the same reason the unmatched
-            // route does not list the collections: an unauthenticated caller is
+            // route does not list the tables: an unauthenticated caller is
             // refused before routing, and echoing the set back would undo that.
             throw ApiError.badRequest(
-                `${at} names the unknown collection '${collection}'. It is not defined in this backend, ` +
+                `${at} names the unknown table '${table}'. It is not defined in this backend, ` +
                 "or its route is not exposed.",
                 "INVALID_BATCH_BODY"
             );
@@ -219,7 +220,7 @@ export function parseBatchBody(
 
         parsed.push({
             op: op as BatchOp,
-            collection,
+            table,
             id: raw.id,
             values: needsValues ? (raw.values as Record<string, unknown>) : undefined,
             onConflict: raw.onConflict as string[] | undefined,

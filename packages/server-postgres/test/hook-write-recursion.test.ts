@@ -41,7 +41,7 @@ const orders: CollectionConfig = {
         // The mistake: an unconditional write to its own row.
         afterSave: async ({ id, values, context }) => {
             hookRuns += 1;
-            await context.data.collection("orders").update(id, { touched: Number(values.touched ?? 0) + 1 });
+            await context.data.table("orders").update(id, { touched: Number(values.touched ?? 0) + 1 });
         }
     }
 };
@@ -56,7 +56,7 @@ const steps: CollectionConfig = {
     callbacks: {
         afterSave: async ({ values, status, context }) => {
             const n = Number(values.n);
-            if (status === "new" && n < 5) await context.data.collection("steps").create({ n: n + 1 });
+            if (status === "new" && n < 5) await context.data.table("steps").create({ n: n + 1 });
         }
     }
 };

@@ -34,7 +34,7 @@ const callbacks: CollectionCallbacks = {
     afterRead: async ({ row, context }) => {
         hookRuns++;
         try {
-            await context.data.collection("read_log").create({ id: `r${++logId}`, widget: String(row.id) });
+            await context.data.table("read_log").create({ id: `r${++logId}`, widget: String(row.id) });
         } catch (error) {
             refusals.push(String((error as Error).message));
         }

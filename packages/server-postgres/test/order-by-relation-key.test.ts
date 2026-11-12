@@ -180,7 +180,7 @@ describe("orderBy on an owning relation resolves through localKey", () => {
          * exactly that reason, so a sort field answers the same way.
          */
         expect(() => resolve("nonexistent", postsCollection))
-            .toThrow(/Unknown orderBy field 'nonexistent' on collection 'posts'/);
+            .toThrow(/Unknown orderBy field 'nonexistent' on table 'posts'/);
     });
 
     it("names the fields that would have worked", () => {

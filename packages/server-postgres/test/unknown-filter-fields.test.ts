@@ -96,7 +96,7 @@ describe("unknown filter fields", () => {
             expect(thrown).toBeInstanceOf(ApiError);
             expect(thrown!.statusCode).toBe(400);
             expect(thrown!.code).toBe("UNKNOWN_FILTER_FIELD");
-            expect(thrown!.message).toContain("Unknown filter field 'titel' on collection 'posts'");
+            expect(thrown!.message).toContain("Unknown filter field 'titel' on table 'posts'");
             expect(thrown!.message).toContain("authorId");
             expect(thrown!.details).toMatchObject({
                 field: "titel",
@@ -130,7 +130,7 @@ describe("unknown filter fields", () => {
                 },
                 postsTable,
                 "posts"
-            )).toThrow(/Unknown filter field 'nonexistent' on collection 'posts'/);
+            )).toThrow(/Unknown filter field 'nonexistent' on table 'posts'/);
         });
 
         it("throws for an unknown leaf nested two levels deep", () => {

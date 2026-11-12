@@ -247,8 +247,8 @@ describe("deleting a user through the data API", () => {
 
         const res = await send(app, "POST", "/_batch", {
             operations: [
-                { op: "create", collection: "posts", values: { title: "x" } },
-                { op: "delete", collection: "users", id: "admin-1" }
+                { op: "create", table: "posts", values: { title: "x" } },
+                { op: "delete", table: "users", id: "admin-1" }
             ]
         });
 
@@ -263,8 +263,8 @@ describe("deleting a user through the data API", () => {
 
         const res = await send(app, "POST", "/_batch", {
             operations: [
-                { op: "create", collection: "posts", ref: "p", values: { title: "admin-1" } },
-                { op: "delete", collection: "users", id: { $ref: "p.title" } }
+                { op: "create", table: "posts", ref: "p", values: { title: "admin-1" } },
+                { op: "delete", table: "users", id: { $ref: "p.title" } }
             ]
         });
 
@@ -279,14 +279,14 @@ describe("deleting a user through the data API", () => {
 
         const byId = await send(app, "POST", "/_batch", {
             operations: [
-                { op: "create", collection: "posts", ref: "p", values: { title: "admin-1" } },
-                { op: "update", collection: "users", id: { $ref: "p.title" }, values: { roles: ["viewer"] } }
+                { op: "create", table: "posts", ref: "p", values: { title: "admin-1" } },
+                { op: "update", table: "users", id: { $ref: "p.title" }, values: { roles: ["viewer"] } }
             ]
         });
         const byValue = await send(app, "POST", "/_batch", {
             operations: [
-                { op: "create", collection: "posts", ref: "p", values: { title: "Taken@Example.COM" } },
-                { op: "update", collection: "users", id: "editor-1", values: { email: { $ref: "p.title" } } }
+                { op: "create", table: "posts", ref: "p", values: { title: "Taken@Example.COM" } },
+                { op: "update", table: "users", id: "editor-1", values: { email: { $ref: "p.title" } } }
             ]
         });
 
@@ -302,8 +302,8 @@ describe("deleting a user through the data API", () => {
 
         const res = await send(app, "POST", "/_batch", {
             operations: [
-                { op: "create", collection: "users", ref: "u", values: { email: "n@e.w" } },
-                { op: "update", collection: "posts", id: "1", values: { title: { $ref: "u.email" } } }
+                { op: "create", table: "users", ref: "u", values: { email: "n@e.w" } },
+                { op: "update", table: "posts", id: "1", values: { title: { $ref: "u.email" } } }
             ]
         });
 
@@ -381,7 +381,7 @@ describe("updating a user through the data API", () => {
         const { app, writes } = harness({ admins: ["admin-1"] });
 
         await send(app, "PATCH", "/users/bulk", { updates: [{ id: "editor-1", data: { email: "A@B.C" } }] });
-        await send(app, "POST", "/_batch", { operations: [{ op: "update", collection: "users", id: "editor-2", values: { email: "D@E.F" } }] });
+        await send(app, "POST", "/_batch", { operations: [{ op: "update", table: "users", id: "editor-2", values: { email: "D@E.F" } }] });
 
         const [[, bulk], [, batch]] = writes();
         expect((bulk.updates as { values: Record<string, unknown> }[])[0].values.email).toBe("a@b.c");
@@ -509,8 +509,8 @@ describe("creating users through the data API's bulk doors", () => {
 
         const res = await send(app, "POST", "/_batch", {
             operations: [
-                { op: "create", collection: "posts", values: { title: "Mixed Case" } },
-                { op: "create", collection: "users", values: { email: "New@Example.COM", displayName: "N" } }
+                { op: "create", table: "posts", values: { title: "Mixed Case" } },
+                { op: "create", table: "users", values: { email: "New@Example.COM", displayName: "N" } }
             ]
         });
 
@@ -531,8 +531,8 @@ describe("creating users through the data API's bulk doors", () => {
 
         const res = await send(app, "POST", "/_batch", {
             operations: [
-                { op: "create", collection: "users", values: { email: "n@e.w" } },
-                { op: "delete", collection: "users", id: "admin-1" }
+                { op: "create", table: "users", values: { email: "n@e.w" } },
+                { op: "delete", table: "users", id: "admin-1" }
             ]
         });
 
@@ -545,7 +545,7 @@ describe("creating users through the data API's bulk doors", () => {
         const { app, sent } = harness({ admins: ["admin-1"], email: true, failWrites: true });
 
         const res = await send(app, "POST", "/_batch", {
-            operations: [{ op: "create", collection: "users", values: { email: "a@b.c", displayName: "A" } }]
+            operations: [{ op: "create", table: "users", values: { email: "a@b.c", displayName: "A" } }]
         });
 
         expect(res.status).toBe(500);
@@ -566,7 +566,7 @@ describe("an upsert on the users collection", () => {
     it.each([
         ["POST /bulk", "POST", "/users/bulk", { rows: [{ id: "admin-1", email: "a@b.c", displayName: "A", roles: ["viewer"] }], upsert: true }],
         ["POST /bulk on a unique key", "POST", "/users/bulk", { rows: [{ email: "a@b.c", displayName: "A", roles: ["viewer"] }], upsert: true, onConflict: ["email"] }],
-        ["_batch", "POST", "/_batch", { operations: [{ op: "upsert", collection: "users", id: "admin-1", values: { email: "a@b.c", displayName: "A", roles: ["viewer"] } }] }],
+        ["_batch", "POST", "/_batch", { operations: [{ op: "upsert", table: "users", id: "admin-1", values: { email: "a@b.c", displayName: "A", roles: ["viewer"] } }] }],
         ["POST ?on_conflict", "POST", "/users?on_conflict=email", { email: "a@b.c", displayName: "A", roles: ["viewer"] }]
     ])("is refused through %s, before anything is written", async (_door, method, path, body) => {
         const { app, writes } = harness({ admins: ["admin-1"] });

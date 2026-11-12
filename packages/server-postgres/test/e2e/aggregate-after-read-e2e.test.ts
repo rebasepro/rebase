@@ -139,9 +139,9 @@ describe("aggregates on a collection afterRead masks (E2E)", () => {
 
     it("the in-process SDK refuses too, and counts", async () => {
         const data = buildSdkData(driver);
-        await expect(data.collection("customers").aggregate({ select: [{ fn: "max", field: "email" }] }))
+        await expect(data.table("customers").aggregate({ select: [{ fn: "max", field: "email" }] }))
             .rejects.toMatchObject({ code: "AGGREGATE_MASKED_BY_AFTER_READ" });
-        await expect(data.collection("customers").aggregate({ select: [{ fn: "count" }] }))
+        await expect(data.table("customers").aggregate({ select: [{ fn: "count" }] }))
             .resolves.toEqual([{ count: 2 }]);
     });
 });

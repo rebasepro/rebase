@@ -130,7 +130,7 @@ describe("aggregates on a collection an afterRead callback rewrites", () => {
 
     it("refuses through the in-process SDK (`context.data`)", async () => {
         const driver = driverOver(registry());
-        const accessor = driver.data.collection("customers");
+        const accessor = driver.data.table("customers");
         await expect(accessor.aggregate({ select: [{ fn: "sum", field: "salary" }] })).rejects.toEqual(refusal);
         await expect(accessor.aggregate({ select: [{ fn: "count" }], groupBy: ["email"] })).rejects.toEqual(refusal);
         await expect(accessor.aggregate({ select: [{ fn: "count" }] })).resolves.toEqual([{ count: 3 }]);

@@ -442,7 +442,7 @@ function assertKnownCollection(
     if (!registry || typeof path !== "string") return;
     const root = path.split("/").find(segment => segment !== "");
     if (root !== undefined && !registry.getCollectionByPath(root)) {
-        throw ApiError.notFound(`Unknown collection '${root}'.`);
+        throw ApiError.notFound(`Unknown table '${root}'.`);
     }
 }
 

@@ -304,7 +304,7 @@ export function createHistoryRoutes(params: {
             ? await scoped.restFetchService.fetchOneForRest(collection.slug, id, undefined, undefined, { withDeleted: true }) ?? undefined
             : await scoped.fetchOne({ path: collection.slug, id, collection, withDeleted: true });
         if (!row) {
-            throw ApiError.notFound(`Entity '${id}' not found in collection '${collection.slug}'`);
+            throw ApiError.notFound(`Entity '${id}' not found in table '${collection.slug}'`);
         }
         return row;
     }
@@ -337,11 +337,11 @@ export function createHistoryRoutes(params: {
         );
 
         if (!collection) {
-            throw ApiError.notFound(`Collection '${slug}' not found`);
+            throw ApiError.notFound(`Table '${slug}' not found`);
         }
 
         if (!collection.history) {
-            throw ApiError.badRequest(`History is not enabled for collection '${slug}'`);
+            throw ApiError.badRequest(`History is not enabled for table '${slug}'`);
         }
 
         await authorizeEntityRead(c, collection, id);
@@ -387,11 +387,11 @@ export function createHistoryRoutes(params: {
         );
 
         if (!collection) {
-            throw ApiError.notFound(`Collection '${slug}' not found`);
+            throw ApiError.notFound(`Table '${slug}' not found`);
         }
 
         if (!collection.history) {
-            throw ApiError.badRequest(`History is not enabled for collection '${slug}'`);
+            throw ApiError.badRequest(`History is not enabled for table '${slug}'`);
         }
 
         // Before looking the entry up at all: the lookup is by history id alone,

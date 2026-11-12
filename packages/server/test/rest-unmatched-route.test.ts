@@ -58,7 +58,7 @@ async function request(path: string, method = "GET"): Promise<{
 }
 
 describe("an unmatched path under /api/data", () => {
-    it("answers a missing collection with the JSON error envelope", async () => {
+    it("answers a missing table with the JSON error envelope", async () => {
         const res = await request("/api/data/nonexistent");
 
         expect(res.status).toBe(404);
@@ -70,12 +70,12 @@ describe("an unmatched path under /api/data", () => {
         expect(parsed.error.message).toContain("nonexistent");
     });
 
-    it("names the collection rather than describing the shape of the URL", async () => {
+    it("names the table rather than describing the shape of the URL", async () => {
         const parsed = JSON.parse((await request("/api/data/pots")).body);
         expect(parsed.error.message).toContain("'pots'");
     });
 
-    it("does not enumerate the other collections", async () => {
+    it("does not enumerate the other tables", async () => {
         // Unauthenticated, this same URL is answered 401 before routing, on
         // purpose. Echoing every slug back would undo that for any signed-in
         // caller — a different guarantee from UNKNOWN_FILTER_FIELD, which
@@ -85,13 +85,13 @@ describe("an unmatched path under /api/data", () => {
         expect(body).not.toContain("posts");
     });
 
-    it("distinguishes an unknown collection from an unsupported method on a real one", async () => {
+    it("distinguishes an unknown table from an unsupported method on a real one", async () => {
         const unknown = JSON.parse((await request("/api/data/nonexistent")).body);
-        expect(unknown.error.message).toContain("Unknown collection");
+        expect(unknown.error.message).toContain("Unknown table");
 
         const known = JSON.parse((await request("/api/data/users", "PATCH")).body);
         expect(known.error.code).toBe("NOT_FOUND");
-        expect(known.error.message).not.toContain("Unknown collection");
+        expect(known.error.message).not.toContain("Unknown table");
         expect(known.error.message).toContain("users");
     });
 

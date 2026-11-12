@@ -885,7 +885,7 @@ export class DrizzleConditionBuilder {
         collection: CollectionConfig | undefined
     ): undefined {
         if (mode === "warn") {
-            logger.warn(`Filtering by field '${field}', but it does not exist in table for collection '${collectionPath}'`);
+            logger.warn(`Filtering by field '${field}', but it does not exist in table '${collectionPath}'`);
             return undefined;
         }
 
@@ -927,7 +927,7 @@ export class DrizzleConditionBuilder {
 
         if (relation.kind === "via") {
             throw ApiError.badRequest(
-                `Cannot filter by '${field}' on collection '${collectionPath}': '${path.relationKey}' is a ` +
+                `Cannot filter by '${field}' on table '${collectionPath}': '${path.relationKey}' is a ` +
                 "`via` relation, whose join path is authored one way only, so there is nothing to correlate " +
                 "a subquery back to.",
                 "UNSUPPORTED_RELATION_FILTER",
@@ -1263,7 +1263,7 @@ export class DrizzleConditionBuilder {
             if (!targetTable) {
                 throw new Error(
                     `Table not found for the target of relation '${relation.relationName}' ` +
-                    `(collection '${targetCollection.slug}')`
+                    `(table '${targetCollection.slug}')`
                 );
             }
             const fkColumn = relationColumn(targetTable, targetCollection, relation.foreignKeyOnTarget);
@@ -1386,7 +1386,7 @@ export class DrizzleConditionBuilder {
                 return isNullish ? { negate: true } : { predicate: inList(), negate: false };
             default:
                 throw ApiError.badRequest(
-                    `Operator '${op}' cannot be applied to relation field '${field}' on collection ` +
+                    `Operator '${op}' cannot be applied to relation field '${field}' on table ` +
                     `'${collectionPath}'. A relation with no column on this row is filtered by ` +
                     "membership: ==, !=, in, not-in, array-contains, array-contains-any, is-null, " +
                     "is-not-null.",
@@ -1603,7 +1603,7 @@ export class DrizzleConditionBuilder {
                 const operand = patternOperand(column, ref);
                 if (!operand) {
                     throw ApiError.badRequest(
-                        `Operator '${op}' cannot be applied to '${field}' on collection '${collectionPath}': ` +
+                        `Operator '${op}' cannot be applied to '${field}' on table '${collectionPath}': ` +
                         `'${column.name}' is ${column.getSQLType?.() ?? "not a text column"}, and pattern ` +
                         "matching is only defined on text.",
                         "UNSUPPORTED_RELATION_FILTER_OPERATOR",
@@ -1681,7 +1681,7 @@ export class DrizzleConditionBuilder {
             : resolveCollectionRelations(collection)[spec.relation];
         if (!relation) {
             throw ApiError.badRequest(
-                `Cannot sort by '${encodeRelationAggregateSort(spec)}' on collection '${collectionPath}': ` +
+                `Cannot sort by '${encodeRelationAggregateSort(spec)}' on table '${collectionPath}': ` +
                 `'${spec.relation}' is not a relation there.`,
                 "UNKNOWN_ORDER_BY_FIELD",
                 { field: encodeRelationAggregateSort(spec), collection: collectionPath, relation: spec.relation }
@@ -1689,7 +1689,7 @@ export class DrizzleConditionBuilder {
         }
         if (relation.kind === "via") {
             throw ApiError.badRequest(
-                `Cannot sort by '${encodeRelationAggregateSort(spec)}' on collection '${collectionPath}': ` +
+                `Cannot sort by '${encodeRelationAggregateSort(spec)}' on table '${collectionPath}': ` +
                 "`via` relations are authored one way only, so there is nothing to correlate a subquery back to.",
                 "ORDER_BY_FIELD_NOT_SORTABLE",
                 { field: encodeRelationAggregateSort(spec), collection: collectionPath, kind: relation.kind }
@@ -1719,7 +1719,7 @@ export class DrizzleConditionBuilder {
                 const validFields = listedColumnKeys(targetTable, targetCollection);
                 throw ApiError.badRequest(
                     `Unknown field '${spec.field}' on '${targetCollection.slug}', the target of relation ` +
-                    `'${spec.relation}' on collection '${collectionPath}'` +
+                    `'${spec.relation}' on table '${collectionPath}'` +
                     (validFields.length > 0 ? `. Valid fields: ${validFields.join(", ")}` : ""),
                     "UNKNOWN_ORDER_BY_FIELD",
                     {

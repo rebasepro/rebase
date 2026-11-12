@@ -2841,8 +2841,8 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         const emptyDataStub = new Hono<HonoEnv>();
         const emptyDataAnswer = {
             error: {
-                message: `This project serves no collections yet. ${noCollectionsCause(unprotectedTables)}`,
-                code: "NO_COLLECTIONS",
+                message: `This project serves no tables yet. ${noCollectionsCause(unprotectedTables)}`,
+                code: "NO_TABLES",
                 ...(unprotectedTables.length > 0 && {
                     details: { unprotectedTables: unprotectedTables.map(({ schema, table }) => `${schema}.${table}`) }
                 })
@@ -4122,7 +4122,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         if (surfaces.data) {
             app.route(`${basePath}/data`, groups.data());
             if (announce && activeCollections.length === 0) {
-                logger.info("No collections to serve — /data returns 404 NO_COLLECTIONS");
+                logger.info("No tables to serve — /data returns 404 NO_TABLES");
             }
             // ── OpenAPI / Swagger ─────────────────────────────────────────
             // Follows the data surface: the document describes the collection

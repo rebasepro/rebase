@@ -20,7 +20,7 @@ const NAMED_TABLES = 10;
 export function noCollectionsCause(unprotected: readonly { schema: string; table: string }[]): string {
     if (unprotected.length === 0) {
         return "It declares none in code, and the database has no tables to derive them from. " +
-            "Create tables — a migration, SQL, or a collection file plus `rebase db push` — and restart.";
+            "Create tables — a migration, SQL, or a table in backend/schema plus `rebase db push` — and restart.";
     }
     const names = unprotected.slice(0, NAMED_TABLES).map(({ schema, table }) => `${schema}.${table}`);
     const rest = unprotected.length - names.length;

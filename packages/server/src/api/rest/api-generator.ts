@@ -317,14 +317,14 @@ export class RestApiGenerator {
      */
     private createBatchRoute(): void {
         const bySlug = new Map(this.collections.map(collection => [collection.slug, collection]));
-        const knownCollections = new Set(bySlug.keys());
+        const knownTables = new Set(bySlug.keys());
 
         this.router.post("/_batch", async (c) => {
             const driver = this.getScopedDriver(c);
             const body = await parseJsonBody(c) as { operations?: unknown };
 
             const operations = parseBatchBody(body, {
-                knownCollections,
+                knownTables,
                 // The same cap as a bulk write, and for the same reason: one
                 // batch is one transaction and holds its locks for the whole of
                 // it, so an unbounded one is a self-inflicted outage.
@@ -337,8 +337,8 @@ export class RestApiGenerator {
 
             if (!driver.batchWrite) {
                 throw ApiError.badRequest(
-                    "This backend's data driver does not support cross-collection batches. " +
-                    "Send the writes as separate requests, or per-collection /bulk calls.",
+                    "This backend's data driver does not support cross-table batches. " +
+                    "Send the writes as separate requests, or per-table /bulk calls.",
                     "BATCH_UNSUPPORTED"
                 );
             }
@@ -356,10 +356,10 @@ export class RestApiGenerator {
             operations.forEach((operation, index) => {
                 this.enforceApiKeyPermission(
                     { get: c.get, req: { method: operation.op === "delete" ? "DELETE" : "POST" } },
-                    operation.collection,
+                    operation.table,
                     operation.op === "delete" ? "delete" : "write"
                 );
-                const collection = bySlug.get(operation.collection)!;
+                const collection = bySlug.get(operation.table)!;
                 if (operation.op === "upsert") assertNoUserUpsert(this.authAdapter, collection, `Operation ${index}`);
                 this.assertNoUserAdministrationRef(collection, operation, index);
                 if (!operation.values) return;
@@ -403,7 +403,7 @@ export class RestApiGenerator {
                 const userDeletes: string[] = [];
                 let usersCollection: CollectionConfig | undefined;
                 for (const operation of operations) {
-                    const collection = bySlug.get(operation.collection)!;
+                    const collection = bySlug.get(operation.table)!;
                     if (!isAuthCollection(collection) || operation.id === undefined) continue;
                     usersCollection = collection;
                     if (operation.op === "update" && operation.values) userUpdates.push(operation);
@@ -429,10 +429,10 @@ export class RestApiGenerator {
                     return driver.batchWrite!({
                         operations: operations.map((operation: ParsedBatchOperation) => ({
                             op: operation.op,
-                            path: getCollectionDataPath(bySlug.get(operation.collection)!),
+                            path: getCollectionDataPath(bySlug.get(operation.table)!),
                             id: operation.id,
                             values: operation.values,
-                            collection: bySlug.get(operation.collection),
+                            collection: bySlug.get(operation.table),
                             onConflict: operation.onConflict,
                             ref: operation.ref
                         }))
@@ -462,7 +462,7 @@ export class RestApiGenerator {
                 c.header("Preference-Applied", "return=minimal");
                 return c.json({
                     data: rows.map((row, index) =>
-                        row ? rowIdentity(row, bySlug.get(operations[index].collection)!) : null),
+                        row ? rowIdentity(row, bySlug.get(operations[index].table)!) : null),
                     meta: (result as { meta?: unknown })?.meta
                 });
             };
@@ -611,13 +611,13 @@ export class RestApiGenerator {
         this.router.all("/:slug{.*}", (c) => {
             const slug = (c.req.param("slug") ?? "").split("/")[0];
             if (!slug) {
-                throw notFound("No collection in the request path. Expected /api/data/<collection>.");
+                throw notFound("No table in the request path. Expected /api/data/<table>.");
             }
             if (known.has(slug)) {
-                throw notFound(`No ${c.req.method} route on collection '${slug}' at this path.`);
+                throw notFound(`No ${c.req.method} route on table '${slug}' at this path.`);
             }
             throw notFound(
-                `Unknown collection '${slug}'. It is not defined in this backend, `
+                `Unknown table '${slug}'. It is not defined in this backend, `
                 + "or its route is not exposed."
             );
         });
@@ -732,7 +732,7 @@ export class RestApiGenerator {
             throw new ApiError(
                 404,
                 "NOT_FOUND",
-                `Unknown collection '${segments[0]}'. It is not defined in this backend, `
+                `Unknown table '${segments[0]}'. It is not defined in this backend, `
                 + "or its route is not exposed.",
                 undefined,
                 true

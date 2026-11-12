@@ -18,7 +18,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { collectionsToTableDefs, compileTables, toCollectionAccessor, type AnySchemaDef } from "@rebasepro/common";
+import { collectionsToTableDefs, compileTables, toTableAccessor, type AnySchemaDef } from "@rebasepro/common";
 import { generateTypedefs } from "@rebasepro/codegen";
 import {
     isPostgresCollectionConfig,
@@ -141,7 +141,7 @@ describe("sdk equivalence: generateTypedefs(compileTables(collectionsToTableDefs
             const differences = compareSdk(golden, generated).filter(difference =>
                 !(difference.kind === "removed" && difference.key !== undefined
                     && removed.some(entry => entry.table === difference.table && entry.keys.includes(difference.key ?? ""))));
-            const byAccessor = new Map(tables.map(table => [toCollectionAccessor(table.slug), table]));
+            const byAccessor = new Map(tables.map(table => [toTableAccessor(table.slug), table]));
             const { unexplained, used: rules } = unexplainedDifferences(differences, byAccessor);
             for (const rule of rules) used.add(rule);
             if (unexplained.length > 0) failures.push({ set: set.id, unexplained });

@@ -41,7 +41,7 @@ export function assertCollectionWritable(collection: CollectionConfig | undefine
     if (!isViewCollection(collection)) return;
     throw new ApiError(
         405,
-        "COLLECTION_READ_ONLY",
+        "TABLE_READ_ONLY",
         `"${collection?.slug ?? path}" serves a SQL view, which is read-only: write to the tables it reads.`,
         { collection: collection?.slug ?? path },
         true

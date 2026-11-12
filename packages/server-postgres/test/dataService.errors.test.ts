@@ -114,7 +114,7 @@ dataType: "number" },
 
             await expect(
                 dataService.fetchOne("test", 1)
-            ).rejects.toThrow("Table not found for collection");
+            ).rejects.toThrow("Table not found for '");
         });
 
 
@@ -270,7 +270,7 @@ name: "Root row" }]);
             // "no rows".
             await expect(
                 dataService.fetchCollection("test/1/missing_relation", {})
-            ).rejects.toThrow("Relation 'missing_relation' not found in collection 'test'");
+            ).rejects.toThrow("Relation 'missing_relation' not found in table 'test'");
         });
 
         it("should reject empty path segments", async () => {

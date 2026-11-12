@@ -162,7 +162,7 @@ async function createProducts(db: PGlite, collection: CollectionConfig): Promise
     expect({ status: response.status, error: body.error?.message }).toEqual({ status: 201, error: undefined });
     expect(String(body.id)).toMatch(UUID);
 
-    const viaSdk = await client.data.collection(collection.slug).create({ name: "Gadget", price: 5 });
+    const viaSdk = await client.data.table(collection.slug).create({ name: "Gadget", price: 5 });
     expect(String(viaSdk.id)).toMatch(UUID);
     expect(viaSdk.id).not.toBe(body.id);
 

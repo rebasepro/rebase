@@ -5,7 +5,7 @@
  * The type said `RebaseClient`, `data` included. The object is the server
  * singleton, which has had no `data` since the admin plane was given one name
  * (`dataAsAdmin`), and the driver passed it through a cast. So
- * `context.client.data.collection(...)` compiled and threw "Cannot read
+ * `context.client.data.table(...)` compiled and threw "Cannot read
  * properties of undefined" in production: the saas control plane's stop/start
  * hooks read through it, flipped the project's status and paused nothing
  * (found 2026-09-13). Its test fixture modelled `client: { data }` — the shape
@@ -68,7 +68,7 @@ const callbacks: CollectionCallbacks = {
         seen.push(context);
         // The accessor a callback's queries are meant to use, on the write's
         // own transaction.
-        await context.data.collection("widgets").find();
+        await context.data.table("widgets").find();
         if (readsClient) void context.client.functions;
         return values;
     }
@@ -142,7 +142,7 @@ describe("a collection callback's `context.client`, on a booted server", () => {
     it("agrees with its type about `data` on a write through `rebase.dataAsAdmin`", async () => {
         await boot();
 
-        await rebase.dataAsAdmin.collection("widgets").create({ id: "w1", name: "one" });
+        await rebase.dataAsAdmin.table("widgets").create({ id: "w1", name: "one" });
 
         expect(seen).toHaveLength(1);
         const { client } = seen[0];

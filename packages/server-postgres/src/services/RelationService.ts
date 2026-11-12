@@ -704,7 +704,7 @@ export class RelationService {
             // point means the caller could already read the parent collection,
             // and `?include=` would list the same names.
             throw ApiError.notFound(
-                `Relation '${relationKey}' not found in collection '${parentCollectionPath}'. Available relations: [${available}]`,
+                `Relation '${relationKey}' not found in table '${parentCollectionPath}'. Available relations: [${available}]`,
                 "UNKNOWN_RELATION"
             );
         }
@@ -905,7 +905,7 @@ export class RelationService {
             // point means the caller could already read the parent collection,
             // and `?include=` would list the same names.
             throw ApiError.notFound(
-                `Relation '${relationKey}' not found in collection '${parentCollectionPath}'. Available relations: [${available}]`,
+                `Relation '${relationKey}' not found in table '${parentCollectionPath}'. Available relations: [${available}]`,
                 "UNKNOWN_RELATION"
             );
         }
@@ -1033,7 +1033,7 @@ export class RelationService {
         const identity: SQL[] = targetPks.map(pk => {
             const column = targetTable[pk.fieldName as keyof typeof targetTable] as AnyPgColumn;
             if (!column) {
-                throw new Error(`ID field '${pk.fieldName}' not found in table for collection '${hop.targetCollection.slug}'`);
+                throw new Error(`ID field '${pk.fieldName}' not found in table '${hop.targetCollection.slug}'`);
             }
             return eq(column, parsedTargetId[pk.fieldName]);
         });

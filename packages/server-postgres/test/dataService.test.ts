@@ -1046,7 +1046,7 @@ status: "active" }
 
             await expect(
                 dataService.fetchOne("users", 1)
-            ).rejects.toThrow("Table not found for collection");
+            ).rejects.toThrow("Table not found for '");
         });
 
         it("reports an id no row could have as no row, not as an error", async () => {

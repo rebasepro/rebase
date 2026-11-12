@@ -89,7 +89,7 @@ export function resolveNestedPath(
             // point means the caller could already read the parent collection,
             // and `?include=` would list the same names.
             throw ApiError.notFound(
-                `Relation '${relationKey}' not found in collection '${parentCollection.slug}'. Available relations: [${available}]`,
+                `Relation '${relationKey}' not found in table '${parentCollection.slug}'. Available relations: [${available}]`,
                 "UNKNOWN_RELATION"
             );
         }
