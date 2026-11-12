@@ -21,6 +21,9 @@ const RENAMED = {
     "server-core": "server",
     "server-postgresql": "server-postgres",
     "server-mongodb": "server-postgres (MongoDB support was removed)",
+    // 0.31: the second MongoDB driver package was retired with the rest of
+    // MongoDB support. Postgres is the one backend database.
+    "server-mongo": "server-postgres (MongoDB support was removed in 0.31)",
     "client-postgresql": "client-postgres",
     "client-firebase": "firebase",
     "plugin-data-enhancement": "plugin-ai",
@@ -58,6 +61,7 @@ const BARE = new Set([
     "server-core",
     "server-postgresql",
     "server-mongodb",
+    "server-mongo",
     "client-postgresql",
     "client-firebase",
     "plugin-data-enhancement",
@@ -148,6 +152,10 @@ const SKIP_FILES = new Set([
     "website/public/llms.txt",
     "tooling/scripts/headless-guard/check-package-names.mjs",
     "tooling/scripts/deprecate-old-packages.sh",
+    // The plan that retires `server-mongo` in 0.31: its Phase 1 is the removal,
+    // and it cannot describe the removal without the name, any more than an
+    // upgrade page can.
+    "docs/plans/POSTGRES-FIRST.md",
     // A dated post narrating a debugging session, quoting the commands that
     // were actually typed during it — at a time when `@rebasepro/admin` was
     // the package's real name. Rewriting the quoted grep to today's name would
