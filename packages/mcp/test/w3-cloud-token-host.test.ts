@@ -92,7 +92,7 @@ describe("a cloud project's bearer", () => {
 
         const switched = await call("rebase_project_switch", { name: "cloud:alpha" });
         expect(switched.isError).toBeFalsy();
-        const listed = await call("list_documents", { collection: "posts" });
+        const listed = await call("query_table", { table: "posts" });
         expect(listed.isError, listed.content[0].text).toBeFalsy();
 
         const toAlpha = created.filter((c) => c.baseUrl.startsWith(HOST_A));
@@ -106,7 +106,7 @@ describe("a cloud project's bearer", () => {
         const fetchMock = vi.fn(async (_url: string, _init: RequestInit) => new Response(JSON.stringify({ statements: [] }), { status: 200 }));
         vi.stubGlobal("fetch", fetchMock);
 
-        const planned = await call("rebase_schema_plan", { collectionId: "posts", collection: { slug: "posts" } });
+        const planned = await call("rebase_schema_plan", { patches: [{ op: "removeColumn", table: "posts", key: "subtitle" }] });
 
         expect(planned.isError, planned.content[0].text).toBeFalsy();
         const [url, init] = fetchMock.mock.calls[0];

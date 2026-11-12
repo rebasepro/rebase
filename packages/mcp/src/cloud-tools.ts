@@ -450,7 +450,7 @@ export function cloudSuccessNext(tool: CloudCommandTool, call: CloudCall): strin
             return "The rollback is a new deployment. rebase_cloud_status shows when it is live; rebase_cloud_logs with `source: \"build\"` shows its progress.";
         case "rebase_cloud_projects_list":
             return "Every project in every organization the signed-in account belongs to. rebase_project_use_cloud with a project's " +
-                "`id` or `slug` points the data and admin tools (list_documents, get_document, list_users, cron_list_jobs…) at its " +
+                "`id` or `slug` points the data and admin tools (query_table, get_row, list_users, cron_list_jobs…) at its " +
                 "production backend, through the console's Studio proxy with the same login: no service key is needed or shown.";
     }
 }

@@ -21,7 +21,7 @@ import path from "node:path";
 const GROUPS = [
     { const: "CLI_TOOLS", title: "Schema & database", note: "Spawn the Rebase CLI in the active project directory." },
     { const: "SCHEMA_TOOLS", title: "Schema planning", note: "Ask the backend what a change would do. No CLI, no files written." },
-    { const: "DATA_TOOLS", title: "Documents", note: "CRUD over a collection through `@rebasepro/client`." },
+    { const: "DATA_TOOLS", title: "Rows", note: "Read and write the rows of a table through `@rebasepro/client` (`data.table(slug)`)." },
     { const: "ADMIN_TOOLS", title: "Users & roles", note: "" },
     { const: "DEV_TOOLS", title: "Dev server", note: "" },
     { const: "STORAGE_TOOLS", title: "Storage", note: "" },

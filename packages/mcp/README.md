@@ -101,13 +101,13 @@ Spawn the Rebase CLI in the active project directory.
 
 | Tool | Required | Description |
 |---|---|---|
-| `rebase_schema_generate` | — | Generate Drizzle schema from Rebase TypeScript collection definitions |
+| `rebase_schema_generate` | — | Generate the Drizzle schema (schema.generated.ts) from the project's table definitions in backend/schema |
 | `rebase_db_push` ⚠ | — | Apply the current Drizzle schema directly to the database (development shortcut, skips migration files) |
-| `rebase_schema_introspect` | — | Introspect the live database and generate Rebase collection definitions from existing tables |
+| `rebase_schema_introspect` | — | Read the live database and write a defineTable definition into backend/schema for each table it holds (tables without row-level security are refused) |
 | `rebase_db_generate` | — | Generate SQL migration files from schema changes (compares current Drizzle schema against the last entity) |
 | `rebase_db_migrate` ⚠ | — | Run all pending SQL migrations against the database |
-| `rebase_generate_sdk` | — | Generate a fully-typed JavaScript/TypeScript SDK from collection definitions |
-| `rebase_doctor` | — | Detect schema drift between collection definitions, generated Drizzle schema, and the live PostgreSQL database |
+| `rebase_generate_sdk` | — | Generate a fully-typed JavaScript/TypeScript SDK from the project's table definitions |
+| `rebase_doctor` | — | Detect schema drift between the table definitions in backend/schema, the generated Drizzle schema, and the live PostgreSQL database |
 | `rebase_db_branch_create` ⚠ | `name` | Create a new database branch (Admins only) |
 | `rebase_db_branch_list` | — | List all database branches (Admins only) |
 | `rebase_db_branch_delete` ⚠ | `name` | Delete an existing database branch (Admins only) |
@@ -121,19 +121,19 @@ Ask the backend what a change would do. No CLI, no files written.
 
 | Tool | Required | Description |
 |---|---|---|
-| `rebase_schema_plan` | `collectionId`, `collection` | Show the SQL a collection change would run, without running any of it |
+| `rebase_schema_plan` | `patches` | Show the SQL a change to the project's tables would run, without running any of it |
 
-### Documents (5)
+### Rows (5)
 
-CRUD over a collection through `@rebasepro/client`.
+Read and write the rows of a table through `@rebasepro/client` (`data.table(slug)`).
 
 | Tool | Required | Description |
 |---|---|---|
-| `list_documents` | `collection` | List documents from a Rebase collection with optional filtering, sorting, and pagination |
-| `get_document` | `collection`, `id` | Get a single document by ID from a Rebase collection |
-| `create_document` ⚠ | `collection`, `data` | Create a new document in a Rebase collection |
-| `update_document` ⚠ | `collection`, `id`, `data` | Update an existing document in a Rebase collection |
-| `delete_document` ⚠ | `collection`, `id` | Delete a document from a Rebase collection |
+| `query_table` | `table` | Read rows from a table of the project's Postgres database, with optional filtering, sorting and paging, as the SDK's `data.table(name).find()` does |
+| `get_row` | `table`, `id` | Read one row of a table by its id |
+| `create_row` ⚠ | `table`, `data` | Add a row to a table |
+| `update_row` ⚠ | `table`, `id`, `data` | Change columns on an existing row of a table; only the columns given are touched |
+| `delete_row` ⚠ | `table`, `id` | Delete a row of a table by its id |
 
 ### Users & roles (6)
 
@@ -184,7 +184,7 @@ CRUD over a collection through `@rebasepro/client`.
 |---|---|---|
 | `rebase_project_list` | — | List all registered Rebase projects and show which one is active |
 | `rebase_project_switch` | `name` | Switch the active Rebase project by name |
-| `rebase_project_use_cloud` | `project` | Point the data and admin tools (list_documents, get_document, list_users, list_roles, cron_list_jobs, storage_list_objects…) at a Rebase Cloud project's production backend, by its id, slug or name — any project the signed-in account can reach, linked here or not |
+| `rebase_project_use_cloud` | `project` | Point the data and admin tools (query_table, get_row, list_users, list_roles, cron_list_jobs, storage_list_objects…) at a Rebase Cloud project's production backend, by its id, slug or name — any project the signed-in account can reach, linked here or not |
 | `rebase_project_add` | `name` | Register a new Rebase project |
 | `rebase_project_remove` | `name` | Remove a registered project from the project registry |
 | `rebase_project_current` | — | Show details about the currently active Rebase project, including resolved URL and auth status |
@@ -196,7 +196,7 @@ Spawn `rebase cloud … --json` in the active project directory, against the pro
 
 | Tool | Required | Description |
 |---|---|---|
-| `rebase_cloud_provision` | — | Give the active project a live backend on Rebase Cloud with no account or signup: provisions a project, sets REBASE_BASE_URL in .env, links the directory and deploys the local collections to it (`rebase cloud init --claim`), then sets REBASE_API_TOKEN in .env: a key the deployed app accepts, for reading and writing data through its row-level security, expiring with the claim window |
+| `rebase_cloud_provision` | — | Give the active project a live backend on Rebase Cloud with no account or signup: provisions a project, sets REBASE_BASE_URL in .env, links the directory and deploys the local backend to it (`rebase cloud init --claim`), then sets REBASE_API_TOKEN in .env: a key the deployed app accepts, for reading and writing data through its row-level security, expiring with the claim window |
 | `rebase_cloud_projects_list` | — | List every Rebase Cloud project the signed-in account can reach, across all its organizations (`rebase cloud projects list --all-orgs`): id, name, slug, host and status |
 | `rebase_cloud_status` | — | Show the Rebase Cloud project this directory is linked to (`rebase cloud status`) |
 | `rebase_cloud_deploy` | — | Deploy this directory to its linked Rebase Cloud project (`rebase cloud deploy`) |
