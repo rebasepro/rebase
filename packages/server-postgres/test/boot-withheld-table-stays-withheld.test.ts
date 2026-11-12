@@ -22,6 +22,7 @@ import type { CollectionConfig } from "@rebasepro/types";
 import { createPostgresBootstrapper } from "../src/PostgresBootstrapper";
 import { ensureAppRole } from "../src/security/rls-enforcement";
 import { unreadDriver } from "./helpers/spg-a-driver";
+import { compileSet } from "./helpers/plan-tables";
 
 const tiers: CollectionConfig = {
     name: "Tiers", slug: "tiers", table: "tiers", schema: "public",
@@ -113,7 +114,7 @@ describe("boot keeps a table it could not lock withheld from the user role", () 
         expect(await reach("customers")).toEqual({ rls: false, select: true });
 
         // The policies step: `customers` cannot be locked, so it is closed.
-        await bootstrapper.ensureCollectionPolicies!(collections, driverResult);
+        await bootstrapper.ensureCollectionPolicies!(compileSet(collections), driverResult);
         expect(await reach("customers")).toEqual({ rls: false, select: false });
         expect(await reach("tiers")).toEqual({ rls: true, select: true });
 

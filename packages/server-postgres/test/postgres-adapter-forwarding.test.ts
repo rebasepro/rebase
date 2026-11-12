@@ -6,6 +6,7 @@ import { createPostgresAdapter } from "../src/PostgresAdapter";
 import * as bootstrapperModule from "../src/PostgresBootstrapper";
 import { createPostgresBootstrapper, type PostgresDriverConfig } from "../src/PostgresBootstrapper";
 import { driverStand } from "./helpers/spg-b-driver-stand";
+import { tablesFromCollections } from "./helpers/tables";
 
 /**
  * `createPostgresAdapter` must surface the boot-time schema/RLS provisioning the
@@ -39,7 +40,10 @@ describe("createPostgresAdapter forwards the schema-provisioning methods", () =>
      * operator sees what was applied), and the `{ applied }` count coming back.
      */
     describe("delegation", () => {
-        const collections = [{ slug: "posts" }, { slug: "authors" }];
+        const collections = tablesFromCollections([
+            { slug: "posts", name: "Posts", properties: { id: { type: "string", name: "Id", isId: true } } },
+            { slug: "authors", name: "Authors", properties: { id: { type: "string", name: "Id", isId: true } } }
+        ]).tables;
         const driverResult: InitializedDriver = { driver: driverStand().driver };
         const log = jest.fn();
 

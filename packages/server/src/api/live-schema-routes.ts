@@ -37,6 +37,7 @@ import {
     type AuthAdapter,
     type ClassifiedSchemaChanges,
     type CollectionConfig,
+    type CompiledTable,
     type DatabaseAdmin,
     type SchemaChangeFile,
     type SchemaChangePlan,
@@ -66,6 +67,7 @@ import {
 } from "../schema-edit/schema-edit-permissions";
 import { requireScope } from "../auth/access";
 import type { EditedSchema, TableSourceEditError } from "./table-source-editor";
+import { compileSchemaDefs } from "../schema/load-schema";
 
 /**
  * A schema edit applied to a copy of `backend/schema` and compiled: the files
@@ -131,7 +133,7 @@ export interface LiveSchemaRoutesConfig {
      * then reports `policies: { status: "deferred" }` and the served tables
      * keep the `rls` the database enforces.
      */
-    applyPolicies?: (collections: readonly CollectionConfig[]) => Promise<{ applied: number }>;
+    applyPolicies?: (tables: readonly CompiledTable[]) => Promise<{ applied: number }>;
     /**
      * Why {@link writeSource} is absent, when the caller knows.
      *
@@ -450,9 +452,9 @@ export function rlsChangedSlugs(before: readonly CollectionConfig[], after: read
     return after.filter(collection => previous.get(collection.slug) !== rlsIdentity(collection)).map(collection => collection.slug);
 }
 
-/** Whether the default database stores a collection: the one the apply's DDL ran on. */
-function onDefaultDatabase(collection: CollectionConfig): boolean {
-    return collection.dataSource === undefined || collection.dataSource === "(default)";
+/** Whether the default database stores a table: the one the apply's DDL ran on. */
+function onDefaultDatabase(table: CompiledTable): boolean {
+    return table.descriptor.database === undefined || table.descriptor.database === "(default)";
 }
 
 /**
@@ -461,12 +463,15 @@ function onDefaultDatabase(collection: CollectionConfig): boolean {
  */
 async function applyChangedPolicies(
     config: LiveSchemaRoutesConfig,
-    after: readonly CollectionConfig[],
+    after: EditedSchema,
     changed: string[]
 ): Promise<SchemaEditPolicyOutcome> {
     if (!config.applyPolicies) return { status: "deferred", tables: changed, message: POLICIES_DEFERRED_MESSAGE };
     try {
-        const { applied } = await config.applyPolicies(after.filter(onDefaultDatabase));
+        // The edited definitions compiled, as boot compiles its own: the
+        // policy applier plans from the compiled tables.
+        const tables = compileSchemaDefs(after.defs, after.defaultRls).tables;
+        const { applied } = await config.applyPolicies(tables.filter(onDefaultDatabase));
         return { status: "applied", tables: changed, statements: applied };
     } catch (err) {
         const error = err instanceof Error ? err.message : String(err);
@@ -863,7 +868,7 @@ export function createLiveSchemaRoutes(config: LiveSchemaRoutesConfig): Hono<Hon
                 const changed = rlsChangedSlugs(before, after);
                 let served = source.schema;
                 if (changed.length > 0) {
-                    policies = await applyChangedPolicies(config, after, changed);
+                    policies = await applyChangedPolicies(config, source.schema, changed);
                     if (policies.status !== "applied") served = keepEnforcedRls(source.schema, changed, before, config.getTables?.() ?? []);
                 }
                 await config.onApplied?.(served);

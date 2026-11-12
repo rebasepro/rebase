@@ -31,6 +31,7 @@ import type { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
 import type { HistoryService } from "../../src/history/HistoryService.js";
 import type { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry.js";
 import { testUser } from "./test-user.js";
+import { tablesFromCollections } from "../helpers/tables.js";
 
 // What a project's generated schema hands the registry; the table itself is
 // created by the boot's provisioning step below.
@@ -87,9 +88,9 @@ describe("first boot on an empty database (E2E)", () => {
             )).rows[0].n === 1;
 
             // The provisioning steps, in init.ts's order.
-            await bootstrapper.ensureCollectionSchema!([ordersCollection], driverResult);
+            await bootstrapper.ensureCollectionSchema!(tablesFromCollections([ordersCollection]).tables, driverResult);
             await bootstrapper.ensureRlsRuntime!(driverResult);
-            await bootstrapper.ensureCollectionPolicies!([ordersCollection], driverResult);
+            await bootstrapper.ensureCollectionPolicies!(tablesFromCollections([ordersCollection]).tables, driverResult);
             await bootstrapper.finalizeSecurityPosture!(driverResult);
             const history = await bootstrapper.initializeHistory!(true, driverResult);
 

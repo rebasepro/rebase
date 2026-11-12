@@ -23,6 +23,7 @@ import { createPostgresDatabaseConnection } from "../../src/connection.js";
 import type { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
 import type { PostgresTableRegistry } from "../../src/model/PostgresTableRegistry.js";
 import { testUser } from "./test-user.js";
+import { tablesFromCollections } from "../helpers/tables.js";
 
 const TABLE = "a_fifty_byte_collection_table_name_for_rls_policie";
 
@@ -67,10 +68,10 @@ async function boot(url: string, beforePolicies?: (observer: pg.Client) => Promi
             dataSourceKey: "(default)",
             realtime: { subscribe: false, provision: false }
         });
-        await bootstrapper.ensureCollectionSchema!([collection], driverResult);
+        await bootstrapper.ensureCollectionSchema!(tablesFromCollections([collection]).tables, driverResult);
         await bootstrapper.ensureRlsRuntime!(driverResult);
         await beforePolicies?.(observer);
-        await bootstrapper.ensureCollectionPolicies!([collection], driverResult);
+        await bootstrapper.ensureCollectionPolicies!(tablesFromCollections([collection]).tables, driverResult);
         await bootstrapper.finalizeSecurityPosture!(driverResult);
         const internals = driverResult.internals as { driver: PostgresBackendDriver; registry: PostgresTableRegistry };
         internals.registry.registerPgTable(drizzleTable, TABLE);

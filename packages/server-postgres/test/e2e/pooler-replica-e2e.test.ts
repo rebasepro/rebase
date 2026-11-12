@@ -45,6 +45,7 @@ import { createPostgresDatabaseConnection } from "../../src/connection.js";
 import { initializeRebaseBackend, _resetRebaseMock } from "../../../server/src/index.js";
 import { testUser } from "./test-user.js";
 import { tablesFrom } from "../helpers/tables.js";
+import { tablesFromCollections } from "../helpers/tables.js";
 
 const COMPOSE_FILE = fileURLToPath(new URL("./fixtures/pooler-replica/docker-compose.yml", import.meta.url));
 const PROJECT = `${process.env.REBASE_E2E_CONTAINER_PREFIX || "rebase-db-e2e-"}pooler-${crypto.randomUUID().slice(0, 8)}`;
@@ -262,8 +263,8 @@ describe("behind PgBouncer in transaction mode, with a hot standby (E2E)", () =>
         try {
             // A later boot's ensure: the table exists, so the index is built in
             // the background once the policies step is done.
-            await adapter.ensureCollectionSchema!([notes]);
-            await adapter.ensureCollectionPolicies!([notes]);
+            await adapter.ensureCollectionSchema!(tablesFromCollections([notes]).tables);
+            await adapter.ensureCollectionPolicies!(tablesFromCollections([notes]).tables);
             await waitFor(async () => (await query<{ valid: boolean }>(primaryUrl,
                 "SELECT i.indisvalid AS valid FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid WHERE c.relname = $1",
                 [name])).some(r => r.valid), "the index to be built", 90_000);

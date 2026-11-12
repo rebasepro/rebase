@@ -17,7 +17,7 @@ import { afterAll, afterEach, describe, expect, it } from "@jest/globals";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import type { BackendBootstrapper, CollectionConfig, DataDriver, InitializedDriver } from "@rebasepro/types";
+import type { BackendBootstrapper, CompiledTable, DataDriver, InitializedDriver } from "@rebasepro/types";
 import { createRebaseBackend, loadBackendSchema, type RebaseBackend } from "../src/index";
 import { _resetRebaseMock } from "../src/singleton";
 import { inertRealtimeProvider } from "./helpers/server-a-g3-realtime";
@@ -57,9 +57,9 @@ export const defaultRls = ${JSON.stringify(DEFAULT_RLS)};
     return dir;
 }
 
-/** Each collection's rules, by slug, as plain data. */
-const rulesBySlug = (collections: readonly CollectionConfig[]): Record<string, unknown> =>
-    Object.fromEntries(collections.map(c => [c.slug, JSON.parse(JSON.stringify("securityRules" in c ? c.securityRules ?? null : null))]));
+/** Each table's rules, by slug, as plain data. */
+const rulesBySlug = (tables: readonly CompiledTable[]): Record<string, unknown> =>
+    Object.fromEntries(tables.map(t => [t.descriptor.slug, JSON.parse(JSON.stringify(t.descriptor.rls.rules))]));
 
 /** A driver with no rows, whose RLS scoping hands back another like it. */
 interface EmptyDriver extends DataDriver {
@@ -78,8 +78,8 @@ function driver(): EmptyDriver & { withAuth: () => Promise<EmptyDriver> } {
     return { ...scoped(), withAuth: async () => scoped() };
 }
 
-/** A bootstrapper that records the rules of the collections it is asked to provision policies for. */
-function recordingBootstrapper(provisioned: CollectionConfig[][]): BackendBootstrapper {
+/** A bootstrapper that records the tables it is asked to provision policies for. */
+function recordingBootstrapper(provisioned: (readonly CompiledTable[])[]): BackendBootstrapper {
     return {
         type: "postgres",
         isDefault: true,
@@ -89,8 +89,8 @@ function recordingBootstrapper(provisioned: CollectionConfig[][]): BackendBootst
         async ensureCollectionSchema() {
             return { applied: 0 };
         },
-        async ensureCollectionPolicies(collections: CollectionConfig[]) {
-            provisioned.push(collections);
+        async ensureCollectionPolicies(tables: readonly CompiledTable[]) {
+            provisioned.push(tables);
             return { applied: 0 };
         }
     };
@@ -103,7 +103,7 @@ afterEach(async () => {
 });
 
 async function provisionedRules(source: Partial<Parameters<typeof createRebaseBackend>[0]>): Promise<Record<string, unknown>> {
-    const provisioned: CollectionConfig[][] = [];
+    const provisioned: (readonly CompiledTable[])[] = [];
     const backend = await createRebaseBackend({
         ...source,
         bootstrappers: [recordingBootstrapper(provisioned)],

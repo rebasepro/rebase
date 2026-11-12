@@ -32,6 +32,7 @@ import { PostgresBackendDriver } from "../../src/PostgresBackendDriver.js";
 import { RealtimeService } from "../../src/services/realtimeService.js";
 import { ensureCollectionTables, type Queryable } from "../../src/schema/ensure-collection-tables.js";
 import { compileSet } from "../helpers/plan-tables";
+import { tablesFromCollections } from "../helpers/tables.js";
 
 const postsCollection: CollectionConfig = {
     name: "Posts",
@@ -154,7 +155,7 @@ describe("Two data sources, each listening on its own database (E2E)", () => {
                 connectionString: defaultUrl,
                 connection: defaultConn.db
             });
-            await defaultBootstrapper.ensureCollectionPolicies!([postsCollection], undefined);
+            await defaultBootstrapper.ensureCollectionPolicies!(tablesFromCollections([postsCollection]).tables, undefined);
             defaultSource = partsOf(await defaultBootstrapper.initializeDriver!({
                 collections: ALL_COLLECTIONS,
                 dataSourceKey: "(default)",
@@ -165,7 +166,7 @@ describe("Two data sources, each listening on its own database (E2E)", () => {
                 directConnectionString: `${analyticsUrl}&application_name=analytics-direct`,
                 connection: analyticsConn.db
             });
-            await analyticsBootstrapper.ensureCollectionPolicies!([eventsCollection], undefined);
+            await analyticsBootstrapper.ensureCollectionPolicies!(tablesFromCollections([eventsCollection]).tables, undefined);
             analyticsSource = partsOf(await analyticsBootstrapper.initializeDriver!({
                 collections: ALL_COLLECTIONS,
                 dataSourceKey: "analytics",

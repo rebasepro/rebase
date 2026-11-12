@@ -1,5 +1,6 @@
 import type { CollectionConfig, FilterValues, WhereFilterOp } from "./collections";
 import type { TableHooks } from "../schema/hooks";
+import type { CompiledTable } from "../schema/compiled";
 import type { OrderByTuple } from "./filter-operators";
 import type { LogicalCondition } from "../controllers/data";
 import type { AuthAdapter } from "./auth_adapter";
@@ -1606,7 +1607,7 @@ export interface BackendBootstrapper {
      * and breaks every app that builds its own adapter.
      */
     ensureCollectionSchema?(
-        collections: unknown[],
+        tables: readonly CompiledTable[],
         driverResult?: InitializedDriver,
         log?: (message: string) => void
     ): Promise<{ applied: number }>;
@@ -1628,7 +1629,7 @@ export interface BackendBootstrapper {
      * `auth.*` helper functions and `CREATE POLICY` validates they exist.
      */
     ensureCollectionPolicies?(
-        collections: unknown[],
+        tables: readonly CompiledTable[],
         driverResult?: InitializedDriver,
         log?: (message: string) => void
     ): Promise<{ applied: number }>;

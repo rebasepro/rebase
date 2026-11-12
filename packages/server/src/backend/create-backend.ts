@@ -114,7 +114,7 @@ import { previewRemoteSchema } from "../schema-edit/remote-source";
 import { refuseWhenRepositoryIsAhead } from "../schema-edit/deployed-schema-guard";
 import type { EditedSchema, TableSourceEdit, TableSourceEditor } from "../api/table-source-editor";
 import type { PreviewedSource } from "../api/live-schema-routes";
-import type { PostgresCollectionConfig } from "@rebasepro/types";
+import type { CompiledTable, PostgresCollectionConfig } from "@rebasepro/types";
 import { realpathSync } from "node:fs";
 import { replaceableRoutes, type ReplaceableRoutes } from "./replaceable-routes";
 import { createLocalGitRepository, findRepositoryRoot } from "../schema-edit/local-git-repository";
@@ -803,6 +803,9 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     }
     logUnprovisionedTables(declaredDescriptors, storedBySome, sourceShapes);
     const provisionable = provisionableBy.get(provisionTarget) ?? [];
+    // What the boot appliers plan from: the compiled tables themselves.
+    const compiledBySlug = new Map(declaredTables.tables.map(table => [table.descriptor.slug, table]));
+    const compiledOf = (slug: string) => compiledBySlug.get(slug);
 
     // Before that first query: ask the database whether it is there at all. The
     // adapter's connection diagnosis — the box that names the host, the port and
@@ -811,7 +814,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     // it. See `verifyProvisioningConnection`.
     await verifyProvisioningConnection(provisionTarget);
 
-    let schemaOutcome = await provisionTableSchema(provisionable, driverCollection, provisionTarget, {
+    let schemaOutcome = await provisionTableSchema(provisionable, compiledOf, provisionTarget, {
         introspecting: introspectCollections,
         provision: provision.tables,
         skipReason: provisionSkipReason
@@ -824,7 +827,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         // first: a second source that is down would otherwise fail inside the
         // DDL with the redacted "Failed query" this probe exists to pre-empt.
         await verifyProvisioningConnection(target);
-        const outcome = await provisionTableSchema(mine, driverCollection, target, {
+        const outcome = await provisionTableSchema(mine, compiledOf, target, {
             introspecting: introspectCollections,
             provision: provision.tables,
             skipReason: provisionSkipReason
@@ -1133,7 +1136,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         }
         return target;
     };
-    const policyOutcome = await provisionTablePolicies(provisionable, driverCollection, initializedTarget(provisionTarget), {
+    const policyOutcome = await provisionTablePolicies(provisionable, compiledOf, initializedTarget(provisionTarget), {
         introspecting: introspectCollections,
         provision: provision.tables,
         skipReason: provisionSkipReason
@@ -1149,7 +1152,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         if (provision.tables && !provisioningDisabled() && target.bootstrapper.ensureRlsRuntime) {
             await target.bootstrapper.ensureRlsRuntime(target.driverResult);
         }
-        await provisionTablePolicies(mine, driverCollection, target, {
+        await provisionTablePolicies(mine, compiledOf, target, {
             introspecting: introspectCollections,
             provision: provision.tables,
             skipReason: provisionSkipReason
@@ -2463,8 +2466,8 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
                     const target = initializedTarget(provisionTarget);
                     const ensure = target.bootstrapper.ensureCollectionPolicies;
                     if (!ensure || !provision.tables || provisioningDisabled()) return undefined;
-                    return (collections: readonly CollectionConfig[]) => ensure.call(
-                        target.bootstrapper, [...collections], target.driverResult, (message: string) => logger.debug(`policies: ${message}`));
+                    return (tables: readonly CompiledTable[]) => ensure.call(
+                        target.bootstrapper, tables, target.driverResult, (message: string) => logger.debug(`policies: ${message}`));
                 })()
             }));
 

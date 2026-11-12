@@ -21,6 +21,7 @@
  */
 
 import type { DataDriver } from "../controllers/data_driver";
+import type { CompiledTable } from "../schema/compiled";
 import type { CollectionConfig } from "./collections";
 import type {
     CollectionRegistryInterface,
@@ -135,7 +136,7 @@ export interface DatabaseAdapter {
      * unconditionally works for managed tenants and breaks every self-built one.
      */
     ensureCollectionSchema?(
-        collections: unknown[],
+        tables: readonly CompiledTable[],
         driverResult?: InitializedDriver,
         log?: (message: string) => void,
     ): Promise<{ applied: number }>;
@@ -151,7 +152,7 @@ export interface DatabaseAdapter {
      * collection answers 401).
      */
     ensureCollectionPolicies?(
-        collections: unknown[],
+        tables: readonly CompiledTable[],
         driverResult?: InitializedDriver,
         log?: (message: string) => void,
     ): Promise<{ applied: number }>;

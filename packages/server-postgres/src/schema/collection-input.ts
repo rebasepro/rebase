@@ -1,17 +1,14 @@
 /**
  * TRANSITIONAL (B-PLAN-2): the one place the schema code turns legacy
- * collections into the compiled tables the planner reads.
+ * collections into compiled tables — for the live schema editor only.
  *
- * The live schema editor (`planSchemaChange` → `generateSchemaCommit`, and
- * `classifyTableChanges` under it) still receives the edited schema as
- * collections from `@rebasepro/server`: the edits are not in the registry, so
- * they cannot be looked up as compiled tables. The boot appliers
- * (`ensureCollectionSchema`, `ensureCollectionPolicies` on the bootstrapper) are handed the
- * server's lowered collections before the driver opens, so there is no
- * registry to read them from either. Until the server hands the driver
- * compiled tables (slice B-R7), both are lifted here with the codemod's lift
- * (`collectionsToTableDefs`) and compiled. Nothing else may call this: every
- * other door already holds `CompiledTable[]`.
+ * The editor (`planSchemaChange` → `generateSchemaCommit`, and
+ * `classifyTableChanges` under it) still receives the served and the edited
+ * schema as collections from `@rebasepro/server`, through the driver's
+ * `planSchemaChange`, and lifts them here with the codemod's lift
+ * (`collectionsToTableDefs`). It should be handed the compiled tables (the
+ * server holds the edited definitions); when it is, delete this file. Boot
+ * never comes here: the appliers take `CompiledTable[]`.
  */
 import { collectionsToTableDefs, compileSchema } from "@rebasepro/common";
 import type { CollectionConfig, CompiledTable } from "@rebasepro/types";
@@ -53,10 +50,9 @@ function isCollectionInput(value: unknown): value is CollectionConfig {
 }
 
 /**
- * What a boot applier plans from: the compiled tables it was handed, taken as
+ * What the editor plans from: the compiled tables it was handed, taken as
  * they are, or — while the server still hands collections — those compiled
- * through {@link compileEditedCollections}. Never read from a registry: boot
- * provisions the schema before the driver opens.
+ * through {@link compileEditedCollections}.
  *
  * @throws Error naming the entry that is neither.
  */

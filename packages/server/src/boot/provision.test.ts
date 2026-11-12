@@ -32,10 +32,10 @@ let infoSpy: ReturnType<typeof jest.spyOn>;
 let warnSpy: ReturnType<typeof jest.spyOn>;
 let debugSpy: ReturnType<typeof jest.spyOn>;
 
-/** `posts` as the boot hands it to provisioning: its descriptor, and the seam naming it to the driver. */
+/** `posts` as the boot hands it to provisioning: its descriptor, and its compiled table by slug. */
 const served = servedTablesFor([plainTable("posts")]);
 const posts = served.tables[0].descriptor;
-const lowered = served.driverCollection;
+const lowered = (slug: string) => served.tables.find(table => table.descriptor.slug === slug);
 
 /** A target whose driver can create tables, unless told otherwise. */
 function target(over: Partial<ProvisionTarget> = {}): ProvisionTarget {

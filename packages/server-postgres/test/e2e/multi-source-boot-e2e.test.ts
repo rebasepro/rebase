@@ -232,7 +232,7 @@ describe("Two data sources, one routed collection (E2E)", () => {
                 connection: conn.db
             });
             const outcome = await bootstrapper.ensureCollectionPolicies!(
-                [eventsCollection],
+                compileSet([eventsCollection]),
                 undefined
             );
             expect(outcome.applied).toBeGreaterThan(0);

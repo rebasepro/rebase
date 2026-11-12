@@ -3,7 +3,7 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { Hono } from "hono";
-import type { BackendBootstrapper, CollectionConfig, SchemaChangePlan, TableDescriptor } from "@rebasepro/types";
+import type { BackendBootstrapper, CompiledTable, SchemaChangePlan, TableDescriptor } from "@rebasepro/types";
 
 import { initializeRebaseBackend } from "../src/init";
 import type { HonoEnv } from "../src/api/types";
@@ -31,7 +31,7 @@ const BOOTS_A_BACKEND = 30_000;
 let fixture: ReturnType<typeof writeSchemaFixture>;
 const originalNodeEnv = process.env.NODE_ENV;
 /** The collections each policy write was handed, in order. */
-const policyWrites: CollectionConfig[][] = [];
+const policyWrites: TableDescriptor[][] = [];
 
 beforeEach(() => {
     process.env.NODE_ENV = "development";
@@ -67,9 +67,9 @@ function bootstrapper(options: { policies: "write" | "none" | "fail" }): Backend
         }
     };
     if (options.policies !== "none") {
-        overrides.ensureCollectionPolicies = async (collections: unknown[]) => {
+        overrides.ensureCollectionPolicies = async (tables: readonly CompiledTable[]) => {
             if (policyWrites.length > 0 && options.policies === "fail") throw new Error("permission denied for table posts");
-            policyWrites.push(collections.filter((c): c is CollectionConfig => typeof c === "object" && c !== null && "slug" in c));
+            policyWrites.push(tables.map(table => table.descriptor));
             return { applied: 3 };
         };
     }
@@ -124,13 +124,13 @@ describe("a live apply that removes a public read rule", () => {
 
         // The applier was handed the edited table, without the public rule.
         expect(policyWrites.length).toBe(bootWrites + 1);
-        const written = policyWrites.at(-1)?.find(collection => collection.slug === "posts");
-        expect(written?.securityRules).not.toContainEqual(PUBLIC_READ);
-        expect(written?.securityRules).toHaveLength(2);
+        const written = policyWrites.at(-1)?.find(table => table.slug === "posts");
+        expect(written?.rls.rules).not.toContainEqual(PUBLIC_READ);
+        expect(written?.rls.rules).toHaveLength(2);
         // And what is served agrees with what was written.
         const served = await servedPosts(app);
         expect(served.rls.rules).not.toContainEqual(PUBLIC_READ);
-        expect(served.rls.rules).toEqual(written?.securityRules);
+        expect(served.rls.rules).toEqual(written?.rls.rules);
     }, BOOTS_A_BACKEND);
 
     it("where policies cannot be written, keeps serving the rules the database enforces, and says so", async () => {

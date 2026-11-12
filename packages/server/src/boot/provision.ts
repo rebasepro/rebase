@@ -1,6 +1,5 @@
 import { DEFAULT_DATA_SOURCE_KEY } from "@rebasepro/types";
-import type { BackendBootstrapper, CollectionConfig, DataDriver, InitializedDriver, TableDescriptor } from "@rebasepro/types";
-import type { DriverCollectionOf } from "../schema/driver-seam";
+import type { BackendBootstrapper, CompiledTable, DataDriver, InitializedDriver, TableDescriptor } from "@rebasepro/types";
 
 import { createIdempotencyStore } from "../api/rest/idempotency";
 import { resolveRateLimitStoreKind } from "../auth/resolve-rate-limit-store";
@@ -251,7 +250,7 @@ export async function verifyProvisioningConnection(target: ProvisionTarget): Pro
  */
 export async function provisionTableSchema(
     tables: readonly TableDescriptor[],
-    driverCollection: DriverCollectionOf,
+    compiledOf: CompiledTableOf,
     target: ProvisionTarget,
     options: ProvisionRunOptions = {}
 ): Promise<ProvisionOutcome> {
@@ -299,7 +298,7 @@ reason };
     }
 
     const { applied } = await target.bootstrapper.ensureCollectionSchema(
-        loweredFor(tables, driverCollection),
+        compiledFor(tables, compiledOf),
         target.driverResult as InitializedDriver,
         message => logger.debug(`schema: ${message}`)
     );
@@ -315,13 +314,17 @@ reason };
 applied };
 }
 
+/** The compiled table a declared slug names, as the boot compiled it. */
+export type CompiledTableOf = (slug: string) => CompiledTable | undefined;
+
 /**
  * What the driver's provisioning calls (`ensureCollectionSchema`,
- * `ensureCollectionPolicies`) are handed for these tables: the collections
- * they were lowered into, through the B-R7 seam (see `DriverCollectionOf`).
+ * `ensureCollectionPolicies`) are handed for these tables: the compiled
+ * tables themselves — the driver plans from them before it opens, so it can
+ * look nothing up.
  */
-function loweredFor(tables: readonly TableDescriptor[], driverCollection: DriverCollectionOf): CollectionConfig[] {
-    return tables.flatMap(table => driverCollection(table.slug) ?? []);
+function compiledFor(tables: readonly TableDescriptor[], compiledOf: CompiledTableOf): CompiledTable[] {
+    return tables.flatMap(table => compiledOf(table.slug) ?? []);
 }
 
 /**
@@ -342,7 +345,7 @@ function loweredFor(tables: readonly TableDescriptor[], driverCollection: Driver
  */
 export async function provisionTablePolicies(
     tables: readonly TableDescriptor[],
-    driverCollection: DriverCollectionOf,
+    compiledOf: CompiledTableOf,
     target: ProvisionTarget,
     options: ProvisionRunOptions = {}
 ): Promise<ProvisionOutcome> {
@@ -377,7 +380,7 @@ reason };
     }
 
     const { applied } = await target.bootstrapper.ensureCollectionPolicies(
-        loweredFor(tables, driverCollection),
+        compiledFor(tables, compiledOf),
         target.driverResult as InitializedDriver,
         message => logger.debug(`policies: ${message}`)
     );
