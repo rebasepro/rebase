@@ -164,6 +164,14 @@ export interface ArrayValidation extends BaseValidation {
     maxItems?: number;
     /** Refuse an array holding the same value twice. */
     uniqueItems?: boolean;
+    /**
+     * For a JSON array of objects (`json.array(json.object({...}))`): refuse
+     * two items with the same value in any one of these fields — each field
+     * is unique across the items on its own (`["sku"]`: no SKU twice). The
+     * fields are keys of the item object; anything else is refused when the
+     * schema compiles.
+     */
+    uniqueBy?: string[];
 }
 
 /**
@@ -193,6 +201,7 @@ export interface ColumnValidation {
     minItems?: number;
     maxItems?: number;
     uniqueItems?: boolean;
+    uniqueBy?: string[];
 }
 
 /** The rules a builder method accepts, before they are normalized. */
@@ -220,7 +229,8 @@ export function normalizeValidation(rules: ValidationInput): ColumnValidation {
             out[key] = isoOf(value);
             continue;
         }
-        Object.assign(out, { [key]: value });
+        // A list is copied, so the stored rules do not alias the caller's array.
+        Object.assign(out, { [key]: Array.isArray(value) ? [...value] : value });
     }
     return out;
 }

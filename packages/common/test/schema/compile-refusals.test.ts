@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
-import { ColumnBuilder, TABLE_BRAND, VIEW_BRAND, col, defineAuthTable, defineTable, defineView, policy, rel } from "@rebasepro/types";
+import { ColumnBuilder, TABLE_BRAND, VIEW_BRAND, col, defineAuthTable, defineTable, defineView, json, policy, rel } from "@rebasepro/types";
 import type { AnyTableDef, AnyViewDef, ColumnDef, DefaultRls } from "@rebasepro/types";
 
 import { compileTables, type AnySchemaDef } from "../../src/schema/compile-tables";
@@ -591,5 +591,33 @@ describe("compileTables — refusals", () => {
             expect(() => defineView("v", { query: "", columns: { id: id() } })).toThrow(/needs a `query`/);
             expect(() => defineView("v", { query: "select 1", roles: ["admin"], columns: { id: id() } })).toThrow(/not materialized/);
         });
+    });
+});
+
+describe("compileTables — uniqueBy", () => {
+    it("accepts it on a JSON array of objects, on the shape or on the column, naming the items' fields", () => {
+        expect(problemsOf([table("t", {
+            id: id(),
+            lines: col.jsonb(json.array(json.object({ sku: json.string(), qty: json.number() })).validate({ uniqueBy: ["sku"] })),
+            rows: rawColumn({ type: { kind: "jsonb" }, json: { kind: "array", of: { kind: "object", fields: { code: { kind: "string" } } } }, validate: { uniqueBy: ["code"] } })
+        })])).toEqual([]);
+    });
+
+    it("refuses it where nothing can check it, naming the column and what to write", () => {
+        const problems = problemsOf([table("t", {
+            id: id(),
+            missing: col.jsonb(json.array(json.object({ sku: json.string() })).validate({ uniqueBy: ["ean"] })),
+            scalars: col.jsonb(json.array(json.string()).validate({ uniqueBy: ["x"] })),
+            empty: col.jsonb(json.array(json.object({ sku: json.string() })).validate({ uniqueBy: [] })),
+            pgArray: col.array(col.text()).validate({ uniqueBy: ["x"] }),
+            nested: col.jsonb(json.object({ inner: json.array(json.object({ a: json.string() })).validate({ uniqueBy: ["b"] }) }))
+        })]);
+        expect(problems.map(problem => [problem.key, problem.message])).toEqual([
+            ["missing", expect.stringContaining("naming \"ean\", which the items do not have (they have \"sku\")")],
+            ["scalars", expect.stringContaining("its items are JSON string values, not objects. For plain values, use `uniqueItems: true`")],
+            ["empty", expect.stringContaining("`uniqueBy: []`, which compares nothing")],
+            ["pgArray", expect.stringContaining("this column is not one")],
+            ["nested", expect.stringContaining("\"inner\" declares `uniqueBy` naming \"b\"")]
+        ]);
     });
 });

@@ -716,6 +716,21 @@ describe("lowerTables — refusals", () => {
      * each now lowers to the nearest legacy shape without the rule (nothing
      * reads the rule from the lowered shape; the bridge goes with slice K8).
      */
+    it("lowers `uniqueBy` as `uniqueInArray` on the named fields of the item map", () => {
+        const [table] = lowerTables([defineTable("t", {
+            columns: {
+                id,
+                lines: col.jsonb(json.array(json.object({ sku: json.string(), qty: json.number() })).validate({ uniqueBy: ["sku"] }))
+            },
+            rls: "admin-only"
+        })]);
+        expect(table.properties.lines).toMatchObject({
+            type: "array",
+            of: { type: "map", properties: { sku: { type: "string", validation: { uniqueInArray: true } }, qty: { type: "number" } } }
+        });
+        expect(table.properties.lines).not.toHaveProperty("of.properties.qty.validation");
+    });
+
     it("lowers what the write validation now enforces from the descriptor, without the rule", () => {
         const [table] = lowerTables([defineTable("t", {
             columns: {
@@ -732,8 +747,9 @@ describe("lowerTables — refusals", () => {
         const props = table.properties;
         expect(props.s).toMatchObject({ type: "string" });
         expect(props.s).not.toHaveProperty("enum");
-        expect(props.a).toMatchObject({ type: "array" });
-        expect(props.a.validation).toBeUndefined();
+        // `uniqueItems` comes back as the legacy shape said it, so the bridge
+        // round-trips; the write validation reads the descriptor's.
+        expect(props.a).toMatchObject({ type: "array", validation: { uniqueInArray: true } });
         expect(props.scalar).toMatchObject({ type: "map" });
         expect(props.scalar).not.toHaveProperty("properties");
         expect(props.blocks).toMatchObject({ type: "map" });

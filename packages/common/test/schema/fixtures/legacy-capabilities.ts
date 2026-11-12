@@ -212,6 +212,8 @@ export const everything: PostgresCollectionConfig = {
                 approver: { type: "string", userSelect: true },
                 spot: { type: "geopoint" },
                 lines: { type: "array", of: { type: "string" }, validation: { max: 3 } },
+                // Unique items in a nested array: its `uniqueItems`.
+                refs: { type: "array", of: { type: "string" }, validation: { uniqueInArray: true } },
                 avatar: { type: "string", storage: { storagePath: "avatars/" } }
             }
         },
@@ -227,6 +229,13 @@ export const everything: PostgresCollectionConfig = {
         amounts: { type: "array", columnType: "numeric[]", of: { type: "number" }, defaultValue: [1, 2] },
         photos: { type: "array", columnType: "text[]", of: { type: "string", storage: { storagePath: "photos/" } } },
         limited: { type: "array", columnType: "text[]", of: { type: "string" }, validation: { required: true, min: 1, max: 3 } },
+        // `uniqueInArray` on the array: `uniqueItems`; on a field of its object items: `uniqueBy`.
+        distinctTags: { type: "array", columnType: "text[]", of: { type: "string" }, validation: { uniqueInArray: true } },
+        lineItems: {
+            type: "array",
+            columnType: "jsonb",
+            of: { type: "map", properties: { sku: { type: "string", validation: { uniqueInArray: true } }, qty: { type: "number" } } }
+        },
         events: { type: "array", columnType: "jsonb", of: { type: "date" } },
         docs: { type: "array", columnType: "json", of: { type: "map", properties: { a: { type: "string" } } } },
         blocks: {

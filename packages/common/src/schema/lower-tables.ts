@@ -960,7 +960,7 @@ function idFields(def: ColumnDef, ctx: ColumnContext): { isId?: true | string } 
 const STRING_RULES = new Set(["requiredMessage", "min", "max", "length", "matches", "matchesFlags", "matchesMessage", "email", "url", "trim", "lowercase", "uppercase"]);
 const NUMBER_RULES = new Set(["requiredMessage", "min", "max", "lessThan", "moreThan", "positive", "negative", "integer"]);
 const DATE_RULES = new Set(["requiredMessage", "min", "max"]);
-const ARRAY_RULES = new Set(["requiredMessage", "minItems", "maxItems", "uniqueItems"]);
+const ARRAY_RULES = new Set(["requiredMessage", "minItems", "maxItems", "uniqueItems", "uniqueBy"]);
 const BASE_RULES = new Set(["requiredMessage"]);
 
 /** Refuses a rule this kind of column does not check — `.validate()` is typed per kind, so this is a definition built by hand. */
@@ -1046,10 +1046,25 @@ function arrayValidation(flags: Flags, rules: ColumnValidation | undefined, at: 
     if (r.requiredMessage !== undefined) out.requiredMessage = r.requiredMessage;
     if (r.minItems !== undefined) out.min = r.minItems;
     if (r.maxItems !== undefined) out.max = r.maxItems;
-    // `uniqueItems` is not carried: the REST write validation reads it from
-    // the column's descriptor, and nothing reads it here. (This bridge is
-    // deleted in slice K8.)
+    // The REST write validation reads `uniqueItems` and `uniqueBy` from the
+    // column's descriptor; they are lowered so the legacy shape says what it
+    // said (`uniqueInArray`), and `uniqueBy` by `markUniqueBy` on the items.
+    if (r.uniqueItems) out.uniqueInArray = true;
     return Object.keys(out).length > 0 ? out : undefined;
+}
+
+/** `uniqueBy` of an array of objects, as the legacy shape said it: `uniqueInArray` on each named field of the item map. */
+function markUniqueBy(property: ArrayProperty, uniqueBy: readonly string[] | undefined): void {
+    const item = property.of;
+    if (!uniqueBy || uniqueBy.length === 0 || item === undefined || Array.isArray(item) || item.type !== "map" || !item.properties) return;
+    const properties = { ...item.properties };
+    for (const field of uniqueBy) {
+        const child = properties[field];
+        // `Object.assign`, not a spread: a spread of the property union loses
+        // which member it is, and the result is no longer a `Property`.
+        if (child) properties[field] = Object.assign({}, child, { validation: { ...child.validation, uniqueInArray: true } });
+    }
+    property.of = { ...item, properties };
 }
 
 // ── Column kinds ─────────────────────────────────────────────────────────────
@@ -1187,8 +1202,10 @@ function lowerDocumentColumn(def: ColumnDef, kind: "json" | "jsonb", base: BaseF
         const property: ArrayProperty = { type: "array", ...base, columnType: kind };
         applyArrayShape(property, shape, ctx);
         if (shape.transform !== undefined) property.callbacks = lowerTransform(shape.transform, ctx.slug, ctx.describe);
-        const validation = arrayValidation(flagsOf(def), { ...shape.validate, ...def.validate }, ctx.at);
+        const rules = { ...shape.validate, ...def.validate };
+        const validation = arrayValidation(flagsOf(def), rules, ctx.at);
         if (validation) property.validation = validation;
+        markUniqueBy(property, rules.uniqueBy);
         if (Array.isArray(literal)) property.defaultValue = literal;
         return property;
     }
@@ -1383,6 +1400,7 @@ function jsonFieldProperty(node: JsonShapeDef, ctx: ColumnContext): Property {
             applyArrayShape(property, node, ctx);
             const validation = arrayValidation(flags, node.validate, at);
             if (validation) property.validation = validation;
+            markUniqueBy(property, node.validate?.uniqueBy);
             if (Array.isArray(node.default)) property.defaultValue = node.default;
             return property;
         }

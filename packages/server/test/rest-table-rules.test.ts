@@ -18,7 +18,9 @@ import { compileTables } from "./helpers/tables";
  * - array item rules (`col.array(col.text().validate(...).oneOf(...))`);
  * - `json-document-shape`: a document whose top is a scalar or a `json.oneOf()`;
  * - `json-one-of-placement`: `json.oneOf()` as a field of an object;
- * - `json-unknown-field`: `json.unknown()` as a field or a variant — anything goes.
+ * - `json-unknown-field`: `json.unknown()` as a field or a variant — anything goes;
+ * - `array-unique-by`: `validate({ uniqueBy: [...] })` on a JSON array of objects;
+ * - `strictWrites: false`: a key the table does not declare reaches the driver.
  */
 const items = defineTable("items", {
     columns: {
@@ -33,12 +35,24 @@ const items = defineTable("items", {
             extra: json.unknown(),
             title: json.string().required()
         })),
-        list: col.jsonb(json.array(json.oneOf({ note: json.string(), any: json.unknown() })))
+        list: col.jsonb(json.array(json.oneOf({ note: json.string(), any: json.unknown() }))),
+        lines: col.jsonb(json.array(json.object({ sku: json.string(), qty: json.number() })).validate({ uniqueBy: ["sku"] }))
     },
     rls: "admin-only"
 });
 
-const fixture = compileTables([items]);
+/** A table that accepts keys it does not declare (`strictWrites: false`), and one that does not. */
+const loose = defineTable("loose", {
+    columns: { id: col.text().primaryKey(), name: col.text() },
+    strictWrites: false,
+    rls: "admin-only"
+});
+const strict = defineTable("strict", {
+    columns: { id: col.text().primaryKey(), name: col.text() },
+    rls: "admin-only"
+});
+
+const fixture = compileTables([items, loose, strict]);
 
 type Violations = { error: { code: string; details?: { violations?: { field: string; code: string }[] } } };
 
@@ -97,6 +111,57 @@ describe("column rules the descriptor carries, on every write door", () => {
 
     it("refuses an array holding the same item twice [array-unique-items]", async () => {
         await refusedEverywhere({ tags: ["a", "a"] }, { field: "tags", code: "unique_items" });
+    });
+
+    it("refuses two object items with the same value in a `uniqueBy` field [array-unique-by]", async () => {
+        await refusedEverywhere(
+            { lines: [{ sku: "A", qty: 1 }, { sku: "B", qty: 1 }, { sku: "A", qty: 2 }] },
+            { field: "lines", code: "unique_by" }
+        );
+        const res = await request("POST", "/items", { id: "1", lines: [{ sku: "A", qty: 1 }, { sku: "A", qty: 2 }] });
+        const body = await res.json() as { error: { details: { violations: { message: string }[] } } };
+        expect(body.error.details.violations[0].message).toBe("'lines' must not hold two items with the same 'sku' (items 0 and 1 have the same 'sku').");
+    });
+
+    it("accepts object items that differ in every `uniqueBy` field, and items without one", async () => {
+        const values = { lines: [{ sku: "A", qty: 1 }, { sku: "B", qty: 1 }, { qty: 3 }, { qty: 4 }] };
+        for (const [door, send] of Object.entries(doors(values))) {
+            const res = await send();
+            expect({ door, status: res.status }).toEqual({ door, status: door === "create" || door === "upsert" ? 201 : 200 });
+        }
+    });
+
+    it("refuses pushing two items with the same `uniqueBy` field [array-unique-by]", async () => {
+        const res = await request("PATCH", "/items/1", { lines: { $push: [{ sku: "C", qty: 1 }, { sku: "C", qty: 9 }] } });
+        expect(res.status).toBe(400);
+        expect(((await res.json()) as Violations).error.details?.violations)
+            .toEqual(expect.arrayContaining([expect.objectContaining({ field: "lines", code: "unique_by" })]));
+        const one = await request("PATCH", "/items/1", { lines: { $push: { sku: "C", qty: 1 } } });
+        expect(one.status).toBe(200);
+        expect(save).toHaveBeenCalledTimes(1);
+    });
+
+    it("hands a key a `strictWrites: false` table does not declare to the driver, on create and update", async () => {
+        const created = await request("POST", "/loose", { id: "1", name: "n", nickname: "x" });
+        expect(created.status).toBe(201);
+        expect(save).toHaveBeenLastCalledWith(expect.objectContaining({ values: expect.objectContaining({ nickname: "x" }) }));
+        const updated = await request("PATCH", "/loose/1", { nickname: "y" });
+        expect(updated.status).toBe(200);
+        expect(save).toHaveBeenLastCalledWith(expect.objectContaining({ values: expect.objectContaining({ nickname: "y" }) }));
+    });
+
+    it("refuses a key the table does not declare by default, naming the table and the column", async () => {
+        for (const send of [
+            () => request("POST", "/strict", { id: "1", name: "n", nickname: "x" }),
+            () => request("PATCH", "/strict/1", { nickname: "y" })
+        ]) {
+            const res = await send();
+            const body = await res.json() as { error: { code: string; message: string } };
+            expect(res.status).toBe(400);
+            expect(body.error.code).toBe("VALIDATION_UNKNOWN_FIELDS");
+            expect(body.error.message).toContain("Table 'strict' has no column 'nickname'. Known columns: 'id', 'name'.");
+        }
+        expect(save).not.toHaveBeenCalled();
     });
 
     it("refuses an item outside the item's `.oneOf()`, and one over the item's length", async () => {

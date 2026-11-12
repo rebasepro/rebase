@@ -351,6 +351,22 @@ const isBoolean = (v: unknown): v is boolean => typeof v === "boolean";
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 const isArray = (v: unknown): v is unknown[] => Array.isArray(v);
 
+/**
+ * An array's `uniqueBy`, as the panel's form checks it: each named field of
+ * the item map marked `uniqueInArray` (unique across the array's items).
+ */
+function uniqueByFields(item: PostgresProperty, uniqueBy: readonly string[] | undefined): PostgresProperty {
+    if (!uniqueBy || uniqueBy.length === 0 || item.type !== "map" || !item.properties) return item;
+    const properties: Properties = { ...item.properties };
+    for (const field of uniqueBy) {
+        const child = properties[field];
+        // `Object.assign`, not a spread: a spread of the property union loses
+        // which member it is, and the result is no longer a `Property`.
+        if (child) properties[field] = Object.assign({}, child, { validation: { ...child.validation, uniqueInArray: true } });
+    }
+    return { ...item, properties };
+}
+
 function nodeProperties(fields: Record<string, JsonShape>): { properties: Properties; propertiesOrder: string[] } {
     const properties: Properties = {};
     for (const [key, field] of Object.entries(fields)) {
@@ -437,7 +453,7 @@ export function jsonNodeProperty(node: JsonShape): PostgresProperty {
                 ...base,
                 type: "array",
                 validation,
-                of: jsonNodeProperty(item),
+                of: uniqueByFields(jsonNodeProperty(item), node.validate?.uniqueBy),
                 defaultValue: nodeDefault(node.default, isArray)
             });
         }

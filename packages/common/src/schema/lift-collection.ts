@@ -747,8 +747,9 @@ class CollectionLift {
         if (primaryKey && property.validation?.required === true) {
             this.note(key, "validation.required", "redundant", true, "A key column is NOT NULL and required already.");
         }
-        if (property.validation?.uniqueInArray !== undefined) {
-            this.note(key, "validation.uniqueInArray", "ui", property.validation.uniqueInArray, "Checked by the panel only.");
+        // An array's own `uniqueInArray` is carried by `liftArray` (`uniqueItems`).
+        if (property.validation?.uniqueInArray !== undefined && property.type !== "array") {
+            this.note(key, "validation.uniqueInArray", "inert", property.validation.uniqueInArray, UNIQUE_OUTSIDE_ARRAY);
         }
         if (property.excludeFromApi) {
             if (property.access !== undefined) {
@@ -973,7 +974,8 @@ class CollectionLift {
     }
 
     private liftArray(key: string, property: Extract<Property, { type: "array" }>, def: ColumnDef): void {
-        const rules = arrayRules(property.validation);
+        const rules = arrayRules(property.validation, property.of);
+        this.noteItemUniqueness(key, property);
         if (def.type.kind === "array") {
             // A native Postgres array: the element is a column definition.
             const of = Array.isArray(property.of) ? undefined : property.of;
@@ -1033,16 +1035,28 @@ class CollectionLift {
 
     // ── JSON shapes ─────────────────────────────────────────────────────────
 
+    /**
+     * An item's own `uniqueInArray` (`of: { …, validation: { uniqueInArray } }`)
+     * is carried as the array's `uniqueItems` — the same rule, said where the
+     * table model says it — which lowers back as the array's own flag.
+     */
+    private noteItemUniqueness(key: string, property: Extract<Property, { type: "array" }>): void {
+        const of = Array.isArray(property.of) ? undefined : property.of;
+        if (of?.validation?.uniqueInArray === true) {
+            this.note(`${key}[]`, "validation.uniqueInArray", "derived", true, UNIQUE_ITEMS_REASON);
+        }
+    }
+
     /** A map column's shape: its declared fields, and whether it takes others. */
     private mapShape(key: string, property: Extract<Property, { type: "map" }>): JsonShapeDef | undefined {
         if (property.properties === undefined && !property.keyValue) return undefined;
         return this.objectNode(key, property);
     }
 
-    private objectNode(key: string, property: Extract<Property, { type: "map" }>): JsonShapeDef {
+    private objectNode(key: string, property: Extract<Property, { type: "map" }>, inArrayItem = false): JsonShapeDef {
         const fields: Record<string, JsonShapeDef> = {};
         for (const [field, nested] of Object.entries(property.properties ?? {})) {
-            fields[field] = this.jsonNode(`${key}.${field}`, nested, false);
+            fields[field] = this.jsonNode(`${key}.${field}`, nested, false, inArrayItem);
         }
         const node: JsonShapeDef = { kind: "object", fields };
         if (property.keyValue) node.additional = true;
@@ -1075,14 +1089,20 @@ class CollectionLift {
     }
 
     /** One nested property as a JSON node. */
-    private jsonNode(key: string, property: Property, arrayItem: boolean): JsonShapeDef {
+    private jsonNode(key: string, property: Property, arrayItem: boolean, itemField = false): JsonShapeDef {
         this.noteUnknownPropertyFields(key, property);
         for (const field of ["columnName", "access", "excludeFromApi", "databaseDefault"] as const) {
             if (property[field] !== undefined) this.note(key, field, "inert", property[field], "Not read on a field inside a JSON document.");
         }
         if ("isId" in property && property.isId !== undefined) this.note(key, "isId", "inert", property.isId, "Not read on a field inside a JSON document.");
         if (property.validation?.unique !== undefined) this.note(key, "validation.unique", "inert", property.validation.unique, "Not read on a field inside a JSON document.");
-        if (property.validation?.uniqueInArray !== undefined) this.note(key, "validation.uniqueInArray", "ui", property.validation.uniqueInArray, "Checked by the panel only.");
+        // Carried by the array it is in: an item's as the array's
+        // `uniqueItems` (noted where the array is lifted), a field of an
+        // object item's as the array's `uniqueBy`, an array's own as its
+        // `uniqueItems`. Anywhere else it never had an effect.
+        if (property.validation?.uniqueInArray !== undefined && !arrayItem && !itemField && property.type !== "array") {
+            this.note(key, "validation.uniqueInArray", "inert", property.validation.uniqueInArray, UNIQUE_OUTSIDE_ARRAY);
+        }
         const extra: { required?: boolean; description?: string; transform?: ColumnTransform } = {};
         if (property.validation?.required === true) extra.required = true;
         if (property.description !== undefined) extra.description = property.description;
@@ -1136,14 +1156,15 @@ class CollectionLift {
                 return { kind: "geopoint", ...extra, ...(property.defaultValue !== undefined ? { default: { latitude: property.defaultValue.latitude, longitude: property.defaultValue.longitude } } : {}) };
             case "map": {
                 if (property.columnType !== undefined) this.note(key, "columnType", "inert", property.columnType, "Not read on a field inside a JSON document.");
-                const node = this.objectNode(key, property);
+                const node = this.objectNode(key, property, arrayItem);
                 Object.assign(node, extra);
                 if (property.defaultValue !== undefined) node.default = property.defaultValue;
                 return node;
             }
             case "array": {
                 if (property.columnType !== undefined) this.note(key, "columnType", "inert", property.columnType, "Not read on a field inside a JSON document.");
-                const node: JsonShapeDef = { kind: "array", of: this.arrayItemShape(key, property), ...extra, ...validate(arrayRules(property.validation)) };
+                this.noteItemUniqueness(key, property);
+                const node: JsonShapeDef = { kind: "array", of: this.arrayItemShape(key, property), ...extra, ...validate(arrayRules(property.validation, property.of)) };
                 if (property.defaultValue !== undefined) node.default = property.defaultValue;
                 return node;
             }
@@ -1675,13 +1696,35 @@ function dateRules(validation: Extract<Property, { type: "date" }>["validation"]
     return { ...rest };
 }
 
-/** An array's `min`/`max` are counts of items: the table model's `minItems`/`maxItems`. */
-function arrayRules(validation: Extract<Property, { type: "array" }>["validation"]): Rules {
-    if (!validation) return {};
+/** Why an item's `uniqueInArray` is carried by its array. */
+const UNIQUE_ITEMS_REASON = "Carried as the array's `uniqueItems`: the server now refuses a duplicate item on every write (REST, "
+    + "the socket, MCP), where only the panel's form checked it before.";
+
+/** Why `uniqueInArray` outside an array is not carried. */
+const UNIQUE_OUTSIDE_ARRAY = "`uniqueInArray` has an effect only on an array, its items, or the fields of its object items; here it never had one.";
+
+/**
+ * An array's rules. Its `min`/`max` are counts of items: the table model's
+ * `minItems`/`maxItems`. `uniqueInArray` — on the array, or on its items —
+ * is `uniqueItems`; on fields of its object items, `uniqueBy` naming them.
+ * Both are enforced by the server's write validation now, which is stronger
+ * than the panel-only check they were.
+ */
+function arrayRules(validation: Extract<Property, { type: "array" }>["validation"], of: Extract<Property, { type: "array" }>["of"]): Rules {
     const out: Rules = {};
-    if (validation.requiredMessage !== undefined) out.requiredMessage = validation.requiredMessage;
-    if (validation.min !== undefined) out.minItems = validation.min;
-    if (validation.max !== undefined) out.maxItems = validation.max;
+    if (validation?.requiredMessage !== undefined) out.requiredMessage = validation.requiredMessage;
+    if (validation?.min !== undefined) out.minItems = validation.min;
+    if (validation?.max !== undefined) out.maxItems = validation.max;
+    const item = Array.isArray(of) ? undefined : of;
+    if (validation?.uniqueInArray === true || item?.validation?.uniqueInArray === true) {
+        out.uniqueItems = true;
+    }
+    if (item?.type === "map" && item.properties) {
+        const uniqueBy = Object.entries(item.properties)
+            .filter(([, field]) => field.validation?.uniqueInArray === true)
+            .map(([field]) => field);
+        if (uniqueBy.length > 0) out.uniqueBy = uniqueBy;
+    }
     return out;
 }
 

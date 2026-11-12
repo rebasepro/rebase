@@ -15,6 +15,7 @@ import {
     type FieldViewer,
     type RelationOfKind,
     fieldOperationKind,
+    firstDuplicate,
     isColumnFieldOperation,
     isIntegerFamilyType,
     normalizeInclude,
@@ -540,21 +541,10 @@ function collectScalarViolations(key: string, rules: ScalarRules, value: unknown
     }
 }
 
-/** A value as a key two equal values share: JSON with sorted object keys. */
-function sameValueKey(value: unknown): string {
-    const stable = (v: unknown): unknown => {
-        if (Array.isArray(v)) return v.map(stable);
-        if (isPlainObject(v)) return Object.fromEntries(Object.keys(v).sort().map(k => [k, stable(v[k])]));
-        if (v instanceof Date) return v.toISOString();
-        return v;
-    };
-    return `${typeof value}:${JSON.stringify(stable(value))}`;
-}
-
-/** The list-level rules: `minItems`, `maxItems`, `uniqueItems`. */
+/** The list-level rules: `minItems`, `maxItems`, `uniqueItems`, `uniqueBy`. */
 function collectListViolations(key: string, validate: ColumnValidation | undefined, items: readonly unknown[], into: WriteViolation[]): void {
     if (!validate) return;
-    const { minItems, maxItems, uniqueItems } = validate;
+    const { minItems, maxItems, uniqueItems, uniqueBy } = validate;
     if (minItems !== undefined && items.length < minItems) {
         into.push({ field: key, code: "min_items", message: `'${key}' must have at least ${minItems} item${minItems === 1 ? "" : "s"} (received ${items.length}).` });
     }
@@ -562,15 +552,18 @@ function collectListViolations(key: string, validate: ColumnValidation | undefin
         into.push({ field: key, code: "max_items", message: `'${key}' must have at most ${maxItems} item${maxItems === 1 ? "" : "s"} (received ${items.length}).` });
     }
     if (uniqueItems) {
-        const seen = new Map<string, number>();
-        for (const [index, item] of items.entries()) {
-            const sameAs = seen.get(sameValueKey(item));
-            if (sameAs !== undefined) {
-                // Positions rather than the value: the item is caller data.
-                into.push({ field: key, code: "unique_items", message: `'${key}' must not hold the same value twice (items ${sameAs} and ${index} are equal).` });
-                return;
-            }
-            seen.set(sameValueKey(item), index);
+        const duplicate = firstDuplicate(items);
+        // Positions rather than the value: the item is caller data.
+        if (duplicate) into.push({ field: key, code: "unique_items", message: `'${key}' must not hold the same value twice (items ${duplicate[0]} and ${duplicate[1]} are equal).` });
+    }
+    for (const field of uniqueBy ?? []) {
+        const duplicate = firstDuplicate(items, field);
+        if (duplicate) {
+            into.push({
+                field: key,
+                code: "unique_by",
+                message: `'${key}' must not hold two items with the same '${field}' (items ${duplicate[0]} and ${duplicate[1]} have the same '${field}').`
+            });
         }
     }
 }
@@ -729,7 +722,11 @@ function collectFieldOperationViolations(
         if (maxItems !== undefined && pushed.length > maxItems) {
             into.push({ field: key, code: "max_items", message: `'${key}' must have at most ${maxItems} item${maxItems === 1 ? "" : "s"}; $push adds ${pushed.length}.` });
         }
-        if (listRules?.uniqueItems) collectListViolations(key, { uniqueItems: true }, pushed, into);
+        // What the pushed items hold among themselves; a stored item they
+        // repeat is the stored row's, which this request never sees.
+        if (listRules?.uniqueItems || listRules?.uniqueBy) {
+            collectListViolations(key, { uniqueItems: listRules.uniqueItems, uniqueBy: listRules.uniqueBy }, pushed, into);
+        }
         return;
     }
 

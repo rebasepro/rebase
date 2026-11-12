@@ -201,6 +201,12 @@ describe("printColumn — golden chains", () => {
         ].join("\n"));
     });
 
+    it("prints an array's `uniqueBy`", () => {
+        const shape = json.array(json.object({ sku: json.string(), qty: json.number() })).validate({ uniqueBy: ["sku"], maxItems: 50 });
+        expect(printJsonShape(shape.shape)).toBe(
+            "json.array(json.object({ sku: json.string(), qty: json.number() })).validate({ uniqueBy: [\"sku\"], maxItems: 50 })");
+    });
+
     it("prints a transform from its source, and refuses one without", () => {
         const builder = col.text().transform({ beforeSave: ({ value }) => value?.trim() ?? null });
         expect(printColumn(builder.def, { transform: TRANSFORM_SOURCE })).toBe(`col.text().transform(${TRANSFORM_SOURCE})`);

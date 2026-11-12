@@ -7,6 +7,7 @@ import type {
     ColumnDescriptor,
     ColumnElementDescriptor,
     DefaultRls,
+    JsonShapeDef,
     OrderByTuple,
     RelationDef,
     RelationDescriptor,
@@ -369,6 +370,7 @@ function compileOne(
     const columns: ColumnDescriptor[] = [];
     for (const column of entry.columns) {
         problems.push(...checkColumnDef(name, column.key, column.def, column.column));
+        problems.push(...checkUniqueBy(name, column.key, column.def));
         const described = describeColumn(column.key, column.def, column.column);
         // The user store's secrets never leave the server, whatever the
         // declaration says: a redeclared users table is where the flag goes
@@ -744,6 +746,74 @@ function compileOne(
     if (tableConfig.strictWrites === false) descriptor.strictWrites = false;
 
     return { descriptor, problems };
+}
+
+/**
+ * `uniqueBy` names fields of the items of a JSON array of objects
+ * (`json.array(json.object({...})).validate({ uniqueBy: [...] })`, or the
+ * rules of a column holding one). Anywhere else — another column's rules, an
+ * array of scalars, a field the item does not have — it would be a rule
+ * nothing can check, so it is refused.
+ */
+function checkUniqueBy(table: string, key: string, def: ColumnDef): SchemaDefinitionProblem[] {
+    const problems: SchemaDefinitionProblem[] = [];
+    const refuse = (message: string): void => {
+        problems.push({ table, key, message });
+    };
+    // A JSON array column's list rules may sit on the column (the lift puts
+    // them there) or on its shape: both describe the one array.
+    const columnUniqueBy = def.validate?.uniqueBy;
+    if (columnUniqueBy !== undefined && def.json?.kind !== "array") {
+        refuse(
+            "`uniqueBy` compares the items of a JSON array of objects, and this column is not one. Declare the column " +
+            "`col.jsonb(json.array(json.object({ … })).validate({ uniqueBy: [\"field\"] }))`; for an array of plain " +
+            "values, `uniqueItems: true`."
+        );
+    }
+    if (def.element?.validate?.uniqueBy !== undefined) {
+        refuse("the array's items declare `uniqueBy`, which compares a JSON array's object items. For a Postgres array, use `uniqueItems: true` on the column.");
+    }
+    const visit = (node: JsonShapeDef, path: string): void => {
+        const at = path === "" ? "the document" : `"${path}"`;
+        const uniqueBy = "validate" in node ? node.validate?.uniqueBy : undefined;
+        if (uniqueBy !== undefined) {
+            if (node.kind !== "array") {
+                refuse(`${at} declares \`uniqueBy\`, which applies to a JSON array of objects, and it is a JSON ${node.kind}.`);
+            } else if (node.of.kind !== "object") {
+                refuse(`${at} declares \`uniqueBy\`, and its items are JSON ${node.of.kind} values, not objects. For plain values, use \`uniqueItems: true\`.`);
+            } else if (uniqueBy.length === 0) {
+                refuse(`${at} declares \`uniqueBy: []\`, which compares nothing. Name the item fields that must be unique, or drop it.`);
+            } else {
+                const fields = node.of.fields;
+                const missing = uniqueBy.filter(field => !Object.prototype.hasOwnProperty.call(fields, field));
+                if (missing.length > 0) {
+                    refuse(
+                        `${at} declares \`uniqueBy\` naming ${missing.map(field => `"${field}"`).join(", ")}, which the items do not have ` +
+                        `(they have ${Object.keys(fields).map(field => `"${field}"`).join(", ") || "no fields"}).`
+                    );
+                }
+            }
+        }
+        switch (node.kind) {
+            case "object":
+                for (const [field, child] of Object.entries(node.fields)) visit(child, path === "" ? field : `${path}.${field}`);
+                return;
+            case "array":
+                visit(node.of, `${path}[]`);
+                return;
+            case "oneOf":
+                for (const [variant, child] of Object.entries(node.variants)) visit(child, `${path}[${variant}]`);
+                return;
+            default:
+                return;
+        }
+    };
+    if (def.json !== undefined) {
+        visit(def.json.kind === "array" && columnUniqueBy !== undefined
+            ? { ...def.json, validate: { ...def.json.validate, uniqueBy: columnUniqueBy } }
+            : def.json, "");
+    }
+    return problems;
 }
 
 function isMaterialized(def: AnySchemaDef): boolean {

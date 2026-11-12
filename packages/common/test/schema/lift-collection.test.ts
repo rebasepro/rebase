@@ -156,10 +156,45 @@ describe("collectionToTableDef — columns", () => {
             ["c", "name", "ui", "string"],
             ["c", "metadata", "metadata", "object"],
             ["c", "multiline", "unknown", "boolean"],
-            ["c", "validation.uniqueInArray", "ui", "boolean"],
+            // Outside an array it never had an effect.
+            ["c", "validation.uniqueInArray", "inert", "boolean"],
             ["c", "enum", "ui", "array"],
             ["c", "storage.processFile", "browser", "function"]
         ]);
+    });
+});
+
+describe("collectionToTableDef — unique array items", () => {
+    it("carries an array's `uniqueInArray` as `uniqueItems`, and an item's too, noting that the server now enforces it", () => {
+        const { columns, notes } = liftOne({
+            tags: { type: "array", columnType: "text[]", of: { type: "string" }, validation: { uniqueInArray: true } },
+            codes: { type: "array", columnType: "text[]", of: { type: "string", validation: { uniqueInArray: true } } },
+            doc: { type: "map", properties: { refs: { type: "array", of: { type: "string" }, validation: { uniqueInArray: true } } } }
+        });
+        expect(columns.tags.validate).toEqual({ uniqueItems: true });
+        expect(columns.codes.validate).toEqual({ uniqueItems: true });
+        const refs = columns.doc.json?.kind === "object" ? columns.doc.json.fields.refs : undefined;
+        expect(refs?.kind === "array" && refs.validate).toEqual({ uniqueItems: true });
+        expect(notes.map(note => [note.key, note.field, note.kind])).toEqual([["codes[]", "validation.uniqueInArray", "derived"]]);
+        expect(notes[0].reason).toContain("the server now refuses a duplicate item on every write");
+    });
+
+    it("carries `uniqueInArray` on fields of an array's object items as the array's `uniqueBy`", () => {
+        const { columns, notes } = liftOne({
+            lines: {
+                type: "array",
+                columnType: "jsonb",
+                of: { type: "map", properties: { sku: { type: "string", validation: { uniqueInArray: true } }, ean: { type: "string", validation: { uniqueInArray: true } }, qty: { type: "number" } } }
+            },
+            doc: {
+                type: "map",
+                properties: { rows: { type: "array", of: { type: "map", properties: { code: { type: "string", validation: { uniqueInArray: true } } } } } }
+            }
+        });
+        expect(columns.lines.validate).toEqual({ uniqueBy: ["sku", "ean"] });
+        const rows = columns.doc.json?.kind === "object" ? columns.doc.json.fields.rows : undefined;
+        expect(rows?.kind === "array" && rows.validate).toEqual({ uniqueBy: ["code"] });
+        expect(notes).toEqual([]);
     });
 });
 
