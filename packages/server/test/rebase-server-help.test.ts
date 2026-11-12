@@ -45,11 +45,11 @@ describe("rebase-server --help", () => {
         }
     });
 
-    it("says boot provisions collection tables, not that `db push` does", () => {
+    it("says boot provisions the project's tables, not that `db push` does", () => {
         const migrate = help.slice(help.indexOf("REBASE_MIGRATE_ON_BOOT"));
         // The claim the self-hosting page makes, and the one this line
         // contradicted: `ensure` creates the project's tables too.
-        expect(migrate).toMatch(/collections/i);
+        expect(migrate).toMatch(/INCLUDING your schema's/);
         expect(migrate).toMatch(/additive/i);
         // `db push` still has a job, and the help has to say which one: what
         // boot will not do. Not junction-table RLS — boot creates the junction

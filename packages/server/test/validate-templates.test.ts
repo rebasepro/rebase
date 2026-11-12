@@ -3,12 +3,11 @@ import fs from "fs";
 import path from "path";
 
 import { compileTables } from "@rebasepro/common";
-import type { CollectionConfig } from "@rebasepro/types";
-import { tablesFrom } from "./helpers/tables";
+import { isFixtureCollection, tablesFrom } from "./helpers/tables";
 
 /** Lift the template's collections and compile them: what boot does with tables. */
 const compiles = (collections: unknown[]): void => {
-    const { tables, defaultRls } = tablesFrom(collections.filter((c): c is CollectionConfig => typeof c === "object" && c !== null));
+    const { tables, defaultRls } = tablesFrom(collections.filter(isFixtureCollection));
     compileTables(tables, defaultRls ? { defaultRls } : {});
 };
 

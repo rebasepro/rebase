@@ -18,8 +18,7 @@
  */
 import { nestAdminKeysDeep } from "../src/api/ast-schema-editor";
 import { compileTables } from "@rebasepro/common";
-import type { CollectionConfig } from "@rebasepro/types";
-import { tablesFrom } from "./helpers/tables";
+import { isFixtureCollection, tablesFrom } from "./helpers/tables";
 
 import { productsCollectionTemplate } from "../../cms/src/collection_editor/ui/collection_editor/templates/products_template";
 import { blogCollectionTemplate } from "../../cms/src/collection_editor/ui/collection_editor/templates/blog_template";
@@ -41,7 +40,8 @@ describe("every collection template the panel offers boots", () => {
         // below mean something.
         expect(Object.keys(template.properties as Record<string, unknown>).length).toBeGreaterThan(3);
 
-        const saved: CollectionConfig = { ...nestAdminKeysDeep(template), slug: name, table: name };
+        const saved = { ...nestAdminKeysDeep(template), slug: name, table: name };
+        if (!isFixtureCollection(saved)) throw new Error(`template "${name}" is not a collection`);
         const { tables, defaultRls } = tablesFrom([saved]);
         expect(() => compileTables(tables, defaultRls ? { defaultRls } : {})).not.toThrow();
     });

@@ -45,6 +45,17 @@ export function tablesFrom(
 }
 
 /**
+ * Whether an untyped object (a panel template, a parsed file) has the shape of
+ * a legacy collection: a slug and a `properties` map. The lift checks the
+ * rest, property by property, and refuses what it cannot convert.
+ */
+export function isFixtureCollection(value: unknown): value is CollectionConfig {
+    return typeof value === "object" && value !== null
+        && "slug" in value && typeof value.slug === "string"
+        && "properties" in value && typeof value.properties === "object" && value.properties !== null;
+}
+
+/**
  * Import a directory of legacy collection files (`config/collections`) the way
  * the retired loader did — every module's default export, and the index's
  * `defaultSecurityRules` — and lift them. For the tests that still read the

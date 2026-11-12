@@ -46,7 +46,7 @@ Key environment variables:
   DISABLE_SELF_REGISTRATION  "true" to refuse sign-ups outright
   REBASE_METRICS        "true" to expose Prometheus metrics at /metrics
   REBASE_MIGRATE_ON_BOOT  none | ensure (default). "ensure" creates missing
-                        tables and columns at boot, INCLUDING your collections',
+                        tables and columns at boot, INCLUDING your schema's,
                         additively, and applies their row-level security. It
                         never alters, drops or narrows: those go through
                         'rebase db push' from a checkout
