@@ -64,6 +64,7 @@ import {
     customSqlTypeProblem,
     declaredSchemaOf,
     columnByKey,
+    columnNameOf,
     tenantOf
 } from "@rebasepro/common";
 import {
@@ -88,8 +89,7 @@ import {
 import {
     AUTH_USERS_COLUMNS,
     authUsersColumnDefinition,
-    authUsersColumnSql,
-    isAuthCollection
+    authUsersColumnSql
 } from "../auth-users-columns";
 import {
     buildTableSearchColumnSpec,
@@ -960,7 +960,7 @@ export function planSchema(compiledTables: readonly CompiledTable[], options: Pl
     const relational = relationalCollections(allCollections);
     // A collection that serves a view has no table, policy or enum: it is
     // planned on its own (`views`), and resolvable as a relation target.
-    const collections = relational.filter(c => !servesView(c));
+    const collections = relational.filter(c => requireDescriptor(c).kind !== "view");
 
     // The first collection, in declaration order, whose slug or table name is
     // the key — what `collections.find(...)` answered, from a map built once
@@ -1192,7 +1192,7 @@ export function planSchema(compiledTables: readonly CompiledTable[], options: Pl
         declaredSchemas,
         enums,
         tables,
-        views: planViews(relational),
+        views: planViews(compiledTables.map(table => table.descriptor)),
         relations: planRelations(collections, tableEntries),
         extensions,
         functions,
@@ -1202,29 +1202,29 @@ export function planSchema(compiledTables: readonly CompiledTable[], options: Pl
 }
 
 /**
- * The view collections' views, each after the views its query names.
+ * The views the tables declare (`defineView`), each after the views its query
+ * names.
  *
  * Which views a query reads is read off its text — a planned view's name as a
  * whole word — which is enough to order them: a name that appears in a string
  * literal only orders two views that did not need it, never the other way.
  */
-export function planViews(collections: CollectionConfig[]): ViewPlan[] {
-    const declared = collections.flatMap(collection => {
-        if (!isPostgresCollectionConfig(collection) || !collection.view) return [];
-        const schema = schemaOf(collection);
-        const name = getTableName(collection);
-        const idColumns = primaryKeyPropertyNames(collection)
-            .map(key => resolveColumnName(key, collection.properties?.[key]));
-        const materialized = collection.view.materialized === true;
+export function planViews(tables: readonly TableDescriptor[]): ViewPlan[] {
+    const declared = tables.flatMap(descriptor => {
+        const view = descriptor.view;
+        if (descriptor.kind !== "view" || !view || view.query === undefined) return [];
+        const { schema, table: name } = descriptor;
+        const idColumns = descriptor.primaryKey.map(key => columnNameOf(descriptor, key) ?? key);
+        const materialized = view.materialized;
         return [{
             schema, name, qualified: `${schema}.${name}`,
-            query: collection.view.query.trim().replace(/;\s*$/, ""),
+            query: view.query.trim().replace(/;\s*$/, ""),
             materialized,
-            roles: materialized ? [...(collection.view.roles ?? DEFAULT_VIEW_ROLES)] : [],
+            roles: materialized ? [...(view.roles ?? DEFAULT_VIEW_ROLES)] : [],
             idColumns,
             // A materialized view's own `indexes`, on its stored rows.
             indexes: materialized
-                ? buildCollectionIndexSpecs(collection, resolveColumnName)
+                ? buildTableIndexSpecs(descriptor)
                     .map(spec => collectionIndexStatement({ ...spec, table: viewRowsName(name) }).replace(/;$/, ""))
                 : []
         }];
@@ -1360,7 +1360,7 @@ function planCollectionTable(
     triggerFunctionNeeded: { value: boolean }
 ): TablePlan {
     const { schema, table, slug } = descriptor;
-    const auth = isAuthCollection(collection);
+    const auth = descriptor.auth !== undefined;
     const columns: ColumnPlan[] = [];
     const triggers: TriggerPlan[] = [];
     const relations = resolveCollectionRelations(collection);
