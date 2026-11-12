@@ -22,6 +22,7 @@ import { REBASE_USER_ROLE } from "@rebasepro/common";
 import type { BackendBootstrapper, CollectionConfig, DataDriver, InitializedDriver } from "@rebasepro/types";
 import { database as declareDatabase } from "@rebasepro/types";
 import { createRebaseBackend, type RebaseBackend } from "@rebasepro/server";
+import { tablesFrom } from "./helpers/tables";
 
 async function whoamiDb(name: string): Promise<PGlite> {
     const db = new PGlite();
@@ -93,7 +94,7 @@ beforeAll(async () => {
     const mainDriver = driverFor(mainDb, {});
     const analyticsDriver = driverFor(analyticsDb, {});
     backend = await createRebaseBackend({
-        collections: [collection("posts"), collection("page_views", "analytics")],
+        ...tablesFrom([collection("posts"), collection("page_views", "analytics")]),
         bootstrappers: [
             bootstrapper("(default)", true, mainDriver),
             bootstrapper("analytics", false, analyticsDriver)

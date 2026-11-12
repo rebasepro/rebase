@@ -48,6 +48,7 @@ import { _resetRebaseMock } from "../../server/src/singleton";
 import { createPostgresWebSocket } from "../src/websocket";
 import type { RealtimeService } from "../src/services/realtimeService";
 import type { PostgresBackendDriver } from "../src/PostgresBackendDriver";
+import { tablesFrom } from "./helpers/tables";
 
 const SECRET = {
     A: "backend-a-secret-0123456789abcdef-0123456789",
@@ -203,7 +204,7 @@ async function instance(name: "A" | "B", collections: CollectionConfig[], userLi
     const db = await database(name);
     const rateLimitStore = new MemoryRateLimitStore(RATE_WINDOW_MS);
     const backend = await createRebaseBackend({
-        collections,
+        ...tablesFrom(collections),
         bootstrappers: [bootstrapper(name, db)],
         auth: { jwtSecret: SECRET[name] },
         functions: { whoami },
@@ -453,7 +454,7 @@ describe("a read reached over any door sees its backend as rebase", () => {
             // Signed with the process default's secret, so the token below —
             // minted with the module-level helper — verifies on it.
             backend = await createRebaseBackend({
-                collections: [collection("delta_items")],
+                ...tablesFrom([collection("delta_items")]),
                 bootstrappers: [bootstrapper("M", db)],
                 auth: { jwtSecret: SECRET.DEFAULT },
                 surfaces: { mcp: true },
@@ -495,7 +496,7 @@ describe("a read reached over any door sees its backend as rebase", () => {
         let backend: RebaseBackend;
         try {
             backend = await createRebaseBackend({
-                collections: [collection("epsilon_items")],
+                ...tablesFrom([collection("epsilon_items")]),
                 bootstrappers: [bootstrapper("N", db)],
                 auth: { jwtSecret: SECRET.DEFAULT },
                 cronPersistence: false,
@@ -532,7 +533,7 @@ describe("two backends built from one options object", () => {
         const dbs = [await database("E"), await database("F")];
         for (const [i, db] of dbs.entries()) {
             const backend = await createRebaseBackend({
-                collections: [collection(`items_${i}`), users({})],
+                ...tablesFrom([collection(`items_${i}`), users({})]),
                 bootstrappers: [bootstrapper(i === 0 ? "E" : "F", db)],
                 auth,
                 cronPersistence: false,
@@ -563,7 +564,7 @@ describe("two backends built from one auth adapter", () => {
         for (const name of ["G", "H"]) {
             const db = await database(name);
             const backend = await createRebaseBackend({
-                collections: [collection(`keyed_${name.toLowerCase()}`)],
+                ...tablesFrom([collection(`keyed_${name.toLowerCase()}`)]),
                 bootstrappers: [bootstrapper(name, db)],
                 auth,
                 functions: { who },
@@ -638,7 +639,7 @@ describe("initializeRebaseBackend installs its backend as the process default", 
         booted = await initializeRebaseBackend({
             app,
             server,
-            collections: [collection("gamma_items"), users({ auditor: { scopes: ["logs:read"] } })],
+            ...tablesFrom([collection("gamma_items"), users({ auditor: { scopes: ["logs:read"] } })]),
             bootstrappers: [bootstrapper("C", db)],
             auth: { jwtSecret: SECRET.C },
             cronPersistence: false

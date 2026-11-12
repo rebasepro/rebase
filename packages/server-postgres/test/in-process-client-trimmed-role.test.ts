@@ -30,6 +30,7 @@ import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectio
 import { RealtimeService } from "../src/services/realtimeService";
 import { pgliteNodePg } from "./helpers/spg-b-pglite-node-pg";
 import type { HonoEnv } from "../../server/src/api/types";
+import { tablesFrom } from "./helpers/tables";
 
 const ping = defineFunction((app) => {
     app.post("/", (c) => c.json({ pong: true }));
@@ -73,7 +74,7 @@ async function make(surfaces?: typeof WORKER | typeof FUNCTIONS): Promise<Rebase
     const db = new PGlite();
     await db.exec(`CREATE ROLE ${REBASE_USER_ROLE} NOLOGIN`);
     const backend = await createRebaseBackend({
-        collections: [{ name: "x", slug: "x", table: "x", properties: { id: { name: "ID", type: "string", isId: "uuid" } } }],
+        ...tablesFrom([{ name: "x", slug: "x", table: "x", properties: { id: { name: "ID", type: "string", isId: "uuid" } } }]),
         bootstrappers: [bootstrapper(db)],
         auth: { jwtSecret: "in-process-client-trimmed-role-secret-0123456789" },
         functions: { ping },

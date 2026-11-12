@@ -28,6 +28,7 @@ import { initializeRebaseBackend, rebase, _resetRebaseMock, type HonoEnv } from 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { RealtimeService } from "../src/services/realtimeService";
+import { tablesFrom } from "./helpers/tables";
 
 /**
  * Whether the callback context's `client` type declares `data` — the contract,
@@ -131,7 +132,7 @@ describe("a collection callback's `context.client`, on a booted server", () => {
             app: new Hono<HonoEnv>(),
             // Never listening: its `close` is all the shutdown needs.
             server: createServer(),
-            collections: [widgets()],
+            ...tablesFrom([widgets()]),
             bootstrappers: [bootstrapperFor(driver)]
         });
         shutdown = () => backend.shutdown(1_000);

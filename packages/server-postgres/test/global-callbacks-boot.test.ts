@@ -1,7 +1,8 @@
 /**
- * Global callbacks run on a booted Postgres server.
+ * Global hooks run on a booted Postgres server.
  *
- * `initializeRebaseBackend({ callbacks })` stored them on the backend's own
+ * `initializeRebaseBackend({ hooks })` (`backend/hooks.ts`) — `callbacks`
+ * before tables were the front door — stored them on the backend's own
  * collection registry, and `PostgresBootstrapper.initializeDriver` builds a
  * registry of its own for the driver — which is where the driver looks for
  * global callbacks. So a global `afterRead` masking a field across every
@@ -17,13 +18,14 @@ import { createServer } from "node:http";
 import { PGlite } from "@electric-sql/pglite";
 import { pgTable, varchar } from "drizzle-orm/pg-core";
 import { Hono } from "hono";
-import type { BackendBootstrapper, CollectionCallbacks, CollectionConfig, InitializedDriver } from "@rebasepro/types";
+import type { BackendBootstrapper, CollectionConfig, InitializedDriver, TableHooks } from "@rebasepro/types";
 import { initializeRebaseBackend, _resetRebaseMock } from "@rebasepro/server";
 
 import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
 import { RealtimeService } from "../src/services/realtimeService";
 import { pgliteNodePg } from "./helpers/spg-b-pglite-node-pg";
+import { tablesFrom } from "./helpers/tables";
 
 const notesTable = pgTable("notes", {
     id: varchar("id").primaryKey(),
@@ -69,15 +71,15 @@ function bootstrapperOver(pglite: PGlite): { bootstrapper: BackendBootstrapper; 
     return { bootstrapper, driver };
 }
 
-async function boot(callbacks: CollectionCallbacks): Promise<PostgresBackendDriver> {
+async function boot(hooks: TableHooks): Promise<PostgresBackendDriver> {
     const { bootstrapper, driver } = bootstrapperOver(db);
     const backend = await initializeRebaseBackend({
         app: new Hono(),
         // Never listening: its `close` is all the shutdown needs.
         server: createServer(),
-        collections: [notes()],
+        ...tablesFrom([notes()]),
         bootstrappers: [bootstrapper],
-        callbacks
+        hooks
     });
     shutdown = () => backend.shutdown(1_000);
     return driver;
@@ -103,10 +105,10 @@ afterEach(async () => {
     await db.close();
 });
 
-describe("global callbacks on a booted Postgres server", () => {
+describe("global hooks on a booted Postgres server", () => {
     it("run a global `afterRead` on the rows a read returns", async () => {
         const driver = await boot({
-            afterRead: ({ row }) => ({ ...row, body: "[masked]" })
+            afterRead: ({ values }) => ({ ...values, body: "[masked]" })
         });
 
         const rows = await driver.fetchCollection({ path: "notes" });
