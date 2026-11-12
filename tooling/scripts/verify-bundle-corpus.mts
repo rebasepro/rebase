@@ -6,7 +6,7 @@
  * waves, without anyone rebuilding the project. That is the whole promise, and
  * the thing standing behind it has until now been a health gate watching request
  * rates and error rates — which can see a crash loop and cannot see a bundle
- * that quietly stopped loading its collections, a schema version that changed
+ * that quietly stopped loading its tables, a schema version that changed
  * identity under a deployed project, or an old manifest shape that now parses to
  * something subtly different. Those are exactly the regressions a fleet-wide
  * auto-upgrade turns into an outage for everyone at once.
@@ -23,9 +23,20 @@
  *
  * Override the database with CORPUS_DATABASE_URL.
  *
- * Adding a bundle: copy the closest existing directory, change `table` in its
- * collections so it owns its own tables, and add an entry to CORPUS below. Record
- * one per release — the value is entirely in how far back the oldest one goes.
+ * Adding a bundle: copy the closest existing directory, change the table names
+ * in its `backend/schema` so it owns its own tables, and add an entry to CORPUS
+ * below. Record one per release — the value is entirely in how far back the
+ * oldest one goes.
+ *
+ * Bundle format 3 (0.31) is where tables begin, and the runtime refuses every
+ * earlier bundle at manifest read with a message naming the codemod: formats 1
+ * and 2 carry `config/collections`, which it no longer reads, and serving one
+ * would mean introspecting the database instead of serving the declared tables.
+ * So the format-1 and format-2 fixtures are kept as specimens of that refusal —
+ * the contract for a deployed project that was never migrated is now "refused,
+ * loudly, with the way out", and that is what they assert. The fleet-upgrade
+ * promise for tables needs a format-3 fixture; until one is recorded the corpus
+ * says so and fails, rather than passing on refusals alone.
  *
  * Like `verify-selfhost.mts`, this imports runtime source BY PATH rather than by
  * package name: in a git worktree `@rebasepro/*` resolves through node_modules
@@ -52,6 +63,12 @@ interface CorpusEntry {
     kind: "backend" | "static";
     /** Marker text the bundle's index.html contains, when it serves one. */
     indexMarker?: string;
+    /**
+     * A bundle this runtime refuses at manifest read: formats 1 and 2, built
+     * from `config/collections`. Asserted to be refused with the codemod named,
+     * and never booted.
+     */
+    refused?: true;
 }
 
 const CORPUS: CorpusEntry[] = [
@@ -59,19 +76,22 @@ const CORPUS: CorpusEntry[] = [
         dir: "format1-cms",
         describe: "bundle format 1 — `mode: cms`, a bundled admin at entry.admin",
         kind: "backend",
-        indexMarker: "CORPUS_FORMAT1_ADMIN_INDEX"
+        indexMarker: "CORPUS_FORMAT1_ADMIN_INDEX",
+        refused: true
     },
     {
         dir: "format2-backend",
         describe: "bundle format 2 — `kind: backend`, entry.static as a list",
         kind: "backend",
-        indexMarker: "CORPUS_FORMAT2_SITE_INDEX"
+        indexMarker: "CORPUS_FORMAT2_SITE_INDEX",
+        refused: true
     },
     {
         dir: "format2-static",
         describe: "bundle format 2 — `kind: static`, no database at all",
         kind: "static",
-        indexMarker: "CORPUS_STATIC_INDEX"
+        indexMarker: "CORPUS_STATIC_INDEX",
+        refused: true
     }
 ];
 
@@ -83,10 +103,11 @@ function check(label: string, ok: boolean, detail = ""): void {
 
 const { bootFromBundle } = await import(`${ROOT}/packages/server/src/boot/boot.ts`);
 const { readBundleManifest } = await import(`${ROOT}/packages/server/src/boot/bundle.ts`);
-const { loadCollectionsFromDirectory } = await import(`${ROOT}/packages/server/src/collections/loader.ts`);
+const { loadBackendSchema, compileLoadedSchema } = await import(`${ROOT}/packages/server/src/schema/load-schema.ts`);
 const { computeSchemaVersion } = await import(`${ROOT}/packages/types/src/types/schema_version.ts`);
+const { LEGACY_LAYOUT_REMEDY } = await import(`${ROOT}/packages/types/src/index.ts`);
 
-// One database, many bundles. Each fixture's collections own distinct tables, so
+// One database, many bundles. Each fixture's schema owns distinct tables, so
 // they can share it without colliding — and sharing is closer to the truth than
 // a pristine database per bundle would be, because a runtime upgrade always
 // lands on a database some earlier runtime already wrote to.
@@ -153,8 +174,12 @@ const staged: string[] = [];
  */
 const DRIVER_SKEW = ["0.10.0", "0.11.0", "0.12.0", "0.13.0", "0.14.0", "0.14.1", "0.15.0", "0.16.0", "0.17.3"];
 
-/** The fixture the skew pass exercises — current format, real collections, real writes. */
-const SKEW_FIXTURE = "format2-backend";
+/**
+ * The fixture the skew pass exercises — current format, real tables, real
+ * writes: the first backend fixture this runtime boots. `undefined` while the
+ * corpus has none (see the header), which the pass reports as a failure.
+ */
+const SKEW_FIXTURE = CORPUS.find(e => e.kind === "backend" && !e.refused)?.dir;
 
 /**
  * The oldest driver that can still build its own collection tables at boot.
@@ -362,6 +387,12 @@ async function provisionsFromEmpty(bundleDir: string): Promise<boolean> {
  * exists to prevent.
  */
 async function runSkewPass(): Promise<void> {
+    if (!SKEW_FIXTURE) {
+        check("a format-3 backend fixture exists for the version-skew pass", false,
+            "every backend fixture is a pre-tables bundle the runtime refuses — record a format-3 bundle " +
+            "(backend/schema, entry.tables) under tests/fixtures/bundles/ and add it to CORPUS");
+        return;
+    }
     const fixtureDir = path.join(CORPUS_DIR, SKEW_FIXTURE);
     const entry = CORPUS.find(e => e.dir === SKEW_FIXTURE);
     if (!entry) throw new Error(`SKEW_FIXTURE ${SKEW_FIXTURE} is not in CORPUS`);
@@ -484,6 +515,21 @@ async function runSkewPass(): Promise<void> {
  * not have.
  */
 async function verifyBundle(entry: CorpusEntry, bundleDir: string): Promise<void> {
+    if (entry.refused) {
+        // The runtime's answer to a bundle built before tables: refused at
+        // manifest read, before anything boots, with the way out in the hint.
+        // A refusal without the codemod named is a tenant with no next step.
+        try {
+            readBundleManifest(bundleDir);
+            check("refused at manifest read (built from config/collections)", false, "the manifest was accepted");
+        } catch (err) {
+            const said = err instanceof Error ? `${err.message} ${"hint" in err ? String(err.hint) : ""}` : String(err);
+            check("refused at manifest read (built from config/collections)", true);
+            check("the refusal names the codemod", said.includes(LEGACY_LAYOUT_REMEDY), said.slice(0, 160));
+        }
+        return;
+    }
+
     // Read the manifest before booting: a format the runtime refuses is a
     // different (and much louder) failure than one that boots and misbehaves,
     // and the corpus should tell them apart.
@@ -530,35 +576,36 @@ async function verifyBundle(entry: CorpusEntry, bundleDir: string): Promise<void
             //
             // `GET /api/meta/schema-version` cannot supply one: `schemaVersionOf`
             // returns the manifest's value verbatim whenever the bundle declares
-            // it, and only computes from collections when it does not. Comparing
+            // it, and only computes from the tables when it does not. Comparing
             // the endpoint to the manifest therefore compares the manifest to
             // itself and passes on a bundle whose declared version is nonsense —
             // which is exactly what it did here until a deliberately corrupted
             // fixture still went green.
             //
-            // So the hash is recomputed from the bundle's own collections with
-            // the same function the CLI used at build time. The manifest's value
-            // is the CLI's answer, frozen; this is the runtime's answer, now. If
-            // they part company, every deployed bundle's declared schemaVersion
-            // is wrong and SDK drift detection has quietly stopped meaning
-            // anything.
+            // So the hash is recomputed from the bundle's own tables with the
+            // same function the CLI used at build time: loaded and compiled the
+            // way boot loads them, hashed over the descriptors. The manifest's
+            // value is the CLI's answer, frozen; this is the runtime's answer,
+            // now. If they part company, every deployed bundle's declared
+            // schemaVersion is wrong and SDK drift detection has quietly stopped
+            // meaning anything.
             const declared = String(manifest.schemaVersion ?? "");
-            // `manifest` is parsed JSON, so `entry` is `unknown`, and `any` on it
-            // switched off the check on everything read through it —
-            // `String((manifest.entry as any)?.collections)` turned a missing
-            // entry into the *directory name* `"undefined"`, which then failed
-            // as "0 collections" and read like a broken bundle rather than a
-            // manifest that never said where they were.
+            // `manifest` is parsed JSON, so `entry` is `unknown`. A missing
+            // entry must read as "the manifest never said where the tables
+            // are", not as a directory named "undefined" holding none.
             const entry = manifest.entry;
-            const collectionsEntry = entry && typeof entry === "object"
-                ? (entry as { collections?: unknown }).collections
-                : undefined;
-            check("manifest names its collections directory", typeof collectionsEntry === "string",
-                typeof collectionsEntry === "string" ? collectionsEntry : "entry.collections missing");
-            const collectionsDir = path.join(bundleDir, typeof collectionsEntry === "string" ? collectionsEntry : "__no_collections_entry__");
-            const loaded = await loadCollectionsFromDirectory(collectionsDir);
-            const recomputed = computeSchemaVersion(loaded);
-            check("collections load from the bundle", loaded.length > 0, `${loaded.length} collection(s)`);
+            const tablesEntry = entry && typeof entry === "object" && "tables" in entry ? entry.tables : undefined;
+            check("manifest names its tables directory", typeof tablesEntry === "string",
+                typeof tablesEntry === "string" ? tablesEntry : "entry.tables missing");
+            const tablesDir = path.join(bundleDir, typeof tablesEntry === "string" ? tablesEntry : "__no_tables_entry__");
+            let descriptors: unknown[] = [];
+            try {
+                descriptors = compileLoadedSchema(await loadBackendSchema(tablesDir)).descriptors;
+            } catch (err) {
+                check("tables load from the bundle", false, err instanceof Error ? err.message.split("\n")[0] : String(err));
+            }
+            const recomputed = computeSchemaVersion(descriptors);
+            check("tables load from the bundle", descriptors.length > 0, `${descriptors.length} table(s)`);
             check("schema-version recomputes to the frozen value", recomputed === declared,
                 `manifest ${declared || "(none)"} vs recomputed ${recomputed}`);
 
@@ -566,9 +613,9 @@ async function verifyBundle(entry: CorpusEntry, bundleDir: string): Promise<void
             const reported = (await get("/api/meta/schema-version")).body;
             check("schema-version endpoint serves it", reported.includes(declared), reported.slice(0, 60));
 
-            // The collections actually loaded, and their tables actually exist —
-            // boot creates them additively. A bundle whose collections silently
-            // failed to load looks perfectly healthy right up to the first query.
+            // The tables actually loaded, and actually exist — boot creates them
+            // additively. A bundle whose schema silently failed to load looks
+            // perfectly healthy right up to the first query.
             const slug = entry.dir === "format1-cms" ? "notes" : "notes";
             const authed = await get(`/api/data/${slug}?limit=1`, asService);
             check(`GET /api/data/${slug} as a service`, authed.status === 200,
@@ -626,7 +673,7 @@ await runSkewPass();
 for (const dir of staged) fs.rmSync(dir, { recursive: true, force: true });
 
 console.log(failures === 0
-    ? `\n\x1b[32m✓ Bundle corpus passed — every shipped bundle shape still boots, and ` +
+    ? `\n\x1b[32m✓ Bundle corpus passed — every shipped bundle shape boots or is refused with the codemod, and ` +
       `today's runtime still serves a project carrying any of ${DRIVER_SKEW.join(", ")}.\x1b[0m\n`
     : `\n\x1b[31m✗ ${failures} check(s) failed.\x1b[0m\n`);
 process.exit(failures === 0 ? 0 : 1);

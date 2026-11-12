@@ -68,7 +68,7 @@ done
 # Keep this list in step with `packages:` in pnpm-workspace.yaml. `e2e` used to
 # be here and is gone — it moved under tests/ and is no longer an importer.
 # `saas/*` is deliberately absent: it is gitignored, so a worktree never has it.
-for p in app app/frontend app/backend app/config website tooling/videos tooling/rebase-agent-skills; do
+for p in app app/frontend app/backend website tooling/videos tooling/rebase-agent-skills; do
     link_importer "$p"
 done
 for p in "$WORKTREE"/examples/*/; do

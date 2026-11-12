@@ -172,7 +172,7 @@ The root scripts among them:
 | `check:contributor-setup:live` | CONTRIBUTING, `app/.env.example` and the compose file, executed: compose is started and the documented URL has to reach *that* container, which a native Postgres on the same port silently prevents. Lane `cli`. | `REBASE_DB_PORT` moves the port |
 | `verify:selfhost` | A self-hosted deploy, built and booted from the repository. Lane `selfhost`. | — |
 | `verify:selfhost:docker` | The same, through the shipped compose file and image. Lane `selfhost`. | — |
-| `verify:corpus` | A corpus of bundles still loads under the current runtime contract. Lane `selfhost`. | — |
+| `verify:corpus` | A corpus of bundles still loads under the current runtime contract — and a bundle built before tables (formats 1 and 2, `config/collections`) is refused at manifest read with the codemod named, never booted into a different API. Fails while the corpus has no bootable format-3 backend fixture for the version-skew pass. Lane `selfhost`. | Record a fixture under `tests/fixtures/bundles/` |
 | `rls:check` | The database `verify:selfhost` pushed into, against the fifteen RLS checks, with table and policy floors so an empty database cannot pass, and `--strict-baseline` so a baseline entry nothing matches any more fails instead of waiting to accept a regression. Lane `selfhost`. | `tooling/scripts/rls-baseline.json` |
 
 And the suites that are not root scripts:

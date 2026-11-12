@@ -4,8 +4,8 @@
  * `infra/docker/docker-compose.selfhost.yml` is the shipped form of this — Postgres,
  * plus the published runtime image with `dist-bundle` mounted at `/bundle`. What
  * that adds over this script is a container and an image tag. Everything the
- * change is actually about happens below: a real bundle built from real
- * collections, two static apps folded in at different paths, and a real boot
+ * change is actually about happens below: a real bundle built from the real
+ * `backend/schema`, two static apps folded in at different paths, and a real boot
  * against a real database, answering real requests.
  *
  * Run it when you touch the manifest, the bundle format, folding, or serveSPA:
@@ -15,7 +15,7 @@
  *
  * Override the database with ACCEPTANCE_DATABASE_URL. The script pushes the
  * schema itself, up front — that is the self-host recipe, and it exercises the
- * full `db push` path. The runtime would otherwise create the collection tables
+ * full `db push` path. The runtime would otherwise create the tables
  * and their RLS, junction tables included, at boot (REBASE_MIGRATE_ON_BOOT defaults to "ensure"); pushing first just
  * means that boot step finds nothing left to do. The managed equivalent — a
  * fresh database served purely by boot-time provisioning, no push — is pinned
@@ -67,7 +67,7 @@ for (const [name, label, base] of [["site", "SITE", "/"], ["admin", "ADMIN", "/a
     fs.writeFileSync(path.join(appDir(name), "assets", "app.js"), `console.log("${label}_ASSET");`);
 }
 
-// ── Build the backend bundle from the reference app's collections ────────────
+// ── Build the backend bundle from the reference app's tables ─────────────────
 console.log("\n[1m▸ Building the backend bundle[0m");
 const loaded = loadManifest(projectRoot);
 const backend = findBackendApp(loaded.manifest);
@@ -84,7 +84,7 @@ const built = await buildBundle({
 });
 check("bundle built", fs.existsSync(path.join(outDir, "manifest.json")));
 check("kind is backend", built.manifest.kind === "backend", String(built.manifest.kind));
-check("collections compiled in", (built.collectionCount ?? 0) > 0, `${built.collectionCount} collection(s)`);
+check("tables compiled in", (built.tableCount ?? 0) > 0, `${built.tableCount} table(s)`);
 
 // ── Fold both static apps in, each at its own path ───────────────────────────
 console.log("\n[1m▸ Folding two static apps in[0m");
@@ -106,7 +106,7 @@ check("both apps folded", folded.length === 2, folded.map((f: { appName: string;
 const manifest = JSON.parse(fs.readFileSync(path.join(outDir, "manifest.json"), "utf8"));
 check("entry.static lists both", Array.isArray(manifest.entry.static) && manifest.entry.static.length === 2,
     JSON.stringify(manifest.entry.static));
-check("folding did not drop entry.config", Boolean(manifest.entry.config), manifest.entry.config);
+check("folding did not drop entry.tables", Boolean(manifest.entry.tables), manifest.entry.tables);
 
 // ── The schema. Its own step, exactly as the compose recipe has it ───────────
 console.log("\n[1m▸ Pushing the schema[0m");
@@ -118,7 +118,7 @@ const pushUrl = DATABASE_URL.includes("sslmode=") ? DATABASE_URL : `${DATABASE_U
 // package.json of its own, so a pnpm-isolated dependency would not resolve.
 const push = spawnSync(
     "npx",
-    ["tsx", pluginCli, "db", "push", "--collections", "../config/collections", "--yes"],
+    ["tsx", pluginCli, "db", "push", "--schema-dir", "schema", "--yes"],
     {
         cwd: path.join(projectRoot, "backend"),
         env: { ...process.env, DATABASE_URL: pushUrl },
@@ -177,7 +177,7 @@ check("GET /admin/collections/posts", deep.body.includes("ADMIN_INDEX") && !deep
 check("GET /health", (await get("/health")).status === 200, "not swallowed by the SPA fallback");
 check("GET /api/data/posts unauthenticated", (await get("/api/data/posts?limit=1")).status === 401);
 
-// "The admin lists collections": the data API reading the tables push created,
+// "The admin lists the tables": the data API reading the tables push created,
 // out of the same process that just served the SPA.
 const posts = await get("/api/data/posts?limit=1", asService);
 let rows: unknown;

@@ -37,7 +37,7 @@ function evalRoot(ctx) {
  * lockfile-worktree check exists to catch.
  */
 function linkNodeModules(primaryRoot, worktree) {
-    const candidates = ["", "app", "app/frontend", "app/backend", "app/config"];
+    const candidates = ["", "app", "app/frontend", "app/backend"];
     for (const entry of fs.readdirSync(path.join(primaryRoot, "packages"), { withFileTypes: true })) {
         if (entry.isDirectory()) candidates.push(path.join("packages", entry.name));
     }
