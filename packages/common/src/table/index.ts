@@ -14,3 +14,7 @@ export * from "./access";
 export * from "./relations";
 export * from "./table-options";
 export * from "./json-shape";
+export * from "./field-operations";
+export * from "./validation";
+export * from "./query-names";
+export * from "./junction";
