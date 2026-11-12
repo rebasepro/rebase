@@ -44,7 +44,7 @@ export function setDefaultBackend(backend: { rebase: RebaseServerClient; service
     if (services.jwt !== processJwtService) setDefaultJwtService(services.jwt);
     setDefaultAccessControl(services.access);
     configureCredentials({ apiKeyStore: services.apiKeyStore, authAdapter: services.authAdapter });
-    configureUserPicking(services.collections);
+    configureUserPicking(services.tables);
     setSharedRateLimitStore(services.rateLimitStore);
     _initRebase(backend.rebase);
     setDefaultBackendScope({ rebase: backend.rebase, topics: services.topics, queues: services.queues });

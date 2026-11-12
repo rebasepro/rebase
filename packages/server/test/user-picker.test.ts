@@ -1,14 +1,14 @@
 /**
  * `GET /api/admin/users/pick` — the user picker's read.
  *
- * A `userSelect` field is picked from the users, and the picker listed them
- * through `GET /api/admin/users`, which needs `users:read`. An editor who may
- * write the collection the field is on holds no admin-plane scope, so their
+ * A user column (`.userId()`) is picked from the users, and the picker listed
+ * them through `GET /api/admin/users`, which needs `users:read`. An editor who
+ * may write the table the column is on holds no admin-plane scope, so their
  * picker was always empty and the value they had picked showed as a bare id.
  *
- * The pick read answers anyone who may write a collection with a `userSelect`
- * field — judged by the collection's `securityRules` the way the admin panel
- * judges whether to offer the form — and anyone holding `users:read`. It
+ * The pick read answers anyone who may write a table with a user column —
+ * judged by the table's `rls` the way the admin panel judges whether to offer
+ * the form — and anyone holding `users:read`. It
  * answers four fields per user and nothing else: no roles, no disabled flag,
  * no timestamps, nothing an administrator's list carries beyond who the
  * person is.
@@ -16,7 +16,8 @@
 import { describe, it, expect, beforeAll, afterEach } from "@jest/globals";
 import { Hono } from "hono";
 import { EMPTY_ACCESS_MODEL } from "@rebasepro/types";
-import type { CollectionConfig, SecurityRule } from "@rebasepro/types";
+import { col, defineTable, json, type AnyTableDef, type SecurityRule } from "@rebasepro/types";
+import { compileTables } from "@rebasepro/common";
 import { initializeRebaseBackend } from "../src/init";
 import type { HonoEnv } from "../src/api/types";
 import { createAdminUsersRoute } from "../src/auth/admin-users-route";
@@ -25,7 +26,6 @@ import { configureUserPicking } from "../src/auth/user-picking";
 import { configureJwt, generateAccessToken } from "../src/auth/jwt";
 import type { AuthRepository, ListUsersOptions, UserData } from "../src/auth/interfaces";
 import { fakeBootstrapper, fakeDataDriver, idleServer, mockAuthRepository } from "./helpers/server-b-fakes";
-import { tablesFrom } from "./helpers/tables";
 
 const ROLES: Record<string, string[]> = {
     "admin-1": ["admin"],
@@ -63,28 +63,27 @@ function repo() {
 }
 
 /** Editors write posts; readers only read them. `assignee` references a user. */
-const posts: CollectionConfig = {
-    slug: "posts",
-    name: "Posts",
-    table: "posts",
-    securityRules: [
+const postsDef = defineTable("posts", {
+    columns: {
+        id: col.serial().primaryKey(),
+        title: col.text(),
+        assignee: col.text().userId()
+    },
+    rls: [
         { operations: ["select"], roles: ["editor", "reader"] },
         { operations: ["insert", "update"], roles: ["editor"] }
-    ],
-    properties: {
-        id: { name: "ID", type: "number", isId: "increment" },
-        title: { name: "Title", type: "string" },
-        assignee: { name: "Assignee", type: "string", userSelect: true }
-    }
-};
+    ]
+});
 
-/** No field here references a user. */
-const tags: CollectionConfig = {
-    slug: "tags",
-    name: "Tags",
-    table: "tags",
-    properties: { id: { name: "ID", type: "number", isId: "increment" }, label: { name: "Label", type: "string" } }
-};
+/** No column here references a user. */
+const tagsDef = defineTable("tags", {
+    columns: { id: col.serial().primaryKey(), label: col.text() },
+    rls: [{ operation: "all", access: "authenticated" }]
+});
+
+const descriptorOfDef = (def: AnyTableDef) => compileTables([def])[0];
+const posts = descriptorOfDef(postsDef);
+const tags = descriptorOfDef(tagsDef);
 
 function app() {
     const { authRepo, listCalls } = repo();
@@ -105,7 +104,7 @@ describe("GET /users/pick", () => {
         configureAccess({ model: EMPTY_ACCESS_MODEL });
     });
 
-    it("answers an editor who may write a collection with a userSelect field", async () => {
+    it("answers an editor who may write a table with a user column", async () => {
         configureUserPicking(() => [posts, tags]);
         const { get } = app();
 
@@ -154,7 +153,7 @@ describe("GET /users/pick", () => {
         expect(Object.keys(body.users[0]).sort()).toEqual(["displayName", "email", "photoURL", "uid"]);
     });
 
-    it("refuses a caller who may only read the collections that reference users", async () => {
+    it("refuses a caller who may only read the tables that reference users", async () => {
         configureUserPicking(() => [posts, tags]);
         const { get } = app();
 
@@ -163,34 +162,34 @@ describe("GET /users/pick", () => {
         expect(res.status).toBe(403);
     });
 
-    it("refuses an editor when no collection references users", async () => {
+    it("refuses an editor when no table references users", async () => {
         configureUserPicking(() => [tags]);
         const { get } = app();
 
         expect((await get("ed-1", "/users/pick")).status).toBe(403);
     });
 
-    it("finds a userSelect field nested in a map or an array", async () => {
-        const nested: CollectionConfig = {
-            ...tags,
-            slug: "tasks",
-            securityRules: [{ operations: ["insert", "update"], roles: ["editor"] }],
-            properties: {
-                id: { name: "ID", type: "number", isId: "increment" },
-                review: {
-                    name: "Review",
-                    type: "map",
-                    properties: { reviewers: { name: "Reviewers", type: "array", of: { name: "Reviewer", type: "string", userSelect: true } } }
-                }
-            }
-        };
+    it("finds a user column nested in a json document or as the items of an array", async () => {
+        const nested = descriptorOfDef(defineTable("tasks", {
+            columns: {
+                id: col.serial().primaryKey(),
+                review: col.jsonb(json.object({ reviewers: json.array(json.string().userId()) }))
+            },
+            rls: [{ operations: ["insert", "update"], roles: ["editor"] }]
+        }));
+        const listed = descriptorOfDef(defineTable("teams", {
+            columns: { id: col.serial().primaryKey(), members: col.array(col.text().userId()) },
+            rls: [{ operations: ["insert", "update"], roles: ["editor"] }]
+        }));
+        configureUserPicking(() => [listed]);
+        expect((await app().get("ed-1", "/users/pick")).status).toBe(200);
         configureUserPicking(() => [nested]);
         const { get } = app();
 
         expect((await get("ed-1", "/users/pick")).status).toBe(200);
     });
 
-    it("answers whoever holds users:read, whatever the collections say", async () => {
+    it("answers whoever holds users:read, whatever the tables say", async () => {
         configureUserPicking(() => []);
         configureAccess({ model: { roles: { reader: { scopes: ["users:read"] } }, scopes: {} } });
         const { get } = app();
@@ -203,15 +202,14 @@ describe("GET /users/pick", () => {
      * A rule written as SQL the policy model cannot read cannot be judged
      * before the row exists. Read optimistically, as the admin panel's form
      * gate reads it, any signed-in person could list every user's name and
-     * email through such a collection. For the picker it counts as refusing.
+     * email through such a table. For the picker it counts as refusing.
      */
-    describe("a collection whose rules are raw SQL", () => {
+    describe("a table whose rules are raw SQL", () => {
         const RAW = "current_setting('app.flag', true) = 'on'";
-        const withRules = (securityRules: SecurityRule[]): CollectionConfig => ({
-            ...posts,
-            slug: "notes",
-            securityRules
-        });
+        const withRules = (rls: SecurityRule[]) => descriptorOfDef(defineTable("notes", {
+            columns: { id: col.serial().primaryKey(), assignee: col.text().userId() },
+            rls
+        }));
 
         it("does not count as writable: an editor is refused", async () => {
             configureUserPicking(() => [withRules([{ operations: ["insert", "update"], using: RAW }])]);
@@ -274,7 +272,7 @@ describe("GET /users/pick", () => {
 });
 
 /**
- * The picker judges the collections the backend was booted with: wired at
+ * The picker judges the tables the backend was booted with: wired at
  * boot, not only in a unit test that configures it by hand.
  */
 describe("GET /api/admin/users/pick on a booted backend", () => {
@@ -296,7 +294,7 @@ describe("GET /api/admin/users/pick on a booted backend", () => {
         const backend = await initializeRebaseBackend({
             app: hono,
             server: idleServer(),
-            ...tablesFrom([posts]),
+            tables: [postsDef],
             cronPersistence: false,
             bootstrappers: [bootstrapper],
             auth: { jwtSecret: SECRET }
@@ -304,7 +302,7 @@ describe("GET /api/admin/users/pick on a booted backend", () => {
         return { hono, stop: () => backend.cronScheduler?.stop() };
     }
 
-    it("answers an editor of a collection with a userSelect field", async () => {
+    it("answers an editor of a table with a user column", async () => {
         const { hono, stop } = await boot();
         try {
             const token = await generateAccessToken("ed-1", ["editor"]);

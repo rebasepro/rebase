@@ -24,6 +24,7 @@ import type { EmailService } from "../src/email";
 import type {
     AuthCollectionConfig,
     BatchWriteProps,
+    CompiledAuthHooks,
     CollectionConfig,
     DeleteManyProps,
     DeleteProps,
@@ -72,6 +73,8 @@ function harness(options: {
     hooks?: AuthHooks;
     caller?: string;
     collections?: CollectionConfig[];
+    /** The auth table's compiled `onCreateUser` / `onResetPassword`, as the adapter is built with them. */
+    authTableHooks?: CompiledAuthHooks;
     /** An email service that can send, so a created user is invited. */
     email?: boolean;
     failWrites?: boolean;
@@ -99,6 +102,7 @@ function harness(options: {
     const adapter = createBuiltinAuthAdapter({
         authRepository: repo,
         authHooks: options.hooks,
+        authTableHooks: options.authTableHooks,
         ...(options.email ? {
             emailService,
             emailConfig: { from: "noreply@example.com", resetPasswordUrl: "https://app.example.com" }
@@ -475,13 +479,13 @@ describe("creating users through the data API's bulk doors", () => {
         expect(failed.sent).toEqual([]);
     });
 
-    it("POST /bulk runs the collection's onCreateUser for each row", async () => {
+    it("POST /bulk runs the auth table's onCreateUser for each row", async () => {
         const onCreateUser = jest.fn(async (body: Record<string, unknown>) => ({
             values: { email: String(body.email).toLowerCase(), displayName: "From the hook" },
             invitationSent: true
         }));
         const hooked = usersCollection({ enabled: true, onCreateUser });
-        const { app, writes } = harness({ admins: ["admin-1"], collections: [hooked, posts] });
+        const { app, writes } = harness({ admins: ["admin-1"], collections: [hooked, posts], authTableHooks: { onCreateUser } });
 
         const res = await send(app, "POST", "/users/bulk", { rows: [{ email: "X@Y.Z", inviteCode: "a" }, { email: "P@Q.R", inviteCode: "b" }] });
 
@@ -527,7 +531,7 @@ describe("creating users through the data API's bulk doors", () => {
     it("a _batch refused by a user-administration check runs no create hook", async () => {
         const onCreateUser = jest.fn(async (body: Record<string, unknown>) => ({ values: body }));
         const hooked = usersCollection({ enabled: true, onCreateUser });
-        const { app, writes } = harness({ admins: ["admin-1"], collections: [hooked, posts] });
+        const { app, writes } = harness({ admins: ["admin-1"], collections: [hooked, posts], authTableHooks: { onCreateUser } });
 
         const res = await send(app, "POST", "/_batch", {
             operations: [

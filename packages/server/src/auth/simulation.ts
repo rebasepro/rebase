@@ -53,10 +53,10 @@ import {
     SIMULATED_CONTEXT_HEADER,
     type AccessSimulation,
     type ApiKeyMasked,
-    type CollectionConfig,
-    type DataDriver
+    type DataDriver,
+    type TableDescriptor
 } from "@rebasepro/types";
-import { apiHiddenFieldNames, restrictedFieldNames } from "@rebasepro/common";
+import { apiHiddenKeys, restrictedKeys } from "@rebasepro/common";
 import type { HonoEnv } from "../api/types";
 import { ApiError, errorHandler } from "../api/errors";
 import { scopeDataDriver } from "./rls-scope";
@@ -336,13 +336,13 @@ export async function applySimulation(
 }
 
 /**
- * The fields of `collection` the roles cannot read: what the driver strips
- * from every row it hands them. Fields hidden from everyone (`excludeFromApi`)
- * are left out — no role sees those, so they say nothing about this one.
+ * The columns and relations of `table` the roles cannot read: what the driver
+ * strips from every row it hands them. Private columns (`.private()`) are left
+ * out — no role sees those, so they say nothing about this one.
  */
-export function maskedFieldsFor(collection: CollectionConfig, roles: readonly string[]): string[] {
-    const hiddenFromAll = apiHiddenFieldNames(collection);
-    return restrictedFieldNames(collection, { roles }, "read").declared
+export function maskedFieldsFor(table: TableDescriptor, roles: readonly string[]): string[] {
+    const hiddenFromAll = apiHiddenKeys(table);
+    return restrictedKeys(table, { roles }, "read").declared
         .filter(name => !hiddenFromAll.has(name));
 }
 
@@ -352,7 +352,7 @@ export function maskedFieldsFor(collection: CollectionConfig, roles: readonly st
  *
  * Mounted ahead of the data-plane groups; it reads, after the request is
  * answered, what {@link applySimulation} and the REST generator recorded on
- * the context — the identity, and which collection the request was about.
+ * the context — the identity, and which table the request was about.
  */
 export function reportSimulatedContext(): MiddlewareHandler<HonoEnv> {
     return async (c, next) => {
@@ -360,11 +360,11 @@ export function reportSimulatedContext(): MiddlewareHandler<HonoEnv> {
         const simulation = c.get("simulation");
         if (!simulation) return;
         const slug = c.get("collection");
-        const collection = slug ? c.get("services")?.collections().find(entry => entry.slug === slug) : undefined;
+        const table = slug ? c.get("services")?.tables().find(entry => entry.slug === slug) : undefined;
         const value = formatSimulatedContext({
             role: simulation.role,
             sub: simulation.sub,
-            maskedColumns: collection ? maskedFieldsFor(collection, simulation.roles) : [],
+            maskedColumns: table ? maskedFieldsFor(table, simulation.roles) : [],
             ...(simulation.apiKeyId ? { apiKeyId: simulation.apiKeyId } : {}),
             ...(slug ? { collection: slug } : {})
         });

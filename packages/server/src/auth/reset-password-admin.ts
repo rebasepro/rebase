@@ -2,7 +2,7 @@
  * Standalone admin endpoint for resetting a user's password.
  *
  * Hook resolution order:
- * 1. Collection-level hook (`auth.onResetPassword` on the collection)
+ * 1. Auth-table hook (`auth.onResetPassword` on `defineAuthTable`)
  * 2. Backend-level hook (`AuthHooks.onAdminResetPassword`)
  * 3. Built-in default (send reset email, or generate temp password)
  *
@@ -24,7 +24,7 @@ import { getPasswordResetTemplate, resolveEmailBranding } from "../email/templat
 import { resolveEmailLinkBase } from "../email/link-base";
 import type { EmailService, EmailConfig } from "../email";
 import type { HonoEnv } from "../api/types";
-import type { AuthCollectionConfig } from "@rebasepro/types";
+import type { CompiledAuthHooks } from "@rebasepro/types";
 import { logger } from "../utils/logger";
 
 export interface ResetPasswordRouteConfig {
@@ -33,8 +33,8 @@ export interface ResetPasswordRouteConfig {
     emailConfig?: EmailConfig;
     serviceKey?: string;
     authHooks?: AuthHooks;
-    /** The parsed auth config from the collection, if available. */
-    collectionAuthConfig?: AuthCollectionConfig;
+    /** The auth table's `onCreateUser` / `onResetPassword` (`defineAuthTable`'s `auth`), compiled. */
+    authTableHooks?: CompiledAuthHooks;
 }
 
 /**
@@ -45,7 +45,7 @@ export interface ResetPasswordRouteConfig {
 export function createResetPasswordRoute(config: ResetPasswordRouteConfig): Hono<HonoEnv> {
     const router = new Hono<HonoEnv>();
     const authRepo = config.authRepo;
-    const { emailService, emailConfig, collectionAuthConfig } = config;
+    const { emailService, emailConfig, authTableHooks } = config;
     const ops = resolveAuthHooks(config.authHooks);
 
     router.onError(errorHandler);
@@ -84,10 +84,10 @@ export function createResetPasswordRoute(config: ResetPasswordRouteConfig): Hono
                 );
             }
         }
-        // 1. Collection-level hook (closest to the data)
-        else if (collectionAuthConfig?.onResetPassword) {
+        // 1. The auth table's hook (closest to the data)
+        else if (authTableHooks?.onResetPassword) {
             const isEmailConfigured = !!(emailService && emailService.isConfigured());
-            const hookResult = await collectionAuthConfig.onResetPassword(existing.id, {
+            const hookResult = await authTableHooks.onResetPassword(existing.id, {
                 hashPassword: (password: string) => ops.hashPassword(password),
                 sendEmail: isEmailConfigured
                     ? (options) => emailService!.send(options)

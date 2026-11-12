@@ -129,7 +129,7 @@ import {
     type RuntimeSurface
 } from "../init/surfaces";
 import { injectCallbackClient } from "../init/callback-client";
-import { handGlobalCallbacksTo } from "../init/global-callbacks";
+import { handGlobalHooksTo } from "../init/global-hooks";
 import { createJwtService, DEFAULT_REFRESH_EXPIRES_IN, processJwtService, type JwtService } from "../auth/jwt";
 import { createJwksRoutes } from "../auth/jwks-routes";
 import { readRuntimeVersion } from "../boot/version-skew";
@@ -177,7 +177,7 @@ import { AUTH_CONFIG_LIMIT, createAuthLimiters, createDataRateLimiter, createDat
 import { MemoryRateLimitStore } from "../auth/rate-limit-store";
 import { createSqlRateLimitStore } from "../auth/sql-rate-limit-store";
 import { resolveRateLimitStoreKind } from "../auth/resolve-rate-limit-store";
-import { warnOnAuthCollectionDataCallbacks } from "../auth/collection-callback-warning";
+import { warnOnAuthTableDataHooks } from "../auth/auth-table-hooks-warning";
 import { enforceAuthSecretExclusion } from "../auth/exclude-auth-secrets";
 import { seedInitialAdmin } from "../auth/seed-admin";
 import { createHistoryRoutes } from "../history";
@@ -876,10 +876,10 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             // only when this backend provisions nothing at all.
             provision: provision.database
         });
-        // Global callbacks were set on `collectionRegistry` above, and no driver
-        // reads that one — see `handGlobalCallbacksTo`.
+        // Global hooks were set on `collectionRegistry` above, and no driver
+        // reads that one — see `handGlobalHooksTo`.
         if (globalCallbacks) {
-            handGlobalCallbacksTo(b.id || bootstrapper.type, driverResult, globalCallbacks);
+            handGlobalHooksTo(b.id || bootstrapper.type, driverResult, globalCallbacks);
         }
         delegates[b.id || bootstrapper.type] = driverResult.driver;
         // Kept because a later step has to hand each bootstrapper back its own
@@ -1020,9 +1020,10 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     // that reads it: the registration guard refuses a default role holding an
     // admin-plane scope, and every scope check consults it. Built from the
     // `auth` options of the table defined with `defineAuthTable`.
-    const authTable = declaredTables.authTable;
-    const accessModel = accessModelFromAuthTable(authTable?.options, authTable?.descriptor.slug);
-    const personalKeysEnabled = authTable?.options.personalKeys === true;
+    // The auth table is the one compiled with `descriptor.auth` (`defineAuthTable`).
+    const authTable = tableRegistry.authTable();
+    const accessModel = accessModelFromAuthTable(authTable?.descriptor.auth, authTable?.descriptor.slug);
+    const personalKeysEnabled = authTable?.descriptor.auth?.personalKeys === true;
 
     // 2. Initialize Auth & History via the default driver's bootstrapper
     let authConfigResult: BootstrappedAuth | undefined = undefined;
@@ -1062,22 +1063,19 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             // to a non-default database, login would read/write the default
             // one while the table's data views hit another — a split-brain
             // user store. Warn loudly.
-            const authCollection = authTable?.collection;
-            if (authCollection) {
-                const authDs = resolveDataSource(authCollection, dataSourceRegistry);
-                if (authDs.key !== DEFAULT_DRIVER_ID) {
-                    logger.warn(
-                        `[Auth] The auth table "${authCollection.slug}" is in database ` +
-                        `"${authDs.key}", but the built-in auth system always uses the default database. ` +
-                        `Move the auth table to the default database, or replace auth with an AuthAdapter ` +
-                        `that manages users in "${authDs.key}".`
-                    );
-                }
+            const authDatabase = authTable?.descriptor.database;
+            if (authTable && authDatabase !== undefined && authDatabase !== DEFAULT_DRIVER_ID) {
+                logger.warn(
+                    `[Auth] The auth table "${authTable.descriptor.slug}" is in database ` +
+                    `"${authDatabase}", but the built-in auth system always uses the default database. ` +
+                    `Move the auth table to the default database, or replace auth with an AuthAdapter ` +
+                    `that manages users in "${authDatabase}".`
+                );
             }
 
-            // The auth write path does not run the collection save pipeline, on
-            // purpose — say so when the collection expects otherwise.
-            warnOnAuthCollectionDataCallbacks(authCollection);
+            // The auth write path does not run the table's save pipeline, on
+            // purpose — say so when the table expects otherwise.
+            warnOnAuthTableDataHooks(authTable);
 
             if (safeAuthConfig.jwtSecret) {
                 jwt = createJwtService({
@@ -1107,7 +1105,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
                 // exactly as it always has; the option the application no
                 // longer writes is supplied from `defineAuthTable` here.
                 authConfigResult = await defaultBootstrapper.initializeAuth(
-                    { ...safeAuthConfig, collection: authCollection },
+                    { ...safeAuthConfig, collection: authTable ? driverCollection(authTable.descriptor.slug) : undefined },
                     defaultDriverResult
                 );
 
@@ -1605,8 +1603,8 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             }
 
             // Re-create the built-in adapter with all resolved OAuth providers
-            const reCollectionAuth = authTable?.collection.auth;
-            const collectionAuthConfig = (typeof reCollectionAuth === "object" && reCollectionAuth !== null) ? reCollectionAuth : undefined;
+            // The auth table's `onCreateUser` / `onResetPassword`, compiled.
+            const authTableHooks = tableRegistry.authTable()?.auth;
             // On unless the app turns it off, as the runtime has it. Left off
             // when unset, a backend booted here answered the refresh token in
             // the body, which a browser client (cookie mode by default) does
@@ -1635,7 +1633,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
                 // control-plane requests even without a configured key.
                 serviceKey: serviceKey || internalServiceKey,
                 authHooks: safeAuthConfig.hooks,
-                collectionAuthConfig,
+                authTableHooks,
                 enableMagicLink: safeAuthConfig.magicLink ?? false,
                 enableEmailOtp: safeAuthConfig.emailOtp ?? false,
                 deviceLogin,
@@ -3703,11 +3701,9 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         const rlsSimulatorRouter = new Hono<HonoEnv>();
         applyAdminGate(rlsSimulatorRouter, "RLS simulator", "schema:read");
         rlsSimulatorRouter.route("/", createRlsSimulatorRoutes({
-            collections: () => collectionRegistry.getRawCollections(),
-            driverFor: (slug) => {
-                const key = keyForCollectionPath(slug);
-                return !key || key === DEFAULT_DRIVER_ID ? defaultDriver : driverRegistry.get(key) ?? defaultDriver;
-            },
+            tables: () => tableRegistry.list(),
+            driverFor: table => unscopedDriverServing(table) ?? defaultDriver,
+            driverCollection,
             resolveUser: authAdapter?.resolveUser ? authAdapter.resolveUser.bind(authAdapter) : undefined,
             apiKeyStore
         }));
@@ -3984,14 +3980,19 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         // the one call that keeps it.
         const replaced = new Set<string>();
         for (const registry of callbackTargets()) {
-            const collection = registry.get(slug) as { callbacks?: Record<string, unknown> } | undefined;
-            if (collection) {
-                for (const [name, value] of Object.entries(collection.callbacks ?? {})) {
-                    if (typeof value === "function" && typeof (callbacks as Record<string, unknown>)[name] !== "function") {
-                        replaced.add(name);
+            // The driver registries' copies, in the shape the driver runs (the
+            // B-R7 seam: `lowerHooks` above).
+            const collection = registry.get(slug);
+            if (typeof collection === "object" && collection !== null) {
+                const previous: unknown = Reflect.get(collection, "callbacks");
+                if (typeof previous === "object" && previous !== null) {
+                    for (const [name, value] of Object.entries(previous)) {
+                        if (typeof value === "function" && typeof Reflect.get(callbacks, name) !== "function") {
+                            replaced.add(name);
+                        }
                     }
                 }
-                collection.callbacks = callbacks;
+                Reflect.set(collection, "callbacks", callbacks);
                 attached++;
             }
         }
@@ -4263,7 +4264,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             // spec for URLs it 404s.
             mountOpenApiDocs(app, basePath, {
                 enableSwagger: config.enableSwagger,
-                serverCollections,
+                serverTables: serverCollections.flatMap(collection => tableRegistry.get(collection.slug) ?? []),
                 requireAuth: resolveRequireAuth(config.auth),
                 adminGate: adminGate("schema:read"),
                 generate: openApiGenerator,

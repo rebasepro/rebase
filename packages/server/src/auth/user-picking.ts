@@ -1,74 +1,54 @@
 /**
  * Who may read the user picker (`GET /api/admin/users/pick`).
  *
- * A `userSelect` field stores a user's id, and the person filling it in picks
- * that user from a list. Listing the users is an admin-plane read
- * (`users:read`), which an editor does not hold — so the picker answers a
- * narrower question for a wider audience: id, name, email and avatar, to
- * anyone who may write a collection that has such a field.
+ * A user column (`.userId()`, `semantic: "user"` — a column, the items of an
+ * array, or a field of a JSON document) stores a user's id, and the person
+ * filling it in picks that user from a list. Listing the users is an
+ * admin-plane read (`users:read`), which an editor does not hold — so the
+ * picker answers a narrower question for a wider audience: id, name, email and
+ * avatar, to anyone who may write a table that has such a column.
  *
- * "May write" is the collection's `securityRules` for an insert or an update,
- * evaluated the way the admin panel decides whether to offer the form, with
- * one difference. A rule that depends only on the row (an owner field) counts
- * as allowing, since the person may write some row. A rule written as SQL the
+ * "May write" is the table's row-level security for an insert or an update,
+ * read from its descriptor (`checkTableOperation`), with one difference from
+ * Postgres. A rule that depends only on the row (an owner column) counts as
+ * allowing, since the person may write some row. A rule written as SQL the
  * policy model cannot read cannot be judged ahead, and here it counts as
  * refusing: read optimistically, it would let any signed-in person list every
  * user's name and email. A key or token narrowed by scopes must also hold
- * `data:write` on that collection.
+ * `data:write` on that table.
  *
- * The collections are the backend's own (`c.var.services`), read when the
- * question is asked, so a schema edited live is what is judged.
+ * The tables are the backend's own (`c.var.services`), read when the question
+ * is asked, so a schema edited live is what is judged.
  *
  * @module
  */
 import type { Context } from "hono";
-import { checkOperation, securityRuleToConditions } from "@rebasepro/common";
+import { checkTableOperation, referencesUsers, securityRuleToConditions } from "@rebasepro/common";
 import {
     isAnonymousUid,
     policy,
-    type CollectionConfig,
     type PolicyExpression,
-    type Properties,
-    type Property,
     type SecurityRule,
-    type User
+    type TableDescriptor
 } from "@rebasepro/types";
 import type { HonoEnv } from "../api/types";
 import { hasScope } from "./access";
 
 /**
- * The collections the picker judges for a route mounted outside any backend:
+ * The tables the picker judges for a route mounted outside any backend:
  * the process default's. None until a backend is installed as the default, or
  * a test configures some.
  */
-let collectionsForPicking: () => readonly CollectionConfig[] = () => [];
+let tablesForPicking: () => readonly TableDescriptor[] = () => [];
 
-/** Tell the process default's picker which collections it serves. */
-export function configureUserPicking(collections: () => readonly CollectionConfig[]): void {
-    collectionsForPicking = collections;
+/** Tell the process default's picker which tables it serves. */
+export function configureUserPicking(tables: () => readonly TableDescriptor[]): void {
+    tablesForPicking = tables;
 }
 
-/** @internal The process default's collections getter, to snapshot or restore it. */
-export function defaultUserPicking(): () => readonly CollectionConfig[] {
-    return collectionsForPicking;
-}
-
-function propertyReferencesUsers(property: Property | undefined): boolean {
-    if (!property) return false;
-    if (property.type === "string" && property.userSelect === true) return true;
-    if (property.type === "map") return propertiesReferenceUsers(property.properties);
-    if (property.type === "array") {
-        const of = property.of;
-        if (Array.isArray(of)) return of.some(propertyReferencesUsers);
-        if (of) return propertyReferencesUsers(of);
-        return propertiesReferenceUsers(property.oneOf?.properties);
-    }
-    return false;
-}
-
-/** Whether any property, at any depth, is a `userSelect` field. */
-export function propertiesReferenceUsers(properties: Properties | undefined): boolean {
-    return !!properties && Object.values(properties).some(propertyReferencesUsers);
+/** @internal The process default's tables getter, to snapshot or restore it. */
+export function defaultUserPicking(): () => readonly TableDescriptor[] {
+    return tablesForPicking;
 }
 
 /** Whether any part of a policy is raw SQL the evaluator cannot decide. */
@@ -113,31 +93,29 @@ function failClosedOnRawSql(rule: SecurityRule): SecurityRule {
 }
 
 /** The signed-in person behind a request, as the policy evaluator reads one. */
-function personOf(c: Context<HonoEnv>): User | null {
+function personOf(c: Context<HonoEnv>): { uid: string; roles: string[] } | null {
     const user = c.get("user");
     if (typeof user !== "object" || user === null) return null;
     const uid = typeof user.uid === "string" ? user.uid : undefined;
     if (!uid || isAnonymousUid(uid)) return null;
     if ("isAnonymous" in user && user.isAnonymous === true) return null;
     const roles = Array.isArray(user.roles) ? user.roles.filter((role): role is string => typeof role === "string") : [];
-    return { uid, roles, isAnonymous: false, displayName: null, email: null, photoURL: null, providerId: "custom" };
+    return { uid, roles };
 }
 
 /**
  * Whether this request's caller may read the user picker: they hold
- * `users:read`, or they may write a collection with a `userSelect` field.
+ * `users:read`, or they may write a table with a user column.
  */
 export function mayPickUsers(c: Context<HonoEnv>): boolean {
     if (hasScope(c, "users:read")) return true;
     const person = personOf(c);
     if (!person) return false;
-    const collections = c.get("services")?.collections ?? collectionsForPicking;
-    return collections().some(collection => {
-        if (!propertiesReferenceUsers(collection.properties) || !hasScope(c, "data:write", collection.slug)) return false;
-        const judged = collection.securityRules
-            ? { ...collection, securityRules: collection.securityRules.map(failClosedOnRawSql) }
-            : collection;
-        return checkOperation(judged, { user: person }, null, "insert")
-            || checkOperation(judged, { user: person }, null, "update");
+    const tables = c.get("services")?.tables ?? tablesForPicking;
+    return tables().some(table => {
+        if (!referencesUsers(table) || !hasScope(c, "data:write", table.slug)) return false;
+        const options = { mapRule: failClosedOnRawSql };
+        return checkTableOperation(table, person, "insert", options)
+            || checkTableOperation(table, person, "update", options);
     });
 }

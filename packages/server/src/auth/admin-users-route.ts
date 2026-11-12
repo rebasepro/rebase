@@ -38,7 +38,7 @@ import {
 import { replaceUserPassword, revokeAllSessions } from "./token-revocation";
 import type { EmailService, EmailConfig } from "../email";
 import type { HonoEnv } from "../api/types";
-import type { AdminGuest, AdminUser, AuthCollectionConfig, DeleteGuestsResult, PickedUser } from "@rebasepro/types";
+import type { AdminGuest, AdminUser, CompiledAuthHooks, DeleteGuestsResult, PickedUser } from "@rebasepro/types";
 import { resolveListLimitParam } from "../api/rest/query-parser";
 import { logger } from "../utils/logger";
 
@@ -48,7 +48,8 @@ export interface AdminUsersRouteConfig {
     emailConfig?: EmailConfig;
     serviceKey?: string;
     authHooks?: AuthHooks;
-    collectionAuthConfig?: AuthCollectionConfig;
+    /** The auth table's `onCreateUser` / `onResetPassword` (`defineAuthTable`'s `auth`), compiled. */
+    authTableHooks?: CompiledAuthHooks;
 }
 
 /** Upper bound for `GET /users?ids=…`, so one request can't fan out unbounded. */
@@ -88,7 +89,7 @@ function readOffset(c: Context<HonoEnv>): number {
 export function createAdminUsersRoute(config: AdminUsersRouteConfig): Hono<HonoEnv> {
     const router = new Hono<HonoEnv>();
     const authRepo = config.authRepo;
-    const { emailService, emailConfig, collectionAuthConfig } = config;
+    const { emailService, emailConfig, authTableHooks } = config;
     const ops = resolveAuthHooks(config.authHooks);
 
     function toAdminUser(
@@ -252,7 +253,7 @@ export function createAdminUsersRoute(config: AdminUsersRouteConfig): Hono<HonoE
 
     router.get("/users", requireScope("users:read"), async (c) => {
         // `?ids=a,b,c` resolves a known set of users in one round trip. The admin
-        // UI needs it to turn the ids stored in `userSelect` columns into names
+        // UI needs it to turn the ids stored in user columns (`.userId()`) into names
         // without firing one request per row.
         const idsParam = c.req.query("ids");
         if (idsParam !== undefined) {
@@ -307,9 +308,9 @@ offset: 0 });
     });
 
     /**
-     * The user picker's read: who a `userSelect` field can name, as id, name,
-     * email and avatar — nothing an administrator's list carries beyond that.
-     * Open to anyone who may write a collection with such a field, as well as
+     * The user picker's read: who a user column (`.userId()`) can name, as id,
+     * name, email and avatar — nothing an administrator's list carries beyond
+     * that. Open to anyone who may write a table with such a column, as well as
      * to `users:read` ({@link mayPickUsers}). Registered before `/users/:uid`,
      * which would otherwise take `pick` for an id.
      *
@@ -319,7 +320,7 @@ offset: 0 });
     router.get("/users/pick", async (c) => {
         if (!mayPickUsers(c)) {
             throw new ApiError(403, "SCOPE_MISSING",
-                "Picking a user needs write access to a collection with a user field, or the \"users:read\" scope.",
+                "Picking a user needs write access to a table with a user column (`.userId()`), or the \"users:read\" scope.",
                 { requiredScope: "users:read" });
         }
         const toPickedUser = (u: { id: string; email: string; displayName?: string | null; photoUrl?: string | null }): PickedUser => ({
@@ -386,7 +387,7 @@ offset: 0 });
             emailService,
             emailConfig,
             resolvedHooks: ops,
-            collectionAuthConfig
+            authTableHooks
         }, { mayWaivePasswordPolicy: callerIsAdmin(c) });
 
         // `beforeUserCreate` runs here too.
@@ -435,7 +436,7 @@ values: prepResult.values },
                 emailService,
                 emailConfig,
                 resolvedHooks: ops,
-                collectionAuthConfig
+                authTableHooks
             }
         ));
 

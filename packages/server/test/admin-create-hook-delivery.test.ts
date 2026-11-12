@@ -123,7 +123,7 @@ async function harness(kind: HookKind, scenario: Scenario) {
         emailService,
         emailConfig: { from: "noreply@example.com", resetPasswordUrl: "https://app.example.com", appName: "Acme" },
         authHooks,
-        collectionAuthConfig
+        authTableHooks: collectionAuthConfig
     });
 
     const driver = fakeDataDriver({

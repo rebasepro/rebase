@@ -2,56 +2,44 @@ import { authSecretsMissingExclusion, type AuthSecretCandidate } from "@rebasepr
 import { logger } from "../utils/logger";
 
 /**
- * Keep the auth collection's secret columns off the API, whoever declared it.
+ * Keep the auth table's secret columns off the API, whoever declared it.
  *
- * `users` is the one collection a project is *expected* to redeclare: it is
- * scaffolded into `config/collections/users.ts` so the panel can present it, and
- * a slug collision replaces the framework's default outright rather than merging
- * with it. So every protection the default carried has to be restated by hand in
- * the copy — and the one that is invisible when it goes missing is
- * `excludeFromApi`.
+ * The users table is the one a project is *expected* to redeclare, and every
+ * protection the default carried has to be restated in the copy — the one that
+ * is invisible when it goes missing is "never on the wire". Neighbouring panel
+ * options (hidden in a form, hidden in a list) look like they do the same job;
+ * none strips the column from a row. The result once was a users table that
+ * hid the password hash from the admin panel and served it to anyone whose
+ * read policy admitted the row — what the platform's own control plane did.
  *
- * It is invisible because the neighbouring options *look* like they do the same
- * job. `admin.hideFromCollection` and `admin.disabled.hidden` keep a field out of
- * the CMS, which is what a person editing that file is thinking about, and a
- * declaration carrying both of those reads as careful. Neither one strips the
- * column from a row on the wire; only `excludeFromApi` does. The result is a
- * users collection that hides the password hash from the admin panel and serves
- * it to anyone whose read policy admits the row.
- *
- * Which is not hypothetical: it is what the platform's own control plane did,
- * where the read policy deliberately admits co-members so the Members view can
- * name them, and every colleague's browser was therefore handed everyone's
- * scrypt hash and any pending email-verification token.
- *
- * So the framework restates it. Not by rejecting the collection — a boot failure
- * over a field a developer never thought about is a bad trade, and an existing
- * deployment would stop rather than start protecting itself — but by adding the
- * flag and saying so. Which columns count is decided once, by
- * {@link authSecretsMissingExclusion} in `@rebasepro/common`, and every
- * `CollectionRegistry` applies the same rule to the copies it makes — which is
- * how the panel, building its registry from the project's file as written,
- * agrees with the server.
+ * So the framework restates it, not by refusing the table but by marking the
+ * column and saying so. Which columns count is decided once, by
+ * {@link authSecretsMissingExclusion} in `@rebasepro/common`; the table
+ * compiler applies the same rule to a `defineAuthTable` (its secrets come out
+ * `.private()`), and this applies it to what a driver reports.
  */
 
 /**
- * Force `excludeFromApi` onto the auth collection's secret columns.
+ * Mark the auth table's secret columns hidden on the collections handed to the
+ * data driver.
  *
- * Mutates in place, for what reads the collection configs directly rather than a
- * registry's normalized copies. Run it before the collections are handed on, so
- * those readers never see a config without the flag.
+ * The B-R7 seam of this module: the driver still serves rows from lowered
+ * collections, and for a declared auth table the compiler has already made the
+ * secrets `.private()` (so the lowering carries the flag and nothing is fixed
+ * here). What remains is a collection a driver reports itself (introspection),
+ * which only this pass can protect. Mutates in place, before the collections
+ * are handed on, so no reader sees one without the flag.
  *
- * @returns the columns it had to fix, per collection — for the caller to log and
- *          for tests to assert on.
+ * @returns the columns it had to fix, per table — for the caller to log, to
+ *          mark the same columns private on the descriptors, and for tests.
  */
 export function enforceAuthSecretExclusion(
-    collections: readonly unknown[]
+    collections: readonly (AuthSecretCandidate & { slug?: string })[]
 ): Array<{ slug: string; columns: string[] }> {
     const fixed: Array<{ slug: string; columns: string[] }> = [];
 
-    for (const raw of collections) {
-        const collection = raw as (AuthSecretCandidate & { slug?: string }) | undefined;
-        if (!collection?.properties) continue;
+    for (const collection of collections) {
+        if (!collection.properties) continue;
 
         const columns = authSecretsMissingExclusion(collection);
         for (const key of columns) {
@@ -66,10 +54,9 @@ export function enforceAuthSecretExclusion(
 
     for (const { slug, columns } of fixed) {
         logger.warn(
-            `[Auth] The auth collection "${slug}" declares ${columns.map(c => `'${c}'`).join(", ")} ` +
-            "without excludeFromApi, so the column would have been served in every row a read " +
-            "policy admits — hiding a field in the admin panel does not strip it from the API. " +
-            "Rebase has excluded it. Add `excludeFromApi: true` to the property to make that " +
+            `[Auth] The auth table "${slug}" serves ${columns.map(c => `'${c}'`).join(", ")} ` +
+            "without marking it private, so the column would have been served in every row a read " +
+            "policy admits. Rebase has made it private. Mark the column `.private()` to make that " +
             "explicit, and regenerate the SDK."
         );
     }

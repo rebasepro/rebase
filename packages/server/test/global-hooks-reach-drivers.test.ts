@@ -104,7 +104,7 @@ describe("global hooks", () => {
         // `afterRead` that masks a field is exactly the hook nobody notices is
         // missing until the field is read.
         await expect(boot(adapter({ registry: null }), { hooks: { afterRead: ({ values }) => values } }))
-            .rejects.toThrow(/returned no collection registry that accepts global callbacks/);
+            .rejects.toThrow(/returned no registry that accepts global hooks/);
     });
 
     it("hand an introspected table's descriptor to a hook — the one the driver read from the catalogue", async () => {

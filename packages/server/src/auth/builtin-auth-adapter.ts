@@ -107,8 +107,8 @@ export interface BuiltinAuthAdapterConfig {
     serviceKey?: string;
     /** Auth hooks for customizing password, credentials, lifecycle, etc. */
     authHooks?: AuthHooks;
-    /** The parsed auth config from the collection (if `auth` is an object, not just `true`). */
-    collectionAuthConfig?: import("@rebasepro/types").AuthCollectionConfig;
+    /** The auth table's `onCreateUser` / `onResetPassword` (`defineAuthTable`'s `auth`), compiled. */
+    authTableHooks?: import("@rebasepro/types").CompiledAuthHooks;
     /** Enable magic link (passwordless email) login. Requires email service. */
     enableMagicLink?: boolean;
     enableEmailOtp?: boolean;
@@ -148,7 +148,7 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
         allowedRedirectUris,
         serviceKey,
         authHooks,
-        collectionAuthConfig,
+        authTableHooks,
         enableMagicLink = false,
         enableEmailOtp = false,
         deviceLogin,
@@ -391,7 +391,7 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
                 emailConfig,
                 serviceKey,
                 authHooks,
-                collectionAuthConfig
+                authTableHooks
             });
             const rolesRoute = createAdminRolesRoute({
                 authRepo: authRepository,
@@ -403,7 +403,7 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
                 emailConfig,
                 serviceKey,
                 authHooks,
-                collectionAuthConfig
+                authTableHooks
             });
             router.route("/", resetPasswordRoute);
             router.route("/", rolesRoute);
@@ -411,20 +411,21 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
             return router;
         },
 
-        async prepareUserCreation(values, collectionAuth, options) {
-            const parsedCollectionAuth = collectionAuth as import("@rebasepro/types").AuthCollectionConfig | undefined;
+        // The adapter serves one auth table, whose hooks it was built with
+        // (`authTableHooks`); the per-call argument the data doors pass (the
+        // lowered table's `auth`) names the same table and is not read.
+        async prepareUserCreation(values, _loweredAuth, options) {
             return prepareAdminUserValues(values, {
                 authRepo: authRepository,
                 emailService,
                 emailConfig,
                 resolvedHooks: resolvedOps,
-                collectionAuthConfig: parsedCollectionAuth ?? collectionAuthConfig
+                authTableHooks
             }, options);
         },
 
-        describeUserCreationContract(collectionAuth) {
-            const parsedCollectionAuth = collectionAuth as import("@rebasepro/types").AuthCollectionConfig | undefined;
-            const authConfig = parsedCollectionAuth ?? collectionAuthConfig;
+        describeUserCreationContract() {
+            const authConfig = authTableHooks;
 
             // A custom hook owns the body's shape — `prepareAdminUserValues`
             // hands it the raw body and returns whatever the hook built, so the
@@ -451,7 +452,7 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
                 emailService,
                 emailConfig,
                 resolvedHooks: resolvedOps,
-                collectionAuthConfig
+                authTableHooks
             });
         },
 

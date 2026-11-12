@@ -4,10 +4,10 @@
  * Shared utilities and orchestration for admin-initiated user management
  * (user creation via REST API, password reset via admin panel), and the rules
  * user administration holds to whichever door it arrives by — the admin user
- * routes, or the auth collection through the data API.
+ * routes, or the auth table through the data API.
  *
  * Hook resolution order:
- * 1. Collection-level hook (`auth.onCreateUser` on the collection) — closest to the data
+ * 1. Auth-table hook (`auth.onCreateUser` on `defineAuthTable`) — closest to the data
  * 2. Backend-level hook (`AuthHooks.onAdminCreateUser`) — global override
  * 3. Built-in default — framework fallback
  */
@@ -19,8 +19,8 @@ import type { EmailService, EmailConfig } from "../email";
 import type { ResolvedAuthHooks } from "./auth-hooks";
 import type {
     AuthAdapter,
-    AuthCollectionConfig,
     AuthCollectionContext,
+    CompiledAuthHooks,
     UserCreationFinalizeResult,
     UserCreationOptions,
     UserCreationPrepareResult
@@ -84,8 +84,8 @@ export interface AdminUserContext {
     emailService?: EmailService;
     emailConfig?: EmailConfig;
     resolvedHooks: ResolvedAuthHooks;
-    /** The parsed auth config from the collection (if `auth` is an object, not just `true`). */
-    collectionAuthConfig?: AuthCollectionConfig;
+    /** The auth table's `onCreateUser` / `onResetPassword` (`defineAuthTable`'s `auth`), compiled. */
+    authTableHooks?: CompiledAuthHooks;
 }
 
 /**
@@ -105,10 +105,10 @@ export interface AdminUserPrepareResult {
 /**
  * Build the `AuthCollectionContext` facade from server internals.
  *
- * This is the simplified context exposed to collection-level auth hooks,
+ * This is the simplified context exposed to the auth table's hooks,
  * keeping them decoupled from internal interfaces like `AuthRepository`.
  */
-function buildCollectionContext(ctx: AdminUserContext): AuthCollectionContext {
+function buildAuthTableHookContext(ctx: AdminUserContext): AuthCollectionContext {
     const isEmailConfigured = !!(ctx.emailService && ctx.emailService.isConfigured());
 
     return {
@@ -165,7 +165,7 @@ export function enforceCreationPasswordPolicy(
  * Prepare user values for an admin-initiated user creation.
  *
  * Resolution order:
- * 1. Collection-level `auth.onCreateUser` — closest to the data
+ * 1. The auth table's `auth.onCreateUser` — closest to the data
  * 2. Backend-level `AuthHooks.onAdminCreateUser` — global override
  * 3. Built-in default — generate password → hash → normalize email
  *
@@ -179,15 +179,15 @@ export async function prepareAdminUserValues(
     ctx: AdminUserContext,
     options?: UserCreationOptions
 ): Promise<AdminUserPrepareResult> {
-    const { resolvedHooks, collectionAuthConfig } = ctx;
-    // Roles written through the auth collection obey the rule `POST /users` does.
+    const { resolvedHooks, authTableHooks } = ctx;
+    // Roles written through the auth table obey the rule `POST /users` does.
     if (rawBody.roles !== undefined && rawBody.roles !== null) readRoleNames(rawBody.roles);
     const body = enforceCreationPasswordPolicy(rawBody, resolvedHooks, options);
 
-    // 1. Collection-level hook (closest to the data)
-    if (collectionAuthConfig?.onCreateUser) {
-        const collectionCtx = buildCollectionContext(ctx);
-        const hookResult = await collectionAuthConfig.onCreateUser(body, collectionCtx);
+    // 1. The auth table's hook (closest to the data)
+    if (authTableHooks?.onCreateUser) {
+        const hookCtx = buildAuthTableHookContext(ctx);
+        const hookResult = await authTableHooks.onCreateUser(body, hookCtx);
         return {
             values: hookResult.values,
             clearPassword: hookResult.temporaryPassword,

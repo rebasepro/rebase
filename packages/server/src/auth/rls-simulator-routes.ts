@@ -1,14 +1,14 @@
 /**
  * The RLS simulator's admin surface, under `/api/admin/rls-simulator`.
  *
- * The data API answers one collection at a time for a simulated identity
+ * The data API answers one table at a time for a simulated identity
  * (`auth/simulation.ts`). This answers the questions the admin panel's
  * "Simulate access" bar asks about all of them at once:
  *
  * - `GET /options` — what can be simulated: the roles the project names (the
  *   access model's, the ones its row and field rules mention, and `anon`) and
  *   the API keys that are live.
- * - `POST /preview` — for `{ role?, userId?, apiKeyId? }`, each collection's
+ * - `POST /preview` — for `{ role?, userId?, apiKeyId? }`, each table's
  *   rows as that identity sees them against the caller's own view, whether a
  *   key's scopes shut it out, and which fields its roles cannot read.
  *
@@ -23,10 +23,10 @@ import {
     scopeGrants,
     summarizeRoles,
     type AccessSimulation,
-    type CollectionConfig,
     type DataDriver,
-    type Property
+    type TableDescriptor
 } from "@rebasepro/types";
+import type { DriverCollectionOf } from "../schema/driver-seam";
 import type { HonoEnv } from "../api/types";
 import { ApiError, errorHandler } from "../api/errors";
 import { scopeDataDriver } from "./rls-scope";
@@ -36,15 +36,17 @@ import type { ImpersonationCredential, ImpersonationUserResolver } from "./imper
 import { callerOf, decideSimulation, maskedFieldsFor } from "./simulation";
 
 export interface RlsSimulatorRouteConfig {
-    /** The collections this backend serves, as they are now. */
-    collections(): readonly CollectionConfig[];
-    /** The unscoped driver a collection's rows live in. */
-    driverFor(slug: string): DataDriver;
+    /** The tables this backend serves, as they are now. */
+    tables(): readonly TableDescriptor[];
+    /** The unscoped driver a table's rows live in. */
+    driverFor(table: TableDescriptor): DataDriver;
+    /** What a driver call names a table by (see `DriverCollectionOf`). */
+    driverCollection: DriverCollectionOf;
     resolveUser?: ImpersonationUserResolver;
     apiKeyStore?: ApiKeyStore;
 }
 
-/** One collection, as the simulated identity reaches it. */
+/** One table, as the simulated identity reaches it (the response keeps its wire field names). */
 export interface SimulatedCollectionView {
     slug: string;
     name: string;
@@ -96,24 +98,18 @@ function readSimulation(body: unknown): AccessSimulation {
     };
 }
 
-/** Every role the project's rules name, beyond the access model's own. */
-function rolesNamedByRules(collections: readonly CollectionConfig[]): string[] {
+/** Every role the project's rules name — row rules and column access — beyond the access model's own. */
+function rolesNamedByRules(tables: readonly TableDescriptor[]): string[] {
     const named = new Set<string>();
-    for (const collection of collections) {
-        for (const rule of collection.securityRules ?? []) {
+    for (const table of tables) {
+        for (const rule of table.rls.rules) {
             for (const role of rule.roles ?? []) named.add(role);
         }
-        for (const property of Object.values(collection.properties ?? {})) {
-            const access = (property as Property).access;
-            for (const role of [...(access?.read ?? []), ...(access?.write ?? [])]) named.add(role);
+        for (const target of [...table.columns, ...table.relations]) {
+            for (const role of [...(target.access?.read ?? []), ...(target.access?.write ?? [])]) named.add(role);
         }
     }
     return [...named];
-}
-
-async function countRows(driver: DataDriver, collection: CollectionConfig): Promise<number> {
-    if (driver.count) return driver.count({ path: collection.slug, collection });
-    return (await driver.fetchCollection({ path: collection.slug, collection })).length;
 }
 
 export function createRlsSimulatorRoutes(config: RlsSimulatorRouteConfig): Hono<HonoEnv> {
@@ -143,7 +139,7 @@ export function createRlsSimulatorRoutes(config: RlsSimulatorRouteConfig): Hono<
         const roles = [
             { id: "anon", name: "anon" },
             ...declared,
-            ...rolesNamedByRules(config.collections())
+            ...rolesNamedByRules(config.tables())
                 .filter(role => !seen.has(role) && role !== "anon")
                 .map(role => ({ id: role, name: role }))
         ];
@@ -161,28 +157,34 @@ export function createRlsSimulatorRoutes(config: RlsSimulatorRouteConfig): Hono<
         const { granted: identity, simulator } = await decide(c, simulation);
         const callerIdentity = { uid: simulator, roles: callerOf(c)?.roles ?? [] };
 
+        const countRows = async (driver: DataDriver, table: TableDescriptor): Promise<number> => {
+            const collection = config.driverCollection(table.slug);
+            if (!collection) throw new Error(`No data driver serves "${table.slug}" here.`);
+            if (driver.count) return driver.count({ path: table.slug, collection });
+            return (await driver.fetchCollection({ path: table.slug, collection })).length;
+        };
         const collections: SimulatedCollectionView[] = [];
-        for (const collection of config.collections()) {
+        for (const table of config.tables()) {
             const view: SimulatedCollectionView = {
-                slug: collection.slug,
-                name: collection.name ?? collection.slug,
-                maskedColumns: maskedFieldsFor(collection, identity.roles)
+                slug: table.slug,
+                name: table.name,
+                maskedColumns: maskedFieldsFor(table, identity.roles)
             };
-            if (identity.scopes && !scopeGrants(identity.scopes, "data:read", collection.slug)) {
+            if (identity.scopes && !scopeGrants(identity.scopes, "data:read", table.slug)) {
                 view.hiddenBy = "scope";
                 collections.push(view);
                 continue;
             }
             try {
-                const driver = config.driverFor(collection.slug);
+                const driver = config.driverFor(table);
                 const [visible, total] = await Promise.all([
                     scopeDataDriver(driver, {
                         uid: identity.uid,
                         roles: identity.roles,
                         isAnonymous: identity.isAnonymous,
                         ...(identity.claims ? { claims: identity.claims } : {})
-                    }).then(scoped => countRows(scoped, collection)),
-                    scopeDataDriver(driver, callerIdentity).then(scoped => countRows(scoped, collection))
+                    }).then(scoped => countRows(scoped, table)),
+                    scopeDataDriver(driver, callerIdentity).then(scoped => countRows(scoped, table))
                 ]);
                 view.visibleRows = visible;
                 view.totalRows = total;

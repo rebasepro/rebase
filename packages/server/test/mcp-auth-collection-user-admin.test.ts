@@ -15,7 +15,7 @@
  * The real built-in adapter over a fake repository, and the real MCP routes.
  */
 import { describe, it, expect, jest } from "@jest/globals";
-import type { CollectionConfig, DataDriver } from "@rebasepro/types";
+import type { CompiledAuthHooks, CollectionConfig, DataDriver } from "@rebasepro/types";
 import { configureJwt } from "../src/auth/jwt";
 import { createBuiltinAuthAdapter } from "../src/auth/builtin-auth-adapter";
 import type { AuthHooks } from "../src/auth/auth-hooks";
@@ -52,6 +52,8 @@ function harness(options: {
     /** Handed the harness's event log, so a hook can record when it ran. */
     hooks?: (order: string[]) => AuthHooks;
     collection?: CollectionConfig;
+    /** The auth table's compiled `onCreateUser` / `onResetPassword`, as the adapter is built with them. */
+    authTableHooks?: CompiledAuthHooks;
 }) {
     const order: string[] = [];
     const calls: Call[] = [];
@@ -67,7 +69,7 @@ function harness(options: {
         return holder ? user : null;
     });
     repo.deleteAllRefreshTokensForUser.mockImplementation(deleteAllRefreshTokensForUser);
-    const authAdapter = createBuiltinAuthAdapter({ authRepository: repo, authHooks: options.hooks?.(order) });
+    const authAdapter = createBuiltinAuthAdapter({ authRepository: repo, authHooks: options.hooks?.(order), authTableHooks: options.authTableHooks });
 
     // `withAuth` is the RLS scoping a Postgres driver adds to the interface.
     const driver: DataDriver & { withAuth(): Promise<DataDriver> } = {
@@ -225,14 +227,14 @@ describe("create_row on the auth collection", () => {
         expect(typeof (writes()[0].props.values as Record<string, unknown>).passwordHash).toBe("string");
     });
 
-    it("runs the collection's onCreateUser, which owns the body", async () => {
+    it("runs the auth table's onCreateUser, which owns the body", async () => {
         const onCreateUser = jest.fn(async (body: Record<string, unknown>) => ({
             values: { email: String(body.email).toLowerCase(), displayName: "From the hook" },
             temporaryPassword: "hook-chosen",
             invitationSent: true
         }));
         const hooked: CollectionConfig = { ...users, auth: { enabled: true, onCreateUser } };
-        const { call, writes } = harness({ admins: ["admin-1"], collection: hooked });
+        const { call, writes } = harness({ admins: ["admin-1"], collection: hooked, authTableHooks: { onCreateUser } });
 
         const result = await call("create_row", {
             table: "users", data: { email: "Hook@Example.com", inviteCode: "abc" }

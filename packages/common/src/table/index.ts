@@ -19,3 +19,5 @@ export * from "./validation";
 export * from "./query-names";
 export * from "./junction";
 export * from "./storage";
+export * from "./rls";
+export * from "./users";

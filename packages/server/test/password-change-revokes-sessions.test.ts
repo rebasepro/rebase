@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, jest } from "@jest/globals";
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { Hono } from "hono";
-import type { AuthAdapter, AuthCollectionConfig } from "@rebasepro/types";
+import type { AuthAdapter, CompiledAuthHooks } from "@rebasepro/types";
 import type { HonoEnv } from "../src/api/types";
 import { ApiError, errorHandler } from "../src/api/errors";
 import { createBuiltinAuthAdapter, type BuiltinAuthAdapterConfig } from "../src/auth/builtin-auth-adapter";
@@ -348,12 +348,11 @@ const CASES: Case[] = [
         }
     },
     {
-        name: "admin reset, a collection onResetPassword hook that sends its own link",
+        name: "admin reset, the auth table's onResetPassword hook that sends its own link",
         config: () => ({
-            collectionAuthConfig: {
-                enabled: true,
+            authTableHooks: {
                 onResetPassword: async () => ({ invitationSent: true })
-            } satisfies AuthCollectionConfig
+            } satisfies CompiledAuthHooks
         }),
         act: async (world) => {
             await adminReset()(world);
@@ -364,12 +363,11 @@ const CASES: Case[] = [
         // The documented example's shape. Its context has `hashPassword` and
         // no way to store anything, so the route is the only thing that can
         // make the password it shows the admin a real one.
-        name: "admin reset, a collection onResetPassword hook returning a temporary password",
+        name: "admin reset, the auth table's onResetPassword hook returning a temporary password",
         config: () => ({
-            collectionAuthConfig: {
-                enabled: true,
+            authTableHooks: {
                 onResetPassword: async () => ({ temporaryPassword: HOOK_PASSWORD, invitationSent: false })
-            } satisfies AuthCollectionConfig
+            } satisfies CompiledAuthHooks
         }),
         act: async (world) => {
             expect(await adminReset()(world)).toBe(HOOK_PASSWORD);

@@ -134,7 +134,7 @@ describe("auth secret exclusion at boot", () => {
         // driver introspected, and finds nothing left to fix in these.
         const warnings = warn.mock.calls
             .map(call => call.join(" "))
-            .filter(line => line.includes("without excludeFromApi"));
+            .filter(line => line.includes("without marking it private"));
         expect(warnings).toHaveLength(1);
     });
 });

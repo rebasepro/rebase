@@ -33,7 +33,7 @@ import {
     scopesForRoles,
     validateScopes,
     type AccessModel,
-    type AuthTableOptions,
+    type AuthTableDescriptor,
     type RoleDefinition,
     type ScopeDefinition
 } from "@rebasepro/types";
@@ -178,12 +178,12 @@ export class AccessModelError extends Error {
  *   table's `rls`, so `data:write` on a role would grant nothing and look like
  *   it granted something.
  *
- * @param auth The auth table's options; absent when the project declares no
+ * @param auth The auth table's descriptor `auth` (roles and scopes); absent when the project declares no
  *   auth table, which serves the built-in roles only.
  * @param table The auth table's name, for the messages.
  */
 export function accessModelFromAuthTable(
-    auth: Pick<AuthTableOptions, "roles" | "scopes"> | undefined,
+    auth: Pick<AuthTableDescriptor, "roles" | "scopes"> | undefined,
     table = "users"
 ): AccessModel {
     const declaredScopes: Record<string, ScopeDefinition> = { ...(auth?.scopes ?? {}) };
