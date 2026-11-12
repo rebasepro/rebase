@@ -1938,7 +1938,7 @@ target });
             // threshold it contributes no filter, so the count is unchanged and
             // what is gained is that `/count` refuses the request the listing
             // refuses instead of answering it with a number.
-            const vectorMeta = DrizzleConditionBuilder.buildVectorSearchConditions(table, options.vectorSearch, collection);
+            const vectorMeta = DrizzleConditionBuilder.buildVectorSearchConditions(table, options.vectorSearch, this.registry.requireTable(collection.slug).descriptor);
             if (vectorMeta.filter) allConditions.push(vectorMeta.filter);
         }
 
@@ -2635,7 +2635,7 @@ relatedTo: hop }, include
 
         let vectorMeta: { orderBy: SQL; filter?: SQL; distanceSelect: SQL } | undefined;
         if (options.vectorSearch) {
-            vectorMeta = DrizzleConditionBuilder.buildVectorSearchConditions(table, options.vectorSearch, collection);
+            vectorMeta = DrizzleConditionBuilder.buildVectorSearchConditions(table, options.vectorSearch, this.registry.requireTable(collection.slug).descriptor);
         }
 
         // A generated search column is an index in column form; `SELECT *`

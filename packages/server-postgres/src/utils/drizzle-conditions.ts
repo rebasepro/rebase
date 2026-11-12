@@ -8,7 +8,7 @@ import {
     encodeRelationAggregateSort, parseCaseFoldedFieldPath, type RelationAggregateFn, type RelationAggregateSort
 } from "@rebasepro/types";
 import {
-    apiHiddenFieldNames,
+    apiHiddenKeys,
     canReadColumn,
     isIlikeSearchable,
     queryableFieldNames,
@@ -3112,9 +3112,10 @@ whereConditions };
             distance?: "cosine" | "l2" | "inner_product";
             threshold?: number;
         },
-        collection?: CollectionConfig
+        /** The searched table's descriptor: which of its columns the API does not have. */
+        described?: TableDescriptor
     ): { orderBy: SQL; filter?: SQL; distanceSelect: SQL } {
-        const column = DrizzleConditionBuilder.resolveVectorColumn(table, vectorSearch.property, collection);
+        const column = DrizzleConditionBuilder.resolveVectorColumn(table, vectorSearch.property, described);
 
         // The vector is interpolated as a raw SQL literal below (pgvector has no
         // bind form for the `::vector` cast), so every element must be a finite
@@ -3169,11 +3170,18 @@ whereConditions };
      * property; the REST check answers a hidden one with the same function, so
      * the two cannot be told apart.
      */
-    private static resolveVectorColumn(table: PgTable<any>, property: string, collection?: CollectionConfig): AnyPgColumn {
+    /**
+     * The vector column `property` names. A private column is a column the API
+     * does not have: it is never listed among the known ones, and an API
+     * caller naming it is answered exactly as a caller naming nothing (the
+     * trusted server plane, which has no viewer, may still rank by it).
+     */
+    private static resolveVectorColumn(table: PgTable<any>, property: string, described?: TableDescriptor): AnyPgColumn {
         const columns = getTableColumns(table) as Record<string, AnyPgColumn> | undefined;
-        const column = columns?.[property];
+        const hidden = described ? apiHiddenKeys(described) : undefined;
+        const unreachable = hidden !== undefined && currentFieldViewer() !== undefined && hidden.has(property);
+        const column = unreachable ? undefined : columns?.[property];
         if (!column) {
-            const hidden = collection ? apiHiddenFieldNames(collection) : undefined;
             const known = Object.entries(columns ?? {})
                 .filter(([name, c]) => isVectorColumn(c) && !hidden?.has(name))
                 .map(([name]) => name)
@@ -3183,8 +3191,8 @@ whereConditions };
         }
         if (!isVectorColumn(column)) {
             throw ApiError.badRequest(
-                `Property "${property}" is not a vector column (it is \`${columnSqlType(column) || "unknown"}\`), ` +
-                "so it has no distance operator. Name the property declared as `{ type: \"vector\" }`.",
+                `Column "${property}" is not a vector column (it is \`${columnSqlType(column) || "unknown"}\`), ` +
+                "so it has no distance operator. Name a column declared as `col.vector(...)`.",
                 "UNKNOWN_VECTOR_PROPERTY"
             );
         }
