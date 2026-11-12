@@ -1,5 +1,5 @@
 import { DataService } from "./services/dataService";
-import { createStampKeys, filterRequired, type ConflictRule } from "./services/PersistService";
+import { filterRequired, type ConflictRule } from "./services/PersistService";
 import { BranchService } from "./services/BranchService";
 import { RealtimeService, type SubscriptionAuthContext } from "./services/realtimeService";
 import { DatabasePoolManager } from "./databasePoolManager";
@@ -39,13 +39,13 @@ import {
     LogicalCondition,
     EntityValues,
     EntityStatus,
-    Properties,
-    Property,
     TableColumnInfo,
+    TableDescriptor,
     TableForeignKeyInfo,
     TableJunctionInfo,
     TableMetadata,
     TablePolicyInfo,
+    TenantDescriptor,
     User,
     parseEnvBoolean,
     type BranchDiff,
@@ -55,9 +55,9 @@ import {
 import { sql as drizzleSql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Client, DatabaseError, Pool, type PoolClient } from "pg";
-import { sqlRows, applyDefaultValuesOnCreate, buildPropertyCallbacks, hasFieldAccessRules, buildSdkData, callbackRefusal, createAccessorSlugResolver, classifyTable, getTableName, detectJunctionTables, getTenantConfig, requireCallbackClient, requireCallbackCollection, resolveCollectionRelations, resolveTenantWrite, restoresSoftDeletedRow, tenantBypassRoles, toCallbackError, updateDateAutoValues, updateUserAutoValues } from "@rebasepro/common";
+import { sqlRows, anonymousWriteRefusedBy, applyCreateDefaults, applyStamps, buildPropertyCallbacks, createStampKeys, hasFieldAccessRules, buildSdkData, callbackRefusal, createAccessorSlugResolver, classifyTable, getTableName, detectJunctionTables, requireCallbackClient, requireCallbackCollection, resolveCollectionRelations, resolveTenantWrite, restoresSoftDeletedRow, stampModifier, tenantOf, toCallbackError, updateStampKeys } from "@rebasepro/common";
 import { PostgresTableRegistry } from "./model/PostgresTableRegistry";
-import { deriveRowAddress, getPrimaryKeys, parseIdValues } from "./services/collection-helpers";
+import { deriveRowAddress, getPrimaryKeys, parseIdValues, tableKeys } from "./services/collection-helpers";
 import { isJunctionBackedRelation, isNestedPath, resolveNestedPath, splitPathSegments } from "./services/nested-path";
 import { resolveSoftDelete, rowInTrashError } from "./services/soft-delete";
 import type { RuntimeTable } from "./model/runtime-table";
@@ -209,21 +209,18 @@ function applyBeforeSaveResult<T extends object, R extends object>(values: T, re
 /**
  * The keys of a create's final values that its INSERT alone may write: those
  * the caller did not send, no `beforeSave` hook wrote, and that are not an
- * `on_update` stamp — a declared default, a tenant stamp, a create-time stamp.
- * See `PersistSaveOptions.insertOnlyKeys`.
+ * update stamp (`.onUpdateNow()`, `.onUpdateUser()`) — a declared default, a
+ * tenant stamp, a create-time stamp. See `PersistSaveOptions.insertOnlyKeys`.
  */
 function insertOnlyKeysOf(
     finalValues: object,
     callerValues: object | undefined,
     beforeHooks: Record<string, unknown>,
     afterHooks: Record<string, unknown>,
-    properties: Properties | undefined
+    table: TableDescriptor | undefined
 ): string[] {
     const sent = new Set(Object.keys(callerValues ?? {}));
-    const updateStamps = new Set(Object.entries(properties ?? {})
-        .filter(([, property]) => (property?.type === "date" && property.autoValue === "on_update")
-            || (property?.type === "string" && property.autoValue === "user_on_update"))
-        .map(([key]) => key));
+    const updateStamps = new Set(table ? updateStampKeys(table) : []);
     return Object.keys(finalValues).filter(key =>
         !sent.has(key)
         && !updateStamps.has(key)
@@ -278,14 +275,14 @@ function isPresentKey(id: string | number | undefined | null): id is string | nu
  * hooks hand on, since a `beforeSave` can set the key too.
  */
 function assertKeyUnchanged(
-    collection: CollectionConfig | undefined,
+    table: RuntimeTable | undefined,
     registry: PostgresTableRegistry,
     id: string | number,
     values: Record<string, unknown> | undefined,
     path: string
 ): void {
-    if (!collection || !values) return;
-    const primaryKeys = getPrimaryKeys(collection, registry);
+    if (!table || !values) return;
+    const primaryKeys = keysOfTable(table, registry);
     if (primaryKeys.length === 0) return;
     let address: Record<string, string | number>;
     try {
@@ -298,7 +295,7 @@ function assertKeyUnchanged(
         .map(key => key.fieldName)
         .filter(field => values[field] !== undefined && String(values[field]) !== String(address[field]));
     if (moved.length === 0) return;
-    const slug = collection.slug ?? path;
+    const slug = table.slug ?? path;
     const violations = moved.map(field => {
         const message = `'${field}' is the key of '${slug}', and an update cannot change it: this row is "${id}". `
             + "Create a row under the new key and delete this one.";
@@ -308,43 +305,38 @@ function assertKeyUnchanged(
 }
 
 /**
- * Refuse a write that would leave a *required* `created_by` / `updated_by`
+ * Refuse a write that would leave a `.notNull()` `createdBy` / `updatedBy`
  * column null because nobody is acting.
  *
- * A `user_on_create` column takes the uid from the call context, and an
+ * An `.onCreateUser()` column takes the uid from the call context, and an
  * anonymous request, a service token and an in-process write all have none.
  * Storing `null` is the right answer where the column allows it — plenty of
- * rows are legitimately written by the server. Where the collection has said
- * `required`, it is not: that declaration means "a row must record who made
- * it", and a write that cannot answer the question is a write this collection
- * does not accept. Better a 400 naming the field than a 23502 naming the
- * column, three layers down, after the hooks have run.
+ * rows are legitimately written by the server. Where the table has said
+ * `.notNull()`, it is not: that declaration means "a row must record who made
+ * it", and a write that cannot answer the question is a write this table does
+ * not accept. Better a 400 naming the column than a 23502, three layers down,
+ * after the hooks have run. An update is refused only for an
+ * `.onUpdateUser()` column: the creator is already recorded.
  */
-function assertActingUserForAutoValues(
-    properties: Properties,
+function assertActingUserForStamps(
+    table: TableDescriptor,
     status: EntityStatus,
     uid: string | undefined,
     path: string
 ): void {
     if (uid) return;
-    for (const [key, property] of Object.entries(properties)) {
-        const prop = property as (Property & { autoValue?: string }) | undefined;
-        if (!prop || prop.type !== "string") continue;
-        if (prop.autoValue !== "user_on_create" && prop.autoValue !== "user_on_update") continue;
-        if (!prop.validation?.required) continue;
-        // `user_on_create` says nothing about an update — the column already
-        // holds the creator's uid, and this write is not rewriting it.
-        if (status === "existing" && prop.autoValue === "user_on_create") continue;
-        throw ApiError.badRequest(
-            `'${key}' on '${path}' records the acting user and is required, and this request has none. ` +
-            "Sign in, or drop `required` from the property to let the server write rows anonymously.",
-            "VALIDATION_CONSTRAINT",
-            {
-                collection: path,
-                violations: [{ field: key, code: "required", message: `'${key}' records the acting user, and there is none.` }]
-            }
-        );
-    }
+    const key = anonymousWriteRefusedBy(table, status !== "existing");
+    if (key === undefined) return;
+    const stamp = table.columns.find(column => column.key === key)?.stamp;
+    throw ApiError.badRequest(
+        `'${key}' on '${path}' records the acting user (\`${stamp ? stampModifier(stamp) : ".onCreateUser()"}\`) and is \`.notNull()\`, ` +
+        "and this request has none. Sign in, or drop `.notNull()` from the column to let the server write rows anonymously.",
+        "VALIDATION_CONSTRAINT",
+        {
+            collection: path,
+            violations: [{ field: key, code: "required", message: `'${key}' records the acting user, and there is none.` }]
+        }
+    );
 }
 
 /**
@@ -389,35 +381,40 @@ function declaresAnyHook(...tiers: (object | undefined)[]): boolean {
     return tiers.some(tier => tier !== undefined && Object.values(tier).some(value => typeof value === "function"));
 }
 
-/** The `(collection, field)` pairs {@link warnReplacedAutoValues} has spoken about, once each. */
-const warnedAutoValues = new Set<string>();
+/** The `(table, column)` pairs {@link warnReplacedStamps} has spoken about, once each. */
+const warnedStamps = new Set<string>();
 
 /**
- * Say, once per field and outside production, that a value the write sent
- * for an `autoValue` column was replaced or dropped. By design — the stamp is
- * the server's, never the caller's — and silent, which is how a migration
- * script that copies `createdAt` across found out its dates were all today's.
+ * Say, once per column and outside production, that a value the write sent
+ * for a stamped column was replaced or dropped. By design — the stamp is the
+ * server's, never the caller's — and silent, which is how a migration script
+ * that copies `createdAt` across found out its dates were all today's.
  */
-function warnReplacedAutoValues(
-    collection: CollectionConfig,
+function warnReplacedStamps(
+    table: TableDescriptor,
     sent: Record<string, unknown>,
     stamped: Record<string, unknown>,
     status: EntityStatus
 ): void {
     if (process.env.NODE_ENV === "production") return;
-    for (const [field, property] of Object.entries(collection.properties ?? {})) {
-        const autoValue = (property as { autoValue?: string }).autoValue;
-        if (!autoValue || sent[field] === undefined || sent[field] === null) continue;
+    for (const column of table.columns) {
+        const field = column.key;
+        if (!column.stamp || sent[field] === undefined || sent[field] === null) continue;
         const replaced = stamped[field] === undefined || stamped[field] !== sent[field];
-        const key = `${collection.slug}.${field}`;
-        if (!replaced || warnedAutoValues.has(key)) continue;
-        warnedAutoValues.add(key);
+        const key = `${table.slug}.${field}`;
+        if (!replaced || warnedStamps.has(key)) continue;
+        warnedStamps.add(key);
         logger.warn(
-            `[DataDriver] The value sent for '${field}' on "${collection.slug}" was ${stamped[field] === undefined ? "dropped" : "replaced"}: ` +
-            `it is \`autoValue: "${autoValue}"\`, which the server stamps on ${status === "existing" ? "an update" : "a create"} whatever the write sends. ` +
-            "Copying rows with their original value takes SQL, or a property without autoValue. (Said once per field, outside production.)"
+            `[DataDriver] The value sent for '${field}' on "${table.slug}" was ${stamped[field] === undefined ? "dropped" : "replaced"}: ` +
+            `it is \`${stampModifier(column.stamp)}\`, which the server stamps on ${status === "existing" ? "an update" : "a create"} whatever the write sends. ` +
+            "Copying rows with their original value takes SQL, or a column without the stamp. (Said once per column, outside production.)"
         );
     }
+}
+
+/** The key of a served table, catalogue-aware: what an address is parsed against. */
+function keysOfTable(table: RuntimeTable, registry: PostgresTableRegistry) {
+    return tableKeys(table, registry.getPgTable(table.descriptor.table) ?? table.pg);
 }
 
 /**
@@ -1218,10 +1215,10 @@ export class PostgresBackendDriver implements DataDriver {
     private static readonly TENANT_MEMBERSHIP_CAP = 100;
 
     /**
-     * Stamp, or refuse, the tenant on a write to a `tenant`-scoped collection.
+     * Stamp, or refuse, the tenant on a write to a `tenant`-scoped table.
      *
-     * A no-op for every collection that declares no tenancy, which is the
-     * common case and costs one property read.
+     * A no-op for every table that declares no tenancy, which is the common
+     * case and costs one descriptor read.
      */
     private async applyTenantScope<M extends Record<string, unknown>>(
         collection: CollectionConfig | undefined,
@@ -1230,14 +1227,15 @@ export class PostgresBackendDriver implements DataDriver {
         status: EntityStatus,
         previousValues: Record<string, unknown> | undefined
     ): Promise<Partial<EntityValues<M>>> {
-        const tenant = getTenantConfig(collection);
+        const table = this.tableOf(collection);
+        const tenant = table ? tenantOf(table.descriptor) : undefined;
         if (!tenant) return values;
 
         // The same set the policy lets past: the trusted server context (no
         // user at all) and the bypass roles. Deciding it here rather than
         // inside the pure helper keeps "who is calling" in the one place that
         // knows.
-        const bypassRoles = tenantBypassRoles(tenant);
+        const bypassRoles = tenant.bypassRoles;
         const callerRoles = (this.user?.roles ?? []).map(r =>
             typeof r === "string" ? r : String((r as { id?: unknown })?.id ?? r));
         const bypass = !this.user || callerRoles.some(r => bypassRoles.includes(r));
@@ -1254,7 +1252,7 @@ export class PostgresBackendDriver implements DataDriver {
             callerTenantsComplete: complete,
             bypass,
             previousValues,
-            slug: collection?.slug ?? path
+            slug: table?.slug ?? path
         });
 
         if (decision.refusal) {
@@ -1284,7 +1282,7 @@ export class PostgresBackendDriver implements DataDriver {
      * collection is readable by its own members in the first place.
      */
     private async resolveCallerTenants(
-        tenant: NonNullable<ReturnType<typeof getTenantConfig>>,
+        tenant: TenantDescriptor,
         collection: CollectionConfig | undefined
     ): Promise<{ tenants: unknown[]; complete: boolean }> {
         if ("claim" in tenant.from) {
@@ -1413,7 +1411,7 @@ export class PostgresBackendDriver implements DataDriver {
         id: string | number | undefined,
         onConflict: readonly string[] | undefined
     ): Promise<{ id: string; values: Partial<EntityValues<M>>; row: Record<string, unknown> } | undefined> {
-        const primaryKeys = getPrimaryKeys(collection, this.registry);
+        const primaryKeys = keysOfTable(this.registry.requireTable(collection.slug), this.registry);
         const key: Record<string, unknown> = { ...values };
         if (isPresentKey(id)) Object.assign(key, parseIdValues(id, primaryKeys));
         const targetFields = onConflict && onConflict.length > 0
@@ -1471,47 +1469,40 @@ export class PostgresBackendDriver implements DataDriver {
     }
 
     /**
-     * The stamps a write takes after its hooks: `autoValue` dates and acting
-     * users, and on an update the create-time stamps dropped, which record who
-     * made the row and when — facts no later write can change.
+     * The stamps a write takes after its hooks: the time and the acting user
+     * (`.onCreateNow()`, `.onUpdateNow()`, `.onCreateUser()`,
+     * `.onUpdateUser()`, on columns and inside JSON documents), and on an
+     * update the create-time stamp columns dropped, which record who made the
+     * row and when — facts no later write can change.
      */
-    private stampAutoValues<M extends Record<string, unknown>>(
+    private stampWrite<M extends Record<string, unknown>>(
         collection: CollectionConfig | undefined,
         values: Partial<EntityValues<M>>,
         status: EntityStatus,
         path: string
     ): Partial<EntityValues<M>> {
-        // Apply autoValue timestamps (on_create / on_update) at the application layer.
-        // This handles updated_at fields for all writes that flow through the Rebase backend.
-        if (!collection?.properties) return values;
-        let stamped: Partial<EntityValues<M>> = updateDateAutoValues<M>({
-            inputValues: values,
-            properties: collection.properties,
-            status,
-            timestampNowValue: new Date()
-        });
-        // The identity half of the same idea: `created_by` / `updated_by`
-        // taken from the call context, never from the body. Stamped after
-        // the hooks for the same reason the timestamps are — a hook must
-        // not be able to attribute a write to another user either.
-        assertActingUserForAutoValues(collection.properties, status, this.user?.uid, path);
-        stamped = updateUserAutoValues<M>({
-            inputValues: stamped,
-            properties: collection.properties,
-            status,
+        const table = this.tableOf(collection)?.descriptor;
+        if (!table) return values;
+        // Stamped at the application layer, after the hooks, so every write
+        // through the backend carries them and a hook cannot attribute a
+        // write to another time or user. The user comes from the call
+        // context, never from the body; a write nobody makes is refused
+        // where the stamp column is `.notNull()`.
+        assertActingUserForStamps(table, status, this.user?.uid, path);
+        const stamped = applyStamps(table, values as Record<string, unknown>, {
+            creating: status !== "existing",
+            now: new Date(),
             uid: this.user?.uid
         });
         // And an update leaves the create-time stamps alone. They record
         // who made the row and when, which no later write can change; left
         // to the body (or a hook), any row writer could reattribute a row
-        // they edited — `created_by` is the column that exists to stop that.
+        // they edited — `createdBy` is the column that exists to stop that.
         if (status === "existing") {
-            const kept: Record<string, unknown> = { ...stamped };
-            for (const key of createStampKeys(collection.properties)) delete kept[key];
-            stamped = kept as Partial<EntityValues<M>>;
+            for (const key of createStampKeys(table)) delete stamped[key];
         }
-        warnReplacedAutoValues(collection, values as Record<string, unknown>, stamped as Record<string, unknown>, status);
-        return stamped;
+        warnReplacedStamps(table, values as Record<string, unknown>, stamped, status);
+        return stamped as Partial<EntityValues<M>>;
     }
 
     /**
@@ -1570,7 +1561,7 @@ export class PostgresBackendDriver implements DataDriver {
             || callbacks?.afterSaveError || globalCallbacks?.afterSaveError || propertyCallbacks?.afterSaveError
             || callbacks?.beforeQuery || globalCallbacks?.beforeQuery
             || collection.history
-            || getTenantConfig(collection)
+            || tenantOf(this.registry.requireTable(collection.slug).descriptor)
             || hasFieldAccessRules(collection)
             || resolveSoftDelete(this.tableOf(collection))
             || isNestedPath(path)
@@ -1657,7 +1648,7 @@ export class PostgresBackendDriver implements DataDriver {
             if (status !== "existing") return;
             assertUpdateDoesNotSoftDelete(this.tableOf(resolvedCollection as CollectionConfig | undefined), values, path);
             if (isPresentKey(id)) {
-                assertKeyUnchanged(resolvedCollection as CollectionConfig | undefined, this.registry, id, values as Record<string, unknown>, path);
+                assertKeyUnchanged(this.tableOf(resolvedCollection as CollectionConfig | undefined), this.registry, id, values as Record<string, unknown>, path);
             }
         };
         // A caller's precondition is answered first, as the REST routes
@@ -1707,14 +1698,12 @@ export class PostgresBackendDriver implements DataDriver {
         // reads `values.currency` to pick a tax rate was reading `undefined`
         // on exactly the writes the default exists to cover.
         //
-        // Before validation too: `required` on create is satisfied by a
-        // default, which is why `assertWriteValuesValid` skips a property that
+        // Before validation too: `.notNull()` on create is satisfied by a
+        // default, which is why `assertWriteValuesValid` skips a column that
         // declares one.
-        if ((status === "new" || status === "copy") && resolvedCollection?.properties) {
-            updatedValues = applyDefaultValuesOnCreate<M>(
-                updatedValues,
-                resolvedCollection.properties
-            ) as Partial<EntityValues<M>>;
+        const writtenTable = this.tableOf(resolvedCollection as CollectionConfig | undefined)?.descriptor;
+        if ((status === "new" || status === "copy") && writtenTable) {
+            updatedValues = applyCreateDefaults(writtenTable, updatedValues as Record<string, unknown>) as Partial<EntityValues<M>>;
         }
 
         // Fetch previous values for callbacks AND history recording. Same walk
@@ -1858,10 +1847,10 @@ export class PostgresBackendDriver implements DataDriver {
         }
         const afterHooks: Partial<EntityValues<M>> = updatedValues;
         if (status === "existing" && isPresentKey(id)) {
-            assertKeyUnchanged(resolvedCollection as CollectionConfig | undefined, this.registry, id, updatedValues as Record<string, unknown>, path);
+            assertKeyUnchanged(this.tableOf(resolvedCollection as CollectionConfig | undefined), this.registry, id, updatedValues as Record<string, unknown>, path);
         }
 
-        updatedValues = this.stampAutoValues(resolvedCollection, updatedValues, status ?? "new", path);
+        updatedValues = this.stampWrite(resolvedCollection, updatedValues, status ?? "new", path);
 
         // Tenancy, last of the three stamps and for the same reason they are
         // here rather than in a hook: the tenant comes from the *call context*,
@@ -1891,7 +1880,7 @@ export class PostgresBackendDriver implements DataDriver {
         if ((status === "new" || status === "copy") && !upsert && isPresentKey(id) && resolvedCollection) {
             updatedValues = {
                 ...updatedValues,
-                ...parseIdValues(id, getPrimaryKeys(resolvedCollection as CollectionConfig, this.registry))
+                ...parseIdValues(id, keysOfTable(this.registry.requireTable(resolvedCollection.slug), this.registry))
             } as Partial<EntityValues<M>>;
             writeId = undefined;
         }
@@ -1899,11 +1888,11 @@ export class PostgresBackendDriver implements DataDriver {
         // For an upsert whose INSERT meets a stored row anyway — one the read
         // above could not see, or one inserted concurrently — what the
         // conflict-update may set: what the caller sent, what a hook wrote, and
-        // the `on_update` stamps. Everything else here the create alone decided
+        // the update stamps. Everything else here the create alone decided
         // (declared defaults, a tenant stamp; the create-time stamps are left
         // out by the persistence layer), and a stored row keeps its own.
         const insertOnlyKeys = upserting
-            ? insertOnlyKeysOf(updatedValues, values, beforeHooks, afterHooks, resolvedCollection?.properties)
+            ? insertOnlyKeysOf(updatedValues, values, beforeHooks, afterHooks, writtenTable)
             : undefined;
         // A stamped soft-delete field may create a row already trashed, and
         // may not trash a stored one: that is a delete (see
@@ -2292,14 +2281,14 @@ export class PostgresBackendDriver implements DataDriver {
      */
     private writesRowsTogether(collection: CollectionConfig | undefined, path: string): boolean {
         const { collection: resolved, callbacks, globalCallbacks, propertyCallbacks } = this.resolveCollectionCallbacks(collection, path);
-        if (!resolved || isNestedPath(path) || resolved.history || getTenantConfig(resolved as CollectionConfig)) return false;
+        if (!resolved || isNestedPath(path) || resolved.history || tenantOf(this.registry.requireTable(resolved.slug).descriptor)) return false;
         return [callbacks, globalCallbacks, propertyCallbacks].every(tier => !tier?.beforeSave && !tier?.afterSave && !tier?.afterSaveError);
     }
 
     /**
      * {@link saveMany}'s rows written together, a few multi-row statements in
      * place of one statement per row (`PersistService.saveRows`), and answered
-     * as {@link save} answers each: defaults and `autoValue` stamps applied,
+     * as {@link save} answers each: defaults and stamps applied,
      * the stored row through `afterRead`, a realtime event per row.
      *
      * For a collection {@link writesRowsTogether} allows; `undefined`, before
@@ -2322,14 +2311,15 @@ export class PostgresBackendDriver implements DataDriver {
         // What `saveInFrame` does to a new row with no hooks to run: the
         // declared defaults, then the stamps, and for an upsert the keys its
         // conflict-update must leave alone.
-        const softDeleteField = resolveSoftDelete(this.tableOf(resolved))?.field;
+        const runtimeTable = this.tableOf(resolved);
+        const softDeleteField = resolveSoftDelete(runtimeTable)?.field;
         const prepared = rows.map(values => {
-            const withDefaults = resolved.properties
-                ? applyDefaultValuesOnCreate<M>(values, resolved.properties) as Partial<EntityValues<M>>
+            const withDefaults = runtimeTable
+                ? applyCreateDefaults(runtimeTable.descriptor, values as Record<string, unknown>) as Partial<EntityValues<M>>
                 : values;
-            const stamped = this.stampAutoValues(resolved, withDefaults, "new", path) as Record<string, unknown>;
+            const stamped = this.stampWrite(resolved, withDefaults, "new", path) as Record<string, unknown>;
             const insertOnlyKeys = upsert
-                ? insertOnlyKeysOf(stamped, values, withDefaults as Record<string, unknown>, withDefaults as Record<string, unknown>, resolved.properties)
+                ? insertOnlyKeysOf(stamped, values, withDefaults as Record<string, unknown>, withDefaults as Record<string, unknown>, runtimeTable?.descriptor)
                 : undefined;
             if (insertOnlyKeys && softDeleteField && stamped[softDeleteField] !== undefined && stamped[softDeleteField] !== null) {
                 insertOnlyKeys.push(softDeleteField);
@@ -2351,7 +2341,7 @@ export class PostgresBackendDriver implements DataDriver {
 
     /**
      * {@link updateMany}'s updates written together (`PersistService.updateRows`)
-     * and answered as {@link save} answers each: the `on_update` stamps
+     * and answered as {@link save} answers each: the update stamps
      * applied, the stored row through `afterRead`, a realtime event per row.
      * For a collection {@link writesRowsTogether} allows; `undefined`, before
      * anything is written, for updates `updateRows` declines.
@@ -2366,8 +2356,8 @@ export class PostgresBackendDriver implements DataDriver {
         if (!resolved) return undefined;
         const prepared = updates.map(({ id, values }) => {
             assertUpdateDoesNotSoftDelete(this.tableOf(resolved), values as Record<string, unknown>, path);
-            assertKeyUnchanged(resolved, this.registry, String(id), values as Record<string, unknown>, path);
-            return { id, values: this.stampAutoValues(resolved, values, "existing", path) as Record<string, unknown> };
+            assertKeyUnchanged(this.tableOf(resolved), this.registry, String(id), values as Record<string, unknown>, path);
+            return { id, values: this.stampWrite(resolved, values, "existing", path) as Record<string, unknown> };
         });
         const stored = await this.dataService.getPersistService().updateRows(path, prepared);
         if (!stored) return undefined;
@@ -2553,7 +2543,7 @@ export class PostgresBackendDriver implements DataDriver {
         const resolved = this.assertFilteredWrite(resolvedCollection as CollectionConfig | undefined, path, filter, logical);
         const written = values as Record<string, unknown>;
         assertUpdateDoesNotSoftDelete(this.tableOf(resolved), written, path);
-        const keys = getPrimaryKeys(resolved, this.registry).map(key => key.fieldName).filter(field => written[field] !== undefined);
+        const keys = keysOfTable(this.registry.requireTable(resolved.slug), this.registry).map(key => key.fieldName).filter(field => written[field] !== undefined);
         if (keys.length > 0) {
             throw ApiError.badRequest(
                 `'${keys[0]}' is the key of '${resolved.slug}', and an update cannot change it — a filtered one least of all, ` +
@@ -2564,7 +2554,7 @@ export class PostgresBackendDriver implements DataDriver {
         }
         const hooks = { callbacks, globalCallbacks, propertyCallbacks };
         if (!this.writeReadsStoredRow(resolved, path, hooks)) {
-            const stamped = this.stampAutoValues(resolved, values, "existing", path) as Record<string, unknown>;
+            const stamped = this.stampWrite(resolved, values, "existing", path) as Record<string, unknown>;
             const stored = await this.dataService.getPersistService().updateWhere(path, filter, logical, stamped, {
                 commitsTransaction: this.lastWriteCommits(resolved, callbacks, globalCallbacks, propertyCallbacks)
             });

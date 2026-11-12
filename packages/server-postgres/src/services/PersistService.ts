@@ -2,7 +2,7 @@ import { eq, and, isNotNull, isNull, sql, SQL } from "drizzle-orm";
 import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 // import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { CollectionConfig, FilterValues, JUNCTION_PIVOT_KEY, type LogicalCondition, Properties, ResolvedRelation, type ResolvedManyToMany, isManyToMany, hasForeignKeyOnTarget, joinConditions } from "@rebasepro/types";
-import { getTableName, resolveCollectionRelations, fieldKeyForColumn } from "@rebasepro/common";
+import { createStampKeys, getTableName, resolveCollectionRelations, fieldKeyForColumn } from "@rebasepro/common";
 import { DrizzleConditionBuilder } from "../utils/drizzle-conditions";
 import {
     assertWritableColumns,
@@ -40,27 +40,6 @@ import { currentWriteScope } from "./write-transaction-scope";
 import { resolveSoftDelete, rowInTrashError, softDeleteColumn } from "./soft-delete";
 import { commitWithNextStatement } from "../pipelined-transaction";
 
-/**
- * The top-level properties whose value is stamped once, when the row is
- * created: `on_create` dates and `user_on_create` identities.
- *
- * What they hold is a fact about the row's creation, so a write to a row that
- * already exists has nothing to say about them — an update, and the
- * conflict-update of an upsert that met a stored row. Top level only: a stamp
- * nested inside a `map` is part of that map's value, not a column a write can
- * leave out.
- */
-export function createStampKeys(properties: Properties | undefined): string[] {
-    const keys: string[] = [];
-    for (const [key, property] of Object.entries(properties ?? {})) {
-        if ((property?.type === "date" && property.autoValue === "on_create")
-            || (property?.type === "string" && property.autoValue === "user_on_create")) {
-            keys.push(key);
-        }
-    }
-    return keys;
-}
-
 /** How {@link PersistService.save} writes a row that may already be stored. */
 export interface PersistSaveOptions {
     /** INSERT ... ON CONFLICT DO UPDATE. See `SaveProps.upsert`. */
@@ -70,9 +49,9 @@ export interface PersistSaveOptions {
     /**
      * Keys of `values` that belong to the INSERT alone: what the create
      * pipeline filled in rather than what the caller wrote — a declared
-     * `defaultValue`, a tenant stamp. When an upsert's INSERT meets a stored
+     * literal `.default()`, a tenant stamp. When an upsert's INSERT meets a stored
      * row, those columns keep the value they have. The create-time stamps
-     * (`on_create`, `user_on_create`) are left out of the conflict-update
+     * (`.onCreateNow()`, `.onCreateUser()`) are left out of the conflict-update
      * without being named here.
      */
     insertOnlyKeys?: readonly string[];
@@ -727,7 +706,7 @@ export class PersistService {
                         for (const field of targetFields) delete set[field];
 
                         // A conflict means the row was already there, so its
-                        // create-time stamps (`on_create`, `user_on_create`)
+                        // create-time stamps (`.onCreateNow()`, `.onCreateUser()`)
                         // are facts about the past and not this write's to
                         // redecide. Bulk rows are saved with `status: "new"` on
                         // purpose (an import's rows carry a natural key for
@@ -737,11 +716,11 @@ export class PersistService {
                         // `createdAt` on everything it touched, and handed
                         // `createdBy` to whoever ran it. The INSERT branch keeps
                         // the values: they are right there.
-                        for (const key of createStampKeys(collection.properties as Properties | undefined)) {
+                        for (const key of createStampKeys(this.registry.requireTable(collection.slug).descriptor)) {
                             delete set[key];
                         }
                         // The same for everything else the create alone filled
-                        // in. A `defaultValue` describes a row the caller did
+                        // in. A `.default()` describes a row the caller did
                         // not finish describing, not one that exists: written
                         // here it reset every omitted field of every stored row
                         // an import touched — `status` back to "draft".
@@ -951,7 +930,7 @@ export class PersistService {
         const targetFields = options?.onConflict && options.onConflict.length > 0
             ? [...options.onConflict]
             : idInfoArray.map(info => info.fieldName);
-        const createStamps = createStampKeys(collection.properties as Properties | undefined);
+        const createStamps = createStampKeys(this.registry.requireTable(collection.slug).descriptor);
 
         // Each row as `save` would write it, or `undefined` for the batch.
         const prepared: { data: Record<string, unknown>; set: string[]; key: string }[] = [];
