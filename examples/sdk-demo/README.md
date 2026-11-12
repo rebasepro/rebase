@@ -5,7 +5,7 @@ A sample React + Vite app demonstrating the `@rebasepro/client` SDK.
 ## Features
 
 - **Authentication** — Login / Register using the SDK's auth client
-- **Collection Browsing** — Navigate Authors, Posts, Tags
+- **Table Browsing** — Navigate the authors, posts and tags tables
 - **CRUD Operations** — Create, edit, delete records via the SDK
 - **Pagination** — Server-side pagination with page navigation
 - **Live queries** — Lists are driven by `observe()`, so writes appear without a refetch
@@ -71,5 +71,5 @@ The demo pre-fills `admin@demo.com` / `Demo-admin-123`. No seed creates that acc
 | File | Description |
 |------|-------------|
 | `src/client.ts` | SDK initialization with `createRebaseClient()` |
-| `src/hooks.ts` | `useAuth()` and `useCollection()` React hooks |
+| `src/hooks.ts` | `useAuth()` and `useTable()` React hooks |
 | `src/App.tsx` | Full UI with auth, sidebar, table, CRUD dialogs |

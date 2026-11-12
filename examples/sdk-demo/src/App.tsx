@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import "./index.css";
-import { useAuth, useCollection, useOfflineStatus } from "./hooks";
+import { useAuth, useTable, useOfflineStatus } from "./hooks";
 import { client, isNetworkDown, onNetworkChange, setNetworkDown } from "./client";
 
 // ===== Logo =====
@@ -298,10 +298,10 @@ function AuthScreen({ onAuth }: { onAuth: () => void }) {
   );
 }
 
-// ===== Collection Table =====
-function CollectionView({ slug, label }: { slug: string; label: string }) {
+// ===== Table View =====
+function TableView({ slug, label }: { slug: string; label: string }) {
   const [page, setPage] = useState(1);
-  const { data, meta, loading, fromCache, hasPendingWrites, refetch } = useCollection(slug, { limit: 15,
+  const { data, meta, loading, fromCache, hasPendingWrites, refetch } = useTable(slug, { limit: 15,
 page });
   const [editingEntity, setEditingEntity] = useState<any>(null);
   const [showCreate, setShowCreate] = useState(false);
@@ -323,7 +323,7 @@ type }]);
   const handleDelete = async (id: string | number) => {
     if (!confirm("Delete this record?")) return;
     try {
-      await client.data.collection(slug).delete(id);
+      await client.data.table(slug).delete(id);
       toast("Record deleted");
       refetch();
     } catch (err: any) {
@@ -334,10 +334,10 @@ type }]);
   const handleSave = async (values: Record<string, any>, id?: string | number) => {
     try {
       if (id !== undefined) {
-        await client.data.collection(slug).update(id, values);
+        await client.data.table(slug).update(id, values);
         toast("Record updated");
       } else {
-        await client.data.collection(slug).create(values);
+        await client.data.table(slug).create(values);
         toast("Record created");
       }
       setEditingEntity(null);
@@ -527,7 +527,7 @@ function EntityDialog({
 }
 
 // ===== Main App =====
-const COLLECTIONS = [
+const TABLES = [
   { slug: "authors",
 label: "Authors",
 icon: "👤" },
@@ -598,7 +598,7 @@ export default function App() {
     return <AuthScreen onAuth={() => setAuthenticated(true)}/>;
   }
 
-  const activeCollection = COLLECTIONS.find((c) => c.slug === activeSlug)!;
+  const activeTable = TABLES.find((c) => c.slug === activeSlug)!;
 
   return (
     <div className="app-layout">
@@ -613,8 +613,8 @@ export default function App() {
         </div>
 
         <div className="sidebar-section">
-          <div className="sidebar-section-title">Collections</div>
-          {COLLECTIONS.map((col) => (
+          <div className="sidebar-section-title">Tables</div>
+          {TABLES.map((col) => (
             <button
               key={col.slug}
               className={`sidebar-item ${activeSlug === col.slug ? "active" : ""}`}
@@ -650,7 +650,7 @@ color: "var(--danger)" }}>
 
       {/* Main Content */}
       <main className="main-content">
-        <CollectionView key={activeSlug} slug={activeCollection.slug} label={activeCollection.label}/>
+        <TableView key={activeSlug} slug={activeTable.slug} label={activeTable.label}/>
       </main>
     </div>
   );

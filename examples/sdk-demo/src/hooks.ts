@@ -62,8 +62,8 @@ signUp,
 signOut };
 }
 
-// ===== Collection Hook =====
-type FindParams = NonNullable<Parameters<ReturnType<typeof client.data.collection>["find"]>[0]>;
+// ===== Table Hook =====
+type FindParams = NonNullable<Parameters<ReturnType<typeof client.data.table>["find"]>[0]>;
 
 /**
  * A live query.
@@ -73,7 +73,7 @@ type FindParams = NonNullable<Parameters<ReturnType<typeof client.data.collectio
  * queued writes reaching the server, rollbacks, and changes pushed over
  * realtime. So none of the mutation handlers below need to refetch.
  */
-export function useCollection(
+export function useTable(
   slug: string,
   options?: { limit?: number; page?: number; orderBy?: FindParams["orderBy"]; where?: FindParams["where"] }
 ) {
@@ -101,10 +101,10 @@ hasMore: false });
   }), [limit, offset, options?.orderBy, where]);
 
   useEffect(() => {
-    // No loading reset here: switching collections remounts this view (the
+    // No loading reset here: switching tables remounts this view (the
     // list is keyed by slug), and a page change re-emits from the local
     // database immediately, so there is nothing to wait behind.
-    const unsubscribe = client.data.collection(slug).observe(
+    const unsubscribe = client.data.table(slug).observe(
       params,
       (result) => {
         setData(result.data);
@@ -123,7 +123,7 @@ hasMore: false });
   }, [slug, params]);
 
   const refetch = useCallback(
-    () => client.data.collection(slug).find(params).catch(() => undefined),
+    () => client.data.table(slug).find(params).catch(() => undefined),
     [slug, params]
   );
 
