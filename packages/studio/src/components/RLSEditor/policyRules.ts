@@ -1,4 +1,21 @@
-import type { PolicyExpression, PostgresPolicy, SecurityRule, SecurityRuleBase } from "@rebasepro/types";
+import { isRedactedSecurityRule } from "@rebasepro/types";
+import type {
+    AuthenticatedSecurityRule,
+    CheckedAccessSecurityRule,
+    ConditionalAccessSecurityRule,
+    OwnerSecurityRule,
+    PolicyCondition,
+    PostgresPolicy,
+    PublicSecurityRule,
+    RawSQLCheckOnlySecurityRule,
+    RawSQLSecurityRule,
+    RedactedSecurityRule,
+    RolesOnlySecurityRule,
+    SecurityRule,
+    SecurityRuleAccess,
+    SecurityRuleBase,
+    StructuredSecurityRule
+} from "@rebasepro/types";
 import { policyToSecurityRule } from "@rebasepro/common";
 import { getPolicyNamesForRule, getPolicyOperations } from "@rebasepro/utils";
 
@@ -14,10 +31,48 @@ export type PolicyRule = SecurityRuleBase & {
     using?: string;
     withCheck?: string;
     ownerField?: string;
-    access?: "public";
-    condition?: PolicyExpression;
-    check?: PolicyExpression;
+    access?: SecurityRuleAccess;
+    condition?: PolicyCondition;
+    check?: PolicyCondition;
+    /** Carried through untouched; a redacted rule is never edited ({@link ruleForm}). */
+    redacted?: true;
 };
+
+/**
+ * Which form a declared rule is written in — what the editor can do with it.
+ *
+ * Every rule form but one is editable as SQL: the editor shows the policy the
+ * rule compiles to, and a field is only rewritten when the form changed it
+ * ({@link applyPolicyEdit}), so an untouched rule — a `PolicyShorthand`
+ * condition, `access` with a condition — is saved exactly as written, and
+ * its policy keeps its name. The exception is `redacted`: the server withheld
+ * the rule's clauses from this caller, so there is nothing to show or edit;
+ * it is defined on the server.
+ */
+export type PolicyRuleForm =
+    | "owner" | "access" | "conditional_access" | "structured" | "raw" | "roles_only" | "redacted";
+
+/**
+ * Every `SecurityRule` member {@link ruleForm} classifies. A member added to
+ * the union and not listed here fails to compile at {@link RULE_FORMS_COVER_THE_UNION}
+ * — the one place to decide how the editor treats it.
+ */
+type ClassifiedRule =
+    | OwnerSecurityRule | PublicSecurityRule | AuthenticatedSecurityRule
+    | ConditionalAccessSecurityRule | CheckedAccessSecurityRule | StructuredSecurityRule
+    | RawSQLSecurityRule | RawSQLCheckOnlySecurityRule | RolesOnlySecurityRule | RedactedSecurityRule;
+const RULE_FORMS_COVER_THE_UNION: [Exclude<SecurityRule, ClassifiedRule>] extends [never] ? true : false = true;
+void RULE_FORMS_COVER_THE_UNION;
+
+/** The {@link PolicyRuleForm} of a declared rule. */
+export function ruleForm(rule: SecurityRule): PolicyRuleForm {
+    if (isRedactedSecurityRule(rule)) return "redacted";
+    if (rule.using != null || rule.withCheck != null) return "raw";
+    if (rule.ownerField != null) return "owner";
+    if (rule.access !== undefined) return rule.condition != null || rule.check != null ? "conditional_access" : "access";
+    if (rule.condition != null || rule.check != null) return "structured";
+    return "roles_only";
+}
 
 /** Why an edited policy could not be written back to a rule. */
 export type PolicyEditRefusal =
@@ -26,7 +81,9 @@ export type PolicyEditRefusal =
     /** It exists only in the database. */
     | "not_declared"
     /** Its rule covers several operations, and the policy is one of them. */
-    | "several_operations";
+    | "several_operations"
+    /** Its rule was served redacted: the clauses are defined on the server. */
+    | "redacted";
 
 export type PolicyEdit =
     | { ok: true; rules: PolicyRule[] }
@@ -62,6 +119,7 @@ export function applyPolicyEdit(
         return { ok: false, reason: effective.some(compilesTo) ? "generated" : "not_declared" };
     }
     const rule = declared[index];
+    if (ruleForm(rule) === "redacted") return { ok: false, reason: "redacted" };
     if (getPolicyOperations(rule).length > 1) return { ok: false, reason: "several_operations" };
 
     return {

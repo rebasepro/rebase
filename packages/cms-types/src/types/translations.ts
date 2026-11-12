@@ -1166,6 +1166,14 @@ export interface RebaseTranslations {
     studio_rls_edit_generated?: string;
     studio_rls_edit_not_declared?: string;
     studio_rls_edit_several_operations?: string;
+    studio_rls_edit_redacted?: string;
+    studio_rls_rule_defined_on_server?: string;
+    studio_rls_rule_edit_in_code?: string;
+    studio_rls_rule_who_public?: string;
+    studio_rls_rule_who_authenticated?: string;
+    studio_rls_rule_rows?: string;
+    studio_rls_rule_writes?: string;
+    studio_rls_rule_redacted?: string;
     studio_rls_delete?: string;
     studio_rls_confirm_delete_title?: string;
     studio_rls_confirm_delete_body?: string;

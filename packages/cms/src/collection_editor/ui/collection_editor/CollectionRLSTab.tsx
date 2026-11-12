@@ -46,12 +46,15 @@ import {
     isPostgresCollectionConfig,
     RLS_ROLES_SQL,
     RLS_UID_SQL,
-    type PolicyExpression,
+    type CollectionConfig,
+    type PolicyCondition,
     type PostgresPolicy,
     type SecurityOperation,
     type SecurityRule,
+    type SecurityRuleAccess,
     type SecurityRuleBase
 } from "@rebasepro/types";
+import { describeCondition, isEditableInForm, rlsRuleForm } from "./rlsRuleForm";
 
 export type { PostgresPolicy } from "@rebasepro/types";
 
@@ -72,9 +75,11 @@ type PolicyRule = SecurityRuleBase & {
     using?: string;
     withCheck?: string;
     ownerField?: string;
-    access?: "public";
-    condition?: PolicyExpression;
-    check?: PolicyExpression;
+    access?: SecurityRuleAccess;
+    condition?: PolicyCondition;
+    check?: PolicyCondition;
+    /** Carried through untouched; a redacted rule is never edited (see `rlsRuleForm`). */
+    redacted?: true;
 };
 
 /**
@@ -310,6 +315,10 @@ export function CollectionRLSTab() {
         return getGeneratedPolicyNamesOnce(values as AdminCollection);
     }, [tableName, values]);
 
+    // The collection the rules' column keys resolve against, to show a
+    // condition as the SQL it compiles to.
+    const ruleCollection: CollectionConfig = values;
+
     const unmappedPolicies = dbPolicies.filter(dp => !generatedPolicyNames.has(dp.policyname));
 
     const handleSave = (newPolicy: Partial<PostgresPolicy>) => {
@@ -342,7 +351,14 @@ export function CollectionRLSTab() {
                     </div>
                 ) : (
                     <div className="flex flex-col gap-3">
-                        {rules.map((rule: SecurityRule, index: number) => (
+                        {rules.map((rule: SecurityRule, index: number) => {
+                            const form = rlsRuleForm(rule);
+                            const editable = isEditableInForm(form);
+                            // Why EDIT is off for this rule, when it is: the form
+                            // has no field for what the rule says, so the rule is
+                            // edited where it is written — or, redacted, on the server.
+                            const lockedTitle = form === "redacted" ? t("studio_rls_rule_defined_on_server") : t("studio_rls_rule_edit_in_code");
+                            return (
                             <Paper key={`${index}:${rule.name ?? ""}`}
                                 className={"p-4 border border-transparent hover:border-surface-200 dark:hover:border-surface-700 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-colors bg-surface-card shadow-sm"}>
                                 <div className="flex flex-col gap-1.5 min-w-0">
@@ -359,9 +375,30 @@ export function CollectionRLSTab() {
                                     <div className="flex gap-2 text-xs pl-6 overflow-x-auto hide-scrollbar">
                                         <Chip size="small" className="bg-surface-raised text-text-secondary border-none">Action: {rule.operation || "ALL"}</Chip>
                                         <Chip size="small" className="bg-surface-raised text-text-secondary border-none">Roles: {Array.isArray(rule.roles) ? rule.roles.join(", ") : rule.roles}</Chip>
+                                        {rule.access && (
+                                            <Chip size="small" className="bg-surface-raised text-text-secondary border-none">
+                                                {rule.access === "authenticated" ? t("studio_rls_rule_who_authenticated") : t("studio_rls_rule_who_public")}
+                                            </Chip>
+                                        )}
+                                        {form !== "redacted" && rule.condition != null && (
+                                            <Chip size="small" className="bg-surface-raised text-text-secondary border-none font-mono">
+                                                {t("studio_rls_rule_rows", { condition: describeCondition(rule.condition, ruleCollection) })}
+                                            </Chip>
+                                        )}
+                                        {form !== "redacted" && rule.check != null && (
+                                            <Chip size="small" className="bg-surface-raised text-text-secondary border-none font-mono">
+                                                {t("studio_rls_rule_writes", { condition: describeCondition(rule.check, ruleCollection) })}
+                                            </Chip>
+                                        )}
+                                        {form === "redacted" && (
+                                            <Chip size="small" className="bg-surface-raised text-text-secondary border-none">
+                                                {t("studio_rls_rule_redacted")}
+                                            </Chip>
+                                        )}
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+                                    {editable ? (
                                     <Button size="small" variant="text" disabled={readOnly} onClick={() => setEditing({
                                         index,
                                         policy: {
@@ -376,6 +413,16 @@ export function CollectionRLSTab() {
                                     })}>
                                         EDIT
                                     </Button>
+                                    ) : (
+                                        // Read-only: the form has no field for what this rule
+                                        // says. The button stays, disabled, saying where the
+                                        // rule is edited instead.
+                                        <Tooltip title={lockedTitle}>
+                                            <div>
+                                                <Button size="small" variant="text" disabled={true}>EDIT</Button>
+                                            </div>
+                                        </Tooltip>
+                                    )}
                                     <IconButton aria-label={t("delete")} size="small" disabled={readOnly} onClick={() => {
                                         // By position, for the reason editing is: filtered
                                         // by `name`, every unnamed rule went with this one.
@@ -385,7 +432,8 @@ export function CollectionRLSTab() {
                                     </IconButton>
                                 </div>
                             </Paper>
-                        ))}
+                            );
+                        })}
                     </div>
                 )}
 

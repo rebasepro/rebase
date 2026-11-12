@@ -61,7 +61,8 @@ function mapsTable(collection: CollectionConfig, table: { schemaName: string; ta
 const POLICY_EDIT_REFUSALS: Record<PolicyEditRefusal, string> = {
     generated: "studio_rls_edit_generated",
     not_declared: "studio_rls_edit_not_declared",
-    several_operations: "studio_rls_edit_several_operations"
+    several_operations: "studio_rls_edit_several_operations",
+    redacted: "studio_rls_edit_redacted"
 };
 
 function classifyTableClient(
