@@ -10,9 +10,14 @@
  * reference only a contributor can resolve.
  *
  * A path inside the *reader's* project is the opposite: `backend/crons/` and
- * `config/collections/` are exactly what a remedy should name, and this check
+ * `backend/schema/` are exactly what a remedy should name, and this check
  * leaves them alone. What it rejects is the repository's own furniture —
- * `docs/*.md`, `README.md`, `packages/…`, `tooling/…`, `website/…`.
+ * `docs/*.md`, `README.md`, `packages/…`, `tooling/…`, `website/…` — and the
+ * project furniture a scaffold no longer has: since 0.31 there is no `config/`
+ * package (tables are `backend/schema/`, resources, storage and hooks are
+ * `backend/resources.ts`, `backend/storage.ts`, `backend/hooks.ts`), so a
+ * remedy naming `config/collections/` sends the reader to a directory their
+ * project does not have — the same failure from the other side.
  *
  *     pnpm check:ui-string-paths
  */
@@ -34,6 +39,9 @@ const dim = (s) => `\x1b[2m${s}\x1b[0m`;
 
 /** Repository furniture, not anything in a reader's project. */
 const REPO_PATH = /\b(?:docs\/[a-z0-9-]+\.md|README\.md|packages\/[a-z-]+\/|tooling\/[a-z-]+\/|website\/src\/)/;
+
+/** The `config/` package a project had before 0.31, and what replaced each part. */
+const RETIRED_PROJECT_PATH = /\bconfig\/(?:collections\b|resources\.ts|storage\.ts|index\.ts|cms\.d\.ts|admin\.d\.ts)/;
 
 function files(dir) {
     const abs = path.join(ROOT, dir);
@@ -72,25 +80,26 @@ for (const file of SCANNED.flatMap(files)) {
             const text = m[1] ?? m[2] ?? m[3];
             // A className, a URL, a route.
             if (/^https?:\/\//.test(text) || /(?:^|\s)(?:text|bg|px|py|flex|rounded|font)-/.test(text)) continue;
-            if (!REPO_PATH.test(text)) continue;
-            findings.push({ file: rel, line: i + 1, text: text.trim().slice(0, 100) });
+            const retired = RETIRED_PROJECT_PATH.test(text);
+            if (!REPO_PATH.test(text) && !retired) continue;
+            findings.push({ file: rel, line: i + 1, text: text.trim().slice(0, 100), retired });
         }
     });
 }
 
 if (findings.length === 0) {
-    console.log(green("✓ UI strings: no reference to a file in this repository."));
+    console.log(green("✓ UI strings: no reference to a file in this repository, or to the retired config/ package."));
     process.exit(0);
 }
 
-console.error(red(`\n✗ ${findings.length} UI string(s) point at a file in this repository:\n`));
+console.error(red(`\n✗ ${findings.length} UI string(s) point at a file the reader's project does not have:\n`));
 for (const f of findings) {
-    console.error(`  ${bold(`${f.file}:${f.line}`)}`);
+    console.error(`  ${bold(`${f.file}:${f.line}`)}${f.retired ? dim("  (the config/ package, gone since 0.31)") : ""}`);
     console.error(`    ${f.text}`);
 }
 console.error(dim(
     "\n  A reader following it looks in their own project and finds nothing.\n" +
     "  Link `https://rebase.pro/docs/...`, or name a path that exists in a\n" +
-    "  scaffolded project (`backend/crons/`, `config/collections/`).\n"
+    "  scaffolded project (`backend/crons/`, `backend/schema/`, `frontend/src/cms/`).\n"
 ));
 process.exit(1);
