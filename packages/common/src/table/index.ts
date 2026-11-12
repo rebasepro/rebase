@@ -8,6 +8,7 @@
  */
 export * from "./columns";
 export * from "./column-types";
+export * from "./codecs";
 export * from "./keys";
 export * from "./write-values";
 export * from "./access";
