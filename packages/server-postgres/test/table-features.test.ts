@@ -16,7 +16,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { pgTable, text, uuid } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { lowerTables, type LoweredCollection } from "@rebasepro/common";
-import type { AnyTableDef } from "@rebasepro/types";
+import { col, defineTable, rel, type AnyTableDef } from "@rebasepro/types";
 
 import { planSchema } from "../src/schema/plan/plan-schema";
 import { renderPostgresDdl } from "../src/schema/plan/render-ddl";
@@ -25,7 +25,9 @@ import type { ColumnPlan, SchemaPlan, TablePlan } from "../src/schema/plan/types
 import { ensureCollectionTables, type Queryable } from "../src/schema/ensure-collection-tables";
 import { withPinnedPlannerWorld } from "../src/schema/render-outputs";
 import { assertWritableColumns } from "../src/services/collection-helpers";
-import { TABLE_FEATURES, counters, people, tallies } from "./fixtures/table-features";
+import {
+    TABLE_FEATURES, codes, counters, days, grades, initials, keyed, pairs, people, prices, slugs, switches, tallies, tickets
+} from "./fixtures/table-features";
 
 const PACKAGE_ROOT = path.resolve(__dirname, "..");
 
@@ -220,5 +222,65 @@ describe("table features: `.identity()` at any width, key or not", () => {
         } finally {
             await db.close();
         }
+    });
+});
+
+describe("table features: every scalar key type, and the links into it", () => {
+    const KEYS = [codes, initials, grades, days, switches, prices, tickets, slugs, pairs, keyed];
+
+    it("plans each key on its own type", () => {
+        const plan = planOf(KEYS);
+        expect(columnOf(plan, "codes", "code")).toMatchObject({ type: { kind: "varchar", length: 12 }, primaryKey: true, nullable: false });
+        expect(columnOf(plan, "initials", "letter")).toMatchObject({ type: { kind: "char", length: 1 }, primaryKey: true });
+        expect(columnOf(plan, "grades", "grade")).toMatchObject({ type: { kind: "enum", name: "grades_grade", labels: ["a", "b", "c"] }, primaryKey: true });
+        expect(columnOf(plan, "days", "day")).toMatchObject({ type: { kind: "date" }, primaryKey: true });
+        expect(columnOf(plan, "switches", "enabled")).toMatchObject({ type: { kind: "boolean" }, primaryKey: true });
+        expect(columnOf(plan, "prices", "amount")).toMatchObject({ type: { kind: "numeric", precision: 10, scale: 2 }, primaryKey: true });
+        expect(columnOf(plan, "tickets", "id")).toMatchObject({ type: { kind: "serial" }, primaryKey: true });
+        expect(tableOf(plan, "pairs").primaryKey).toEqual(["left", "right"]);
+        expect(columnOf(plan, "pairs", "left")).toMatchObject({ primaryKey: false, nullable: false });
+    });
+
+    it("types each link with the key it points at (a serial key as its plain integer)", () => {
+        const plan = planOf(KEYS);
+        const linkType = (column: string) => columnOf(plan, "keyed", column).type;
+        expect(linkType("code_id")).toEqual({ kind: "varchar", length: 12 });
+        expect(linkType("letter_id")).toEqual({ kind: "char", length: 1 });
+        expect(linkType("grade_id")).toMatchObject({ kind: "enum", name: "grades_grade" });
+        expect(linkType("day_id")).toEqual({ kind: "date" });
+        expect(linkType("switch_id")).toEqual({ kind: "boolean" });
+        expect(linkType("price_id")).toEqual({ kind: "numeric", precision: 10, scale: 2 });
+        expect(linkType("ticket_id")).toEqual({ kind: "integer" });
+        expect(linkType("slug_id")).toEqual({ kind: "text" });
+        // One enum type, the key table's, typing both columns.
+        expect(plan.enums.map(e => e.name)).toEqual(["grades_grade"]);
+    });
+
+    it("renders the composite key as one constraint, and Postgres accepts every key and link", async () => {
+        const ddl = ddlOf(KEYS);
+        expect(ddl).toContain("  PRIMARY KEY (\"left\", \"right\")\n");
+        expect(ddlLine(ddl, "grade_id")).toBe("\"grade_id\" \"public\".\"grades_grade\",");
+        expect(drizzleLine(drizzleOf(KEYS), "gradeId")).toBe(
+            "gradeId: gradesGrade(\"grade_id\").references((): AnyPgColumn => grades.grade, { onDelete: \"set null\" }),");
+        const db = new PGlite();
+        try {
+            await db.waitReady;
+            await db.exec(ddl);
+            await db.query("INSERT INTO grades VALUES ('b')");
+            await db.query("INSERT INTO days VALUES ('2026-01-02')");
+            await db.query("INSERT INTO keyed (grade_id, day_id) VALUES ('b', '2026-01-02')");
+            await expect(db.query("INSERT INTO keyed (day_id) VALUES ('2026-01-03')")).rejects.toThrow(/foreign key/);
+        } finally {
+            await db.close();
+        }
+    });
+
+    it("refuses a link into the composite key, naming the link", () => {
+        const into = defineTable("into_pairs", {
+            columns: { id: col.uuid().primaryKey() },
+            relations: { pair: rel.belongsTo(() => pairs) },
+            rls: "admin-only"
+        });
+        expect(() => planOf([pairs, into])).toThrow(/composite key/);
     });
 });

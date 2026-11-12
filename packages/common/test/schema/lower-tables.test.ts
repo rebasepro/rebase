@@ -620,7 +620,6 @@ describe("lowerTables — refusals", () => {
         "json-document-shape": () => [defineTable("t", { columns: { id, j: col.jsonb(json.string()) }, rls: "admin-only" })],
         "json-one-of-placement": () => [defineTable("t", { columns: { id, j: col.jsonb(json.object({ b: json.oneOf({ x: json.string() }) })) }, rls: "admin-only" })],
         "json-unknown-field": () => [defineTable("t", { columns: { id, j: col.jsonb(json.object({ u: json.unknown() })) }, rls: "admin-only" })],
-        "primary-key-type": () => [defineTable("t", { columns: { id: col.jsonb().primaryKey() }, rls: "admin-only" })],
         "array-unique-items": () => [defineTable("t", { columns: { id, a: col.array(col.text()).validate({ uniqueItems: true }) }, rls: "admin-only" })]
     };
 
@@ -644,6 +643,25 @@ describe("lowerTables — refusals", () => {
         expect(problems).toEqual([
             expect.stringMatching(/^a: declares no primary key/),
             expect.stringMatching(/^b\.s: is `.private\(\)` and declares `.access\(\)`/)
+        ]);
+    });
+
+    it("refuses a key no row can be addressed by: a document, a vector, binary data, a list", () => {
+        const keyed = (key: Parameters<typeof lowerColumn>[0]): AnyTableDef =>
+            defineTable("t", { columns: { k: key }, rls: "admin-only" });
+        const problems = refusal(() => lowerTables([
+            keyed(col.jsonb().primaryKey()),
+            keyed(col.geopoint().primaryKey()),
+            keyed(col.vector(3).primaryKey()),
+            keyed(col.bytea().primaryKey()),
+            keyed(col.array(col.text()).primaryKey())
+        ]));
+        expect(problems).toEqual([
+            expect.stringMatching(/^t\.k: is `\.primaryKey\(\)` on a `jsonb` column\. A row is addressed by its key/),
+            expect.stringMatching(/^t\.k: is `\.primaryKey\(\)` on a geopoint column/),
+            expect.stringMatching(/^t\.k: is `\.primaryKey\(\)` on a `vector\(3\)` column/),
+            expect.stringMatching(/^t\.k: is `\.primaryKey\(\)` on a `bytea` column/),
+            expect.stringMatching(/^t\.k: is `\.primaryKey\(\)` on a `text\[\]` column/)
         ]);
     });
 

@@ -39,6 +39,7 @@
  *   left out, and the planner adds it back as it always has.
  */
 import {
+    columnTypeLabel,
     isTableDef,
     isViewDef,
     resourceKeyOf,
@@ -169,10 +170,6 @@ export const PENDING_TABLE_FEATURES = [
     {
         id: "json-unknown-field",
         description: "`json.unknown()` as a field of a `json.object()` or a variant of a `json.oneOf()`. Only an array item may be left untyped today."
-    },
-    {
-        id: "primary-key-type",
-        description: "`.primaryKey()` on a column that is not text, uuid, a number, a boolean or a date/time. The legacy shape marks keys on those properties only."
     },
     {
         id: "array-unique-items",
@@ -773,7 +770,15 @@ const NO_FLAGS: Flags = { required: false, unique: false };
  */
 function lowerColumn(key: string, def: ColumnDef, ctx: ColumnContext): PostgresProperty {
     const { at } = ctx;
-    if (def.primaryKey && !KEY_KINDS.has(def.type.kind)) pending(at, "primary-key-type");
+    if (def.primaryKey && (!KEY_KINDS.has(def.type.kind) || def.semantic === "geopoint")) {
+        refuse(
+            at,
+            `is \`.primaryKey()\` on a ${def.semantic === "geopoint" ? "geopoint" : `\`${columnTypeLabel(def.type)}\``} column. A row is ` +
+            "addressed by its key — in every URL, filter, cursor and foreign key — so a key is a scalar: text, varchar, " +
+            "char, uuid, an enum, a number, a boolean or a date/time. Key the table by such a column (several make a " +
+            "composite key) and keep this one as an ordinary column."
+        );
+    }
     if (def.transform !== undefined && def.json?.transform !== undefined) {
         refuse(at, "declares a `.transform()` on the column and another on its JSON shape. Keep one: they are the same hook.");
     }
@@ -847,7 +852,11 @@ function lowerColumn(key: string, def: ColumnDef, ctx: ColumnContext): PostgresP
     }
 }
 
-/** The column types the legacy shape can mark as a key (`isId`). */
+/**
+ * The column types a key may have: the scalars a row can be addressed by (and
+ * the legacy shape marks with `isId`). A document, a vector, binary data and a
+ * list are refused as keys.
+ */
 const KEY_KINDS: ReadonlySet<ColumnType["kind"]> = new Set([
     "text", "varchar", "char", "uuid", "enum",
     "smallint", "integer", "bigint", "smallserial", "serial", "bigserial", "real", "doublePrecision", "numeric",
