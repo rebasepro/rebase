@@ -140,13 +140,11 @@ This package is **framework-agnostic** in the sense that it doesn't depend on an
 Available as a separate entry point:
 
 ```ts
-import { rebaseCollectionsPlugin, rebaseManualChunks, transformCollectionSource } from "@rebasepro/app/vitePlugin";
+import { rebaseManualChunks, rebaseMcpViewPlugin } from "@rebasepro/app/vitePlugin";
 ```
 
-`rebaseCollectionsPlugin` serves `virtual:rebase-collections`, lazy-loads the
-components a collection names by path, and keeps the server-only `callbacks`
-bodies out of the admin bundle; `transformCollectionSource` is that transform on
-its own, and `rebaseManualChunks` is the admin's `manualChunks` split.
+`rebaseManualChunks` is the admin's `manualChunks` split; `rebaseMcpViewPlugin`
+builds the project's own MCP App view (`rebase-view.html`) beside the admin.
 
 ## Quick Start
 
