@@ -144,10 +144,6 @@ export const PENDING_TABLE_FEATURES = [
         description: "`rel.belongsTo(target, { constraint: false })` without `index: false`. A foreign-key index is planned only with its constraint; declare the index in `indexes` instead."
     },
     {
-        id: "index-without-reason",
-        description: "An entry of `indexes` without a `reason`. The planner refuses an index nobody can justify."
-    },
-    {
         id: "json-document-shape",
         description: "A `json`/`jsonb` column whose shape is a scalar or a `json.oneOf()` at the top. A document is an object or an array today."
     },
@@ -489,8 +485,8 @@ function fillCollection(collection: LoweredCollection, def: AnyDef, ctx: LowerCo
     if (config.description !== undefined) collection.description = config.description;
     if (config.metadata !== undefined) collection.metadata = config.metadata;
     if (config.indexes !== undefined) {
-        collection.indexes = config.indexes.map((index, position): LoweredIndex =>
-            Object.assign(lowerIndex(index, absorbed, { table: def.name, key: `indexes[${position}]` }), { tableIndex: index }));
+        collection.indexes = config.indexes.map((index): LoweredIndex =>
+            Object.assign(lowerIndex(index, absorbed), { tableIndex: index }));
     }
 
     if (isViewDef(def)) {
@@ -1362,14 +1358,16 @@ function lowerVectorIndex(index: VectorIndexOptions | false): VectorIndexConfig 
  * column absorbed into a relation property is named by the relation, which
  * the planner resolves to the same column.
  */
-function lowerIndex(index: TableIndex, absorbed: ReadonlyMap<string, string>, at: Where): CollectionIndex {
-    if (index.reason === undefined) pending(at, "index-without-reason");
+function lowerIndex(index: TableIndex, absorbed: ReadonlyMap<string, string>): CollectionIndex {
     const keyOf = (key: string): string => absorbed.get(key) ?? key;
     const on = index.columns.map((entry): string | IndexKey => {
         if (typeof entry === "string") return keyOf(entry);
         return lowerIndexKey(entry, keyOf);
     });
     const [first, ...rest] = on;
+    // `reason` is optional on a table's index; the legacy entry needs a
+    // string, and the planner reads an empty one off a table index (see
+    // `LoweredIndex.tableIndex`) as none.
     const reason = index.reason ?? "";
     const where = index.where !== undefined ? { where: lowerPredicate(index.where, keyOf) } : {};
     if (index.using === "gin" || index.using === "brin") {

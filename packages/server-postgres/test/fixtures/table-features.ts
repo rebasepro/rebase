@@ -129,6 +129,8 @@ export const handles = defineTable("handles", {
         handle: col.varchar(40).notNull().validate({ max: 20 }),
         country: col.char(2).validate({ min: 2, max: 3 })
     },
+    // `reason` is optional on a table's index.
+    indexes: [{ columns: ["country", "handle"] }],
     rls: "admin-only"
 });
 

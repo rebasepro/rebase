@@ -26,6 +26,7 @@ import { ensureCollectionTables, type Queryable } from "../src/schema/ensure-col
 import { withPinnedPlannerWorld } from "../src/schema/render-outputs";
 import { assertWritableColumns } from "../src/services/collection-helpers";
 import { readCatalogueSchema } from "../src/schema/catalogue-schema";
+import { collectionIndexStatement } from "../src/schema/collection-index";
 import { parsePropertyFromServer, serializePropertyToServer } from "../src/data-transformer";
 import { drizzle } from "drizzle-orm/pglite";
 import {
@@ -429,5 +430,25 @@ describe("table features: a varchar/char length is the builder's `n`, not `.vali
         const [collection] = lowered([handles]);
         expect(collection.properties.handle).toMatchObject({ validation: { max: 20 } });
         expect(collection.properties.country).toMatchObject({ validation: { min: 2, max: 3 } });
+    });
+});
+
+describe("table features: an index without a `reason`", () => {
+    it("is planned, rendered in both files and created, with no reason required anywhere", async () => {
+        const plan = planOf([handles]);
+        const [index] = tableOf(plan, "handles").indexes;
+        expect(index).toMatchObject({ method: "btree", keys: [{ column: "country" }, { column: "handle" }] });
+        expect(index.reason).toBeUndefined();
+        expect(ddlOf([handles])).toContain(collectionIndexStatement(index));
+        expect(drizzleOf([handles])).toContain(`index("${index.indexName}").on(table.country.asc().nullsLast(), table.handle.asc().nullsLast())`);
+        const db = new PGlite();
+        try {
+            await db.waitReady;
+            await db.exec(ddlOf([handles]));
+            const { rows } = await db.query<{ indexname: string }>("SELECT indexname FROM pg_indexes WHERE tablename = 'handles'");
+            expect(rows.map(row => row.indexname)).toContain(index.indexName);
+        } finally {
+            await db.close();
+        }
     });
 });

@@ -420,6 +420,11 @@ describe("lowerTables — relations", () => {
             { on: ["author", { prop: "at", direction: "desc" }], include: ["author"], where: { prop: "author", op: "is not null" }, reason: "feed" }
         ]);
     });
+
+    it("lowers an index without a reason, which the planner reads off the table index as none", () => {
+        const notes = defineTable("notes", { columns: { id, body: col.text() }, indexes: [{ columns: ["body"] }], rls: "admin-only" });
+        expect(only([notes]).indexes).toEqual([{ on: ["body"], reason: "" }]);
+    });
 });
 
 describe("lowerTables — table keys", () => {
@@ -628,7 +633,6 @@ describe("lowerTables — refusals", () => {
         "has-many-order-by": () => [defineTable("t", { columns: { id }, relations: { posts: rel.hasMany(() => users, { orderBy: ["id", "asc"] }) }, rls: "admin-only" }), users],
         "belongs-to-unconstrained-derived": () => [defineTable("t", { columns: { id }, relations: { user: rel.belongsTo(() => users, { constraint: false, index: false }) }, rls: "admin-only" }), users],
         "belongs-to-unconstrained-index": () => [defineTable("t", { columns: { id, userId: col.uuid() }, relations: { user: rel.belongsTo(() => users, { constraint: false }) }, rls: "admin-only" }), users],
-        "index-without-reason": () => [defineTable("t", { columns: { id, v: col.text() }, indexes: [{ columns: ["v"] }], rls: "admin-only" })],
         "json-document-shape": () => [defineTable("t", { columns: { id, j: col.jsonb(json.string()) }, rls: "admin-only" })],
         "json-one-of-placement": () => [defineTable("t", { columns: { id, j: col.jsonb(json.object({ b: json.oneOf({ x: json.string() }) })) }, rls: "admin-only" })],
         "json-unknown-field": () => [defineTable("t", { columns: { id, j: col.jsonb(json.object({ u: json.unknown() })) }, rls: "admin-only" })],
