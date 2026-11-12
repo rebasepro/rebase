@@ -575,9 +575,14 @@ function columnTypeOf(col: TableColumn, context: TableContext, table: string): C
                 ? { kind: "numeric", precision: col.numeric_precision, scale: col.numeric_scale }
                 : { kind: "numeric", precision: col.numeric_precision };
         case "boolean": return { kind: "boolean" };
-        case "timestamp with time zone": return { kind: "timestamptz" };
+        // A declared fractional precision (`timestamptz(3)`, `time(0)`) is no
+        // builder's: kept as the type the database holds, so a push does not
+        // widen the column back to the default of 6.
+        case "timestamp with time zone":
+            return withPrecision(col) ?? { kind: "timestamptz" };
         case "date": return { kind: "date" };
-        case "time without time zone": return { kind: "time" };
+        case "time without time zone":
+            return withPrecision(col) ?? { kind: "time" };
         case "json": return { kind: "json" };
         case "jsonb": return { kind: "jsonb" };
         case "bytea": return { kind: "bytea" };
@@ -600,6 +605,11 @@ function columnTypeOf(col: TableColumn, context: TableContext, table: string): C
         default:
             return { kind: "other", sqlType: col.formatted_type ?? col.data_type };
     }
+}
+
+/** A temporal column with a declared precision, as `col.custom()` of the type the catalogue prints; `undefined` without one. */
+function withPrecision(col: TableColumn): ColumnType | undefined {
+    return col.formatted_type && /\(\d+\)/.test(col.formatted_type) ? { kind: "other", sqlType: col.formatted_type } : undefined;
 }
 
 /** `'text'::type` → `text`, unescaped. */

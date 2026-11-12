@@ -149,6 +149,14 @@ describe("a generated table", () => {
         expect(moduleOf(g, "hits")).toContain("ip: col.custom(\"inet\")");
         expect(moduleOf(g, "hits")).toContain("at: col.custom(\"timestamp(3) without time zone\")");
         expect(g.tables[0].notes).toEqual([]);
+        const precise = generate({ tables: [{ name: "ticks", columns: [
+            serialPk("ticks"),
+            column("ticks", "at", { data_type: "timestamp with time zone", udt_name: "timestamptz", formatted_type: "timestamp(3) with time zone" }),
+            column("ticks", "plain", { data_type: "timestamp with time zone", udt_name: "timestamptz", formatted_type: "timestamp with time zone" })
+        ] }] });
+        // A declared precision is kept; the default one is the builder's.
+        expect(moduleOf(precise, "ticks")).toContain("at: col.custom(\"timestamp(3) with time zone\")");
+        expect(moduleOf(precise, "ticks")).toContain("plain: col.timestamptz()");
         expect(moduleOf(g, "hits")).not.toContain("Not reproduced exactly");
     });
 

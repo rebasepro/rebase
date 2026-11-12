@@ -598,7 +598,7 @@ describe("reporting a statement that failed", () => {
     it("does not report the ORM wrapper as the reason", async () => {
         const client = failingClient(wrapped({ message: "some real reason", code: "42501" }));
 
-        const failure = await ensureCollectionTables(client, [posts]).catch((e: Error) => e.message);
+        const failure = await ensureCollectionTables(client, [posts]).then(() => "", (e: Error) => e.message);
 
         // `Failed query:` is the wrapper's own text. It named the statement,
         // which the thrown error appends itself, and nothing else — so it
@@ -606,7 +606,7 @@ describe("reporting a statement that failed", () => {
         expect(failure).not.toContain("Failed query:");
         expect(failure).toContain("some real reason");
         // Named once, by us, at the end.
-        expect(failure!.match(/CREATE TABLE/g)).toHaveLength(1);
+        expect(failure.match(/CREATE TABLE/g)).toHaveLength(1);
     });
 
     it("passes Postgres's detail and hint through", async () => {
