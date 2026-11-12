@@ -145,6 +145,29 @@ const SKIP_DIR_SEGMENTS = [
     "/docs/upgrading/"
 ];
 
+/**
+ * Dated audit and sweep records: what a system looked like on the day it was
+ * audited, and which bug classes were swept where.
+ *
+ * Same reason as CHANGELOG.md: a record of what was true then is not a stale
+ * reference. `docs/audits/06-history-and-audit-log.md` audited
+ * `packages/server-mongo/src/services/MongoHistoryService.ts` when that file
+ * existed; rewriting the path to a package that never held it would make the
+ * audit's findings point at nothing, and deleting the name would make it
+ * unreadable. `docs/bug-classes.md` is the same kind of log: each entry names the
+ * test that pinned a class at the time, in the package it lived in.
+ *
+ * Narrow on purpose: Markdown only, under a directory named `audits` inside a
+ * `docs` tree (`docs/audits/`, `saas/docs/imported-from-oss/audits/`), plus the
+ * one log file. `docs/audits/systems.json` is a gate input, not a record — a
+ * removed package named there is a real stale reference, and it is still scanned.
+ * A new audit written today should use today's names; it only earns the
+ * exemption by being a record, which the directory says.
+ */
+const AUDIT_RECORD = /(?:^|\/)docs\/(?:[^/]+\/)*audits\/[^/]+\.md$/;
+const HISTORY_LOGS = new Set(["docs/bug-classes.md"]);
+const isDatedRecord = (rel) => AUDIT_RECORD.test(rel) || HISTORY_LOGS.has(rel);
+
 const SKIP_FILES = new Set([
     "CHANGELOG.md",
     "upgrading.mdx",
@@ -198,7 +221,8 @@ function trackedFiles() {
         (f) =>
             !SKIP_FILES.has(f) &&
             !SKIP_FILES.has(path.basename(f)) &&
-            !SKIP_DIR_SEGMENTS.some((d) => f.includes(d))
+            !SKIP_DIR_SEGMENTS.some((d) => f.includes(d)) &&
+            !isDatedRecord(f)
     );
 }
 
